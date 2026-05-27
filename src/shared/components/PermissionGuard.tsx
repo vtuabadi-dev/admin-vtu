@@ -2,37 +2,35 @@
 
 import { useState, useEffect } from "react";
 import { ShieldAlert } from "lucide-react";
-import { getUserRole } from "@/services/mock/handlers";
 import { canAccessModule } from "@/shared/lib/rbac-utils";
-import type { PermissionCheck } from "@/shared/types";
+import type { PermissionAction } from "@/shared/types";
 
 interface PermissionGuardProps {
   module: string;
-  required?: "view" | "edit" | "delete" | "export";
+  required?: PermissionAction;
   children: React.ReactNode;
   fallback?: React.ReactNode;
 }
 
 export function PermissionGuard({ module, required = "view", children, fallback }: PermissionGuardProps) {
-  const [check, setCheck] = useState<PermissionCheck | null>(null);
+  const [allowed, setAllowed] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    getUserRole().then((role) => {
-      setCheck(canAccessModule(role, module));
-      setLoading(false);
-    });
-  }, [module]);
+    // Fetch real session dari Auth.js
+    fetch("/api/auth/session")
+      .then((res) => res.json())
+      .then((session) => {
+        const role = session?.user?.role || "jamaah";
+        const check = canAccessModule(role, module);
+        const actionKey = required as keyof typeof check;
+        setAllowed(!!check[actionKey]);
+      })
+      .catch(() => setAllowed(false))
+      .finally(() => setLoading(false));
+  }, [module, required]);
 
   if (loading) return null;
-
-  if (!check) return null;
-
-  const allowed =
-    required === "view" ? check.canView :
-    required === "edit" ? check.canEdit :
-    required === "delete" ? check.canDelete :
-    check.canExport;
 
   if (!allowed) {
     if (fallback) return <>{fallback}</>;
@@ -48,18 +46,4 @@ export function PermissionGuard({ module, required = "view", children, fallback 
   }
 
   return <>{children}</>;
-}
-
-export function usePermission(module: string) {
-  const [check, setCheck] = useState<PermissionCheck | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    getUserRole().then((role) => {
-      setCheck(canAccessModule(role, module));
-      setLoading(false);
-    });
-  }, [module]);
-
-  return { permission: check, loading };
 }

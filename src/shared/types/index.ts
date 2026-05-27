@@ -610,10 +610,26 @@ export type OperationalRole =
 
 export interface PermissionCheck {
   canView: boolean;
+  canCreate: boolean;
   canEdit: boolean;
-  canDelete: boolean;
+  canApprove: boolean;
   canExport: boolean;
+  canDelete: boolean;
 }
+
+export type PermissionAction = "view" | "create" | "edit" | "approve" | "export" | "delete";
+
+export type PermissionModule =
+  | "dokumen"
+  | "pembayaran"
+  | "manifest"
+  | "rooming"
+  | "keberangkatan"
+  | "jamaah"
+  | "sistem"
+  | "audit"
+  | "export"
+  | "backup";
 
 // ============================================================
 // SYSTEM: AUDIT TRAIL

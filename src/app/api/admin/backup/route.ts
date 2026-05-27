@@ -2,10 +2,12 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { auth } from "@/server/auth";
 import { runDatabaseBackup, runStorageBackup, listBackups } from "@/server/services/backup.service";
+import { checkServerPermission } from "@/shared/lib/rbac-utils";
 
 export async function GET() {
   const session = await auth();
-  if (!session?.user) return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
+  const perm = checkServerPermission(session, "backup", "view");
+  if (!perm.allowed) return NextResponse.json({ success: false, message: perm.reason }, { status: 403 });
 
   try {
     const backups = await listBackups();
@@ -17,9 +19,8 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   const session = await auth();
-  if (!session?.user || session.user.role === "jamaah") {
-    return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
-  }
+  const perm = checkServerPermission(session, "backup", "create");
+  if (!perm.allowed) return NextResponse.json({ success: false, message: perm.reason }, { status: 403 });
 
   try {
     const body = await request.json().catch(() => ({}));
