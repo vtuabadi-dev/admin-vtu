@@ -1,0 +1,51 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Next.js build
+.next/
+out/
+
+# Testing
+coverage/
+.vitest/
+*.test.ts
+*.test.tsx
+__tests__/
+__mocks__/
+
+# Development
+.env
+.env.local
+.env.development
+.env.development.local
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Docker
+Dockerfile
+.dockerignore
+docker-compose*.yml
+.docker/
+
+# Documentation
+README*.md
+DEPLOYMENT*.md
+docs/
+
+# Temp / Logs
+*.log
+tmp/
+temp/

@@ -1,0 +1,205 @@
+# ============================================================
+# TRAVEL OPERATIONAL SYSTEM — Docker Compose
+# ============================================================
+# Production deployment:
+#   docker compose up -d --build
+#
+# Update deployment:
+#   git pull
+#   docker compose up -d --build
+# ============================================================
+
+version: "3.9"
+
+services:
+  # ── Frontend / API (Next.js) ──────────────────────────────
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      cache_from:
+        - type=local,src=.docker/cache
+    container_name: vtu-frontend
+    restart: unless-stopped
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=${DATABASE_URL}
+      - REDIS_URL=${REDIS_URL}
+      - STORAGE_PATH=/storage
+    volumes:
+      # Persistent document & export storage
+      - storage_passports:/storage/passports
+      - storage_ktp:/storage/ktp
+      - storage_vaccines:/storage/vaccines
+      - storage_pasfoto:/storage/pasfoto
+      - storage_exports:/storage/exports
+      - storage_temp:/storage/temp
+      - storage_invoices:/storage/invoices
+      - storage_manifests:/storage/manifests
+    networks:
+      - vtu_network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  # ── PostgreSQL ────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: vtu-postgres
+    restart: unless-stopped
+    ports:
+      # Internal only — remove this line in production if frontend
+      # and postgres are on the same Docker network
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-vtu_operasional}
+      POSTGRES_USER: ${POSTGRES_USER:-vtu_admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - vtu_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-vtu_admin} -d ${POSTGRES_DB:-vtu_operasional}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # ── Redis ─────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: vtu-redis
+    restart: unless-stopped
+    ports:
+      # Internal only — remove this line in production
+      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
+    command: >
+      redis-server
+      --appendonly yes
+      --requirepass ${REDIS_PASSWORD}
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    networks:
+      - vtu_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "--no-auth-warning", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+
+  # ── DB Migration Init (runs once) ─────────────────────────
+  db-init:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: vtu-db-init
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=${DATABASE_URL}
+    command: >
+      sh -c "npx prisma migrate deploy && npx prisma db seed && echo 'Migrations complete'"
+    networks:
+      - vtu_network
+    depends_on:
+      postgres:
+        condition: service_healthy
+    deploy:
+      restart_policy:
+        condition: none
+
+  # ── Background Worker (BullMQ) ─────────────────────────────
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    container_name: vtu-worker
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=${DATABASE_URL}
+      - REDIS_URL=${REDIS_URL}
+      - STORAGE_PATH=/storage
+    volumes:
+      - storage_exports:/storage/exports
+      - storage_temp:/storage/temp
+    networks:
+      - vtu_network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    # Scale workers as needed:
+    # deploy:
+    #   replicas: 2
+
+# ── Volumes ─────────────────────────────────────────────────
+volumes:
+  # Database
+  pgdata:
+    name: vtu_pgdata
+    driver: local
+
+  # Redis
+  redis_data:
+    name: vtu_redis_data
+    driver: local
+
+  # Document Storage
+  storage_passports:
+    name: vtu_storage_passports
+    driver: local
+  storage_ktp:
+    name: vtu_storage_ktp
+    driver: local
+  storage_vaccines:
+    name: vtu_storage_vaccines
+    driver: local
+  storage_pasfoto:
+    name: vtu_storage_pasfoto
+    driver: local
+  storage_exports:
+    name: vtu_storage_exports
+    driver: local
+  storage_temp:
+    name: vtu_storage_temp
+    driver: local
+  storage_invoices:
+    name: vtu_storage_invoices
+    driver: local
+  storage_manifests:
+    name: vtu_storage_manifests
+    driver: local
+
+# ── Network ─────────────────────────────────────────────────
+networks:
+  vtu_network:
+    name: vtu_network
+    driver: bridge

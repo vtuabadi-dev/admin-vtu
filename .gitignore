@@ -1,0 +1,44 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Next.js build
+.next/
+out/
+
+# Production build
+build/
+dist/
+
+# Environment
+.env
+.env.local
+.env.production
+.env.production.local
+.env.development.local
+
+# Testing
+coverage/
+.vitest/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Docker
+.docker/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Temp
+tmp/
+temp/

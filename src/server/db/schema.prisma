@@ -1,0 +1,732 @@
+// ============================================================
+// TRAVEL OPERATIONAL SYSTEM — Prisma Schema
+// PostgreSQL 16 — Group-centric architecture
+// ============================================================
+// This schema preserves:
+//   - Registration group → Jamaah hierarchy
+//   - Split invoice grouping (A/B/C splits)
+//   - Hotel combination manifest grouping
+//   - Rooming with family/mix/quad/gender logic
+//   - Dynamic manifest numbering
+//   - Document OCR lifecycle
+//   - Immutable audit trail
+//   - Multi-tenant readiness (tenantId columns)
+// ============================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================
+// ENUMS — match domain types exactly
+// ============================================================
+
+enum OperationalRole {
+  super_admin
+  admin_operasional
+  admin_pembayaran
+  admin_manifest
+  admin_dokumen
+  tour_leader
+  jamaah
+}
+
+enum JenisKelamin {
+  L
+  P
+}
+
+enum DokumenJenis {
+  paspor
+  pas_foto
+  vaksin
+  ktp
+  kk
+  akta
+}
+
+enum StatusDokumen {
+  lengkap
+  kurang
+  revisi
+  pending
+  processing
+  verified
+  rejected
+}
+
+enum DokumenDataStatus {
+  valid
+  pending
+  manual_edit
+  ocr_error
+}
+
+enum DokumenFileStatus {
+  valid
+  blurry
+  revisi
+  rejected
+}
+
+enum StatusJamaah {
+  registered
+  dokumen_upload
+  dokumen_verified
+  pembayaran_pending
+  lunas
+  ready
+  berangkat
+  batal
+}
+
+enum StatusKeberangkatan {
+  scheduled
+  preparing
+  ready
+  departed
+  completed
+  cancelled
+}
+
+enum StatusPembayaran {
+  draft
+  dp
+  cicilan
+  hampir_lunas
+  lunas
+  overdue
+}
+
+enum TipeInvoice {
+  dp
+  cicilan
+  pelunasan
+  tambahan
+}
+
+enum StatusInvoice {
+  unpaid
+  partial
+  paid
+  overdue
+  cancelled
+}
+
+enum MetodePembayaran {
+  transfer
+  cash
+  virtual_account
+  qris
+}
+
+enum SumberPembayaran {
+  admin
+  jamaah
+}
+
+enum StatusItemInvoice {
+  active
+  cancelled
+  completed
+}
+
+enum TipeKamar {
+  single
+  double
+  triple
+  quad
+}
+
+enum StatusManifest {
+  draft
+  final
+  submitted
+}
+
+enum StatusRooming {
+  draft
+  final
+}
+
+enum ReminderTipe {
+  dokumen
+  pembayaran
+}
+
+enum ReminderStatus {
+  sent
+  read
+  responded
+}
+
+enum GroupStatus {
+  active
+  completed
+  cancelled
+}
+
+enum PembayaranVerificationStatus {
+  pending
+  verified
+  rejected
+}
+
+enum NotificationType {
+  info
+  success
+  warning
+  error
+}
+
+enum NotificationCategory {
+  dokumen
+  pembayaran
+  manifest
+  rooming
+  sistem
+  deadline
+  keberangkatan
+}
+
+enum AuditModule {
+  dokumen
+  pembayaran
+  manifest
+  rooming
+  keberangkatan
+  jamaah
+  sistem
+}
+
+// ============================================================
+// AUTH — Users
+// ============================================================
+
+model User {
+  id           String          @id @default(cuid())
+  name         String
+  email        String          @unique
+  passwordHash String
+  role         OperationalRole @default(jamaah)
+  tenantId     String?
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+
+  // Relations — user is referenced by name/role in audit, not by FK relation
+  notifications Notification[]
+  @@map("users")
+}
+
+// ============================================================
+// CORE: Keberangkatan (Package / Departure)
+// ============================================================
+
+model Keberangkatan {
+  id               String               @id @default(cuid())
+  kode             String               @unique
+  namaPaket        String
+  hargaPaket       Int
+  tanggalBerangkat DateTime
+  tanggalPulang    DateTime
+  maskapai         String
+  nomorPenerbangan String
+  hotelMekkah      String
+  hotelMadinah     String
+  hotelOptions     Json                 // { hotelMekkah: string; hotelMadinah: string }[]
+  status           StatusKeberangkatan  @default(scheduled)
+  kuota            Int
+  terisi           Int                  @default(0)
+  tenantId         String?
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+
+  // Relations
+  groups           RegistrationGroup[]
+  manifests        Manifest[]
+  roomings         Rooming[]
+  activityEvents   ActivityEvent[]
+  autoDeadlines    AutoDeadline[]
+
+  @@index([status])
+  @@index([tanggalBerangkat])
+  @@map("keberangkatan")
+}
+
+// ============================================================
+// CORE: Registration Group (GRP-YYYY-NNNNN)
+// ============================================================
+
+model RegistrationGroup {
+  id                   String      @id @default(cuid())
+  kodeRegistrasi       String      @unique
+  namaGroup            String
+  ketuaGroupId         String      // FK to Jamaah who is head of group
+  paketKeberangkatanId String
+  jumlahAnggota        Int
+  totalTagihan         Int
+  totalPembayaran      Int         @default(0)
+  sisaPembayaran       Int
+  status               GroupStatus @default(active)
+  tenantId             String?
+  createdAt            DateTime    @default(now())
+  updatedAt            DateTime    @updatedAt
+
+  // Relations
+  keberangkatan       Keberangkatan       @relation(fields: [paketKeberangkatanId], references: [id])
+  anggota             Jamaah[]            // jamaah with this groupId
+  invoices            Invoice[]
+  pembayaran          Pembayaran[]
+  reminders           Reminder[]
+  invoiceSplitConfig  InvoiceSplitConfig?
+  ketuaGroup          Jamaah              @relation("KetuaGroup", fields: [ketuaGroupId], references: [id])
+
+  @@index([paketKeberangkatanId])
+  @@index([status])
+  @@map("registration_groups")
+}
+
+// ============================================================
+// CORE: Jamaah (Individual Pilgrim)
+// ============================================================
+
+model Jamaah {
+  id                String       @id @default(cuid())
+  registrationId    String       @unique // GRP-YYYY-NNNNN-N
+  groupId           String
+  nomorPeserta      String       @unique
+  namaLengkap       String
+  namaAyah          String
+  jenisKelamin      JenisKelamin
+  tempatLahir       String
+  tanggalLahir      DateTime
+  nik               String
+  nomorPaspor       String
+  masaBerlakuPaspor DateTime
+  nomorTelepon      String
+  email             String
+  alamat            String
+  provinsi          String
+  kota              String
+  kecamatan         String
+  kelurahan         String
+  tandaTanganDigital String?    // Base64 encoded
+  syaratDisetujui   Boolean     @default(false)
+  status            StatusJamaah @default(registered)
+  hotelMekkah       String
+  hotelMadinah      String
+  tenantId          String?
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  // Relations
+  group              RegistrationGroup    @relation(fields: [groupId], references: [id])
+  dokumen            DokumenItem[]
+  groupKetuaOf       RegistrationGroup[]  @relation("KetuaGroup")
+  manifestRows       ManifestRow[]
+  penghuniKamar      PenghuniKamar[]
+  alokasiPembayaran  AlokasiPembayaran[]
+
+  @@index([groupId])
+  @@index([status])
+  @@index([hotelMekkah, hotelMadinah])
+  @@map("jamaah")
+}
+
+// ============================================================
+// DOCUMENTS — Per-Jamaah document lifecycle
+// ============================================================
+
+model DokumenItem {
+  id            String            @id @default(cuid())
+  jamaahId      String
+  jenis         DokumenJenis
+  wajib         Boolean
+  status        StatusDokumen     @default(pending)
+  fileUrl       String?
+  catatan       String?
+  uploadedAt    DateTime?
+  verifiedAt    DateTime?
+  verifiedBy    String?
+  dataStatus    DokumenDataStatus?
+  fileStatus    DokumenFileStatus?
+  manualData    Json?             // { namaLengkap?, nik?, nomorPaspor?, tanggalLahir? }
+  ocrData       Json?             // OcrData: { namaLengkap?, nik?, nomorPaspor?, ... confidence, rawText? }
+  ocrRetryCount Int               @default(0)
+  qualityCheck  Json?             // { isBlurry?, isReadable?, checkedAt? }
+  tenantId      String?
+
+  // Relations
+  jamaah Jamaah @relation(fields: [jamaahId], references: [id], onDelete: Cascade)
+
+  @@index([jamaahId])
+  @@index([status])
+  @@index([jenis])
+  @@map("dokumen_items")
+}
+
+// ============================================================
+// INVOICES — Group-centric with per-member optional targeting
+// ============================================================
+
+model Invoice {
+  id           String        @id @default(cuid())
+  nomorInvoice String        @unique
+  groupId      String
+  jamaahId     String?       // null = group invoice; set = targeted to specific member
+  tipe         TipeInvoice
+  jumlah       Int
+  sisaTagihan  Int
+  status       StatusInvoice @default(unpaid)
+  jatuhTempo   DateTime
+  tenantId     String?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  // Relations
+  group      RegistrationGroup @relation(fields: [groupId], references: [id])
+  items      InvoiceItem[]
+  pembayaran Pembayaran[]
+  reminders  Reminder[]
+
+  @@index([groupId])
+  @@index([status])
+  @@index([jatuhTempo])
+  @@map("invoices")
+}
+
+model InvoiceItem {
+  id                String            @id @default(cuid())
+  invoiceId         String
+  kategori          String            // "Paket Umroh", "Perlengkapan", "Handling", "Administrasi"
+  deskripsi         String
+  qty               Int
+  hargaSatuan       Int
+  jumlah            Int               // auto-calculated: qty * hargaSatuan
+  status            StatusItemInvoice @default(active)
+  cancelledAt       DateTime?
+  cancelledBy       String?
+  cancellationReason String?
+
+  // Relations
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@index([invoiceId])
+  @@map("invoice_items")
+}
+
+// ============================================================
+// INVOICE SPLIT — Permanent group split structure (A/B/C)
+// ============================================================
+
+model InvoiceSplitConfig {
+  id        String   @id @default(cuid())
+  groupId   String   @unique // one split config per group
+  splits    Json     // InvoiceSplitItem[]: { id, label, anggotaIds[] }
+  createdAt DateTime @default(now())
+
+  // Relations
+  group RegistrationGroup @relation(fields: [groupId], references: [id])
+
+  @@map("invoice_split_configs")
+}
+
+// ============================================================
+// PAYMENTS — Always against a Registration Group
+// ============================================================
+
+model Pembayaran {
+  id              String                        @id @default(cuid())
+  groupId         String
+  invoiceId       String?
+  jumlah          Int
+  metode          MetodePembayaran
+  tanggal         DateTime
+  buktiUrl        String?
+  status          PembayaranVerificationStatus  @default(pending)
+  sumber          SumberPembayaran              @default(admin)
+  verifiedBy      String?
+  alasanReject    String?
+  reviewedBy      String?
+  reviewedAt      DateTime?
+  bankPengirim    String?
+  nomorRekening   String?
+  catatan         String?
+  ocrData         Json?                         // { nominal?, bank?, tanggal?, confidence? }
+  tenantId        String?
+  createdAt       DateTime                      @default(now())
+  updatedAt       DateTime                      @updatedAt
+
+  // Relations
+  group   RegistrationGroup @relation(fields: [groupId], references: [id])
+  invoice Invoice?          @relation(fields: [invoiceId], references: [id])
+  alokasi AlokasiPembayaran[]
+
+  @@index([groupId])
+  @@index([status])
+  @@index([invoiceId])
+  @@map("pembayaran")
+}
+
+model AlokasiPembayaran {
+  id           String @id @default(cuid())
+  pembayaranId String
+  jamaahId     String
+  namaJamaah   String
+  jumlah       Int
+
+  // Relations
+  pembayaran Pembayaran @relation(fields: [pembayaranId], references: [id], onDelete: Cascade)
+  jamaah     Jamaah     @relation(fields: [jamaahId], references: [id])
+
+  @@index([pembayaranId])
+  @@index([jamaahId])
+  @@map("alokasi_pembayaran")
+}
+
+// ============================================================
+// MANIFEST — Generated per Keberangkatan + Hotel Combination
+// ============================================================
+
+model Manifest {
+  id               String         @id @default(cuid())
+  keberangkatanId  String
+  kode             String         @unique // MAN/UMRH-JUN/001 etc — dynamically numbered
+  namaManifest     String
+  templateId       String?
+  hotelMekkah      String?        // Set when manifest is split by hotel combination
+  hotelMadinah     String?        // Set when manifest is split by hotel combination
+  status           StatusManifest @default(draft)
+  tenantId         String?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  // Relations
+  keberangkatan Keberangkatan @relation(fields: [keberangkatanId], references: [id])
+  rows          ManifestRow[]
+
+  @@index([keberangkatanId])
+  @@index([hotelMekkah, hotelMadinah])
+  @@index([status])
+  @@map("manifests")
+}
+
+model ManifestRow {
+  id          String  @id @default(cuid())
+  manifestId  String
+  nomorUrut   Int
+  jamaahId    String
+  nomorPaspor String
+  namaLengkap String
+  tempatLahir String
+  tanggalLahir String
+  nomorKursi  String?
+  nomorKamar  String?
+  catatan     String?
+
+  // Relations
+  manifest Manifest @relation(fields: [manifestId], references: [id], onDelete: Cascade)
+  jamaah   Jamaah   @relation(fields: [jamaahId], references: [id])
+
+  @@index([manifestId])
+  @@index([jamaahId])
+  @@unique([manifestId, nomorUrut])
+  @@map("manifest_rows")
+}
+
+// ============================================================
+// ROOMING — Room assignment per Keberangkatan + Hotel Combo
+// ============================================================
+
+model Rooming {
+  id               String        @id @default(cuid())
+  keberangkatanId  String
+  hotelMekkah      String
+  hotelMadinah     String
+  hotelNama        String        // Display label: "Safwa — Taiba"
+  status           StatusRooming @default(draft)
+  tenantId         String?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  // Relations
+  keberangkatan Keberangkatan @relation(fields: [keberangkatanId], references: [id])
+  kamar         Kamar[]
+
+  @@index([keberangkatanId])
+  @@index([hotelMekkah, hotelMadinah])
+  @@map("roomings")
+}
+
+model Kamar {
+  id         String    @id @default(cuid())
+  roomingId  String
+  nomorKamar String
+  tipe       TipeKamar
+  lantai     Int
+  mixLabel   String?   // "Quad Mix Male 1", etc.
+
+  // Relations
+  rooming  Rooming         @relation(fields: [roomingId], references: [id], onDelete: Cascade)
+  penghuni PenghuniKamar[]
+
+  @@index([roomingId])
+  @@map("kamar")
+}
+
+model PenghuniKamar {
+  id            String       @id @default(cuid())
+  kamarId       String
+  jamaahId      String
+  namaLengkap   String
+  jenisKelamin  JenisKelamin
+  isPasangan    Boolean      @default(false)
+
+  // Relations
+  kamar  Kamar  @relation(fields: [kamarId], references: [id], onDelete: Cascade)
+  jamaah Jamaah @relation(fields: [jamaahId], references: [id])
+
+  @@index([kamarId])
+  @@index([jamaahId])
+  @@map("penghuni_kamar")
+}
+
+// ============================================================
+// REMINDERS — Group-aware, optionally per-jamaah
+// ============================================================
+
+model Reminder {
+  id         String         @id @default(cuid())
+  groupId    String
+  jamaahId   String?
+  invoiceId  String?
+  tipe       ReminderTipe
+  pesan      String
+  dikirimPada DateTime
+  status     ReminderStatus @default(sent)
+  tenantId   String?
+
+  // Relations
+  group   RegistrationGroup @relation(fields: [groupId], references: [id])
+  invoice Invoice?          @relation(fields: [invoiceId], references: [id])
+
+  @@index([groupId])
+  @@index([status])
+  @@index([dikirimPada])
+  @@map("reminders")
+}
+
+// ============================================================
+// NOTIFICATIONS — Per-user in-app notifications
+// ============================================================
+
+model Notification {
+  id        String               @id @default(cuid())
+  userId    String
+  type      NotificationType
+  category  NotificationCategory
+  title     String
+  message   String
+  link      String?
+  read      Boolean              @default(false)
+  readAt    DateTime?
+  createdAt DateTime             @default(now())
+
+  // Relations
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId, read])
+  @@index([category])
+  @@map("notifications")
+}
+
+// ============================================================
+// AUDIT TRAIL — Immutable operational change log
+// ============================================================
+
+model AuditEntry {
+  id         String      @id @default(cuid())
+  timestamp  DateTime    @default(now())
+  userId     String
+  userName   String
+  role       OperationalRole
+  module     AuditModule
+  action     String
+  detail     String
+  before     String?     // JSON string of previous value
+  after      String?     // JSON string of new value
+  entityId   String?
+  entityType String?
+  tenantId   String?
+
+  @@index([timestamp])
+  @@index([module])
+  @@index([entityId, entityType])
+  @@index([userId])
+  @@map("audit_entries")
+}
+
+// ============================================================
+// ACTIVITY EVENTS — Per-keberangkatan operational timeline
+// ============================================================
+
+model ActivityEvent {
+  id               String   @id @default(cuid())
+  keberangkatanId  String
+  timestamp        DateTime @default(now())
+  type             String   // "warning" | "info" | "success" | "error"
+  message          String
+  module           String
+  triggeredBy      String?
+
+  // Relations
+  keberangkatan Keberangkatan @relation(fields: [keberangkatanId], references: [id])
+
+  @@index([keberangkatanId])
+  @@index([timestamp])
+  @@map("activity_events")
+}
+
+// ============================================================
+// AUTO DEADLINES — Per-keberangkatan deadline tracking
+// ============================================================
+
+model AutoDeadline {
+  id               String   @id @default(cuid())
+  keberangkatanId  String
+  label            String
+  deadlineDate     DateTime
+  type             String   // "pelunasan" | "dokumen" | "manifest" | "rooming" | "finalisasi"
+  passed           Boolean  @default(false)
+  warningDays      Int
+
+  // Relations
+  keberangkatan Keberangkatan @relation(fields: [keberangkatanId], references: [id])
+
+  @@index([keberangkatanId])
+  @@index([deadlineDate])
+  @@map("auto_deadlines")
+}
+
+// ============================================================
+// BACKUP RECORDS — Metadata for database/storage backups
+// ============================================================
+
+model BackupRecord {
+  id        String   @id @default(cuid())
+  type      String   // "full" | "schema" | "data" | "storage"
+  filePath  String
+  sizeBytes Int      @default(0)
+  checksum  String?
+  status    String   @default("completed") // "running" | "completed" | "failed"
+  createdAt DateTime @default(now())
+  createdBy String?
+
+  @@index([createdAt])
+  @@map("backup_records")
+}

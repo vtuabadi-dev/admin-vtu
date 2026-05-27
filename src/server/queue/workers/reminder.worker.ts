@@ -1,0 +1,35 @@
+import { Worker } from "bullmq";
+import { connectionOptions } from "../connection";
+import type { PaymentReminderJob } from "@/services/queue/types";
+
+const worker = new Worker(
+  "payment-reminder",
+  async (job) => {
+    const data = job.data as PaymentReminderJob["data"];
+    console.log(`[Reminder Worker] Sending ${data.reminderType} reminder via ${data.channel} for invoice ${data.invoiceId}`);
+
+    // TODO: Integrasi dengan email/WhatsApp gateway
+    // await sendReminder(data);
+
+    await job.updateProgress({ current: 1, total: 1, percent: 100, label: "Reminder dispatched" });
+
+    return { success: true, message: `Reminder ${data.reminderType} sent for invoice ${data.invoiceId}` };
+  },
+  {
+    connection: connectionOptions,
+    concurrency: 5,
+    autorun: true,
+    removeOnComplete: { count: 2000 },
+    removeOnFail: { count: 500 },
+  }
+);
+
+worker.on("completed", (job) => {
+  console.log(`[Reminder Worker] Job ${job.id} completed`);
+});
+
+worker.on("failed", (job, err) => {
+  console.error(`[Reminder Worker] Job ${job?.id} failed:`, err.message);
+});
+
+export default worker;
