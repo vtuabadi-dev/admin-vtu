@@ -39,6 +39,9 @@ Thumbs.db
 *.log
 npm-debug.log*
 
+# Runtime storage
+storage/
+
 # Temp
 tmp/
 temp/
