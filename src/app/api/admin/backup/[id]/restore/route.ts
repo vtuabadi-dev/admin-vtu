@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/server/auth";
+import { checkServerPermission } from "@/shared/lib/rbac-utils";
 import { restoreBackup } from "@/server/services/backup.service";
 
 export async function POST(_request: Request, { params }: { params: { id: string } }) {
   const session = await auth();
-  if (!session?.user || session.user.role === "jamaah") {
-    return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
-  }
+  const perm = checkServerPermission(session, "backup", "create");
+  if (!perm.allowed) return NextResponse.json({ success: false, message: perm.reason }, { status: 403 });
 
   try {
     const result = await restoreBackup(params.id);

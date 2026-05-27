@@ -9,7 +9,7 @@ const worker = new Worker(
     const count = data.targetJamaahIds.length;
     console.log(`[Notification Worker] Dispatching "${data.type}" notification to ${count} recipients`);
 
-    // TODO: Push notification / in-app notification delivery
+    // Push/in-app notification delivery stub
     for (let i = 0; i < count; i++) {
       await job.updateProgress({ current: i + 1, total: count, percent: Math.round(((i + 1) / count) * 100), label: `Notified ${i + 1}/${count}` });
     }

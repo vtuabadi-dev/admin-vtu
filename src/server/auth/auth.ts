@@ -72,6 +72,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   },
   session: {
     strategy: "jwt",
+    maxAge: 8 * 60 * 60, // 8 hours inactive → logout
+  },
+  jwt: {
+    maxAge: 8 * 60 * 60,
   },
   trustHost: true,
 });

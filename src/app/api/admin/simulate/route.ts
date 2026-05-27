@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { auth } from "@/server/auth";
+import { checkServerPermission } from "@/shared/lib/rbac-utils";
 
 // Dev/QA simulation endpoint — advance date, generate overdue, random uploads, process payments
 export async function POST(request: NextRequest) {
   const session = await auth();
-  if (!session?.user || session.user.role === "jamaah") {
-    return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
-  }
+  const perm = checkServerPermission(session, "sistem", "create");
+  if (!perm.allowed) return NextResponse.json({ success: false, message: perm.reason }, { status: 403 });
 
   if (process.env.NODE_ENV === "production") {
     return NextResponse.json({ success: false, message: "Simulation not available in production" }, { status: 403 });

@@ -6,11 +6,7 @@ const worker = new Worker(
   "payment-reminder",
   async (job) => {
     const data = job.data as PaymentReminderJob["data"];
-    console.log(`[Reminder Worker] Sending ${data.reminderType} reminder via ${data.channel} for invoice ${data.invoiceId}`);
-
-    // TODO: Integrasi dengan email/WhatsApp gateway
-    // await sendReminder(data);
-
+    // Email/WhatsApp gateway stub — integrate with external provider here
     await job.updateProgress({ current: 1, total: 1, percent: 100, label: "Reminder dispatched" });
 
     return { success: true, message: `Reminder ${data.reminderType} sent for invoice ${data.invoiceId}` };

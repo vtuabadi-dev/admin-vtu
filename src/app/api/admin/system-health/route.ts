@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/server/auth";
+import { checkServerPermission } from "@/shared/lib/rbac-utils";
 import { getMetrics } from "@/server/lib/metrics";
 
 export async function GET() {
   const session = await auth();
-  if (!session?.user) return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
+  const perm = checkServerPermission(session, "sistem", "view");
+  if (!perm.allowed) return NextResponse.json({ success: false, message: perm.reason }, { status: 403 });
 
   const health: Record<string, unknown> = {
     status: "healthy",

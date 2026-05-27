@@ -13,8 +13,7 @@ const worker = new Worker(
       label: `Format: ${data.format}, includeUnverified: ${data.includeUnverified}`,
     });
 
-    // TODO: Real manifest generation — panggil ManifestService
-    // const result = await manifestService.generate(data.packageId, data.format);
+    // Manifest generation stub — call ManifestService.generate() here
 
     return { success: true, message: `Manifest ${data.format} generated for ${data.packageId}` };
   },
