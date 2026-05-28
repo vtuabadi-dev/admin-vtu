@@ -31,8 +31,8 @@ docker compose version
 ## 2. Clone & Konfigurasi
 
 ```bash
-# Clone repository
-git clone <repo-url> /opt/vtu-operasional
+# Clone repository (private)
+git clone https://github.com/abadivtu-dev/vtu-operasional.git /opt/vtu-operasional
 cd /opt/vtu-operasional
 
 # Buat file .env dari template
@@ -182,7 +182,26 @@ docker run --rm \
 5. **Websocket Support**: Enable
 6. **SSL**: Request via Let's Encrypt
 
-### Atau dengan Caddy:
+### Nginx (recommended)
+
+Template sudah disediakan di `deploy/nginx.conf`. Setup:
+
+```bash
+sudo cp deploy/nginx.conf /etc/nginx/sites-available/vtu
+sudo ln -s /etc/nginx/sites-available/vtu /etc/nginx/sites-enabled/
+sudo nginx -t && sudo systemctl reload nginx
+```
+
+File tersebut sudah include:
+- HTTP → HTTPS redirect
+- WebSocket upgrade (BullMQ dashboard)
+- Upload size limit (10MB)
+- Rate limiting (login 5/menit, API 30/menit)
+- Security headers
+- Gzip compression
+- Let's Encrypt ready
+
+### Caddy (alternatif)
 
 ```caddyfile
 vtu.example.com {
@@ -287,3 +306,43 @@ Saat fitur-fitur ini diimplementasikan, struktur Docker TIDAK perlu diubah — c
 - [ ] Backup volume sudah dijadwalkan (cron harian)
 - [ ] Firewall hanya membuka port 80/443
 - [ ] Log rotation sudah dikonfigurasi
+
+---
+
+## 15. Automated Reminder Scheduler
+
+Scheduler untuk pengingat pembayaran otomatis. Setup cron:
+
+```bash
+# Jalankan setiap jam 9 pagi
+crontab -e
+0 9 * * * curl -X POST http://localhost:3000/api/admin/scheduler
+```
+
+Ini akan otomatis:
+- Kirim H-7 reminder ke invoice yang jatuh tempo 7 hari lagi
+- Kirim H-3 reminder ke invoice yang jatuh tempo 3 hari lagi
+- Tandai invoice overdue dan kirim peringatan
+
+---
+
+## 16. Deploy Directory Structure
+
+```
+deploy/
+  nginx.conf       # Nginx reverse proxy config
+  checklist.md     # Pre-deployment validation checklist
+```
+
+Gunakan checklist sebelum deploy pertama kali dan setiap major update.
+
+---
+
+## 17. Branch Workflow
+
+```
+main     → production (VPS deploy)
+dev      → active development
+feature/* → feature work (merge ke dev)
+hotfix/*  → emergency fix (merge ke main + dev)
+```
