@@ -74,7 +74,10 @@ export async function runStorageBackup(): Promise<BackupRecord> {
   await fs.mkdir(path.dirname(tarFile), { recursive: true });
 
   try {
-    await execAsync(`tar -czf "${tarFile}" -C "${STORAGE_ROOT}" dokumen exports 2>/dev/null || echo "no files to backup"`, {
+    // Back up all storage subdirectories
+    const dirs = ["passports", "ktp", "vaccines", "pasfoto", "exports", "invoices", "manifests", "dokumen"];
+    const dirArgs = dirs.join(" ");
+    await execAsync(`tar -czf "${tarFile}" -C "${STORAGE_ROOT}" ${dirArgs} 2>/dev/null || echo "no files to backup"`, {
       timeout: 600000,
     });
 
@@ -98,15 +101,19 @@ export async function listBackups(): Promise<BackupRecord[]> {
   const storage = getStorageAdapter();
   const files = await storage.list("backups/");
   return files.map((f) => {
-    const name = path.basename(f.path, ".sql.gz");
-    const [type, ...timestampParts] = name.split("-");
-    return {
-      id: name,
-      type: type as "full" | "schema" | "data",
-      timestamp: timestampParts.join("-"),
-      filePath: f.path,
-      sizeBytes: f.size,
-    };
+    const name = path.basename(f.path, ".sql.gz").replace(/\.tar\.gz$/, "");
+    // Expected format: db-{type}-{timestamp} or storage-{timestamp}
+    const match = name.match(/^(db|storage)-(\w+)-(.+)$/);
+    if (match) {
+      return {
+        id: name,
+        type: (match[2] === "full" || match[2] === "schema" || match[2] === "data" ? match[2] : "full") as "full" | "schema" | "data",
+        timestamp: match[3]!,
+        filePath: f.path,
+        sizeBytes: f.size,
+      };
+    }
+    return { id: name, type: "full", timestamp: "", filePath: f.path, sizeBytes: f.size };
   });
 }
 

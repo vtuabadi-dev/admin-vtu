@@ -6,7 +6,7 @@ import { getStorageAdapter, exportFilePath } from "@/server/storage";
 export type ExportFormat = "csv" | "xlsx" | "pdf";
 export type ExportType = "manifest" | "rooming" | "invoice" | "payment" | "jamaah" | "dokumen";
 
-interface ExportRequest {
+export interface ExportRequest {
   id: string;
   format: ExportFormat;
   exportType: ExportType;
@@ -14,7 +14,7 @@ interface ExportRequest {
   filters?: Record<string, string>;
 }
 
-interface ExportResult {
+export interface ExportResult {
   fileUrl: string;
   fileName: string;
   format: ExportFormat;

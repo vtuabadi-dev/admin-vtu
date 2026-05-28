@@ -16,6 +16,9 @@ WORKDIR /app
 # Copy package files only (layer cache)
 COPY package.json package-lock.json* yarn.lock* pnpm-lock.yaml* ./
 
+# Copy Prisma schema so prisma generate has the full schema during postinstall
+COPY prisma/ ./prisma/
+
 # Install production deps first, then dev deps for build
 RUN \
   if [ -f yarn.lock ]; then yarn --frozen-lockfile; \
@@ -45,19 +48,23 @@ RUN \
   fi
 
 # ---- Stage 3: Runner ----
-FROM node:22-alpine AS runner
-RUN apk add --no-cache tini curl
+FROM node:22-slim AS runner
+RUN apt-get update && apt-get install -y --no-install-recommends tini curl postgresql-client \
+  && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
 # Create non-root user
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 nextjs
+RUN groupadd --system --gid 1001 nodejs \
+  && useradd --system --uid 1001 --gid nodejs --create-home nextjs
 
 # Copy standalone output
 COPY --from=builder /app/public ./public
+
+# Copy Prisma schema and migrations (needed by db-init service)
+COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
 
 # Copy the standalone build — Next.js places it here
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
@@ -80,7 +87,7 @@ ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
 # Use tini as init system for proper signal handling
-ENTRYPOINT ["/sbin/tini", "--"]
+ENTRYPOINT ["/usr/bin/tini", "--"]
 
 # Start the Next.js server
 CMD ["node", "server.js"]

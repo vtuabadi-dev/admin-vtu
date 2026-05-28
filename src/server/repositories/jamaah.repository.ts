@@ -1,8 +1,7 @@
 import { prisma } from "@/server/db/client";
+import { dokumenRepo } from "./dokumen.repository";
 import type {
   Jamaah,
-  DokumenItem,
-  OcrData,
   StatusJamaah,
   ReadinessLevel,
   JamaahReadinessResult,
@@ -35,32 +34,12 @@ function mapJamaah(row: any): Jamaah {
     status: row.status as StatusJamaah,
     hotelMekkah: row.hotelMekkah,
     hotelMadinah: row.hotelMadinah,
-    dokumen: (row.dokumen ?? []).map(mapDokumen),
+    dokumen: (row.dokumen ?? []).map(dokumenRepo.mapDokumen),
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
 }
 
-function mapDokumen(doc: any): DokumenItem {
-  return {
-    id: doc.id,
-    jamaahId: doc.jamaahId,
-    jenis: doc.jenis,
-    wajib: doc.wajib,
-    status: doc.status,
-    fileUrl: doc.fileUrl ?? undefined,
-    ocrData: doc.ocrData as OcrData | undefined,
-    catatan: doc.catatan ?? undefined,
-    uploadedAt: doc.uploadedAt?.toISOString(),
-    verifiedAt: doc.verifiedAt?.toISOString(),
-    verifiedBy: doc.verifiedBy ?? undefined,
-    dataStatus: (doc.dataStatus as DokumenItem["dataStatus"]) ?? undefined,
-    fileStatus: (doc.fileStatus as DokumenItem["fileStatus"]) ?? undefined,
-    manualData: doc.manualData as DokumenItem["manualData"] | undefined,
-    ocrRetryCount: doc.ocrRetryCount ?? 0,
-    qualityCheck: doc.qualityCheck as DokumenItem["qualityCheck"] | undefined,
-  };
-}
 
 // ────────────────────────────────────────────────────────────
 // Queries
@@ -92,6 +71,11 @@ export const jamaahRepo = {
 
   async findByRegistrationId(registrationId: string) {
     const row = await prisma.jamaah.findUnique({ where: { registrationId }, include: { dokumen: true } });
+    return row ? mapJamaah(row) : null;
+  },
+
+  async findByUserId(userId: string) {
+    const row = await prisma.jamaah.findFirst({ where: { userId }, include: { dokumen: true } });
     return row ? mapJamaah(row) : null;
   },
 
@@ -170,7 +154,7 @@ export const jamaahRepo = {
     return rows.map((j) => ({
       jamaahId: j.id,
       namaLengkap: j.namaLengkap,
-      dokumen: j.dokumen.map(mapDokumen),
+      dokumen: j.dokumen.map(dokumenRepo.mapDokumen),
     }));
   },
 

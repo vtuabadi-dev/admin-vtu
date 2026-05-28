@@ -16,13 +16,6 @@ import { Select } from "@/shared/components/ui/Select";
 import { Badge, StatusBadge } from "@/shared/components/ui/Badge";
 import { formatDateShort, cn } from "@/shared/lib/utils";
 import { getHotelCombinations, generateHotelLabel } from "@/shared/lib/hotel-utils";
-import {
-  getRoomingList,
-  getRoomingByKeberangkatan,
-  getKeberangkatanList,
-  getJamaahList,
-} from "@/services/mock/handlers";
-import { mockRoomings } from "@/services/mock/data";
 import type { Rooming, Kamar, PenghuniKamar, Keberangkatan, Jamaah, HotelCombinationSummary } from "@/shared/types";
 
 function PenghuniAvatar({ penghuni }: { penghuni: PenghuniKamar }) {
@@ -166,13 +159,12 @@ export default function RoomingPage() {
   const loadRoomings = useCallback(async () => {
     setLoading(true);
     try {
-      let data: Rooming[];
-      if (selectedKeberangkatan) {
-        data = await getRoomingByKeberangkatan(selectedKeberangkatan);
-      } else {
-        data = await getRoomingList();
+      const params = selectedKeberangkatan ? `?keberangkatanId=${selectedKeberangkatan}` : "";
+      const res = await fetch(`/api/roomings${params}`);
+      if (res.ok) {
+        const json = await res.json();
+        setRoomings(json.data ?? []);
       }
-      setRoomings(data);
     } finally {
       setLoading(false);
     }
@@ -183,8 +175,8 @@ export default function RoomingPage() {
   }, [loadRoomings]);
 
   useEffect(() => {
-    getKeberangkatanList().then(setKeberangkatanList);
-    getJamaahList().then(setAllJamaah);
+    fetch("/api/keberangkatan").then(r => r.json()).then(j => setKeberangkatanList(j.data ?? []));
+    fetch("/api/jamaah").then(r => r.json()).then(j => setAllJamaah(j.data ?? []));
   }, []);
 
   function getKeberangkatanName(keberangkatanId: string): string {
@@ -267,7 +259,7 @@ export default function RoomingPage() {
     [visibleRoomings, activeRoomingId]
   );
 
-  function handleGenerateRooming() {
+  async function handleGenerateRooming() {
     if (!selectedKbr) return;
 
     const combinations = getHotelCombinations(kbrJamaah);
@@ -378,7 +370,14 @@ export default function RoomingPage() {
       };
     });
 
-    mockRoomings.push(...newRoomings);
+    // Post each rooming to real API
+    for (const r of newRoomings) {
+      await fetch("/api/roomings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(r),
+      });
+    }
     loadRoomings();
   }
 

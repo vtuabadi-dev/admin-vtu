@@ -8,6 +8,7 @@ import { Button } from "@/shared/components/ui/Button";
 import { Table } from "@/shared/components/ui/Table";
 import { Select } from "@/shared/components/ui/Select";
 import { OperationalAlertPanel } from "@/shared/components/OperationalAlertPanel";
+import { OperationalWarnings } from "@/shared/components/OperationalWarnings";
 import {
   Users,
   UserCheck,
@@ -21,18 +22,6 @@ import {
   ChevronUp,
   Package,
 } from "lucide-react";
-import {
-  getDashboardStats,
-  getOperationalAlerts,
-  getAutoWarnings,
-  getKeberangkatanList,
-  getPackageReadinessScore,
-  getAutoDeadlines,
-  getPackageIntelligence,
-  getPaymentReviewQueue,
-  getDokumenReviewQueue,
-  getInvoiceList,
-} from "@/services/mock/handlers";
 import type {
   DashboardStats,
   OperationalAlert,
@@ -67,54 +56,85 @@ export default function AdminDashboardPage() {
   // ── Load global data ────────────────────────────────────────────
   useEffect(() => {
     async function load() {
-      const [s, a, autoWarnings, kbr, reviewPayments, reviewDocs, allInvoices] = await Promise.all([
-        getDashboardStats(),
-        getOperationalAlerts(),
-        getAutoWarnings(),
-        getKeberangkatanList(),
-        getPaymentReviewQueue(),
-        getDokumenReviewQueue(),
-        getInvoiceList(),
-      ]);
-      setStats(s);
-      setAlerts([...a, ...autoWarnings]);
-      setKbrList(kbr);
-      setPendingReviewCount(reviewPayments.length);
-      setPendingDocReviewCount(reviewDocs.length);
-      const overdue = allInvoices
-        .filter((inv) => inv.status === "overdue")
-        .reduce((sum, inv) => sum + inv.sisaTagihan, 0);
-      setOverdueAmount(overdue);
+      try {
+        const [statsRes, alertsRes, kbrRes, payReviewRes, docReviewRes, invRes] = await Promise.all([
+          fetch("/api/dashboard/stats"),
+          fetch("/api/dashboard/alerts"),
+          fetch("/api/keberangkatan"),
+          fetch("/api/pembayaran/review"),
+          fetch("/api/dokumen/review"),
+          fetch("/api/invoices"),
+        ]);
 
-      const scoreMap: Record<string, PackageReadinessScore> = {};
-      const deadlineMap: Record<string, AutoDeadline[]> = {};
-      await Promise.all(
-        kbr.map(async (pkg) => {
-          const [score, dls] = await Promise.all([
-            getPackageReadinessScore(pkg.id),
-            getAutoDeadlines(pkg.id),
-          ]);
-          if (score) scoreMap[pkg.id] = score;
-          if (dls) deadlineMap[pkg.id] = dls;
-        })
-      );
-      setScores(scoreMap);
-      setDeadlines(deadlineMap);
-      setLoading(false);
+        if (statsRes.ok) { const j = await statsRes.json(); setStats(j.data ?? j); }
+        if (alertsRes.ok) { const j = await alertsRes.json(); setAlerts(j.data ?? []); }
+        if (kbrRes.ok) { const j = await kbrRes.json(); setKbrList(j.data ?? []); }
+        if (payReviewRes.ok) { const j = await payReviewRes.json(); setPendingReviewCount((j.data ?? []).length); }
+        if (docReviewRes.ok) { const j = await docReviewRes.json(); setPendingDocReviewCount((j.data ?? []).length); }
+        if (invRes.ok) {
+          const j = await invRes.json();
+          const invoices = j.data ?? [];
+          const overdue = invoices
+            .filter((inv: any) => inv.status === "overdue")
+            .reduce((sum: number, inv: any) => sum + (inv.sisaTagihan ?? 0), 0);
+          setOverdueAmount(overdue);
+        }
+      } catch (err) {
+        console.error("Failed to load dashboard:", err);
+      } finally {
+        setLoading(false);
+      }
     }
     load();
   }, []);
 
+  // ── Load per-package readiness after kbrList loads ──────────────
+  useEffect(() => {
+    if (kbrList.length === 0) return;
+    async function loadScores() {
+      const scoreMap: Record<string, PackageReadinessScore> = {};
+      const deadlineMap: Record<string, AutoDeadline[]> = {};
+      await Promise.all(
+        kbrList.map(async (pkg) => {
+          try {
+            const [scoreRes, intelRes] = await Promise.all([
+              fetch(`/api/keberangkatan/${pkg.id}/readiness-score`),
+              fetch(`/api/keberangkatan/${pkg.id}/intelligence`),
+            ]);
+            if (scoreRes.ok) {
+              const j = await scoreRes.json();
+              if (j.data) scoreMap[pkg.id] = j.data;
+            }
+            if (intelRes.ok) {
+              const j = await intelRes.json();
+              if (j.data) deadlineMap[pkg.id] = j.data;
+            }
+          } catch { /* per-package load can fail gracefully */ }
+        })
+      );
+      setScores(scoreMap);
+      setDeadlines(deadlineMap as any);
+    }
+    loadScores();
+  }, [kbrList]);
+
   // ── Load package-specific data when filter changes ──────────────
   const loadPackageData = useCallback(async (kbrId: string) => {
     setLoadingPackage(true);
-    const [intel, autoWarns] = await Promise.all([
-      getPackageIntelligence(kbrId),
-      getAutoWarnings(kbrId),
-    ]);
-    setPackageIntel(intel ?? null);
-    setPackageAlerts(autoWarns);
-    setLoadingPackage(false);
+    try {
+      const [intelRes] = await Promise.all([
+        fetch(`/api/keberangkatan/${kbrId}/intelligence`),
+      ]);
+      if (intelRes.ok) {
+        const j = await intelRes.json();
+        setPackageIntel(j.data ?? null);
+      }
+      setPackageAlerts([]);
+    } catch {
+      setPackageAlerts([]);
+    } finally {
+      setLoadingPackage(false);
+    }
   }, []);
 
   useEffect(() => {
@@ -178,6 +198,9 @@ export default function AdminDashboardPage() {
 
   return (
     <div className="space-y-6">
+      {/* Operational warnings */}
+      <OperationalWarnings />
+
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>

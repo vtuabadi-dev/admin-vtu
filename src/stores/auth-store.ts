@@ -29,13 +29,14 @@ interface AuthState {
 }
 
 const MOCK_CREDENTIALS: Record<string, { password: string; role: OperationalRole; name: string }> = {
-  "admin@vtu.id": { password: "admin123", role: "super_admin", name: "Super Admin" },
-  "admin@travel.id": { password: "admin123", role: "admin_operasional", name: "Admin Operasional" },
-  "pembayaran@travel.id": { password: "admin123", role: "admin_pembayaran", name: "Admin Pembayaran" },
-  "manifest@travel.id": { password: "admin123", role: "admin_manifest", name: "Admin Manifest" },
-  "dokumen@travel.id": { password: "admin123", role: "admin_dokumen", name: "Admin Dokumen" },
-  "jamaah@email.com": { password: "jamaah123", role: "jamaah", name: "Ahmad Fauzi" },
-  "jamaah2@email.com": { password: "jamaah123", role: "jamaah", name: "Siti Rahma" },
+  "superadmin@vtu.id": { password: "SuperAdmin123!", role: "super_admin", name: "Super Admin" },
+  "admin@vtu.id": { password: "admin123", role: "super_admin", name: "Super Admin (Legacy)" },
+  "ops@vtu.id": { password: "admin123", role: "admin_operasional", name: "Admin Operasional" },
+  "finance@vtu.id": { password: "admin123", role: "admin_pembayaran", name: "Admin Pembayaran" },
+  "manifest@vtu.id": { password: "admin123", role: "admin_manifest", name: "Admin Manifest" },
+  "docs@vtu.id": { password: "admin123", role: "admin_dokumen", name: "Admin Dokumen" },
+  "tl@vtu.id": { password: "admin123", role: "tour_leader", name: "Tour Leader" },
+  "jamaah@vtu.id": { password: "admin123", role: "jamaah", name: "Jamaah Demo" },
 };
 
 const INACTIVITY_TIMEOUT = 30 * 60 * 1000; // 30 minutes

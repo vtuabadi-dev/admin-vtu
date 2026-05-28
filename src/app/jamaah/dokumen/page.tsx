@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getDokumenByJamaah } from "@/services/mock/handlers";
 import {
   Table,
   Card,
@@ -23,8 +22,6 @@ import {
 } from "lucide-react";
 import { LoadingSkeleton } from "@/shared/components/LoadingSkeleton";
 import type { DokumenItem, DokumenJenis, OcrData } from "@/shared/types";
-
-const JAMAHA_ID = "jmh-001";
 
 // ============================================================
 // Dokumen display names
@@ -187,8 +184,11 @@ export default function DokumenStatusPage() {
   useEffect(() => {
     async function load() {
       try {
-        const docs = await getDokumenByJamaah(JAMAHA_ID);
-        setDokumenList(docs);
+        const res = await fetch("/api/jamaah/me/documents");
+        if (res.ok) {
+          const json = await res.json();
+          setDokumenList(json.data ?? []);
+        }
       } catch (err) {
         console.error("Failed to load dokumen:", err);
       } finally {

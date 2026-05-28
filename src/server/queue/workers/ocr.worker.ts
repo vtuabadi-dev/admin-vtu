@@ -19,7 +19,8 @@ const worker = new Worker(
       const buffer = await storage.download(data.fileUrl);
       const fs = await import("fs/promises");
       const path = await import("path");
-      const tmpPath = `${process.env.STORAGE_PATH || "./storage"}/temp/ocr-${data.dokumenId}.jpg`;
+      const safeId = data.dokumenId.replace(/[^a-zA-Z0-9_-]/g, "_");
+      const tmpPath = `${process.env.STORAGE_PATH || "./storage"}/temp/ocr-${safeId}.jpg`;
       await fs.mkdir(path.dirname(tmpPath), { recursive: true });
       await fs.writeFile(tmpPath, buffer);
       imagePath = tmpPath;
@@ -47,12 +48,22 @@ const worker = new Worker(
 
     await job.updateProgress({ current: 3, total: 3, percent: 100, label: "OCR complete" });
 
+    // Cleanup temp file
+    if (imagePath && imagePath.includes("/temp/")) {
+      try {
+        const fs = await import("fs/promises");
+        await fs.unlink(imagePath);
+      } catch { /* temp file may already be gone */ }
+    }
+
     return result;
   },
   {
     connection: connectionOptions,
     concurrency: 3,
     autorun: true,
+    lockDuration: 30000,
+    stalledInterval: 30000,
     removeOnComplete: { count: 1000 },
     removeOnFail: { count: 500 },
   }

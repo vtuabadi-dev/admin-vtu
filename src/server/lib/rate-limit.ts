@@ -16,9 +16,9 @@ function cleanup() {
   const now = Date.now();
   if (now - lastCleanup < CLEANUP_INTERVAL) return;
   lastCleanup = now;
-  for (const [key, entry] of store) {
+  store.forEach((entry, key) => {
     if (now > entry.resetAt) store.delete(key);
-  }
+  });
 }
 
 export interface RateLimitConfig {
@@ -32,12 +32,12 @@ export interface RateLimitResult {
   resetAt: number;
 }
 
-const DEFAULT_CONFIGS: Record<string, RateLimitConfig> = {
+const DEFAULT_CONFIGS = {
   auth: { windowMs: 60_000, maxRequests: 5 },          // 5 login attempts per minute
   upload: { windowMs: 60_000, maxRequests: 10 },        // 10 uploads per minute
   api: { windowMs: 60_000, maxRequests: 60 },           // 60 API calls per minute
   "api-write": { windowMs: 60_000, maxRequests: 20 },   // 20 write operations per minute
-};
+} as const satisfies Record<string, RateLimitConfig>;
 
 export function checkRateLimit(
   key: string,

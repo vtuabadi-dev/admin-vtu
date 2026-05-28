@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { auth } from "@/server/auth";
+import { checkServerPermission } from "@/shared/lib/rbac-utils";
 import { getStorageAdapter, dokumenPath } from "@/server/storage";
 import { validateImageMetadata } from "@/server/services/ocr.service";
 import { dokumenRepo } from "@/server/repositories";
@@ -19,6 +20,8 @@ function sanitizeFilename(name: string): string {
 export async function POST(request: NextRequest) {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
+  const perm = checkServerPermission(session, "dokumen", "create");
+  if (!perm.allowed) return NextResponse.json({ success: false, message: perm.reason }, { status: 403 });
 
   // Rate limit uploads
   const rlKey = rateLimitKey(request, session);
@@ -82,7 +85,7 @@ export async function POST(request: NextRequest) {
 
     // Find existing dokumen item untuk jamaah+jenis ini
     const semuaDokumen = await dokumenRepo.findByJamaah(jamaahId);
-    const dokumenItem = semuaDokumen.find((d) => d.jenis === jenisDokumen);
+    const dokumenItem = semuaDokumen.find((d: { id: string; jenis: string }) => d.jenis === jenisDokumen);
 
     if (dokumenItem) {
       await dokumenRepo.updateFileStatus(dokumenItem.id, "valid");

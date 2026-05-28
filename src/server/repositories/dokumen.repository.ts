@@ -27,6 +27,7 @@ function mapDokumen(doc: any): DokumenItem {
 // ────────────────────────────────────────────────────────────
 
 export const dokumenRepo = {
+  mapDokumen,
   async findByJamaah(jamaahId: string) {
     const rows = await prisma.dokumenItem.findMany({ where: { jamaahId }, orderBy: { jenis: "asc" } });
     return rows.map(mapDokumen);

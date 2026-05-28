@@ -204,6 +204,17 @@ enum AuditModule {
   sistem
 }
 
+enum RegistrationStatus {
+  DRAFT
+  PENDING_REVIEW
+  APPROVED
+  REJECTED
+  ACCOUNT_CREATED
+  ACTIVE
+  CANCELLED
+  EXPIRED
+}
+
 // ============================================================
 // AUTH — Users
 // ============================================================
@@ -213,10 +224,11 @@ model User {
   name         String
   email        String          @unique
   passwordHash String
-  role         OperationalRole @default(jamaah)
-  tenantId     String?
-  createdAt    DateTime        @default(now())
-  updatedAt    DateTime        @updatedAt
+  role                OperationalRole @default(jamaah)
+  mustChangePassword  Boolean         @default(false)
+  tenantId            String?
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
 
   // Relations — user is referenced by name/role in audit, not by FK relation
   notifications Notification[]
@@ -247,11 +259,12 @@ model Keberangkatan {
   updatedAt        DateTime             @updatedAt
 
   // Relations
-  groups           RegistrationGroup[]
-  manifests        Manifest[]
-  roomings         Rooming[]
-  activityEvents   ActivityEvent[]
-  autoDeadlines    AutoDeadline[]
+  groups              RegistrationGroup[]
+  registrationRequests RegistrationRequest[]
+  manifests           Manifest[]
+  roomings            Rooming[]
+  activityEvents      ActivityEvent[]
+  autoDeadlines       AutoDeadline[]
 
   @@index([status])
   @@index([tanggalBerangkat])
@@ -278,13 +291,14 @@ model RegistrationGroup {
   updatedAt            DateTime    @updatedAt
 
   // Relations
-  keberangkatan       Keberangkatan       @relation(fields: [paketKeberangkatanId], references: [id])
-  anggota             Jamaah[]            // jamaah with this groupId
-  invoices            Invoice[]
-  pembayaran          Pembayaran[]
-  reminders           Reminder[]
-  invoiceSplitConfig  InvoiceSplitConfig?
-  ketuaGroup          Jamaah              @relation("KetuaGroup", fields: [ketuaGroupId], references: [id])
+  keberangkatan        Keberangkatan        @relation(fields: [paketKeberangkatanId], references: [id])
+  anggota              Jamaah[]             // jamaah with this groupId
+  invoices             Invoice[]
+  pembayaran           Pembayaran[]
+  reminders            Reminder[]
+  invoiceSplitConfig   InvoiceSplitConfig?
+  ketuaGroup           Jamaah               @relation("KetuaGroup", fields: [ketuaGroupId], references: [id])
+  registrationRequests RegistrationRequest[]
 
   @@index([paketKeberangkatanId])
   @@index([status])
@@ -320,6 +334,7 @@ model Jamaah {
   status            StatusJamaah @default(registered)
   hotelMekkah       String
   hotelMadinah      String
+  userId            String?
   tenantId          String?
   createdAt         DateTime    @default(now())
   updatedAt         DateTime    @updatedAt
@@ -336,6 +351,53 @@ model Jamaah {
   @@index([status])
   @@index([hotelMekkah, hotelMadinah])
   @@map("jamaah")
+}
+
+// ============================================================
+// REGISTRATION REQUEST — Pre-approval pipeline (self-service group registration)
+// ============================================================
+
+model RegistrationRequest {
+  id              String             @id @default(cuid())
+  kodeRegistrasi  String             @unique // GRP-YYYY-NNNNN
+  namaPerwakilan  String
+  nomorTelepon    String
+  emailPerwakilan String
+  paxCount        Int
+  paketId         String
+  roomUpgrade     String?            // "standard" | "double" | "quad"
+  hotelUpgrade    String?            // "standard" | "premium" | "vip"
+  signaturePath   String             // Storage path to signature JPG
+  termsAccepted   Boolean
+  status          RegistrationStatus @default(DRAFT)
+  catatanAdmin    String?
+  reviewedBy      String?
+  reviewedAt      DateTime?
+  groupId         String?
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  keberangkatan Keberangkatan       @relation(fields: [paketId], references: [id])
+  members       RegistrationMember[]
+  group         RegistrationGroup?  @relation(fields: [groupId], references: [id])
+
+  @@index([status])
+  @@index([paketId])
+  @@map("registration_requests")
+}
+
+model RegistrationMember {
+  id            String       @id @default(cuid())
+  requestId     String
+  namaLengkap   String
+  jenisKelamin  JenisKelamin
+  hubungan      String?      // "keluarga" | "teman" | null
+  urutan        Int          // 1..paxCount
+
+  request RegistrationRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@index([requestId])
+  @@map("registration_members")
 }
 
 // ============================================================

@@ -2,10 +2,6 @@
 
 import { useEffect, useState, useCallback } from "react";
 import {
-  getInvoiceByJamaah,
-  submitJamaahPayment,
-} from "@/services/mock/handlers";
-import {
   Card,
   CardContent,
   CardFooter,
@@ -34,8 +30,6 @@ import { LoadingSkeleton } from "@/shared/components/LoadingSkeleton";
 import { EmptyState } from "@/shared/components/EmptyState";
 import type { Invoice } from "@/shared/types";
 
-const JAMAHA_ID = "jmh-001";
-
 // ============================================================
 // Bayar Modal
 // ============================================================
@@ -61,17 +55,16 @@ function BayarModal({
 }) {
   const [nominal, setNominal] = useState("");
   const [bankPengirim, setBankPengirim] = useState("");
-  const [buktiFile, setBuktiFile] = useState<string>("");
+  const [buktiFile, setBuktiFile] = useState<File | null>(null);
   const [catatan, setCatatan] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
 
-  // Reset form when modal opens
   useEffect(() => {
     if (open) {
       setNominal("");
       setBankPengirim("");
-      setBuktiFile("");
+      setBuktiFile(null);
       setCatatan("");
       setSubmitting(false);
       setSubmitted(false);
@@ -84,17 +77,25 @@ function BayarModal({
     if (!nominal || !bankPengirim) return;
     setSubmitting(true);
     try {
-      await submitJamaahPayment({
-        groupId: invoice.groupId,
-        invoiceId: invoice.id,
-        jumlah: parseFloat(nominal),
-        bankPengirim,
-        buktiUrl: buktiFile || undefined,
-        catatan: catatan || undefined,
+      const formData = new FormData();
+      formData.append("jumlah", nominal);
+      formData.append("bankPengirim", bankPengirim);
+      if (catatan) formData.append("catatan", catatan);
+      if (buktiFile) formData.append("file", buktiFile);
+
+      const res = await fetch("/api/jamaah/me/payments", {
+        method: "POST",
+        body: formData,
       });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || "Gagal mengajukan pembayaran");
+      }
+
       setSubmitted(true);
-    } catch {
-      window.alert("Gagal mengajukan pembayaran. Silakan coba lagi.");
+    } catch (err) {
+      window.alert((err as Error).message || "Gagal mengajukan pembayaran. Silakan coba lagi.");
     } finally {
       setSubmitting(false);
     }
@@ -103,7 +104,7 @@ function BayarModal({
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      setBuktiFile(file.name);
+      setBuktiFile(file);
     }
   };
 
@@ -185,7 +186,7 @@ function BayarModal({
             <label className="flex items-center gap-2 rounded-md border border-input px-3 py-2 text-sm cursor-pointer hover:bg-muted/50 transition-colors">
               <Upload className="h-4 w-4 text-muted-foreground" />
               <span className={buktiFile ? "text-foreground text-xs" : "text-muted-foreground text-xs"}>
-                {buktiFile || "Pilih file (JPG/PNG/PDF)"}
+                {buktiFile?.name || "Pilih file (JPG/PNG/PDF)"}
               </span>
               <input
                 type="file"
@@ -386,8 +387,11 @@ export default function TagihanPage() {
   useEffect(() => {
     async function load() {
       try {
-        const invs = await getInvoiceByJamaah(JAMAHA_ID);
-        setInvoices(invs);
+        const invRes = await fetch("/api/jamaah/me/invoices");
+        if (invRes.ok) {
+          const json = await invRes.json();
+          setInvoices(json.data ?? []);
+        }
       } catch (err) {
         console.error("Failed to load tagihan:", err);
       } finally {

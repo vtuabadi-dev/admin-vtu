@@ -2,6 +2,7 @@ import { Worker } from "bullmq";
 import { connectionOptions } from "../connection";
 import type { ExportGeneratorJob } from "@/services/queue/types";
 import { generateExport, type ExportType } from "@/server/services/export-gen.service";
+import { resolveOperationalName } from "@/shared/lib/name-resolver";
 
 function normalizeRows(result: any): Record<string, unknown>[] {
   if (Array.isArray(result)) return result;
@@ -44,7 +45,7 @@ const worker = new Worker(
           const allDokumen: any[] = [];
           for (const j of jamaahList) {
             const docs = await repos.dokumenRepo.findByJamaah(j.id as string);
-            allDokumen.push(...docs.map((d: any) => ({ ...d, namaJamaah: j.namaLengkap })));
+            allDokumen.push(...docs.map((d: any) => ({ ...d, namaJamaah: resolveOperationalName(j as any, docs) })));
           }
           rows = allDokumen;
           break;
@@ -77,6 +78,8 @@ const worker = new Worker(
     connection: connectionOptions,
     concurrency: 2,
     autorun: true,
+    lockDuration: 30000,
+    stalledInterval: 30000,
     removeOnComplete: { count: 500 },
     removeOnFail: { count: 200 },
   }

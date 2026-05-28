@@ -2,10 +2,6 @@
 
 import { useEffect, useState } from "react";
 import {
-  getInvoiceByJamaah,
-  getPembayaranByJamaah,
-} from "@/services/mock/handlers";
-import {
   Card,
   CardContent,
   CardFooter,
@@ -29,8 +25,6 @@ import {
 import { LoadingSkeleton } from "@/shared/components/LoadingSkeleton";
 import { EmptyState } from "@/shared/components/EmptyState";
 import type { Invoice, Pembayaran } from "@/shared/types";
-
-const JAMAHA_ID = "jmh-001";
 
 // ============================================================
 // Invoice card with expandable detail
@@ -332,12 +326,18 @@ export default function InvoicePage() {
   useEffect(() => {
     async function load() {
       try {
-        const [invs, pays] = await Promise.all([
-          getInvoiceByJamaah(JAMAHA_ID),
-          getPembayaranByJamaah(JAMAHA_ID),
+        const [invRes, payRes] = await Promise.all([
+          fetch("/api/jamaah/me/invoices"),
+          fetch("/api/jamaah/me/payments"),
         ]);
-        setInvoices(invs);
-        setPembayaranList(pays);
+        if (invRes.ok) {
+          const json = await invRes.json();
+          setInvoices(json.data ?? []);
+        }
+        if (payRes.ok) {
+          const json = await payRes.json();
+          setPembayaranList(json.data ?? []);
+        }
       } catch (err) {
         console.error("Failed to load invoices:", err);
       } finally {

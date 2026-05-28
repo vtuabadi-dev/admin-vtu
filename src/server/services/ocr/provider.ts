@@ -41,18 +41,14 @@ export interface OcrProvider {
   dispose?(): Promise<void>;
 }
 
-// Field mappings per jenis dokumen
+// Field mappings per jenis dokumen — must match DokumenJenis union
 export const DOCUMENT_FIELD_MAPS: Record<string, string[]> = {
-  ktp: ["nik", "nama", "tempat_lahir", "tanggal_lahir", "alamat", "agama", "pekerjaan"],
-  kk: ["no_kk", "nama_kepala", "alamat", "daftar_anggota"],
-  paspor: ["no_paspor", "nama", "tempat_lahir", "tanggal_lahir", "tanggal_terbit", "tanggal_habis", "kewarganegaraan"],
-  akta_lahir: ["no_akta", "nama", "tempat_lahir", "tanggal_lahir", "nama_ayah", "nama_ibu"],
-  surat_nikah: ["no_surat", "nama_suami", "nama_istri", "tanggal_nikah", "tempat_nikah"],
-  buku_nikah: ["no_buku", "nama_suami", "nama_istri", "tanggal_nikah"],
-  ijazah: ["nama", "institusi", "tahun_lulus", "jurusan"],
-  foto: [],
-  visa: ["no_visa", "nama", "tanggal_terbit", "tanggal_habis", "jenis_visa"],
-  "bebas-covid19": ["nama", "no_sertifikat", "tanggal_vaksin", "jenis_vaksin"],
+  paspor: ["namaLengkap", "nomorPaspor", "tanggalLahir", "tempatLahir", "masaBerlaku"],
+  pas_foto: [],
+  vaksin: ["namaLengkap"],
+  ktp: ["namaLengkap", "nik", "tanggalLahir", "tempatLahir"],
+  kk: ["namaLengkap", "nik"],
+  akta: ["namaLengkap", "nik", "tanggalLahir", "tempatLahir"],
 };
 
 export function getExpectedFields(jenis: DokumenJenis): string[] {

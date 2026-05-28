@@ -2,9 +2,6 @@
 
 import { useEffect, useState } from "react";
 import {
-  getDokumenByJamaah,
-} from "@/services/mock/handlers";
-import {
   Contact as IdCard,
   Fingerprint,
   BookOpen,
@@ -25,8 +22,6 @@ import { Modal } from "@/shared/components/ui/Modal";
 import { formatDate } from "@/shared/lib/utils";
 import DocumentUpload from "@/shared/components/DocumentUpload";
 import type { DokumenItem, DokumenJenis, UploadResult } from "@/shared/types";
-
-const JAMAHA_ID = "jmh-001";
 
 // ============================================================
 // Document type metadata
@@ -108,8 +103,11 @@ export default function DokumenUploadPage() {
   useEffect(() => {
     async function load() {
       try {
-        const docs = await getDokumenByJamaah(JAMAHA_ID);
-        setDokumenList(docs);
+        const res = await fetch("/api/jamaah/me/documents");
+        if (res.ok) {
+          const json = await res.json();
+          setDokumenList(json.data ?? []);
+        }
       } catch (err) {
         console.error("Failed to load dokumen:", err);
       } finally {
@@ -124,7 +122,6 @@ export default function DokumenUploadPage() {
   }
 
   function handleUploadComplete(jenis: DokumenJenis, result: UploadResult) {
-    // Update local state to reflect successful upload
     setDokumenList((prev) => {
       const idx = prev.findIndex((d) => d.jenis === jenis);
       if (idx >= 0) {
@@ -132,19 +129,16 @@ export default function DokumenUploadPage() {
         updated[idx] = {
           ...updated[idx],
           status: "lengkap",
-          fileUrl: URL.createObjectURL(new Blob()),
           uploadedAt: result.uploadedAt,
         } as DokumenItem;
         return updated;
       }
-      // If doc didn't exist before, add it
       const newDoc: DokumenItem = {
         id: `dok-${Date.now()}`,
-        jamaahId: JAMAHA_ID,
+        jamaahId: "",
         jenis: jenis as DokumenJenis,
         wajib: true,
         status: "lengkap",
-        fileUrl: URL.createObjectURL(new Blob()),
         uploadedAt: result.uploadedAt,
       };
       return [...prev, newDoc];

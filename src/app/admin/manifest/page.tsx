@@ -22,8 +22,6 @@ import { Modal } from "@/shared/components/ui/Modal";
 import { Table } from "@/shared/components/ui/Table";
 import { formatDateShort } from "@/shared/lib/utils";
 import { getHotelCombinations, generateHotelLabel } from "@/shared/lib/hotel-utils";
-import { getManifestList, getManifestByKeberangkatan, getKeberangkatanList, getJamaahList } from "@/services/mock/handlers";
-import { mockManifests } from "@/services/mock/data";
 import type { Manifest, ManifestRow, Keberangkatan, Jamaah, HotelCombinationSummary } from "@/shared/types";
 
 export default function ManifestPage() {
@@ -43,13 +41,12 @@ export default function ManifestPage() {
   const loadManifests = useCallback(async () => {
     setLoading(true);
     try {
-      let data: Manifest[];
-      if (selectedKeberangkatan) {
-        data = await getManifestByKeberangkatan(selectedKeberangkatan);
-      } else {
-        data = await getManifestList();
+      const params = selectedKeberangkatan ? `?keberangkatanId=${selectedKeberangkatan}` : "";
+      const res = await fetch(`/api/manifests${params}`);
+      if (res.ok) {
+        const json = await res.json();
+        setManifests(json.data ?? []);
       }
-      setManifests(data);
     } finally {
       setLoading(false);
     }
@@ -60,8 +57,8 @@ export default function ManifestPage() {
   }, [loadManifests]);
 
   useEffect(() => {
-    getKeberangkatanList().then(setKeberangkatanList);
-    getJamaahList().then(setAllJamaah);
+    fetch("/api/keberangkatan").then(r => r.json()).then(j => setKeberangkatanList(j.data ?? []));
+    fetch("/api/jamaah").then(r => r.json()).then(j => setAllJamaah(j.data ?? []));
   }, []);
 
   function handleGenerate() {
@@ -112,28 +109,31 @@ export default function ManifestPage() {
     { key: "nomorKamar", header: "No. Kamar", accessor: (row: Record<string, unknown>) => (row.nomorKamar as string) ?? "-" },
   ];
 
-  function doGenerate() {
+  async function doGenerate() {
     if (!selectedKbr || !formNama.trim()) return;
 
-    if (formTemplate === "siskopatuh") {
-      const combinations = getHotelCombinations(kbrJamaah);
-      const newManifests: Manifest[] = combinations.map((combo, idx) => {
-        const filteredJamaah = kbrJamaah.filter(
-          (j) => j.hotelMekkah === combo.hotelMekkah && j.hotelMadinah === combo.hotelMadinah
-        );
-        const label = generateHotelLabel(combo.hotelMekkah, combo.hotelMadinah);
-        const seq = String(idx + 1).padStart(3, "0");
-        return {
-          id: `man-${Date.now()}-${idx}`,
-          keberangkatanId: selectedKbr.id,
-          kode: `MAN/${selectedKbr.kode}/SKP/${seq}`,
-          namaManifest: `${formNama.trim()} — ${label}`,
-          hotelMekkah: combo.hotelMekkah,
-          hotelMadinah: combo.hotelMadinah,
-          createdAt: new Date().toISOString().split("T")[0]!,
-          updatedAt: new Date().toISOString().split("T")[0]!,
-          status: "draft" as const,
-          data: filteredJamaah.map((j, i): ManifestRow => ({
+    const buildManifestData = (rows: ManifestRow[], kode: string, nama: string, hotelMekkah?: string, hotelMadinah?: string) => ({
+      keberangkatanId: selectedKbr!.id,
+      kode,
+      namaManifest: nama,
+      templateId: formTemplate,
+      hotelMekkah: hotelMekkah ?? selectedKbr!.hotelMekkah,
+      hotelMadinah: hotelMadinah ?? selectedKbr!.hotelMadinah,
+      status: "draft" as const,
+      data: rows,
+    });
+
+    try {
+      if (formTemplate === "siskopatuh") {
+        const combinations = getHotelCombinations(kbrJamaah);
+        for (let idx = 0; idx < combinations.length; idx++) {
+          const combo = combinations[idx]!;
+          const filteredJamaah = kbrJamaah.filter(
+            (j) => j.hotelMekkah === combo.hotelMekkah && j.hotelMadinah === combo.hotelMadinah
+          );
+          const label = generateHotelLabel(combo.hotelMekkah, combo.hotelMadinah);
+          const seq = String(idx + 1).padStart(3, "0");
+          const rows: ManifestRow[] = filteredJamaah.map((j, i) => ({
             id: `mrow-${Date.now()}-${idx}-${i}`,
             nomorUrut: i + 1,
             jamaahId: j.id,
@@ -141,21 +141,15 @@ export default function ManifestPage() {
             namaLengkap: j.namaLengkap,
             tempatLahir: j.tempatLahir,
             tanggalLahir: j.tanggalLahir,
-          })),
-        };
-      });
-      mockManifests.push(...newManifests);
-    } else {
-      const seq = String(mockManifests.length + 1).padStart(3, "0");
-      const newManifest: Manifest = {
-        id: `man-${Date.now()}`,
-        keberangkatanId: selectedKbr.id,
-        kode: `MAN/${selectedKbr.kode}/${seq}`,
-        namaManifest: formNama.trim(),
-        createdAt: new Date().toISOString().split("T")[0]!,
-        updatedAt: new Date().toISOString().split("T")[0]!,
-        status: "draft",
-        data: kbrJamaah.map((j, i): ManifestRow => ({
+          }));
+          await fetch("/api/manifests", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(buildManifestData(rows, `MAN/${selectedKbr!.kode}/SKP/${seq}`, `${formNama.trim()} — ${label}`, combo.hotelMekkah, combo.hotelMadinah)),
+          });
+        }
+      } else {
+        const rows: ManifestRow[] = kbrJamaah.map((j, i) => ({
           id: `mrow-${Date.now()}-${i}`,
           nomorUrut: i + 1,
           jamaahId: j.id,
@@ -163,13 +157,20 @@ export default function ManifestPage() {
           namaLengkap: j.namaLengkap,
           tempatLahir: j.tempatLahir,
           tanggalLahir: j.tanggalLahir,
-        })),
-      };
-      mockManifests.push(newManifest);
-    }
+        }));
+        const seq = String(Date.now()).slice(-5);
+        await fetch("/api/manifests", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(buildManifestData(rows, `MAN/${selectedKbr!.kode}/${seq}`, formNama.trim())),
+        });
+      }
 
-    setModalOpen(false);
-    loadManifests();
+      setModalOpen(false);
+      loadManifests();
+    } catch (err) {
+      console.error("Failed to generate manifest:", err);
+    }
   }
 
   return (

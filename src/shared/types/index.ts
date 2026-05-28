@@ -608,6 +608,32 @@ export type OperationalRole =
   | "tour_leader"
   | "jamaah";
 
+// ── Enterprise Role Hierarchy (abstraction over OperationalRole) ──
+export type EnterpriseRole = "SUPER_ADMIN" | "OWNER" | "ADMIN" | "STAFF" | "VIEWER";
+
+export const ENTERPRISE_ROLE_MAP: Record<OperationalRole, EnterpriseRole> = {
+  super_admin: "SUPER_ADMIN",
+  admin_operasional: "OWNER",
+  admin_pembayaran: "ADMIN",
+  admin_manifest: "ADMIN",
+  admin_dokumen: "STAFF",
+  tour_leader: "VIEWER",
+  jamaah: "VIEWER",
+};
+
+// ── Named permissions for hasPermission() checks ──
+export type SystemPermission =
+  | "VIEW_AUDIT_LOG"
+  | "MANAGE_USERS"
+  | "MANAGE_SYSTEM"
+  | "VIEW_REPORTS"
+  | "MANAGE_PACKAGES"
+  | "MANAGE_JAMAAH"
+  | "MANAGE_PAYMENTS"
+  | "MANAGE_EXPORTS"
+  | "VIEW_HEALTH_MONITORING"
+  | "VIEW_MAINTENANCE";
+
 export interface PermissionCheck {
   canView: boolean;
   canCreate: boolean;
@@ -722,6 +748,68 @@ export interface GlobalSearchResult {
   subtitle: string;
   module: string;
   link: string;
+}
+
+// ============================================================
+// REGISTRATION REQUEST — Pre-approval pipeline
+// ============================================================
+
+export type RegistrationStatus =
+  | "DRAFT"
+  | "PENDING_REVIEW"
+  | "APPROVED"
+  | "REJECTED"
+  | "ACCOUNT_CREATED"
+  | "ACTIVE"
+  | "CANCELLED"
+  | "EXPIRED";
+
+export interface RegistrationRequest {
+  id: string;
+  kodeRegistrasi: string;
+  namaPerwakilan: string;
+  nomorTelepon: string;
+  emailPerwakilan: string;
+  paxCount: number;
+  paketId: string;
+  roomUpgrade?: string;
+  hotelUpgrade?: string;
+  signaturePath: string;
+  termsAccepted: boolean;
+  status: RegistrationStatus;
+  catatanAdmin?: string;
+  reviewedBy?: string;
+  reviewedAt?: string;
+  groupId?: string;
+  members: RegistrationMember[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface RegistrationMember {
+  id: string;
+  requestId: string;
+  namaLengkap: string;
+  jenisKelamin: JenisKelamin;
+  hubungan?: string;
+  urutan: number;
+}
+
+export interface GroupRegistrationFormData {
+  namaPerwakilan: string;
+  nomorTelepon: string;
+  emailPerwakilan: string;
+  termsAccepted: boolean;
+  paxCount: number;
+  members: {
+    namaLengkap: string;
+    jenisKelamin: JenisKelamin;
+    hubungan?: string;
+  }[];
+  paketId: string;
+  roomUpgrade?: string;
+  hotelUpgrade?: string;
+  signaturePath: string;
 }
 
 // ============================================================

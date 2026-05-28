@@ -10,7 +10,8 @@ export type QueueName =
   | "notification-dispatch"
   | "cleanup-temp"
   | "backup-database"
-  | "manifest-generate";
+  | "manifest-generate"
+  | "broadcast-dispatch";
 
 export interface RetryPolicy {
   enabled: boolean;
@@ -126,6 +127,19 @@ export interface ManifestGenerateJob extends BaseJob {
   };
 }
 
+// ── Broadcast Dispatch ─────────────────────────────────────
+
+export interface BroadcastDispatchJob extends BaseJob {
+  queue: "broadcast-dispatch";
+  data: {
+    channel: "telegram" | "whatsapp" | "email";
+    target: string;
+    templateId: string;
+    templateVars: Record<string, string>;
+    priority: "low" | "normal" | "high";
+  };
+}
+
 export type QueueJob =
   | DocumentOcrJob
   | PaymentReminderJob
@@ -133,7 +147,8 @@ export type QueueJob =
   | NotificationDispatchJob
   | CleanupTempJob
   | BackupDatabaseJob
-  | ManifestGenerateJob;
+  | ManifestGenerateJob
+  | BroadcastDispatchJob;
 
 // ── Queue Registration (stub — ganti dengan BullMQ Queue saat production) ──
 
@@ -145,6 +160,7 @@ const QUEUE_NAMES: QueueName[] = [
   "cleanup-temp",
   "backup-database",
   "manifest-generate",
+  "broadcast-dispatch",
 ];
 
 export function getRegisteredQueues(): QueueName[] {
@@ -160,6 +176,7 @@ export function getQueueDescription(queue: QueueName): string {
     "cleanup-temp": "Bersihkan file temporary yang sudah expired",
     "backup-database": "Backup database ke persistent storage",
     "manifest-generate": "Generate manifest SISKOPATUH/Visa/Blockseat/Hotel",
+    "broadcast-dispatch": "Dispatch broadcast message via Telegram/WhatsApp/Email",
   };
   return map[queue];
 }

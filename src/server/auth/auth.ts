@@ -3,7 +3,8 @@ import Credentials from "next-auth/providers/credentials";
 import type { OperationalRole } from "@/shared/types";
 
 const MOCK_CREDENTIALS: Record<string, { password: string; role: OperationalRole; name: string }> = {
-  "admin@vtu.id": { password: "admin123", role: "super_admin", name: "Super Admin" },
+  "superadmin@vtu.id": { password: "SuperAdmin123!", role: "super_admin", name: "Super Admin" },
+  "admin@vtu.id": { password: "admin123", role: "super_admin", name: "Super Admin (Legacy)" },
   "ops@vtu.id": { password: "admin123", role: "admin_operasional", name: "Admin Operasional" },
   "finance@vtu.id": { password: "admin123", role: "admin_pembayaran", name: "Admin Pembayaran" },
   "manifest@vtu.id": { password: "admin123", role: "admin_manifest", name: "Admin Manifest" },
@@ -12,7 +13,10 @@ const MOCK_CREDENTIALS: Record<string, { password: string; role: OperationalRole
   "jamaah@vtu.id": { password: "admin123", role: "jamaah", name: "Jamaah Demo" },
 };
 
+const useSecureCookies = process.env.NEXTAUTH_URL?.startsWith("https://") ?? false;
+
 export const { handlers, auth, signIn, signOut } = NextAuth({
+  secret: process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET ?? "dev-secret-fallback",
   providers: [
     Credentials({
       name: "credentials",
@@ -34,14 +38,16 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             const bcrypt = await import("bcryptjs");
             const valid = await bcrypt.compare(password, user.passwordHash);
             if (valid) {
-              return { id: user.id, name: user.name, email: user.email, role: user.role };
+              return { id: user.id, name: user.name, email: user.email, role: user.role, mustChangePassword: user.mustChangePassword };
             }
           }
         } catch {
-          // DB unavailable — fall through to mock
+          // DB unavailable — fall through to mock (dev only)
         }
 
-        // Fallback to mock credentials (dev / no-DB)
+        // Fallback to mock credentials — dev only, never in production
+        if (process.env.NODE_ENV === "production") return null;
+
         const mock = MOCK_CREDENTIALS[email];
         if (mock && mock.password === password) {
           return { id: `mock-${email.replace(/[^a-z0-9]/g, "-")}`, name: mock.name, email, role: mock.role };
@@ -56,6 +62,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (user) {
         token.role = user.role as OperationalRole;
         token.id = user.id;
+        token.mustChangePassword = user.mustChangePassword ?? false;
       }
       return token;
     },
@@ -63,6 +70,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (session.user) {
         session.user.role = token.role as OperationalRole;
         session.user.id = token.id as string;
+        session.user.mustChangePassword = token.mustChangePassword as boolean | undefined;
       }
       return session;
     },
@@ -77,5 +85,15 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   jwt: {
     maxAge: 8 * 60 * 60,
   },
-  trustHost: true,
+  cookies: {
+    sessionToken: {
+      name: `${useSecureCookies ? "__Secure-" : ""}next-auth.session-token`,
+      options: {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        secure: useSecureCookies,
+      },
+    },
+  },
 });

@@ -1,14 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import {
-  getJamaahById,
-  getDokumenByJamaah,
-  getInvoiceByJamaah,
-  getPembayaranByJamaah,
-  getRemindersByJamaah,
-  getKeberangkatanList,
-} from "@/services/mock/handlers";
+import { getKeberangkatanList } from "@/services/mock/handlers";
 import {
   Check,
   Upload,
@@ -36,7 +29,6 @@ import { LoadingSkeleton } from "@/shared/components/LoadingSkeleton";
 import { ErrorState } from "@/shared/components/ErrorState";
 import type { Jamaah, DokumenItem, Invoice, Reminder, Keberangkatan } from "@/shared/types";
 
-const JAMAHA_ID = "jmh-001";
 
 // ============================================================
 // Step indicator for dashboard
@@ -132,38 +124,48 @@ export default function JamaahDashboardPage() {
   const [jamaah, setJamaah] = useState<Jamaah | null>(null);
   const [dokumen, setDokumen] = useState<DokumenItem[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const [reminders, setReminders] = useState<Reminder[]>([]);
+  const reminders: Reminder[] = [];
   const [keberangkatan, setKeberangkatan] = useState<Keberangkatan | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function load() {
       try {
-        const [j, docs, invs, pays, rems, kbrs] = await Promise.all([
-          getJamaahById(JAMAHA_ID),
-          getDokumenByJamaah(JAMAHA_ID),
-          getInvoiceByJamaah(JAMAHA_ID),
-          getPembayaranByJamaah(JAMAHA_ID),
-          getRemindersByJamaah(JAMAHA_ID),
+        const [meRes, invRes, payRes, kbrs] = await Promise.all([
+          fetch("/api/jamaah/me"),
+          fetch("/api/jamaah/me/invoices"),
+          fetch("/api/jamaah/me/payments"),
           getKeberangkatanList(),
         ]);
-        setJamaah(j ?? null);
-        setDokumen(docs);
-        setInvoices(invs);
 
-        // Attach pembayaran to invoices
-        const invsWithPays = invs.map((inv) => ({
-          ...inv,
-          pembayaran: pays.filter((p) => p.invoiceId === inv.id),
-        }));
-        setInvoices(invsWithPays);
-        setReminders(rems);
+        if (meRes.ok) {
+          const meJson = await meRes.json();
+          const j = meJson.data as Jamaah;
+          setJamaah(j);
+          setDokumen((j as any).dokumen ?? []);
 
-        // Find the jamaah's keberangkatan
-        if (j) {
-          const kbr = kbrs.find((k) => k.jamaahIds.includes(j.id)) ?? null;
+          // Find the jamaah's keberangkatan
+          const kbr = kbrs.find((k) => k.jamaahIds?.includes(j.id)) ?? null;
           setKeberangkatan(kbr);
         }
+
+        let invs: Invoice[] = [];
+        if (invRes.ok) {
+          const invJson = await invRes.json();
+          invs = invJson.data ?? [];
+        }
+
+        let pays: any[] = [];
+        if (payRes.ok) {
+          const payJson = await payRes.json();
+          pays = payJson.data ?? [];
+        }
+
+        const invsWithPays = invs.map((inv) => ({
+          ...inv,
+          pembayaran: pays.filter((p: any) => p.invoiceId === inv.id),
+        }));
+        setInvoices(invsWithPays);
       } catch (err) {
         console.error("Failed to load dashboard data:", err);
       } finally {

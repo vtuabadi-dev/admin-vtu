@@ -8,6 +8,7 @@ import notificationWorker from "./notification.worker";
 import manifestWorker from "./manifest.worker";
 import cleanupWorker from "./cleanup.worker";
 import backupWorker from "./backup.worker";
+import broadcastWorker from "./broadcast.worker";
 
 export const workers = {
   ocr: ocrWorker,
@@ -17,6 +18,7 @@ export const workers = {
   manifest: manifestWorker,
   cleanup: cleanupWorker,
   backup: backupWorker,
+  broadcast: broadcastWorker,
 };
 
 export async function startAllWorkers(): Promise<void> {

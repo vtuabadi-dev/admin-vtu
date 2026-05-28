@@ -4,13 +4,29 @@
 import type { DokumenJenis } from "@/shared/types";
 import type { OcrProvider, OcrResult, ImageMetaCheck } from "./ocr/provider";
 import { createTesseractProvider } from "./ocr/tesseract.provider";
+import { createExternalApiProvider } from "./ocr/external-api.provider";
+import { createGoogleVisionProvider } from "./ocr/google-vision.provider";
 
-// Singleton provider — bisa diganti dengan provider lain via setOcrProvider()
 let _provider: OcrProvider | null = null;
 
 async function getProvider(): Promise<OcrProvider> {
   if (_provider) return _provider;
-  _provider = createTesseractProvider();
+
+  const configured = process.env.OCR_PROVIDER ?? "tesseract";
+
+  switch (configured) {
+    case "google-vision":
+      _provider = createGoogleVisionProvider();
+      break;
+    case "external-api":
+      _provider = createExternalApiProvider();
+      break;
+    case "tesseract":
+    default:
+      _provider = createTesseractProvider();
+      break;
+  }
+
   await _provider.initialize?.();
   return _provider;
 }

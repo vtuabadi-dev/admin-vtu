@@ -16,7 +16,6 @@ import { Button } from "@/shared/components/ui/Button";
 import { Input } from "@/shared/components/ui/Input";
 import { Select } from "@/shared/components/ui/Select";
 import { PermissionGuard } from "@/shared/components/PermissionGuard";
-import { getAuditLog } from "@/services/mock/handlers";
 import { exportCsv } from "@/shared/lib/export-utils";
 import type { AuditEntry } from "@/shared/types";
 import { cn } from "@/shared/lib/utils";
@@ -54,12 +53,22 @@ export default function AuditLogPage() {
   useEffect(() => {
     async function load() {
       setLoading(true);
-      const data = await getAuditLog();
-      setEntries(data);
-      setLoading(false);
+      try {
+        const params = new URLSearchParams();
+        if (moduleFilter && moduleFilter !== "all") params.set("module", moduleFilter);
+        const res = await fetch(`/api/audit?${params.toString()}`);
+        if (res.ok) {
+          const json = await res.json();
+          setEntries(json.data ?? []);
+        }
+      } catch {
+        setEntries([]);
+      } finally {
+        setLoading(false);
+      }
     }
     load();
-  }, []);
+  }, [moduleFilter]);
 
   const filteredEntries = useMemo(() => {
     let result = entries;
@@ -123,7 +132,7 @@ export default function AuditLogPage() {
   const hasActiveFilters = moduleFilter !== "all" || searchQuery || dateFrom || dateTo;
 
   return (
-    <PermissionGuard module="sistem">
+    <PermissionGuard module="audit">
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">

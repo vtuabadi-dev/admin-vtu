@@ -10,10 +10,11 @@ import { NotificationBell } from "@/shared/components/NotificationBell";
 import { SearchOverlay } from "@/shared/components/SearchOverlay";
 import { CommandPalette } from "@/shared/components/CommandPalette";
 import { Search } from "lucide-react";
+import type { OperationalRole } from "@/shared/types";
 
 interface ShellProps {
   children: React.ReactNode;
-  role: "admin" | "jamaah";
+  role: OperationalRole;
 }
 
 export function Shell({ children, role }: ShellProps) {

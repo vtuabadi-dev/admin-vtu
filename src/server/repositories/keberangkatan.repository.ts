@@ -197,6 +197,57 @@ export const keberangkatanRepo = {
     };
   },
 
+  async getManifestValidation(keberangkatanId: string): Promise<{
+    canFinalize: boolean;
+    blockers: { label: string; count: number; detail: string }[];
+    warnings: { label: string; count: number; detail: string }[];
+  }> {
+    const row = await prisma.keberangkatan.findUnique({
+      where: { id: keberangkatanId },
+      include: {
+        groups: {
+          include: {
+            anggota: { include: { dokumen: true } },
+            pembayaran: { where: { status: "verified" } },
+          },
+        },
+      },
+    });
+    if (!row) throw new Error("Keberangkatan not found");
+
+    const blockers: { label: string; count: number; detail: string }[] = [];
+    const warnings: { label: string; count: number; detail: string }[] = [];
+    const allJamaah = row.groups.flatMap((g) => g.anggota);
+
+    // Blockers
+    const unpaidJamaah = row.groups.filter((g) => g.sisaPembayaran > 0).flatMap((g) => g.anggota);
+    if (unpaidJamaah.length > 0) {
+      blockers.push({ label: "Unpaid Jamaah", count: unpaidJamaah.length, detail: `${unpaidJamaah.length} jamaah in groups with outstanding balance` });
+    }
+
+    const missingPassport = allJamaah.filter((j) => !j.dokumen.some((d) => d.jenis === "paspor" && (d.status === "verified" || d.status === "lengkap")));
+    if (missingPassport.length > 0) {
+      blockers.push({ label: "Missing Verified Passport", count: missingPassport.length, detail: `${missingPassport.length} jamaah without verified passport` });
+    }
+
+    // Warnings
+    const incompleteDocs = allJamaah.filter((j) => j.dokumen.filter((d) => d.wajib).some((d) => d.status !== "verified" && d.status !== "lengkap"));
+    if (incompleteDocs.length > 0) {
+      warnings.push({ label: "Incomplete Documents", count: incompleteDocs.length, detail: `${incompleteDocs.length} jamaah with incomplete required documents` });
+    }
+
+    const noRooming = row.groups.length > 0 && !await prisma.rooming.findFirst({ where: { keberangkatanId } });
+    if (noRooming) {
+      warnings.push({ label: "No Rooming Assignment", count: allJamaah.length, detail: "Rooming has not been generated for this departure" });
+    }
+
+    return {
+      canFinalize: blockers.length === 0,
+      blockers,
+      warnings,
+    };
+  },
+
   async getReadinessScore(keberangkatanId: string): Promise<PackageReadinessScore> {
     const row = await prisma.keberangkatan.findUnique({
       where: { id: keberangkatanId },

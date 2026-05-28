@@ -3,10 +3,6 @@
 import { useEffect, useState, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import {
-  getAllPaymentSummaries,
-  getKeberangkatanList,
-} from "@/services/mock/handlers";
-import {
   Card,
   CardHeader,
   CardTitle,
@@ -62,10 +58,24 @@ export default function PembayaranMonitoringPage() {
 
   useEffect(() => {
     async function load() {
-      const [s, k] = await Promise.all([getAllPaymentSummaries(), getKeberangkatanList()]);
-      setSummaries(s);
-      setKbrList(k);
-      setLoading(false);
+      try {
+        const [groupsRes, kbrRes] = await Promise.all([
+          fetch("/api/groups"),
+          fetch("/api/keberangkatan"),
+        ]);
+        if (groupsRes.ok) {
+          const json = await groupsRes.json();
+          setSummaries(json.data ?? []);
+        }
+        if (kbrRes.ok) {
+          const json = await kbrRes.json();
+          setKbrList(json.data ?? []);
+        }
+      } catch (err) {
+        console.error("Failed to load payment data:", err);
+      } finally {
+        setLoading(false);
+      }
     }
     load();
   }, []);

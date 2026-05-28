@@ -1,44 +1,27 @@
-// Worker Entry Point — dipanggil via `npm run worker` atau Docker CMD
-// Menjalankan semua BullMQ workers + health check HTTP server
+// Worker entrypoint — spawned by Dockerfile.worker
+// Runs all BullMQ workers in a single process.
 
-import http from "http";
 import { startAllWorkers, stopAllWorkers } from "./index";
 
-const PORT = parseInt(process.env.WORKER_PORT || "3001", 10);
+async function main(): Promise<void> {
+  console.log("[Worker Entry] Booting...");
+  await startAllWorkers();
+  console.log("[Worker Entry] All workers running. Awaiting jobs...");
 
-const server = http.createServer((req, res) => {
-  if (req.url === "/health") {
-    res.writeHead(200, { "Content-Type": "application/json" });
-    res.end(JSON.stringify({ status: "ok", uptime: process.uptime() }));
-    return;
-  }
-  res.writeHead(404);
-  res.end();
+  process.on("SIGTERM", async () => {
+    console.log("[Worker Entry] SIGTERM received, shutting down...");
+    await stopAllWorkers();
+    process.exit(0);
+  });
+
+  process.on("SIGINT", async () => {
+    console.log("[Worker Entry] SIGINT received, shutting down...");
+    await stopAllWorkers();
+    process.exit(0);
+  });
+}
+
+main().catch((err) => {
+  console.error("[Worker Entry] Fatal error:", err);
+  process.exit(1);
 });
-
-async function main() {
-  try {
-    await startAllWorkers();
-    console.log("[Worker] All workers started — processing jobs...");
-
-    server.listen(PORT, () => {
-      console.log(`[Worker] Health server listening on :${PORT}`);
-    });
-  } catch (err) {
-    console.error("[Worker] Startup failed:", err);
-    process.exit(1);
-  }
-}
-
-// Graceful shutdown
-async function shutdown(signal: string) {
-  console.log(`[Worker] Received ${signal}, shutting down...`);
-  server.close();
-  await stopAllWorkers();
-  process.exit(0);
-}
-
-process.on("SIGTERM", () => shutdown("SIGTERM"));
-process.on("SIGINT", () => shutdown("SIGINT"));
-
-main();

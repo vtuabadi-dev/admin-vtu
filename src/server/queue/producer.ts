@@ -11,6 +11,7 @@ import type {
   CleanupTempJob,
   BackupDatabaseJob,
   ManifestGenerateJob,
+  BroadcastDispatchJob,
 } from "@/services/queue/types";
 
 // ── Queue instances (lazy — created on first use) ──────────────
@@ -96,6 +97,16 @@ export async function enqueueManifestGenerate(job: ManifestGenerateJob): Promise
   return { jobId: j.id || job.id, status: "queued" };
 }
 
+export async function enqueueBroadcastDispatch(job: BroadcastDispatchJob): Promise<{ jobId: string; status: "queued" }> {
+  const q = getQueue("broadcast-dispatch");
+  const j = await q.add("broadcast", job.data, {
+    attempts: job.maxAttempts || 3,
+    backoff: { type: "exponential", delay: 5000 },
+    jobId: job.id,
+  });
+  return { jobId: j.id || job.id, status: "queued" };
+}
+
 // ── Generic enqueue (dispatches by job.queue) ──────────────────
 
 export async function enqueueJob(job: QueueJob): Promise<{ jobId: string; status: "queued" }> {
@@ -107,6 +118,7 @@ export async function enqueueJob(job: QueueJob): Promise<{ jobId: string; status
     case "cleanup-temp":           return enqueueCleanupTemp(job as CleanupTempJob);
     case "backup-database":        return enqueueBackupDatabase(job as BackupDatabaseJob);
     case "manifest-generate":      return enqueueManifestGenerate(job as ManifestGenerateJob);
+    case "broadcast-dispatch":     return enqueueBroadcastDispatch(job as BroadcastDispatchJob);
     default: throw new Error(`Unknown queue: ${(job as QueueJob).queue}`);
   }
 }
@@ -114,7 +126,8 @@ export async function enqueueJob(job: QueueJob): Promise<{ jobId: string; status
 // ── Queue management helpers ───────────────────────────────────
 
 export async function getJobStatus(jobId: string): Promise<"waiting" | "active" | "completed" | "failed" | "delayed"> {
-  for (const name of ["document-ocr", "payment-reminder", "export-generator", "notification-dispatch", "cleanup-temp", "backup-database", "manifest-generate"] as QueueName[]) {
+  const queueNames: QueueName[] = ["document-ocr", "payment-reminder", "export-generator", "notification-dispatch", "cleanup-temp", "backup-database", "manifest-generate", "broadcast-dispatch"];
+  for (const name of queueNames) {
     try {
       const q = getQueue(name);
       const job = await q.getJob(jobId);
@@ -143,7 +156,8 @@ export async function getQueueStats(queueName: QueueName): Promise<{
 }
 
 export async function updateJobProgress(jobId: string, progress: JobProgress): Promise<void> {
-  for (const name of ["document-ocr", "payment-reminder", "export-generator", "notification-dispatch", "cleanup-temp", "backup-database", "manifest-generate"] as QueueName[]) {
+  const queueNames: QueueName[] = ["document-ocr", "payment-reminder", "export-generator", "notification-dispatch", "cleanup-temp", "backup-database", "manifest-generate", "broadcast-dispatch"];
+  for (const name of queueNames) {
     try {
       const q = getQueue(name);
       const job = await q.getJob(jobId);
@@ -156,7 +170,8 @@ export async function updateJobProgress(jobId: string, progress: JobProgress): P
 }
 
 export async function cancelJob(jobId: string): Promise<{ cancelled: boolean }> {
-  for (const name of ["document-ocr", "payment-reminder", "export-generator", "notification-dispatch", "cleanup-temp", "backup-database", "manifest-generate"] as QueueName[]) {
+  const queueNames: QueueName[] = ["document-ocr", "payment-reminder", "export-generator", "notification-dispatch", "cleanup-temp", "backup-database", "manifest-generate", "broadcast-dispatch"];
+  for (const name of queueNames) {
     try {
       const q = getQueue(name);
       const job = await q.getJob(jobId);
@@ -170,7 +185,8 @@ export async function cancelJob(jobId: string): Promise<{ cancelled: boolean }> 
 }
 
 export async function retryJob(jobId: string): Promise<{ jobId: string; status: "queued" }> {
-  for (const name of ["document-ocr", "payment-reminder", "export-generator", "notification-dispatch", "cleanup-temp", "backup-database", "manifest-generate"] as QueueName[]) {
+  const queueNames: QueueName[] = ["document-ocr", "payment-reminder", "export-generator", "notification-dispatch", "cleanup-temp", "backup-database", "manifest-generate", "broadcast-dispatch"];
+  for (const name of queueNames) {
     try {
       const q = getQueue(name);
       const job = await q.getJob(jobId);

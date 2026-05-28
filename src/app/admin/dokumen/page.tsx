@@ -26,15 +26,6 @@ import { Select } from "@/shared/components/ui/Select";
 import { Modal } from "@/shared/components/ui/Modal";
 import { Tabs } from "@/shared/components/ui/Tabs";
 import {
-  updateDokumenStatus,
-  getKeberangkatanList,
-  getGroupList,
-  getDokumenReviewQueue,
-  getDocumentCompletionMatrix,
-  simulateZipDownload,
-  saveManualOcrData,
-} from "@/services/mock/handlers";
-import {
   getValidationPriority,
   canEditManualData,
   getDocumentStatusBadge,
@@ -130,17 +121,17 @@ export default function DokumenPage() {
   // --- Rekap Tab State ---
   const [selectedPackage, setSelectedPackage] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
-  const [completionMatrix, setCompletionMatrix] = useState<Awaited<ReturnType<typeof getDocumentCompletionMatrix>>>([]);
+  const [completionMatrix, setCompletionMatrix] = useState<any[]>([]);
   const [matrixLoading, setMatrixLoading] = useState(false);
   const [zipLoading, setZipLoading] = useState<string | null>(null);
   const [showReminderModal, setShowReminderModal] = useState(false);
 
   // --- Review Tab State ---
   const [reviewFilter, setReviewFilter] = useState("");
-  const [reviewQueue, setReviewQueue] = useState<Awaited<ReturnType<typeof getDokumenReviewQueue>>>([]);
+  const [reviewQueue, setReviewQueue] = useState<any[]>([]);
   const [reviewLoading, setReviewLoading] = useState(false);
   const [reviewSearch, setReviewSearch] = useState("");
-  const [selectedReview, setSelectedReview] = useState<Awaited<ReturnType<typeof getDokumenReviewQueue>>[number] | null>(null);
+  const [selectedReview, setSelectedReview] = useState<any>(null);
 
   // --- OCR / Action Modal State ---
   const [ocrFields, setOcrFields] = useState<OcrFieldEdit[]>([]);
@@ -156,43 +147,72 @@ export default function DokumenPage() {
   // Load initial data
   useEffect(() => {
     async function load() {
-      const [kbrList, groupList] = await Promise.all([
-        getKeberangkatanList(),
-        getGroupList(),
-      ]);
-      setKeberangkatanList(kbrList);
-      const groupMap: Record<string, { namaGroup: string; kodeRegistrasi: string; paketId: string }> = {};
-      groupList.forEach((g) => {
-        groupMap[g.id] = { namaGroup: g.namaGroup, kodeRegistrasi: g.kodeRegistrasi, paketId: g.paketKeberangkatanId };
-      });
-      setGroups(groupMap);
-
-      // Pre-select first package
-      if (kbrList.length > 0) {
-        setSelectedPackage(kbrList[0]!.id);
-      }
+      try {
+        const [kbrRes, groupsRes] = await Promise.all([
+          fetch("/api/keberangkatan"),
+          fetch("/api/groups"),
+        ]);
+        if (kbrRes.ok) {
+          const json = await kbrRes.json();
+          const kbrList = json.data ?? [];
+          setKeberangkatanList(kbrList);
+          if (kbrList.length > 0) setSelectedPackage(kbrList[0].id);
+        }
+        if (groupsRes.ok) {
+          const json = await groupsRes.json();
+          const groupList = json.data ?? [];
+          const groupMap: Record<string, { namaGroup: string; kodeRegistrasi: string; paketId: string }> = {};
+          groupList.forEach((g: any) => {
+            groupMap[g.id] = { namaGroup: g.namaGroup, kodeRegistrasi: g.kodeRegistrasi, paketId: g.paketKeberangkatanId };
+          });
+          setGroups(groupMap);
+        }
+      } catch { /* graceful */ }
       setLoading(false);
     }
     load();
   }, []);
 
-  // Load completion matrix when package changes
+  // Load completion matrix when package changes (fetch jamaah + documents for package)
   useEffect(() => {
     if (!selectedPackage) return;
     async function load() {
       setMatrixLoading(true);
-      const matrix = await getDocumentCompletionMatrix(selectedPackage);
-      setCompletionMatrix(matrix);
+      try {
+        const res = await fetch(`/api/jamaah?groupId=&limit=200`);
+        if (res.ok) {
+          const json = await res.json();
+          const allJamaah = json.data ?? [];
+          const pkgJamaah = allJamaah.filter((j: any) => {
+            const g = groups[j.groupId];
+            return g?.paketId === selectedPackage;
+          });
+          // Build matrix from jamaah documents
+          const matrix = pkgJamaah.map((j: any) => ({
+            jamaahId: j.id,
+            namaLengkap: j.namaLengkap,
+            nomorPeserta: j.nomorPeserta,
+            groupId: j.groupId,
+            dokumen: j.dokumen ?? [],
+          }));
+          setCompletionMatrix(matrix);
+        }
+      } catch { /* graceful */ }
       setMatrixLoading(false);
     }
     load();
-  }, [selectedPackage]);
+  }, [selectedPackage, groups]);
 
   // Load review queue
-  const loadReviewQueue = useCallback(async (filter?: string) => {
+  const loadReviewQueue = useCallback(async (_filter?: string) => {
     setReviewLoading(true);
-    const queue = await getDokumenReviewQueue(filter);
-    setReviewQueue(queue);
+    try {
+      const res = await fetch("/api/dokumen/review");
+      if (res.ok) {
+        const json = await res.json();
+        setReviewQueue(json.data ?? []);
+      }
+    } catch { /* graceful */ }
     setReviewLoading(false);
   }, []);
 
@@ -245,15 +265,22 @@ export default function DokumenPage() {
     if (!selectedPackage) return;
     const key = docJenis ?? "semua";
     setZipLoading(key);
-    const result = await simulateZipDownload(selectedPackage, docJenis);
-    setZipLoading(null);
-    if (result.success) {
-      window.alert(
-        `[MOCK] ZIP siap di-download\n\nFile: ${result.fileName}\nJumlah file: ${result.fileCount}\n\nStruktur:\n${result.structure.slice(0, 10).join("\n")}${result.structure.length > 10 ? `\n... dan ${result.structure.length - 10} file lainnya` : ""}`
-      );
-    } else {
-      window.alert("Paket tidak ditemukan atau tidak ada dokumen.");
+    try {
+      const res = await fetch("/api/exports", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ exportType: "dokumen", format: "csv", packageId: selectedPackage, filters: docJenis ? { jenis: docJenis } : undefined }),
+      });
+      if (res.ok) {
+        const json = await res.json();
+        window.alert(`Export berhasil diantrikan.\n\nJob ID: ${json.data.jobId}\n\nCek status di: /api/exports/${json.data.jobId}`);
+      } else {
+        window.alert("Gagal membuat export. Silakan coba lagi.");
+      }
+    } catch {
+      window.alert("Gagal membuat export.");
     }
+    setZipLoading(null);
   }
 
   // --- Review: Filtered queue ---
@@ -290,7 +317,13 @@ export default function DokumenPage() {
   async function handleSaveManualData() {
     if (!selectedReview) return;
     setUpdating(true);
-    await saveManualOcrData(selectedReview.dokumen.id, manualEditData);
+    try {
+      await fetch("/api/dokumen/review", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ dokumenId: selectedReview.dokumen.id, manualData: manualEditData, dataStatus: "manual_edit" }),
+      });
+    } catch { /* graceful */ }
     setManualEditMode(false);
     setUpdating(false);
     loadReviewQueue(reviewFilter);
@@ -300,7 +333,13 @@ export default function DokumenPage() {
   async function handleApprove() {
     if (!selectedReview) return;
     setUpdating(true);
-    await updateDokumenStatus(selectedReview.dokumen.id, "verified");
+    try {
+      await fetch(`/api/dokumen/${selectedReview.dokumen.id}/status`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "verified" }),
+      });
+    } catch { /* graceful */ }
     setUpdating(false);
     setSelectedReview(null);
     loadReviewQueue(reviewFilter);
@@ -310,7 +349,13 @@ export default function DokumenPage() {
     if (!selectedReview) return;
     const note = revisiNote.trim() || "Perlu revisi dokumen";
     setUpdating(true);
-    await updateDokumenStatus(selectedReview.dokumen.id, "revisi", note);
+    try {
+      await fetch(`/api/dokumen/${selectedReview.dokumen.id}/status`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "revisi", catatan: note }),
+      });
+    } catch { /* graceful */ }
     setUpdating(false);
     setSelectedReview(null);
     loadReviewQueue(reviewFilter);
@@ -319,7 +364,13 @@ export default function DokumenPage() {
   async function handleTolak() {
     if (!selectedReview) return;
     setUpdating(true);
-    await updateDokumenStatus(selectedReview.dokumen.id, "rejected");
+    try {
+      await fetch(`/api/dokumen/${selectedReview.dokumen.id}/status`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "rejected" }),
+      });
+    } catch { /* graceful */ }
     setUpdating(false);
     setSelectedReview(null);
     loadReviewQueue(reviewFilter);

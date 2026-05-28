@@ -8,6 +8,7 @@ export {
   enqueueCleanupTemp,
   enqueueBackupDatabase,
   enqueueManifestGenerate,
+  enqueueBroadcastDispatch,
   getJobStatus,
   getQueueStats,
   updateJobProgress,

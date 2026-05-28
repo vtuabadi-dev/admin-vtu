@@ -39,6 +39,18 @@ export function backupLogPath(timestamp: string): string {
   return `backups/logs/${timestamp}.log`;
 }
 
+// ── Registration signature paths ──────────────────────────────────
+
+export function signaturePath(registrationId: string): string {
+  return `dokumen/signatures/${registrationId}_ttd.jpg`;
+}
+
+// ── Payment proof paths ──────────────────────────────────────────
+
+export function paymentProofPath(jamaahId: string, ext: string): string {
+  return `pembayaran/${jamaahId}/bukti_${Date.now()}.${ext}`;
+}
+
 // ── Temp / cleanup paths ─────────────────────────────────────────
 
 export function tempUploadPath(fileName: string): string {

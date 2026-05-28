@@ -20,19 +20,21 @@ const prisma = new PrismaClient();
 async function main() {
   console.log("Seeding database...");
 
-  // ── 1. Users (7 mock credentials from auth-store.ts) ──────
-  // Password: "admin123" hashed with bcrypt placeholder
-  // In production, use real bcrypt hashes
-  const HASH = "$2b$10$placeholder_hash_replace_in_production";
+  // ── 1. Users ────────────────────────────────────────────────
+  // Shared password for operational admins: "admin123"
+  // Super admin password: "SuperAdmin123!"
+  const ADMIN_HASH = "$2b$12$iPziIA.8ozPqTQ8PHljdh.abAF8rzbZZGvO3hXSIdjpntBDPzIFBG";
+  const SUPER_ADMIN_HASH = "$2b$12$okEmUFNfL5/KZc9W3qO87OIqwzF4lw/KUXY01bCFxu1XiEy2P8Wea";
 
   const users = [
-    { name: "Super Admin", email: "admin@vtu.id", passwordHash: HASH, role: "super_admin" as const },
-    { name: "Admin Operasional", email: "ops@vtu.id", passwordHash: HASH, role: "admin_operasional" as const },
-    { name: "Admin Pembayaran", email: "finance@vtu.id", passwordHash: HASH, role: "admin_pembayaran" as const },
-    { name: "Admin Manifest", email: "manifest@vtu.id", passwordHash: HASH, role: "admin_manifest" as const },
-    { name: "Admin Dokumen", email: "docs@vtu.id", passwordHash: HASH, role: "admin_dokumen" as const },
-    { name: "Tour Leader", email: "tl@vtu.id", passwordHash: HASH, role: "tour_leader" as const },
-    { name: "Jamaah Demo", email: "jamaah@vtu.id", passwordHash: HASH, role: "jamaah" as const },
+    { name: "Super Admin", email: "superadmin@vtu.id", passwordHash: SUPER_ADMIN_HASH, role: "super_admin" as const },
+    { name: "Super Admin (Legacy)", email: "admin@vtu.id", passwordHash: ADMIN_HASH, role: "super_admin" as const },
+    { name: "Admin Operasional", email: "ops@vtu.id", passwordHash: ADMIN_HASH, role: "admin_operasional" as const },
+    { name: "Admin Pembayaran", email: "finance@vtu.id", passwordHash: ADMIN_HASH, role: "admin_pembayaran" as const },
+    { name: "Admin Manifest", email: "manifest@vtu.id", passwordHash: ADMIN_HASH, role: "admin_manifest" as const },
+    { name: "Admin Dokumen", email: "docs@vtu.id", passwordHash: ADMIN_HASH, role: "admin_dokumen" as const },
+    { name: "Tour Leader", email: "tl@vtu.id", passwordHash: ADMIN_HASH, role: "tour_leader" as const },
+    { name: "Jamaah Demo", email: "jamaah@vtu.id", passwordHash: ADMIN_HASH, role: "jamaah" as const },
   ];
 
   for (const u of users) {

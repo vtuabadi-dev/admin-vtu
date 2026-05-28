@@ -8,3 +8,4 @@ export { roomingRepo } from "./rooming.repository";
 export { dokumenRepo } from "./dokumen.repository";
 export { auditRepo } from "./audit.repository";
 export { notificationRepo } from "./notification.repository";
+export { registrationRepo } from "./registration.repository";

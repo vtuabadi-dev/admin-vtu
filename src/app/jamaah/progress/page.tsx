@@ -2,12 +2,6 @@
 
 import { useEffect, useState } from "react";
 import {
-  getJamaahById,
-  getDokumenByJamaah,
-  getInvoiceByJamaah,
-  getKeberangkatanList,
-} from "@/services/mock/handlers";
-import {
   Check,
   Circle,
   Clock,
@@ -41,8 +35,6 @@ import type {
   Invoice,
   Keberangkatan,
 } from "@/shared/types";
-
-const JAMAHA_ID = "jmh-001";
 
 // ============================================================
 // Progress step definitions
@@ -314,20 +306,25 @@ export default function ProgressPage() {
   useEffect(() => {
     async function load() {
       try {
-        const [j, docs, invs, kbrs] = await Promise.all([
-          getJamaahById(JAMAHA_ID),
-          getDokumenByJamaah(JAMAHA_ID),
-          getInvoiceByJamaah(JAMAHA_ID),
-          getKeberangkatanList(),
+        const [meRes, invRes, docRes] = await Promise.all([
+          fetch("/api/jamaah/me"),
+          fetch("/api/jamaah/me/invoices"),
+          fetch("/api/jamaah/me/documents"),
         ]);
-        setJamaah(j ?? null);
-        setDokumen(docs);
-        setInvoices(invs);
 
-        if (j) {
-          const kbr = kbrs.find((k) => k.jamaahIds.includes(j.id)) ?? null;
-          setKeberangkatan(kbr);
+        if (meRes.ok) {
+          const json = await meRes.json();
+          setJamaah(json.data ?? null);
+          if (json.data) {
+            // Try to get departure info
+            try {
+              const kbrRes = await fetch("/api/jamaah/me/departure");
+              if (kbrRes.ok) { const kj = await kbrRes.json(); setKeberangkatan(kj.data ?? null); }
+            } catch { /* non-critical */ }
+          }
         }
+        if (invRes.ok) { const json = await invRes.json(); setInvoices(json.data ?? []); }
+        if (docRes.ok) { const json = await docRes.json(); setDokumen(json.data ?? []); }
       } catch (err) {
         console.error("Failed to load progress data:", err);
       } finally {

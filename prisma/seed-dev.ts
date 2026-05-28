@@ -22,7 +22,8 @@ const prisma = new PrismaClient();
 
 // ── Constants ─────────────────────────────────────────────────
 
-const HASH = "$2b$10$placeholder_hash_replace_in_production";
+const ADMIN_HASH = "$2b$12$iPziIA.8ozPqTQ8PHljdh.abAF8rzbZZGvO3hXSIdjpntBDPzIFBG";
+const SUPER_ADMIN_HASH = "$2b$12$okEmUFNfL5/KZc9W3qO87OIqwzF4lw/KUXY01bCFxu1XiEy2P8Wea";
 const NOW = new Date();
 
 const NAMA_DEPAN = [
@@ -84,13 +85,14 @@ async function main() {
 
   // ── 1. Users ────────────────────────────────────────────────
   const users = await Promise.all([
-    prisma.user.create({ data: { name: "Super Admin", email: "admin@vtu.id", passwordHash: HASH, role: "super_admin" } }),
-    prisma.user.create({ data: { name: "Admin Operasional", email: "ops@vtu.id", passwordHash: HASH, role: "admin_operasional" } }),
-    prisma.user.create({ data: { name: "Admin Pembayaran", email: "finance@vtu.id", passwordHash: HASH, role: "admin_pembayaran" } }),
-    prisma.user.create({ data: { name: "Admin Manifest", email: "manifest@vtu.id", passwordHash: HASH, role: "admin_manifest" } }),
-    prisma.user.create({ data: { name: "Admin Dokumen", email: "dokumen@vtu.id", passwordHash: HASH, role: "admin_dokumen" } }),
-    prisma.user.create({ data: { name: "Tour Leader 1", email: "tl1@vtu.id", passwordHash: HASH, role: "tour_leader" } }),
-    prisma.user.create({ data: { name: "Tour Leader 2", email: "tl2@vtu.id", passwordHash: HASH, role: "tour_leader" } }),
+    prisma.user.create({ data: { name: "Super Admin", email: "superadmin@vtu.id", passwordHash: SUPER_ADMIN_HASH, role: "super_admin" } }),
+    prisma.user.create({ data: { name: "Super Admin (Legacy)", email: "admin@vtu.id", passwordHash: ADMIN_HASH, role: "super_admin" } }),
+    prisma.user.create({ data: { name: "Admin Operasional", email: "ops@vtu.id", passwordHash: ADMIN_HASH, role: "admin_operasional" } }),
+    prisma.user.create({ data: { name: "Admin Pembayaran", email: "finance@vtu.id", passwordHash: ADMIN_HASH, role: "admin_pembayaran" } }),
+    prisma.user.create({ data: { name: "Admin Manifest", email: "manifest@vtu.id", passwordHash: ADMIN_HASH, role: "admin_manifest" } }),
+    prisma.user.create({ data: { name: "Admin Dokumen", email: "dokumen@vtu.id", passwordHash: ADMIN_HASH, role: "admin_dokumen" } }),
+    prisma.user.create({ data: { name: "Tour Leader 1", email: "tl1@vtu.id", passwordHash: ADMIN_HASH, role: "tour_leader" } }),
+    prisma.user.create({ data: { name: "Tour Leader 2", email: "tl2@vtu.id", passwordHash: ADMIN_HASH, role: "tour_leader" } }),
   ]);
   console.log(`✅ Created ${users.length} users`);
 

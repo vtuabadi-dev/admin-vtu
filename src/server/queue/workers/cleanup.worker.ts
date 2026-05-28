@@ -50,6 +50,8 @@ const worker = new Worker(
     connection: connectionOptions,
     concurrency: 1,
     autorun: true,
+    lockDuration: 30000,
+    stalledInterval: 30000,
     removeOnComplete: { count: 200 },
     removeOnFail: { count: 100 },
   }

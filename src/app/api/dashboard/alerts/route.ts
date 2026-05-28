@@ -1,10 +1,13 @@
 ﻿import { NextResponse } from "next/server";
 import { auth } from "@/server/auth";
+import { checkServerPermission } from "@/shared/lib/rbac-utils";
 import { keberangkatanRepo, groupRepo } from "@/server/repositories";
 
 export async function GET() {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
+  const perm = checkServerPermission(session, "jamaah", "view");
+  if (!perm.allowed) return NextResponse.json({ success: false, message: perm.reason }, { status: 403 });
 
   try {
     const [keberangkatan, groups] = await Promise.all([
@@ -25,7 +28,7 @@ export async function GET() {
     const now = new Date();
 
     // Overdue groups
-    const overdue = groups.data.filter((g) => g.sisaPembayaran > 0);
+    const overdue = groups.data.filter((g: { sisaPembayaran: number }) => g.sisaPembayaran > 0);
     if (overdue.length > 0) {
       alerts.push({
         id: "alert-overdue",
@@ -40,7 +43,7 @@ export async function GET() {
 
     // Upcoming departures
     const upcoming = keberangkatan.data.filter(
-      (k) => k.status === "scheduled" && new Date(k.tanggalBerangkat) <= new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+      (k: { status: string; tanggalBerangkat: string }) => k.status === "scheduled" && new Date(k.tanggalBerangkat) <= new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
     );
     if (upcoming.length > 0) {
       alerts.push({

@@ -274,6 +274,18 @@ export default function LoginPage() {
           </button>
         </form>
 
+        {/* ── Registration link (Jamaah only) ── */}
+        {!isAdmin && (
+          <div className="mt-4 text-center">
+            <p className="text-sm text-muted-foreground">
+              Belum punya akun?{" "}
+              <a href="/register" className="text-primary font-medium hover:underline">
+                Daftar di sini
+              </a>
+            </p>
+          </div>
+        )}
+
         {/* ── Demo Credentials ── */}
         <div className="mt-6">
           <button

@@ -2,12 +2,6 @@
 
 import { useEffect, useState, useCallback } from "react";
 import {
-  getPaymentReviewQueue,
-  approvePayment,
-  rejectPayment,
-} from "@/services/mock/handlers";
-import { getGroupList } from "@/services/mock/handlers";
-import {
   Card,
   CardContent,
 } from "@/shared/components/ui/Card";
@@ -27,10 +21,7 @@ import {
 } from "lucide-react";
 import { LoadingSkeleton } from "@/shared/components/LoadingSkeleton";
 import { EmptyState } from "@/shared/components/EmptyState";
-import type {
-  Pembayaran,
-  RegistrationGroup,
-} from "@/shared/types";
+import type { Pembayaran } from "@/shared/types";
 
 // ============================================================
 // REVIEW PAGE
@@ -46,7 +37,6 @@ const ALASAN_REJECT: { value: string; label: string }[] = [
 
 export default function PaymentReviewPage() {
   const [queue, setQueue] = useState<Pembayaran[]>([]);
-  const [groups, setGroups] = useState<RegistrationGroup[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Action state
@@ -58,32 +48,28 @@ export default function PaymentReviewPage() {
   const [showSuccess, setShowSuccess] = useState(false);
 
   const loadData = useCallback(async () => {
-    const [q, g] = await Promise.all([
-      getPaymentReviewQueue(),
-      getGroupList(),
-    ]);
-    setQueue(q);
-    setGroups(g);
-    setLoading(false);
+    try {
+      const res = await fetch("/api/pembayaran/review");
+      if (res.ok) {
+        const json = await res.json();
+        setQueue(json.data ?? []);
+      }
+    } catch (err) {
+      console.error("Failed to load review queue:", err);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => {
     loadData();
   }, [loadData]);
 
-  // Helpers
-  function getGroupName(groupId: string): string {
-    return groups.find((g) => g.id === groupId)?.namaGroup ?? groupId;
-  }
-
-  function getGroupKode(groupId: string): string {
-    return groups.find((g) => g.id === groupId)?.kodeRegistrasi ?? "-";
-  }
-
   const handleApprove = useCallback(async (payment: Pembayaran) => {
     setProcessingId(payment.id);
     try {
-      await approvePayment(payment.id, "Admin");
+      const res = await fetch(`/api/pembayaran/${payment.id}/approve`, { method: "POST" });
+      if (!res.ok) throw new Error("Gagal menyetujui");
       setQueue((prev) => prev.filter((p) => p.id !== payment.id));
       setSuccessMessage(`Pembayaran ${formatCurrency(payment.jumlah)} telah disetujui`);
       setShowSuccess(true);
@@ -99,7 +85,12 @@ export default function PaymentReviewPage() {
     setProcessingId(rejectTarget.id);
     try {
       const alasan = rejectNotes ? `${rejectReason} — ${rejectNotes}` : rejectReason;
-      await rejectPayment(rejectTarget.id, "Admin", alasan);
+      const res = await fetch(`/api/pembayaran/${rejectTarget.id}/reject`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ alasanReject: alasan }),
+      });
+      if (!res.ok) throw new Error("Gagal menolak");
       setQueue((prev) => prev.filter((p) => p.id !== rejectTarget.id));
       setSuccessMessage(`Pembayaran ${formatCurrency(rejectTarget.jumlah)} telah ditolak`);
       setShowSuccess(true);
@@ -174,8 +165,8 @@ export default function PaymentReviewPage() {
                     <tr key={p.id} className="border-b hover:bg-muted/50">
                       <td className="px-3 py-3 text-xs text-muted-foreground">{idx + 1}</td>
                       <td className="px-3 py-3">
-                        <p className="text-xs font-medium">{getGroupName(p.groupId)}</p>
-                        <p className="text-[10px] text-muted-foreground font-mono">{getGroupKode(p.groupId)}</p>
+                        <p className="text-xs font-medium">{(p as any).namaGroup ?? p.groupId}</p>
+                        <p className="text-[10px] text-muted-foreground font-mono">{(p as any).kodeRegistrasi ?? "-"}</p>
                       </td>
                       <td className="px-3 py-3">
                         <span className="font-mono text-xs">{p.invoiceId ?? "-"}</span>

@@ -23,6 +23,9 @@ import {
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useAdminStore } from "@/stores/admin-store";
+import { useSession } from "@/shared/hooks/use-session";
+import { isSidebarItemVisible, isSuperAdmin } from "@/shared/lib/rbac-utils";
+import type { OperationalRole } from "@/shared/types";
 
 interface NavChild {
   label: string;
@@ -137,14 +140,23 @@ const jamaahNav: NavSection[] = [
 ];
 
 interface SidebarProps {
-  role: "admin" | "jamaah";
+  role: OperationalRole;
 }
 
 export function Sidebar({ role }: SidebarProps) {
   const pathname = usePathname();
   const { sidebarCollapsed: collapsed, toggleSidebar } = useAdminStore();
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
-  const sections = role === "admin" ? adminNav : jamaahNav;
+  const { user } = useSession();
+  const superAdmin = isSuperAdmin(role);
+
+  // Build filtered sections based on role visibility
+  const sections = role === "jamaah" ? jamaahNav : adminNav
+    .map((section) => ({
+      ...section,
+      items: section.items.filter((item) => isSidebarItemVisible(role, section.title, item.label)),
+    }))
+    .filter((section) => section.items.length > 0);
 
   // Auto-expand parent when a child route is active
   useEffect(() => {
@@ -162,7 +174,6 @@ export function Sidebar({ role }: SidebarProps) {
       }
     }
     setExpanded(next);
-    // Only re-evaluate on pathname change
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname]);
 
@@ -191,6 +202,10 @@ export function Sidebar({ role }: SidebarProps) {
   function isChildActive(href: string): boolean {
     return pathname === href || pathname.startsWith(href + "/");
   }
+
+  const displayName = user?.name ?? "Admin VTU";
+  const displayEmail = user?.email ?? "";
+  const avatarLetter = displayName.charAt(0).toUpperCase();
 
   return (
     <aside
@@ -239,7 +254,6 @@ export function Sidebar({ role }: SidebarProps) {
                 if (hasChildren) {
                   return (
                     <li key={item.label}>
-                      {/* Parent button */}
                       <button
                         onClick={() => toggleGroup(item.label)}
                         className={cn(
@@ -265,7 +279,6 @@ export function Sidebar({ role }: SidebarProps) {
                         )}
                       </button>
 
-                      {/* Children */}
                       {!collapsed && isExpanded && (
                         <ul className="mt-0.5 ml-4 space-y-0.5 border-l border-border pl-3">
                           {item.children!.map((child) => (
@@ -289,7 +302,6 @@ export function Sidebar({ role }: SidebarProps) {
                   );
                 }
 
-                // Simple link (no children)
                 return (
                   <li key={item.href}>
                     <Link
@@ -318,12 +330,15 @@ export function Sidebar({ role }: SidebarProps) {
       <div className="border-t p-2">
         {!collapsed && (
           <div className="flex items-center gap-3 px-3 py-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-xs font-medium">
-              A
+            <div className={cn(
+              "flex h-8 w-8 items-center justify-center rounded-full text-xs font-medium",
+              superAdmin ? "bg-amber-100 text-amber-700" : "bg-muted"
+            )}>
+              {avatarLetter}
             </div>
-            <div className="text-sm">
-              <div className="font-medium">Admin VTU</div>
-              <div className="text-xs text-muted-foreground">admin@vtu.id</div>
+            <div className="text-sm min-w-0">
+              <div className="font-medium truncate">{displayName}</div>
+              <div className="text-xs text-muted-foreground truncate">{displayEmail}</div>
             </div>
           </div>
         )}
