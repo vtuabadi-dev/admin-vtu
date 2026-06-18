@@ -116,11 +116,11 @@ export const keberangkatanRepo = {
     });
     if (!row) return null;
 
-    const allJamaah = row.groups.flatMap((g) => g.anggota);
-    const unpaidCount = row.groups.reduce((sum, g) => sum + (g.sisaPembayaran > 0 ? 1 : 0), 0);
-    const dokumenPending = allJamaah.filter((j) => j.dokumen.some((d) => d.status !== "verified" && d.status !== "lengkap")).length;
-    const roomingIncomplete = row.roomings.filter((r) => r.status !== "final").length;
-    const manifestIncomplete = row.manifests.filter((m) => m.status !== "final" && m.status !== "submitted").length;
+    const allJamaah = row.groups.flatMap((g: any) => g.anggota);
+    const unpaidCount = row.groups.reduce((sum: number, g: any) => sum + (g.sisaPembayaran > 0 ? 1 : 0), 0);
+    const dokumenPending = allJamaah.filter((j: any) => j.dokumen.some((d: any) => d.status !== "verified" && d.status !== "lengkap")).length;
+    const roomingIncomplete = row.roomings.filter((r: any) => r.status !== "final").length;
+    const manifestIncomplete = row.manifests.filter((m: any) => m.status !== "final" && m.status !== "submitted").length;
     const warningCount = [unpaidCount > 0 ? 1 : 0, dokumenPending > 0 ? 1 : 0, roomingIncomplete > 0 ? 1 : 0, manifestIncomplete > 0 ? 1 : 0].filter(Boolean).length;
 
     return {
@@ -130,7 +130,7 @@ export const keberangkatanRepo = {
       roomingIncomplete,
       manifestIncomplete,
       warningCount,
-      readinessBreakdown: row.groups.reduce((acc, g) => {
+      readinessBreakdown: row.groups.reduce((acc: any, g: any) => {
         acc[g.kodeRegistrasi] = g.sisaPembayaran <= 0 ? 1 : 0;
         return acc;
       }, {} as Record<string, number>),
@@ -157,26 +157,26 @@ export const keberangkatanRepo = {
       {
         key: "all_lunas",
         label: "Semua jamaah lunas",
-        passed: row.groups.every((g) => g.sisaPembayaran <= 0),
+        passed: row.groups.every((g: any) => g.sisaPembayaran <= 0),
         blocking: true,
-        detail: row.groups.filter((g) => g.sisaPembayaran > 0).map((g) => `${g.kodeRegistrasi}: sisa ${g.sisaPembayaran}`).join("; ") || undefined,
+        detail: row.groups.filter((g: any) => g.sisaPembayaran > 0).map((g: any) => `${g.kodeRegistrasi}: sisa ${g.sisaPembayaran}`).join("; ") || undefined,
       },
       {
         key: "dokumen_verified",
         label: "Dokumen semua jamaah terverifikasi",
-        passed: row.groups.every((g) => g.anggota.every((a) => a.dokumen.filter((d) => d.wajib).every((d) => d.status === "verified" || d.status === "lengkap"))),
+        passed: row.groups.every((g: any) => g.anggota.every((a: any) => a.dokumen.filter((d: any) => d.wajib).every((d: any) => d.status === "verified" || d.status === "lengkap"))),
         blocking: true,
       },
       {
         key: "manifest_final",
         label: "Manifest sudah final",
-        passed: row.manifests.length > 0 && row.manifests.every((m) => m.status === "final" || m.status === "submitted"),
+        passed: row.manifests.length > 0 && row.manifests.every((m: any) => m.status === "final" || m.status === "submitted"),
         blocking: true,
       },
       {
         key: "rooming_final",
         label: "Rooming sudah final",
-        passed: row.roomings.length > 0 && row.roomings.every((r) => r.status === "final"),
+        passed: row.roomings.length > 0 && row.roomings.every((r: any) => r.status === "final"),
         blocking: false,
       },
       {
@@ -188,9 +188,9 @@ export const keberangkatanRepo = {
       },
     ];
 
-    const blockingCount = checks.filter((c) => !c.passed && c.blocking).length;
+    const blockingCount = checks.filter((c: any) => !c.passed && c.blocking).length;
     return {
-      canFinalize: checks.every((c) => c.passed || !c.blocking),
+      canFinalize: checks.every((c: any) => c.passed || !c.blocking),
       checks,
       blockingCount,
       totalCount: checks.length,
@@ -217,21 +217,21 @@ export const keberangkatanRepo = {
 
     const blockers: { label: string; count: number; detail: string }[] = [];
     const warnings: { label: string; count: number; detail: string }[] = [];
-    const allJamaah = row.groups.flatMap((g) => g.anggota);
+    const allJamaah = row.groups.flatMap((g: any) => g.anggota);
 
     // Blockers
-    const unpaidJamaah = row.groups.filter((g) => g.sisaPembayaran > 0).flatMap((g) => g.anggota);
+    const unpaidJamaah = row.groups.filter((g: any) => g.sisaPembayaran > 0).flatMap((g: any) => g.anggota);
     if (unpaidJamaah.length > 0) {
       blockers.push({ label: "Unpaid Jamaah", count: unpaidJamaah.length, detail: `${unpaidJamaah.length} jamaah in groups with outstanding balance` });
     }
 
-    const missingPassport = allJamaah.filter((j) => !j.dokumen.some((d) => d.jenis === "paspor" && (d.status === "verified" || d.status === "lengkap")));
+    const missingPassport = allJamaah.filter((j: any) => !j.dokumen.some((d: any) => d.jenis === "paspor" && (d.status === "verified" || d.status === "lengkap")));
     if (missingPassport.length > 0) {
       blockers.push({ label: "Missing Verified Passport", count: missingPassport.length, detail: `${missingPassport.length} jamaah without verified passport` });
     }
 
     // Warnings
-    const incompleteDocs = allJamaah.filter((j) => j.dokumen.filter((d) => d.wajib).some((d) => d.status !== "verified" && d.status !== "lengkap"));
+    const incompleteDocs = allJamaah.filter((j: any) => j.dokumen.filter((d: any) => d.wajib).some((d: any) => d.status !== "verified" && d.status !== "lengkap"));
     if (incompleteDocs.length > 0) {
       warnings.push({ label: "Incomplete Documents", count: incompleteDocs.length, detail: `${incompleteDocs.length} jamaah with incomplete required documents` });
     }
@@ -264,13 +264,13 @@ export const keberangkatanRepo = {
     });
     if (!row) throw new Error("Keberangkatan not found");
 
-    const allJamaah = row.groups.flatMap((g) => g.anggota);
+    const allJamaah = row.groups.flatMap((g: any) => g.anggota);
     const totalJamaah = allJamaah.length || 1;
 
-    const paymentScore = row.groups.reduce((sum, g) => sum + (g.totalTagihan > 0 ? g.totalPembayaran / g.totalTagihan : 1), 0) / (row.groups.length || 1) * 100;
-    const documentScore = allJamaah.filter((j) => j.dokumen.filter((d) => d.wajib).every((d) => d.status === "verified" || d.status === "lengkap")).length / totalJamaah * 100;
-    const manifestScore = row.manifests.length > 0 ? (row.manifests.filter((m) => m.status === "final" || m.status === "submitted").length / row.manifests.length) * 100 : 0;
-    const roomingScore = row.roomings.length > 0 ? (row.roomings.filter((r) => r.status === "final").length / row.roomings.length) * 100 : 0;
+    const paymentScore = row.groups.reduce((sum: number, g: any) => sum + (g.totalTagihan > 0 ? g.totalPembayaran / g.totalTagihan : 1), 0) / (row.groups.length || 1) * 100;
+    const documentScore = allJamaah.filter((j: any) => j.dokumen.filter((d: any) => d.wajib).every((d: any) => d.status === "verified" || d.status === "lengkap")).length / totalJamaah * 100;
+    const manifestScore = row.manifests.length > 0 ? (row.manifests.filter((m: any) => m.status === "final" || m.status === "submitted").length / row.manifests.length) * 100 : 0;
+    const roomingScore = row.roomings.length > 0 ? (row.roomings.filter((r: any) => r.status === "final").length / row.roomings.length) * 100 : 0;
     const operationalScore = row.status === "ready" || row.status === "departed" ? 100 : row.status === "preparing" ? 50 : 0;
 
     const scores = [
@@ -281,7 +281,7 @@ export const keberangkatanRepo = {
       { label: "Operasional", score: operationalScore, weight: 10 },
     ];
 
-    const overallScore = scores.reduce((sum, s) => sum + (s.score * s.weight) / 100, 0);
+    const overallScore = scores.reduce((sum: number, s: any) => sum + (s.score * s.weight) / 100, 0);
 
     return {
       overallScore: Math.round(overallScore),

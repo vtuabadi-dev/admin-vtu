@@ -170,7 +170,7 @@ export const jamaahRepo = {
       { key: "pembayaran", label: "Pembayaran", status: jamaah.status === "lunas" ? "passed" : jamaah.status === "batal" ? "failed" : "warning" },
     ];
 
-    const passed = checks.filter((c) => c.status === "passed").length;
+    const passed = checks.filter((c: any) => c.status === "passed").length;
     const total = checks.length;
     const score = Math.round((passed / total) * 100);
 

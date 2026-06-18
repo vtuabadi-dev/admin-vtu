@@ -97,8 +97,8 @@ export const invoiceRepo = {
     const invoice = await prisma.invoice.findUnique({ where: { id }, include: { items: true } });
     if (!invoice) throw new Error("Invoice not found");
 
-    const activeItems = invoice.items.filter((it) => it.status === "active");
-    const jumlah = activeItems.reduce((sum, it) => sum + it.jumlah, 0);
+    const activeItems = invoice.items.filter((it: any) => it.status === "active");
+    const jumlah = activeItems.reduce((sum: number, it: any) => sum + it.jumlah, 0);
     const pembayaran = await prisma.pembayaran.aggregate({ where: { invoiceId: id, status: "verified" }, _sum: { jumlah: true } });
     const totalPembayaran = pembayaran._sum.jumlah ?? 0;
     const sisaTagihan = Math.max(0, jumlah - totalPembayaran);
