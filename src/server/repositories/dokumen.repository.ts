@@ -92,7 +92,7 @@ export const dokumenRepo = {
       orderBy: { uploadedAt: "asc" },
       take: 100,
     });
-    return rows.map((r) => ({
+    return rows.map((r: any) => ({
       dokumen: mapDokumen(r),
       jamaah: (r as any).jamaah ?? null,
     }));
