@@ -144,6 +144,18 @@ export default function DokumenPage() {
   const [manualEditMode, setManualEditMode] = useState(false);
   const [manualEditData, setManualEditData] = useState({ namaLengkap: "", nik: "", nomorPaspor: "", tanggalLahir: "" });
 
+  // --- Upload Dokumen Tab State ---
+  const [uploadSearchId, setUploadSearchId] = useState("");
+  const [uploadSearching, setUploadSearching] = useState(false);
+  const [uploadError, setUploadError] = useState("");
+  const [selectedJamaah, setSelectedJamaah] = useState<any>(null);
+  const [uploadDocuments, setUploadDocuments] = useState<any[]>([]);
+  const [uploadPreviews, setUploadPreviews] = useState<Record<string, string>>({});
+  const [uploading, setUploading] = useState(false);
+  const [extractingOcr, setExtractingOcr] = useState<string | null>(null);
+  const [ocrResults, setOcrResults] = useState<Record<string, any>>({});
+  const [submitting, setSubmitting] = useState(false);
+
   // Load initial data
   useEffect(() => {
     async function load() {
@@ -329,6 +341,162 @@ export default function DokumenPage() {
     loadReviewQueue(reviewFilter);
   }
 
+  // --- Upload Dokumen Tab Functions ---
+  async function handleSearchJamaah() {
+    if (!uploadSearchId.trim()) return;
+    setUploadSearching(true);
+    setUploadError("");
+    setSelectedJamaah(null);
+    setUploadDocuments([]);
+    setUploadPreviews({});
+    setOcrResults({});
+
+    try {
+      const res = await fetch(`/api/jamaah?search=${encodeURIComponent(uploadSearchId.trim())}`);
+      if (!res.ok) throw new Error("Gagal mencari jamaah");
+      
+      const json = await res.json();
+      const jamaahList = json.data ?? [];
+      
+      if (jamaahList.length === 0) {
+        setUploadError("Jamaah tidak ditemukan dengan ID tersebut");
+        return;
+      }
+
+      // Find exact match by registrationId
+      const exactMatch = jamaahList.find((j: any) => j.registrationId === uploadSearchId.trim());
+      if (!exactMatch) {
+        setUploadError("Jamaah tidak ditemukan dengan ID tersebut");
+        return;
+      }
+
+      setSelectedJamaah(exactMatch);
+      
+      // Load existing documents
+      const docRes = await fetch(`/api/jamaah/${exactMatch.id}/dokumen`);
+      if (docRes.ok) {
+        const docJson = await docRes.json();
+        setUploadDocuments(docJson.data ?? []);
+      }
+    } catch (err) {
+      setUploadError((err as Error).message);
+    } finally {
+      setUploadSearching(false);
+    }
+  }
+
+  function handleClearJamaah() {
+    setSelectedJamaah(null);
+    setUploadDocuments([]);
+    setUploadPreviews({});
+    setOcrResults({});
+    setUploadSearchId("");
+    setUploadError("");
+  }
+
+  function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>, jenis: string) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Create preview URL
+    const previewUrl = URL.createObjectURL(file);
+    setUploadPreviews((prev) => ({ ...prev, [jenis]: previewUrl }));
+
+    // Upload file
+    uploadFile(file, jenis);
+  }
+
+  async function uploadFile(file: File, jenis: string) {
+    if (!selectedJamaah) return;
+    setUploading(true);
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("jamaahId", selectedJamaah.id);
+      formData.append("jenisDokumen", jenis);
+
+      const res = await fetch("/api/dokumen/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!res.ok) throw new Error("Gagal mengupload file");
+
+      const json = await res.json();
+      
+      // Update documents list
+      setUploadDocuments((prev) => {
+        const existing = prev.find((d) => d.jenis === jenis);
+        if (existing) {
+          return prev.map((d) => d.jenis === jenis ? { ...d, fileUrl: json.data.fileUrl, status: "processing" } : d);
+        } else {
+          return [...prev, json.data.dokumen];
+        }
+      });
+    } catch (err) {
+      console.error("Upload error:", err);
+      alert("Gagal mengupload file");
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  async function handleExtractOcr(jenis: string) {
+    const doc = uploadDocuments.find((d) => d.jenis === jenis);
+    if (!doc?.fileUrl) return;
+
+    setExtractingOcr(jenis);
+    try {
+      const res = await fetch("/api/dokumen/ocr", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ dokumenId: doc.id, fileUrl: doc.fileUrl, jenis }),
+      });
+
+      if (!res.ok) throw new Error("Gagal mengekstrak data");
+
+      const json = await res.json();
+      setOcrResults((prev) => ({ ...prev, [jenis]: json.data }));
+    } catch (err) {
+      console.error("OCR error:", err);
+      alert("Gagal mengekstrak data");
+    } finally {
+      setExtractingOcr(null);
+    }
+  }
+
+  async function handleSubmitOcrResults() {
+    if (!selectedJamaah || Object.keys(ocrResults).length === 0) return;
+    setSubmitting(true);
+
+    try {
+      // Submit each OCR result
+      for (const [jenis, ocrData] of Object.entries(ocrResults)) {
+        const doc = uploadDocuments.find((d) => d.jenis === jenis);
+        if (!doc) continue;
+
+        await fetch("/api/dokumen/review", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            dokumenId: doc.id,
+            manualData: ocrData,
+            dataStatus: "valid",
+          }),
+        });
+      }
+
+      alert("Data berhasil disimpan ke manifest jamaah");
+      handleClearJamaah();
+    } catch (err) {
+      console.error("Submit error:", err);
+      alert("Gagal menyimpan data");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
   // --- Document Actions ---
   async function handleApprove() {
     if (!selectedReview) return;
@@ -403,6 +571,7 @@ export default function DokumenPage() {
         tabs={[
           { value: "rekap", label: "Rekap Dokumen" },
           { value: "review", label: "Review Dokumen", count: reviewCounts.semua },
+          { value: "upload", label: "Upload Dokumen" },
         ]}
         onTabChange={setActiveTab}
       >
@@ -775,6 +944,230 @@ export default function DokumenPage() {
                     )}
                   </CardContent>
                 </Card>
+              </div>
+            )}
+
+            {/* ================================================================ */}
+            {/* TAB: UPLOAD DOKUMEN                                              */}
+            {/* ================================================================ */}
+            {activeTab === "upload" && (
+              <div className="space-y-4">
+                {/* Jamaah Search */}
+                <Card>
+                  <CardContent className="pt-4">
+                    <div className="flex items-center gap-3">
+                      <div className="flex-1">
+                        <label className="text-sm font-medium">Cari Jamaah berdasarkan ID Registrasi</label>
+                        <div className="flex gap-2 mt-2">
+                          <Input
+                            placeholder="Masukkan ID Registrasi (GRP-YYYY-NNNNN-N)"
+                            value={uploadSearchId}
+                            onChange={(e) => setUploadSearchId(e.target.value)}
+                            className="flex-1"
+                          />
+                          <Button
+                            onClick={handleSearchJamaah}
+                            disabled={!uploadSearchId.trim() || uploadSearching}
+                          >
+                            {uploadSearching ? (
+                              <RefreshCw className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Search className="h-4 w-4" />
+                            )}
+                            Cari
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                    {uploadError && (
+                      <div className="mt-2 rounded-md bg-destructive/10 p-2 text-sm text-destructive">
+                        {uploadError}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* Selected Jamaah Info */}
+                {selectedJamaah && (
+                  <Card>
+                    <CardContent className="pt-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h3 className="text-lg font-semibold">{selectedJamaah.namaLengkap}</h3>
+                          <p className="text-sm text-muted-foreground">
+                            No. Peserta: {selectedJamaah.nomorPeserta} | ID: {selectedJamaah.registrationId}
+                          </p>
+                        </div>
+                        <Button variant="outline" onClick={handleClearJamaah}>
+                          Clear
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Document Upload Grid */}
+                {selectedJamaah && (
+                  <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                    {ALL_DOC_JENIS.map((jenis) => {
+                      const existingDoc = uploadDocuments.find((d) => d.jenis === jenis);
+                      const isUploaded = existingDoc?.fileUrl;
+                      const previewUrl = uploadPreviews[jenis] || existingDoc?.fileUrl;
+
+                      return (
+                        <Card key={jenis}>
+                          <CardContent className="pt-4">
+                            <div className="flex items-start gap-4">
+                              {/* Left: Upload Area */}
+                              <div className="flex-1">
+                                <h4 className="text-sm font-medium mb-2">{LABEL_DOKUMEN[jenis]}</h4>
+                                <div
+                                  className={cn(
+                                    "relative flex aspect-[3/4] items-center justify-center rounded-lg border-2 border-dashed transition-colors",
+                                    isUploaded ? "border-success/50 bg-success/5" : "border-muted-foreground/25 bg-muted/20",
+                                    "hover:border-primary/50 hover:bg-primary/5"
+                                  )}
+                                >
+                                  {previewUrl ? (
+                                    <img
+                                      src={previewUrl}
+                                      alt={LABEL_DOKUMEN[jenis]}
+                                      className="h-full w-full object-cover rounded-md"
+                                    />
+                                  ) : (
+                                    <div className="text-center">
+                                      <FileImage className="mx-auto h-12 w-12 text-muted-foreground/30" />
+                                      <p className="mt-2 text-xs text-muted-foreground">Belum ada foto</p>
+                                    </div>
+                                  )}
+                                  <input
+                                    type="file"
+                                    accept="image/jpeg,image/jpg"
+                                    className="absolute inset-0 cursor-pointer opacity-0"
+                                    onChange={(e) => handleFileSelect(e, jenis)}
+                                    disabled={uploading}
+                                  />
+                                </div>
+                                {isUploaded && (
+                                  <div className="mt-2 flex items-center gap-1 text-xs text-success">
+                                    <CheckCircle className="h-3 w-3" />
+                                    Sudah terupload
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Right: Extract Data */}
+                              <div className="flex-1 space-y-3">
+                                <h4 className="text-sm font-medium">Ekstrak Data</h4>
+                                <p className="text-xs text-muted-foreground">
+                                  Klik tombol di bawah untuk mengekstrak data dari dokumen menggunakan OCR.
+                                </p>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleExtractOcr(jenis)}
+                                  disabled={!isUploaded || extractingOcr === jenis}
+                                  className="w-full"
+                                >
+                                  {extractingOcr === jenis ? (
+                                    <>
+                                      <RefreshCw className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                                      Mengekstrak...
+                                    </>
+                                  ) : (
+                                    <>
+                                      <FileText className="mr-1.5 h-3.5 w-3.5" />
+                                      Ekstrak Data
+                                    </>
+                                  )}
+                                </Button>
+
+                                {/* OCR Results */}
+                                {ocrResults[jenis] && (
+                                  <div className="space-y-2 rounded-md border p-3">
+                                    <div className="flex items-center justify-between">
+                                      <h5 className="text-xs font-medium">Hasil Ekstraksi</h5>
+                                      <Badge
+                                        variant={ocrResults[jenis].confidence >= 0.7 ? "success" : "warning"}
+                                        size="sm"
+                                      >
+                                        {Math.round(ocrResults[jenis].confidence * 100)}%
+                                      </Badge>
+                                    </div>
+                                    <div className="space-y-1 text-xs">
+                                      {ocrResults[jenis].namaLengkap && (
+                                        <div className="flex justify-between">
+                                          <span className="text-muted-foreground">Nama:</span>
+                                          <span>{ocrResults[jenis].namaLengkap}</span>
+                                        </div>
+                                      )}
+                                      {ocrResults[jenis].nik && (
+                                        <div className="flex justify-between">
+                                          <span className="text-muted-foreground">NIK:</span>
+                                          <span>{ocrResults[jenis].nik}</span>
+                                        </div>
+                                      )}
+                                      {ocrResults[jenis].nomorPaspor && (
+                                        <div className="flex justify-between">
+                                          <span className="text-muted-foreground">No. Paspor:</span>
+                                          <span>{ocrResults[jenis].nomorPaspor}</span>
+                                        </div>
+                                      )}
+                                      {ocrResults[jenis].tanggalLahir && (
+                                        <div className="flex justify-between">
+                                          <span className="text-muted-foreground">Tgl. Lahir:</span>
+                                          <span>{ocrResults[jenis].tanggalLahir}</span>
+                                        </div>
+                                      )}
+                                      {ocrResults[jenis].tempatLahir && (
+                                        <div className="flex justify-between">
+                                          <span className="text-muted-foreground">Tempat Lahir:</span>
+                                          <span>{ocrResults[jenis].tempatLahir}</span>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Submit Button */}
+                {selectedJamaah && Object.keys(ocrResults).length > 0 && (
+                  <Card>
+                    <CardContent className="pt-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h4 className="text-sm font-medium">Simpan Hasil Ekstraksi</h4>
+                          <p className="text-xs text-muted-foreground">
+                            Data yang diekstrak akan disimpan ke dalam data manifest jamaah.
+                          </p>
+                        </div>
+                        <Button
+                          onClick={handleSubmitOcrResults}
+                          disabled={submitting}
+                        >
+                          {submitting ? (
+                            <>
+                              <RefreshCw className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                              Menyimpan...
+                            </>
+                          ) : (
+                            <>
+                              <Save className="mr-1.5 h-3.5 w-3.5" />
+                              Simpan ke Manifest
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
               </div>
             )}
           </>

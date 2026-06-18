@@ -9,7 +9,8 @@ import { useKeyboardShortcut } from "@/shared/hooks/use-keyboard-shortcut";
 import { NotificationBell } from "@/shared/components/NotificationBell";
 import { SearchOverlay } from "@/shared/components/SearchOverlay";
 import { CommandPalette } from "@/shared/components/CommandPalette";
-import { Search } from "lucide-react";
+import { Search, LogOut } from "lucide-react";
+import { signOut } from "next-auth/react";
 import type { OperationalRole } from "@/shared/types";
 
 interface ShellProps {
@@ -17,9 +18,19 @@ interface ShellProps {
   role: OperationalRole;
 }
 
+const ROLE_LABELS: Record<string, string> = {
+  super_admin: "Super Admin",
+  admin_operasional: "Admin Operasional",
+  admin_pembayaran: "Admin Pembayaran",
+  admin_manifest: "Admin Manifest",
+  admin_dokumen: "Admin Dokumen",
+  tour_leader: "Tour Leader",
+  jamaah: "Jamaah",
+};
+
 export function Shell({ children, role }: ShellProps) {
   const sidebarCollapsed = useAdminStore((s) => s.sidebarCollapsed);
-  const { updateActivity } = useSession();
+  const { updateActivity, user, logout } = useSession();
   const { isOpen: paletteOpen, close: closePalette } = useKeyboardShortcut();
   const [searchOpen, setSearchOpen] = useState(false);
 
@@ -84,6 +95,26 @@ export function Shell({ children, role }: ShellProps) {
                 day: "numeric",
               })}
             </span>
+
+            {/* User info + logout */}
+            <div className="flex items-center gap-2 pl-2 border-l border-border">
+              <div className="hidden sm:block text-right">
+                <p className="text-xs font-medium text-foreground leading-tight">{user?.name ?? "User"}</p>
+                <p className="text-[10px] text-muted-foreground leading-tight">{ROLE_LABELS[role] ?? role}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  logout();
+                  signOut({ callbackUrl: "/login" });
+                }}
+                className="flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                title="Keluar"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Keluar</span>
+              </button>
+            </div>
           </div>
         </div>
 

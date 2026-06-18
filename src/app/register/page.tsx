@@ -19,10 +19,19 @@ import {
   X,
   Loader2,
   UserPlus,
+  Minus,
+  Plus,
+  AlertTriangle,
 } from "lucide-react";
 import type { JenisKelamin, Keberangkatan } from "@/shared/types";
 
 type Step = 1 | 2 | 3 | 4 | 5 | 6 | 7;
+
+// Konfigurasi jumlah jamaah — ubah di sini jika kebijakan berubah
+const MIN_GROUP_SIZE = 1;
+const MAX_GROUP_SIZE = 100;
+const LARGE_GROUP_THRESHOLD = 30;
+const VERY_LARGE_GROUP_THRESHOLD = 60;
 
 interface MemberForm {
   namaLengkap: string;
@@ -41,8 +50,14 @@ export default function RegisterPage() {
   const [nomorTelepon, setNomorTelepon] = useState("");
   const [emailPerwakilan, setEmailPerwakilan] = useState("");
 
-  // Step 2: Terms
-  const [termsAccepted, setTermsAccepted] = useState(false);
+  // Step 2: Terms (4 mandatory checkboxes) — fetched dynamically
+  const [termsDoc, setTermsDoc] = useState<{ title: string; content: string; version: string } | null>(null);
+  const [termsVersion, setTermsVersion] = useState("");
+  const [termsSyarat, setTermsSyarat] = useState(false);
+  const [termsPembayaran, setTermsPembayaran] = useState(false);
+  const [termsPembatalan, setTermsPembatalan] = useState(false);
+  const [termsData, setTermsData] = useState(false);
+  const [termsAcceptedAt, setTermsAcceptedAt] = useState<string | null>(null);
 
   // Step 3: PAX count
   const [paxCount, setPaxCount] = useState(1);
@@ -63,6 +78,7 @@ export default function RegisterPage() {
   const [signatureFile, setSignatureFile] = useState<File | null>(null);
   const [signaturePreview, setSignaturePreview] = useState("");
   const [signaturePath, setSignaturePath] = useState("");
+  const [signedAt, setSignedAt] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState("");
 
@@ -92,6 +108,23 @@ export default function RegisterPage() {
       }
     };
     loadPaket();
+  }, []);
+
+  // Load active Terms & Conditions from CMS
+  useEffect(() => {
+    const loadTerms = async () => {
+      try {
+        const res = await fetch("/api/operational-documents?type=TERMS_CONDITIONS");
+        const data = await res.json();
+        if (data.success && data.data) {
+          setTermsDoc(data.data);
+          setTermsVersion(data.data.version ?? "1.0");
+        }
+      } catch {
+        // Fallback: no terms loaded, will use empty state
+      }
+    };
+    loadTerms();
   }, []);
 
   // Sync members when paxCount changes
@@ -128,7 +161,14 @@ export default function RegisterPage() {
     }
 
     if (s === 2) {
-      if (!termsAccepted) errs.terms = "Anda harus menyetujui syarat & ketentuan";
+      if (!termsSyarat || !termsPembayaran || !termsPembatalan || !termsData) {
+        errs.terms = "Anda harus menyetujui seluruh syarat & ketentuan";
+      }
+    }
+
+    if (s === 3) {
+      if (!paxCount || paxCount < MIN_GROUP_SIZE) errs.paxCount = `Jumlah minimal ${MIN_GROUP_SIZE} jamaah`;
+      else if (paxCount > MAX_GROUP_SIZE) errs.paxCount = `Jumlah maksimal ${MAX_GROUP_SIZE} jamaah per pendaftaran`;
     }
 
     if (s === 4) {
@@ -147,10 +187,16 @@ export default function RegisterPage() {
 
     setErrors(errs);
     return Object.keys(errs).length === 0;
-  }, [namaPerwakilan, nomorTelepon, emailPerwakilan, termsAccepted, members, selectedPaketId, signaturePath, signatureFile]);
+  }, [namaPerwakilan, nomorTelepon, emailPerwakilan, termsSyarat, termsPembayaran, termsPembatalan, termsData, members, selectedPaketId, signaturePath, signatureFile]);
 
   const nextStep = () => {
-    if (validateStep(step)) setStep((s) => Math.min(7, s + 1) as Step);
+    if (validateStep(step)) {
+      // Record terms acceptance timestamp when leaving step 2
+      if (step === 2 && !termsAcceptedAt) {
+        setTermsAcceptedAt(new Date().toISOString());
+      }
+      setStep((s) => Math.min(7, s + 1) as Step);
+    }
   };
 
   const prevStep = () => setStep((s) => Math.max(1, s - 1) as Step);
@@ -162,13 +208,13 @@ export default function RegisterPage() {
 
     setUploadError("");
 
-    if (!["image/jpeg", "image/jpg"].includes(file.type)) {
-      setUploadError("Hanya file JPG/JPEG yang diizinkan");
+    if (!["image/jpeg", "image/jpg", "image/png"].includes(file.type)) {
+      setUploadError("Hanya file PNG, JPG, atau JPEG yang diizinkan");
       return;
     }
 
-    if (file.size > 5 * 1024 * 1024) {
-      setUploadError("File terlalu besar (max 5MB)");
+    if (file.size > 100 * 1024) {
+      setUploadError("Tanda tangan terlalu besar. Maksimal 100 KB.");
       return;
     }
 
@@ -186,6 +232,7 @@ export default function RegisterPage() {
 
       if (data.success) {
         setSignaturePath(data.data.storagePath);
+        setSignedAt(new Date().toISOString());
       } else {
         setUploadError(data.message ?? "Upload gagal");
         setSignatureFile(null);
@@ -220,7 +267,13 @@ export default function RegisterPage() {
           namaPerwakilan,
           nomorTelepon,
           emailPerwakilan,
-          termsAccepted,
+          termsAccepted: termsSyarat && termsPembayaran && termsPembatalan && termsData,
+          termsSyarat,
+          termsPembayaran,
+          termsPembatalan,
+          termsData,
+          termsAcceptedAt,
+          termsVersion,
           paxCount,
           members: members.map((m) => ({
             namaLengkap: m.namaLengkap,
@@ -231,6 +284,7 @@ export default function RegisterPage() {
           roomUpgrade: roomUpgrade || undefined,
           hotelUpgrade: hotelUpgrade || undefined,
           signaturePath,
+          signedAt,
         }),
       });
 
@@ -420,65 +474,152 @@ export default function RegisterPage() {
           {step === 2 && (
             <div className="space-y-4">
               <h2 className="text-lg font-semibold text-gray-900">Syarat & Ketentuan</h2>
-              <div className="border border-gray-200 rounded-lg p-4 h-64 overflow-y-auto text-sm text-gray-600 space-y-2">
-                <p className="font-semibold">Syarat & Ketentuan Pendaftaran Umroh</p>
-                <p>1. Pendaftar adalah perwakilan resmi dari anggota rombongan yang didaftarkan.</p>
-                <p>2. Seluruh data jamaah yang didaftarkan harus benar dan sesuai dengan dokumen identitas resmi (KTP/Paspor).</p>
-                <p>3. Setiap rombongan minimal terdiri dari 1 (satu) orang dan maksimal 10 (sepuluh) orang per pendaftaran.</p>
-                <p>4. Biaya paket umroh yang tercantum belum termasuk biaya tambahan seperti upgrade hotel, perlengkapan, handling, dan administrasi.</p>
-                <p>5. Pembayaran DP minimal 30% dari total tagihan harus dilunasi dalam waktu 14 hari setelah pendaftaran disetujui.</p>
-                <p>6. Pembatalan sepihak oleh jamaah setelah pendaftaran disetujui dapat dikenakan biaya administrasi sesuai kebijakan yang berlaku.</p>
-                <p>7. Dokumen yang wajib dilengkapi: Paspor (min. berlaku 6 bulan), Pas Foto 4x6, Kartu Vaksin Meningitis, dan KTP.</p>
-                <p>8. Pihak travel berhak menolak permohonan pendaftaran apabila data tidak lengkap atau tidak memenuhi syarat.</p>
-                <p>9. Tanda tangan digital yang diunggah merupakan bentuk persetujuan sah atas seluruh syarat dan ketentuan ini.</p>
-                <p>10. Dengan mendaftar, Anda menyetujui bahwa data Anda akan diproses sesuai dengan kebijakan privasi yang berlaku.</p>
-              </div>
+              {termsDoc ? (
+                <>
+                  <div
+                    className="border border-gray-200 rounded-lg p-4 h-64 overflow-y-auto text-sm text-gray-600 prose prose-sm max-w-none"
+                    dangerouslySetInnerHTML={{ __html: termsDoc.content }}
+                  />
+                  <p className="text-xs text-gray-400 mt-1">
+                    Versi {termsDoc.version || termsVersion} — {termsDoc.title}
+                  </p>
+                </>
+              ) : (
+                <div className="border border-gray-200 rounded-lg p-4 h-64 overflow-y-auto flex items-center justify-center text-sm text-gray-400 italic">
+                  Memuat Syarat & Ketentuan...
+                </div>
+              )}
 
-              <label className="flex items-start gap-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={termsAccepted}
-                  onChange={(e) => setTermsAccepted(e.target.checked)}
-                  className="mt-0.5 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                />
-                <span className="text-sm text-gray-700">
-                  Saya telah membaca, memahami, dan menyetujui seluruh syarat & ketentuan di atas.
-                </span>
-              </label>
-              {errors.terms && <p className="text-xs text-red-500">{errors.terms}</p>}
+              <div className="space-y-3 pt-2">
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={termsSyarat}
+                    onChange={(e) => setTermsSyarat(e.target.checked)}
+                    className="mt-0.5 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  <span className="text-sm text-gray-700">
+                    Saya telah membaca dan memahami syarat & ketentuan di atas.
+                  </span>
+                </label>
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={termsPembayaran}
+                    onChange={(e) => setTermsPembayaran(e.target.checked)}
+                    className="mt-0.5 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  <span className="text-sm text-gray-700">
+                    Saya memahami kebijakan pembayaran (DP 30%, jadwal pelunasan, dan metode pembayaran).
+                  </span>
+                </label>
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={termsPembatalan}
+                    onChange={(e) => setTermsPembatalan(e.target.checked)}
+                    className="mt-0.5 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  <span className="text-sm text-gray-700">
+                    Saya memahami kebijakan pembatalan dan refund yang berlaku.
+                  </span>
+                </label>
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={termsData}
+                    onChange={(e) => setTermsData(e.target.checked)}
+                    className="mt-0.5 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  <span className="text-sm text-gray-700">
+                    Saya menyetujui pengolahan data pribadi dan komunikasi WhatsApp dari pihak travel.
+                  </span>
+                </label>
+              </div>
+              {errors.terms && <p className="text-xs text-red-500 mt-2">{errors.terms}</p>}
             </div>
           )}
 
           {/* Step 3: PAX Count */}
           {step === 3 && (
             <div className="space-y-4">
-              <h2 className="text-lg font-semibold text-gray-900">Jumlah Anggota Rombongan (PAX)</h2>
-              <p className="text-sm text-gray-500">Tentukan berapa banyak jamaah yang akan didaftarkan dalam grup ini.</p>
+              <h2 className="text-lg font-semibold text-gray-900">Jumlah Anggota Rombongan</h2>
+              <p className="text-sm text-gray-500">Masukkan jumlah jamaah yang akan didaftarkan dalam rombongan ini.</p>
 
-              <div className="grid grid-cols-5 gap-3">
-                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => (
-                  <button
-                    key={n}
-                    type="button"
-                    onClick={() => setPaxCount(n)}
+              {/* Numeric Input */}
+              <div className="flex items-center justify-center gap-4 py-4">
+                <button
+                  type="button"
+                  onClick={() => setPaxCount((prev) => Math.max(MIN_GROUP_SIZE, prev - 1))}
+                  disabled={paxCount <= MIN_GROUP_SIZE}
+                  className="w-14 h-14 rounded-xl border-2 border-gray-200 flex items-center justify-center text-gray-600 hover:border-blue-400 hover:text-blue-600 disabled:opacity-30 disabled:cursor-not-allowed transition-colors active:scale-95"
+                  aria-label="Kurangi jumlah"
+                >
+                  <Minus className="w-6 h-6" />
+                </button>
+
+                <div className="text-center">
+                  <input
+                    type="number"
+                    value={paxCount}
+                    min={MIN_GROUP_SIZE}
+                    max={MAX_GROUP_SIZE}
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value, 10);
+                      if (!isNaN(val) && val >= MIN_GROUP_SIZE && val <= MAX_GROUP_SIZE) {
+                        setPaxCount(val);
+                      } else if (e.target.value === "") {
+                        setPaxCount(MIN_GROUP_SIZE);
+                      }
+                    }}
                     className={cn(
-                      "py-3 rounded-lg text-sm font-medium border-2 transition-colors",
-                      paxCount === n
-                        ? "border-blue-500 bg-blue-50 text-blue-700"
-                        : "border-gray-200 hover:border-gray-300 text-gray-600"
+                      "w-24 h-14 text-center text-2xl font-bold rounded-xl border-2",
+                      "focus:outline-none focus:ring-2 focus:ring-blue-500",
+                      errors.paxCount ? "border-red-300" : "border-gray-200"
                     )}
-                  >
-                    {n} PAX
-                  </button>
-                ))}
+                    style={{ MozAppearance: "textfield" }}
+                  />
+                  <p className="text-xs text-gray-400 mt-1">orang</p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setPaxCount((prev) => Math.min(MAX_GROUP_SIZE, prev + 1))}
+                  disabled={paxCount >= MAX_GROUP_SIZE}
+                  className="w-14 h-14 rounded-xl border-2 border-gray-200 flex items-center justify-center text-gray-600 hover:border-blue-400 hover:text-blue-600 disabled:opacity-30 disabled:cursor-not-allowed transition-colors active:scale-95"
+                  aria-label="Tambah jumlah"
+                >
+                  <Plus className="w-6 h-6" />
+                </button>
               </div>
 
+              {errors.paxCount && <p className="text-xs text-red-500 text-center">{errors.paxCount}</p>}
+
+              {/* Info */}
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
                 <p className="text-sm text-blue-700">
                   <Users className="w-4 h-4 inline mr-1" />
-                  {paxCount} jamaah akan didaftarkan. Anda akan diminta mengisi data masing-masing di langkah berikutnya.
+                  {paxCount} jamaah akan didaftarkan. Anda akan diminta mengisi data masing-masing jamaah pada langkah berikutnya.
                 </p>
               </div>
+
+              {/* Large group warnings */}
+              {paxCount > VERY_LARGE_GROUP_THRESHOLD && (
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 flex items-start gap-2">
+                  <AlertTriangle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+                  <p className="text-sm text-amber-700">
+                    Rombongan sangat besar. Tim travel mungkin akan menghubungi Anda untuk koordinasi lebih lanjut.
+                  </p>
+                </div>
+              )}
+              {paxCount > LARGE_GROUP_THRESHOLD && paxCount <= VERY_LARGE_GROUP_THRESHOLD && (
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 flex items-start gap-2">
+                  <AlertTriangle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+                  <p className="text-sm text-amber-700">
+                    Rombongan besar terdeteksi. Pastikan seluruh data jamaah telah disiapkan sebelum melanjutkan.
+                  </p>
+                </div>
+              )}
             </div>
           )}
 
@@ -617,34 +758,47 @@ export default function RegisterPage() {
 
               {selectedPaketId && (
                 <div className="border-t pt-4 mt-4 space-y-3">
-                  <p className="text-sm font-medium text-gray-700">Opsi Upgrade (opsional)</p>
+                  <p className="text-sm font-medium text-gray-700">Preferensi Kamar</p>
+                  <p className="text-xs text-gray-500">Pilih tipe kamar yang diinginkan untuk rombongan Anda.</p>
                   <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs font-medium text-gray-600 mb-1">Room Upgrade</label>
-                      <select
-                        value={roomUpgrade}
-                        onChange={(e) => setRoomUpgrade(e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    {[
+                      { value: "mix", label: "MIX", desc: "Penempatan kamar akan diatur oleh pihak travel." },
+                      { value: "quad", label: "QUAD", desc: "4 orang per kamar (1 kamar berempat)." },
+                      { value: "triple", label: "TRIPLE", desc: "3 orang per kamar (1 kamar bertiga)." },
+                      { value: "double", label: "DOUBLE", desc: "2 orang per kamar (1 kamar berdua)." },
+                    ].map((opt) => (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => setRoomUpgrade(roomUpgrade === opt.value ? "" : opt.value)}
+                        className={cn(
+                          "text-left p-3 rounded-lg border-2 transition-colors",
+                          roomUpgrade === opt.value
+                            ? "border-blue-500 bg-blue-50"
+                            : "border-gray-200 hover:border-gray-300"
+                        )}
                       >
-                        <option value="">Standard</option>
-                        <option value="standard">Standard</option>
-                        <option value="double">Double</option>
-                        <option value="quad">Quad</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-gray-600 mb-1">Hotel Upgrade</label>
-                      <select
-                        value={hotelUpgrade}
-                        onChange={(e) => setHotelUpgrade(e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      >
-                        <option value="">Standard</option>
-                        <option value="standard">Standard</option>
-                        <option value="premium">Premium</option>
-                        <option value="vip">VIP</option>
-                      </select>
-                    </div>
+                        <p className={cn(
+                          "text-sm font-semibold",
+                          roomUpgrade === opt.value ? "text-blue-700" : "text-gray-700"
+                        )}>
+                          {opt.label}
+                        </p>
+                        <p className="text-xs text-gray-500 mt-1">{opt.desc}</p>
+                      </button>
+                    ))}
+                  </div>
+                  <div className="border-t pt-3 mt-2">
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Hotel Upgrade (opsional)</label>
+                    <select
+                      value={hotelUpgrade}
+                      onChange={(e) => setHotelUpgrade(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="">Standard</option>
+                      <option value="premium">Premium</option>
+                      <option value="vip">VIP</option>
+                    </select>
                   </div>
                 </div>
               )}
@@ -658,7 +812,7 @@ export default function RegisterPage() {
             <div className="space-y-4">
               <h2 className="text-lg font-semibold text-gray-900">Tanda Tangan Digital</h2>
               <p className="text-sm text-gray-500">
-                Unggah foto tanda tangan Anda pada kertas putih. Format JPG, maksimal 5MB.
+                Unggah foto tanda tangan PIC pada kertas putih. Format PNG, JPG, atau JPEG. Maksimal 100 KB.
               </p>
 
               <div
@@ -690,10 +844,10 @@ export default function RegisterPage() {
                     <div>
                       <label className="cursor-pointer inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">
                         <Upload className="w-4 h-4" />
-                        Pilih File JPG
+                        Pilih File Gambar
                         <input
                           type="file"
-                          accept="image/jpeg,image/jpg"
+                          accept="image/png,image/jpeg,image/jpg"
                           onChange={handleSignatureChange}
                           className="hidden"
                         />
@@ -739,9 +893,20 @@ export default function RegisterPage() {
               {/* Terms */}
               <div className="border border-gray-200 rounded-lg p-4">
                 <h3 className="text-sm font-semibold text-gray-700 mb-2">Syarat & Ketentuan</h3>
-                <p className="text-sm text-green-600">
-                  <Check className="w-4 h-4 inline mr-1" /> Disetujui
-                </p>
+                <div className="space-y-1 text-sm">
+                  <p className={termsSyarat ? "text-green-600" : "text-red-500"}>
+                    {termsSyarat ? "☑" : "☐"} Syarat & ketentuan
+                  </p>
+                  <p className={termsPembayaran ? "text-green-600" : "text-red-500"}>
+                    {termsPembayaran ? "☑" : "☐"} Kebijakan pembayaran
+                  </p>
+                  <p className={termsPembatalan ? "text-green-600" : "text-red-500"}>
+                    {termsPembatalan ? "☑" : "☐"} Kebijakan pembatalan
+                  </p>
+                  <p className={termsData ? "text-green-600" : "text-red-500"}>
+                    {termsData ? "☑" : "☐"} Pengolahan data & komunikasi
+                  </p>
+                </div>
               </div>
 
               {/* Members */}
@@ -772,7 +937,7 @@ export default function RegisterPage() {
                       Rp {(selectedPaket.hargaPaket * paxCount).toLocaleString("id-ID")}
                     </span>
                   </p>
-                  {roomUpgrade && <p className="text-xs text-gray-400">Room: {roomUpgrade}</p>}
+                  {roomUpgrade && <p className="text-xs text-gray-400">Kamar: {roomUpgrade.toUpperCase()}{roomUpgrade === "mix" ? " (diatur travel)" : ""}</p>}
                   {hotelUpgrade && <p className="text-xs text-gray-400">Hotel: {hotelUpgrade}</p>}
                 </div>
               )}

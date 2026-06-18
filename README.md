@@ -12,7 +12,7 @@ Sistem operasional perjalanan umroh — manajemen jamaah, dokumen, pembayaran, m
 | Cache/Queue | Redis 7 + BullMQ |
 | Auth | Auth.js v5 (Credentials + JWT) |
 | Storage | Local filesystem (S3-ready) |
-| OCR | Tesseract.js / Google Vision |
+| OCR | Google Vision API / custom external OCR API |
 | Container | Docker Compose |
 
 ## Quick Start (Local)
@@ -145,7 +145,7 @@ See `.env.example` for full list with descriptions. Key variables:
 | REDIS_URL | Yes | Redis connection string |
 | AUTH_SECRET | Yes | Auth.js JWT signing key |
 | AUTH_URL | Yes | Application URL |
-| OCR_PROVIDER | No | `tesseract` (default) or `google-vision` |
+| OCR_PROVIDER | Yes | `google-vision` for Google Vision API, or `external-api` for a custom OCR gateway |
 | GOOGLE_VISION_API_KEY | If google-vision | Google Cloud Vision API key |
 | NOTIFICATION_PROVIDER | No | `mock` (default), `console` |
 

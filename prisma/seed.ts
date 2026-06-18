@@ -1,6 +1,6 @@
 // ============================================================
 // Prisma Seed Script — Population from mock/data.ts
-// Run: npx prisma db seed (after prisma migrate dev)
+// Run: npx prisma db seed (after prisma migrate deploy)
 // ============================================================
 
 import { PrismaClient } from "@prisma/client";
@@ -23,8 +23,8 @@ async function main() {
   // ── 1. Users ────────────────────────────────────────────────
   // Shared password for operational admins: "admin123"
   // Super admin password: "SuperAdmin123!"
-  const ADMIN_HASH = "$2b$12$iPziIA.8ozPqTQ8PHljdh.abAF8rzbZZGvO3hXSIdjpntBDPzIFBG";
-  const SUPER_ADMIN_HASH = "$2b$12$okEmUFNfL5/KZc9W3qO87OIqwzF4lw/KUXY01bCFxu1XiEy2P8Wea";
+  const ADMIN_HASH = "$2b$12$MlkLoZElDrwG9V5ANA6tGurAdNizkti.4hZr9fQlZpi0WBm4R5J1m";
+  const SUPER_ADMIN_HASH = "$2b$12$KJLXR.8XT4KAg.riXcJxB.ddrK4t0ACrBq6y2XZUi7rnQYMMTA/Ui";
 
   const users = [
     { name: "Super Admin", email: "superadmin@vtu.id", passwordHash: SUPER_ADMIN_HASH, role: "super_admin" as const },
@@ -71,87 +71,101 @@ async function main() {
   }
   console.log(`  ✓ ${mockKeberangkatan.length} keberangkatan`);
 
-  // ── 3. Jamaah ─────────────────────────────────────────────
-  for (const j of mockJamaah) {
-    await prisma.jamaah.upsert({
-      where: { registrationId: j.registrationId },
-      update: {},
-      create: {
-        id: j.id,
-        registrationId: j.registrationId,
-        groupId: j.groupId,
-        nomorPeserta: j.nomorPeserta,
-        namaLengkap: j.namaLengkap,
-        namaAyah: j.namaAyah,
-        jenisKelamin: j.jenisKelamin,
-        tempatLahir: j.tempatLahir,
-        tanggalLahir: new Date(j.tanggalLahir),
-        nik: j.nik,
-        nomorPaspor: j.nomorPaspor,
-        masaBerlakuPaspor: new Date(j.masaBerlakuPaspor),
-        nomorTelepon: j.nomorTelepon,
-        email: j.email,
-        alamat: j.alamat,
-        provinsi: j.provinsi,
-        kota: j.kota,
-        kecamatan: j.kecamatan,
-        kelurahan: j.kelurahan,
-        tandaTanganDigital: j.tandaTanganDigital,
-        syaratDisetujui: j.syaratDisetujui,
-        status: j.status,
-        hotelMekkah: j.hotelMekkah,
-        hotelMadinah: j.hotelMadinah,
-      },
-    });
+  // ── 3 & 4: Groups + Jamaah (1 transaksi — circular FK) ──────
+  // jamaah.groupId ↔ registration_groups.ketuaGroupId
+  // Solusi: buat FK DEFERRABLE, lalu deferred check dalam transaksi tunggal
 
-    // ── Dokumen per jamaah ──────────────────────────────────
-    for (const doc of j.dokumen) {
-      await prisma.dokumenItem.upsert({
-        where: { id: doc.id },
-        update: {},
-        create: {
-          id: doc.id,
-          jamaahId: j.id,
-          jenis: doc.jenis,
-          wajib: doc.wajib,
-          status: doc.status,
-          fileUrl: doc.fileUrl,
-          catatan: doc.catatan,
-          uploadedAt: doc.uploadedAt ? new Date(doc.uploadedAt) : null,
-          verifiedAt: doc.verifiedAt ? new Date(doc.verifiedAt) : null,
-          verifiedBy: doc.verifiedBy,
-          dataStatus: doc.dataStatus as any,
-          fileStatus: doc.fileStatus as any,
-          manualData: doc.manualData as any,
-          ocrData: doc.ocrData as any,
-          ocrRetryCount: doc.ocrRetryCount ?? 0,
-          qualityCheck: doc.qualityCheck as any,
-        },
-      });
+  // 3a. Alter FK constraints jadi DEFERRABLE
+  await prisma.$executeRawUnsafe(`ALTER TABLE registration_groups DROP CONSTRAINT IF EXISTS "registration_groups_ketuaGroupId_fkey"`);
+  await prisma.$executeRawUnsafe(`ALTER TABLE registration_groups ADD CONSTRAINT "registration_groups_ketuaGroupId_fkey" FOREIGN KEY ("ketuaGroupId") REFERENCES jamaah(id) ON DELETE RESTRICT ON UPDATE CASCADE DEFERRABLE INITIALLY DEFERRED`);
+  await prisma.$executeRawUnsafe(`ALTER TABLE jamaah DROP CONSTRAINT IF EXISTS "jamaah_groupId_fkey"`);
+  await prisma.$executeRawUnsafe(`ALTER TABLE jamaah ADD CONSTRAINT "jamaah_groupId_fkey" FOREIGN KEY ("groupId") REFERENCES registration_groups(id) ON DELETE RESTRICT ON UPDATE CASCADE DEFERRABLE INITIALLY DEFERRED`);
+  console.log("  ✓ FK constraints made DEFERRABLE");
+
+  await prisma.$transaction(async (tx) => {
+    // Defer FK checks sampai COMMIT
+    await tx.$executeRawUnsafe("SET CONSTRAINTS ALL DEFERRED");
+
+    // 3a. Insert groups via raw SQL (lengkap dengan ketuaGroupId asli)
+    for (const g of mockGroups) {
+      await tx.$executeRawUnsafe(
+        `INSERT INTO registration_groups (id, "kodeRegistrasi", "namaGroup", "ketuaGroupId", "paketKeberangkatanId", "jumlahAnggota", "totalTagihan", "totalPembayaran", "sisaPembayaran", status, "createdAt", "updatedAt")
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::"GroupStatus", NOW(), NOW())
+         ON CONFLICT ("kodeRegistrasi") DO NOTHING`,
+        g.id,
+        g.kodeRegistrasi,
+        g.namaGroup,
+        g.ketuaGroupId,
+        g.paketKeberangkatanId,
+        g.jumlahAnggota,
+        g.totalTagihan,
+        g.totalPembayaran,
+        g.sisaPembayaran,
+        "active",
+      );
     }
-  }
-  console.log(`  ✓ ${mockJamaah.length} jamaah with documents`);
 
-  // ── 4. Registration Groups ────────────────────────────────
-  for (const g of mockGroups) {
-    await prisma.registrationGroup.upsert({
-      where: { kodeRegistrasi: g.kodeRegistrasi },
-      update: {},
-      create: {
-        id: g.id,
-        kodeRegistrasi: g.kodeRegistrasi,
-        namaGroup: g.namaGroup,
-        ketuaGroupId: g.ketuaGroupId,
-        paketKeberangkatanId: g.paketKeberangkatanId,
-        jumlahAnggota: g.jumlahAnggota,
-        totalTagihan: g.totalTagihan,
-        totalPembayaran: g.totalPembayaran,
-        sisaPembayaran: g.sisaPembayaran,
-        status: "active",
-      },
-    });
-  }
+    // 3b. Insert jamaah via raw SQL (groupId references groups di atas)
+    for (const j of mockJamaah) {
+      await tx.$executeRawUnsafe(
+        `INSERT INTO jamaah (id, "registrationId", "groupId", "nomorPeserta", "namaLengkap", "namaAyah", "jenisKelamin", "tempatLahir", "tanggalLahir", nik, "nomorPaspor", "masaBerlakuPaspor", "nomorTelepon", email, alamat, provinsi, kota, kecamatan, kelurahan, "tandaTanganDigital", "syaratDisetujui", status, "hotelMekkah", "hotelMadinah", "createdAt", "updatedAt")
+         VALUES ($1, $2, $3, $4, $5, $6, $7::"JenisKelamin", $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22::"StatusJamaah", $23, $24, NOW(), NOW())
+         ON CONFLICT ("registrationId") DO NOTHING`,
+        j.id,
+        j.registrationId,
+        j.groupId,
+        j.nomorPeserta,
+        j.namaLengkap,
+        j.namaAyah,
+        j.jenisKelamin,
+        j.tempatLahir,
+        new Date(j.tanggalLahir),
+        j.nik,
+        j.nomorPaspor,
+        new Date(j.masaBerlakuPaspor),
+        j.nomorTelepon,
+        j.email,
+        j.alamat,
+        j.provinsi,
+        j.kota,
+        j.kecamatan,
+        j.kelurahan,
+        j.tandaTanganDigital ?? null,
+        j.syaratDisetujui,
+        j.status,
+        j.hotelMekkah,
+        j.hotelMadinah,
+      );
+
+      // Dokumen per jamaah
+      for (const doc of j.dokumen) {
+        await tx.$executeRawUnsafe(
+          `INSERT INTO dokumen_items (id, "jamaahId", jenis, wajib, status, "fileUrl", catatan, "uploadedAt", "verifiedAt", "verifiedBy", "dataStatus", "fileStatus", "manualData", "ocrData", "ocrRetryCount", "qualityCheck")
+           VALUES ($1, $2, $3::"DokumenJenis", $4, $5::"StatusDokumen", $6, $7, $8, $9, $10, $11::"DokumenDataStatus", $12::"DokumenFileStatus", $13::jsonb, $14::jsonb, $15, $16::jsonb)
+           ON CONFLICT (id) DO NOTHING`,
+          doc.id,
+          j.id,
+          doc.jenis,
+          doc.wajib,
+          doc.status,
+          doc.fileUrl ?? null,
+          doc.catatan ?? null,
+          doc.uploadedAt ? new Date(doc.uploadedAt) : null,
+          doc.verifiedAt ? new Date(doc.verifiedAt) : null,
+          doc.verifiedBy ?? null,
+          doc.dataStatus ?? null,
+          doc.fileStatus ?? null,
+          JSON.stringify(doc.manualData ?? {}),
+          JSON.stringify(doc.ocrData ?? {}),
+          doc.ocrRetryCount ?? 0,
+          JSON.stringify(doc.qualityCheck ?? {}),
+        );
+      }
+    }
+    // FK check terjadi di sini (COMMIT) — kedua sisi sudah lengkap
+  });
   console.log(`  ✓ ${mockGroups.length} registration groups`);
+  console.log(`  ✓ ${mockJamaah.length} jamaah with documents`);
 
   // ── 5. Invoices ───────────────────────────────────────────
   for (const inv of mockInvoices) {

@@ -18,8 +18,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider     = "postgresql"
+  url          = env("DATABASE_URL")
+  relationMode = "prisma"
 }
 
 // ============================================================
@@ -215,6 +216,16 @@ enum RegistrationStatus {
   EXPIRED
 }
 
+enum LeadStatus {
+  BARU
+  DIHUBUNGI
+  FOLLOW_UP
+  MENUNGGU_DP
+  DP_MASUK
+  DIKONVERSI
+  DITOLAK
+}
+
 // ============================================================
 // AUTH — Users
 // ============================================================
@@ -365,10 +376,13 @@ model RegistrationRequest {
   emailPerwakilan String
   paxCount        Int
   paketId         String
-  roomUpgrade     String?            // "standard" | "double" | "quad"
+  roomUpgrade     String?            // "standard" | "double" | "quad" | "mix" | "triple"
   hotelUpgrade    String?            // "standard" | "premium" | "vip"
   signaturePath   String             // Storage path to signature JPG
   termsAccepted   Boolean
+  termsAcceptedAt DateTime?
+  signedAt        DateTime?
+  leadStatus      LeadStatus?
   status          RegistrationStatus @default(DRAFT)
   catatanAdmin    String?
   reviewedBy      String?
@@ -791,4 +805,42 @@ model BackupRecord {
 
   @@index([createdAt])
   @@map("backup_records")
+}
+
+// ============================================================
+// OPERATIONAL DOCUMENTS — CMS Terms, Templates, Policies
+// ============================================================
+
+enum DocumentType {
+  TERMS_CONDITIONS
+  PAYMENT_POLICY
+  CANCELLATION_POLICY
+  REFUND_POLICY
+  PDF_TEMPLATE
+  EMAIL_TEMPLATE
+  WHATSAPP_TEMPLATE
+}
+
+enum DocumentStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+
+model OperationalDocument {
+  id            String         @id @default(cuid())
+  type          DocumentType
+  title         String
+  version       String         // e.g. "1.0", "1.1", "2.0"
+  content       String         // Rich text HTML
+  status        DocumentStatus @default(DRAFT)
+  effectiveDate DateTime?
+  createdBy     String?
+  updatedBy     String?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  @@unique([type, version])
+  @@index([type, status])
+  @@map("operational_documents")
 }

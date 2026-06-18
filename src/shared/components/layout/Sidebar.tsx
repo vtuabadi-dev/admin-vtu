@@ -19,6 +19,7 @@ import {
   Shield,
   Activity,
   Wrench,
+  ScrollText,
   type LucideIcon,
 } from "lucide-react";
 import { useState, useEffect } from "react";
@@ -61,6 +62,7 @@ const adminNav: NavSection[] = [
           { label: "Semua Paket", href: "/admin/keberangkatan" },
           { label: "Paket Aktif", href: "/admin/keberangkatan?status=active" },
           { label: "Draft Paket", href: "/admin/keberangkatan?status=draft" },
+          { label: "Import Flyer OCR", href: "/admin/ocr-package" },
           { label: "Arsip Paket", href: "/admin/keberangkatan?status=archived" },
         ],
       },
@@ -77,6 +79,7 @@ const adminNav: NavSection[] = [
           { label: "Pencarian Jamaah", href: "/admin/jamaah?search" },
           { label: "Histori Paket", href: "/admin/jamaah/histori-paket" },
           { label: "Dokumen Jamaah", href: "/admin/dokumen" },
+          { label: "Review OCR Dokumen", href: "/admin/ocr-review" },
         ],
       },
     ],
@@ -118,6 +121,7 @@ const adminNav: NavSection[] = [
     items: [
       { label: "Laporan", href: "/admin/laporan", icon: BarChart3 },
       { label: "Pengaturan", href: "/admin/pengaturan", icon: Settings },
+      { label: "Aturan Operasional", href: "/admin/pengaturan/aturan-operasional", icon: ScrollText },
       { label: "Audit Trail", href: "/admin/audit-log", icon: Shield },
       { label: "Kesehatan Sistem", href: "/admin/kesehatan-sistem", icon: Activity },
       { label: "Maintenance", href: "/admin/maintenance", icon: Wrench },

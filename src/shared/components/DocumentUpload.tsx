@@ -6,8 +6,6 @@ import {
   FileText,
   CheckCircle2,
   XCircle,
-  AlertTriangle,
-  Loader2,
   Image,
 } from "lucide-react";
 import { cn } from "@/shared/lib/utils";
@@ -21,10 +19,8 @@ type UploadState =
   | "dragging"
   | "preview"
   | "uploading"
-  | "processing"
   | "complete"
-  | "error"
-  | "blurry_warning";
+  | "error";
 
 export interface DocumentUploadProps {
   jenis: string;
@@ -44,12 +40,6 @@ function formatFileSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-function getConfidenceBg(confidence: number): string {
-  if (confidence >= 85) return "bg-success/10 text-success border-success/20";
-  if (confidence >= 60) return "bg-warning/10 text-warning border-warning/20";
-  return "bg-destructive/10 text-destructive border-destructive/20";
-}
-
 // ─── Component ───────────────────────────────────────────────────────
 
 export default function DocumentUpload({
@@ -65,7 +55,6 @@ export default function DocumentUpload({
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [progress, setProgress] = useState(0);
   const [errorMessage, setErrorMessage] = useState<string>("");
-  const [ocrConfidence, setOcrConfidence] = useState(0);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const progressIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -97,7 +86,6 @@ export default function DocumentUpload({
     setSelectedFile(null);
     setProgress(0);
     setErrorMessage("");
-    setOcrConfidence(0);
     setState("idle");
   }, [previewUrl]);
 
@@ -147,25 +135,8 @@ export default function DocumentUpload({
       return;
     }
 
-    // OCR processing phase: 2 seconds
-    setState("processing");
-    await new Promise<void>((resolve) => {
-      processingTimeoutRef.current = setTimeout(() => {
-        processingTimeoutRef.current = null;
-        resolve();
-      }, 2000);
-    });
-
-    // Generate OCR confidence between 60-95
-    const confidence = Math.round((60 + Math.random() * 35));
-    setOcrConfidence(confidence);
-
-    // 20% chance of blurry warning
-    if (Math.random() < 0.2) {
-      setState("blurry_warning");
-    } else {
-      setState("complete");
-    }
+    // Upload complete — OCR diproses oleh service external
+    setState("complete");
 
     // Callback
     if (onUploadComplete && selectedFile) {
@@ -174,7 +145,7 @@ export default function DocumentUpload({
         fileSize: selectedFile.size,
         fileType: selectedFile.type,
         uploadedAt: new Date().toISOString(),
-        ocrConfidence: confidence / 100,
+        ocrConfidence: 0,
       });
     }
   }, [onUploadComplete, selectedFile]);
@@ -328,14 +299,6 @@ export default function DocumentUpload({
           </div>
         );
 
-      case "processing":
-        return (
-          <div className="flex flex-col items-center gap-3">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            <p className="text-sm text-muted-foreground">Memproses OCR...</p>
-          </div>
-        );
-
       case "complete":
         return (
           <div className="flex flex-col items-center gap-2">
@@ -343,14 +306,9 @@ export default function DocumentUpload({
             <p className="text-sm font-medium text-success">
               {label} berhasil diupload
             </p>
-            <span
-              className={cn(
-                "inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold",
-                getConfidenceBg(ocrConfidence)
-              )}
-            >
-              OCR: {ocrConfidence}%
-            </span>
+            <p className="text-xs text-muted-foreground">
+              OCR diproses oleh service external
+            </p>
           </div>
         );
 
@@ -359,30 +317,6 @@ export default function DocumentUpload({
           <div className="flex flex-col items-center gap-2">
             <XCircle className="h-8 w-8 text-destructive" />
             <p className="text-sm font-medium text-destructive">{errorMessage}</p>
-          </div>
-        );
-
-      case "blurry_warning":
-        return (
-          <div className="flex flex-col items-center gap-2">
-            <CheckCircle2 className="h-8 w-8 text-success" />
-            <p className="text-sm font-medium text-success">
-              {label} berhasil diupload
-            </p>
-            <div className="flex items-center gap-1.5 rounded-md bg-warning/10 px-3 py-1.5">
-              <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-warning" />
-              <p className="text-xs text-warning-foreground">
-                Gambar terdeteksi buram. Disarankan upload ulang.
-              </p>
-            </div>
-            <span
-              className={cn(
-                "inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold",
-                getConfidenceBg(ocrConfidence)
-              )}
-            >
-              OCR: {ocrConfidence}%
-            </span>
           </div>
         );
 
@@ -454,18 +388,6 @@ export default function DocumentUpload({
           </div>
         );
 
-      case "blurry_warning":
-        return (
-          <div className="flex justify-center gap-2 mt-2">
-            <Button size="sm" variant="outline" onClick={reset}>
-              Upload Ulang
-            </Button>
-            <Button size="sm" variant="ghost" onClick={() => setState("complete")}>
-              Tetap Gunakan
-            </Button>
-          </div>
-        );
-
       default:
         return null;
     }
@@ -480,8 +402,6 @@ export default function DocumentUpload({
         return "border-success/30 bg-success/5";
       case "error":
         return "border-destructive/30 bg-destructive/5";
-      case "blurry_warning":
-        return "border-warning/30 bg-warning/5";
       default:
         return "border-muted-foreground/20";
     }

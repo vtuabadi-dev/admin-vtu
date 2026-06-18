@@ -5,7 +5,6 @@ import { checkServerPermission } from "@/shared/lib/rbac-utils";
 import { getStorageAdapter, dokumenPath } from "@/server/storage";
 import { validateImageMetadata } from "@/server/services/ocr.service";
 import { dokumenRepo } from "@/server/repositories";
-import { enqueueDocumentOcr } from "@/server/queue";
 import { checkRateLimit, rateLimitKey, getRateLimitConfig } from "@/server/lib/rate-limit";
 import type { DokumenJenis } from "@/shared/types";
 
@@ -81,7 +80,7 @@ export async function POST(request: NextRequest) {
     // Save file
     const storage = getStorageAdapter();
     const storagePath = dokumenPath(jamaahId, jenisDokumen, ext);
-    const fileUrl = await storage.upload(storagePath, buffer, file.type || "image/jpeg");
+    await storage.upload(storagePath, buffer, file.type || "image/jpeg");
 
     // Find existing dokumen item untuk jamaah+jenis ini
     const semuaDokumen = await dokumenRepo.findByJamaah(jamaahId);
@@ -91,34 +90,14 @@ export async function POST(request: NextRequest) {
       await dokumenRepo.updateFileStatus(dokumenItem.id, "valid");
     }
 
-    // Enqueue OCR processing
-    const ocrJobId = `ocr-${jamaahId}-${jenisDokumen}-${Date.now()}`;
-    try {
-      await enqueueDocumentOcr({
-        id: ocrJobId,
-        queue: "document-ocr",
-        createdAt: new Date().toISOString(),
-        attempts: 0,
-        maxAttempts: 3,
-        data: {
-          dokumenId: dokumenItem?.id || jenisDokumen,
-          jamaahId,
-          fileUrl,
-          jenisDokumen,
-        },
-      } as Parameters<typeof enqueueDocumentOcr>[0]);
-    } catch {
-      // OCR queue not critical — upload succeeds even if OCR can't be enqueued
-      console.warn("[Upload] Failed to enqueue OCR job, continuing with upload");
-    }
+    // OCR: diproses oleh service external (tidak di VPS aplikasi)
 
     return NextResponse.json({
       success: true,
       data: {
         dokumen: dokumenItem,
         fileUrl: await storage.getUrl(storagePath),
-        ocrJobId,
-        status: "processing",
+        status: "uploaded",
       },
     });
   } catch (error) {

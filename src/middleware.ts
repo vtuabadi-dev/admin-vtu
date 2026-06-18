@@ -2,7 +2,7 @@ import { auth } from "@/server/auth";
 import { NextResponse } from "next/server";
 import { checkRateLimit, rateLimitKey, getRateLimitConfig } from "@/server/lib/rate-limit";
 
-const PUBLIC_PATHS = ["/login", "/register", "/track", "/reset-password", "/api/auth", "/api/health", "/api/track", "/_next", "/api/register", "/api/keberangkatan"];
+const PUBLIC_PATHS = ["/login", "/register", "/track", "/reset-password", "/api/auth", "/api/health", "/api/track", "/_next", "/api/register", "/api/keberangkatan", "/api/migrate-terms", "/api/operational-documents"];
 
 // API routes accessible to jamaah (own data + notifications + uploads)
 const JAMAAH_API_PREFIXES = [
@@ -19,7 +19,6 @@ const SUPER_ADMIN_ONLY_PREFIXES = [
   "/admin/kesehatan-sistem",
   "/admin/maintenance",
   "/api/admin/system-health",
-  "/api/admin/simulate",
   "/api/admin/backup",
 ];
 

@@ -7,7 +7,7 @@ import { checkRateLimit, rateLimitKey, getRateLimitConfig } from "@/server/lib/r
 import { getStorageAdapter, signaturePath } from "@/server/storage";
 import type { GroupRegistrationFormData } from "@/shared/types";
 
-const MAX_PAX = 10;
+const MAX_PAX = 100;
 const MIN_PAX = 1;
 
 async function generateKodeRegistrasi(): Promise<string> {
@@ -36,8 +36,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, message: "Data perwakilan wajib diisi" }, { status: 400 });
     }
 
-    if (!body.termsAccepted) {
-      return NextResponse.json({ success: false, message: "Syarat & ketentuan harus disetujui" }, { status: 400 });
+    if (!body.termsAccepted || !(body as any).termsSyarat || !(body as any).termsPembayaran || !(body as any).termsPembatalan || !(body as any).termsData) {
+      return NextResponse.json({ success: false, message: "Semua syarat & ketentuan harus disetujui" }, { status: 400 });
     }
 
     if (!body.paxCount || body.paxCount < MIN_PAX || body.paxCount > MAX_PAX) {
@@ -89,7 +89,7 @@ export async function POST(request: NextRequest) {
       urutan: i + 1,
     }));
 
-    // Create registration request
+    // Create registration request as DRAFT with leadStatus = BARU
     const reg = await registrationRepo.create({
       kodeRegistrasi,
       namaPerwakilan,
@@ -101,7 +101,10 @@ export async function POST(request: NextRequest) {
       hotelUpgrade: body.hotelUpgrade || undefined,
       signaturePath: finalSignaturePath,
       termsAccepted: body.termsAccepted,
-      status: "PENDING_REVIEW",
+      termsAcceptedAt: (body as any).termsAcceptedAt ? new Date((body as any).termsAcceptedAt) : new Date(),
+      signedAt: (body as any).signedAt ? new Date((body as any).signedAt) : undefined,
+      leadStatus: "BARU",
+      status: "DRAFT",
       members: members.map((m) => ({
         ...m,
         hubungan: m.hubungan || undefined,
@@ -123,6 +126,82 @@ export async function POST(request: NextRequest) {
     } catch {
       // Non-critical
     }
+
+    // ── Generate PDF ────────────────────────────────────────
+    let pdfPath = "";
+    try {
+      const { generateRegistrationPdf } = await import("@/server/services/registration-pdf.service");
+      const pdfBuffer = await generateRegistrationPdf({
+        registration: reg,
+        packageInfo: (paket as any) ?? null,
+        termsVersion: (body as any).termsVersion || "1.0",
+        termsAcceptedAt: reg.termsAcceptedAt ?? reg.createdAt,
+        signedAt: reg.signedAt,
+      });
+
+      const storage = getStorageAdapter();
+      pdfPath = `registrations/${kodeRegistrasi}/formulir-pendaftaran.pdf`;
+      await storage.upload(pdfPath, pdfBuffer, "application/pdf");
+    } catch (err) {
+      console.error("[register] PDF generation failed:", err);
+      // Non-blocking — registration still succeeds
+    }
+
+    // ── Send confirmation email ─────────────────────────────
+    let emailStatus = "not_sent";
+    try {
+      const { getNotificationProvider } = await import("@/server/services/notify");
+      const notifier = getNotificationProvider();
+      await notifier.send({
+        channel: "email",
+        recipient: body.emailPerwakilan,
+        subject: "Konfirmasi Registrasi Jamaah — " + kodeRegistrasi,
+        body: [
+          `Yth. ${namaPerwakilan},`,
+          "",
+          `Terima kasih telah melakukan pendaftaran melalui portal registrasi kami.`,
+          "",
+          `Berikut ringkasan pendaftaran Anda:`,
+          `  No. Registrasi: ${kodeRegistrasi}`,
+          `  Paket: ${paket?.namaPaket ?? "-"}`,
+          `  Jumlah Jamaah: ${body.paxCount} orang`,
+          `  Preferensi Kamar: ${body.roomUpgrade?.toUpperCase() ?? "MIX"}`,
+          "",
+          `Status pendaftaran Anda saat ini: BARU.`,
+          `Tim travel kami akan menghubungi Anda dalam 1-2 hari kerja untuk proses selanjutnya.`,
+          "",
+          `Formulir registrasi terlampir dalam email ini untuk arsip Anda.`,
+          "",
+          `Jika ada pertanyaan, silakan hubungi kami melalui WhatsApp.`,
+          "",
+          `Hormat kami,`,
+          `Tim VTU Operasional`,
+        ].join("\n"),
+        metadata: {
+          kodeRegistrasi,
+          pdfPath,
+          registrationId: reg.id,
+        },
+      });
+      emailStatus = "sent";
+    } catch (err) {
+      console.error("[register] Email notification failed:", err);
+      // Non-blocking
+    }
+
+    // ── Audit: PDF + Email ──────────────────────────────────
+    try {
+      await auditRepo.create({
+        userId: "system",
+        userName: "System (Auto)",
+        role: "jamaah",
+        module: "jamaah",
+        action: "registration.artifacts",
+        detail: `PDF: ${pdfPath || "gagal"} | Email: ${emailStatus} | Ke: ${body.emailPerwakilan}`,
+        entityId: reg.id,
+        entityType: "RegistrationRequest",
+      });
+    } catch { /* non-critical */ }
 
     // Notify admins
     try {

@@ -27,12 +27,10 @@ import type {
   OperationalAlert,
   Keberangkatan,
   PackageReadinessScore,
-  AutoDeadline,
   PackageIntelligence,
 } from "@/shared/types";
 import { cn, formatCurrency } from "@/shared/lib/utils";
 import { getScoreVariant } from "@/shared/lib/readiness-score";
-import { getDeadlineStatus } from "@/shared/lib/deadline-utils";
 import Link from "next/link";
 
 export default function AdminDashboardPage() {
@@ -40,7 +38,7 @@ export default function AdminDashboardPage() {
   const [alerts, setAlerts] = useState<OperationalAlert[]>([]);
   const [kbrList, setKbrList] = useState<Keberangkatan[]>([]);
   const [scores, setScores] = useState<Record<string, PackageReadinessScore>>({});
-  const [deadlines, setDeadlines] = useState<Record<string, AutoDeadline[]>>({});
+  const [intelMap, setIntelMap] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(true);
   const [mobileAlertsOpen, setMobileAlertsOpen] = useState(false);
   const [pendingReviewCount, setPendingReviewCount] = useState(0);
@@ -93,7 +91,7 @@ export default function AdminDashboardPage() {
     if (kbrList.length === 0) return;
     async function loadScores() {
       const scoreMap: Record<string, PackageReadinessScore> = {};
-      const deadlineMap: Record<string, AutoDeadline[]> = {};
+      const intelAcc: Record<string, any> = {};
       await Promise.all(
         kbrList.map(async (pkg) => {
           try {
@@ -107,13 +105,13 @@ export default function AdminDashboardPage() {
             }
             if (intelRes.ok) {
               const j = await intelRes.json();
-              if (j.data) deadlineMap[pkg.id] = j.data;
+              if (j.data) intelAcc[pkg.id] = j.data;
             }
           } catch { /* per-package load can fail gracefully */ }
         })
       );
       setScores(scoreMap);
-      setDeadlines(deadlineMap as any);
+      setIntelMap(intelAcc);
     }
     loadScores();
   }, [kbrList]);
@@ -153,9 +151,12 @@ export default function AdminDashboardPage() {
     ? packageAlerts
     : alerts;
 
-  const selectedKbr = isFiltered
-    ? kbrList.find((k) => k.id === selectedPackageId) ?? null
-    : null;
+  const selectedKbr = (() => {
+    if (!isFiltered) return null;
+    console.log("[DEBUG FIND kbrList]", typeof kbrList, Array.isArray(kbrList), kbrList);
+    if (!Array.isArray(kbrList)) return null;
+    return kbrList.find((k) => k.id === selectedPackageId) ?? null;
+  })();
 
   const filteredKbrList = isFiltered
     ? (selectedKbr ? [selectedKbr] : [])
@@ -185,7 +186,18 @@ export default function AdminDashboardPage() {
     );
   }
 
-  if (!stats) return null;
+  // Guard: if stats failed to load, show fallback with retry
+  if (!stats) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 gap-3">
+        <AlertTriangle className="h-8 w-8 text-muted-foreground/30" />
+        <p className="text-sm text-muted-foreground">Gagal memuat data dashboard.</p>
+        <Button size="sm" variant="outline" onClick={() => window.location.reload()}>
+          Muat Ulang
+        </Button>
+      </div>
+    );
+  }
 
   const pkgOptions = [
     { value: "all", label: "Semua Paket" },
@@ -198,8 +210,8 @@ export default function AdminDashboardPage() {
 
   return (
     <div className="space-y-6">
-      {/* Operational warnings */}
-      <OperationalWarnings />
+        {/* Operational warnings */}
+        <OperationalWarnings />
 
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -621,27 +633,18 @@ export default function AdminDashboardPage() {
                       },
                     },
                     {
-                      key: "deadline",
-                      header: "Deadline",
+                      key: "intel",
+                      header: "Status Intel",
                       accessor: (r) => {
-                        const dls = deadlines[r.id];
-                        if (!dls || dls.length === 0) return <span className="text-xs text-muted-foreground">-</span>;
-                        const urgent = dls.find((d) => getDeadlineStatus(d) === "overdue") ??
-                          dls.find((d) => getDeadlineStatus(d) === "warning") ??
-                          dls[0]!;
-                        const status = getDeadlineStatus(urgent);
+                        const intel = intelMap[r.id];
+                        if (!intel) return <span className="text-xs text-muted-foreground">-</span>;
+                        const issues = (intel.warningCount ?? 0) + (intel.manifestIncomplete ?? 0) + (intel.roomingIncomplete ?? 0);
                         return (
-                          <span
-                            className={cn(
-                              "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold",
-                              status === "overdue"
-                                ? "bg-destructive/10 text-destructive"
-                                : status === "warning"
-                                  ? "bg-warning/10 text-warning"
-                                  : "bg-success/10 text-success"
-                            )}
-                          >
-                            {urgent.label.split(" ").slice(-1)[0]}
+                          <span className={cn(
+                            "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold",
+                            issues > 0 ? "bg-warning/10 text-warning" : "bg-success/10 text-success"
+                          )}>
+                            {issues > 0 ? `${issues} isu` : "OK"}
                           </span>
                         );
                       },

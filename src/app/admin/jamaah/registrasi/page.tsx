@@ -120,6 +120,173 @@ function formatLocaleDate(iso: string): string {
 }
 
 // ============================================================
+// LEAD MANAGEMENT PANEL
+// ============================================================
+
+function LeadManagementPanel() {
+  const [leads, setLeads] = useState<any[]>([]);
+  const [loadingLeads, setLoadingLeads] = useState(true);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState<string>("");
+
+  const fetchLeads = useCallback(async () => {
+    setLoadingLeads(true);
+    try {
+      const params = new URLSearchParams();
+      if (statusFilter) params.set("status", statusFilter);
+      const res = await fetch(`/api/admin/registrations?${params}`);
+      const data = await res.json();
+      if (data.success) setLeads(data.data ?? []);
+    } catch {
+      // silent
+    } finally {
+      setLoadingLeads(false);
+    }
+  }, [statusFilter]);
+
+  const leadStatuses = ["BARU", "DIHUBUNGI", "FOLLOW_UP", "MENUNGGU_DP", "DP_MASUK"];
+
+  const getActionsForLeadStatus = (lStatus: string): { label: string; nextStatus: string; variant: string }[] => {
+    const map: Record<string, { label: string; nextStatus: string; variant: string }[]> = {
+      BARU: [
+        { label: "Hubungi", nextStatus: "DIHUBUNGI", variant: "bg-blue-600 hover:bg-blue-700" },
+        { label: "Tolak", nextStatus: "DITOLAK", variant: "bg-red-500 hover:bg-red-600" },
+      ],
+      DIHUBUNGI: [
+        { label: "Follow Up", nextStatus: "FOLLOW_UP", variant: "bg-indigo-600 hover:bg-indigo-700" },
+        { label: "Menunggu DP", nextStatus: "MENUNGGU_DP", variant: "bg-amber-500 hover:bg-amber-600" },
+        { label: "Tolak", nextStatus: "DITOLAK", variant: "bg-red-500 hover:bg-red-600" },
+      ],
+      FOLLOW_UP: [
+        { label: "Menunggu DP", nextStatus: "MENUNGGU_DP", variant: "bg-amber-500 hover:bg-amber-600" },
+        { label: "Hubungi Lagi", nextStatus: "DIHUBUNGI", variant: "bg-blue-600 hover:bg-blue-700" },
+        { label: "Tolak", nextStatus: "DITOLAK", variant: "bg-red-500 hover:bg-red-600" },
+      ],
+      MENUNGGU_DP: [
+        { label: "DP Masuk", nextStatus: "DP_MASUK", variant: "bg-green-600 hover:bg-green-700" },
+        { label: "Hubungi", nextStatus: "DIHUBUNGI", variant: "bg-blue-600 hover:bg-blue-700" },
+        { label: "Tolak", nextStatus: "DITOLAK", variant: "bg-red-500 hover:bg-red-600" },
+      ],
+      DP_MASUK: [
+        { label: "Konversi", nextStatus: "DIKONVERSI", variant: "bg-green-600 hover:bg-green-700" },
+        { label: "Tolak", nextStatus: "DITOLAK", variant: "bg-red-500 hover:bg-red-600" },
+      ],
+    };
+    return map[lStatus] ?? [];
+  };
+
+  useEffect(() => { fetchLeads(); }, [fetchLeads]);
+
+  const handleStatusChange = async (id: string, newLeadStatus: string) => {
+    setActionLoading(id);
+    try {
+      const res = await fetch(`/api/admin/registrations/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ leadStatus: newLeadStatus }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setLeads((prev) => prev.map((l) => l.id === id ? { ...l, leadStatus: newLeadStatus } : l));
+      }
+    } catch {
+      // silent
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  // allStatuses for filter dropdown — declared once in panel scope
+  const allStatuses = [...leadStatuses, "PENDING_REVIEW", "APPROVED", "REJECTED"];
+
+  const STATUS_COLORS: Record<string, string> = {
+    BARU: "bg-purple-100 text-purple-800", DIHUBUNGI: "bg-blue-100 text-blue-800",
+    FOLLOW_UP: "bg-indigo-100 text-indigo-800", MENUNGGU_DP: "bg-amber-100 text-amber-800",
+    DP_MASUK: "bg-green-100 text-green-800", PENDING_REVIEW: "bg-cyan-100 text-cyan-800",
+    APPROVED: "bg-emerald-100 text-emerald-800", REJECTED: "bg-red-100 text-red-800",
+    CANCELLED: "bg-gray-100 text-gray-600",
+  };
+
+  const STATUS_LABELS: Record<string, string> = {
+    BARU: "Baru", DIHUBUNGI: "Dihubungi", FOLLOW_UP: "Follow Up",
+    MENUNGGU_DP: "Menunggu DP", DP_MASUK: "DP Masuk", PENDING_REVIEW: "Review",
+    APPROVED: "Disetujui", REJECTED: "Ditolak", CANCELLED: "Batal",
+  };
+
+  return (
+    <Card>
+      <CardContent className="p-4 space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="font-semibold text-sm">Lead Registrasi ({leads.length})</h3>
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="px-3 py-1.5 border border-gray-300 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="">Semua Status</option>
+            {allStatuses.map((s) => (
+              <option key={s} value={s}>{STATUS_LABELS[s] ?? s}</option>
+            ))}
+          </select>
+        </div>
+
+        {loadingLeads ? (
+          <p className="text-sm text-muted-foreground text-center py-4">Memuat...</p>
+        ) : leads.length === 0 ? (
+          <p className="text-sm text-muted-foreground text-center py-4">Belum ada lead registrasi.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b text-left">
+                  <th className="py-2 pr-3 font-medium text-xs text-gray-500">Kode</th>
+                  <th className="py-2 pr-3 font-medium text-xs text-gray-500">Perwakilan</th>
+                  <th className="py-2 pr-3 font-medium text-xs text-gray-500">PAX</th>
+                  <th className="py-2 pr-3 font-medium text-xs text-gray-500">Status</th>
+                  <th className="py-2 font-medium text-xs text-gray-500">Aksi</th>
+                </tr>
+              </thead>
+              <tbody>
+                {leads.slice(0, 20).map((lead: any) => (
+                  <tr key={lead.id} className="border-b last:border-0 hover:bg-gray-50">
+                    <td className="py-2 pr-3 font-mono text-xs">{lead.kodeRegistrasi}</td>
+                    <td className="py-2 pr-3">
+                      <p className="font-medium">{lead.namaPerwakilan}</p>
+                      <p className="text-xs text-gray-400">{lead.nomorTelepon}</p>
+                    </td>
+                    <td className="py-2 pr-3 text-xs">{lead.paxCount} org</td>
+                    <td className="py-2 pr-3">
+                      <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[lead.leadStatus ?? "BARU"] ?? "bg-gray-100 text-gray-600"}`}>
+                        {STATUS_LABELS[lead.leadStatus ?? "BARU"] ?? (lead.leadStatus ?? "BARU")}
+                      </span>
+                    </td>
+                    <td className="py-2">
+                      <div className="flex gap-1.5">
+                        {getActionsForLeadStatus(lead.leadStatus ?? "BARU").map((action) => (
+                          <button
+                            key={action.nextStatus}
+                            type="button"
+                            disabled={actionLoading === lead.id}
+                            onClick={() => handleStatusChange(lead.id, action.nextStatus)}
+                            className={`px-2 py-1 text-xs text-white rounded ${action.variant} disabled:opacity-50`}
+                          >
+                            {actionLoading === lead.id ? "..." : action.label}
+                          </button>
+                        ))}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// ============================================================
 // MAIN PAGE COMPONENT
 // ============================================================
 
@@ -228,7 +395,17 @@ export default function RegistrasiPage() {
           Registrasi Jamaah Baru
         </h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Isi data diri dan pilih paket keberangkatan
+          Kelola lead pendaftaran dan registrasi jamaah baru
+        </p>
+      </div>
+
+      {/* Lead Management Panel */}
+      <LeadManagementPanel />
+
+      {/* Divider */}
+      <div className="border-t pt-4">
+        <p className="text-sm font-semibold text-muted-foreground mb-4">
+          Registrasi Manual (Admin Entry)
         </p>
       </div>
 

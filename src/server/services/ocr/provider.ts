@@ -1,6 +1,6 @@
 // OCR Provider Abstraction
-// Memungkinkan swap OCR engine tanpa mengubah business logic
-// Implementasi: Tesseract.js (default), Google Vision, AWS Textract, dll.
+// Memungkinkan swap OCR provider tanpa mengubah business logic.
+// Implementasi utama: Google Vision API atau custom external API.
 
 import type { DokumenJenis } from "@/shared/types";
 
@@ -37,7 +37,7 @@ export interface OcrProvider {
   /** Konfigurasi provider — dipanggil saat inisialisasi */
   initialize?(): Promise<void>;
 
-  /** Cleanup — dipanggil saat worker shutdown */
+  /** Cleanup provider bila diperlukan */
   dispose?(): Promise<void>;
 }
 

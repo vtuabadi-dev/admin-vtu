@@ -14,6 +14,9 @@ function mapRequest(row: any): RegistrationRequest {
     hotelUpgrade: row.hotelUpgrade ?? undefined,
     signaturePath: row.signaturePath,
     termsAccepted: row.termsAccepted,
+    termsAcceptedAt: row.termsAcceptedAt?.toISOString(),
+    signedAt: row.signedAt?.toISOString(),
+    leadStatus: row.leadStatus ?? undefined,
     status: row.status as RegistrationStatus,
     catatanAdmin: row.catatanAdmin ?? undefined,
     reviewedBy: row.reviewedBy ?? undefined,
@@ -82,6 +85,9 @@ export const registrationRepo = {
     hotelUpgrade?: string;
     signaturePath: string;
     termsAccepted: boolean;
+    termsAcceptedAt?: Date;
+    signedAt?: Date;
+    leadStatus?: string;
     status: string;
     members: { namaLengkap: string; jenisKelamin: string; hubungan?: string | undefined; urutan: number }[];
   }) {
@@ -97,6 +103,9 @@ export const registrationRepo = {
         hotelUpgrade: data.hotelUpgrade ?? null,
         signaturePath: data.signaturePath,
         termsAccepted: data.termsAccepted,
+        termsAcceptedAt: data.termsAcceptedAt ?? null,
+        signedAt: data.signedAt ?? null,
+        leadStatus: data.leadStatus ? (data.leadStatus as any) : null,
         status: data.status as any,
         members: {
           create: data.members.map((m) => ({
@@ -112,8 +121,10 @@ export const registrationRepo = {
     return mapRequest(row);
   },
 
-  async updateStatus(id: string, status: string, extra?: { catatanAdmin?: string; reviewedBy?: string; groupId?: string }) {
-    const data: any = { status: status as any, reviewedAt: extra ? new Date() : undefined };
+  async updateStatus(id: string, status?: string, extra?: { catatanAdmin?: string; reviewedBy?: string; groupId?: string; leadStatus?: string }) {
+    const data: any = { reviewedAt: extra ? new Date() : undefined };
+    if (status !== undefined) data.status = status as any;
+    if (extra?.leadStatus !== undefined) data.leadStatus = extra.leadStatus as any;
     if (extra?.catatanAdmin !== undefined) data.catatanAdmin = extra.catatanAdmin;
     if (extra?.reviewedBy !== undefined) data.reviewedBy = extra.reviewedBy;
     if (extra?.groupId !== undefined) data.groupId = extra.groupId;

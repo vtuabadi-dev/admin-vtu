@@ -23,7 +23,8 @@ export function PermissionGuard({ module, required = "view", children, fallback 
       .then((session) => {
         const role = session?.user?.role || "jamaah";
         const check = canAccessModule(role, module);
-        const actionKey = required as keyof typeof check;
+        // Map short action name to PermissionCheck key (e.g. "view" → "canView")
+        const actionKey = `can${required.charAt(0).toUpperCase()}${required.slice(1)}` as keyof typeof check;
         setAllowed(!!check[actionKey]);
       })
       .catch(() => setAllowed(false))

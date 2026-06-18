@@ -606,12 +606,6 @@ export async function simulateUpload(file: { name: string; size: number; type: s
   return { fileName: file.name, fileSize: file.size, fileType: file.type, uploadedAt: new Date().toISOString(), ocrConfidence: Math.round(confidence * 100) / 100 };
 }
 
-export async function simulateOcrProcessing(_dokumenId: string): Promise<{ confidence: number }> {
-  await new Promise((r) => setTimeout(r, 2000));
-  const confidence = 0.55 + Math.random() * 0.4;
-  return { confidence: Math.round(confidence * 100) / 100 };
-}
-
 // ────────────────────────────────────────────────────────────
 // PAYMENT WORKFLOW
 // ────────────────────────────────────────────────────────────

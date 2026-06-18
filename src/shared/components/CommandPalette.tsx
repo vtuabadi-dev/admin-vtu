@@ -54,6 +54,8 @@ const PAGES: PageItem[] = [
   { label: "Rooming", link: "/admin/rooming", icon: Building2 },
   { label: "Pembayaran", link: "/admin/pembayaran", icon: CreditCard },
   { label: "Dokumen", link: "/admin/dokumen", icon: FileCheck },
+  { label: "Import Flyer OCR", link: "/admin/ocr-package", icon: Package },
+  { label: "Review OCR Dokumen", link: "/admin/ocr-review", icon: FileCheck },
   { label: "Command Center", link: "/admin/command-center", icon: BarChart3 },
   { label: "Export Center", link: "/admin/export-center", icon: Download },
   { label: "Bulk Operations", link: "/admin/bulk-operations", icon: Layers },
@@ -74,6 +76,7 @@ const QUICK_ACTIONS: QuickActionItem[] = [
   { label: "Generate Rooming", link: "/admin/rooming", icon: Building2 },
   { label: "Kirim Reminder", link: "/admin/pengingat", icon: Send },
   { label: "Export Data", link: "/admin/export-center", icon: Download },
+  { label: "Import Flyer OCR", link: "/admin/ocr-package", icon: Package },
   { label: "Review Dokumen", link: "/admin/ocr-review", icon: FileCheck },
   { label: "Bulk Operations", link: "/admin/bulk-operations", icon: Layers },
 ];

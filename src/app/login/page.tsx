@@ -274,17 +274,25 @@ export default function LoginPage() {
           </button>
         </form>
 
-        {/* ── Registration link (Jamaah only) ── */}
-        {!isAdmin && (
-          <div className="mt-4 text-center">
-            <p className="text-sm text-muted-foreground">
-              Belum punya akun?{" "}
-              <a href="/register" className="text-primary font-medium hover:underline">
-                Daftar di sini
-              </a>
-            </p>
+        {/* ── Portal Registrasi Jamaah ── */}
+        <div className="mt-6 pt-5 border-t border-border">
+          <div className="text-center space-y-3">
+            <div>
+              <p className="text-sm font-medium text-foreground">
+                Belum menjadi jamaah?
+              </p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Silakan lakukan pendaftaran online melalui portal registrasi.
+              </p>
+            </div>
+            <a
+              href="/register"
+              className="block w-full py-2.5 px-4 rounded-lg border-2 border-primary/20 bg-primary/5 text-primary text-sm font-medium hover:bg-primary/10 hover:border-primary/30 transition-colors duration-200"
+            >
+              Portal Registrasi Jamaah
+            </a>
           </div>
-        )}
+        </div>
 
         {/* ── Demo Credentials ── */}
         <div className="mt-6">

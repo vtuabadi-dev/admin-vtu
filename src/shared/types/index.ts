@@ -764,6 +764,15 @@ export type RegistrationStatus =
   | "CANCELLED"
   | "EXPIRED";
 
+export type LeadStatus =
+  | "BARU"
+  | "DIHUBUNGI"
+  | "FOLLOW_UP"
+  | "MENUNGGU_DP"
+  | "DP_MASUK"
+  | "DIKONVERSI"
+  | "DITOLAK";
+
 export interface RegistrationRequest {
   id: string;
   kodeRegistrasi: string;
@@ -776,6 +785,9 @@ export interface RegistrationRequest {
   hotelUpgrade?: string;
   signaturePath: string;
   termsAccepted: boolean;
+  termsAcceptedAt?: string;
+  signedAt?: string;
+  leadStatus?: LeadStatus;
   status: RegistrationStatus;
   catatanAdmin?: string;
   reviewedBy?: string;

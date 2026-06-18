@@ -1,4 +1,5 @@
 // Google Cloud Vision OCR Provider
+// OCR diproses synchronous via Google Vision API (tanpa queue/worker/Redis).
 // Set OCR_PROVIDER=google-vision + GOOGLE_VISION_API_KEY di .env
 
 import type { DokumenJenis } from "@/shared/types";
@@ -6,11 +7,11 @@ import type { OcrProvider, OcrResult, ImageMetaCheck } from "./provider";
 import { getExpectedFields } from "./provider";
 import fs from "fs";
 
-// Baca semua API key — support multiple keys dipisah koma
+// ── API Key Management ───────────────────────────────────────
+// Support multiple keys (comma-separated) with auto-rotation on rate limit.
 // GOOGLE_VISION_API_KEY=key1,key2,key3
-// atau eja satu per satu:
-// GOOGLE_VISION_API_KEY_1=key1
-// GOOGLE_VISION_API_KEY_2=key2
+// atau eja satu per satu: GOOGLE_VISION_API_KEY_2, _3, dst.
+
 function getApiKeys(): string[] {
   const main = process.env.GOOGLE_VISION_API_KEY ?? "";
   const keys = main
@@ -18,7 +19,6 @@ function getApiKeys(): string[] {
     .map((k) => k.trim())
     .filter(Boolean);
 
-  // Support juga format GOOGLE_VISION_API_KEY_1, _2, _3
   for (let i = 2; i <= 20; i++) {
     const extra = process.env[`GOOGLE_VISION_API_KEY_${i}`];
     if (extra?.trim()) keys.push(extra.trim());
@@ -36,6 +36,57 @@ function getNextApiKey(keys: string[]): string | null {
   return key;
 }
 
+// ── Field Extraction ─────────────────────────────────────────
+
+const FIELD_PATTERNS: Record<string, RegExp[]> = {
+  namaLengkap: [
+    /Nama\s*:\s*(.+)/i, /NAME\s*:\s*(.+)/i,
+    /Surname\s*:\s*(.+)/i, /Given\s*Names?\s*:\s*(.+)/i,
+  ],
+  nomorPaspor: [
+    /Paspor\s*(?:No|Number)?\s*:\s*([A-Z0-9]+)/i,
+    /Passport\s*(?:No|Number)?\s*:\s*([A-Z0-9]+)/i,
+  ],
+  nik: [
+    /NIK\s*:\s*(\d+)/i, /KTP\s*(?:No|Number)?\s*:\s*(\d+)/i,
+  ],
+  tanggalLahir: [
+    /Tempat\s*\/?\s*Tgl?\s*\.?\s*Lahir\s*:\s*.+?,\s*([\d\-/]+)/i,
+    /Tanggal\s*Lahir\s*:\s*([\d\-/]+)/i,
+    /Tgl?\s*\.?\s*Lahir\s*:\s*([\d\-/]+)/i,
+    /Date\s*of\s*Birth\s*:\s*([\d\-/]+)/i,
+  ],
+  tempatLahir: [
+    /Tempat\s*Lahir\s*:\s*(.+)/i,
+    /Place\s*of\s*Birth\s*:\s*(.+)/i,
+    // KTP Indonesia: "Tempat/Tgl Lahir: JAKARTA, 15-07-1980"
+    /Tempat\s*\/?\s*Tgl?\s*\.?\s*Lahir\s*:\s*([^,]+)/i,
+  ],
+  masaBerlaku: [
+    /Berlaku\s*(?:sampai|hingga)?\s*:\s*([\d\-/]+)/i,
+    /Expiry\s*Date\s*:\s*([\d\-/]+)/i,
+  ],
+};
+
+export function extractField(text: string, field: string): string {
+  const patterns = FIELD_PATTERNS[field] ?? [];
+  for (const regex of patterns) {
+    const match = text.match(regex);
+    if (match?.[1]) return match[1].trim();
+  }
+
+  // Fallback: return first line containing the field name
+  for (const line of text.split("\n")) {
+    if (line.toLowerCase().includes(field.toLowerCase())) {
+      return line.replace(/^[^:]*:\s*/, "").trim();
+    }
+  }
+
+  return "";
+}
+
+// ── Provider ──────────────────────────────────────────────────
+
 export function createGoogleVisionProvider(): OcrProvider {
   return {
     name: "google-vision",
@@ -43,14 +94,33 @@ export function createGoogleVisionProvider(): OcrProvider {
     async recognize(imagePath: string, jenis: DokumenJenis, retryCount = 0): Promise<OcrResult> {
       const keys = getApiKeys();
       if (keys.length === 0) {
-        return { success: false, fields: [], rawText: "GOOGLE_VISION_API_KEY not set", overallConfidence: 0, processingTimeMs: 0, retryCount };
+        return {
+          success: false,
+          fields: [],
+          rawText: "GOOGLE_VISION_API_KEY not set",
+          overallConfidence: 0,
+          processingTimeMs: 0,
+          retryCount,
+        };
       }
 
       const start = Date.now();
-      const imageBuffer = fs.readFileSync(imagePath);
+
+      let imageBuffer: Buffer;
+      try {
+        imageBuffer = fs.readFileSync(imagePath);
+      } catch (err) {
+        return {
+          success: false,
+          fields: [],
+          rawText: `Cannot read image file: ${(err as Error).message}`,
+          overallConfidence: 0,
+          processingTimeMs: Date.now() - start,
+          retryCount,
+        };
+      }
       const base64 = imageBuffer.toString("base64");
 
-      // Coba semua key — rotasi kalau kena rate limit (429) atau error
       let lastError = "";
       for (let attempt = 0; attempt < keys.length; attempt++) {
         const apiKey = getNextApiKey(keys)!;
@@ -79,34 +149,38 @@ export function createGoogleVisionProvider(): OcrProvider {
 
           if (!res.ok) {
             const text = await res.text().catch(() => "");
-            return { success: false, fields: [], rawText: text, overallConfidence: 0, processingTimeMs: Date.now() - start, retryCount };
+            return {
+              success: false,
+              fields: [],
+              rawText: text,
+              overallConfidence: 0,
+              processingTimeMs: Date.now() - start,
+              retryCount,
+            };
           }
 
           const data = await res.json();
           const fullText: string = data?.responses?.[0]?.fullTextAnnotation?.text ?? "";
 
-        // Extract fields from OCR text
-        const expectedFields = getExpectedFields(jenis);
-        const fields = expectedFields.map((field) => {
-          const value = extractField(fullText, field, jenis);
-          return { field, value, confidence: 0.9 };
-        });
+          const expectedFields = getExpectedFields(jenis);
+          const fields = expectedFields.map((field) => {
+            const value = extractField(fullText, field);
+            return { field, value, confidence: value ? 0.9 : 0 };
+          });
 
           return {
             success: true,
             fields,
             rawText: fullText,
-            overallConfidence: 0.9,
+            overallConfidence: fullText ? 0.9 : 0,
             processingTimeMs: Date.now() - start,
             retryCount,
           };
         } catch (err) {
           lastError = (err as Error).message;
-          // Lanjut ke key berikutnya
         }
       }
 
-      // Semua key gagal
       return {
         success: false,
         fields: [],
@@ -121,51 +195,14 @@ export function createGoogleVisionProvider(): OcrProvider {
       const issues: string[] = [];
       if (buffer.length < 10240) issues.push("File terlalu kecil (< 10KB)");
       if (buffer.length > 10 * 1024 * 1024) issues.push("File terlalu besar (> 10MB)");
+
+      const isJpeg = buffer[0] === 0xFF && buffer[1] === 0xD8 && buffer[2] === 0xFF;
+      const isPng = buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4E && buffer[3] === 0x47;
+      if (!isJpeg && !isPng) {
+        issues.push("File bukan JPEG/PNG valid (magic bytes mismatch)");
+      }
+
       return { valid: issues.length === 0, issues };
     },
   };
-}
-
-// Simple regex-based field extraction from OCR text
-function extractField(text: string, field: string, _jenis: string): string {
-  const patterns: Record<string, RegExp[]> = {
-    namaLengkap: [
-      /Nama\s*:\s*(.+)/i, /NAME\s*:\s*(.+)/i,
-      /Surname\s*:\s*(.+)/i, /Given\s*Names?\s*:\s*(.+)/i,
-    ],
-    nomorPaspor: [
-      /Paspor\s*(?:No|Number)?\s*:\s*([A-Z0-9]+)/i,
-      /Passport\s*(?:No|Number)?\s*:\s*([A-Z0-9]+)/i,
-    ],
-    nik: [
-      /NIK\s*:\s*(\d+)/i, /KTP\s*(?:No|Number)?\s*:\s*(\d+)/i,
-    ],
-    tanggalLahir: [
-      /Tanggal\s*Lahir\s*:\s*([\d\-/]+)/i,
-      /Date\s*of\s*Birth\s*:\s*([\d\-/]+)/i,
-    ],
-    tempatLahir: [
-      /Tempat\s*Lahir\s*:\s*(.+)/i,
-      /Place\s*of\s*Birth\s*:\s*(.+)/i,
-    ],
-    masaBerlaku: [
-      /Berlaku\s*(?:sampai|hingga)?\s*:\s*([\d\-/]+)/i,
-      /Expiry\s*Date\s*:\s*([\d\-/]+)/i,
-    ],
-  };
-
-  const fieldPatterns = patterns[field] ?? [];
-  for (const regex of fieldPatterns) {
-    const match = text.match(regex);
-    if (match?.[1]) return match[1].trim();
-  }
-
-  // Fallback: return first line containing the field name
-  for (const line of text.split("\n")) {
-    if (line.toLowerCase().includes(field.toLowerCase())) {
-      return line.replace(/^[^:]*:\s*/, "").trim();
-    }
-  }
-
-  return "";
 }

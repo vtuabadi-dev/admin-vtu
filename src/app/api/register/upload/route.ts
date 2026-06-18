@@ -1,11 +1,20 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getStorageAdapter, signaturePath } from "@/server/storage";
-import { validateImageMetadata } from "@/server/services/ocr.service";
 import { checkRateLimit, rateLimitKey, getRateLimitConfig } from "@/server/lib/rate-limit";
 
-const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
-const VALID_MIME_TYPES = ["image/jpeg", "image/jpg"];
+function validateImageMetadata(buffer: Buffer): { valid: boolean; issues: string[] } {
+  const issues: string[] = [];
+  if (buffer.length < 10240) issues.push("File size too small (< 10KB)");
+  if (buffer.length > 10 * 1024 * 1024) issues.push("File size terlalu besar (> 10MB)");
+  const isJpeg = buffer[0] === 0xFF && buffer[1] === 0xD8 && buffer[2] === 0xFF;
+  const isPng = buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4E && buffer[3] === 0x47;
+  if (!isJpeg && !isPng) issues.push("File bukan JPEG/PNG valid (magic bytes mismatch)");
+  return { valid: issues.length === 0, issues };
+}
+
+const MAX_FILE_SIZE = 100 * 1024; // 100 KB
+const VALID_MIME_TYPES = ["image/jpeg", "image/jpg", "image/png"];
 
 function sanitizeFilename(name: string): string {
   return name.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 128);
@@ -33,17 +42,17 @@ export async function POST(request: NextRequest) {
     // Validate MIME type
     const clientMime = (file.type || "").toLowerCase();
     if (!VALID_MIME_TYPES.includes(clientMime)) {
-      return NextResponse.json({ success: false, message: "Hanya file JPG/JPEG yang diizinkan" }, { status: 400 });
+      return NextResponse.json({ success: false, message: "Hanya file PNG, JPG, atau JPEG yang diizinkan" }, { status: 400 });
     }
 
     // Validate extension
     const ext = sanitizeFilename(file.name).split(".").pop()?.toLowerCase();
-    if (ext !== "jpg" && ext !== "jpeg") {
-      return NextResponse.json({ success: false, message: "Hanya file JPG/JPEG yang diizinkan" }, { status: 400 });
+    if (ext !== "jpg" && ext !== "jpeg" && ext !== "png") {
+      return NextResponse.json({ success: false, message: "Hanya file PNG, JPG, atau JPEG yang diizinkan" }, { status: 400 });
     }
 
     if (file.size > MAX_FILE_SIZE) {
-      return NextResponse.json({ success: false, message: "File terlalu besar (max 5MB)" }, { status: 400 });
+      return NextResponse.json({ success: false, message: "Tanda tangan terlalu besar. Maksimal 100 KB." }, { status: 400 });
     }
 
     const buffer = Buffer.from(await file.arrayBuffer());

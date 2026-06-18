@@ -1,11 +1,8 @@
-// Centralized health check aggregator for the Travel Operational Automation System.
-// All checks return real data — no hardcoded "healthy" values.
+// Centralized health check aggregator — VTU Core (simplified)
+// Database + Storage + Disk + Operational diagnostics only.
 
 import { prisma } from "@/server/db/client";
-import { getConnection } from "@/server/queue/connection";
 import { getStorageAdapter } from "@/server/storage";
-import { getQueueStats } from "@/server/queue";
-import { workers } from "@/server/queue/workers";
 import { getMetrics } from "@/server/lib/metrics";
 import { execSync } from "child_process";
 import path from "path";
@@ -14,19 +11,6 @@ import os from "os";
 // ── Types ──────────────────────────────────────────────────────────
 
 export type HealthStatus = "healthy" | "degraded" | "unhealthy";
-
-export interface QueueHealth {
-  waiting: number;
-  active: number;
-  completed: number;
-  failed: number;
-  delayed: number;
-}
-
-export interface WorkerHealth {
-  name: string;
-  alive: boolean;
-}
 
 export interface OperationalDiagnostic {
   label: string;
@@ -41,12 +25,9 @@ export interface HealthReport {
   timestamp: string;
   infrastructure: {
     database: { status: "connected" | "disconnected"; error?: string };
-    redis: { status: "connected" | "disconnected"; error?: string };
     storage: { status: "available" | "unavailable"; type: "local" | "s3"; error?: string };
     disk: { status: "ok" | "warning" | "critical"; usedPercent: number; freeBytes: number; totalBytes: number };
   };
-  queues: Record<string, QueueHealth>;
-  workers: Record<string, WorkerHealth>;
   metrics: ReturnType<typeof getMetrics>;
   operational: OperationalDiagnostic[];
 }
@@ -59,19 +40,6 @@ export async function checkDatabaseHealth(): Promise<{
 }> {
   try {
     await prisma.$queryRaw`SELECT 1`;
-    return { status: "connected" };
-  } catch (err) {
-    return { status: "disconnected", error: (err as Error).message };
-  }
-}
-
-export async function checkRedisHealth(): Promise<{
-  status: "connected" | "disconnected";
-  error?: string;
-}> {
-  try {
-    const redis = getConnection();
-    await redis.ping();
     return { status: "connected" };
   } catch (err) {
     return { status: "disconnected", error: (err as Error).message };
@@ -106,7 +74,6 @@ export async function checkDiskUsage(): Promise<{
     let freeBytes = 0;
 
     if (process.platform === "win32") {
-      // Windows: use wmic to query the logical disk
       const driveRoot = path.parse(storagePath).root;
       const cwdFirstChar = process.cwd().charAt(0);
       const driveLetter = driveRoot
@@ -130,7 +97,6 @@ export async function checkDiskUsage(): Promise<{
         }
       }
     } else {
-      // Unix / macOS: use df -k (kilobyte blocks)
       const output = execSync(`df -k "${storagePath}"`, {
         encoding: "utf8",
         timeout: 5000,
@@ -151,7 +117,6 @@ export async function checkDiskUsage(): Promise<{
       }
     }
 
-    // Fallback if exec failed to parse: use OS memory info as rough estimate
     if (totalBytes === 0) {
       totalBytes = os.totalmem();
       freeBytes = os.freemem();
@@ -162,62 +127,17 @@ export async function checkDiskUsage(): Promise<{
       totalBytes > 0 ? Math.round((usedBytes / totalBytes) * 100) : 0;
 
     let status: "ok" | "warning" | "critical";
-    if (usedPercent >= 95) {
-      status = "critical";
-    } else if (usedPercent >= 85) {
-      status = "warning";
-    } else {
-      status = "ok";
-    }
+    if (usedPercent >= 95) status = "critical";
+    else if (usedPercent >= 85) status = "warning";
+    else status = "ok";
 
     return { status, usedPercent, freeBytes, totalBytes };
   } catch {
-    // Ultimate fallback: use OS memory info
     const totalBytes = os.totalmem();
     const freeBytes = os.freemem();
     const usedPercent = Math.round(((totalBytes - freeBytes) / totalBytes) * 100);
     return { status: "ok", usedPercent, freeBytes, totalBytes };
   }
-}
-
-export async function checkQueueHealth(): Promise<Record<string, QueueHealth>> {
-  const queueNames = [
-    "document-ocr",
-    "payment-reminder",
-    "export-generator",
-    "notification-dispatch",
-    "cleanup-temp",
-    "backup-database",
-    "manifest-generate",
-    "broadcast-dispatch",
-  ] as const;
-
-  const result: Record<string, QueueHealth> = {};
-  for (const name of queueNames) {
-    try {
-      const stats = await getQueueStats(name as any);
-      result[name] = stats;
-    } catch {
-      result[name] = { waiting: 0, active: 0, completed: 0, failed: 0, delayed: 0 };
-    }
-  }
-  return result;
-}
-
-export async function checkWorkerHealth(): Promise<Record<string, WorkerHealth>> {
-  const result: Record<string, WorkerHealth> = {};
-
-  for (const [name, worker] of Object.entries(workers)) {
-    try {
-      const alive = typeof worker.isRunning === "function" && (await worker.isRunning());
-      result[name] = { name, alive };
-    } catch {
-      // Worker check failed — report as not alive
-      result[name] = { name, alive: false };
-    }
-  }
-
-  return result;
 }
 
 // ── Operational diagnostics ──────────────────────────────────────
@@ -229,7 +149,7 @@ export async function checkOperationalDiagnostics(): Promise<OperationalDiagnost
   const diagnostics: OperationalDiagnostic[] = [];
 
   try {
-    // 1. Stuck registrations — PENDING_REVIEW older than threshold
+    // 1. Stuck registrations
     const stuckDate = new Date(Date.now() - STUCK_REGISTRATION_DAYS * 86400000);
     const stuckCount = await prisma.registrationRequest.count({
       where: { status: "PENDING_REVIEW", createdAt: { lt: stuckDate } },
@@ -252,7 +172,7 @@ export async function checkOperationalDiagnostics(): Promise<OperationalDiagnost
       detail: overdueCount > 0 ? `${overdueCount} invoices past due date` : undefined,
     });
 
-    // 3. Jamaah with missing required documents (paspor)
+    // 3. Jamaah without verified passport
     const incompleteDocs = await prisma.dokumenItem.count({
       where: {
         jenis: "paspor",
@@ -267,7 +187,7 @@ export async function checkOperationalDiagnostics(): Promise<OperationalDiagnost
       detail: incompleteDocs > 0 ? `${incompleteDocs} active jamaah missing verified passport` : undefined,
     });
 
-    // 4. Unpaid DP invoices approaching/past due
+    // 4. DP invoices past due
     const dpOverdue = await prisma.invoice.count({
       where: {
         tipe: "dp",
@@ -282,7 +202,7 @@ export async function checkOperationalDiagnostics(): Promise<OperationalDiagnost
       detail: dpOverdue > 0 ? `${dpOverdue} DP invoices past due date and unpaid` : undefined,
     });
 
-    // 5. Groups with zero payment after 14 days of creation
+    // 5. Groups with zero payment after 14 days
     const fourteenDaysAgo = new Date(Date.now() - 14 * 86400000);
     const unpaidGroups = await prisma.registrationGroup.count({
       where: {
@@ -298,7 +218,7 @@ export async function checkOperationalDiagnostics(): Promise<OperationalDiagnost
       detail: unpaidGroups > 0 ? `${unpaidGroups} active groups with zero payment after 14 days` : undefined,
     });
 
-    // 6. Expired passports (masa berlaku < today for active jamaah)
+    // 6. Expired passports
     const expiredPassports = await prisma.dokumenItem.count({
       where: {
         jenis: "paspor",
@@ -316,7 +236,7 @@ export async function checkOperationalDiagnostics(): Promise<OperationalDiagnost
       detail: expiredPassports > 0 ? `${expiredPassports} active jamaah with expired passports` : undefined,
     });
 
-    // 7. Duplicate passport numbers among active jamaah
+    // 7. Duplicate passport numbers
     const duplicatePassports = await prisma.$queryRaw<{ nomorPaspor: string; count: bigint }[]>`
       SELECT "nomorPaspor", COUNT(*) as count FROM jamaah
       WHERE "nomorPaspor" != '' AND status != 'batal'
@@ -329,13 +249,10 @@ export async function checkOperationalDiagnostics(): Promise<OperationalDiagnost
       detail: duplicatePassports.length > 0 ? `${duplicatePassports.length} passport numbers used by multiple active jamaah` : undefined,
     });
 
-    // 8. Unreviewed uploads older than 7 days
+    // 8. Unreviewed uploads > 7 days
     const unreviewedDate = new Date(Date.now() - 7 * 86400000);
     const unreviewedUploads = await prisma.dokumenItem.count({
-      where: {
-        status: "pending",
-        uploadedAt: { lt: unreviewedDate },
-      },
+      where: { status: "pending", uploadedAt: { lt: unreviewedDate } },
     });
     diagnostics.push({
       label: "Unreviewed Document Uploads (>7 days)",
@@ -344,7 +261,7 @@ export async function checkOperationalDiagnostics(): Promise<OperationalDiagnost
       detail: unreviewedUploads > 0 ? `${unreviewedUploads} document uploads awaiting review for >7 days` : undefined,
     });
 
-    // 9. Jamaah with passport expiring within 3 months of departure
+    // 9. Passports expiring within 3 months
     const threeMonthsFromNow = new Date(Date.now() + 90 * 86400000);
     const expiringPassports = await prisma.jamaah.count({
       where: {
@@ -373,33 +290,22 @@ export async function checkOperationalDiagnostics(): Promise<OperationalDiagnost
 // ── Aggregated report ─────────────────────────────────────────────
 
 export async function getHealthReport(): Promise<HealthReport> {
-  const [database, redis, storage, disk, queues, workerStatus, operational] = await Promise.all([
+  const [database, storage, disk, operational] = await Promise.all([
     checkDatabaseHealth(),
-    checkRedisHealth(),
     checkStorageHealth(),
     checkDiskUsage(),
-    checkQueueHealth(),
-    checkWorkerHealth(),
     checkOperationalDiagnostics(),
   ]);
 
-  // ── Compute aggregate status ─────────────────────────────
-  // Rules:
-  //   "unhealthy"  → DB disconnected OR Redis disconnected
-  //   "degraded"   → storage unavailable OR any queue >10 failed OR any worker not alive
-  //   "healthy"    → everything passes
-
   let status: HealthStatus = "healthy";
 
-  if (database.status === "disconnected" || redis.status === "disconnected") {
+  if (database.status === "disconnected") {
     status = "unhealthy";
   } else {
     const storageDegraded = storage.status === "unavailable";
-    const queueDegraded = Object.values(queues).some((q) => q.failed > 10);
-    const workerDegraded = Object.values(workerStatus).some((w) => !w.alive);
     const operationalCritical = operational.some((d) => d.status === "critical");
 
-    if (storageDegraded || queueDegraded || workerDegraded || operationalCritical) {
+    if (storageDegraded || operationalCritical) {
       status = "degraded";
     }
   }
@@ -408,9 +314,7 @@ export async function getHealthReport(): Promise<HealthReport> {
     status,
     uptime: process.uptime(),
     timestamp: new Date().toISOString(),
-    infrastructure: { database, redis, storage, disk },
-    queues,
-    workers: workerStatus,
+    infrastructure: { database, storage, disk },
     metrics: getMetrics(),
     operational,
   };

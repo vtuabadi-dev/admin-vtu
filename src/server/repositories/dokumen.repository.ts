@@ -88,14 +88,13 @@ export const dokumenRepo = {
   async getReviewQueue() {
     const rows = await prisma.dokumenItem.findMany({
       where: { status: { in: ["pending", "processing", "revisi"] } },
-      include: { jamaah: { select: { namaLengkap: true, registrationId: true, groupId: true } } },
+      include: { jamaah: { select: { id: true, namaLengkap: true, nomorPeserta: true, registrationId: true, groupId: true } } },
       orderBy: { uploadedAt: "asc" },
       take: 100,
     });
     return rows.map((r) => ({
-      ...mapDokumen(r),
-      namaJamaah: (r as any).jamaah?.namaLengkap,
-      registrationId: (r as any).jamaah?.registrationId,
+      dokumen: mapDokumen(r),
+      jamaah: (r as any).jamaah ?? null,
     }));
   },
 };

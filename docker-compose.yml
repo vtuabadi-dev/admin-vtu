@@ -1,10 +1,10 @@
 # ============================================================
-# VTU ADMIN TRAVEL — Production Docker Compose
+# VTU CORE — Production Docker Compose (simplified)
 # ============================================================
 # Prerequisites:
 #   1. Copy .env.example to .env and fill in real secrets
 #   2. Generate AUTH_SECRET:  openssl rand -hex 32
-#   3. Set strong POSTGRES_PASSWORD and REDIS_PASSWORD
+#   3. Set strong POSTGRES_PASSWORD
 #
 # Deploy:
 #   docker compose up -d --build
@@ -15,10 +15,7 @@
 #
 # Services:
 #   frontend   — Next.js 14 (App Router, standalone output)
-#   worker     — BullMQ background processor (OCR, export, manifest, etc.)
 #   postgres   — PostgreSQL 16
-#   redis      — Redis 7
-#   db-init    — Prisma migration runner (one-shot)
 # ============================================================
 
 services:
@@ -36,7 +33,6 @@ services:
     environment:
       - NODE_ENV=production
       - DATABASE_URL=${DATABASE_URL}
-      - REDIS_URL=${REDIS_URL}
       - STORAGE_PATH=/storage
       # Auth.js v5 — all four env vars required for correct operation
       - AUTH_SECRET=${AUTH_SECRET}
@@ -44,7 +40,6 @@ services:
       - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
       - NEXTAUTH_URL=${NEXTAUTH_URL}
       # Trust host in production (set by AUTH_URL above in @auth/core)
-      # Explicit fallback for reverse-proxy deployments
       - AUTH_TRUST_HOST=${AUTH_TRUST_HOST:-true}
     volumes:
       - storage_passports:/storage/passports
@@ -61,8 +56,6 @@ services:
       - vtu_network
     depends_on:
       postgres:
-        condition: service_healthy
-      redis:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
@@ -84,8 +77,6 @@ services:
     image: postgres:16-alpine
     container_name: vtu-postgres
     restart: unless-stopped
-    # No external port exposure in production.
-    # Bind to localhost only if local tooling needs direct access.
     ports:
       - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     environment:
@@ -116,130 +107,10 @@ services:
           cpus: "0.25"
           memory: 128M
 
-  # ── Redis 7 ───────────────────────────────────────────────
-  redis:
-    image: redis:7-alpine
-    container_name: vtu-redis
-    restart: unless-stopped
-    # No external port exposure in production.
-    # Bind to localhost only if local tooling needs direct access.
-    ports:
-      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
-    command: >
-      redis-server
-      --appendonly yes
-      --requirepass ${REDIS_PASSWORD}
-      --maxmemory 256mb
-      --maxmemory-policy noeviction
-    volumes:
-      - redis_data:/data
-    networks:
-      - vtu_network
-    healthcheck:
-      test:
-        [
-          "CMD",
-          "redis-cli",
-          "--no-auth-warning",
-          "-a",
-          "${REDIS_PASSWORD}",
-          "ping",
-        ]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 5s
-    deploy:
-      resources:
-        limits:
-          cpus: "0.5"
-          memory: 256M
-        reservations:
-          cpus: "0.1"
-          memory: 64M
-
-  # ── DB Migration Init (one-shot) ──────────────────────────
-  db-init:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: vtu-db-init
-    env_file:
-      - .env.docker
-    environment:
-      - NODE_ENV=production
-      - DATABASE_URL=${DATABASE_URL}
-    command: >
-      sh -c "cd /app && npx -p prisma@5.22.0 prisma migrate deploy --schema=./prisma/schema.prisma && echo 'Migrations complete.'"
-    networks:
-      - vtu_network
-    depends_on:
-      postgres:
-        condition: service_healthy
-    deploy:
-      restart_policy:
-        condition: none
-
-  # ── Background Worker (BullMQ) ─────────────────────────────
-  worker:
-    build:
-      context: .
-      dockerfile: Dockerfile.worker
-    container_name: vtu-worker
-    restart: unless-stopped
-    env_file:
-      - .env.docker
-    environment:
-      - NODE_ENV=production
-      - DATABASE_URL=${DATABASE_URL}
-      - REDIS_URL=${REDIS_URL}
-      - STORAGE_PATH=/storage
-      # Auth vars needed if worker touches user records
-      - AUTH_SECRET=${AUTH_SECRET}
-    volumes:
-      - storage_passports:/storage/passports
-      - storage_ktp:/storage/ktp
-      - storage_vaccines:/storage/vaccines
-      - storage_pasfoto:/storage/pasfoto
-      - storage_exports:/storage/exports
-      - storage_temp:/storage/temp
-      - storage_invoices:/storage/invoices
-      - storage_manifests:/storage/manifests
-      - storage_backups:/storage/backups
-      - storage_dokumen:/storage/dokumen
-    networks:
-      - vtu_network
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      db-init:
-        condition: service_completed_successfully
-    healthcheck:
-      test:
-        ["CMD-SHELL", "pgrep -f 'node.*entry' > /dev/null || exit 1"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 15s
-    deploy:
-      resources:
-        limits:
-          cpus: "1.0"
-          memory: 512M
-        reservations:
-          cpus: "0.25"
-          memory: 128M
-
 # ── Named Volumes ───────────────────────────────────────────
 volumes:
   pgdata:
     name: vtu_pgdata
-    driver: local
-
-  redis_data:
-    name: vtu_redis_data
     driver: local
 
   storage_passports:

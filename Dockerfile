@@ -39,6 +39,10 @@ COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
 
+# Re-generate Prisma client for correct binary targets
+# (stage 1 runs on Alpine/musl, but stage 3 runs on Debian/openssl)
+RUN npx prisma generate
+
 # Build the Next.js app (standalone output)
 RUN \
   if [ -f yarn.lock ]; then yarn build; \

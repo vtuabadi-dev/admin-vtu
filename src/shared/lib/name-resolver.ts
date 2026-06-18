@@ -10,21 +10,17 @@ export function resolveOperationalName(
 ): string {
   if (!dokumen || dokumen.length === 0) return jamaah.namaLengkap.toUpperCase().trim();
 
-  // Priority 1: Passport OCR or manual data
+  // Priority 1: Passport manual data
   const paspor = dokumen.find((d) => d.jenis === "paspor");
   if (paspor) {
-    const passportName =
-      paspor.manualData?.namaLengkap?.trim() ||
-      paspor.ocrData?.namaLengkap?.trim();
+    const passportName = paspor.manualData?.namaLengkap?.trim();
     if (passportName) return passportName.toUpperCase();
   }
 
-  // Priority 2: KTP OCR or manual data
+  // Priority 2: KTP manual data
   const ktp = dokumen.find((d) => d.jenis === "ktp");
   if (ktp) {
-    const ktpName =
-      ktp.manualData?.namaLengkap?.trim() ||
-      ktp.ocrData?.namaLengkap?.trim();
+    const ktpName = ktp.manualData?.namaLengkap?.trim();
     if (ktpName) return ktpName.toUpperCase();
   }
 
@@ -42,7 +38,7 @@ export function resolveOperationalNik(
   for (const jenis of sources) {
     const doc = dokumen.find((d) => d.jenis === jenis);
     if (doc) {
-      const nik = doc.manualData?.nik?.trim() || doc.ocrData?.nik?.trim();
+      const nik = doc.manualData?.nik?.trim();
       if (nik) return nik;
     }
   }
@@ -54,5 +50,5 @@ export function resolveOperationalPaspor(
 ): string | undefined {
   const paspor = dokumen?.find((d) => d.jenis === "paspor");
   if (!paspor) return undefined;
-  return paspor.manualData?.nomorPaspor?.trim() || paspor.ocrData?.nomorPaspor?.trim();
+  return paspor.manualData?.nomorPaspor?.trim();
 }

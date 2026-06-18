@@ -75,17 +75,9 @@ export function getValidationPriority(jenis: DokumenJenis): ValidationPriority {
   return VALIDATION_LEVEL[jenis] ?? "flexible";
 }
 
-export function isOcrRetryNeeded(doc: DokumenItem): boolean {
-  // Skip OCR if data was manually edited (manual edits should not be overwritten)
-  if (doc.dataStatus === "manual_edit") return false;
-  // Skip if already verified
-  if (doc.status === "verified") return false;
-  // Retry if OCR failed or confidence is very low
-  if (doc.dataStatus === "ocr_error") return true;
-  if (doc.ocrData && doc.ocrData.confidence < 0.6) return true;
-  // For re-uploads: only check image quality, don't re-run OCR
-  if ((doc.ocrRetryCount ?? 0) > 0) return false;
-  return doc.dataStatus === "pending";
+export function isOcrRetryNeeded(_doc: DokumenItem): boolean {
+  // OCR diproses oleh service external — tidak ada retry dari VTU
+  return false;
 }
 
 export function canEditManualData(jenis: DokumenJenis, dataStatus?: string): boolean {
@@ -131,13 +123,12 @@ export function getDocumentStatusBadge(doc: DokumenItem): { variant: string; lab
 }
 
 export function getOcrStatusLabel(doc: DokumenItem): string {
-  if (doc.dataStatus === "ocr_error") return "Gagal";
   if (doc.dataStatus === "manual_edit") return "Manual";
-  if (doc.dataStatus === "pending") return "Pending";
-  if (!doc.ocrData) return "Belum OCR";
-  if (doc.ocrData.confidence >= 0.85) return "Berhasil";
+  if (doc.dataStatus === "pending") return "Pending External";
+  if (!doc.ocrData) return "External OCR";
+  if (doc.ocrData.confidence >= 0.85) return "Terverifikasi";
   if (doc.ocrData.confidence >= 0.6) return "Confidence Rendah";
-  return "Gagal";
+  return "Pending";
 }
 
 export function getOcrConfidenceVariant(confidence?: number): "success" | "warning" | "destructive" {

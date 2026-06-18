@@ -8,11 +8,16 @@ import { getExpectedFields } from "./provider";
 import fs from "fs";
 
 function getConfig() {
+  const rawHeaderPrefix = process.env.OCR_API_HEADER_PREFIX ?? "Bearer";
+  const headerPrefix = rawHeaderPrefix && !rawHeaderPrefix.endsWith(" ")
+    ? `${rawHeaderPrefix} `
+    : rawHeaderPrefix;
+
   return {
     url: process.env.OCR_API_URL ?? "",
     key: process.env.OCR_API_KEY ?? "",
     headerName: process.env.OCR_API_HEADER_NAME ?? "Authorization",
-    headerPrefix: process.env.OCR_API_HEADER_PREFIX ?? "Bearer ",
+    headerPrefix,
     timeout: parseInt(process.env.OCR_API_TIMEOUT ?? "30000", 10),
     model: process.env.OCR_API_MODEL ?? undefined,
   };

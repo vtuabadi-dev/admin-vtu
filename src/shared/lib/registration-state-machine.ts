@@ -1,39 +1,37 @@
 // ============================================================
-// REGISTRATION STATE MACHINE — Travel Operational Automation System
+// STATE MACHINE — Travel Operational Automation System
 // ============================================================
-// Documents all valid state transitions for the registration
-// lifecycle pipeline:
-//   DRAFT → PENDING_REVIEW → APPROVED → ACCOUNT_CREATED → ACTIVE
-//                                                   ↘ CANCELLED / EXPIRED
-//   PENDING_REVIEW → REJECTED → PENDING_REVIEW (re-review)
+// Dua workflow terpisah:
 //
-// Each transition should:
-//   1. Validate the transition is allowed
-//   2. Perform the side effects (DB writes, audit, notifications)
-//   3. Update the status atomically
+// A. REGISTRATION LIFECYCLE (status):
+//    DRAFT → PENDING_REVIEW → APPROVED → ACCOUNT_CREATED → ACTIVE
+//                        ↘ REJECTED → PENDING_REVIEW (re-review)
+//    Any → CANCELLED / EXPIRED
+//
+// B. LEAD PIPELINE (leadStatus):
+//    BARU → DIHUBUNGI → FOLLOW_UP → MENUNGGU_DP → DP_MASUK → DIKONVERSI
+//                                                     ↘ DITOLAK
+//    DIKONVERSI triggers: status = PENDING_REVIEW
 // ============================================================
 
-import type { RegistrationStatus } from "@/shared/types";
+import type { RegistrationStatus, LeadStatus } from "@/shared/types";
 
-/**
- * Maps each status to the list of valid next statuses.
- * This is the single source of truth for registration lifecycle transitions.
- */
+// ═══════════════════════════════════════════════════════════
+// A. REGISTRATION LIFECYCLE
+// ═══════════════════════════════════════════════════════════
+
 export const REGISTRATION_TRANSITIONS: Record<RegistrationStatus, RegistrationStatus[]> = {
   DRAFT: ["PENDING_REVIEW", "CANCELLED"],
   PENDING_REVIEW: ["APPROVED", "REJECTED", "CANCELLED"],
   APPROVED: ["ACCOUNT_CREATED", "CANCELLED"],
-  REJECTED: ["PENDING_REVIEW"], // can be re-reviewed after rejection
+  REJECTED: ["PENDING_REVIEW"], // can be re-reviewed
   ACCOUNT_CREATED: ["ACTIVE"],
   ACTIVE: [],
   CANCELLED: [],
   EXPIRED: [],
 };
 
-/**
- * Returns true if the transition from `current` to `next` is valid.
- */
-export function isValidTransition(
+export function isValidRegistrationTransition(
   current: RegistrationStatus,
   next: RegistrationStatus,
 ): boolean {
@@ -42,19 +40,12 @@ export function isValidTransition(
   return allowed.includes(next);
 }
 
-/**
- * Returns a human-readable description of allowed transitions for a given status.
- * Useful for error messages in API responses.
- */
-export function getAllowedTransitionsDescription(status: RegistrationStatus): string {
+export function getRegistrationTransitionsDescription(status: RegistrationStatus): string {
   const allowed = REGISTRATION_TRANSITIONS[status];
   if (!allowed || allowed.length === 0) return "tidak ada transisi yang diizinkan";
   return allowed.join(", ");
 }
 
-/**
- * Describes the semantic meaning of each status.
- */
 export const REGISTRATION_STATUS_LABELS: Record<RegistrationStatus, string> = {
   DRAFT: "Draf — registrasi baru dibuat, belum diajukan",
   PENDING_REVIEW: "Menunggu Review — registrasi menunggu persetujuan admin",
@@ -65,3 +56,52 @@ export const REGISTRATION_STATUS_LABELS: Record<RegistrationStatus, string> = {
   CANCELLED: "Dibatalkan — registrasi dibatalkan",
   EXPIRED: "Kedaluwarsa — registrasi melewati batas waktu",
 };
+
+// ═══════════════════════════════════════════════════════════
+// B. LEAD PIPELINE
+// ═══════════════════════════════════════════════════════════
+
+export const LEAD_TRANSITIONS: Record<LeadStatus, LeadStatus[]> = {
+  BARU: ["DIHUBUNGI", "DITOLAK"],
+  DIHUBUNGI: ["FOLLOW_UP", "MENUNGGU_DP", "DITOLAK"],
+  FOLLOW_UP: ["MENUNGGU_DP", "DIHUBUNGI", "DITOLAK"],
+  MENUNGGU_DP: ["DP_MASUK", "DIHUBUNGI", "DITOLAK"],
+  DP_MASUK: ["DIKONVERSI", "MENUNGGU_DP", "DITOLAK"],
+  DIKONVERSI: [], // terminal — sudah masuk registration pipeline
+  DITOLAK: [],   // terminal
+};
+
+export function isValidLeadTransition(
+  current: LeadStatus,
+  next: LeadStatus,
+): boolean {
+  const allowed = LEAD_TRANSITIONS[current];
+  if (!allowed) return false;
+  return allowed.includes(next);
+}
+
+export function getLeadTransitionsDescription(status: LeadStatus): string {
+  const allowed = LEAD_TRANSITIONS[status];
+  if (!allowed || allowed.length === 0) return "tidak ada transisi yang diizinkan";
+  return allowed.join(", ");
+}
+
+export const LEAD_STATUS_LABELS: Record<LeadStatus, string> = {
+  BARU: "Baru — lead dari portal pendaftaran",
+  DIHUBUNGI: "Dihubungi — tim sudah kontak calon jamaah",
+  FOLLOW_UP: "Follow Up — dalam proses tindak lanjut",
+  MENUNGGU_DP: "Menunggu DP — menunggu pembayaran uang muka",
+  DP_MASUK: "DP Masuk — uang muka diterima, siap konversi",
+  DIKONVERSI: "Dikonversi — lead sudah menjadi registrasi aktif",
+  DITOLAK: "Ditolak — lead tidak dilanjutkan",
+};
+
+// ═══════════════════════════════════════════════════════════
+// BACKWARD COMPATIBILITY
+// ═══════════════════════════════════════════════════════════
+
+/** @deprecated Use isValidRegistrationTransition */
+export const isValidTransition = isValidRegistrationTransition;
+
+/** @deprecated Use getRegistrationTransitionsDescription */
+export const getAllowedTransitionsDescription = getRegistrationTransitionsDescription;
