@@ -82,7 +82,7 @@ async function main() {
   await prisma.$executeRawUnsafe(`ALTER TABLE jamaah ADD CONSTRAINT "jamaah_groupId_fkey" FOREIGN KEY ("groupId") REFERENCES registration_groups(id) ON DELETE RESTRICT ON UPDATE CASCADE DEFERRABLE INITIALLY DEFERRED`);
   console.log("  ✓ FK constraints made DEFERRABLE");
 
-  await prisma.$transaction(async (tx) => {
+  await prisma.$transaction(async (tx: any) => {
     // Defer FK checks sampai COMMIT
     await tx.$executeRawUnsafe("SET CONSTRAINTS ALL DEFERRED");
 
