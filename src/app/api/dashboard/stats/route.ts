@@ -17,7 +17,7 @@ export async function GET() {
     ]);
 
     const stats = {
-      totalJamaah: Object.values(statusCounts).reduce((a, b) => a + b, 0),
+      totalJamaah: Object.values(statusCounts).reduce((a: number, b: any) => a + b, 0),
       totalGroup: groups.total,
       totalBerangkat: statusCounts["berangkat"] ?? 0,
       dokumenLengkap: statusCounts["dokumen_verified"] ?? 0 + (statusCounts["ready"] ?? 0) + (statusCounts["berangkat"] ?? 0),
