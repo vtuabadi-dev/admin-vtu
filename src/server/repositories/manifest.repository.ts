@@ -99,7 +99,7 @@ export const manifestRepo = {
 
     // Renumber rows sequentially
     const updates = existing.rows
-      .sort((a, b) => a.nomorUrut - b.nomorUrut)
+      .sort((a: any, b: any) => a.nomorUrut - b.nomorUrut)
       .map((r: any, i: number) => prisma.manifestRow.update({ where: { id: r.id }, data: { nomorUrut: i + 1 } }));
     await Promise.all(updates);
 
