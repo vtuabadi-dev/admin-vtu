@@ -308,7 +308,7 @@ model RegistrationGroup {
   pembayaran           Pembayaran[]
   reminders            Reminder[]
   invoiceSplitConfig   InvoiceSplitConfig?
-  ketuaGroup           Jamaah               @relation("KetuaGroup", fields: [ketuaGroupId], references: [id], onUpdate: NoAction, onDelete: NoAction)
+  ketuaGroup           Jamaah               @relation("KetuaGroup", fields: [ketuaGroupId], references: [id], onUpdate: Restrict, onDelete: Restrict)
   registrationRequests RegistrationRequest[]
 
   @@index([paketKeberangkatanId])
