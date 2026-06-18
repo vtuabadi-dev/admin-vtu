@@ -86,7 +86,7 @@ export const jamaahRepo = {
 
   async countByStatus() {
     const rows = await prisma.jamaah.groupBy({ by: ["status"], _count: true });
-    return Object.fromEntries(rows.map((r) => [r.status, r._count]));
+    return Object.fromEntries(rows.map((r: any) => [r.status, r._count]));
   },
 
   async create(data: Omit<Jamaah, "id" | "createdAt" | "updatedAt" | "dokumen">) {
@@ -151,7 +151,7 @@ export const jamaahRepo = {
       where: { groupId },
       include: { dokumen: true },
     });
-    return rows.map((j) => ({
+    return rows.map((j: any) => ({
       jamaahId: j.id,
       namaLengkap: j.namaLengkap,
       dokumen: j.dokumen.map(dokumenRepo.mapDokumen),

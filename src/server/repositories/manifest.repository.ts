@@ -74,7 +74,7 @@ export const manifestRepo = {
         hotelMadinah: data.hotelMadinah ?? null,
         status: data.status,
         rows: {
-          create: data.rows.map((r) => ({
+          create: data.rows.map((r: any) => ({
             nomorUrut: r.nomorUrut,
             jamaahId: r.jamaahId,
             nomorPaspor: r.nomorPaspor,
@@ -100,7 +100,7 @@ export const manifestRepo = {
     // Renumber rows sequentially
     const updates = existing.rows
       .sort((a, b) => a.nomorUrut - b.nomorUrut)
-      .map((r, i) => prisma.manifestRow.update({ where: { id: r.id }, data: { nomorUrut: i + 1 } }));
+      .map((r: any, i: number) => prisma.manifestRow.update({ where: { id: r.id }, data: { nomorUrut: i + 1 } }));
     await Promise.all(updates);
 
     const row = await prisma.manifest.update({

@@ -108,7 +108,7 @@ export const registrationRepo = {
         leadStatus: data.leadStatus ? (data.leadStatus as any) : null,
         status: data.status as any,
         members: {
-          create: data.members.map((m) => ({
+          create: data.members.map((m: any) => ({
             namaLengkap: m.namaLengkap,
             jenisKelamin: m.jenisKelamin as any,
             hubungan: m.hubungan ?? null,
@@ -139,6 +139,6 @@ export const registrationRepo = {
 
   async countByStatus() {
     const rows = await prisma.registrationRequest.groupBy({ by: ["status"], _count: true });
-    return Object.fromEntries(rows.map((r) => [r.status, r._count]));
+    return Object.fromEntries(rows.map((r: any) => [r.status, r._count]));
   },
 };

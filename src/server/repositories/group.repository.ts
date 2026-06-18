@@ -194,7 +194,7 @@ export const groupRepo = {
       },
       orderBy: { createdAt: "desc" },
     });
-    return rows.map((row) => ({
+    return rows.map((row: any) => ({
       groupId: row.id,
       kodeRegistrasi: row.kodeRegistrasi,
       namaGroup: row.namaGroup,

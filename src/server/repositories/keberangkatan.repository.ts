@@ -290,7 +290,7 @@ export const keberangkatanRepo = {
       manifestScore: Math.round(manifestScore),
       roomingScore: Math.round(roomingScore),
       operationalScore: Math.round(operationalScore),
-      breakdown: scores.map((s) => ({ ...s, score: Math.round(s.score) })),
+      breakdown: scores.map((s: any) => ({ ...s, score: Math.round(s.score) })),
     };
   },
 };

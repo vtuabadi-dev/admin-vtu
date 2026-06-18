@@ -78,3 +78,5 @@ prisma/dev.db-journal
 *.zip
 *.tar.gz
 *.rar
+
+.vercel

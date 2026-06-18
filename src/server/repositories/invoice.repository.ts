@@ -73,7 +73,7 @@ export const invoiceRepo = {
         status: data.status,
         jatuhTempo: new Date(data.jatuhTempo),
         items: {
-          create: data.items.map((it) => ({
+          create: data.items.map((it: any) => ({
             kategori: it.kategori,
             deskripsi: it.deskripsi,
             qty: it.qty,

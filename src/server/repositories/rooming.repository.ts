@@ -76,13 +76,13 @@ export const roomingRepo = {
         hotelNama: data.hotelNama,
         status: data.status,
         kamar: {
-          create: data.kamar.map((k) => ({
+          create: data.kamar.map((k: any) => ({
             nomorKamar: k.nomorKamar,
             tipe: k.tipe,
             lantai: k.lantai,
             mixLabel: k.mixLabel ?? null,
             penghuni: {
-              create: k.penghuni.map((p) => ({
+              create: k.penghuni.map((p: any) => ({
                 jamaahId: p.jamaahId,
                 namaLengkap: p.namaLengkap,
                 jenisKelamin: p.jenisKelamin,
@@ -124,7 +124,7 @@ export const roomingRepo = {
       comboMap.get(key)!.jamaahIds.push(j.id);
     }
 
-    return Array.from(comboMap.values()).map((c) => ({
+    return Array.from(comboMap.values()).map((c: any) => ({
       hotelMekkah: c.hotelMekkah,
       hotelMadinah: c.hotelMadinah,
       label: `${c.hotelMekkah} — ${c.hotelMadinah}`,

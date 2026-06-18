@@ -71,7 +71,7 @@ export const pembayaranRepo = {
         catatan: data.catatan ?? null,
         ocrData: data.ocrData as any,
         alokasi: {
-          create: data.alokasi.map((a) => ({
+          create: data.alokasi.map((a: any) => ({
             jamaahId: a.jamaahId,
             namaJamaah: a.namaJamaah,
             jumlah: a.jumlah,
@@ -144,7 +144,7 @@ export const pembayaranRepo = {
       include: { alokasi: true, group: { select: { kodeRegistrasi: true, namaGroup: true } } },
       orderBy: { tanggal: "asc" },
     });
-    return rows.map((r) => ({
+    return rows.map((r: any) => ({
       ...mapPembayaran(r),
       kodeRegistrasi: (r as any).group?.kodeRegistrasi,
       namaGroup: (r as any).group?.namaGroup,
