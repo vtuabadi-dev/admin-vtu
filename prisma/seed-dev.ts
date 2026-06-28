@@ -22,8 +22,8 @@ const prisma = new PrismaClient();
 
 // ── Constants ─────────────────────────────────────────────────
 
-const ADMIN_HASH = "$2b$12$iPziIA.8ozPqTQ8PHljdh.abAF8rzbZZGvO3hXSIdjpntBDPzIFBG";
-const SUPER_ADMIN_HASH = "$2b$12$okEmUFNfL5/KZc9W3qO87OIqwzF4lw/KUXY01bCFxu1XiEy2P8Wea";
+const ADMIN_HASH = "$2b$12$7Y0gv8aqa5GaWfmvEcHNI.Ys/TjVDLmBKN5RViypFPJEJ0YhULtBy";
+const SUPER_ADMIN_HASH = "$2b$12$VS0HspiCaCchdtNMNpWDgeRNefq/OX0iOPWnpn2UIzP45mZPXwimS";
 const NOW = new Date();
 
 const NAMA_DEPAN = [

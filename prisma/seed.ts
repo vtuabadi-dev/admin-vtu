@@ -23,8 +23,8 @@ async function main() {
   // ── 1. Users ────────────────────────────────────────────────
   // Shared password for operational admins: "admin123"
   // Super admin password: "SuperAdmin123!"
-  const ADMIN_HASH = "$2b$12$MlkLoZElDrwG9V5ANA6tGurAdNizkti.4hZr9fQlZpi0WBm4R5J1m";
-  const SUPER_ADMIN_HASH = "$2b$12$KJLXR.8XT4KAg.riXcJxB.ddrK4t0ACrBq6y2XZUi7rnQYMMTA/Ui";
+  const ADMIN_HASH = "$2b$12$7Y0gv8aqa5GaWfmvEcHNI.Ys/TjVDLmBKN5RViypFPJEJ0YhULtBy";
+  const SUPER_ADMIN_HASH = "$2b$12$VS0HspiCaCchdtNMNpWDgeRNefq/OX0iOPWnpn2UIzP45mZPXwimS";
 
   const users = [
     { name: "Super Admin", email: "superadmin@vtu.id", passwordHash: SUPER_ADMIN_HASH, role: "super_admin" as const },
