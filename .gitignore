@@ -56,8 +56,8 @@ npm-debug.log*
 yarn-debug.log*
 pnpm-debug.log*
 
-# Runtime storage — generated files only
-storage/
+# Runtime storage — generated files only (root only, not src/server/storage)
+/storage/
 uploads/
 exports/
 
