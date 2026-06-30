@@ -275,39 +275,25 @@ function DatabaseStorage() {
   return (
     <div className="space-y-4">
       <SettingSection title="Database" desc="Koneksi database (read-only — dikelola via .env)">
-        <SettingRow label="Status Koneksi" desc="PostgreSQL 16">
+        <SettingRow label="Status Koneksi" desc="Supabase PostgreSQL 16">
           <span className="inline-flex items-center gap-1.5 rounded-full bg-success/10 px-2.5 py-1 text-xs font-medium text-success">
             <span className="h-1.5 w-1.5 rounded-full bg-success" /> Terhubung
           </span>
         </SettingRow>
-        <SettingRow label="Host" desc="Docker service name">
-          <span className="text-sm font-mono text-muted-foreground">vtu-postgres:5432</span>
+        <SettingRow label="Provider" desc="Supabase Pooler (PgBouncer)">
+          <span className="text-sm font-mono text-muted-foreground">aws-1-ap-northeast-1.pooler.supabase.com</span>
         </SettingRow>
         <SettingRow label="Database">
-          <span className="text-sm font-mono text-muted-foreground">vtu_operasional</span>
+          <span className="text-sm font-mono text-muted-foreground">postgres</span>
         </SettingRow>
       </SettingSection>
 
-      <SettingSection title="Redis" desc="Cache & queue (read-only)">
-        <SettingRow label="Status Koneksi" desc="Redis 7 Alpine">
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-success/10 px-2.5 py-1 text-xs font-medium text-success">
-            <span className="h-1.5 w-1.5 rounded-full bg-success" /> Terhubung
-          </span>
+      <SettingSection title="Penyimpanan Dokumen" desc="Google Drive — cloud storage">
+        <SettingRow label="Provider" desc="Google Drive API v3">
+          <span className="text-sm font-medium">Google Drive</span>
         </SettingRow>
-        <SettingRow label="Max Memory">
-          <span className="text-sm font-mono text-muted-foreground">256 MB</span>
-        </SettingRow>
-        <SettingRow label="Policy">
-          <span className="text-sm font-mono text-muted-foreground">allkeys-lru</span>
-        </SettingRow>
-      </SettingSection>
-
-      <SettingSection title="Penyimpanan Dokumen" desc="Docker volumes — persistent storage">
-        <SettingRow label="Total Volume" desc="10 named volumes terdaftar">
-          <span className="text-sm font-medium">10 volume</span>
-        </SettingRow>
-        <SettingRow label="Mount Path" desc="Path penyimpanan dalam container">
-          <span className="text-sm font-mono text-muted-foreground">/storage/*</span>
+        <SettingRow label="Mount Path" desc="Path virtual dalam storage adapter">
+          <span className="text-sm font-mono text-muted-foreground">/dokumen/*</span>
         </SettingRow>
       </SettingSection>
 

@@ -1,12 +1,11 @@
-// Centralized health check aggregator — VTU Core (simplified)
-// Database + Storage + Disk + Operational diagnostics only.
+// Centralized health check aggregator — VTU Core
+// Vercel-compatible: tidak menggunakan execSync, shell command, atau disk inspection.
+// Database + Google Drive + Google Vision + Application checks only.
 
 import { prisma } from "@/server/db/client";
 import { getStorageAdapter } from "@/server/storage";
 import { getMetrics } from "@/server/lib/metrics";
-import { execSync } from "child_process";
-import path from "path";
-import os from "os";
+import { validateEnvironment } from "@/server/lib/env-validation";
 
 // ── Types ──────────────────────────────────────────────────────────
 
@@ -25,8 +24,9 @@ export interface HealthReport {
   timestamp: string;
   infrastructure: {
     database: { status: "connected" | "disconnected"; error?: string };
-    storage: { status: "available" | "unavailable"; type: "local" | "s3"; error?: string };
-    disk: { status: "ok" | "warning" | "critical"; usedPercent: number; freeBytes: number; totalBytes: number };
+    storage: { status: "available" | "unavailable"; type: "google-drive" | "s3" | "local"; error?: string };
+    ocr: { status: "configured" | "unconfigured" | "error"; provider: string; error?: string };
+    application: { status: "ok" | "error"; errors?: string[]; warnings?: string[] };
   };
   metrics: ReturnType<typeof getMetrics>;
   operational: OperationalDiagnostic[];
@@ -46,98 +46,95 @@ export async function checkDatabaseHealth(): Promise<{
   }
 }
 
+function detectStorageType(): "google-drive" | "s3" | "local" {
+  if (process.env.GOOGLE_DRIVE_FOLDER_ID) return "google-drive";
+  if (process.env.AWS_REGION && process.env.S3_BUCKET) return "s3";
+  return "local";
+}
+
 export async function checkStorageHealth(): Promise<{
   status: "available" | "unavailable";
-  type: "local" | "s3";
+  type: "google-drive" | "s3" | "local";
   error?: string;
 }> {
   try {
     getStorageAdapter();
-    const type = process.env.AWS_REGION ? "s3" : "local";
+    const type = detectStorageType();
+
+    // Quick connectivity test: try listing (validates auth + network)
+    try {
+      await getStorageAdapter().list("");
+    } catch {
+      // List may fail on empty/new buckets — non-critical
+    }
+
     return { status: "available", type };
   } catch (err) {
-    const type = process.env.AWS_REGION ? "s3" : "local";
+    const type = detectStorageType();
     return { status: "unavailable", type, error: (err as Error).message };
   }
 }
 
-export async function checkDiskUsage(): Promise<{
-  status: "ok" | "warning" | "critical";
-  usedPercent: number;
-  freeBytes: number;
-  totalBytes: number;
+export async function checkOcrHealth(): Promise<{
+  status: "configured" | "unconfigured" | "error";
+  provider: string;
+  error?: string;
 }> {
-  const storagePath = process.env.STORAGE_PATH || "./storage";
-
   try {
-    let totalBytes = 0;
-    let freeBytes = 0;
+    // ── DB-Driven mode: check provider table ──
+    if (process.env.OCR_DB_DRIVEN === "true") {
+      const { ocrProviderRepo } = await import("@/server/repositories/ocr-provider.repository");
+      const providers = await ocrProviderRepo.findAll();
+      const active = providers.filter((p) => p.isActive && p.healthStatus === "active");
+      const total = providers.length;
 
-    if (process.platform === "win32") {
-      const driveRoot = path.parse(storagePath).root;
-      const cwdFirstChar = process.cwd().charAt(0);
-      const driveLetter = driveRoot
-        ? driveRoot.replace("\\", "")
-        : (cwdFirstChar || "C") + ":";
-
-      const output = execSync(
-        `wmic logicaldisk where caption='${driveLetter}' get size,freespace /format:csv`,
-        { encoding: "utf8", timeout: 5000 },
-      );
-
-      const lines = output.trim().split(/\r?\n/).filter(Boolean);
-      if (lines.length > 1) {
-        const dataLine = lines[1];
-        if (dataLine) {
-          const parts = dataLine.split(",");
-          if (parts.length >= 3) {
-            freeBytes = parseInt(parts[1]!, 10) || 0;
-            totalBytes = parseInt(parts[2]!, 10) || 0;
-          }
-        }
+      if (total === 0) {
+        return { status: "unconfigured", provider: "db-driven", error: "No OCR providers in database. Seed via Admin Panel → OCR Settings." };
       }
-    } else {
-      const output = execSync(`df -k "${storagePath}"`, {
-        encoding: "utf8",
-        timeout: 5000,
-      });
-
-      const lines = output.trim().split("\n");
-      if (lines.length > 1) {
-        const dataLine = lines[1];
-        if (dataLine) {
-          const parts = dataLine.split(/\s+/);
-          if (parts.length >= 4) {
-            const totalBlocks = parseInt(parts[1]!, 10);
-            const availableBlocks = parseInt(parts[3]!, 10);
-            totalBytes = Number.isFinite(totalBlocks) ? totalBlocks * 1024 : 0;
-            freeBytes = Number.isFinite(availableBlocks) ? availableBlocks * 1024 : 0;
-          }
-        }
-      }
+      return {
+        status: "configured",
+        provider: `db-driven (${active.length}/${total} active)`,
+      };
     }
 
-    if (totalBytes === 0) {
-      totalBytes = os.totalmem();
-      freeBytes = os.freemem();
+    // ── Legacy env-var mode ──
+    const provider = process.env.OCR_PROVIDER?.trim() || "google-vision";
+
+    switch (provider) {
+      case "google-vision": {
+        const keys = process.env.GOOGLE_VISION_API_KEY ?? "";
+        const hasKey = keys.split(",").filter(Boolean).length > 0;
+        return hasKey
+          ? { status: "configured", provider: "google-vision" }
+          : { status: "unconfigured", provider: "google-vision", error: "GOOGLE_VISION_API_KEY not set" };
+      }
+      case "external-api": {
+        const url = process.env.OCR_API_URL?.trim();
+        return url
+          ? { status: "configured", provider: "external-api" }
+          : { status: "unconfigured", provider: "external-api", error: "OCR_API_URL not set" };
+      }
+      default:
+        return { status: "unconfigured", provider, error: `Unknown OCR_PROVIDER: ${provider}` };
     }
-
-    const usedBytes = totalBytes - freeBytes;
-    const usedPercent =
-      totalBytes > 0 ? Math.round((usedBytes / totalBytes) * 100) : 0;
-
-    let status: "ok" | "warning" | "critical";
-    if (usedPercent >= 95) status = "critical";
-    else if (usedPercent >= 85) status = "warning";
-    else status = "ok";
-
-    return { status, usedPercent, freeBytes, totalBytes };
-  } catch {
-    const totalBytes = os.totalmem();
-    const freeBytes = os.freemem();
-    const usedPercent = Math.round(((totalBytes - freeBytes) / totalBytes) * 100);
-    return { status: "ok", usedPercent, freeBytes, totalBytes };
+  } catch (err) {
+    return { status: "error", provider: "unknown", error: (err as Error).message };
   }
+}
+
+export function checkApplicationHealth(): {
+  status: "ok" | "error";
+  errors?: string[];
+  warnings?: string[];
+} {
+  const report = validateEnvironment();
+  if (!report.valid) {
+    return { status: "error", errors: report.errors, warnings: report.warnings };
+  }
+  if (report.warnings.length > 0) {
+    return { status: "ok", warnings: report.warnings };
+  }
+  return { status: "ok" };
 }
 
 // ── Operational diagnostics ──────────────────────────────────────
@@ -290,12 +287,14 @@ export async function checkOperationalDiagnostics(): Promise<OperationalDiagnost
 // ── Aggregated report ─────────────────────────────────────────────
 
 export async function getHealthReport(): Promise<HealthReport> {
-  const [database, storage, disk, operational] = await Promise.all([
+  const [database, storage, ocr, operational] = await Promise.all([
     checkDatabaseHealth(),
     checkStorageHealth(),
-    checkDiskUsage(),
+    checkOcrHealth(),
     checkOperationalDiagnostics(),
   ]);
+
+  const application = checkApplicationHealth();
 
   let status: HealthStatus = "healthy";
 
@@ -303,9 +302,12 @@ export async function getHealthReport(): Promise<HealthReport> {
     status = "unhealthy";
   } else {
     const storageDegraded = storage.status === "unavailable";
+    const appError = application.status === "error";
     const operationalCritical = operational.some((d) => d.status === "critical");
 
-    if (storageDegraded || operationalCritical) {
+    if (storageDegraded || appError) {
+      status = "degraded";
+    } else if (operationalCritical) {
       status = "degraded";
     }
   }
@@ -314,7 +316,7 @@ export async function getHealthReport(): Promise<HealthReport> {
     status,
     uptime: process.uptime(),
     timestamp: new Date().toISOString(),
-    infrastructure: { database, storage, disk },
+    infrastructure: { database, storage, ocr, application },
     metrics: getMetrics(),
     operational,
   };

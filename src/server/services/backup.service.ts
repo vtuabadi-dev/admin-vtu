@@ -1,5 +1,10 @@
 // Backup & Recovery Service
 // pg_dump-based database backup + storage backup (tar) + retention
+//
+// TODO(PRODUCTION): Service ini menggunakan pg_dump, tar, psql, gunzip (shell commands)
+// dan local filesystem — TIDAK kompatibel dengan Vercel serverless.
+// Lihat PRODUCTION_TODO.md untuk strategi backup production.
+// Jangan panggil service ini di Vercel environment.
 
 import { exec } from "child_process";
 import { promisify } from "util";

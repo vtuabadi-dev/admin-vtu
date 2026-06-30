@@ -3,7 +3,7 @@
 import { useState } from "react";
 import {
   Trash2, Database, RefreshCw, HardDrive, AlertTriangle,
-  Archive, FileText, Download, Terminal, Shield,
+  Archive, FileText, Download, Terminal,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/components/ui/Card";
 import { Button } from "@/shared/components/ui/Button";
@@ -151,7 +151,7 @@ export default function MaintenancePage() {
           <MaintAction
             icon={Trash2}
             title="Bersihkan File Temporary"
-            desc="Hapus semua file di /storage/temp yang lebih lama dari 7 hari"
+            desc="Hapus semua file temporary yang lebih lama dari 7 hari (storage adapter)"
             buttonLabel="Bersihkan Temp"
             status={status("clean-temp")}
             resultMsg={results["clean-temp"]}
@@ -187,18 +187,9 @@ export default function MaintenancePage() {
         </CardHeader>
         <CardContent className="space-y-3">
           <MaintAction
-            icon={RefreshCw}
-            title="Flush Redis Cache"
-            desc="Kosongkan cache Redis tanpa menghapus persistent data (AOF tetap aman)"
-            buttonLabel="Flush Cache"
-            status={status("flush-redis")}
-            resultMsg={results["flush-redis"]}
-            onExecute={() => execute("flush-redis", 1000)}
-          />
-          <MaintAction
             icon={HardDrive}
             title="Clear Next.js Cache"
-            desc="Hapus .next/cache untuk rebuild incremental static pages"
+            desc="Hapus .next/cache untuk rebuild incremental static pages (Vercel-compatible)"
             buttonLabel="Clear Cache"
             status={status("clear-next")}
             resultMsg={results["clear-next"]}
@@ -217,8 +208,8 @@ export default function MaintenancePage() {
         <CardContent className="space-y-3">
           <MaintAction
             icon={Database}
-            title="Backup Database (pg_dump)"
-            desc="Export full database ke /storage/exports/backup-YYYYMMDD.sql.gz"
+            title="Backup Database"
+            desc="Backup database via Supabase Dashboard atau GitHub Actions. Backup mandiri via endpoint /api/admin/backup."
             buttonLabel="Backup DB"
             buttonVariant="default"
             status={status("backup-db")}
@@ -228,7 +219,7 @@ export default function MaintenancePage() {
           <MaintAction
             icon={FileText}
             title="Backup Dokumen Storage"
-            desc="Arsip semua dokumen jamaah ke storage_exports volume"
+            desc="Arsip semua dokumen jamaah ke Google Drive (folder backup)"
             buttonLabel="Backup Dokumen"
             status={status("backup-docs")}
             resultMsg={results["backup-docs"]}
@@ -246,15 +237,6 @@ export default function MaintenancePage() {
         </CardHeader>
         <CardContent className="space-y-3">
           <MaintAction
-            icon={Shield}
-            title="Restart Worker Container"
-            desc="Restart background worker untuk reload queue processors"
-            buttonLabel="Restart Worker"
-            status={status("restart-worker")}
-            resultMsg={results["restart-worker"]}
-            onExecute={() => execute("restart-worker", 2000)}
-          />
-          <MaintAction
             icon={AlertTriangle}
             title="Reset Semua Data (Development)"
             desc="Hapus SEMUA data dan kembalikan ke state awal. HANYA untuk development."
@@ -269,17 +251,11 @@ export default function MaintenancePage() {
       </Card>
 
       {/* ── STATUS INFO ── */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
         <Card>
           <CardContent className="pt-6 text-center">
-            <p className="text-xs text-muted-foreground">Volume pgdata</p>
+            <p className="text-xs text-muted-foreground">Database Size</p>
             <p className="text-lg font-bold">128 MB</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6 text-center">
-            <p className="text-xs text-muted-foreground">Volume redis_data</p>
-            <p className="text-lg font-bold">4.2 MB</p>
           </CardContent>
         </Card>
         <Card>
@@ -297,7 +273,7 @@ export default function MaintenancePage() {
       </div>
 
       <p className="text-xs text-muted-foreground">
-        Maintenance Center — operasi berjalan di container worker. Semua operasi dicatat di Audit Trail.
+        Maintenance Center — operasi dijalankan di Vercel serverless. Semua operasi dicatat di Audit Trail.
       </p>
     </div>
     </PermissionGuard>

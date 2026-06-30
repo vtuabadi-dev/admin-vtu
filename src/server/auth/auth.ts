@@ -2,6 +2,43 @@ import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import type { OperationalRole } from "@/shared/types";
 
+// ── Production Secret Validation ─────────────────────────────
+// AUTH_SECRET / NEXTAUTH_SECRET wajib di-set di production.
+// Validasi dilakukan saat runtime (bukan build time) oleh instrumentation.ts.
+// Di sini hanya logging — tidak throw agar build Vercel tetap berhasil.
+
+function getAuthSecret(): string {
+  const secret = process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET;
+  if (!secret) {
+    const msg =
+      "[AUTH] AUTH_SECRET atau NEXTAUTH_SECRET wajib di-set di environment variables.\n" +
+      "Generate dengan: openssl rand -hex 32";
+    if (process.env.NODE_ENV === "production") {
+      console.error(msg);
+    }
+    // Fallback untuk build time — runtime akan divalidasi ulang oleh instrumentation.ts
+    return "build-time-fallback-not-for-production-use";
+  }
+  if (process.env.NODE_ENV === "production") {
+    const weakSecrets = [
+      "dev-secret-change-in-production",
+      "dev-secret-fallback",
+      "changeme",
+      "secret",
+      "password",
+    ];
+    const isWeak = weakSecrets.some((w) => secret.toLowerCase().includes(w.toLowerCase()));
+    if (isWeak) {
+      console.error(
+        "[AUTH] WARNING: AUTH_SECRET / NEXTAUTH_SECRET menggunakan nilai development yang lemah.\n" +
+        "Generate production secret dengan: openssl rand -hex 32\n" +
+        "Lalu set di environment variables Vercel / .env."
+      );
+    }
+  }
+  return secret;
+}
+
 const MOCK_CREDENTIALS: Record<string, { password: string; role: OperationalRole; name: string }> = {
   "superadmin@vtu.id": { password: "SuperAdmin123!", role: "super_admin", name: "Super Admin" },
   "admin@vtu.id": { password: "admin123", role: "super_admin", name: "Super Admin (Legacy)" },
@@ -16,7 +53,7 @@ const MOCK_CREDENTIALS: Record<string, { password: string; role: OperationalRole
 const useSecureCookies = process.env.NEXTAUTH_URL?.startsWith("https://") ?? false;
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
-  secret: process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET ?? "dev-secret-fallback",
+  secret: getAuthSecret(),
   providers: [
     Credentials({
       name: "credentials",
