@@ -146,12 +146,13 @@ function buildMatrix() {
   const modules: PermissionModule[] = [
     "dokumen", "pembayaran", "manifest", "rooming",
     "keberangkatan", "jamaah", "sistem", "audit", "export", "backup",
+    "ocr-settings",
   ];
 
   modules.forEach((m) => { ROLE_PERMISSIONS.super_admin[m] = FULL; });
 
   modules.forEach((m) => {
-    ROLE_PERMISSIONS.admin_operasional[m] = m === "backup" ? VIEW_ONLY : (m === "sistem" ? FULL_NO_DELETE : FULL);
+    ROLE_PERMISSIONS.admin_operasional[m] = m === "backup" ? VIEW_ONLY : (m === "sistem" || m === "ocr-settings" ? FULL_NO_DELETE : FULL);
   });
 
   modules.forEach((m) => {

@@ -655,7 +655,8 @@ export type PermissionModule =
   | "sistem"
   | "audit"
   | "export"
-  | "backup";
+  | "backup"
+  | "ocr-settings";
 
 // ============================================================
 // SYSTEM: AUDIT TRAIL
