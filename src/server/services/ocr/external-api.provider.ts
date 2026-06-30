@@ -1,11 +1,11 @@
 // External API OCR Provider
 // Configurable via env vars — works with any OCR API endpoint
 // Set OCR_PROVIDER=external-api in .env to activate
+// Menerima Buffer langsung — tidak membaca filesystem.
 
 import type { DokumenJenis } from "@/shared/types";
 import type { OcrProvider, OcrResult, ImageMetaCheck } from "./provider";
 import { getExpectedFields } from "./provider";
-import fs from "fs";
 
 function getConfig() {
   const rawHeaderPrefix = process.env.OCR_API_HEADER_PREFIX ?? "Bearer";
@@ -47,14 +47,13 @@ export function createExternalApiProvider(): OcrProvider {
       }
     },
 
-    async recognize(imagePath: string, jenis: DokumenJenis, retryCount = 0): Promise<OcrResult> {
+    async recognize(imageBuffer: Buffer, jenis: DokumenJenis, retryCount = 0): Promise<OcrResult> {
       const cfg = getConfig();
       if (!cfg.url) {
         return { success: false, fields: [], rawText: "", overallConfidence: 0, processingTimeMs: 0, retryCount };
       }
 
       const start = Date.now();
-      const imageBuffer = fs.readFileSync(imagePath);
       const base64 = imageBuffer.toString("base64");
 
       const headers: Record<string, string> = {

@@ -1,11 +1,11 @@
 // Google Cloud Vision OCR Provider
 // OCR diproses synchronous via Google Vision API (tanpa queue/worker/Redis).
 // Set OCR_PROVIDER=google-vision + GOOGLE_VISION_API_KEY di .env
+// Menerima Buffer langsung — tidak membaca filesystem.
 
 import type { DokumenJenis } from "@/shared/types";
 import type { OcrProvider, OcrResult, ImageMetaCheck } from "./provider";
 import { getExpectedFields } from "./provider";
-import fs from "fs";
 
 // ── API Key Management ───────────────────────────────────────
 // Support multiple keys (comma-separated) with auto-rotation on rate limit.
@@ -91,7 +91,7 @@ export function createGoogleVisionProvider(): OcrProvider {
   return {
     name: "google-vision",
 
-    async recognize(imagePath: string, jenis: DokumenJenis, retryCount = 0): Promise<OcrResult> {
+    async recognize(imageBuffer: Buffer, jenis: DokumenJenis, retryCount = 0): Promise<OcrResult> {
       const keys = getApiKeys();
       if (keys.length === 0) {
         return {
@@ -105,20 +105,6 @@ export function createGoogleVisionProvider(): OcrProvider {
       }
 
       const start = Date.now();
-
-      let imageBuffer: Buffer;
-      try {
-        imageBuffer = fs.readFileSync(imagePath);
-      } catch (err) {
-        return {
-          success: false,
-          fields: [],
-          rawText: `Cannot read image file: ${(err as Error).message}`,
-          overallConfidence: 0,
-          processingTimeMs: Date.now() - start,
-          retryCount,
-        };
-      }
       const base64 = imageBuffer.toString("base64");
 
       let lastError = "";

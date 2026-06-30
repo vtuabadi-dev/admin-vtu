@@ -86,10 +86,10 @@ export async function processPackageFlyer(
     );
   }
 
-  // Run OCR on the flyer
+  // Run OCR on the flyer directly from buffer (already read above)
   // Use "paspor" jenis type since it's the closest document type
   // for general text extraction from flyers
-  const ocrResult = await processDocument(imagePath, "paspor", 0);
+  const ocrResult = await processDocument(imageBuffer, "paspor", 0);
 
   // Parse the caption text
   const captionFields = parseCaption(caption);

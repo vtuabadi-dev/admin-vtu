@@ -844,3 +844,103 @@ model OperationalDocument {
   @@index([type, status])
   @@map("operational_documents")
 }
+
+// ============================================================
+// OCR INFRASTRUCTURE — Adaptive Provider Registry
+// ============================================================
+
+enum OcrProviderType {
+  google_vision
+  external_api
+}
+
+enum OcrHealthStatus {
+  active
+  cooldown
+  disabled
+  error
+}
+
+model OcrProvider {
+  id              String          @id @default(cuid())
+  label           String          // Human-readable: "Google Vision Key #1"
+  providerType    OcrProviderType @default(google_vision)
+  apiKey          String          // The API key
+  apiUrl          String?         // For external_api type
+  apiHeaderName   String?         // For external_api type
+  apiHeaderPrefix String?         // For external_api type
+
+  // Rotation & usage
+  isActive        Boolean         @default(true)
+  rotationOrder   Int             @default(0)
+  rotationCount   Int             @default(2) // Requests before rotating to next
+  requestCounter  Int             @default(0) // Current count in rotation slot
+  dailyUsage      Int             @default(0)
+  dailyLimit      Int?            // null = unlimited
+
+  // Health
+  healthStatus     OcrHealthStatus @default(active)
+  cooldownUntil    DateTime?
+  lastUsedAt       DateTime?
+  lastErrorAt      DateTime?
+  lastErrorMsg     String?
+  consecutiveErrors Int           @default(0)
+
+  // Statistics
+  successRate      Float          @default(0) // 0.0 - 1.0
+  totalRequests    Int            @default(0)
+  totalErrors      Int            @default(0)
+  averageLatencyMs Float          @default(0)
+  totalPages       Int            @default(0)
+
+  // Metadata
+  notes       String?
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+
+  usageLogs   OcrUsageLog[]
+
+  @@index([healthStatus])
+  @@index([isActive, rotationOrder])
+  @@map("ocr_providers")
+}
+
+model OcrUsageLog {
+  id           String        @id @default(cuid())
+  providerId   String
+  requestType  String        @default("ocr") // "ocr" | "health_check"
+  documentType DokumenJenis?
+  success      Boolean
+  confidence   Float?
+  latencyMs    Int
+  errorCode    String?       // "401" | "403" | "429" | "500" | "503" | "TIMEOUT"
+  errorMessage String?
+  imageHash    String?       // SHA-256 for dedup
+  imageSize    Int?          // Bytes
+  metadata     Json?         // Flexible extension
+
+  provider     OcrProvider   @relation(fields: [providerId], references: [id])
+  createdAt    DateTime      @default(now())
+
+  @@index([providerId, createdAt])
+  @@index([imageHash])
+  @@index([createdAt])
+  @@index([success])
+  @@map("ocr_usage_logs")
+}
+
+model OcrCacheEntry {
+  id             String      @id @default(cuid())
+  imageHash      String      @unique // SHA-256 of image buffer
+  documentType   DokumenJenis
+  result         Json        // Full OcrResult serialized
+  confidence     Float
+  expiresAt      DateTime
+  createdAt      DateTime    @default(now())
+  lastAccessedAt DateTime    @default(now())
+  accessCount    Int         @default(1)
+
+  @@index([imageHash])
+  @@index([expiresAt])
+  @@map("ocr_cache_entries")
+}

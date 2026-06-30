@@ -3,6 +3,7 @@ import type { NextRequest } from "next/server";
 import { auth } from "@/server/auth";
 import { checkServerPermission } from "@/shared/lib/rbac-utils";
 import { processDocument } from "@/server/services/ocr.service";
+import { getStorageAdapter } from "@/server/storage";
 import type { DokumenJenis } from "@/shared/types";
 
 export async function POST(request: NextRequest) {
@@ -22,8 +23,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, message: "dokumenId, fileUrl, and jenis are required" }, { status: 400 });
     }
 
-    // Process OCR
-    const ocrResult = await processDocument(fileUrl, jenis);
+    // Download file dari storage ke memory buffer — tanpa filesystem
+    const storage = getStorageAdapter();
+    const buffer = await storage.download(fileUrl);
+
+    // OCR langsung dari buffer — tanpa write/read/delete temp file
+    const ocrResult = await processDocument(buffer, jenis);
 
     if (!ocrResult.success) {
       return NextResponse.json({ success: false, message: "OCR processing failed", details: ocrResult.rawText }, { status: 500 });

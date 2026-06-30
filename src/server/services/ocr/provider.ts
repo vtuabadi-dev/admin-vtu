@@ -28,8 +28,8 @@ export interface OcrProvider {
   /** Nama provider (untuk logging) */
   readonly name: string;
 
-  /** Proses OCR pada gambar */
-  recognize(imagePath: string, jenis: DokumenJenis, retryCount?: number): Promise<OcrResult>;
+  /** Proses OCR pada gambar — menerima Buffer, bukan file path */
+  recognize(imageBuffer: Buffer, jenis: DokumenJenis, retryCount?: number): Promise<OcrResult>;
 
   /** Validasi metadata gambar sebelum OCR */
   validateImage(buffer: Buffer): ImageMetaCheck;
