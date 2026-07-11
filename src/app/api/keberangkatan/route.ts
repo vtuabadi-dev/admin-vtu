@@ -4,20 +4,11 @@ import { auth } from "@/server/auth";
 import { checkServerPermission } from "@/shared/lib/rbac-utils";
 import { keberangkatanRepo } from "@/server/repositories";
 
-import { getToken } from "next-auth/jwt";
-
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
-  const isSecure = request.nextUrl.protocol === "https:" || !!process.env.VERCEL_URL;
-  const token = await getToken({
-    req: request,
-    secret: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET || "",
-    secureCookie: isSecure,
-  });
-
-  if (!token) return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
-  const session = { user: { role: token.role, id: token.id } } as any;
+  const session = await auth();
+  if (!session?.user) return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
   const perm = checkServerPermission(session, "keberangkatan", "view");
   if (!perm.allowed) return NextResponse.json({ success: false, message: perm.reason }, { status: 403 });
 
@@ -35,15 +26,8 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const isSecure = request.nextUrl.protocol === "https:" || !!process.env.VERCEL_URL;
-  const token = await getToken({
-    req: request,
-    secret: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET || "",
-    secureCookie: isSecure,
-  });
-
-  if (!token) return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
-  const session = { user: { role: token.role, id: token.id } } as any;
+  const session = await auth();
+  if (!session?.user) return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
   const perm = checkServerPermission(session, "keberangkatan", "create");
 
   if (!perm.allowed) return NextResponse.json({ success: false, message: perm.reason }, { status: 403 });
