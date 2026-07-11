@@ -206,6 +206,28 @@ export async function getKeberangkatanById(id: string): Promise<Keberangkatan | 
   return apiGet(`/api/keberangkatan/${id}`, () => mockKeberangkatan.find((k) => k.id === id));
 }
 
+export async function deleteKeberangkatan(id: string): Promise<void> {
+  let res;
+  try {
+    res = await fetch(`/api/keberangkatan/${id}`, { method: "DELETE" });
+  } catch (networkError) {
+    // Network error (offline/no server) — fallback to mock
+    const index = mockKeberangkatan.findIndex((k) => k.id === id);
+    if (index > -1) {
+      mockKeberangkatan.splice(index, 1);
+      return;
+    }
+    throw networkError;
+  }
+
+  // Server reached — process its response
+  const json = await res.json();
+  if (!json.success) {
+    throw new Error(json.message); // Throw business logic error to UI
+  }
+}
+
+
 // ────────────────────────────────────────────────────────────
 // DOKUMEN
 // ────────────────────────────────────────────────────────────
