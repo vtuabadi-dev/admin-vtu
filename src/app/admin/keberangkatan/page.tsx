@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
-import { Plane, CalendarDays, Hotel, MapPin, Plus, Search } from "lucide-react";
+import { Plane, CalendarDays, Hotel, MapPin, Plus, Search, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import {
   Card,
@@ -39,6 +39,12 @@ export default function KeberangkatanListPage() {
     }
     load();
   }, []);
+
+  const handleDelete = (id: string) => {
+    if (confirm("Apakah Anda yakin ingin menghapus paket ini?")) {
+      setKeberangkatan((prev) => prev.filter((k) => k.id !== id));
+    }
+  };
 
   const availableMonths = useMemo(() => {
     const months = new Set<number>();
@@ -92,7 +98,7 @@ export default function KeberangkatanListPage() {
             Kelola jadwal dan paket keberangkatan umroh
           </p>
         </div>
-        <Button>
+        <Button onClick={() => router.push("/admin/keberangkatan/tambah")}>
           <Plus className="mr-2 h-4 w-4" />
           Tambah Keberangkatan
         </Button>
@@ -316,6 +322,15 @@ export default function KeberangkatanListPage() {
                   >
                     <Plane className="mr-1.5 h-3.5 w-3.5" />
                     Manifest
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    className="shrink-0 px-2"
+                    title="Hapus Paket"
+                    onClick={() => handleDelete(k.id)}
+                  >
+                    <Trash2 className="h-4 w-4" />
                   </Button>
                 </div>
               </CardContent>

@@ -244,11 +244,7 @@ export function Sidebar({ role }: SidebarProps) {
       <nav className="flex-1 overflow-y-auto py-3 px-2 space-y-5">
         {sections.map((section) => (
           <div key={section.title}>
-            {!collapsed && (
-              <h3 className="mb-1 px-3 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
-                {section.title}
-              </h3>
-            )}
+            {/* Section title removed for a cleaner look */}
             <ul className="space-y-0.5">
               {section.items.map((item) => {
                 const hasChildren = !!item.children?.length;
