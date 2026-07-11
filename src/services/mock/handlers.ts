@@ -227,6 +227,24 @@ export async function deleteKeberangkatan(id: string): Promise<void> {
   }
 }
 
+export async function createKeberangkatan(data: Omit<Keberangkatan, "id" | "jamaahIds" | "terisi" | "status">): Promise<Keberangkatan> {
+  const payload = {
+    ...data,
+    terisi: 0,
+    status: "preparing",
+  };
+  return apiPost("/api/keberangkatan", payload, () => {
+    const newK: Keberangkatan = {
+      ...payload,
+      id: `UMRH-${Date.now()}`,
+      jamaahIds: [],
+      status: "preparing",
+    };
+    mockKeberangkatan.push(newK);
+    return newK;
+  });
+}
+
 
 // ────────────────────────────────────────────────────────────
 // DOKUMEN
