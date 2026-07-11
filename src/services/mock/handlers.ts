@@ -80,7 +80,7 @@ import { useNotificationStore } from "@/stores/notification-store";
 
 async function apiGet<T>(path: string, fallback: () => T): Promise<T> {
   try {
-    const res = await fetch(path);
+    const res = await fetch(path, { cache: "no-store" });
     if (res.ok) {
       const json = await res.json();
       if (json.success) return json.data as T;
@@ -93,6 +93,7 @@ async function apiPost<T>(path: string, body?: unknown, fallback?: () => T): Pro
   try {
     const res = await fetch(path, {
       method: "POST",
+      cache: "no-store",
       headers: { "Content-Type": "application/json" },
       body: body ? JSON.stringify(body) : undefined,
     });
