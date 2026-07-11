@@ -12,7 +12,7 @@ import {
 import { StatusBadge } from "@/shared/components/ui/Badge";
 import { Button } from "@/shared/components/ui/Button";
 import { Input } from "@/shared/components/ui/Input";
-import { getKeberangkatanList } from "@/services/mock/handlers";
+import { getKeberangkatanList, deleteKeberangkatan } from "@/services/mock/handlers";
 import type { Keberangkatan } from "@/shared/types";
 import { formatDate, cn } from "@/shared/lib/utils";
 
@@ -40,9 +40,14 @@ export default function KeberangkatanListPage() {
     load();
   }, []);
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (confirm("Apakah Anda yakin ingin menghapus paket ini?")) {
-      setKeberangkatan((prev) => prev.filter((k) => k.id !== id));
+      try {
+        await deleteKeberangkatan(id);
+        setKeberangkatan((prev) => prev.filter((k) => k.id !== id));
+      } catch (error) {
+        alert("Gagal menghapus paket: " + (error as Error).message);
+      }
     }
   };
 

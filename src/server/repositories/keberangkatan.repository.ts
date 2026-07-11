@@ -100,6 +100,24 @@ export const keberangkatanRepo = {
     return mapKeberangkatan(row);
   },
 
+  async delete(id: string) {
+    const keberangkatan = await prisma.keberangkatan.findUnique({
+      where: { id },
+      include: { _count: { select: { groups: true } } },
+    });
+    
+    if (!keberangkatan) throw new Error("Keberangkatan not found");
+    if (keberangkatan._count.groups > 0) {
+      throw new Error("Cannot delete package: There are already groups registered to this package.");
+    }
+
+    await prisma.keberangkatan.delete({
+      where: { id },
+    });
+    
+    return true;
+  },
+
   async getPackageIntelligence(keberangkatanId: string): Promise<PackageIntelligence | null> {
     const row = await prisma.keberangkatan.findUnique({
       where: { id: keberangkatanId },
