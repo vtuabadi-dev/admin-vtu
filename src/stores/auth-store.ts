@@ -180,19 +180,38 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: "vtu-auth-storage",
-      partialize: (state) => {
-        if (!state.rememberMe) return {} as Partial<AuthState>;
-        return {
-          user: state.user,
-          isAuthenticated: state.isAuthenticated,
-          rememberMe: state.rememberMe,
-        } as Partial<AuthState>;
-      },
+      partialize: (state) => ({
+        user: state.user,
+        isAuthenticated: state.isAuthenticated,
+        rememberMe: state.rememberMe,
+        lastActivity: state.lastActivity,
+      } as Partial<AuthState>),
       onRehydrateStorage: () => (state) => {
         if (state) {
           state.isLoading = false;
-          state.lastActivity = Date.now();
           state.sessionExpired = false;
+
+          // If we have stored auth, validate against server session
+          if (state.isAuthenticated && state.user) {
+            state.lastActivity = Date.now();
+            // Verify server session is still valid (async, non-blocking)
+            fetch("/api/auth/session")
+              .then((res) => res.json())
+              .then((session) => {
+                if (!session?.user) {
+                  // Server session expired — clear client state
+                  useAuthStore.setState({
+                    user: null,
+                    isAuthenticated: false,
+                    sessionExpired: false,
+                    lastActivity: 0,
+                  });
+                }
+              })
+              .catch(() => {
+                // Network error — keep local state (offline support)
+              });
+          }
         }
       },
     }
