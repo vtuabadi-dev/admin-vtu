@@ -85,8 +85,8 @@ export default auth((req) => {
     }
   }
 
-  // CSRF validation for state-changing API requests
-  if (pathname.startsWith("/api/") && !validateCsrf(req)) {
+  // CSRF validation for state-changing API requests (skip /api/auth — NextAuth handles its own CSRF)
+  if (pathname.startsWith("/api/") && !pathname.startsWith("/api/auth") && !validateCsrf(req)) {
     return addSecurityHeaders(
       NextResponse.json({ success: false, message: "Invalid origin" }, { status: 403 })
     );
