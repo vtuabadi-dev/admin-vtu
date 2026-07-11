@@ -50,7 +50,12 @@ const MOCK_CREDENTIALS: Record<string, { password: string; role: OperationalRole
   "jamaah@vtu.id": { password: "admin123", role: "jamaah", name: "Jamaah Demo" },
 };
 
-const useSecureCookies = process.env.NEXTAUTH_URL?.startsWith("https://") ?? false;
+// Detect HTTPS correctly: check NEXTAUTH_URL, AUTH_URL, VERCEL_URL, or production env
+const useSecureCookies =
+  process.env.NEXTAUTH_URL?.startsWith("https://") ??
+  process.env.AUTH_URL?.startsWith("https://") ??
+  !!process.env.VERCEL_URL ??
+  process.env.NODE_ENV === "production";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   secret: getAuthSecret(),
