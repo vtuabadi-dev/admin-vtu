@@ -54,6 +54,7 @@ const MOCK_CREDENTIALS: Record<string, { password: string; role: OperationalRole
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   secret: getAuthSecret(),
+  trustHost: true,
   providers: [
     Credentials({
       name: "credentials",
