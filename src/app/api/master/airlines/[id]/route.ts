@@ -1,0 +1,75 @@
+import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
+import { auth } from "@/server/auth";
+import { checkServerPermission } from "@/shared/lib/rbac-utils";
+import { masterDataService } from "@/server/services/master-data.service";
+import { z } from "zod";
+
+const updateAirlineSchema = z.object({
+  code: z.string().min(1, "Code is required").optional(),
+  name: z.string().min(1, "Name is required").optional(),
+  isActive: z.boolean().optional(),
+});
+
+function formatError(error: any) {
+  if (error.message === "DUPLICATE_CODE" || error.message === "DUPLICATE_NAME") {
+    return NextResponse.json({ success: false, message: error.message }, { status: 409 });
+  }
+  if (error.message === "NOT_FOUND") {
+    return NextResponse.json({ success: false, message: "Airline not found" }, { status: 404 });
+  }
+  return NextResponse.json({ success: false, message: error.message || "Internal Server Error" }, { status: 500 });
+}
+
+export async function GET(_request: NextRequest, { params }: { params: { id: string } }) {
+  try {
+    const session = await auth();
+    if (!session?.user) return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
+
+    const perm = checkServerPermission(session, "sistem", "view");
+    if (!perm.allowed) return NextResponse.json({ success: false, message: perm.reason }, { status: 403 });
+
+    const data = await masterDataService.getAirlineById(params.id);
+    if (!data) return NextResponse.json({ success: false, message: "Airline not found" }, { status: 404 });
+
+    return NextResponse.json({ success: true, data });
+  } catch (error) {
+    return formatError(error);
+  }
+}
+
+export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
+  try {
+    const session = await auth();
+    if (!session?.user) return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
+
+    const perm = checkServerPermission(session, "sistem", "edit");
+    if (!perm.allowed) return NextResponse.json({ success: false, message: perm.reason }, { status: 403 });
+
+    const body = await request.json();
+    const parsed = updateAirlineSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json({ success: false, message: "Validation Error", data: parsed.error.format() }, { status: 400 });
+    }
+
+    const data = await masterDataService.updateAirline(params.id, parsed.data);
+    return NextResponse.json({ success: true, data });
+  } catch (error) {
+    return formatError(error);
+  }
+}
+
+export async function DELETE(_request: NextRequest, { params }: { params: { id: string } }) {
+  try {
+    const session = await auth();
+    if (!session?.user) return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
+
+    const perm = checkServerPermission(session, "sistem", "delete");
+    if (!perm.allowed) return NextResponse.json({ success: false, message: perm.reason }, { status: 403 });
+
+    await masterDataService.deleteAirline(params.id);
+    return NextResponse.json({ success: true, message: "Deleted successfully" });
+  } catch (error) {
+    return formatError(error);
+  }
+}
