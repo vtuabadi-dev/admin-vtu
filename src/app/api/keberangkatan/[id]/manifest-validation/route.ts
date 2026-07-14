@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { auth } from "@/server/auth";
 import { checkServerPermission } from "@/shared/lib/rbac-utils";
-import { keberangkatanRepo } from "@/server/repositories";
+import { packageService } from "@/server/services/package.service";
 
 export async function GET(
   _request: NextRequest,
@@ -18,7 +18,7 @@ export async function GET(
   }
 
   try {
-    const validation = await keberangkatanRepo.getManifestValidation(params.id);
+    const validation = await packageService.getManifestValidation(params.id);
     return NextResponse.json({ success: true, data: validation });
   } catch (error) {
     return NextResponse.json({ success: false, message: (error as Error).message }, { status: 500 });
