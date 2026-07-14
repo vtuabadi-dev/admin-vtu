@@ -324,6 +324,19 @@ export interface Keberangkatan {
   kuota: number;
   terisi: number;
   jamaahIds: string[];
+  // Sprint 2 Database Evolution - New Additive Fields
+  maskapaiId?: string;
+  hotelMekkahId?: string;
+  hotelMadinahId?: string;
+  startingPointId?: string;
+  packageTypeId?: string;
+  pricingMode?: "SINGLE" | "TIER";
+  durationDays?: number;
+  promoText?: string;
+  description?: string;
+  notes?: string;
+  include?: string[];
+  exclude?: string[];
 }
 
 /** TODO: Multi-tenant — add tenantId: string */

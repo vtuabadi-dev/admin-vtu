@@ -20,6 +20,7 @@ generator client {
 datasource db {
   provider     = "postgresql"
   url          = env("DATABASE_URL")
+  directUrl    = env("DIRECT_URL")
   relationMode = "prisma"
 }
 
@@ -226,23 +227,53 @@ enum LeadStatus {
   DITOLAK
 }
 
+enum PricingMode {
+  SINGLE
+  TIER
+}
+
+enum PackageDraftStatus {
+  DRAFT
+  REVIEW
+  READY
+  PUBLISHED
+  ARCHIVED
+}
+
+enum FieldStatus {
+  MISSING
+  EXTRACTED
+  MAPPED
+  CONFLICT
+  NEED_REVIEW
+  VALIDATED
+}
+
+enum ExtractionSource {
+  flyer_ocr
+  caption
+  itinerary_ocr
+  master_suggest
+}
+
 // ============================================================
 // AUTH — Users
 // ============================================================
 
 model User {
-  id           String          @id @default(cuid())
-  name         String
-  email        String          @unique
-  passwordHash String
-  role                OperationalRole @default(jamaah)
-  mustChangePassword  Boolean         @default(false)
-  tenantId            String?
-  createdAt           DateTime        @default(now())
-  updatedAt           DateTime        @updatedAt
+  id                 String          @id @default(cuid())
+  name               String
+  email              String          @unique
+  passwordHash       String
+  role               OperationalRole @default(jamaah)
+  mustChangePassword Boolean         @default(false)
+  tenantId           String?
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
 
   // Relations — user is referenced by name/role in audit, not by FK relation
   notifications Notification[]
+
   @@map("users")
 }
 
@@ -251,34 +282,57 @@ model User {
 // ============================================================
 
 model Keberangkatan {
-  id               String               @id @default(cuid())
-  kode             String               @unique
+  id               String              @id @default(cuid())
+  kode             String              @unique
   namaPaket        String
   hargaPaket       Int
   tanggalBerangkat DateTime
   tanggalPulang    DateTime
   maskapai         String
+  maskapaiId       String?
   nomorPenerbangan String
   hotelMekkah      String
+  hotelMekkahId    String?
   hotelMadinah     String
-  hotelOptions     Json                 // { hotelMekkah: string; hotelMadinah: string }[]
-  status           StatusKeberangkatan  @default(scheduled)
+  hotelMadinahId   String?
+  startingPointId  String?
+  packageTypeId    String?
+  pricingMode      PricingMode         @default(SINGLE)
+  durationDays     Int?
+  promoText        String?
+  description      String?
+  notes            String?
+  include          String[]
+  exclude          String[]
+  hotelOptions     Json // { hotelMekkah: string; hotelMadinah: string }[]
+  status           StatusKeberangkatan @default(scheduled)
   kuota            Int
-  terisi           Int                  @default(0)
+  terisi           Int                 @default(0)
   tenantId         String?
-  createdAt        DateTime             @default(now())
-  updatedAt        DateTime             @updatedAt
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
 
   // Relations
-  groups              RegistrationGroup[]
+  maskapaiMaster     MasterAirline?     @relation(fields: [maskapaiId], references: [id])
+  hotelMekkahMaster  MasterHotel?       @relation("HotelMekkah", fields: [hotelMekkahId], references: [id])
+  hotelMadinahMaster MasterHotel?       @relation("HotelMadinah", fields: [hotelMadinahId], references: [id])
+  startingPoint      MasterCity?        @relation("StartingPoint", fields: [startingPointId], references: [id])
+  packageType        MasterPackageType? @relation(fields: [packageTypeId], references: [id])
+
+  groups               RegistrationGroup[]
   registrationRequests RegistrationRequest[]
-  manifests           Manifest[]
-  roomings            Rooming[]
-  activityEvents      ActivityEvent[]
-  autoDeadlines       AutoDeadline[]
+  manifests            Manifest[]
+  roomings             Rooming[]
+  activityEvents       ActivityEvent[]
+  autoDeadlines        AutoDeadline[]
 
   @@index([status])
   @@index([tanggalBerangkat])
+  @@index([maskapaiId])
+  @@index([hotelMekkahId])
+  @@index([hotelMadinahId])
+  @@index([startingPointId])
+  @@index([packageTypeId])
   @@map("keberangkatan")
 }
 
@@ -290,7 +344,7 @@ model RegistrationGroup {
   id                   String      @id @default(cuid())
   kodeRegistrasi       String      @unique
   namaGroup            String
-  ketuaGroupId         String      // FK to Jamaah who is head of group
+  ketuaGroupId         String // FK to Jamaah who is head of group
   paketKeberangkatanId String
   jumlahAnggota        Int
   totalTagihan         Int
@@ -302,13 +356,13 @@ model RegistrationGroup {
   updatedAt            DateTime    @updatedAt
 
   // Relations
-  keberangkatan        Keberangkatan        @relation(fields: [paketKeberangkatanId], references: [id])
-  anggota              Jamaah[]             // jamaah with this groupId
+  keberangkatan        Keberangkatan         @relation(fields: [paketKeberangkatanId], references: [id])
+  anggota              Jamaah[] // jamaah with this groupId
   invoices             Invoice[]
   pembayaran           Pembayaran[]
   reminders            Reminder[]
   invoiceSplitConfig   InvoiceSplitConfig?
-  ketuaGroup           Jamaah               @relation("KetuaGroup", fields: [ketuaGroupId], references: [id], onUpdate: Restrict, onDelete: Restrict)
+  ketuaGroup           Jamaah                @relation("KetuaGroup", fields: [ketuaGroupId], references: [id], onUpdate: Restrict, onDelete: Restrict)
   registrationRequests RegistrationRequest[]
 
   @@index([paketKeberangkatanId])
@@ -321,42 +375,42 @@ model RegistrationGroup {
 // ============================================================
 
 model Jamaah {
-  id                String       @id @default(cuid())
-  registrationId    String       @unique // GRP-YYYY-NNNNN-N
-  groupId           String
-  nomorPeserta      String       @unique
-  namaLengkap       String
-  namaAyah          String
-  jenisKelamin      JenisKelamin
-  tempatLahir       String
-  tanggalLahir      DateTime
-  nik               String
-  nomorPaspor       String
-  masaBerlakuPaspor DateTime
-  nomorTelepon      String
-  email             String
-  alamat            String
-  provinsi          String
-  kota              String
-  kecamatan         String
-  kelurahan         String
-  tandaTanganDigital String?    // Base64 encoded
-  syaratDisetujui   Boolean     @default(false)
-  status            StatusJamaah @default(registered)
-  hotelMekkah       String
-  hotelMadinah      String
-  userId            String?
-  tenantId          String?
-  createdAt         DateTime    @default(now())
-  updatedAt         DateTime    @updatedAt
+  id                 String       @id @default(cuid())
+  registrationId     String       @unique // GRP-YYYY-NNNNN-N
+  groupId            String
+  nomorPeserta       String       @unique
+  namaLengkap        String
+  namaAyah           String
+  jenisKelamin       JenisKelamin
+  tempatLahir        String
+  tanggalLahir       DateTime
+  nik                String
+  nomorPaspor        String
+  masaBerlakuPaspor  DateTime
+  nomorTelepon       String
+  email              String
+  alamat             String
+  provinsi           String
+  kota               String
+  kecamatan          String
+  kelurahan          String
+  tandaTanganDigital String? // Base64 encoded
+  syaratDisetujui    Boolean      @default(false)
+  status             StatusJamaah @default(registered)
+  hotelMekkah        String
+  hotelMadinah       String
+  userId             String?
+  tenantId           String?
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
 
   // Relations
-  group              RegistrationGroup    @relation(fields: [groupId], references: [id])
-  dokumen            DokumenItem[]
-  groupKetuaOf       RegistrationGroup[]  @relation("KetuaGroup")
-  manifestRows       ManifestRow[]
-  penghuniKamar      PenghuniKamar[]
-  alokasiPembayaran  AlokasiPembayaran[]
+  group             RegistrationGroup   @relation(fields: [groupId], references: [id])
+  dokumen           DokumenItem[]
+  groupKetuaOf      RegistrationGroup[] @relation("KetuaGroup")
+  manifestRows      ManifestRow[]
+  penghuniKamar     PenghuniKamar[]
+  alokasiPembayaran AlokasiPembayaran[]
 
   @@index([groupId])
   @@index([status])
@@ -376,9 +430,9 @@ model RegistrationRequest {
   emailPerwakilan String
   paxCount        Int
   paketId         String
-  roomUpgrade     String?            // "standard" | "double" | "quad" | "mix" | "triple"
-  hotelUpgrade    String?            // "standard" | "premium" | "vip"
-  signaturePath   String             // Storage path to signature JPG
+  roomUpgrade     String? // "standard" | "double" | "quad" | "mix" | "triple"
+  hotelUpgrade    String? // "standard" | "premium" | "vip"
+  signaturePath   String // Storage path to signature JPG
   termsAccepted   Boolean
   termsAcceptedAt DateTime?
   signedAt        DateTime?
@@ -391,9 +445,9 @@ model RegistrationRequest {
   createdAt       DateTime           @default(now())
   updatedAt       DateTime           @updatedAt
 
-  keberangkatan Keberangkatan       @relation(fields: [paketId], references: [id])
+  keberangkatan Keberangkatan        @relation(fields: [paketId], references: [id])
   members       RegistrationMember[]
-  group         RegistrationGroup?  @relation(fields: [groupId], references: [id])
+  group         RegistrationGroup?   @relation(fields: [groupId], references: [id])
 
   @@index([status])
   @@index([paketId])
@@ -401,12 +455,12 @@ model RegistrationRequest {
 }
 
 model RegistrationMember {
-  id            String       @id @default(cuid())
-  requestId     String
-  namaLengkap   String
-  jenisKelamin  JenisKelamin
-  hubungan      String?      // "keluarga" | "teman" | null
-  urutan        Int          // 1..paxCount
+  id           String       @id @default(cuid())
+  requestId    String
+  namaLengkap  String
+  jenisKelamin JenisKelamin
+  hubungan     String? // "keluarga" | "teman" | null
+  urutan       Int // 1..paxCount
 
   request RegistrationRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
 
@@ -419,11 +473,11 @@ model RegistrationMember {
 // ============================================================
 
 model DokumenItem {
-  id            String            @id @default(cuid())
+  id            String             @id @default(cuid())
   jamaahId      String
   jenis         DokumenJenis
   wajib         Boolean
-  status        StatusDokumen     @default(pending)
+  status        StatusDokumen      @default(pending)
   fileUrl       String?
   catatan       String?
   uploadedAt    DateTime?
@@ -431,10 +485,10 @@ model DokumenItem {
   verifiedBy    String?
   dataStatus    DokumenDataStatus?
   fileStatus    DokumenFileStatus?
-  manualData    Json?             // { namaLengkap?, nik?, nomorPaspor?, tanggalLahir? }
-  ocrData       Json?             // OcrData: { namaLengkap?, nik?, nomorPaspor?, ... confidence, rawText? }
-  ocrRetryCount Int               @default(0)
-  qualityCheck  Json?             // { isBlurry?, isReadable?, checkedAt? }
+  manualData    Json? // { namaLengkap?, nik?, nomorPaspor?, tanggalLahir? }
+  ocrData       Json? // OcrData: { namaLengkap?, nik?, nomorPaspor?, ... confidence, rawText? }
+  ocrRetryCount Int                @default(0)
+  qualityCheck  Json? // { isBlurry?, isReadable?, checkedAt? }
   tenantId      String?
 
   // Relations
@@ -454,7 +508,7 @@ model Invoice {
   id           String        @id @default(cuid())
   nomorInvoice String        @unique
   groupId      String
-  jamaahId     String?       // null = group invoice; set = targeted to specific member
+  jamaahId     String? // null = group invoice; set = targeted to specific member
   tipe         TipeInvoice
   jumlah       Int
   sisaTagihan  Int
@@ -477,16 +531,16 @@ model Invoice {
 }
 
 model InvoiceItem {
-  id                String            @id @default(cuid())
-  invoiceId         String
-  kategori          String            // "Paket Umroh", "Perlengkapan", "Handling", "Administrasi"
-  deskripsi         String
-  qty               Int
-  hargaSatuan       Int
-  jumlah            Int               // auto-calculated: qty * hargaSatuan
-  status            StatusItemInvoice @default(active)
-  cancelledAt       DateTime?
-  cancelledBy       String?
+  id                 String            @id @default(cuid())
+  invoiceId          String
+  kategori           String // "Paket Umroh", "Perlengkapan", "Handling", "Administrasi"
+  deskripsi          String
+  qty                Int
+  hargaSatuan        Int
+  jumlah             Int // auto-calculated: qty * hargaSatuan
+  status             StatusItemInvoice @default(active)
+  cancelledAt        DateTime?
+  cancelledBy        String?
   cancellationReason String?
 
   // Relations
@@ -503,7 +557,7 @@ model InvoiceItem {
 model InvoiceSplitConfig {
   id        String   @id @default(cuid())
   groupId   String   @unique // one split config per group
-  splits    Json     // InvoiceSplitItem[]: { id, label, anggotaIds[] }
+  splits    Json // InvoiceSplitItem[]: { id, label, anggotaIds[] }
   createdAt DateTime @default(now())
 
   // Relations
@@ -517,30 +571,30 @@ model InvoiceSplitConfig {
 // ============================================================
 
 model Pembayaran {
-  id              String                        @id @default(cuid())
-  groupId         String
-  invoiceId       String?
-  jumlah          Int
-  metode          MetodePembayaran
-  tanggal         DateTime
-  buktiUrl        String?
-  status          PembayaranVerificationStatus  @default(pending)
-  sumber          SumberPembayaran              @default(admin)
-  verifiedBy      String?
-  alasanReject    String?
-  reviewedBy      String?
-  reviewedAt      DateTime?
-  bankPengirim    String?
-  nomorRekening   String?
-  catatan         String?
-  ocrData         Json?                         // { nominal?, bank?, tanggal?, confidence? }
-  tenantId        String?
-  createdAt       DateTime                      @default(now())
-  updatedAt       DateTime                      @updatedAt
+  id            String                       @id @default(cuid())
+  groupId       String
+  invoiceId     String?
+  jumlah        Int
+  metode        MetodePembayaran
+  tanggal       DateTime
+  buktiUrl      String?
+  status        PembayaranVerificationStatus @default(pending)
+  sumber        SumberPembayaran             @default(admin)
+  verifiedBy    String?
+  alasanReject  String?
+  reviewedBy    String?
+  reviewedAt    DateTime?
+  bankPengirim  String?
+  nomorRekening String?
+  catatan       String?
+  ocrData       Json? // { nominal?, bank?, tanggal?, confidence? }
+  tenantId      String?
+  createdAt     DateTime                     @default(now())
+  updatedAt     DateTime                     @updatedAt
 
   // Relations
-  group   RegistrationGroup @relation(fields: [groupId], references: [id])
-  invoice Invoice?          @relation(fields: [invoiceId], references: [id])
+  group   RegistrationGroup   @relation(fields: [groupId], references: [id])
+  invoice Invoice?            @relation(fields: [invoiceId], references: [id])
   alokasi AlokasiPembayaran[]
 
   @@index([groupId])
@@ -570,17 +624,17 @@ model AlokasiPembayaran {
 // ============================================================
 
 model Manifest {
-  id               String         @id @default(cuid())
-  keberangkatanId  String
-  kode             String         @unique // MAN/UMRH-JUN/001 etc — dynamically numbered
-  namaManifest     String
-  templateId       String?
-  hotelMekkah      String?        // Set when manifest is split by hotel combination
-  hotelMadinah     String?        // Set when manifest is split by hotel combination
-  status           StatusManifest @default(draft)
-  tenantId         String?
-  createdAt        DateTime       @default(now())
-  updatedAt        DateTime       @updatedAt
+  id              String         @id @default(cuid())
+  keberangkatanId String
+  kode            String         @unique // MAN/UMRH-JUN/001 etc — dynamically numbered
+  namaManifest    String
+  templateId      String?
+  hotelMekkah     String? // Set when manifest is split by hotel combination
+  hotelMadinah    String? // Set when manifest is split by hotel combination
+  status          StatusManifest @default(draft)
+  tenantId        String?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
 
   // Relations
   keberangkatan Keberangkatan @relation(fields: [keberangkatanId], references: [id])
@@ -593,25 +647,25 @@ model Manifest {
 }
 
 model ManifestRow {
-  id          String  @id @default(cuid())
-  manifestId  String
-  nomorUrut   Int
-  jamaahId    String
-  nomorPaspor String
-  namaLengkap String
-  tempatLahir String
+  id           String  @id @default(cuid())
+  manifestId   String
+  nomorUrut    Int
+  jamaahId     String
+  nomorPaspor  String
+  namaLengkap  String
+  tempatLahir  String
   tanggalLahir String
-  nomorKursi  String?
-  nomorKamar  String?
-  catatan     String?
+  nomorKursi   String?
+  nomorKamar   String?
+  catatan      String?
 
   // Relations
   manifest Manifest @relation(fields: [manifestId], references: [id], onDelete: Cascade)
   jamaah   Jamaah   @relation(fields: [jamaahId], references: [id])
 
+  @@unique([manifestId, nomorUrut])
   @@index([manifestId])
   @@index([jamaahId])
-  @@unique([manifestId, nomorUrut])
   @@map("manifest_rows")
 }
 
@@ -620,15 +674,15 @@ model ManifestRow {
 // ============================================================
 
 model Rooming {
-  id               String        @id @default(cuid())
-  keberangkatanId  String
-  hotelMekkah      String
-  hotelMadinah     String
-  hotelNama        String        // Display label: "Safwa — Taiba"
-  status           StatusRooming @default(draft)
-  tenantId         String?
-  createdAt        DateTime      @default(now())
-  updatedAt        DateTime      @updatedAt
+  id              String        @id @default(cuid())
+  keberangkatanId String
+  hotelMekkah     String
+  hotelMadinah    String
+  hotelNama       String // Display label: "Safwa — Taiba"
+  status          StatusRooming @default(draft)
+  tenantId        String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
 
   // Relations
   keberangkatan Keberangkatan @relation(fields: [keberangkatanId], references: [id])
@@ -645,7 +699,7 @@ model Kamar {
   nomorKamar String
   tipe       TipeKamar
   lantai     Int
-  mixLabel   String?   // "Quad Mix Male 1", etc.
+  mixLabel   String? // "Quad Mix Male 1", etc.
 
   // Relations
   rooming  Rooming         @relation(fields: [roomingId], references: [id], onDelete: Cascade)
@@ -656,12 +710,12 @@ model Kamar {
 }
 
 model PenghuniKamar {
-  id            String       @id @default(cuid())
-  kamarId       String
-  jamaahId      String
-  namaLengkap   String
-  jenisKelamin  JenisKelamin
-  isPasangan    Boolean      @default(false)
+  id           String       @id @default(cuid())
+  kamarId      String
+  jamaahId     String
+  namaLengkap  String
+  jenisKelamin JenisKelamin
+  isPasangan   Boolean      @default(false)
 
   // Relations
   kamar  Kamar  @relation(fields: [kamarId], references: [id], onDelete: Cascade)
@@ -677,15 +731,15 @@ model PenghuniKamar {
 // ============================================================
 
 model Reminder {
-  id         String         @id @default(cuid())
-  groupId    String
-  jamaahId   String?
-  invoiceId  String?
-  tipe       ReminderTipe
-  pesan      String
+  id          String         @id @default(cuid())
+  groupId     String
+  jamaahId    String?
+  invoiceId   String?
+  tipe        ReminderTipe
+  pesan       String
   dikirimPada DateTime
-  status     ReminderStatus @default(sent)
-  tenantId   String?
+  status      ReminderStatus @default(sent)
+  tenantId    String?
 
   // Relations
   group   RegistrationGroup @relation(fields: [groupId], references: [id])
@@ -726,16 +780,16 @@ model Notification {
 // ============================================================
 
 model AuditEntry {
-  id         String      @id @default(cuid())
-  timestamp  DateTime    @default(now())
+  id         String          @id @default(cuid())
+  timestamp  DateTime        @default(now())
   userId     String
   userName   String
   role       OperationalRole
   module     AuditModule
   action     String
   detail     String
-  before     String?     // JSON string of previous value
-  after      String?     // JSON string of new value
+  before     String? // JSON string of previous value
+  after      String? // JSON string of new value
   entityId   String?
   entityType String?
   tenantId   String?
@@ -752,13 +806,13 @@ model AuditEntry {
 // ============================================================
 
 model ActivityEvent {
-  id               String   @id @default(cuid())
-  keberangkatanId  String
-  timestamp        DateTime @default(now())
-  type             String   // "warning" | "info" | "success" | "error"
-  message          String
-  module           String
-  triggeredBy      String?
+  id              String   @id @default(cuid())
+  keberangkatanId String
+  timestamp       DateTime @default(now())
+  type            String // "warning" | "info" | "success" | "error"
+  message         String
+  module          String
+  triggeredBy     String?
 
   // Relations
   keberangkatan Keberangkatan @relation(fields: [keberangkatanId], references: [id])
@@ -773,13 +827,13 @@ model ActivityEvent {
 // ============================================================
 
 model AutoDeadline {
-  id               String   @id @default(cuid())
-  keberangkatanId  String
-  label            String
-  deadlineDate     DateTime
-  type             String   // "pelunasan" | "dokumen" | "manifest" | "rooming" | "finalisasi"
-  passed           Boolean  @default(false)
-  warningDays      Int
+  id              String   @id @default(cuid())
+  keberangkatanId String
+  label           String
+  deadlineDate    DateTime
+  type            String // "pelunasan" | "dokumen" | "manifest" | "rooming" | "finalisasi"
+  passed          Boolean  @default(false)
+  warningDays     Int
 
   // Relations
   keberangkatan Keberangkatan @relation(fields: [keberangkatanId], references: [id])
@@ -795,7 +849,7 @@ model AutoDeadline {
 
 model BackupRecord {
   id        String   @id @default(cuid())
-  type      String   // "full" | "schema" | "data" | "storage"
+  type      String // "full" | "schema" | "data" | "storage"
   filePath  String
   sizeBytes Int      @default(0)
   checksum  String?
@@ -831,8 +885,8 @@ model OperationalDocument {
   id            String         @id @default(cuid())
   type          DocumentType
   title         String
-  version       String         // e.g. "1.0", "1.1", "2.0"
-  content       String         // Rich text HTML
+  version       String // e.g. "1.0", "1.1", "2.0"
+  content       String // Rich text HTML
   status        DocumentStatus @default(DRAFT)
   effectiveDate DateTime?
   createdBy     String?
@@ -863,42 +917,42 @@ enum OcrHealthStatus {
 
 model OcrProvider {
   id              String          @id @default(cuid())
-  label           String          // Human-readable: "Google Vision Key #1"
+  label           String // Human-readable: "Google Vision Key #1"
   providerType    OcrProviderType @default(google_vision)
-  apiKey          String          // The API key
-  apiUrl          String?         // For external_api type
-  apiHeaderName   String?         // For external_api type
-  apiHeaderPrefix String?         // For external_api type
+  apiKey          String // The API key
+  apiUrl          String? // For external_api type
+  apiHeaderName   String? // For external_api type
+  apiHeaderPrefix String? // For external_api type
 
   // Rotation & usage
-  isActive        Boolean         @default(true)
-  rotationOrder   Int             @default(0)
-  rotationCount   Int             @default(2) // Requests before rotating to next
-  requestCounter  Int             @default(0) // Current count in rotation slot
-  dailyUsage      Int             @default(0)
-  dailyLimit      Int?            // null = unlimited
+  isActive       Boolean @default(true)
+  rotationOrder  Int     @default(0)
+  rotationCount  Int     @default(2) // Requests before rotating to next
+  requestCounter Int     @default(0) // Current count in rotation slot
+  dailyUsage     Int     @default(0)
+  dailyLimit     Int? // null = unlimited
 
   // Health
-  healthStatus     OcrHealthStatus @default(active)
-  cooldownUntil    DateTime?
-  lastUsedAt       DateTime?
-  lastErrorAt      DateTime?
-  lastErrorMsg     String?
-  consecutiveErrors Int           @default(0)
+  healthStatus      OcrHealthStatus @default(active)
+  cooldownUntil     DateTime?
+  lastUsedAt        DateTime?
+  lastErrorAt       DateTime?
+  lastErrorMsg      String?
+  consecutiveErrors Int             @default(0)
 
   // Statistics
-  successRate      Float          @default(0) // 0.0 - 1.0
-  totalRequests    Int            @default(0)
-  totalErrors      Int            @default(0)
-  averageLatencyMs Float          @default(0)
-  totalPages       Int            @default(0)
+  successRate      Float @default(0) // 0.0 - 1.0
+  totalRequests    Int   @default(0)
+  totalErrors      Int   @default(0)
+  averageLatencyMs Float @default(0)
+  totalPages       Int   @default(0)
 
   // Metadata
-  notes       String?
-  createdAt   DateTime           @default(now())
-  updatedAt   DateTime           @updatedAt
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  usageLogs   OcrUsageLog[]
+  usageLogs OcrUsageLog[]
 
   @@index([healthStatus])
   @@index([isActive, rotationOrder])
@@ -913,14 +967,14 @@ model OcrUsageLog {
   success      Boolean
   confidence   Float?
   latencyMs    Int
-  errorCode    String?       // "401" | "403" | "429" | "500" | "503" | "TIMEOUT"
+  errorCode    String? // "401" | "403" | "429" | "500" | "503" | "TIMEOUT"
   errorMessage String?
-  imageHash    String?       // SHA-256 for dedup
-  imageSize    Int?          // Bytes
-  metadata     Json?         // Flexible extension
+  imageHash    String? // SHA-256 for dedup
+  imageSize    Int? // Bytes
+  metadata     Json? // Flexible extension
 
-  provider     OcrProvider   @relation(fields: [providerId], references: [id])
-  createdAt    DateTime      @default(now())
+  provider  OcrProvider @relation(fields: [providerId], references: [id])
+  createdAt DateTime    @default(now())
 
   @@index([providerId, createdAt])
   @@index([imageHash])
@@ -930,17 +984,112 @@ model OcrUsageLog {
 }
 
 model OcrCacheEntry {
-  id             String      @id @default(cuid())
-  imageHash      String      @unique // SHA-256 of image buffer
+  id             String       @id @default(cuid())
+  imageHash      String       @unique // SHA-256 of image buffer
   documentType   DokumenJenis
-  result         Json        // Full OcrResult serialized
+  result         Json // Full OcrResult serialized
   confidence     Float
   expiresAt      DateTime
-  createdAt      DateTime    @default(now())
-  lastAccessedAt DateTime    @default(now())
-  accessCount    Int         @default(1)
+  createdAt      DateTime     @default(now())
+  lastAccessedAt DateTime     @default(now())
+  accessCount    Int          @default(1)
 
   @@index([imageHash])
   @@index([expiresAt])
   @@map("ocr_cache_entries")
+}
+
+// ============================================================
+// MASTER DATA
+// ============================================================
+
+model MasterAirline {
+  id        String   @id @default(cuid())
+  code      String   @unique
+  name      String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  keberangkatan Keberangkatan[]
+
+  @@map("master_airlines")
+}
+
+model MasterHotel {
+  id         String   @id @default(cuid())
+  code       String   @unique
+  name       String
+  cityId     String
+  starRating Int?
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  city                 MasterCity      @relation(fields: [cityId], references: [id])
+  keberangkatanMekkah  Keberangkatan[] @relation("HotelMekkah")
+  keberangkatanMadinah Keberangkatan[] @relation("HotelMadinah")
+
+  @@index([cityId])
+  @@map("master_hotels")
+}
+
+model MasterCity {
+  id        String   @id @default(cuid())
+  code      String   @unique
+  name      String
+  country   String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  hotels        MasterHotel[]
+  keberangkatan Keberangkatan[] @relation("StartingPoint")
+
+  @@map("master_cities")
+}
+
+model MasterPackageType {
+  id        String   @id @default(cuid())
+  code      String   @unique
+  name      String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  keberangkatan Keberangkatan[]
+
+  @@map("master_package_types")
+}
+
+model MasterPerlengkapan {
+  id        String   @id @default(cuid())
+  code      String   @unique
+  name      String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("master_perlengkapan")
+}
+
+// ============================================================
+// PACKAGE CREATION BOT (AI DRAFT)
+// ============================================================
+
+model PackageDraft {
+  id            String             @id @default(cuid())
+  sourceUrl     String?
+  captionText   String?
+  itineraryText String?
+  status        PackageDraftStatus @default(DRAFT)
+  extractedData Json // JSON structured by Raw + Mapped Value Contract
+  confidence    Float?
+  publishedId   String?            @unique // Link to Keberangkatan if published
+  tenantId      String?
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+
+  @@index([status])
+  @@map("package_drafts")
 }
