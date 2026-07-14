@@ -1,6 +1,8 @@
+# EEOS GOVERNANCE BASELINE v1.2
+Status: FROZEN
+
 # EEOS (Engineering Execution Orchestration System)
 ## Addendum: Engineering Evidence Standard (EES)
-## Version: EEOS v1.1
 
 # Engineering Evidence Standard (EES)
 
@@ -51,10 +53,10 @@ Minimal berisi daftar evidence yang digunakan.
 
 Contoh:
 Evidence Used:
-- Build Log
-- Source Code
-- Database Query
-- Environment Inspection
+- E-001 Build Log
+- E-002 Source Code
+- E-003 Database Query
+- E-004 Environment Inspection
 
 Jika section ini kosong, Root Cause tidak boleh diberi label CONFIRMED.
 
@@ -164,9 +166,15 @@ Berisi:
 - Implementation Recommendation
 
 Recommendation hanya boleh:
-- Proceed
-- Proceed with Caution
-- Hold
+- Proceed Documentation
+- Proceed Investigation
+- Proceed Coding
+- Proceed Refactoring
+- Proceed Database Migration
+- Proceed Deployment
+- Blocked
+- Waiting Product Owner Approval
+- Waiting Additional Evidence
 
 ==========================================================
 9. Mandatory Compliance & Self Consistency Check
@@ -183,3 +191,186 @@ Pastikan seluruh laporan telah memenuhi:
 - Evidence Summary
 
 Tidak boleh ada Engineering Report yang tidak memiliki elemen-elemen di atas.
+
+==========================================================
+10. Evidence Lifecycle
+==========================================================
+
+Evidence Collection
+↓
+Evidence Validation
+↓
+Evidence Classification
+↓
+Decision Making
+↓
+Evidence Archive
+↓
+Future Audit Reference
+
+Tujuan setiap tahap:
+- Evidence Collection: Mengumpulkan data mentah dari berbagai sumber terkait (log, database, dll).
+- Evidence Validation: Memastikan data valid dan relevan dengan konteks permasalahan.
+- Evidence Classification: Menentukan Tier dan Confidence dari bukti yang telah tervalidasi.
+- Decision Making: Menggunakan bukti terklasifikasi untuk mengambil keputusan engineering (coding, deploy, dll).
+- Evidence Archive: Menyimpan bukti ke dalam riwayat dokumentasi sehingga tidak hilang.
+- Future Audit Reference: Memastikan seluruh Evidence yang digunakan pada Engineering Report tetap dapat ditelusuri pada audit berikutnya.
+
+==========================================================
+11. Evidence ID
+==========================================================
+
+Setiap bukti WAJIB memiliki identifier unik.
+
+Contoh:
+E-001
+Runtime Log
+
+E-002
+Terminal Output
+
+E-003
+Database Query
+
+E-004
+Network Trace
+
+E-005
+Build Log
+
+Engineering Report cukup mereferensikan identifier-nya:
+
+Evidence Used
+- E-001
+- E-003
+- E-004
+
+Tidak perlu mengulang isi bukti secara penuh di seluruh dokumen. Penomoran bersifat sekuensial (E-001, E-002, dst) per konteks penyelesaian masalah atau dokumentasi agar mudah ditelusuri.
+
+==========================================================
+12. ADR Trigger Policy
+==========================================================
+
+EEOS menentukan kapan Architecture Decision Record (ADR) WAJIB dibuat.
+
+Minimal kondisi berikut:
+- Database Schema berubah
+- Business Rule berubah
+- Authentication berubah
+- Authorization berubah
+- Security berubah
+- Infrastructure berubah
+- Public API berubah
+- Breaking UI
+- Breaking Contract
+- Cross Domain Impact
+
+Jika salah satu kondisi terpenuhi maka:
+
+STOP IMPLEMENTATION
+
+Status:
+ADR REQUIRED
+
+Coding baru boleh dilakukan setelah ADR disetujui Product Owner.
+
+==========================================================
+13. EEOS Version Governance
+==========================================================
+
+EEOS memiliki governance terhadap dirinya sendiri.
+
+Flow:
+Proposal
+↓
+Architecture Review
+↓
+Engineering Review
+↓
+Product Owner Approval
+↓
+Version Increment
+↓
+Official Release
+
+Aturan:
+Tidak ada engineer yang boleh mengubah EEOS secara sepihak.
+Perubahan EEOS harus melalui proses governance yang sama seperti perubahan arsitektur.
+
+==========================================================
+14. Governance Status
+==========================================================
+
+Version:
+EEOS Governance Baseline v1.2
+
+Status:
+FROZEN
+
+Effective Date:
+13 July 2026
+
+Approved By:
+Product Owner
+
+Scope:
+VTU ABADI Engineering Governance
+
+Applies To:
+- Architecture
+- Database
+- Backend
+- Frontend
+- DevOps
+- QA
+- Investigation
+- Audit
+- Documentation
+- Deployment
+
+==========================================================
+15. Governance Freeze Statement
+==========================================================
+
+Mulai versi ini seluruh engineer, AI Agent, reviewer, maupun contributor wajib menjadikan EEOS sebagai Source of Truth engineering.
+
+Perubahan terhadap EEOS tidak diperbolehkan secara langsung.
+
+Setiap perubahan wajib melalui:
+Proposal
+↓
+Architecture Review
+↓
+Engineering Review
+↓
+Product Owner Approval
+↓
+Version Increment
+↓
+Official Release
+
+==========================================================
+16. Baseline Scope
+==========================================================
+
+EEOS berlaku untuk:
+- Investigation
+- Root Cause Analysis
+- Architecture
+- ADR
+- Coding
+- Refactoring
+- Database Migration
+- Testing
+- QA
+- Deployment
+- Engineering Review
+- Documentation
+
+==========================================================
+17. Future Governance
+==========================================================
+
+Semua revisi EEOS setelah versi ini wajib dianggap sebagai Governance Evolution.
+
+Tidak boleh ada perubahan minor yang langsung mengubah baseline tanpa proses governance resmi.
