@@ -82,3 +82,4 @@ prisma/dev.db-journal
 .vercel
 
 .vercel
+artifacts/
