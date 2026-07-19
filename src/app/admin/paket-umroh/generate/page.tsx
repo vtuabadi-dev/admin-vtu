@@ -29,7 +29,7 @@ export default function GeneratePaketPage() {
   const [pathMode, setPathMode] = useState<"manual" | "ocr">("manual");
 
   // OCR state
-  const [flyerFile, setFlyerFile] = useState<File | null>(null);
+  const [flyerFiles, setFlyerFiles] = useState<File[]>([]);
   const [caption, setCaption] = useState("");
   const [uploading, setUploading] = useState(false);
   const [ocrWarning, setOcrWarning] = useState("");
@@ -48,10 +48,32 @@ export default function GeneratePaketPage() {
     kapasitas: "",
     isAdaPerlengkapan: "",
     hargaBase: "",
-    durasiHari: "",
-    tanggalBerangkat: "",
-    tanggalPulang: "",
+    durasiHari: "9",
   });
+
+  // Multiple Departure Dates State
+  const [departureDates, setDepartureDates] = useState<string[]>([]);
+  const [tempDate, setTempDate] = useState("");
+
+  const handleAddDate = () => {
+    if (!tempDate) return;
+    if (!departureDates.includes(tempDate)) {
+      setDepartureDates(prev => [...prev, tempDate].sort());
+    }
+    setTempDate("");
+  };
+
+  const handleRemoveDate = (val: string) => {
+    setDepartureDates(prev => prev.filter(d => d !== val));
+  };
+
+  const calculateReturnDate = (depDateStr: string, durDaysStr: string) => {
+    if (!depDateStr) return "";
+    const date = new Date(depDateStr);
+    const days = parseInt(durDaysStr, 10) || 9;
+    date.setDate(date.getDate() + days - 1);
+    return date.toISOString().split("T")[0];
+  };
 
   // Cluster-specific hotel selection
   const [clusterHotels, setClusterHotels] = useState<Record<string, { hotelMekkahId: string; hotelMadinahId: string }>>({
@@ -139,57 +161,73 @@ export default function GeneratePaketPage() {
 
   // OCR Processing Handler
   const handleOcrProcess = async () => {
-    if (!flyerFile) return;
+    if (flyerFiles.length === 0) return;
     setUploading(true);
     setOcrWarning("");
     setOcrSuccess(false);
 
     try {
-      const bodyData = new FormData();
-      bodyData.append("flyer", flyerFile);
-      bodyData.append("caption", caption || `Proses dokumen flyer ${flyerFile.name}`);
+      let finalFormData = { ...formData };
+      let warningMessages: string[] = [];
 
-      const res = await fetch("/api/admin/packages/ai-import", {
-        method: "POST",
-        body: bodyData,
-      });
+      for (const file of flyerFiles) {
+        const bodyData = new FormData();
+        bodyData.append("flyer", file);
+        bodyData.append("caption", caption || `Proses dokumen flyer ${file.name}`);
 
-      const resJson = await res.json();
-      if (res.ok && resJson.success) {
-        const result = resJson.data?.extractionResult ?? {};
-        
-        // Form mapping
-        const mappedAirline = matchAirline(result.airline, options?.airlines || []);
-        const mappedCity = matchCity(result.departureCity, options?.cities || []);
-        const mappedPackageType = matchPackageType(result.packageType, options?.packageTypes || []);
-        
-        const mekkahCity = options?.cities.find(c => c.code === "MEK" || c.name.toLowerCase() === "mekkah");
-        const madinahCity = options?.cities.find(c => c.code === "MED" || c.name.toLowerCase() === "madinah");
-        const mekkahHotels = options?.hotels.filter(h => h.cityId === mekkahCity?.id) || [];
-        const madinahHotels = options?.hotels.filter(h => h.cityId === madinahCity?.id) || [];
+        const res = await fetch("/api/admin/packages/ai-import", {
+          method: "POST",
+          body: bodyData,
+        });
 
-        const mappedHotelMekkah = matchHotel(result.hotelMekkah, mekkahHotels);
-        const mappedHotelMadinah = matchHotel(result.hotelMadinah, madinahHotels);
+        const resJson = await res.json();
+        if (res.ok && resJson.success) {
+          const result = resJson.data?.extractionResult ?? {};
+          
+          // Form mapping
+          const mappedAirline = matchAirline(result.airline, options?.airlines || []);
+          const mappedCity = matchCity(result.departureCity, options?.cities || []);
+          const mappedPackageType = matchPackageType(result.packageType, options?.packageTypes || []);
+          
+          const mekkahCity = options?.cities.find(c => c.code === "MEK" || c.name.toLowerCase() === "mekkah");
+          const madinahCity = options?.cities.find(c => c.code === "MED" || c.name.toLowerCase() === "madinah");
+          const mekkahHotels = options?.hotels.filter(h => h.cityId === mekkahCity?.id) || [];
+          const madinahHotels = options?.hotels.filter(h => h.cityId === madinahCity?.id) || [];
 
-        // Pre-fill form fields with OCR parsed attributes
-        setFormData(prev => ({
-          ...prev,
-          namaPaket: result.title || prev.namaPaket,
-          jenisPaketId: mappedPackageType || prev.jenisPaketId,
-          startingPointId: mappedCity || prev.startingPointId,
-          maskapaiId: mappedAirline || prev.maskapaiId,
-          hotelMekkahId: mappedHotelMekkah || prev.hotelMekkahId,
-          hotelMadinahId: mappedHotelMadinah || prev.hotelMadinahId,
-          durasiHari: result.durationDays ? String(result.durationDays) : prev.durasiHari,
-          tanggalBerangkat: result.departureDates?.[0] ? result.departureDates[0].split("T")[0] : prev.tanggalBerangkat,
-        }));
+          const mappedHotelMekkah = matchHotel(result.hotelMekkah, mekkahHotels);
+          const mappedHotelMadinah = matchHotel(result.hotelMadinah, madinahHotels);
 
-        setOcrSuccess(true);
-        if (resJson.data?.warning) {
-          setOcrWarning(resJson.data.warning);
+          // Merge fields (only overwrite if the new result has a value)
+          if (result.title) finalFormData.namaPaket = result.title;
+          if (mappedPackageType) finalFormData.jenisPaketId = mappedPackageType;
+          if (mappedCity) finalFormData.startingPointId = mappedCity;
+          if (mappedAirline) finalFormData.maskapaiId = mappedAirline;
+          if (mappedHotelMekkah) finalFormData.hotelMekkahId = mappedHotelMekkah;
+          if (mappedHotelMadinah) finalFormData.hotelMadinahId = mappedHotelMadinah;
+          if (result.durationDays) finalFormData.durasiHari = String(result.durationDays);
+          
+          if (result.departureDates && Array.isArray(result.departureDates)) {
+            const extractedDates = result.departureDates.map((d: string) => d.split("T")[0]).filter(Boolean);
+            setDepartureDates(prev => Array.from(new Set([...prev, ...extractedDates])).sort());
+          } else if (result.departureDates && typeof result.departureDates === "string") {
+            const d = (result.departureDates as string).split("T")[0];
+            if (d && !departureDates.includes(d)) {
+              setDepartureDates(prev => [...prev, d].sort());
+            }
+          }
+
+          if (resJson.data?.warning) {
+            warningMessages.push(`${file.name}: ${resJson.data.warning}`);
+          }
+        } else {
+          warningMessages.push(`${file.name}: ${resJson.message || "Gagal ekstraksi"}`);
         }
-      } else {
-        setOcrWarning(resJson.message || "Gagal mengekstraksi data flyer.");
+      }
+
+      setFormData(finalFormData);
+      setOcrSuccess(true);
+      if (warningMessages.length > 0) {
+        setOcrWarning(warningMessages.join(" | "));
       }
     } catch (err) {
       console.error(err);
@@ -200,6 +238,10 @@ export default function GeneratePaketPage() {
   };
 
   const handleGenerate = async () => {
+    if (departureDates.length === 0) {
+      alert("Mohon tambahkan minimal satu tanggal keberangkatan pada Langkah 4.");
+      return;
+    }
     setLoading(true);
     setTimeout(() => {
       setLoading(false);
@@ -360,34 +402,72 @@ export default function GeneratePaketPage() {
 
         {/* Step 4: Lainnya */}
         <AccordionSection title="Langkah 4: Operasional & Harga" defaultOpen>
-          <div className="p-4 bg-card border rounded-md grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium mb-1">Tanggal Keberangkatan</label>
-              <Input type="date" name="tanggalBerangkat" value={formData.tanggalBerangkat} onChange={handleChange} />
+          <div className="p-4 bg-card border rounded-md flex flex-col gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
+              <div>
+                <label className="block text-sm font-medium mb-1">Tambah Tanggal Keberangkatan</label>
+                <div className="flex gap-2">
+                  <Input type="date" value={tempDate} onChange={(e) => setTempDate(e.target.value)} />
+                  <Button type="button" onClick={handleAddDate}>Tambah</Button>
+                </div>
+              </div>
+              <div className="text-xs text-muted-foreground bg-muted/30 p-3 rounded-md border">
+                <strong>Catatan Tanggal Pulang:</strong> Tanggal kepulangan dihitung otomatis berdasarkan tanggal keberangkatan ditambah durasi hari paket dikurangi 1 hari.
+              </div>
             </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Tanggal Pulang</label>
-              <Input type="date" name="tanggalPulang" value={formData.tanggalPulang} onChange={handleChange} />
+
+            {/* Departure Dates Chip/Badge List */}
+            <div className="space-y-2">
+              <label className="block text-xs font-semibold text-muted-foreground">
+                Tanggal Keberangkatan Terpilih ({departureDates.length} Tanggal &rarr; {departureDates.length} Paket akan dibuat)
+              </label>
+              {departureDates.length === 0 ? (
+                <div className="text-sm text-red-500 border border-red-200 bg-red-50/50 p-2.5 rounded-md">
+                  Belum ada tanggal keberangkatan yang dimasukkan. Gunakan form di atas untuk menambahkan tanggal.
+                </div>
+              ) : (
+                <div className="flex flex-wrap gap-2 max-h-[160px] overflow-y-auto border p-2.5 rounded-md bg-muted/10">
+                  {departureDates.map((d, idx) => (
+                    <div key={idx} className="flex items-center gap-2 bg-card border px-2.5 py-1.5 rounded-md text-xs shadow-sm">
+                      <span className="font-semibold">{d}</span>
+                      <span className="text-muted-foreground">
+                        (Pulang: {calculateReturnDate(d, formData.durasiHari)})
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveDate(d)}
+                        className="text-red-500 hover:text-red-700 hover:bg-red-50 px-1 py-0.5 rounded font-bold"
+                        title="Hapus tanggal"
+                      >
+                        &times;
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Kapasitas Seat (Maksimal Jamaah)</label>
-              <Input type="number" name="kapasitas" value={formData.kapasitas} onChange={handleChange} placeholder="Misal: 45" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Termasuk Perlengkapan?</label>
-              <select name="isAdaPerlengkapan" value={formData.isAdaPerlengkapan} onChange={handleChange} className="w-full h-10 px-3 py-2 rounded-md border border-input bg-transparent">
-                <option value="">-- Pilih --</option>
-                <option value="ya">Ya, Termasuk Perlengkapan</option>
-                <option value="tidak">Tidak Termasuk</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Durasi (Hari)</label>
-              <Input type="number" name="durasiHari" value={formData.durasiHari} onChange={handleChange} placeholder="9" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Harga Base (Rp)</label>
-              <Input type="number" name="hargaBase" value={formData.hargaBase} onChange={handleChange} placeholder="35000000" />
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">Kapasitas Seat (Maksimal Jamaah)</label>
+                <Input type="number" name="kapasitas" value={formData.kapasitas} onChange={handleChange} placeholder="Misal: 45" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Termasuk Perlengkapan?</label>
+                <select name="isAdaPerlengkapan" value={formData.isAdaPerlengkapan} onChange={handleChange} className="w-full h-10 px-3 py-2 rounded-md border border-input bg-transparent">
+                  <option value="">-- Pilih --</option>
+                  <option value="ya">Ya, Termasuk Perlengkapan</option>
+                  <option value="tidak">Tidak Termasuk</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Durasi (Hari)</label>
+                <Input type="number" name="durasiHari" value={formData.durasiHari} onChange={handleChange} placeholder="9" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Harga Base (Rp)</label>
+                <Input type="number" name="hargaBase" value={formData.hargaBase} onChange={handleChange} placeholder="35000000" />
+              </div>
             </div>
           </div>
         </AccordionSection>
@@ -407,14 +487,14 @@ export default function GeneratePaketPage() {
         <div className="flex gap-2 shrink-0">
           <Button variant="outline" onClick={() => router.push("/admin/paket-umroh")}>Batal</Button>
           <Button onClick={handleGenerate} disabled={loading || fetching}>
-            {loading ? "Memproses..." : "Generate Paket"}
+            {loading ? "Memproses..." : `Generate ${departureDates.length > 0 ? departureDates.length : ""} Paket`}
           </Button>
         </div>
       </div>
 
       {success && (
         <div className="p-4 bg-green-100 text-green-700 border border-green-200 rounded-md">
-          Paket Umroh berhasil digenerate! (Ini adalah UI UAT menggunakan Database Live Master Data)
+          Berhasil men-generate {departureDates.length} Paket Umroh untuk tanggal-tanggal: {departureDates.join(", ")}! (Ini adalah UI UAT menggunakan Database Live Master Data)
         </div>
       )}
 
@@ -454,22 +534,46 @@ export default function GeneratePaketPage() {
             <div className="p-5 border rounded-lg bg-card space-y-4 shadow-sm">
               <h2 className="font-semibold text-base">Ekstraksi Dokumen Flyer</h2>
               <p className="text-xs text-muted-foreground">
-                Unggah flyer brosur paket dalam format JPG/JPEG untuk diekstraksi datanya secara otomatis menggunakan AI.
+                Unggah satu atau beberapa brosur flyer paket dalam format JPG/JPEG untuk diekstraksi datanya secara otomatis menggunakan AI.
               </p>
               
               <div className="flex flex-col items-center justify-center border-2 border-dashed border-border hover:border-primary/50 rounded-lg p-6 bg-muted/10 cursor-pointer transition-colors relative">
                 <input 
                   type="file" 
                   accept=".jpg,.jpeg" 
+                  multiple
                   className="absolute inset-0 opacity-0 cursor-pointer" 
-                  onChange={(e) => setFlyerFile(e.target.files?.[0] ?? null)}
+                  onChange={(e) => {
+                    const selected = Array.from(e.target.files || []);
+                    setFlyerFiles(prev => [...prev, ...selected]);
+                  }}
                 />
                 <Upload className="h-10 w-10 text-muted-foreground mb-2" />
                 <span className="text-sm font-medium text-center">
-                  {flyerFile ? flyerFile.name : "Klik atau seret file JPG kemari"}
+                  Klik atau seret file JPG kemari
                 </span>
-                <span className="text-xs text-muted-foreground mt-1">Maksimal file 10MB</span>
+                <span className="text-xs text-muted-foreground mt-1">Bisa pilih beberapa file sekaligus</span>
               </div>
+
+              {flyerFiles.length > 0 && (
+                <div className="space-y-2 border rounded-md p-3 bg-muted/20">
+                  <label className="text-xs font-semibold text-muted-foreground">Flyer Terpilih ({flyerFiles.length})</label>
+                  <div className="space-y-1.5 max-h-[150px] overflow-y-auto">
+                    {flyerFiles.map((file, idx) => (
+                      <div key={idx} className="flex items-center justify-between text-xs bg-card border p-2 rounded-md">
+                        <span className="truncate font-medium max-w-[80%]">{file.name}</span>
+                        <button
+                          type="button"
+                          onClick={() => setFlyerFiles(prev => prev.filter((_, i) => i !== idx))}
+                          className="text-red-500 hover:text-red-700 font-semibold px-1"
+                        >
+                          Hapus
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               <div className="space-y-1">
                 <label className="text-xs font-semibold text-muted-foreground flex items-center gap-1">
@@ -486,12 +590,12 @@ export default function GeneratePaketPage() {
               <Button 
                 onClick={handleOcrProcess} 
                 className="w-full" 
-                disabled={!flyerFile || uploading}
+                disabled={flyerFiles.length === 0 || uploading}
               >
                 {uploading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Mengekstrak Brosur...
+                    Mengekstrak {flyerFiles.length} Brosur...
                   </>
                 ) : (
                   <>
@@ -504,14 +608,14 @@ export default function GeneratePaketPage() {
               {ocrWarning && (
                 <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 text-amber-800 text-xs p-3 rounded-md">
                   <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600" />
-                  <div>{ocrWarning}</div>
+                  <div className="break-all">{ocrWarning}</div>
                 </div>
               )}
 
               {ocrSuccess && !ocrWarning && (
                 <div className="flex items-center gap-2 bg-green-50 border border-green-200 text-green-800 text-xs p-3 rounded-md">
                   <Sparkles className="h-4 w-4 text-green-600" />
-                  <div>Data berhasil diekstraksi! Silakan verifikasi formulir di sebelah kanan.</div>
+                  <div>Data berhasil diekstraksi dari {flyerFiles.length} brosur! Silakan verifikasi formulir di sebelah kanan.</div>
                 </div>
               )}
             </div>
