@@ -19,6 +19,9 @@ function formatError(error: any) {
   if (error.message === "NOT_FOUND") {
     return NextResponse.json({ success: false, message: "City not found" }, { status: 404 });
   }
+  if (error.message === "REFERENCE_CONSTRAINT") {
+    return NextResponse.json({ success: false, message: "Data tidak bisa dihapus karena masih digunakan sebagai referensi oleh data lain." }, { status: 400 });
+  }
   return NextResponse.json({ success: false, message: error.message || "Internal Server Error" }, { status: 500 });
 }
 

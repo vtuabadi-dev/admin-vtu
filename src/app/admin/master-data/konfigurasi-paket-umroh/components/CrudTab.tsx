@@ -271,18 +271,7 @@ export function CrudTab<T extends { id: string; status?: string; [key: string]: 
                     if (col.key === "actions") {
                       return (
                         <td key="actions" className="px-6 py-4 flex gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleOpenEdit(item)}
-                            title="Edit"
-                            className="flex items-center gap-1"
-                            disabled={loading}
-                          >
-                            <Edit3 className="h-3 w-3" />
-                            Edit
-                          </Button>
-                          {item.status === "Nonaktif" ? (
+                          {item.status === "Nonaktif" && (
                             <Button
                               variant="outline"
                               size="sm"
@@ -294,19 +283,29 @@ export function CrudTab<T extends { id: string; status?: string; [key: string]: 
                               <Check className="h-3 w-3" />
                               Aktifkan
                             </Button>
-                          ) : (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleDelete(item.id)}
-                              title="Hapus"
-                              className="text-red-600 border-red-200 hover:bg-red-50 flex items-center gap-1"
-                              disabled={loading}
-                            >
-                              <Trash2 className="h-3 w-3" />
-                              Nonaktifkan
-                            </Button>
                           )}
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleOpenEdit(item)}
+                            title="Edit"
+                            className="flex items-center gap-1"
+                            disabled={loading}
+                          >
+                            <Edit3 className="h-3 w-3" />
+                            Edit
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleDelete(item.id)}
+                            title="Hapus"
+                            className="text-red-600 border-red-200 hover:bg-red-50 flex items-center gap-1"
+                            disabled={loading}
+                          >
+                            <Trash2 className="h-3 w-3" />
+                            Hapus
+                          </Button>
                         </td>
                       );
                     }

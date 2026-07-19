@@ -48,7 +48,7 @@ export const masterDataService = {
       return await airlineRepo.delete(id);
     } catch (e: any) {
       if (e?.code === "P2003" || e?.code === "P2014") {
-        return await airlineRepo.update(id, { isActive: false });
+        throw new Error("REFERENCE_CONSTRAINT");
       }
       throw e;
     }
@@ -90,7 +90,7 @@ export const masterDataService = {
       return await hotelRepo.delete(id);
     } catch (e: any) {
       if (e?.code === "P2003" || e?.code === "P2014") {
-        return await hotelRepo.update(id, { isActive: false });
+        throw new Error("REFERENCE_CONSTRAINT");
       }
       throw e;
     }
@@ -131,7 +131,7 @@ export const masterDataService = {
       return await cityRepo.delete(id);
     } catch (e: any) {
       if (e?.code === "P2003" || e?.code === "P2014") {
-        return await cityRepo.update(id, { isActive: false });
+        throw new Error("REFERENCE_CONSTRAINT");
       }
       throw e;
     }
@@ -172,7 +172,7 @@ export const masterDataService = {
       return await packageTypeRepo.delete(id);
     } catch (e: any) {
       if (e?.code === "P2003" || e?.code === "P2014") {
-        return await packageTypeRepo.update(id, { isActive: false });
+        throw new Error("REFERENCE_CONSTRAINT");
       }
       throw e;
     }
