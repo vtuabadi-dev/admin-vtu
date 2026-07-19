@@ -2,6 +2,7 @@ import { airlineRepo } from "../repositories/master/airline.repository";
 import { hotelRepo } from "../repositories/master/hotel.repository";
 import { cityRepo } from "../repositories/master/city.repository";
 import { packageTypeRepo } from "../repositories/master/package-type.repository";
+import { hotelCityRepo } from "../repositories/master/hotel-city.repository";
 
 export const masterDataService = {
   // Airline
@@ -170,6 +171,47 @@ export const masterDataService = {
     if (!row) throw new Error("NOT_FOUND");
     try {
       return await packageTypeRepo.delete(id);
+    } catch (e: any) {
+      if (e?.code === "P2003" || e?.code === "P2014") {
+        throw new Error("REFERENCE_CONSTRAINT");
+      }
+      throw e;
+    }
+  },
+
+  // Hotel Cities
+  async getHotelCities(params?: { isActive?: boolean; limit?: number; offset?: number; search?: string; sort?: string; order?: "asc" | "desc" }) {
+    return hotelCityRepo.findAll(params);
+  },
+  async getHotelCityById(id: string) {
+    return hotelCityRepo.findById(id);
+  },
+  async createHotelCity(data: { code: string; name: string; isActive?: boolean }) {
+    const existingCode = await hotelCityRepo.findByCode(data.code);
+    if (existingCode) throw new Error("DUPLICATE_CODE");
+    const existingName = await hotelCityRepo.findByName(data.name);
+    if (existingName) throw new Error("DUPLICATE_NAME");
+    return hotelCityRepo.create({
+      ...data,
+      isActive: data.isActive ?? true,
+    });
+  },
+  async updateHotelCity(id: string, data: { code?: string; name?: string; isActive?: boolean }) {
+    if (data.code) {
+      const existing = await hotelCityRepo.findByCode(data.code);
+      if (existing && existing.id !== id) throw new Error("DUPLICATE_CODE");
+    }
+    if (data.name) {
+      const existing = await hotelCityRepo.findByName(data.name);
+      if (existing && existing.id !== id) throw new Error("DUPLICATE_NAME");
+    }
+    return hotelCityRepo.update(id, data);
+  },
+  async deleteHotelCity(id: string) {
+    const row = await hotelCityRepo.findById(id);
+    if (!row) throw new Error("NOT_FOUND");
+    try {
+      return await hotelCityRepo.delete(id);
     } catch (e: any) {
       if (e?.code === "P2003" || e?.code === "P2014") {
         throw new Error("REFERENCE_CONSTRAINT");

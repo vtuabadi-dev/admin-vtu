@@ -27,48 +27,27 @@ const STATUS_OPTIONS = [
 ];
 
 export default function MasterKonfigurasiPaketUmrohPage() {
-  const [cities, setCities] = useState<any[]>([]);
-  const [hotelCityIds, setHotelCityIds] = useState<string[]>([]);
-  const [selectedCityIds, setSelectedCityIds] = useState<string[]>([]);
+  const [hotelCities, setHotelCities] = useState<any[]>([]);
   const [settingsOpen, setSettingsOpen] = useState(false);
 
-  useEffect(() => {
-    fetch("/api/master/cities")
+  // Fetch hotel cities
+  const fetchHotelCities = () => {
+    fetch("/api/master/hotel-cities")
       .then((res) => res.json())
       .then((res) => {
         if (res.success) {
-          setCities(res.data);
-          // Initial load from localStorage or scan default Saudi cities
-          const saved = localStorage.getItem("hotel_city_ids");
-          if (saved) {
-            const parsed = JSON.parse(saved);
-            setHotelCityIds(parsed);
-            setSelectedCityIds(parsed);
-          } else {
-            const defaults = res.data
-              .filter((c: any) => {
-                const nameLower = c.name.toLowerCase();
-                return nameLower.includes("mekkah") || nameLower.includes("makkah") || nameLower.includes("madinah") || nameLower.includes("jeddah");
-              })
-              .map((c: any) => c.id);
-            setHotelCityIds(defaults);
-            setSelectedCityIds(defaults);
-            localStorage.setItem("hotel_city_ids", JSON.stringify(defaults));
-          }
+          setHotelCities(res.data);
         }
       })
-      .catch((err) => console.error("Failed to load cities for dropdown selection options", err));
+      .catch((err) => console.error("Failed to load hotel cities", err));
+  };
+
+  useEffect(() => {
+    fetchHotelCities();
   }, []);
 
   const handleOpenSettings = () => {
-    setSelectedCityIds(hotelCityIds);
     setSettingsOpen(true);
-  };
-
-  const handleSaveSettings = () => {
-    setHotelCityIds(selectedCityIds);
-    localStorage.setItem("hotel_city_ids", JSON.stringify(selectedCityIds));
-    setSettingsOpen(false);
   };
 
   const [newCityName, setNewCityName] = useState("");
@@ -81,19 +60,14 @@ export default function MasterKonfigurasiPaketUmrohPage() {
     try {
       setAddingCity(true);
       const code = newCityCode.trim() || `CTY-${newCityName.trim().toUpperCase().replace(/[^A-Z0-9]/g, "-").substring(0, 5)}`;
-      const res = await fetch("/api/master/cities", {
+      const res = await fetch("/api/master/hotel-cities", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ nama: newCityName.trim(), kode: code }),
       });
       const resJson = await res.json();
       if (resJson.success) {
-        const cRes = await fetch("/api/master/cities");
-        const cJson = await cRes.json();
-        if (cJson.success) {
-          setCities(cJson.data);
-          setSelectedCityIds((prev) => [...prev, resJson.data.id]);
-        }
+        fetchHotelCities();
         setNewCityName("");
         setNewCityCode("");
       } else {
@@ -107,27 +81,14 @@ export default function MasterKonfigurasiPaketUmrohPage() {
   };
 
   const handleDeleteCity = async (id: string, name: string) => {
-    if (confirm(`Apakah Anda yakin ingin menonaktifkan/menghapus kota "${name}" dari database?`)) {
+    if (confirm(`Apakah Anda yakin ingin menghapus kota lokasi "${name}" secara permanen?`)) {
       try {
-        const res = await fetch(`/api/master/cities/${id}`, {
+        const res = await fetch(`/api/master/hotel-cities/${id}`, {
           method: "DELETE",
         });
         const resJson = await res.json();
         if (resJson.success) {
-          const cRes = await fetch("/api/master/cities");
-          const cJson = await cRes.json();
-          if (cJson.success) {
-            setCities(cJson.data);
-            setSelectedCityIds((prev) => prev.filter((cId) => cId !== id));
-            setHotelCityIds((prev) => prev.filter((cId) => cId !== id));
-            // Update localStorage
-            const saved = localStorage.getItem("hotel_city_ids");
-            if (saved) {
-              const parsed = JSON.parse(saved);
-              const updated = parsed.filter((cId: string) => cId !== id);
-              localStorage.setItem("hotel_city_ids", JSON.stringify(updated));
-            }
-          }
+          fetchHotelCities();
         } else {
           alert(`Error: ${resJson.message}`);
         }
@@ -247,7 +208,7 @@ export default function MasterKonfigurasiPaketUmrohPage() {
                     key: "cityId", 
                     header: "Kota Lokasi", 
                     render: (item) => {
-                      const city = cities.find(c => c.id === item.cityId);
+                      const city = hotelCities.find(c => c.id === item.cityId);
                       return <span>{city ? city.name : item.cityId}</span>;
                     } 
                   },
@@ -257,18 +218,18 @@ export default function MasterKonfigurasiPaketUmrohPage() {
                 ]}
                 fields={[
                   { name: "nama", label: "Nama Hotel", type: "text" },
-                  { name: "cityId", label: "Kota Lokasi", type: "select", options: cities.filter(c => hotelCityIds.includes(c.id)).map(c => ({ label: c.name, value: c.id })) },
+                  { name: "cityId", label: "Kota Lokasi", type: "select", options: hotelCities.map(c => ({ label: c.name, value: c.id })) },
                   { name: "bintang", label: "Rating Bintang (1-5)", type: "number" },
                   { name: "status", label: "Status", type: "select", options: STATUS_OPTIONS },
                 ]}
                 filterField={{
                   name: "cityId",
                   label: "Kota Lokasi",
-                  options: cities.filter(c => hotelCityIds.includes(c.id)).map(c => ({ label: c.name, value: c.id }))
+                  options: hotelCities.map(c => ({ label: c.name, value: c.id }))
                 }}
               />
             </div>
-
+ 
             <div style={{ display: activeTab === "klaster" ? "block" : "none" }}>
               <CrudTab
                 title="Master Klaster Seat"
@@ -286,17 +247,17 @@ export default function MasterKonfigurasiPaketUmrohPage() {
                 ]}
               />
             </div>
-
+ 
           </div>
         )}
       </Tabs>
-
+ 
       {/* Hotel City Settings Modal */}
       <Modal
         open={settingsOpen}
         onClose={() => setSettingsOpen(false)}
         title="Pengaturan Kota Lokasi Hotel"
-        description="Pilih kota-kota dari master data yang dapat dijadikan sebagai lokasi hotel dan filter dropdown."
+        description="Tambahkan atau hapus daftar kota lokasi hotel yang tersedia."
       >
         <div className="space-y-4 mt-4">
           {/* Add City Inline Form */}
@@ -328,49 +289,35 @@ export default function MasterKonfigurasiPaketUmrohPage() {
               {addingCity ? "..." : "Tambah"}
             </Button>
           </form>
-
+ 
           <div className="max-h-[250px] overflow-y-auto border rounded-md p-3 divide-y divide-border bg-card">
-            {cities.map((c) => (
+            {hotelCities.map((c) => (
               <div key={c.id} className="flex items-center justify-between py-2">
                 <div className="flex items-center gap-3">
-                  <input
-                    type="checkbox"
-                    id={`hotel-city-${c.id}`}
-                    checked={selectedCityIds.includes(c.id)}
-                    onChange={(e) => {
-                      if (e.target.checked) {
-                        setSelectedCityIds((prev) => [...prev, c.id]);
-                      } else {
-                        setSelectedCityIds((prev) => prev.filter((id) => id !== c.id));
-                      }
-                    }}
-                    className="h-4 w-4 rounded border-input text-primary focus:ring-primary cursor-pointer"
-                  />
-                  <label
-                    htmlFor={`hotel-city-${c.id}`}
-                    className="text-sm font-medium cursor-pointer select-none"
-                  >
+                  <span className="text-sm font-medium">
                     {c.name} <span className="text-xs text-muted-foreground font-semibold font-mono">({c.code})</span>
-                  </label>
+                  </span>
                 </div>
                 <button
                   type="button"
                   onClick={() => handleDeleteCity(c.id, c.name)}
                   className="text-red-500 hover:text-red-700 hover:bg-red-50 p-1.5 rounded-md transition-colors"
-                  title="Hapus kota dari database"
+                  title="Hapus kota lokasi"
                 >
                   <Trash2 className="h-4 w-4" />
                 </button>
               </div>
             ))}
+            {hotelCities.length === 0 && (
+              <div className="text-center py-6 text-sm text-muted-foreground">
+                Belum ada kota lokasi hotel yang terdaftar.
+              </div>
+            )}
           </div>
-
+ 
           <div className="flex justify-end gap-2 pt-4 border-t">
-            <Button variant="outline" onClick={() => setSettingsOpen(false)}>
-              Batal
-            </Button>
-            <Button onClick={handleSaveSettings}>
-              Simpan Pengaturan
+            <Button onClick={() => setSettingsOpen(false)}>
+              Tutup
             </Button>
           </div>
         </div>

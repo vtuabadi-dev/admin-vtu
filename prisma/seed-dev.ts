@@ -84,6 +84,7 @@ async function main() {
   // Clean master data
   await prisma.masterAirline.deleteMany();
   await prisma.masterHotel.deleteMany();
+  await prisma.masterHotelCity.deleteMany();
   await prisma.masterCity.deleteMany();
   await prisma.masterPackageType.deleteMany();
   await prisma.masterPerlengkapan.deleteMany();
@@ -104,16 +105,21 @@ async function main() {
   ]);
   console.log(`✅ Created ${users.length} users`);
 
-  // ── 1b. Master Cities ───────────────────────────────────────
+  // ── 1b. Master Cities (Starting Points) ─────────────────────
   const cities = {
     cgk: await prisma.masterCity.create({ data: { code: "CGK", name: "Jakarta", country: "Indonesia", isActive: true } }),
     sub: await prisma.masterCity.create({ data: { code: "SUB", name: "Surabaya", country: "Indonesia", isActive: true } }),
     upg: await prisma.masterCity.create({ data: { code: "UPG", name: "Makassar", country: "Indonesia", isActive: true } }),
-    med: await prisma.masterCity.create({ data: { code: "MED", name: "Madinah", country: "Arab Saudi", isActive: true } }),
-    jed: await prisma.masterCity.create({ data: { code: "JED", name: "Jeddah", country: "Arab Saudi", isActive: true } }),
-    mek: await prisma.masterCity.create({ data: { code: "MEK", name: "Mekkah", country: "Arab Saudi", isActive: true } }),
   };
-  console.log("✅ Created master cities");
+  console.log("✅ Created master starting point cities");
+
+  // ── 1b2. Master Hotel Cities ────────────────────────────────
+  const hotelCities = {
+    med: await prisma.masterHotelCity.create({ data: { code: "MED", name: "Madinah", isActive: true } }),
+    jed: await prisma.masterHotelCity.create({ data: { code: "JED", name: "Jeddah", isActive: true } }),
+    mek: await prisma.masterHotelCity.create({ data: { code: "MEK", name: "Mekkah", isActive: true } }),
+  };
+  console.log("✅ Created master hotel cities");
 
   // ── 1c. Master Airlines ──────────────────────────────────────
   const airlines = {
@@ -127,16 +133,16 @@ async function main() {
 
   // ── 1d. Master Hotels ────────────────────────────────────────
   const hotels = {
-    swiss: await prisma.masterHotel.create({ data: { code: "SWISS-MEK", name: "Swissotel Maqam", cityId: cities.mek.id, starRating: 5, isActive: true } }),
-    hyatt: await prisma.masterHotel.create({ data: { code: "HYATT-MEK", name: "Hyatt Regency", cityId: cities.mek.id, starRating: 5, isActive: true } }),
-    midan: await prisma.masterHotel.create({ data: { code: "MIDAN-MEK", name: "Midan Hotel", cityId: cities.mek.id, starRating: 4, isActive: true } }),
-    fairmont: await prisma.masterHotel.create({ data: { code: "FAIRMONT-MEK", name: "Fairmont Clock Tower", cityId: cities.mek.id, starRating: 5, isActive: true } }),
-    hilton: await prisma.masterHotel.create({ data: { code: "HILTON-MEK", name: "Hilton Convention", cityId: cities.mek.id, starRating: 5, isActive: true } }),
-    anwar: await prisma.masterHotel.create({ data: { code: "ANWAR-MED", name: "Anwar Al Madinah", cityId: cities.med.id, starRating: 5, isActive: true } }),
-    dallah: await prisma.masterHotel.create({ data: { code: "DALLAH-MED", name: "Dallah Taibah", cityId: cities.med.id, starRating: 5, isActive: true } }),
-    eiman: await prisma.masterHotel.create({ data: { code: "EIMAN-MED", name: "Al Eiman Royal", cityId: cities.med.id, starRating: 5, isActive: true } }),
-    oberoi: await prisma.masterHotel.create({ data: { code: "OBEROI-MED", name: "Oberoi Madinah", cityId: cities.med.id, starRating: 5, isActive: true } }),
-    pullman: await prisma.masterHotel.create({ data: { code: "PULLMAN-MED", name: "Pullman Zamzam", cityId: cities.med.id, starRating: 5, isActive: true } }),
+    swiss: await prisma.masterHotel.create({ data: { code: "SWISS-MEK", name: "Swissotel Maqam", cityId: hotelCities.mek.id, starRating: 5, isActive: true } }),
+    hyatt: await prisma.masterHotel.create({ data: { code: "HYATT-MEK", name: "Hyatt Regency", cityId: hotelCities.mek.id, starRating: 5, isActive: true } }),
+    midan: await prisma.masterHotel.create({ data: { code: "MIDAN-MEK", name: "Midan Hotel", cityId: hotelCities.mek.id, starRating: 4, isActive: true } }),
+    fairmont: await prisma.masterHotel.create({ data: { code: "FAIRMONT-MEK", name: "Fairmont Clock Tower", cityId: hotelCities.mek.id, starRating: 5, isActive: true } }),
+    hilton: await prisma.masterHotel.create({ data: { code: "HILTON-MEK", name: "Hilton Convention", cityId: hotelCities.mek.id, starRating: 5, isActive: true } }),
+    anwar: await prisma.masterHotel.create({ data: { code: "ANWAR-MED", name: "Anwar Al Madinah", cityId: hotelCities.med.id, starRating: 5, isActive: true } }),
+    dallah: await prisma.masterHotel.create({ data: { code: "DALLAH-MED", name: "Dallah Taibah", cityId: hotelCities.med.id, starRating: 5, isActive: true } }),
+    eiman: await prisma.masterHotel.create({ data: { code: "EIMAN-MED", name: "Al Eiman Royal", cityId: hotelCities.med.id, starRating: 5, isActive: true } }),
+    oberoi: await prisma.masterHotel.create({ data: { code: "OBEROI-MED", name: "Oberoi Madinah", cityId: hotelCities.med.id, starRating: 5, isActive: true } }),
+    pullman: await prisma.masterHotel.create({ data: { code: "PULLMAN-MED", name: "Pullman Zamzam", cityId: hotelCities.med.id, starRating: 5, isActive: true } }),
   };
   console.log("✅ Created master hotels");
 
