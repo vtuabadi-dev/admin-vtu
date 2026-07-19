@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { Button } from "@/shared/components/ui/Button";
 import { Modal } from "@/shared/components/ui/Modal";
 import { Input } from "@/shared/components/ui/Input";
-import { Trash2, Edit3, Settings } from "lucide-react";
+import { Trash2, Edit3, Settings, Check } from "lucide-react";
 
 interface FieldConfig {
   name: string;
@@ -116,6 +116,33 @@ export function CrudTab<T extends { id: string; status?: string; [key: string]: 
       } else {
         setData((prev) => prev.filter((item) => item.id !== id));
       }
+    }
+  };
+
+  const handleReactivate = async (id: string) => {
+    if (apiEndpoint) {
+      try {
+        setLoading(true);
+        const res = await fetch(`${apiEndpoint}/${id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status: "Aktif" }),
+        });
+        const resJson = await res.json();
+        if (resJson.success) {
+          await fetchData();
+        } else {
+          alert(`Error: ${resJson.message}`);
+        }
+      } catch (e) {
+        console.error("Failed to reactivate", e);
+      } finally {
+        setLoading(false);
+      }
+    } else {
+      setData((prev) =>
+        prev.map((item) => (item.id === id ? { ...item, status: "Aktif" } : item))
+      );
     }
   };
 
@@ -255,17 +282,31 @@ export function CrudTab<T extends { id: string; status?: string; [key: string]: 
                             <Edit3 className="h-3 w-3" />
                             Edit
                           </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleDelete(item.id)}
-                            title="Hapus"
-                            className="text-red-600 border-red-200 hover:bg-red-50 flex items-center gap-1"
-                            disabled={loading}
-                          >
-                            <Trash2 className="h-3 w-3" />
-                            Nonaktifkan
-                          </Button>
+                          {item.status === "Nonaktif" ? (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleReactivate(item.id)}
+                              title="Aktifkan"
+                              className="text-green-600 border-green-200 hover:bg-green-50 flex items-center gap-1"
+                              disabled={loading}
+                            >
+                              <Check className="h-3 w-3" />
+                              Aktifkan
+                            </Button>
+                          ) : (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleDelete(item.id)}
+                              title="Hapus"
+                              className="text-red-600 border-red-200 hover:bg-red-50 flex items-center gap-1"
+                              disabled={loading}
+                            >
+                              <Trash2 className="h-3 w-3" />
+                              Nonaktifkan
+                            </Button>
+                          )}
                         </td>
                       );
                     }
