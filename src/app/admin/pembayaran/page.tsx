@@ -88,7 +88,7 @@ export default function PembayaranMonitoringPage() {
       );
       return {
         ...s,
-        namaPaket: groupKbr?.namaPaket ?? "-",
+        namaPaket: groupKbr?.paketUmroh?.namaPaket ?? "-",
         tanggalBerangkat: groupKbr?.tanggalBerangkat ?? "",
       };
     });
@@ -97,7 +97,7 @@ export default function PembayaranMonitoringPage() {
   // Paket filter options
   const paketOptions = useMemo(() => {
     const unique = new Map<string, string>();
-    for (const k of kbrList) unique.set(k.id, k.namaPaket);
+    for (const k of kbrList) unique.set(k.id, k.paketUmroh?.namaPaket || "-");
     return [
       { value: "semua", label: "Semua Paket" },
       ...Array.from(unique.entries()).map(([id, nama]) => ({ value: id, label: nama })),

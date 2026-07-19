@@ -33,6 +33,8 @@ interface TableProps<T> extends VariantProps<typeof tableVariants> {
   emptyMessage?: string;
 }
 
+import { EmptyState } from "@/shared/components/EmptyState";
+
 export function Table<T>({
   columns,
   data,
@@ -44,9 +46,7 @@ export function Table<T>({
 }: TableProps<T>) {
   if (data.length === 0) {
     return (
-      <div className="flex h-32 items-center justify-center text-sm text-muted-foreground">
-        {emptyMessage}
-      </div>
+      <EmptyState title={emptyMessage} className="my-8" />
     );
   }
 

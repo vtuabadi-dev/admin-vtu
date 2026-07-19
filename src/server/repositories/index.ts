@@ -9,3 +9,4 @@ export { dokumenRepo } from "./dokumen.repository";
 export { auditRepo } from "./audit.repository";
 export { notificationRepo } from "./notification.repository";
 export { registrationRepo } from "./registration.repository";
+export { paketUmrohRepo } from "./paket-umroh.repository";

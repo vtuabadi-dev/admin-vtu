@@ -18,7 +18,7 @@ export function enrichManifestWithPackage(
   return {
     ...manifest,
     packageCode: kbr?.kode ?? "-",
-    packageName: kbr?.namaPaket ?? "-",
+    packageName: kbr?.paketUmroh?.namaPaket ?? "-",
   };
 }
 

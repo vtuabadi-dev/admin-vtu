@@ -18,7 +18,7 @@ import {
   getKeberangkatanList,
   getJamaahList,
   getGroupList,
-} from "@/services/mock/handlers";
+} from "@/server/actions/api";
 import type { Keberangkatan, Jamaah, RegistrationGroup } from "@/shared/types";
 import { cn } from "@/shared/lib/utils";
 
@@ -162,7 +162,7 @@ export default function BulkOperationsPage() {
                 placeholder="-- Pilih paket keberangkatan --"
                 options={keberangkatanList.map((k) => ({
                   value: k.id,
-                  label: `${k.kode} — ${k.namaPaket}`,
+                  label: `${k.kode} — ${k.paketUmroh?.namaPaket || "-"}`,
                 }))}
               />
             </div>
@@ -197,7 +197,7 @@ export default function BulkOperationsPage() {
         <div className="flex items-center gap-3 p-4 rounded-lg border bg-muted/30">
           <Users className="h-5 w-5 text-muted-foreground" />
           <div>
-            <p className="text-sm font-semibold">{selectedKbr.namaPaket}</p>
+            <p className="text-sm font-semibold">{selectedKbr.paketUmroh?.namaPaket || "-"}</p>
             <p className="text-xs text-muted-foreground">
               {selectedKbr.kode} · {selectedKbr.tanggalBerangkat} · {filteredJamaah.length} jamaah
             </p>
@@ -346,7 +346,7 @@ export default function BulkOperationsPage() {
           <div className="rounded-lg border p-4 space-y-2 bg-muted/30">
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Paket:</span>
-              <span className="font-medium">{selectedKbr?.namaPaket}</span>
+              <span className="font-medium">{selectedKbr?.paketUmroh?.namaPaket || "-"}</span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Aksi:</span>

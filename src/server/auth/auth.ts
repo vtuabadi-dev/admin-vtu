@@ -50,10 +50,11 @@ const MOCK_CREDENTIALS: Record<string, { password: string; role: OperationalRole
   "jamaah@vtu.id": { password: "admin123", role: "jamaah", name: "Jamaah Demo" },
 };
 
-const useSecureCookies = process.env.NEXTAUTH_URL?.startsWith("https://") ?? false;
+
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   secret: getAuthSecret(),
+  trustHost: true,
   providers: [
     Credentials({
       name: "credentials",
@@ -136,16 +137,5 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   },
   jwt: {
     maxAge: 8 * 60 * 60,
-  },
-  cookies: {
-    sessionToken: {
-      name: `${useSecureCookies ? "__Secure-" : ""}next-auth.session-token`,
-      options: {
-        httpOnly: true,
-        sameSite: "lax",
-        path: "/",
-        secure: useSecureCookies,
-      },
-    },
   },
 });

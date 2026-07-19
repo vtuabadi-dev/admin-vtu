@@ -38,7 +38,7 @@ export type StatusJamaah =
 
 export type JenisKelamin = "L" | "P";
 
-export type StatusKeberangkatan = "scheduled" | "preparing" | "ready" | "departed" | "completed" | "cancelled";
+export type StatusKeberangkatan = "AVAILABLE" | "FULL_SEAT" | "DEPARTED" | "COMPLETED" | "ARCHIVED" | "CANCELLED" | "scheduled" | "preparing" | "ready" | "departed" | "completed" | "cancelled";
 
 export type TipeKamar = "single" | "double" | "triple" | "quad";
 
@@ -305,25 +305,55 @@ export interface GroupPaymentSummary {
 // KEBERANGKATAN & MANIFEST (unchanged core)
 // ============================================================
 
+export interface PaketUmroh {
+  id: string;
+  namaPaket: string;
+  deskripsi: string;
+  hargaBase: number;
+  durasiHari: number;
+  hotelMekkahOptions: string[];
+  hotelMadinahOptions: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreatePackageInput {
+  namaPaket: string;
+  deskripsi: string;
+  hargaBase: number;
+  durasiHari: number;
+  hotelMekkahOptions?: string[];
+  hotelMadinahOptions?: string[];
+}
+
+export type UpdatePackageInput = Partial<CreatePackageInput>;
+
 /** TODO: Multi-tenant — add tenantId: string */
 export interface Keberangkatan {
   id: string;
   kode: string;
-  namaPaket: string;
-  hargaPaket: number;
+  paketUmrohId: string;
+  paketUmroh?: PaketUmroh;
   tanggalBerangkat: string;
   tanggalPulang: string;
-  maskapai: string;
   nomorPenerbangan: string;
-  /** Default hotel (legacy) */
-  hotelMekkah: string;
-  hotelMadinah: string;
-  /** Available hotel combinations — jamaah pick one pair */
-  hotelOptions: { hotelMekkah: string; hotelMadinah: string }[];
   status: StatusKeberangkatan;
-  kuota: number;
   terisi: number;
   jamaahIds: string[];
+  maxSeat?: number;
+  targetMaterialisasi?: number;
+  maskapaiId?: string;
+  hotelMekkahId?: string;
+  hotelMadinahId?: string;
+  startingPointId?: string;
+  packageTypeId?: string;
+  // Legacy Prisma fields needed before DB Drop
+  namaPaket?: string;
+  hargaPaket?: number;
+  maskapai?: string;
+  hotelMekkah?: string;
+  hotelMadinah?: string;
+  kuota?: number;
 }
 
 /** TODO: Multi-tenant — add tenantId: string */

@@ -80,3 +80,6 @@ prisma/dev.db-journal
 *.rar
 
 .vercel
+
+.vercel
+artifacts/

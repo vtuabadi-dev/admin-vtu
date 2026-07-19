@@ -17,7 +17,7 @@ export function enrichSummariesWithPackage(
     );
     return {
       ...s,
-      packageName: groupKbr?.namaPaket ?? "-",
+      packageName: groupKbr?.paketUmroh?.namaPaket ?? "-",
       packageCode: groupKbr?.kode ?? "-",
     };
   });
@@ -72,7 +72,7 @@ export function getUnpaidSummaries(
 
 export function buildPaketOptions(kbrList: Keberangkatan[]) {
   const unique = new Map<string, string>();
-  for (const k of kbrList) unique.set(k.id, k.namaPaket);
+  for (const k of kbrList) unique.set(k.id, k.paketUmroh?.namaPaket ?? k.kode);
   return [
     { value: "semua", label: "Semua Paket" },
     ...Array.from(unique.entries()).map(([id, nama]) => ({ value: id, label: nama })),

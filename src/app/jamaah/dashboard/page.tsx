@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getKeberangkatanList } from "@/services/mock/handlers";
+import { getKeberangkatanList } from "@/server/actions/api";
 import {
   Check,
   Upload,
@@ -145,7 +145,7 @@ export default function JamaahDashboardPage() {
           setDokumen((j as any).dokumen ?? []);
 
           // Find the jamaah's keberangkatan
-          const kbr = kbrs.find((k) => k.jamaahIds?.includes(j.id)) ?? null;
+          const kbr = kbrs.find((k: any) => k.jamaahIds?.includes(j.id)) ?? null;
           setKeberangkatan(kbr);
         }
 
@@ -266,14 +266,14 @@ export default function JamaahDashboardPage() {
               </p>
               {keberangkatan ? (
                 <div className="space-y-1">
-                  <p className="text-sm font-semibold leading-tight">{keberangkatan.namaPaket}</p>
+                  <p className="text-sm font-semibold leading-tight">{keberangkatan.paketUmroh?.namaPaket || "-"}</p>
                   <div className="flex items-center gap-1 text-xs text-muted-foreground">
                     <Calendar className="h-3 w-3" />
                     <span>{formatDate(keberangkatan.tanggalBerangkat)}</span>
                   </div>
                   <div className="flex items-center gap-1 text-xs text-muted-foreground">
                     <Building className="h-3 w-3" />
-                    <span>{keberangkatan.maskapai}</span>
+                    <span>{keberangkatan.maskapaiId || "-"}</span>
                   </div>
                 </div>
               ) : (

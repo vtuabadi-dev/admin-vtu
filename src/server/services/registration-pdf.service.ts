@@ -129,17 +129,17 @@ export async function generateRegistrationPdf(data: PdfData): Promise<Buffer> {
       // ── SECTION 2: PAKET ──────────────────────────────────
       { text: "2. Paket Keberangkatan", style: "sectionTitle" },
       buildInfoTable(
-        packageInfo
+      packageInfo
           ? [
-              ["Nama Paket", packageInfo.namaPaket],
+              ["Nama Paket", packageInfo.paketUmroh?.namaPaket || "-"],
               ["Kode Paket", packageInfo.kode],
-              ["Harga per Orang", formatCurrency(packageInfo.hargaPaket)],
-              ["Maskapai", packageInfo.maskapai],
+              ["Harga per Orang", formatCurrency(packageInfo.paketUmroh?.hargaBase || 0)],
+              ["Maskapai", packageInfo.maskapaiId || "-"], // Placeholder, would need maskapai relation
               ["No. Penerbangan", packageInfo.nomorPenerbangan],
               ["Tanggal Berangkat", formatShortDate(packageInfo.tanggalBerangkat as any)],
               ["Tanggal Pulang", formatShortDate(packageInfo.tanggalPulang as any)],
-              ["Hotel Mekkah", packageInfo.hotelMekkah],
-              ["Hotel Madinah", packageInfo.hotelMadinah],
+              ["Hotel Mekkah", packageInfo.paketUmroh?.hotelMekkahOptions?.[0] || "-"],
+              ["Hotel Madinah", packageInfo.paketUmroh?.hotelMadinahOptions?.[0] || "-"],
             ]
           : [["Status", "Paket tidak ditemukan"]],
       ),

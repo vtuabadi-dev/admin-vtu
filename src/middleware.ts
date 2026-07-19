@@ -1,5 +1,5 @@
-import { auth } from "@/server/auth";
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import { getToken } from "next-auth/jwt";
 import { checkRateLimit, rateLimitKey, getRateLimitConfig } from "@/server/lib/rate-limit";
 
 const PUBLIC_PATHS = ["/login", "/register", "/track", "/reset-password", "/api/auth", "/api/health", "/api/track", "/_next", "/api/register", "/api/keberangkatan", "/api/migrate-terms", "/api/operational-documents"];
@@ -40,7 +40,7 @@ function addSecurityHeaders(response: NextResponse): NextResponse {
 
 const STATE_CHANGING_METHODS = ["POST", "PUT", "PATCH", "DELETE"];
 
-function validateCsrf(req: Request): boolean {
+function validateCsrf(req: NextRequest): boolean {
   // Skip CSRF check for non-mutating methods
   if (!STATE_CHANGING_METHODS.includes(req.method)) return true;
 
@@ -70,9 +70,8 @@ function validateCsrf(req: Request): boolean {
   return false;
 }
 
-export default auth((req) => {
+export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
-  const session = req.auth;
 
   // Rate limit auth POST (login) attempts
   if (pathname === "/api/auth/callback/credentials" && req.method === "POST") {
@@ -85,8 +84,8 @@ export default auth((req) => {
     }
   }
 
-  // CSRF validation for state-changing API requests
-  if (pathname.startsWith("/api/") && !validateCsrf(req)) {
+  // CSRF validation for state-changing API requests (skip /api/auth — NextAuth handles its own CSRF)
+  if (pathname.startsWith("/api/") && !pathname.startsWith("/api/auth") && !validateCsrf(req)) {
     return addSecurityHeaders(
       NextResponse.json({ success: false, message: "Invalid origin" }, { status: 403 })
     );
@@ -97,17 +96,25 @@ export default auth((req) => {
     return addSecurityHeaders(NextResponse.next());
   }
 
+  // Read JWT token directly (more reliable than auth() wrapper in Edge Runtime)
+  const isSecure = req.nextUrl.protocol === "https:" || !!process.env.VERCEL_URL;
+  const token = await getToken({
+    req,
+    secret: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET || "",
+    secureCookie: isSecure,
+  });
+
   // Unauthenticated → redirect to login
-  if (!session?.user) {
+  if (!token) {
     const loginUrl = new URL("/login", req.url);
     loginUrl.searchParams.set("callbackUrl", pathname);
     return addSecurityHeaders(NextResponse.redirect(loginUrl));
   }
 
-  const role = session.user.role;
+  const role = token.role as string | undefined;
 
   // Enforce mustChangePassword redirect for all roles
-  const mustChangePassword = session.user.mustChangePassword as boolean | undefined;
+  const mustChangePassword = token.mustChangePassword as boolean | undefined;
   if (mustChangePassword && !pathname.startsWith("/reset-password") && !pathname.startsWith("/api/")) {
     return addSecurityHeaders(NextResponse.redirect(new URL("/reset-password", req.url)));
   }
@@ -132,7 +139,7 @@ export default auth((req) => {
   }
 
   return addSecurityHeaders(NextResponse.next());
-});
+}
 
 export const config = {
   matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],

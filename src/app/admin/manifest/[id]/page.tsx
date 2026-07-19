@@ -27,7 +27,7 @@ import {
   getKeberangkatanById,
   getJamaahList,
   getGroupList,
-} from "@/services/mock/handlers";
+} from "@/server/actions/api";
 import {
   validateManifestFinalization,
   type ManifestValidationResult,
@@ -66,9 +66,9 @@ export default function ManifestDetailPage() {
 
         if (kbr) {
           const pkgGroupIds = new Set(
-            allGroups.filter((g) => g.paketKeberangkatanId === kbr.id).map((g) => g.id)
+            allGroups.filter((g: any) => g.paketKeberangkatanId === kbr.id).map((g: any) => g.id)
           );
-          const pkgJamaah = allJamaah.filter((j) => pkgGroupIds.has(j.groupId));
+          const pkgJamaah = allJamaah.filter((j: any) => pkgGroupIds.has(j.groupId));
           setValidation(validateManifestFinalization(m, pkgJamaah));
         }
       } else {
@@ -160,7 +160,7 @@ export default function ManifestDetailPage() {
             </div>
             <div>
               <span className="text-muted-foreground">Paket:</span>
-              <p className="font-medium">{keberangkatan?.namaPaket ?? "-"}</p>
+              <p className="font-medium">{keberangkatan?.paketUmroh?.namaPaket ?? "-"}</p>
             </div>
             <div>
               <span className="text-muted-foreground">Tanggal Berangkat:</span>
@@ -170,7 +170,7 @@ export default function ManifestDetailPage() {
             </div>
             <div>
               <span className="text-muted-foreground">Maskapai:</span>
-              <p className="font-medium">{keberangkatan?.maskapai ?? "-"}</p>
+              <p className="font-medium">{keberangkatan?.maskapaiId ?? "-"}</p>
             </div>
           </div>
         </CardContent>

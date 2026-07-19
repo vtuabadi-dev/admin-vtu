@@ -16,7 +16,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/components/ui/Card";
 import { Button } from "@/shared/components/ui/Button";
 import { Select } from "@/shared/components/ui/Select";
-import { getKeberangkatanList, getGroupList, getExportData } from "@/services/mock/handlers";
+import { getKeberangkatanList, getGroupList, getExportData } from "@/server/actions/api";
 import type { Keberangkatan, RegistrationGroup, ExportDataType, ExportFormat } from "@/shared/types";
 import { generateCSVContent, downloadAsCSV } from "@/shared/lib/export-utils";
 import { cn } from "@/shared/lib/utils";
@@ -272,7 +272,7 @@ export default function ExportCenterPage() {
                   { value: "", label: "Semua Paket" },
                   ...keberangkatanList.map((k) => ({
                     value: k.id,
-                    label: `${k.kode} — ${k.namaPaket}`,
+                    label: `${k.kode} — ${k.paketUmroh?.namaPaket || "-"}`,
                   })),
                 ]}
                 value={filterKbrId}

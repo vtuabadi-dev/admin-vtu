@@ -18,8 +18,8 @@ export interface UseNotificationsReturn {
 export function useNotifications(): UseNotificationsReturn {
   const notifications = useNotificationStore((s) => s.notifications);
   const isLoaded = useNotificationStore((s) => s.isLoaded);
-  const loadMockNotifications = useNotificationStore(
-    (s) => s.loadMockNotifications,
+  const fetchNotifications = useNotificationStore(
+    (s) => s.fetchNotifications,
   );
   const markAsRead = useNotificationStore((s) => s.markAsRead);
   const markAllAsRead = useNotificationStore((s) => s.markAllAsRead);
@@ -28,12 +28,12 @@ export function useNotifications(): UseNotificationsReturn {
     (s) => s.dismissNotification,
   );
 
-  // Auto-load mock notifications on first access
+  // Auto-load notifications on first access
   useEffect(() => {
     if (!isLoaded) {
-      loadMockNotifications();
+      fetchNotifications();
     }
-  }, [isLoaded, loadMockNotifications]);
+  }, [isLoaded, fetchNotifications]);
 
   const unreadCount = notifications.filter((n) => !n.read).length;
 
@@ -41,7 +41,7 @@ export function useNotifications(): UseNotificationsReturn {
     notifications,
     unreadCount,
     isLoading: !isLoaded,
-    loadNotifications: loadMockNotifications,
+    loadNotifications: fetchNotifications,
     markAsRead,
     markAllAsRead,
     addNotification,

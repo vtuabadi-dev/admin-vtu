@@ -12,7 +12,8 @@ import {
 import { StatusBadge } from "@/shared/components/ui/Badge";
 import { Button } from "@/shared/components/ui/Button";
 import { Input } from "@/shared/components/ui/Input";
-import { getKeberangkatanList } from "@/services/mock/handlers";
+import { ErrorState } from "@/shared/components/ui/ErrorState";
+import { getKeberangkatanList, deleteKeberangkatan } from "@/server/actions/api";
 import type { Keberangkatan } from "@/shared/types";
 import { formatDate, cn } from "@/shared/lib/utils";
 
@@ -26,23 +27,37 @@ export default function KeberangkatanListPage() {
   const router = useRouter();
   const [keberangkatan, setKeberangkatan] = useState<Keberangkatan[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
   const [selectedMonth, setSelectedMonth] = useState<number | null>(
     new Date().getMonth() + 1
   );
   const [searchQuery, setSearchQuery] = useState("");
 
-  useEffect(() => {
-    async function load() {
+  const load = async () => {
+    try {
+      setLoading(true);
+      setError(null);
       const data = await getKeberangkatanList();
       setKeberangkatan(data);
+    } catch (err: any) {
+      setError(err instanceof Error ? err : new Error("Database Connection Error"));
+    } finally {
       setLoading(false);
     }
+  };
+
+  useEffect(() => {
     load();
   }, []);
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (confirm("Apakah Anda yakin ingin menghapus paket ini?")) {
-      setKeberangkatan((prev) => prev.filter((k) => k.id !== id));
+      try {
+        await deleteKeberangkatan(id);
+        setKeberangkatan((prev) => prev.filter((k) => k.id !== id));
+      } catch (error) {
+        alert("Gagal menghapus paket: " + (error as Error).message);
+      }
     }
   };
 
@@ -65,16 +80,11 @@ export default function KeberangkatanListPage() {
       const q = searchQuery.toLowerCase().trim();
       result = result.filter(
         (k) =>
-          k.namaPaket.toLowerCase().includes(q) ||
+          (k.paketUmroh?.namaPaket || "").toLowerCase().includes(q) ||
           k.kode.toLowerCase().includes(q) ||
-          k.maskapai.toLowerCase().includes(q) ||
-          k.hotelMekkah.toLowerCase().includes(q) ||
-          k.hotelMadinah.toLowerCase().includes(q) ||
-          k.hotelOptions.some(
-            (opt) =>
-              opt.hotelMekkah.toLowerCase().includes(q) ||
-              opt.hotelMadinah.toLowerCase().includes(q)
-          )
+          (k.maskapaiId && k.maskapaiId.toLowerCase().includes(q)) ||
+          (k.hotelMekkahId && k.hotelMekkahId.toLowerCase().includes(q)) ||
+          (k.hotelMadinahId && k.hotelMadinahId.toLowerCase().includes(q))
       );
     }
     return result;
@@ -84,6 +94,14 @@ export default function KeberangkatanListPage() {
     return (
       <div className="flex items-center justify-center h-64">
         <p className="text-muted-foreground">Memuat data keberangkatan...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex h-64 items-center justify-center">
+        <ErrorState onRetry={load} message={error.message} />
       </div>
     );
   }
@@ -135,7 +153,7 @@ export default function KeberangkatanListPage() {
           </CardHeader>
           <CardContent>
             <p className="text-2xl font-bold">
-              {keberangkatan.reduce((s, k) => s + k.kuota, 0)}
+              {keberangkatan.reduce((s, k) => s + (k.maxSeat || 0), 0)}
             </p>
           </CardContent>
         </Card>
@@ -188,7 +206,8 @@ export default function KeberangkatanListPage() {
       ) : (
         <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
           {filteredKeberangkatan.map((k) => {
-          const persen = k.kuota > 0 ? Math.round((k.terisi / k.kuota) * 100) : 0;
+          const maxSeat = k.maxSeat || 0;
+          const persen = maxSeat > 0 ? Math.round((k.terisi / maxSeat) * 100) : 0;
           const progressColor =
             persen >= 90
               ? "bg-success"
@@ -201,7 +220,7 @@ export default function KeberangkatanListPage() {
               <CardHeader className="pb-3">
                 <div className="flex items-start justify-between">
                   <div>
-                    <CardTitle className="text-base">{k.namaPaket}</CardTitle>
+                    <CardTitle className="text-base">{k.paketUmroh?.namaPaket || "-"}</CardTitle>
                     <p className="text-xs text-muted-foreground mt-0.5 font-mono">
                       {k.kode}
                     </p>
@@ -253,7 +272,7 @@ export default function KeberangkatanListPage() {
                   <div>
                     <p className="text-xs text-muted-foreground">Maskapai</p>
                     <p className="font-medium">
-                      {k.maskapai}{" "}
+                      {k.maskapaiId || "-"}{" "}
                       <span className="text-muted-foreground font-normal">
                         ({k.nomorPenerbangan})
                       </span>
@@ -266,17 +285,14 @@ export default function KeberangkatanListPage() {
                   <Hotel className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
                   <div className="flex-1 min-w-0">
                     <p className="text-xs text-muted-foreground mb-1">
-                      Hotel ({k.hotelOptions.length} kombinasi)
+                      Hotel
                     </p>
                     <div className="flex flex-wrap gap-1">
-                      {k.hotelOptions.map((opt, idx) => (
                         <span
-                          key={idx}
                           className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium"
                         >
-                          {opt.hotelMekkah} &mdash; {opt.hotelMadinah}
+                          {k.hotelMekkahId || "-"} &mdash; {k.hotelMadinahId || "-"}
                         </span>
-                      ))}
                     </div>
                   </div>
                 </div>
@@ -289,7 +305,7 @@ export default function KeberangkatanListPage() {
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-muted-foreground">Kuota Terisi</span>
                     <span className="font-semibold">
-                      {k.terisi}/{k.kuota} ({persen}%)
+                      {k.terisi}/{maxSeat} ({persen}%)
                     </span>
                   </div>
                   <div className="h-2.5 w-full rounded-full bg-muted">

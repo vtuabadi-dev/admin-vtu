@@ -58,13 +58,13 @@ const TYPE_COLOR: Record<NotificationType, string> = {
 
 export default function NotifikasiPage() {
   const router = useRouter();
-  const { notifications, isLoaded, loadMockNotifications, markAsRead, markAllAsRead, dismissNotification } = useNotificationStore();
+  const { notifications, isLoaded, fetchNotifications, markAsRead, markAllAsRead, dismissNotification } = useNotificationStore();
   const [categoryFilter, setCategoryFilter] = useState<NotificationCategory | "all">("all");
   const [typeFilter, setTypeFilter] = useState<NotificationType | "all">("all");
   const [readFilter, setReadFilter] = useState<"all" | "unread" | "read">("all");
   const [searchQuery, setSearchQuery] = useState("");
 
-  useEffect(() => { loadMockNotifications(); }, [loadMockNotifications]);
+  useEffect(() => { fetchNotifications(); }, [fetchNotifications]);
 
   const filtered = useMemo(() => {
     let list = notifications;

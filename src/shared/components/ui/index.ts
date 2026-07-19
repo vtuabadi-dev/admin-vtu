@@ -7,3 +7,4 @@ export { Modal } from "./Modal";
 export { Select } from "./Select";
 export { Tabs } from "./Tabs";
 export { StatCard } from "./StatCard";
+export { AccordionSection } from "./Accordion";

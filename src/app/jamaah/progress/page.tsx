@@ -412,7 +412,7 @@ export default function ProgressPage() {
                     <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                     <div>
                       <p className="text-xs text-muted-foreground">Paket</p>
-                      <p className="text-sm font-medium">{keberangkatan.namaPaket}</p>
+                      <p className="text-sm font-medium">{keberangkatan.paketUmroh?.namaPaket || "-"}</p>
                     </div>
                   </div>
                   <div className="flex items-start gap-2">
@@ -433,21 +433,21 @@ export default function ProgressPage() {
                     <Building className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                     <div>
                       <p className="text-xs text-muted-foreground">Maskapai</p>
-                      <p className="text-sm">{keberangkatan.maskapai} ({keberangkatan.nomorPenerbangan})</p>
+                      <p className="text-sm">{keberangkatan.maskapaiId || "Menunggu Informasi"} ({keberangkatan.nomorPenerbangan})</p>
                     </div>
                   </div>
                   <div className="flex items-start gap-2">
                     <Hotel className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                     <div>
                       <p className="text-xs text-muted-foreground">Hotel Mekkah</p>
-                      <p className="text-sm">{keberangkatan.hotelMekkah}</p>
+                      <p className="text-sm">{keberangkatan.paketUmroh?.hotelMekkahOptions?.[0] || "-"}</p>
                     </div>
                   </div>
                   <div className="flex items-start gap-2">
                     <Hotel className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                     <div>
                       <p className="text-xs text-muted-foreground">Hotel Madinah</p>
-                      <p className="text-sm">{keberangkatan.hotelMadinah}</p>
+                      <p className="text-sm">{keberangkatan.paketUmroh?.hotelMadinahOptions?.[0] || "-"}</p>
                     </div>
                   </div>
                 </div>

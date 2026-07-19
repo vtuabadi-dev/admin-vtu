@@ -11,6 +11,7 @@ import {
   CreditCard,
   FileCheck,
   Receipt,
+  Database,
   ChevronLeft,
   ChevronRight,
   ChevronDown,
@@ -27,6 +28,7 @@ import { useAdminStore } from "@/stores/admin-store";
 import { useSession } from "@/shared/hooks/use-session";
 import { isSidebarItemVisible, isSuperAdmin } from "@/shared/lib/rbac-utils";
 import type { OperationalRole } from "@/shared/types";
+
 
 interface NavChild {
   label: string;
@@ -53,17 +55,29 @@ const adminNav: NavSection[] = [
     ],
   },
   {
+    title: "MASTER DATA",
+    items: [
+      {
+        label: "Master Data",
+        icon: Database,
+        children: [
+          {
+            label: "Konfigurasi Paket Umroh",
+            href: "/admin/master-data/konfigurasi-paket-umroh",
+          },
+        ],
+      },
+    ],
+  },
+  {
     title: "PAKET UMROH",
     items: [
       {
         label: "Paket Umroh",
         icon: Plane,
         children: [
-          { label: "Semua Paket", href: "/admin/keberangkatan" },
-          { label: "Paket Aktif", href: "/admin/keberangkatan?status=active" },
-          { label: "Draft Paket", href: "/admin/keberangkatan?status=draft" },
-          { label: "Import Flyer OCR", href: "/admin/ocr-package" },
-          { label: "Arsip Paket", href: "/admin/keberangkatan?status=archived" },
+          { label: "Generate Paket", href: "/admin/paket-umroh/generate" },
+          { label: "Paket Aktif", href: "/admin/keberangkatan" },
         ],
       },
     ],
@@ -247,7 +261,7 @@ export function Sidebar({ role }: SidebarProps) {
             {/* Section title removed for a cleaner look */}
             <ul className="space-y-0.5">
               {section.items.map((item) => {
-                const hasChildren = !!item.children?.length;
+                const hasChildren = item.children !== undefined;
                 const active = isParentActive(item);
                 const isExpanded = expanded.has(item.label);
 

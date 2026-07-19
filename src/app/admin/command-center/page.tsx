@@ -27,7 +27,7 @@ import {
   getGroupList,
   getManifestList,
   getInvoiceList,
-} from "@/services/mock/handlers";
+} from "@/server/actions/api";
 import type {
   Keberangkatan,
   AutoDeadline,
@@ -90,7 +90,7 @@ export default function CommandCenterPage() {
       });
 
       const pkgWithScores: PackageWithScore[] = await Promise.all(
-        kbrList.map(async (kbr) => {
+        kbrList.map(async (kbr: any) => {
           const [score, deadlines] = await Promise.all([
             getPackageReadinessScore(kbr.id),
             getAutoDeadlines(kbr.id),
@@ -151,7 +151,7 @@ export default function CommandCenterPage() {
       p.deadlines.forEach((d) => {
         const dd = new Date(d.deadlineDate);
         if (dd >= now && dd <= cutoff) {
-          all.push({ pkgName: p.kbr.namaPaket, deadline: d, kbrId: p.kbr.id });
+          all.push({ pkgName: p.kbr.paketUmroh?.namaPaket || "-", deadline: d, kbrId: p.kbr.id });
         }
       });
     });
@@ -441,9 +441,9 @@ export default function CommandCenterPage() {
                         {score?.overallScore ?? "?"}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">{kbr.namaPaket}</p>
+                        <p className="text-sm font-medium truncate">{kbr.paketUmroh?.namaPaket || "-"}</p>
                         <p className="text-xs text-muted-foreground">
-                          {kbr.terisi}/{kbr.kuota} · {kbr.tanggalBerangkat}
+                          {kbr.terisi}/{kbr.maxSeat} · {new Date(kbr.tanggalBerangkat).toLocaleDateString()}
                         </p>
                       </div>
                       <ArrowRight className="h-4 w-4 text-muted-foreground shrink-0" />
@@ -510,7 +510,7 @@ export default function CommandCenterPage() {
                         onClick={() => router.push(`/admin/keberangkatan/${kbr.id}`)}
                       >
                         <td className="p-3 align-middle">
-                          <p className="text-sm font-medium">{kbr.namaPaket}</p>
+                          <p className="text-sm font-medium">{kbr.paketUmroh?.namaPaket || "-"}</p>
                           <p className="text-xs text-muted-foreground">{kbr.kode}</p>
                         </td>
                         <td className="p-3 align-middle text-center">

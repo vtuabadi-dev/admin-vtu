@@ -187,22 +187,18 @@ export function buildPackageDraft(
 
   return {
     kode,
-    namaPaket: result.title,
-    hargaPaket: 0, // Price extracted separately; default 0 until manual entry
+    paketUmrohId: "", // Will be assigned later
     tanggalBerangkat,
     tanggalPulang,
-    maskapai: result.airline || "TBD",
     nomorPenerbangan: generateFlightNumber(result.airline),
-    hotelMekkah: result.hotelMekkah || "TBD",
-    hotelMadinah: result.hotelMadinah || "TBD",
-    hotelOptions: [
-      {
-        hotelMekkah: result.hotelMekkah || "TBD",
-        hotelMadinah: result.hotelMadinah || "TBD",
-      },
-    ],
     status: "preparing",
-    kuota,
+    maxSeat: kuota,
     terisi: 0,
+    targetMaterialisasi: undefined,
+    maskapaiId: undefined,
+    hotelMekkahId: undefined,
+    hotelMadinahId: undefined,
+    startingPointId: undefined,
+    packageTypeId: undefined,
   };
 }

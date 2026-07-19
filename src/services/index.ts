@@ -8,4 +8,4 @@ export * from "./reminder.service";
 export * from "./document.service";
 export * from "./export.service";
 export * from "./maintenance";
-export * from "./mock/handlers";
+export * from "@/server/actions/api";

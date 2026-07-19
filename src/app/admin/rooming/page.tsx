@@ -181,7 +181,7 @@ export default function RoomingPage() {
 
   function getKeberangkatanName(keberangkatanId: string): string {
     const k = keberangkatanList.find((x) => x.id === keberangkatanId);
-    return k ? `${k.kode} — ${k.namaPaket}` : "-";
+    return k ? `${k.kode} — ${k.paketUmroh?.namaPaket || "-"}` : "-";
   }
 
   function totalTerisi(rooming: Rooming): number {
@@ -403,7 +403,7 @@ export default function RoomingPage() {
           <Select
             options={keberangkatanList.map((k) => ({
               value: k.id,
-              label: `${k.kode} — ${k.namaPaket}`,
+              label: `${k.kode} — ${k.paketUmroh?.namaPaket || "-"}`,
             }))}
             placeholder="Semua Keberangkatan"
             value={selectedKeberangkatan}
@@ -418,7 +418,7 @@ export default function RoomingPage() {
           <CardHeader>
             <CardTitle className="text-sm flex items-center gap-2">
               <Building2 className="h-4 w-4 text-muted-foreground" />
-              Hotel Combinations — {selectedKbr.namaPaket}
+              Hotel Combinations — {selectedKbr.paketUmroh?.namaPaket || "-"}
             </CardTitle>
           </CardHeader>
           <CardContent>

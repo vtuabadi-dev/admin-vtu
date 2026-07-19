@@ -67,41 +67,18 @@ export function globalSearch(query: string, scope: SearchScope): GlobalSearchRes
   // Search keberangkatan
   scope.keberangkatan.forEach((k) => {
     if (
-      k.namaPaket.toLowerCase().includes(q) ||
-      k.kode.toLowerCase().includes(q) ||
-      k.hotelMekkah.toLowerCase().includes(q) ||
-      k.hotelMadinah.toLowerCase().includes(q) ||
-      k.maskapai.toLowerCase().includes(q)
+      k.paketUmroh?.namaPaket?.toLowerCase().includes(q) ||
+      k.kode.toLowerCase().includes(q)
     ) {
       results.push({
         type: "keberangkatan",
         id: k.id,
-        title: k.namaPaket,
+        title: k.paketUmroh?.namaPaket || k.kode,
         subtitle: `${k.kode} · ${k.tanggalBerangkat}`,
         module: "keberangkatan",
         link: `/admin/keberangkatan/${k.id}`,
       });
     }
-
-    // Search hotel options
-    k.hotelOptions.forEach((opt) => {
-      if (
-        opt.hotelMekkah.toLowerCase().includes(q) ||
-        opt.hotelMadinah.toLowerCase().includes(q)
-      ) {
-        const exists = results.some((r) => r.id === `hotel-${k.id}-${opt.hotelMekkah}`);
-        if (!exists) {
-          results.push({
-            type: "hotel",
-            id: `hotel-${k.id}-${opt.hotelMekkah}`,
-            title: `${opt.hotelMekkah} — ${opt.hotelMadinah}`,
-            subtitle: `Paket: ${k.namaPaket}`,
-            module: "keberangkatan",
-            link: `/admin/keberangkatan/${k.id}`,
-          });
-        }
-      }
-    });
   });
 
   return results.slice(0, 25);

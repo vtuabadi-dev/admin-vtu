@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/shared/components/ui
 import { StatCard } from "@/shared/components/ui/StatCard";
 import { StatusBadge, Badge } from "@/shared/components/ui/Badge";
 import { Table } from "@/shared/components/ui/Table";
-import { getInvoiceList, getGroupList, getKeberangkatanList, getPembayaranList } from "@/services/mock/handlers";
+import { getInvoiceList, getGroupList, getKeberangkatanList, getPembayaranList } from "@/server/actions/api";
 import type { Invoice, RegistrationGroup, Keberangkatan, Pembayaran } from "@/shared/types";
 import { formatCurrency, formatDate } from "@/shared/lib/utils";
 
@@ -57,7 +57,7 @@ export default function InvoiceRekapPage() {
         id: inv.id,
         nomorInvoice: inv.nomorInvoice,
         namaGroup: group?.namaGroup ?? "-",
-        namaPaket: kbr?.namaPaket ?? "-",
+        namaPaket: kbr?.paketUmroh?.namaPaket ?? "-",
         tipe: inv.tipe,
         jumlah: inv.jumlah,
         dibayar: paid,

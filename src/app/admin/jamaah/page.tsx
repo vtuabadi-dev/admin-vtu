@@ -10,11 +10,12 @@ import { Button } from "@/shared/components/ui/Button";
 import { Input } from "@/shared/components/ui/Input";
 import { Table } from "@/shared/components/ui/Table";
 import { Tabs } from "@/shared/components/ui/Tabs";
+import { ErrorState } from "@/shared/components/ui/ErrorState";
 import {
   getJamaahList,
   getInvoiceList,
   getGroupList,
-} from "@/services/mock/handlers";
+} from "@/server/actions/api";
 import type { Jamaah, Invoice, RegistrationGroup } from "@/shared/types";
 
 export default function JamaahListPage() {
@@ -23,11 +24,14 @@ export default function JamaahListPage() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [groups, setGroups] = useState<RegistrationGroup[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
   const [search, setSearch] = useState("");
   const [activeTab, setActiveTab] = useState("semua");
 
-  useEffect(() => {
-    async function load() {
+  const load = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
       const [j, inv, g] = await Promise.all([
         getJamaahList(),
         getInvoiceList(),
@@ -36,10 +40,16 @@ export default function JamaahListPage() {
       setJamaahList(j);
       setInvoices(inv);
       setGroups(g);
+    } catch (err: any) {
+      setError(err instanceof Error ? err : new Error("Database Connection Error"));
+    } finally {
       setLoading(false);
     }
-    load();
   }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
 
   // --- Helper: derive aggregate statuses ---
 
@@ -137,6 +147,14 @@ export default function JamaahListPage() {
     return (
       <div className="flex items-center justify-center h-64">
         <p className="text-muted-foreground">Memuat data jamaah...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex h-64 items-center justify-center">
+        <ErrorState onRetry={load} message={error.message} />
       </div>
     );
   }
