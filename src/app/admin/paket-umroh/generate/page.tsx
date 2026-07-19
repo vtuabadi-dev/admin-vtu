@@ -9,7 +9,7 @@ import {
   MOCK_LANDING_PATTERN, 
   MOCK_KLASTER
 } from "@/shared/lib/mock-data";
-import { Upload, Loader2, FileText, AlertTriangle, Sparkles } from "lucide-react";
+import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X, Image as ImageIcon } from "lucide-react";
 
 interface MasterDataOptions {
   airlines: any[];
@@ -28,18 +28,36 @@ export default function GeneratePaketPage() {
   // Tab path selection
   const [pathMode, setPathMode] = useState<"manual" | "ocr">("manual");
 
-  // OCR state
-  const [flyerFiles, setFlyerFiles] = useState<File[]>([]);
+  // OCR state — multi-slot
+  type FlyerSlot = { id: number; file: File | null };
+  const [flyerSlots, setFlyerSlots] = useState<FlyerSlot[]>([{ id: 1, file: null }]);
+  const [nextSlotId, setNextSlotId] = useState(2);
   const [caption, setCaption] = useState("");
   const [uploading, setUploading] = useState(false);
   const [ocrWarning, setOcrWarning] = useState("");
   const [ocrSuccess, setOcrSuccess] = useState(false);
+
+  const addFlyerSlot = () => {
+    setFlyerSlots(prev => [...prev, { id: nextSlotId, file: null }]);
+    setNextSlotId(n => n + 1);
+  };
+
+  const removeFlyerSlot = (id: number) => {
+    setFlyerSlots(prev => prev.filter(s => s.id !== id));
+  };
+
+  const setSlotFile = (id: number, file: File | null) => {
+    setFlyerSlots(prev => prev.map(s => s.id === id ? { ...s, file } : s));
+  };
+
+  const flyerFiles = flyerSlots.map(s => s.file).filter(Boolean) as File[];
 
   // Main Form Data
   const [formData, setFormData] = useState({
     jenisPaketId: "",
     namaPaket: "",
     kodePaket: "",
+    kodeGrup: "",
     startingPointId: "",
     landingPatternId: "",
     maskapaiId: "",
@@ -108,18 +126,36 @@ export default function GeneratePaketPage() {
     const airCode = options.airlines.find(a => a.id === formData.maskapaiId)?.code || "AIR";
     const firstDate = departureDates[0] || "";
     const dateStr = firstDate ? firstDate.replace(/-/g, "") : "";
-    const autoCode = `${jCode}-${airCode}${dateStr ? `-${dateStr}` : ""}`.toUpperCase();
+    
+    // Individual code uses first departure date
+    const individualCode = `${jCode}-${airCode}${dateStr ? `-${dateStr}` : ""}`.toUpperCase();
+    
+    // Group code is generated only for multi-date batches (no specific date suffix)
+    const now = new Date();
+    const batchStamp = now.getFullYear().toString().slice(-2) + 
+      String(now.getMonth() + 1).padStart(2, "0") + 
+      String(now.getDate()).padStart(2, "0");
+    const groupCode = departureDates.length > 1 
+      ? `GRP-${jCode}-${airCode}-${batchStamp}`.toUpperCase()
+      : "";
 
-    setFormData(prev => ({ ...prev, kodePaket: autoCode }));
+    setFormData(prev => ({ ...prev, kodePaket: individualCode, kodeGrup: groupCode }));
+  };
+
+  // Auto-compute individual code per departure date
+  const getIndividualCodeForDate = (dateStr: string) => {
+    if (!options || !dateStr) return "";
+    const jCode = options.packageTypes.find(t => t.id === formData.jenisPaketId)?.code || "PKG";
+    const airCode = options.airlines.find(a => a.id === formData.maskapaiId)?.code || "AIR";
+    const dStr = dateStr.replace(/-/g, "");
+    return `${jCode}-${airCode}-${dStr}`.toUpperCase();
   };
 
   useEffect(() => {
     if (!formData.namaPaket) {
       handleAutoGenerateName();
     }
-    if (!formData.kodePaket) {
-      handleAutoGenerateCode();
-    }
+    handleAutoGenerateCode();
   }, [formData.jenisPaketId, formData.maskapaiId, departureDates, options]);
 
   // Cluster-specific configuration: Hotels + Pricing + Upgrades
@@ -300,6 +336,25 @@ export default function GeneratePaketPage() {
       return;
     }
     setLoading(true);
+
+    // Build payloads per departure date
+    const isMultiDate = departureDates.length > 1;
+    const packages = departureDates.map((depDate) => {
+      const returnDate = calculateReturnDate(depDate, formData.durasiHari);
+      const indivCode = getIndividualCodeForDate(depDate);
+      return {
+        ...formData,
+        kodePaket: indivCode,
+        kodeGrup: isMultiDate ? formData.kodeGrup : "",
+        departureDates: [depDate],
+        returnDate,
+        clusterConfigs: formData.isAdaKlaster === "ya" ? clusterConfigs : null,
+      };
+    });
+
+    // TODO: replace with real API call
+    console.info("[handleGenerate] packages to create:", packages);
+
     setTimeout(() => {
       setLoading(false);
       setSuccess(true);
@@ -320,7 +375,7 @@ export default function GeneratePaketPage() {
         {/* Step 1: Dasar Paket */}
         <AccordionSection title="Langkah 1: Dasar Paket" defaultOpen>
           <div className="p-4 bg-card border rounded-md flex flex-col gap-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium mb-1">Jenis Paket (Master Data)</label>
                 <select name="jenisPaketId" value={formData.jenisPaketId} onChange={handleChange} className="w-full h-10 px-3 py-2 rounded-md border border-input bg-transparent" disabled={fetching}>
@@ -335,15 +390,6 @@ export default function GeneratePaketPage() {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">Kode Paket</label>
-                <div className="flex gap-2">
-                  <Input name="kodePaket" value={formData.kodePaket} onChange={handleChange} placeholder="REG-SV-20260910" />
-                  <Button type="button" variant="outline" onClick={handleAutoGenerateCode} title="Generate Kode Otomatis">
-                    <Sparkles className="h-4 w-4 text-amber-500 fill-amber-500/20" />
-                  </Button>
-                </div>
-              </div>
-              <div>
                 <label className="block text-sm font-medium mb-1">Nama Paket</label>
                 <div className="flex gap-2">
                   <Input name="namaPaket" value={formData.namaPaket} onChange={handleChange} placeholder="Umroh Syawal 2026" />
@@ -352,6 +398,56 @@ export default function GeneratePaketPage() {
                   </Button>
                 </div>
               </div>
+            </div>
+
+            {/* Package Code Section - dynamic based on date count */}
+            <div className="border-t pt-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Kode Paket</label>
+                <Button type="button" variant="outline" onClick={handleAutoGenerateCode} className="h-7 text-xs px-2 gap-1">
+                  <Sparkles className="h-3 w-3 text-amber-500 fill-amber-500/20" />
+                  Regenerasi Kode
+                </Button>
+              </div>
+
+              {departureDates.length <= 1 ? (
+                /* Single date → only individual code */
+                <div>
+                  <label className="block text-xs font-medium text-muted-foreground mb-1">Kode Paket Individual</label>
+                  <Input name="kodePaket" value={formData.kodePaket} onChange={handleChange} placeholder="REG-GIA-20260910" />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Kode ini unik untuk satu paket dengan satu tanggal keberangkatan.
+                  </p>
+                </div>
+              ) : (
+                /* Multiple dates → group code + individual code per date */
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-xs font-medium text-muted-foreground mb-1">Kode Paket Grup (Batch)</label>
+                    <Input name="kodeGrup" value={formData.kodeGrup} onChange={handleChange} placeholder="GRP-REG-GIA-260710" />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Kode grup menjadi pengikat seluruh paket yang dibuat dalam satu batch ini ({departureDates.length} paket).
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-muted-foreground mb-2">
+                      Kode Paket Individual (per tanggal keberangkatan)
+                    </label>
+                    <div className="flex flex-wrap gap-2 p-3 bg-muted/10 border rounded-md">
+                      {departureDates.map((d, idx) => (
+                        <div key={idx} className="flex items-center gap-1.5 bg-card border px-2.5 py-1.5 rounded-md text-xs shadow-sm">
+                          <span className="font-mono font-semibold text-primary">{getIndividualCodeForDate(d)}</span>
+                          <span className="text-muted-foreground">({d})</span>
+                        </div>
+                      ))}
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Setiap paket mendapat kode individual unik berdasarkan tanggal keberangkatannya.
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </AccordionSection>
@@ -673,64 +769,112 @@ export default function GeneratePaketPage() {
           {/* Left Column: Upload & Actions */}
           <div className="lg:col-span-5 space-y-4">
             <div className="p-5 border rounded-lg bg-card space-y-4 shadow-sm">
-              <h2 className="font-semibold text-base">Ekstraksi Dokumen Flyer</h2>
-              <p className="text-xs text-muted-foreground">
-                Unggah satu atau beberapa brosur flyer paket dalam format JPG/JPEG untuk diekstraksi datanya secara otomatis menggunakan AI.
-              </p>
-              
-              <div className="flex flex-col items-center justify-center border-2 border-dashed border-border hover:border-primary/50 rounded-lg p-6 bg-muted/10 cursor-pointer transition-colors relative">
-                <input 
-                  type="file" 
-                  accept=".jpg,.jpeg" 
-                  multiple
-                  className="absolute inset-0 opacity-0 cursor-pointer" 
-                  onChange={(e) => {
-                    const selected = Array.from(e.target.files || []);
-                    setFlyerFiles(prev => [...prev, ...selected]);
-                  }}
-                />
-                <Upload className="h-10 w-10 text-muted-foreground mb-2" />
-                <span className="text-sm font-medium text-center">
-                  Klik atau seret file JPG kemari
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="font-semibold text-base">Ekstraksi Dokumen Flyer</h2>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Unggah flyer dalam format JPG/JPEG. Tambah slot untuk mengekstraksi dari beberapa gambar sekaligus.
+                  </p>
+                </div>
+                <span className="shrink-0 text-xs bg-muted px-2 py-1 rounded-md font-medium text-muted-foreground">
+                  {flyerFiles.length}/{flyerSlots.length} terisi
                 </span>
-                <span className="text-xs text-muted-foreground mt-1">Bisa pilih beberapa file sekaligus</span>
               </div>
 
-              {flyerFiles.length > 0 && (
-                <div className="space-y-2 border rounded-md p-3 bg-muted/20">
-                  <label className="text-xs font-semibold text-muted-foreground">Flyer Terpilih ({flyerFiles.length})</label>
-                  <div className="space-y-1.5 max-h-[150px] overflow-y-auto">
-                    {flyerFiles.map((file, idx) => (
-                      <div key={idx} className="flex items-center justify-between text-xs bg-card border p-2 rounded-md">
-                        <span className="truncate font-medium max-w-[80%]">{file.name}</span>
-                        <button
-                          type="button"
-                          onClick={() => setFlyerFiles(prev => prev.filter((_, i) => i !== idx))}
-                          className="text-red-500 hover:text-red-700 font-semibold px-1"
-                        >
-                          Hapus
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
+              {/* Multi-slot grid */}
+              <div className="grid grid-cols-2 gap-2.5">
+                {flyerSlots.map((slot, idx) => (
+                  <div
+                    key={slot.id}
+                    className={`relative group rounded-lg border-2 border-dashed transition-all ${
+                      slot.file
+                        ? "border-primary/40 bg-primary/5"
+                        : "border-border hover:border-primary/50 bg-muted/10"
+                    }`}
+                  >
+                    {/* Hidden file input */}
+                    <input
+                      type="file"
+                      accept=".jpg,.jpeg,.png"
+                      id={`flyer-slot-${slot.id}`}
+                      className="absolute inset-0 opacity-0 cursor-pointer z-10"
+                      onChange={(e) => {
+                        const f = e.target.files?.[0] ?? null;
+                        setSlotFile(slot.id, f);
+                        e.target.value = "";
+                      }}
+                    />
 
+                    {/* Remove button — only show when > 1 slot */}
+                    {flyerSlots.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); removeFlyerSlot(slot.id); }}
+                        className="absolute -top-2 -right-2 z-20 bg-red-500 hover:bg-red-600 text-white rounded-full p-0.5 shadow opacity-0 group-hover:opacity-100 transition-opacity"
+                        title="Hapus slot ini"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    )}
+
+                    {/* Slot content */}
+                    <div className="flex flex-col items-center justify-center p-3 min-h-[100px] text-center pointer-events-none select-none">
+                      {slot.file ? (
+                        <>
+                          <div className="w-10 h-10 rounded-md bg-primary/10 flex items-center justify-center mb-1.5">
+                            <ImageIcon className="h-5 w-5 text-primary" />
+                          </div>
+                          <span className="text-xs font-medium text-primary line-clamp-2 break-all leading-tight">
+                            {slot.file.name}
+                          </span>
+                          <span className="text-[10px] text-muted-foreground mt-0.5">
+                            {(slot.file.size / 1024).toFixed(0)} KB
+                          </span>
+                        </>
+                      ) : (
+                        <>
+                          <Upload className="h-6 w-6 text-muted-foreground mb-1.5" />
+                          <span className="text-xs font-medium text-muted-foreground">
+                            Slot {idx + 1}
+                          </span>
+                          <span className="text-[10px] text-muted-foreground">Klik untuk pilih</span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                ))}
+
+                {/* Add slot button */}
+                <button
+                  type="button"
+                  onClick={addFlyerSlot}
+                  className="rounded-lg border-2 border-dashed border-border hover:border-primary/60 hover:bg-primary/5 transition-all flex flex-col items-center justify-center min-h-[100px] gap-1.5 text-muted-foreground hover:text-primary group"
+                  title="Tambah slot gambar baru"
+                >
+                  <div className="w-8 h-8 rounded-full border-2 border-current flex items-center justify-center group-hover:scale-110 transition-transform">
+                    <Plus className="h-4 w-4" />
+                  </div>
+                  <span className="text-[11px] font-medium">Tambah Slot</span>
+                </button>
+              </div>
+
+              {/* Caption */}
               <div className="space-y-1">
-                <label className="text-xs font-semibold text-muted-foreground flex items-center gap-1">
+                <label className="text-xs font-semibold text-muted-foreground">
                   Caption / Deskripsi Flyer (Opsional)
                 </label>
                 <textarea
                   value={caption}
                   onChange={(e) => setCaption(e.target.value)}
                   placeholder="Masukkan caption pemasaran sosial media jika ada..."
-                  className="w-full h-24 p-2.5 text-xs rounded-md border border-input bg-transparent focus:outline-none focus:ring-1 focus:ring-primary min-h-[60px]"
+                  className="w-full h-20 p-2.5 text-xs rounded-md border border-input bg-transparent focus:outline-none focus:ring-1 focus:ring-primary min-h-[56px]"
                 />
               </div>
 
-              <Button 
-                onClick={handleOcrProcess} 
-                className="w-full" 
+              {/* Process button */}
+              <Button
+                onClick={handleOcrProcess}
+                className="w-full"
                 disabled={flyerFiles.length === 0 || uploading}
               >
                 {uploading ? (
@@ -741,7 +885,7 @@ export default function GeneratePaketPage() {
                 ) : (
                   <>
                     <FileText className="mr-2 h-4 w-4" />
-                    Proses Flyer & Prefill Form
+                    Proses {flyerFiles.length > 0 ? `${flyerFiles.length} ` : ""}Flyer & Prefill Form
                   </>
                 )}
               </Button>
