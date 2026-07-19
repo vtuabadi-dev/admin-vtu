@@ -152,7 +152,7 @@ export default function MasterKonfigurasiPaketUmrohPage() {
         {(activeTab) => (
           <div className="bg-card border border-border rounded-lg shadow-sm overflow-hidden mt-4">
             
-            {activeTab === "jenis-paket" && (
+            <div style={{ display: activeTab === "jenis-paket" ? "block" : "none" }}>
               <CrudTab
                 title="Master Jenis Paket"
                 itemName="Jenis Paket"
@@ -170,9 +170,9 @@ export default function MasterKonfigurasiPaketUmrohPage() {
                   { name: "status", label: "Status", type: "select", options: STATUS_OPTIONS },
                 ]}
               />
-            )}
+            </div>
 
-            {activeTab === "starting-point" && (
+            <div style={{ display: activeTab === "starting-point" ? "block" : "none" }}>
               <CrudTab
                 title="Master Starting Point"
                 itemName="Starting Point"
@@ -190,9 +190,9 @@ export default function MasterKonfigurasiPaketUmrohPage() {
                   { name: "status", label: "Status", type: "select", options: STATUS_OPTIONS },
                 ]}
               />
-            )}
+            </div>
 
-            {activeTab === "rute-in-out" && (
+            <div style={{ display: activeTab === "rute-in-out" ? "block" : "none" }}>
               <CrudTab
                 title="Master Rute In-Out"
                 itemName="Rute In-Out"
@@ -212,9 +212,9 @@ export default function MasterKonfigurasiPaketUmrohPage() {
                   { name: "status", label: "Status", type: "select", options: STATUS_OPTIONS },
                 ]}
               />
-            )}
+            </div>
 
-            {activeTab === "maskapai" && (
+            <div style={{ display: activeTab === "maskapai" ? "block" : "none" }}>
               <CrudTab
                 title="Master Maskapai"
                 itemName="Maskapai"
@@ -232,9 +232,9 @@ export default function MasterKonfigurasiPaketUmrohPage() {
                   { name: "status", label: "Status", type: "select", options: STATUS_OPTIONS },
                 ]}
               />
-            )}
+            </div>
 
-            {activeTab === "hotel" && (
+            <div style={{ display: activeTab === "hotel" ? "block" : "none" }}>
               <CrudTab
                 title="Master Hotel"
                 itemName="Hotel"
@@ -267,9 +267,9 @@ export default function MasterKonfigurasiPaketUmrohPage() {
                   options: cities.filter(c => hotelCityIds.includes(c.id)).map(c => ({ label: c.name, value: c.id }))
                 }}
               />
-            )}
+            </div>
 
-            {activeTab === "klaster" && (
+            <div style={{ display: activeTab === "klaster" ? "block" : "none" }}>
               <CrudTab
                 title="Master Klaster Seat"
                 itemName="Klaster"
@@ -285,7 +285,7 @@ export default function MasterKonfigurasiPaketUmrohPage() {
                   { name: "status", label: "Status", type: "select", options: STATUS_OPTIONS },
                 ]}
               />
-            )}
+            </div>
 
           </div>
         )}
