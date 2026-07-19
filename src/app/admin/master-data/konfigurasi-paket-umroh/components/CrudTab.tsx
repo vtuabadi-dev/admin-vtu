@@ -225,9 +225,9 @@ export function CrudTab<T extends { id: string; status?: string; [key: string]: 
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
-            {loading ? (
+            {loading && data.length === 0 ? (
               <tr>
-                <td colSpan={columns.length} className="px-6 py-8 text-center text-muted-foreground">
+                <td colSpan={columns.length} className="px-6 py-8 text-center text-muted-foreground animate-pulse">
                   Memuat data dari database...
                 </td>
               </tr>
