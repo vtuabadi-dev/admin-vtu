@@ -39,6 +39,7 @@ export default function GeneratePaketPage() {
   const [formData, setFormData] = useState({
     jenisPaketId: "",
     namaPaket: "",
+    kodePaket: "",
     startingPointId: "",
     landingPatternId: "",
     maskapaiId: "",
@@ -49,6 +50,8 @@ export default function GeneratePaketPage() {
     isAdaPerlengkapan: "",
     hargaBase: "",
     durasiHari: "9",
+    upgradeDouble: "",
+    upgradeTriple: "",
   });
 
   // Multiple Departure Dates State
@@ -75,12 +78,62 @@ export default function GeneratePaketPage() {
     return date.toISOString().split("T")[0];
   };
 
-  // Cluster-specific hotel selection
-  const [clusterHotels, setClusterHotels] = useState<Record<string, { hotelMekkahId: string; hotelMadinahId: string }>>({
-    "K1": { hotelMekkahId: "", hotelMadinahId: "" }, // Bronze
-    "K2": { hotelMekkahId: "", hotelMadinahId: "" }, // Silver
-    "K3": { hotelMekkahId: "", hotelMadinahId: "" }, // Gold
-    "K4": { hotelMekkahId: "", hotelMadinahId: "" }, // Platinum
+  const handleAutoGenerateName = () => {
+    if (!options) return;
+    const jPaket = options.packageTypes.find(t => t.id === formData.jenisPaketId)?.name || "";
+    const airline = options.airlines.find(a => a.id === formData.maskapaiId)?.name || "";
+    const firstDate = departureDates[0] || "";
+    let monthName = "";
+    let year = "";
+    
+    if (firstDate) {
+      const d = new Date(firstDate);
+      if (!isNaN(d.getTime())) {
+        monthName = d.toLocaleString("id-ID", { month: "long" });
+        year = String(d.getFullYear());
+      }
+    }
+
+    let autoName = "";
+    if (jPaket) autoName += jPaket;
+    if (airline) autoName += (autoName ? ` ${airline}` : airline);
+    if (monthName && year) autoName += (autoName ? ` — ${monthName} ${year}` : `${monthName} ${year}`);
+
+    setFormData(prev => ({ ...prev, namaPaket: autoName }));
+  };
+
+  const handleAutoGenerateCode = () => {
+    if (!options) return;
+    const jCode = options.packageTypes.find(t => t.id === formData.jenisPaketId)?.code || "PKG";
+    const airCode = options.airlines.find(a => a.id === formData.maskapaiId)?.code || "AIR";
+    const firstDate = departureDates[0] || "";
+    const dateStr = firstDate ? firstDate.replace(/-/g, "") : "";
+    const autoCode = `${jCode}-${airCode}${dateStr ? `-${dateStr}` : ""}`.toUpperCase();
+
+    setFormData(prev => ({ ...prev, kodePaket: autoCode }));
+  };
+
+  useEffect(() => {
+    if (!formData.namaPaket) {
+      handleAutoGenerateName();
+    }
+    if (!formData.kodePaket) {
+      handleAutoGenerateCode();
+    }
+  }, [formData.jenisPaketId, formData.maskapaiId, departureDates, options]);
+
+  // Cluster-specific configuration: Hotels + Pricing + Upgrades
+  const [clusterConfigs, setClusterConfigs] = useState<Record<string, { 
+    hotelMekkahId: string; 
+    hotelMadinahId: string;
+    hargaBase: string;
+    upgradeDouble: string;
+    upgradeTriple: string;
+  }>>({
+    "K1": { hotelMekkahId: "", hotelMadinahId: "", hargaBase: "", upgradeDouble: "", upgradeTriple: "" }, // Bronze
+    "K2": { hotelMekkahId: "", hotelMadinahId: "", hargaBase: "", upgradeDouble: "", upgradeTriple: "" }, // Silver
+    "K3": { hotelMekkahId: "", hotelMadinahId: "", hargaBase: "", upgradeDouble: "", upgradeTriple: "" }, // Gold
+    "K4": { hotelMekkahId: "", hotelMadinahId: "", hargaBase: "", upgradeDouble: "", upgradeTriple: "" }, // Platinum
   });
 
   useEffect(() => {
@@ -102,14 +155,18 @@ export default function GeneratePaketPage() {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  const handleClusterHotelChange = (clusterId: string, cityField: "hotelMekkahId" | "hotelMadinahId", val: string) => {
-    setClusterHotels(prev => {
-      const existing = prev[clusterId] || { hotelMekkahId: "", hotelMadinahId: "" };
+  const handleClusterConfigChange = (
+    clusterId: string, 
+    field: "hotelMekkahId" | "hotelMadinahId" | "hargaBase" | "upgradeDouble" | "upgradeTriple", 
+    val: string
+  ) => {
+    setClusterConfigs(prev => {
+      const existing = prev[clusterId] || { hotelMekkahId: "", hotelMadinahId: "", hargaBase: "", upgradeDouble: "", upgradeTriple: "" };
       return {
         ...prev,
         [clusterId]: {
           ...existing,
-          [cityField]: val
+          [field]: val
         }
       };
     });
@@ -262,23 +319,39 @@ export default function GeneratePaketPage() {
       <div className="flex flex-col gap-4">
         {/* Step 1: Dasar Paket */}
         <AccordionSection title="Langkah 1: Dasar Paket" defaultOpen>
-          <div className="p-4 bg-card border rounded-md grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium mb-1">Jenis Paket (Master Data)</label>
-              <select name="jenisPaketId" value={formData.jenisPaketId} onChange={handleChange} className="w-full h-10 px-3 py-2 rounded-md border border-input bg-transparent" disabled={fetching}>
-                <option value="">-- Pilih Jenis Paket --</option>
-                {fetching ? (
-                  <option disabled>Loading jenis paket...</option>
-                ) : (
-                  options?.packageTypes.map((item) => (
-                    <option key={item.id} value={item.id}>{item.name}</option>
-                  ))
-                )}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Nama Paket</label>
-              <Input name="namaPaket" value={formData.namaPaket} onChange={handleChange} placeholder="Misal: Umroh Syawal 2026" />
+          <div className="p-4 bg-card border rounded-md flex flex-col gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">Jenis Paket (Master Data)</label>
+                <select name="jenisPaketId" value={formData.jenisPaketId} onChange={handleChange} className="w-full h-10 px-3 py-2 rounded-md border border-input bg-transparent" disabled={fetching}>
+                  <option value="">-- Pilih Jenis Paket --</option>
+                  {fetching ? (
+                    <option disabled>Loading jenis paket...</option>
+                  ) : (
+                    options?.packageTypes.map((item) => (
+                      <option key={item.id} value={item.id}>{item.name}</option>
+                    ))
+                  )}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Kode Paket</label>
+                <div className="flex gap-2">
+                  <Input name="kodePaket" value={formData.kodePaket} onChange={handleChange} placeholder="REG-SV-20260910" />
+                  <Button type="button" variant="outline" onClick={handleAutoGenerateCode} title="Generate Kode Otomatis">
+                    <Sparkles className="h-4 w-4 text-amber-500 fill-amber-500/20" />
+                  </Button>
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Nama Paket</label>
+                <div className="flex gap-2">
+                  <Input name="namaPaket" value={formData.namaPaket} onChange={handleChange} placeholder="Umroh Syawal 2026" />
+                  <Button type="button" variant="outline" onClick={handleAutoGenerateName} title="Generate Nama Otomatis">
+                    <Sparkles className="h-4 w-4 text-amber-500 fill-amber-500/20" />
+                  </Button>
+                </div>
+              </div>
             </div>
           </div>
         </AccordionSection>
@@ -336,65 +409,125 @@ export default function GeneratePaketPage() {
             </div>
 
             {formData.isAdaKlaster === "tidak" ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium mb-1">Hotel Mekkah</label>
-                  <select name="hotelMekkahId" value={formData.hotelMekkahId} onChange={handleChange} className="w-full h-10 px-3 py-2 rounded-md border border-input bg-transparent" disabled={fetching}>
-                    <option value="">-- Pilih Hotel Mekkah --</option>
-                    {fetching ? (
-                      <option disabled>Loading hotel Mekkah...</option>
-                    ) : (
-                      mekkahHotels.map((item) => (
-                        <option key={item.id} value={item.id}>{item.name} ({item.starRating || 5}⭐)</option>
-                      ))
-                    )}
-                  </select>
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Hotel Mekkah</label>
+                    <select name="hotelMekkahId" value={formData.hotelMekkahId} onChange={handleChange} className="w-full h-10 px-3 py-2 rounded-md border border-input bg-transparent" disabled={fetching}>
+                      <option value="">-- Pilih Hotel Mekkah --</option>
+                      {fetching ? (
+                        <option disabled>Loading hotel Mekkah...</option>
+                      ) : (
+                        mekkahHotels.map((item) => (
+                          <option key={item.id} value={item.id}>{item.name} ({item.starRating || 5}⭐)</option>
+                        ))
+                      )}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Hotel Madinah</label>
+                    <select name="hotelMadinahId" value={formData.hotelMadinahId} onChange={handleChange} className="w-full h-10 px-3 py-2 rounded-md border border-input bg-transparent" disabled={fetching}>
+                      <option value="">-- Pilih Hotel Madinah --</option>
+                      {fetching ? (
+                        <option disabled>Loading hotel Madinah...</option>
+                      ) : (
+                        madinahHotels.map((item) => (
+                          <option key={item.id} value={item.id}>{item.name} ({item.starRating || 5}⭐)</option>
+                        ))
+                      )}
+                    </select>
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Hotel Madinah</label>
-                  <select name="hotelMadinahId" value={formData.hotelMadinahId} onChange={handleChange} className="w-full h-10 px-3 py-2 rounded-md border border-input bg-transparent" disabled={fetching}>
-                    <option value="">-- Pilih Hotel Madinah --</option>
-                    {fetching ? (
-                      <option disabled>Loading hotel Madinah...</option>
-                    ) : (
-                      madinahHotels.map((item) => (
-                        <option key={item.id} value={item.id}>{item.name} ({item.starRating || 5}⭐)</option>
-                      ))
-                    )}
-                  </select>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t pt-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Harga Upgrade Double (Rp)</label>
+                    <Input type="number" name="upgradeDouble" value={formData.upgradeDouble} onChange={handleChange} placeholder="Misal: 5000000" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Harga Upgrade Triple (Rp)</label>
+                    <Input type="number" name="upgradeTriple" value={formData.upgradeTriple} onChange={handleChange} placeholder="Misal: 3000000" />
+                  </div>
                 </div>
               </div>
             ) : (
-              <div className="border rounded-md divide-y divide-border bg-muted/10 p-1">
-                {MOCK_KLASTER.map((klaster) => (
-                  <div key={klaster.id} className="p-3 grid grid-cols-1 md:grid-cols-3 items-center gap-3">
-                    <span className="text-sm font-bold text-primary">{klaster.nama} Seat Class</span>
-                    <div>
-                      <select 
-                        value={clusterHotels[klaster.id]?.hotelMekkahId || ""} 
-                        onChange={(e) => handleClusterHotelChange(klaster.id, "hotelMekkahId", e.target.value)} 
-                        className="w-full h-9 px-2 text-xs rounded-md border border-input bg-background"
-                      >
-                        <option value="">-- Hotel Mekkah --</option>
-                        {mekkahHotels.map((h) => (
-                          <option key={h.id} value={h.id}>{h.name}</option>
-                        ))}
-                      </select>
+              <div className="space-y-4">
+                <div className="text-xs text-muted-foreground bg-amber-50/50 border border-amber-200 p-2.5 rounded-md">
+                  💡 <strong>Info:</strong> Hotel, Harga Base, serta Harga Upgrade Kamar (Double & Triple) akan dikonfigurasi untuk masing-masing klaster di bawah ini.
+                </div>
+                <div className="space-y-3">
+                  {MOCK_KLASTER.map((klaster) => (
+                    <div key={klaster.id} className="p-4 bg-card border rounded-md flex flex-col gap-3 shadow-sm">
+                      <div className="flex items-center justify-between border-b pb-2">
+                        <span className="text-sm font-bold text-primary">{klaster.nama} Seat Class</span>
+                      </div>
+                      
+                      {/* Hotel Selection Row */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs font-semibold text-muted-foreground mb-1">Hotel Mekkah</label>
+                          <select 
+                            value={clusterConfigs[klaster.id]?.hotelMekkahId || ""} 
+                            onChange={(e) => handleClusterConfigChange(klaster.id, "hotelMekkahId", e.target.value)} 
+                            className="w-full h-9 px-2 text-xs rounded-md border border-input bg-background"
+                          >
+                            <option value="">-- Hotel Mekkah --</option>
+                            {mekkahHotels.map((h) => (
+                              <option key={h.id} value={h.id}>{h.name}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-muted-foreground mb-1">Hotel Madinah</label>
+                          <select 
+                            value={clusterConfigs[klaster.id]?.hotelMadinahId || ""} 
+                            onChange={(e) => handleClusterConfigChange(klaster.id, "hotelMadinahId", e.target.value)} 
+                            className="w-full h-9 px-2 text-xs rounded-md border border-input bg-background"
+                          >
+                            <option value="">-- Hotel Madinah --</option>
+                            {madinahHotels.map((h) => (
+                              <option key={h.id} value={h.id}>{h.name}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+
+                      {/* Pricing Row */}
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1">
+                        <div>
+                          <label className="block text-xs font-semibold text-muted-foreground mb-1">Harga Base (Rp)</label>
+                          <Input 
+                            type="number" 
+                            placeholder="Misal: 35000000" 
+                            value={clusterConfigs[klaster.id]?.hargaBase || ""} 
+                            onChange={(e) => handleClusterConfigChange(klaster.id, "hargaBase", e.target.value)} 
+                            className="h-8 text-xs"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-muted-foreground mb-1">Harga Upgrade Double (Rp)</label>
+                          <Input 
+                            type="number" 
+                            placeholder="Misal: 5000000" 
+                            value={clusterConfigs[klaster.id]?.upgradeDouble || ""} 
+                            onChange={(e) => handleClusterConfigChange(klaster.id, "upgradeDouble", e.target.value)} 
+                            className="h-8 text-xs"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-muted-foreground mb-1">Harga Upgrade Triple (Rp)</label>
+                          <Input 
+                            type="number" 
+                            placeholder="Misal: 3000000" 
+                            value={clusterConfigs[klaster.id]?.upgradeTriple || ""} 
+                            onChange={(e) => handleClusterConfigChange(klaster.id, "upgradeTriple", e.target.value)} 
+                            className="h-8 text-xs"
+                          />
+                        </div>
+                      </div>
                     </div>
-                    <div>
-                      <select 
-                        value={clusterHotels[klaster.id]?.hotelMadinahId || ""} 
-                        onChange={(e) => handleClusterHotelChange(klaster.id, "hotelMadinahId", e.target.value)} 
-                        className="w-full h-9 px-2 text-xs rounded-md border border-input bg-background"
-                      >
-                        <option value="">-- Hotel Madinah --</option>
-                        {madinahHotels.map((h) => (
-                          <option key={h.id} value={h.id}>{h.name}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
             )}
           </div>
@@ -465,8 +598,16 @@ export default function GeneratePaketPage() {
                 <Input type="number" name="durasiHari" value={formData.durasiHari} onChange={handleChange} placeholder="9" />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">Harga Base (Rp)</label>
-                <Input type="number" name="hargaBase" value={formData.hargaBase} onChange={handleChange} placeholder="35000000" />
+                {formData.isAdaKlaster === "tidak" ? (
+                  <>
+                    <label className="block text-sm font-medium mb-1">Harga Base (Rp)</label>
+                    <Input type="number" name="hargaBase" value={formData.hargaBase} onChange={handleChange} placeholder="35000000" />
+                  </>
+                ) : (
+                  <div className="bg-muted/40 p-3 rounded-md border text-xs text-muted-foreground h-full flex items-center">
+                    ℹ️ Harga Base diatur per masing-masing Klaster Seat di Langkah 3.
+                  </div>
+                )}
               </div>
             </div>
           </div>
