@@ -9,6 +9,8 @@ import { Tabs } from "@/shared/components/ui/Tabs";
 import { CrudTab } from "./components/CrudTab";
 import { Modal } from "@/shared/components/ui/Modal";
 import { Button } from "@/shared/components/ui/Button";
+import { Input } from "@/shared/components/ui/Input";
+import { Trash2 } from "lucide-react";
 
 const TABS = [
   { value: "jenis-paket", label: "Jenis Paket" },
@@ -67,6 +69,72 @@ export default function MasterKonfigurasiPaketUmrohPage() {
     setHotelCityIds(selectedCityIds);
     localStorage.setItem("hotel_city_ids", JSON.stringify(selectedCityIds));
     setSettingsOpen(false);
+  };
+
+  const [newCityName, setNewCityName] = useState("");
+  const [newCityCode, setNewCityCode] = useState("");
+  const [addingCity, setAddingCity] = useState(false);
+
+  const handleAddCity = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newCityName.trim()) return;
+    try {
+      setAddingCity(true);
+      const code = newCityCode.trim() || `CTY-${newCityName.trim().toUpperCase().replace(/[^A-Z0-9]/g, "-").substring(0, 5)}`;
+      const res = await fetch("/api/master/cities", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nama: newCityName.trim(), kode: code }),
+      });
+      const resJson = await res.json();
+      if (resJson.success) {
+        const cRes = await fetch("/api/master/cities");
+        const cJson = await cRes.json();
+        if (cJson.success) {
+          setCities(cJson.data);
+          setSelectedCityIds((prev) => [...prev, resJson.data.id]);
+        }
+        setNewCityName("");
+        setNewCityCode("");
+      } else {
+        alert(`Error: ${resJson.message}`);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setAddingCity(false);
+    }
+  };
+
+  const handleDeleteCity = async (id: string, name: string) => {
+    if (confirm(`Apakah Anda yakin ingin menonaktifkan/menghapus kota "${name}" dari database?`)) {
+      try {
+        const res = await fetch(`/api/master/cities/${id}`, {
+          method: "DELETE",
+        });
+        const resJson = await res.json();
+        if (resJson.success) {
+          const cRes = await fetch("/api/master/cities");
+          const cJson = await cRes.json();
+          if (cJson.success) {
+            setCities(cJson.data);
+            setSelectedCityIds((prev) => prev.filter((cId) => cId !== id));
+            setHotelCityIds((prev) => prev.filter((cId) => cId !== id));
+            // Update localStorage
+            const saved = localStorage.getItem("hotel_city_ids");
+            if (saved) {
+              const parsed = JSON.parse(saved);
+              const updated = parsed.filter((cId: string) => cId !== id);
+              localStorage.setItem("hotel_city_ids", JSON.stringify(updated));
+            }
+          }
+        } else {
+          alert(`Error: ${resJson.message}`);
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    }
   };
 
   return (
@@ -233,28 +301,68 @@ export default function MasterKonfigurasiPaketUmrohPage() {
         description="Pilih kota-kota dari master data yang dapat dijadikan sebagai lokasi hotel dan filter dropdown."
       >
         <div className="space-y-4 mt-4">
-          <div className="max-h-[300px] overflow-y-auto border rounded-md p-3 divide-y divide-border bg-card">
-            {cities.map((c) => (
-              <div key={c.id} className="flex items-center gap-3 py-2">
-                <input
-                  type="checkbox"
-                  id={`hotel-city-${c.id}`}
-                  checked={selectedCityIds.includes(c.id)}
-                  onChange={(e) => {
-                    if (e.target.checked) {
-                      setSelectedCityIds((prev) => [...prev, c.id]);
-                    } else {
-                      setSelectedCityIds((prev) => prev.filter((id) => id !== c.id));
-                    }
-                  }}
-                  className="h-4 w-4 rounded border-input text-primary focus:ring-primary cursor-pointer"
+          {/* Add City Inline Form */}
+          <form onSubmit={handleAddCity} className="flex items-end gap-2 bg-muted/30 p-2.5 rounded-md border">
+            <div className="flex-grow grid grid-cols-2 gap-2">
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-semibold text-muted-foreground">Nama Kota Baru</label>
+                <Input
+                  type="text"
+                  value={newCityName}
+                  onChange={(e) => setNewCityName(e.target.value)}
+                  placeholder="Misal: Riyadh"
+                  className="h-9 text-xs"
+                  required
                 />
-                <label
-                  htmlFor={`hotel-city-${c.id}`}
-                  className="text-sm font-medium cursor-pointer select-none flex-grow"
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-semibold text-muted-foreground">Kode (Opsional)</label>
+                <Input
+                  type="text"
+                  value={newCityCode}
+                  onChange={(e) => setNewCityCode(e.target.value)}
+                  placeholder="Misal: RUH"
+                  className="h-9 text-xs"
+                />
+              </div>
+            </div>
+            <Button type="submit" size="sm" className="h-9 px-3 text-xs" disabled={addingCity}>
+              {addingCity ? "..." : "Tambah"}
+            </Button>
+          </form>
+
+          <div className="max-h-[250px] overflow-y-auto border rounded-md p-3 divide-y divide-border bg-card">
+            {cities.map((c) => (
+              <div key={c.id} className="flex items-center justify-between py-2">
+                <div className="flex items-center gap-3">
+                  <input
+                    type="checkbox"
+                    id={`hotel-city-${c.id}`}
+                    checked={selectedCityIds.includes(c.id)}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setSelectedCityIds((prev) => [...prev, c.id]);
+                      } else {
+                        setSelectedCityIds((prev) => prev.filter((id) => id !== c.id));
+                      }
+                    }}
+                    className="h-4 w-4 rounded border-input text-primary focus:ring-primary cursor-pointer"
+                  />
+                  <label
+                    htmlFor={`hotel-city-${c.id}`}
+                    className="text-sm font-medium cursor-pointer select-none"
+                  >
+                    {c.name} <span className="text-xs text-muted-foreground font-semibold font-mono">({c.code})</span>
+                  </label>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleDeleteCity(c.id, c.name)}
+                  className="text-red-500 hover:text-red-700 hover:bg-red-50 p-1.5 rounded-md transition-colors"
+                  title="Hapus kota dari database"
                 >
-                  {c.name} <span className="text-xs text-muted-foreground font-semibold font-mono">({c.code})</span>
-                </label>
+                  <Trash2 className="h-4 w-4" />
+                </button>
               </div>
             ))}
           </div>
