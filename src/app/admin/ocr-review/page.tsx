@@ -20,7 +20,7 @@ import {
 import { Badge } from "@/shared/components/ui/Badge";
 import { Button } from "@/shared/components/ui/Button";
 import { Input } from "@/shared/components/ui/Input";
-import { getJamaahList, getDokumenByJamaah } from "@/services/mock/handlers";
+import { getJamaahList, getDokumenByJamaah } from "@/server/actions/api";
 import type { Jamaah, DokumenItem } from "@/shared/types";
 import { formatDateShort, cn } from "@/shared/lib/utils";
 
@@ -145,13 +145,13 @@ export default function OcrReviewPage() {
     async function load() {
       const jamaahList = await getJamaahList();
       const results = await Promise.all(
-        jamaahList.map(async (j) => {
+        jamaahList.map(async (j: any) => {
           const docs = await getDokumenByJamaah(j.id);
           return docs
             .filter(
-              (d) => d.status === "pending" || d.status === "kurang" || d.status === "revisi"
+              (d: any) => d.status === "pending" || d.status === "kurang" || d.status === "revisi"
             )
-            .map((d) => {
+            .map((d: any) => {
               const ocr = generateOcrData(d.jenis, j);
               const edited: Record<string, string> = {};
               ocr.fields.forEach((f) => {

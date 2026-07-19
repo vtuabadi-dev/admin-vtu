@@ -16,7 +16,7 @@ import { Button } from "@/shared/components/ui/Button";
 import { Input } from "@/shared/components/ui/Input";
 import { Table } from "@/shared/components/ui/Table";
 import { Modal } from "@/shared/components/ui/Modal";
-import { getGroupList, getJamaahByGroup } from "@/services/mock/handlers";
+import { getGroupList, getJamaahByGroup } from "@/server/actions/api";
 import type { RegistrationGroup, Jamaah } from "@/shared/types";
 import { formatCurrency } from "@/shared/lib/utils";
 

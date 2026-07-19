@@ -27,7 +27,7 @@ import { formatCurrency } from "@/shared/lib/utils";
 import {
   getKeberangkatanList,
   submitRegistrasi,
-} from "@/services/mock/handlers";
+} from "@/server/actions/api";
 import type {
   RegistrasiFormData,
   Keberangkatan,
@@ -365,7 +365,7 @@ export default function RegistrasiPage() {
     setErrors({});
     setIsSubmitting(true);
     try {
-      const result = await submitRegistrasi();
+      const result = await submitRegistrasi(formData);
       setSubmitResult(result);
       setCurrentStep(4);
     } finally {
@@ -755,9 +755,11 @@ function StepPaket({
               <CardContent className="p-4 space-y-3">
                 <div className="flex items-start justify-between">
                   <div>
-                    <p className="font-semibold text-sm">{paket.namaPaket}</p>
-                    <p className="text-xs text-muted-foreground">
-                      Kode: {paket.kode}
+                    <p className="font-semibold text-sm">
+                      {paket.paketUmroh?.namaPaket || "-"}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {formatCurrency(paket.paketUmroh?.hargaBase || 0)} per orang
                     </p>
                   </div>
                   {isSelected && (
@@ -769,13 +771,13 @@ function StepPaket({
                 </div>
 
                 <p className="text-lg font-bold text-primary">
-                  {formatCurrency(paket.hargaPaket)}
+                  {formatCurrency(paket.paketUmroh?.hargaBase || 0)}
                 </p>
 
                 <div className="text-xs text-muted-foreground space-y-1.5">
                   <div className="flex items-center gap-1.5">
                     <Plane className="h-3.5 w-3.5 shrink-0" />
-                    <span>{paket.maskapai}</span>
+                    <span>{paket.maskapaiId || "-"}</span>
                   </div>
                   <div className="flex items-center gap-1.5">
                     <CalendarDaysIcon className="h-3.5 w-3.5 shrink-0" />
@@ -787,13 +789,13 @@ function StepPaket({
                   <div className="flex items-center gap-1.5">
                     <MapPin className="h-3.5 w-3.5 shrink-0" />
                     <span>
-                      Hotel Mekkah: {paket.hotelMekkah}
+                      Hotel Mekkah: {paket.hotelMekkahId || "-"}
                     </span>
                   </div>
                   <div className="flex items-center gap-1.5">
                     <MapPin className="h-3.5 w-3.5 shrink-0" />
                     <span>
-                      Hotel Madinah: {paket.hotelMadinah}
+                      Hotel Madinah: {paket.hotelMadinahId || "-"}
                     </span>
                   </div>
                 </div>
@@ -824,7 +826,7 @@ function StepPaket({
           <div>
             <p className="text-sm text-muted-foreground">Harga per orang</p>
             <p className="text-xl font-bold text-primary">
-              {formatCurrency(selectedPaket.hargaPaket)}
+              {formatCurrency(selectedPaket.paketUmroh?.hargaBase || 0)}
             </p>
           </div>
           <Badge variant="info" size="lg">
@@ -1226,11 +1228,11 @@ function StepKonfirmasi({
             <>
               <SummaryItem
                 label="Paket Keberangkatan"
-                value={selectedPaket.namaPaket}
+                value={selectedPaket.paketUmroh?.namaPaket || "-"}
               />
               <SummaryItem
                 label="Harga Paket"
-                value={formatCurrency(selectedPaket.hargaPaket)}
+                value={formatCurrency(selectedPaket.paketUmroh?.hargaBase || 0)}
               />
             </>
           )}

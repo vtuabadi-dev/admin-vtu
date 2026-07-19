@@ -7,8 +7,8 @@ import {
 import type { Manifest, Keberangkatan } from "@/shared/types";
 
 const mockKbrList: Keberangkatan[] = [
-  { id: "kbr-1", kode: "PKG01", namaPaket: "Paket A" } as Keberangkatan,
-  { id: "kbr-2", kode: "PKG02", namaPaket: "Paket B" } as Keberangkatan,
+  { id: "kbr-1", kode: "PKG01", paketUmroh: { namaPaket: "Paket A" } } as unknown as Keberangkatan,
+  { id: "kbr-2", kode: "PKG02", paketUmroh: { namaPaket: "Paket B" } } as unknown as Keberangkatan,
 ];
 
 function makeManifest(overrides: Partial<Manifest> = {}): Manifest {

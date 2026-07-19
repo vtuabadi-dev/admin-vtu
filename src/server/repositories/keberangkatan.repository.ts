@@ -5,31 +5,26 @@ function mapKeberangkatan(row: any): Keberangkatan {
   return {
     id: row.id,
     kode: row.kode,
-    namaPaket: row.namaPaket,
-    hargaPaket: row.hargaPaket,
-    tanggalBerangkat: row.tanggalBerangkat.toISOString(),
-    tanggalPulang: row.tanggalPulang.toISOString(),
-    maskapai: row.maskapai,
-    nomorPenerbangan: row.nomorPenerbangan,
-    hotelMekkah: row.hotelMekkah,
-    hotelMadinah: row.hotelMadinah,
-    hotelOptions: (row.hotelOptions as Keberangkatan["hotelOptions"]) ?? [],
+    paketUmrohId: row.paketUmrohId ?? "",
     status: row.status,
-    kuota: row.kuota,
     terisi: row.terisi,
     jamaahIds: (row.groups as any[])?.flatMap((g: any) => g.anggota?.map((a: any) => a.id) ?? []) ?? [],
+    maxSeat: row.maxSeat ?? undefined,
+    targetMaterialisasi: row.targetMaterialisasi ?? undefined,
     maskapaiId: row.maskapaiId ?? undefined,
     hotelMekkahId: row.hotelMekkahId ?? undefined,
     hotelMadinahId: row.hotelMadinahId ?? undefined,
     startingPointId: row.startingPointId ?? undefined,
     packageTypeId: row.packageTypeId ?? undefined,
-    pricingMode: row.pricingMode ?? undefined,
-    durationDays: row.durationDays ?? undefined,
-    promoText: row.promoText ?? undefined,
-    description: row.description ?? undefined,
-    notes: row.notes ?? undefined,
-    include: row.include ?? undefined,
-    exclude: row.exclude ?? undefined,
+    namaPaket: row.namaPaket ?? "-",
+    hargaPaket: row.hargaPaket ?? 0,
+    maskapai: row.maskapai ?? "-",
+    hotelMekkah: row.hotelMekkah ?? "-",
+    hotelMadinah: row.hotelMadinah ?? "-",
+    kuota: row.kuota ?? row.maxSeat ?? 0,
+    tanggalBerangkat: row.tanggalBerangkat?.toISOString() ?? new Date().toISOString(),
+    tanggalPulang: row.tanggalPulang?.toISOString() ?? new Date().toISOString(),
+    nomorPenerbangan: row.nomorPenerbangan ?? "-",
   };
 }
 
@@ -67,30 +62,26 @@ export const keberangkatanRepo = {
     const row = await prisma.keberangkatan.create({
       data: {
         kode: data.kode,
-        namaPaket: data.namaPaket,
-        hargaPaket: data.hargaPaket,
+        paketUmrohId: data.paketUmrohId,
         tanggalBerangkat: new Date(data.tanggalBerangkat),
         tanggalPulang: new Date(data.tanggalPulang),
-        maskapai: data.maskapai,
         nomorPenerbangan: data.nomorPenerbangan,
-        hotelMekkah: data.hotelMekkah,
-        hotelMadinah: data.hotelMadinah,
-        hotelOptions: data.hotelOptions,
         status: data.status,
-        kuota: data.kuota,
         terisi: data.terisi,
+        maxSeat: data.maxSeat,
+        targetMaterialisasi: data.targetMaterialisasi,
         maskapaiId: data.maskapaiId,
         hotelMekkahId: data.hotelMekkahId,
         hotelMadinahId: data.hotelMadinahId,
         startingPointId: data.startingPointId,
         packageTypeId: data.packageTypeId,
-        pricingMode: data.pricingMode,
-        durationDays: data.durationDays,
-        promoText: data.promoText,
-        description: data.description,
-        notes: data.notes,
-        include: data.include,
-        exclude: data.exclude,
+        namaPaket: data.namaPaket ?? "Legacy Package",
+        hargaPaket: data.hargaPaket ?? 0,
+        maskapai: data.maskapai ?? "TBA",
+        hotelMekkah: data.hotelMekkah ?? "TBA",
+        hotelMadinah: data.hotelMadinah ?? "TBA",
+        kuota: data.kuota ?? data.maxSeat ?? 0,
+        hotelOptions: [],
       },
       include: { groups: { include: { anggota: { select: { id: true } } } } },
     });
@@ -99,28 +90,19 @@ export const keberangkatanRepo = {
 
   async update(id: string, data: Partial<Keberangkatan>) {
     const updateData: any = {};
-    if (data.namaPaket !== undefined) updateData.namaPaket = data.namaPaket;
-    if (data.hargaPaket !== undefined) updateData.hargaPaket = data.hargaPaket;
+    if (data.paketUmrohId !== undefined) updateData.paketUmrohId = data.paketUmrohId;
     if (data.tanggalBerangkat !== undefined) updateData.tanggalBerangkat = new Date(data.tanggalBerangkat);
     if (data.tanggalPulang !== undefined) updateData.tanggalPulang = new Date(data.tanggalPulang);
-    if (data.maskapai !== undefined) updateData.maskapai = data.maskapai;
     if (data.nomorPenerbangan !== undefined) updateData.nomorPenerbangan = data.nomorPenerbangan;
-    if (data.hotelOptions !== undefined) updateData.hotelOptions = data.hotelOptions;
     if (data.status !== undefined) updateData.status = data.status;
-    if (data.kuota !== undefined) updateData.kuota = data.kuota;
+    if (data.maxSeat !== undefined) updateData.maxSeat = data.maxSeat;
+    if (data.targetMaterialisasi !== undefined) updateData.targetMaterialisasi = data.targetMaterialisasi;
     if (data.terisi !== undefined) updateData.terisi = data.terisi;
     if (data.maskapaiId !== undefined) updateData.maskapaiId = data.maskapaiId;
     if (data.hotelMekkahId !== undefined) updateData.hotelMekkahId = data.hotelMekkahId;
     if (data.hotelMadinahId !== undefined) updateData.hotelMadinahId = data.hotelMadinahId;
     if (data.startingPointId !== undefined) updateData.startingPointId = data.startingPointId;
     if (data.packageTypeId !== undefined) updateData.packageTypeId = data.packageTypeId;
-    if (data.pricingMode !== undefined) updateData.pricingMode = data.pricingMode;
-    if (data.durationDays !== undefined) updateData.durationDays = data.durationDays;
-    if (data.promoText !== undefined) updateData.promoText = data.promoText;
-    if (data.description !== undefined) updateData.description = data.description;
-    if (data.notes !== undefined) updateData.notes = data.notes;
-    if (data.include !== undefined) updateData.include = data.include;
-    if (data.exclude !== undefined) updateData.exclude = data.exclude;
 
     const row = await prisma.keberangkatan.update({
       where: { id },
@@ -217,5 +199,10 @@ export const keberangkatanRepo = {
     });
   },
 
+  async countByPaketId(paketUmrohId: string) {
+    return prisma.keberangkatan.count({
+      where: { paketUmrohId },
+    });
+  },
 
 };

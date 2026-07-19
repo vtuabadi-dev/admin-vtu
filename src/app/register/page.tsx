@@ -726,7 +726,7 @@ export default function RegisterPage() {
                     >
                       <div className="flex justify-between items-start">
                         <div>
-                          <p className="font-semibold text-gray-900">{paket.namaPaket}</p>
+                          <p className="font-semibold text-gray-900">{paket.paketUmroh?.namaPaket || "-"}</p>
                           <p className="text-sm text-gray-500">
                             {new Date(paket.tanggalBerangkat).toLocaleDateString("id-ID", {
                               day: "numeric", month: "long", year: "numeric",
@@ -736,19 +736,13 @@ export default function RegisterPage() {
                               day: "numeric", month: "long", year: "numeric",
                             })}
                           </p>
-                          <p className="text-xs text-gray-400 mt-1">{paket.maskapai} • {paket.nomorPenerbangan}</p>
-                          <p className="text-xs text-gray-400">
-                            Hotel: {paket.hotelMekkah} / {paket.hotelMadinah}
-                          </p>
+                          <p className="text-xs text-gray-400 mt-1">{paket.maskapaiId || "-"} • {paket.nomorPenerbangan}</p>
+                            Hotel: {paket.hotelMekkahId || "-"} / {paket.hotelMadinahId || "-"}
                         </div>
                         <div className="text-right">
-                          <p className="text-lg font-bold text-blue-600">
-                            Rp {paket.hargaPaket.toLocaleString("id-ID")}
-                          </p>
+                            Rp {(paket.paketUmroh?.hargaBase || 0).toLocaleString("id-ID")}
                           <p className="text-xs text-gray-400">/orang</p>
-                          <p className="text-xs text-gray-400 mt-1">
-                            Kuota: {paket.terisi}/{paket.kuota}
-                          </p>
+                            Kuota: {paket.terisi}/{paket.maxSeat}
                         </div>
                       </div>
                     </button>
@@ -930,11 +924,11 @@ export default function RegisterPage() {
               {selectedPaket && (
                 <div className="border border-gray-200 rounded-lg p-4">
                   <h3 className="text-sm font-semibold text-gray-700 mb-2">Paket</h3>
-                  <p className="text-sm text-gray-900 font-medium">{selectedPaket.namaPaket}</p>
+                  <p className="text-sm text-gray-900 font-medium">{selectedPaket.paketUmroh?.namaPaket || "-"}</p>
                   <p className="text-sm text-gray-500">
-                    Rp {selectedPaket.hargaPaket.toLocaleString("id-ID")} × {paxCount} ={" "}
+                    Rp {(selectedPaket.paketUmroh?.hargaBase || 0).toLocaleString("id-ID")} × {paxCount} ={" "}
                     <span className="font-semibold text-blue-600">
-                      Rp {(selectedPaket.hargaPaket * paxCount).toLocaleString("id-ID")}
+                      Rp {((selectedPaket.paketUmroh?.hargaBase || 0) * paxCount).toLocaleString("id-ID")}
                     </span>
                   </p>
                   {roomUpgrade && <p className="text-xs text-gray-400">Kamar: {roomUpgrade.toUpperCase()}{roomUpgrade === "mix" ? " (diatur travel)" : ""}</p>}

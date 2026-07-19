@@ -40,7 +40,7 @@ export function computeOperationalTimeline(
       90,
       "event",
       90,
-      `Pendaftaran jamaah dibuka untuk paket ${keberangkatan.namaPaket}`
+      `Pendaftaran jamaah dibuka untuk paket ${keberangkatan.paketUmroh?.namaPaket || keberangkatan.kode}`
     ),
     mkMilestone(
       "reminder_pelunasan",

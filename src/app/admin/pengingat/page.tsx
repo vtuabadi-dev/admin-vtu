@@ -5,7 +5,7 @@ import {
   getReminderList,
   getJamaahList,
   getInvoiceList,
-} from "@/services/mock/handlers";
+} from "@/server/actions/api";
 import {
   Card,
   CardContent,

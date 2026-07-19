@@ -1,4 +1,7 @@
 import { airlineRepo } from "../repositories/master/airline.repository";
+import { hotelRepo } from "../repositories/master/hotel.repository";
+import { cityRepo } from "../repositories/master/city.repository";
+import { packageTypeRepo } from "../repositories/master/package-type.repository";
 
 export const masterDataService = {
   // Airline
@@ -41,18 +44,139 @@ export const masterDataService = {
     const row = await airlineRepo.findById(id);
     if (!row) throw new Error("NOT_FOUND");
     
-    // Check relations - using prisma directly is forbidden, but we can do a try/catch on hard delete,
-    // or we can implement the relation check.
-    // The policy says: "Jika memiliki relasi -> Soft Delete". 
     try {
       return await airlineRepo.delete(id);
     } catch (e: any) {
-      // Prisma P2003 Foreign Key constraint failed
       if (e?.code === "P2003") {
         return await airlineRepo.update(id, { isActive: false });
       }
       throw e;
     }
   },
+
+  // Hotels
+  async getHotels(params?: { isActive?: boolean; limit?: number; offset?: number; search?: string; sort?: string; order?: "asc" | "desc"; cityId?: string }) {
+    return hotelRepo.findAll(params);
+  },
+  async getHotelById(id: string) {
+    return hotelRepo.findById(id);
+  },
+  async createHotel(data: { code: string; name: string; cityId: string; starRating?: number; isActive?: boolean }) {
+    const existingCode = await hotelRepo.findByCode(data.code);
+    if (existingCode) throw new Error("DUPLICATE_CODE");
+    const existingName = await hotelRepo.findByName(data.name);
+    if (existingName) throw new Error("DUPLICATE_NAME");
+    return hotelRepo.create({
+      ...data,
+      starRating: data.starRating ?? null,
+      isActive: data.isActive ?? true,
+    });
+  },
+  async updateHotel(id: string, data: { code?: string; name?: string; cityId?: string; starRating?: number; isActive?: boolean }) {
+    if (data.code) {
+      const existing = await hotelRepo.findByCode(data.code);
+      if (existing && existing.id !== id) throw new Error("DUPLICATE_CODE");
+    }
+    if (data.name) {
+      const existing = await hotelRepo.findByName(data.name);
+      if (existing && existing.id !== id) throw new Error("DUPLICATE_NAME");
+    }
+    return hotelRepo.update(id, data);
+  },
+  async deleteHotel(id: string) {
+    const row = await hotelRepo.findById(id);
+    if (!row) throw new Error("NOT_FOUND");
+    try {
+      return await hotelRepo.delete(id);
+    } catch (e: any) {
+      if (e?.code === "P2003") {
+        return await hotelRepo.update(id, { isActive: false });
+      }
+      throw e;
+    }
+  },
+
+  // Cities
+  async getCities(params?: { isActive?: boolean; limit?: number; offset?: number; search?: string; sort?: string; order?: "asc" | "desc" }) {
+    return cityRepo.findAll(params);
+  },
+  async getCityById(id: string) {
+    return cityRepo.findById(id);
+  },
+  async createCity(data: { code: string; name: string; country: string; isActive?: boolean }) {
+    const existingCode = await cityRepo.findByCode(data.code);
+    if (existingCode) throw new Error("DUPLICATE_CODE");
+    const existingName = await cityRepo.findByName(data.name);
+    if (existingName) throw new Error("DUPLICATE_NAME");
+    return cityRepo.create({
+      ...data,
+      isActive: data.isActive ?? true,
+    });
+  },
+  async updateCity(id: string, data: { code?: string; name?: string; country?: string; isActive?: boolean }) {
+    if (data.code) {
+      const existing = await cityRepo.findByCode(data.code);
+      if (existing && existing.id !== id) throw new Error("DUPLICATE_CODE");
+    }
+    if (data.name) {
+      const existing = await cityRepo.findByName(data.name);
+      if (existing && existing.id !== id) throw new Error("DUPLICATE_NAME");
+    }
+    return cityRepo.update(id, data);
+  },
+  async deleteCity(id: string) {
+    const row = await cityRepo.findById(id);
+    if (!row) throw new Error("NOT_FOUND");
+    try {
+      return await cityRepo.delete(id);
+    } catch (e: any) {
+      if (e?.code === "P2003") {
+        return await cityRepo.update(id, { isActive: false });
+      }
+      throw e;
+    }
+  },
+
+  // Package Types
+  async getPackageTypes(params?: { isActive?: boolean; limit?: number; offset?: number; search?: string; sort?: string; order?: "asc" | "desc" }) {
+    return packageTypeRepo.findAll(params);
+  },
+  async getPackageTypeById(id: string) {
+    return packageTypeRepo.findById(id);
+  },
+  async createPackageType(data: { code: string; name: string; isActive?: boolean }) {
+    const existingCode = await packageTypeRepo.findByCode(data.code);
+    if (existingCode) throw new Error("DUPLICATE_CODE");
+    const existingName = await packageTypeRepo.findByName(data.name);
+    if (existingName) throw new Error("DUPLICATE_NAME");
+    return packageTypeRepo.create({
+      ...data,
+      isActive: data.isActive ?? true,
+    });
+  },
+  async updatePackageType(id: string, data: { code?: string; name?: string; isActive?: boolean }) {
+    if (data.code) {
+      const existing = await packageTypeRepo.findByCode(data.code);
+      if (existing && existing.id !== id) throw new Error("DUPLICATE_CODE");
+    }
+    if (data.name) {
+      const existing = await packageTypeRepo.findByName(data.name);
+      if (existing && existing.id !== id) throw new Error("DUPLICATE_NAME");
+    }
+    return packageTypeRepo.update(id, data);
+  },
+  async deletePackageType(id: string) {
+    const row = await packageTypeRepo.findById(id);
+    if (!row) throw new Error("NOT_FOUND");
+    try {
+      return await packageTypeRepo.delete(id);
+    } catch (e: any) {
+      if (e?.code === "P2003") {
+        return await packageTypeRepo.update(id, { isActive: false });
+      }
+      throw e;
+    }
+  },
 };
+
 

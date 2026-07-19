@@ -11,7 +11,7 @@ import {
   getKeberangkatanList,
   getManifestList,
   getInvoiceList,
-} from "@/services/mock/handlers";
+} from "@/server/actions/api";
 import type {
   Jamaah,
   RegistrationGroup,

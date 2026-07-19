@@ -36,7 +36,7 @@ import {
   getPackageReadinessScore,
   getJamaahList,
   getGroupList,
-} from "@/services/mock/handlers";
+} from "@/server/actions/api";
 import type {
   Keberangkatan,
   PackageIntelligence,
@@ -138,9 +138,9 @@ export default function KeberangkatanDetailPage() {
 
       // Build doc rows from jamaah in this package
       const pkgGroupIds = new Set(
-        allGroups.filter((g) => g.paketKeberangkatanId === id).map((g) => g.id)
+        allGroups.filter((g: any) => g.paketKeberangkatanId === id).map((g: any) => g.id)
       );
-      const pkgJamaah = allJamaah.filter((j) => pkgGroupIds.has(j.groupId));
+      const pkgJamaah = allJamaah.filter((j: any) => pkgGroupIds.has(j.groupId));
       setDocRows(buildDocRows(pkgJamaah));
       setLoading(false);
     }
@@ -215,7 +215,7 @@ export default function KeberangkatanDetailPage() {
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
-            <h1 className="text-xl font-bold">{kbr.namaPaket}</h1>
+            <h1 className="text-xl font-bold">{kbr.paketUmroh?.namaPaket || "-"}</h1>
             <div className="flex items-center gap-2 mt-0.5">
               <span className="text-sm text-muted-foreground font-mono">{kbr.kode}</span>
               <span className="text-muted-foreground">·</span>
@@ -355,7 +355,7 @@ export default function KeberangkatanDetailPage() {
                       label="Total Jamaah"
                       value={intel.totalJamaah}
                       icon={Users}
-                      trend={{ value: `${kbr.terisi}/${kbr.kuota} kuota`, positive: intel.totalJamaah > 0 }}
+                      trend={{ value: `${kbr.terisi}/${kbr.maxSeat || 0} kuota`, positive: intel.totalJamaah > 0 }}
                     />
                     <StatCard
                       label="Belum Lunas"
@@ -596,19 +596,16 @@ export default function KeberangkatanDetailPage() {
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    {kbr.hotelOptions.length === 0 ? (
+                    {!kbr.hotelMekkahId && !kbr.hotelMadinahId ? (
                       <p className="text-sm text-muted-foreground py-2 text-center">Belum ada konfigurasi hotel</p>
                     ) : (
                       <div className="flex flex-wrap gap-2">
-                        {kbr.hotelOptions.map((opt, idx) => (
                           <span
-                            key={idx}
                             className="inline-flex items-center rounded-full bg-muted px-3 py-1.5 text-sm font-medium"
                           >
                             <Building2 className="mr-1.5 h-3.5 w-3.5 text-muted-foreground" />
-                            {opt.hotelMekkah} — {opt.hotelMadinah}
+                            {kbr.hotelMekkahId || "-"} — {kbr.hotelMadinahId || "-"}
                           </span>
-                        ))}
                       </div>
                     )}
                   </CardContent>
@@ -834,7 +831,7 @@ export default function KeberangkatanDetailPage() {
                           {generateReminderText(
                             reminderTarget.jamaah,
                             reminderTarget.missingLabels,
-                            kbr.namaPaket
+                            kbr.paketUmroh?.namaPaket || "-"
                           )}
                         </pre>
                       </div>

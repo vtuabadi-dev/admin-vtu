@@ -8,7 +8,7 @@ import { Button } from "@/shared/components/ui/Button";
 import { Select } from "@/shared/components/ui/Select";
 import { Badge } from "@/shared/components/ui/Badge";
 import { getHotelCombinations, generateHotelLabel } from "@/shared/lib/hotel-utils";
-import { getKeberangkatanList, getJamaahList } from "@/services/mock/handlers";
+import { getKeberangkatanList, getJamaahList } from "@/server/actions/api";
 import type { Keberangkatan, Jamaah, HotelCombinationSummary } from "@/shared/types";
 
 export default function HotelCombinationPage() {
@@ -63,7 +63,7 @@ export default function HotelCombinationPage() {
           <Select
             options={keberangkatanList.map((k) => ({
               value: k.id,
-              label: `${k.kode} — ${k.namaPaket}`,
+              label: `${k.kode} — ${k.paketUmroh?.namaPaket || "-"}`,
             }))}
             placeholder="-- Pilih Paket Keberangkatan --"
             value={selectedKbrId}
@@ -82,16 +82,19 @@ export default function HotelCombinationPage() {
             <CardHeader>
               <CardTitle className="text-sm flex items-center gap-2">
                 <Building2 className="h-4 w-4 text-muted-foreground" />
-                Hotel Options — {selectedKbr.namaPaket}
+                Hotel Options — {selectedKbr.paketUmroh?.namaPaket || "-"}
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="flex flex-wrap gap-2">
-                {selectedKbr.hotelOptions.map((opt, idx) => (
-                  <Badge key={idx} variant="outline" size="sm">
-                    {generateHotelLabel(opt.hotelMekkah, opt.hotelMadinah)}
+                {selectedKbr.paketUmroh?.hotelMekkahOptions && selectedKbr.paketUmroh?.hotelMadinahOptions ? (
+                  <Badge variant="outline" size="sm">
+                    {generateHotelLabel(
+                      (selectedKbr.paketUmroh.hotelMekkahOptions as string[])[0] || "TBD",
+                      (selectedKbr.paketUmroh.hotelMadinahOptions as string[])[0] || "TBD"
+                    )}
                   </Badge>
-                ))}
+                ) : null}
               </div>
             </CardContent>
           </Card>

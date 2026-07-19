@@ -59,7 +59,7 @@ describe("LocalStorageAdapter", () => {
 
     const files = await adapter.list("dir");
     expect(files).toHaveLength(2);
-    expect(files[0].size).toBeGreaterThan(0);
+    expect(files[0]!.size).toBeGreaterThan(0);
   });
 
   it("should return empty array for non-existent directory", async () => {

@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/sha
 import { Button } from "@/shared/components/ui/Button";
 import { Input } from "@/shared/components/ui/Input";
 import { ArrowLeft, Save } from "lucide-react";
-import { createKeberangkatan } from "@/services/mock/handlers";
+import { createKeberangkatan } from "@/server/actions/api";
 
 export default function TambahKeberangkatanPage() {
   const router = useRouter();

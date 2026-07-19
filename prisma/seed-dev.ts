@@ -80,6 +80,14 @@ async function main() {
   await prisma.jamaah.deleteMany();
   await prisma.registrationGroup.deleteMany();
   await prisma.keberangkatan.deleteMany();
+  
+  // Clean master data
+  await prisma.masterAirline.deleteMany();
+  await prisma.masterHotel.deleteMany();
+  await prisma.masterCity.deleteMany();
+  await prisma.masterPackageType.deleteMany();
+  await prisma.masterPerlengkapan.deleteMany();
+
   await prisma.user.deleteMany();
   console.log("✅ Existing data cleaned\n");
 
@@ -96,6 +104,64 @@ async function main() {
   ]);
   console.log(`✅ Created ${users.length} users`);
 
+  // ── 1b. Master Cities ───────────────────────────────────────
+  const cities = {
+    cgk: await prisma.masterCity.create({ data: { code: "CGK", name: "Jakarta", country: "Indonesia", isActive: true } }),
+    sub: await prisma.masterCity.create({ data: { code: "SUB", name: "Surabaya", country: "Indonesia", isActive: true } }),
+    upg: await prisma.masterCity.create({ data: { code: "UPG", name: "Makassar", country: "Indonesia", isActive: true } }),
+    med: await prisma.masterCity.create({ data: { code: "MED", name: "Madinah", country: "Arab Saudi", isActive: true } }),
+    jed: await prisma.masterCity.create({ data: { code: "JED", name: "Jeddah", country: "Arab Saudi", isActive: true } }),
+    mek: await prisma.masterCity.create({ data: { code: "MEK", name: "Mekkah", country: "Arab Saudi", isActive: true } }),
+  };
+  console.log("✅ Created master cities");
+
+  // ── 1c. Master Airlines ──────────────────────────────────────
+  const airlines = {
+    ga: await prisma.masterAirline.create({ data: { code: "GA", name: "Garuda Indonesia", isActive: true } }),
+    sv: await prisma.masterAirline.create({ data: { code: "SV", name: "Saudia Airlines", isActive: true } }),
+    qr: await prisma.masterAirline.create({ data: { code: "QR", name: "Qatar Airways", isActive: true } }),
+    ek: await prisma.masterAirline.create({ data: { code: "EK", name: "Emirates", isActive: true } }),
+    jt: await prisma.masterAirline.create({ data: { code: "JT", name: "Lion Air", isActive: true } }),
+  };
+  console.log("✅ Created master airlines");
+
+  // ── 1d. Master Hotels ────────────────────────────────────────
+  const hotels = {
+    swiss: await prisma.masterHotel.create({ data: { code: "SWISS-MEK", name: "Swissotel Maqam", cityId: cities.mek.id, starRating: 5, isActive: true } }),
+    hyatt: await prisma.masterHotel.create({ data: { code: "HYATT-MEK", name: "Hyatt Regency", cityId: cities.mek.id, starRating: 5, isActive: true } }),
+    midan: await prisma.masterHotel.create({ data: { code: "MIDAN-MEK", name: "Midan Hotel", cityId: cities.mek.id, starRating: 4, isActive: true } }),
+    fairmont: await prisma.masterHotel.create({ data: { code: "FAIRMONT-MEK", name: "Fairmont Clock Tower", cityId: cities.mek.id, starRating: 5, isActive: true } }),
+    hilton: await prisma.masterHotel.create({ data: { code: "HILTON-MEK", name: "Hilton Convention", cityId: cities.mek.id, starRating: 5, isActive: true } }),
+    anwar: await prisma.masterHotel.create({ data: { code: "ANWAR-MED", name: "Anwar Al Madinah", cityId: cities.med.id, starRating: 5, isActive: true } }),
+    dallah: await prisma.masterHotel.create({ data: { code: "DALLAH-MED", name: "Dallah Taibah", cityId: cities.med.id, starRating: 5, isActive: true } }),
+    eiman: await prisma.masterHotel.create({ data: { code: "EIMAN-MED", name: "Al Eiman Royal", cityId: cities.med.id, starRating: 5, isActive: true } }),
+    oberoi: await prisma.masterHotel.create({ data: { code: "OBEROI-MED", name: "Oberoi Madinah", cityId: cities.med.id, starRating: 5, isActive: true } }),
+    pullman: await prisma.masterHotel.create({ data: { code: "PULLMAN-MED", name: "Pullman Zamzam", cityId: cities.med.id, starRating: 5, isActive: true } }),
+  };
+  console.log("✅ Created master hotels");
+
+  // ── 1e. Master Package Types ─────────────────────────────────
+  const packageTypes = {
+    reg: await prisma.masterPackageType.create({ data: { code: "REG", name: "Umroh Reguler", isActive: true } }),
+    plt: await prisma.masterPackageType.create({ data: { code: "PLT", name: "Umroh Plus Turki", isActive: true } }),
+    ram: await prisma.masterPackageType.create({ data: { code: "RAM", name: "Umroh Ramadhan", isActive: true } }),
+    syw: await prisma.masterPackageType.create({ data: { code: "SYW", name: "Umroh Syawal", isActive: true } }),
+  };
+  console.log("✅ Created master package types");
+
+  // ── 1f. Master Perlengkapan ──────────────────────────────────
+  await prisma.masterPerlengkapan.createMany({
+    data: [
+      { code: "P1", name: "Koper Besar", isActive: true },
+      { code: "P2", name: "Koper Kabin", isActive: true },
+      { code: "P3", name: "Seragam Batik", isActive: true },
+      { code: "P4", name: "ID Card", isActive: true },
+      { code: "P5", name: "Buku Manasik", isActive: true },
+      { code: "P6", name: "Zamzam 5L", isActive: true },
+    ]
+  });
+  console.log("✅ Created master perlengkapan");
+
   // ── 2. Keberangkatan ─────────────────────────────────────────
   const keberangkatanList = await Promise.all([
     prisma.keberangkatan.create({ data: {
@@ -105,6 +171,11 @@ async function main() {
       hotelMekkah: "Swissotel Maqam", hotelMadinah: "Anwar Al Madinah",
       hotelOptions: [{ hotelMekkah: "Swissotel Maqam", hotelMadinah: "Anwar Al Madinah" }],
       kuota: 50, terisi: 0, status: "preparing", hargaPaket: 32000000,
+      maskapaiId: airlines.sv.id,
+      hotelMekkahId: hotels.swiss.id,
+      hotelMadinahId: hotels.anwar.id,
+      startingPointId: cities.cgk.id,
+      packageTypeId: packageTypes.reg.id,
     }}),
     prisma.keberangkatan.create({ data: {
       kode: "KBR-1447-002", namaPaket: "Umroh Plus — Safar 1447H",
@@ -113,6 +184,11 @@ async function main() {
       hotelMekkah: "Hyatt Regency", hotelMadinah: "Dallah Taibah",
       hotelOptions: [{ hotelMekkah: "Hyatt Regency", hotelMadinah: "Dallah Taibah" }],
       kuota: 45, terisi: 0, status: "preparing", hargaPaket: 38000000,
+      maskapaiId: airlines.ga.id,
+      hotelMekkahId: hotels.hyatt.id,
+      hotelMadinahId: hotels.dallah.id,
+      startingPointId: cities.cgk.id,
+      packageTypeId: packageTypes.plt.id,
     }}),
     prisma.keberangkatan.create({ data: {
       kode: "KBR-1447-003", namaPaket: "Umroh Ekonomi — Rabiul Awal 1447H",
@@ -121,6 +197,11 @@ async function main() {
       hotelMekkah: "Midan Hotel", hotelMadinah: "Al Eiman Royal",
       hotelOptions: [{ hotelMekkah: "Midan Hotel", hotelMadinah: "Al Eiman Royal" }],
       kuota: 60, terisi: 0, status: "preparing", hargaPaket: 25500000,
+      maskapaiId: airlines.jt.id,
+      hotelMekkahId: hotels.midan.id,
+      hotelMadinahId: hotels.eiman.id,
+      startingPointId: cities.cgk.id,
+      packageTypeId: packageTypes.reg.id,
     }}),
     prisma.keberangkatan.create({ data: {
       kode: "KBR-1447-004", namaPaket: "Umroh VIP — Rabiul Akhir 1447H",
@@ -129,6 +210,11 @@ async function main() {
       hotelMekkah: "Fairmont Clock Tower", hotelMadinah: "Oberoi Madinah",
       hotelOptions: [{ hotelMekkah: "Fairmont Clock Tower", hotelMadinah: "Oberoi Madinah" }],
       kuota: 30, terisi: 0, status: "preparing", hargaPaket: 55000000,
+      maskapaiId: airlines.ek.id,
+      hotelMekkahId: hotels.fairmont.id,
+      hotelMadinahId: hotels.oberoi.id,
+      startingPointId: cities.cgk.id,
+      packageTypeId: packageTypes.ram.id,
     }}),
     prisma.keberangkatan.create({ data: {
       kode: "KBR-1447-005", namaPaket: "Umroh Akbar — Jumadil Awal 1447H",
@@ -137,6 +223,11 @@ async function main() {
       hotelMekkah: "Hilton Convention", hotelMadinah: "Pullman Zamzam",
       hotelOptions: [{ hotelMekkah: "Hilton Convention", hotelMadinah: "Pullman Zamzam" }],
       kuota: 55, terisi: 0, status: "preparing", hargaPaket: 42000000,
+      maskapaiId: airlines.qr.id,
+      hotelMekkahId: hotels.hilton.id,
+      hotelMadinahId: hotels.pullman.id,
+      startingPointId: cities.cgk.id,
+      packageTypeId: packageTypes.syw.id,
     }}),
   ]);
   console.log(`✅ Created ${keberangkatanList.length} keberangkatan`);

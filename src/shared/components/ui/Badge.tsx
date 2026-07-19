@@ -66,6 +66,14 @@ const statusColorMap: Record<string, BadgeProps["variant"]> = {
   cancelled: "destructive",
   batal: "destructive",
   kadaluarsa: "destructive",
+  
+  // Paket Umroh
+  DRAFT: "muted",
+  REVIEW: "warning",
+  PUBLISHED: "info",
+  ACTIVE: "success",
+  COMPLETED: "secondary",
+  ARCHIVED: "muted",
 };
 
 const statusLabelMap: Record<string, string> = {
@@ -102,6 +110,14 @@ const statusLabelMap: Record<string, string> = {
   sent: "Terkirim",
   read: "Dibaca",
   responded: "Direspon",
+  
+  // Paket Umroh
+  DRAFT: "Draft",
+  REVIEW: "Review",
+  PUBLISHED: "Published",
+  ACTIVE: "Aktif",
+  COMPLETED: "Selesai",
+  ARCHIVED: "Arsip",
 };
 
 export function StatusBadge({

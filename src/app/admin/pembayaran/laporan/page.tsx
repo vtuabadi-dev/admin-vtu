@@ -14,7 +14,7 @@ import {
   addPembayaran,
   fetchInvoiceSplitConfig,
   saveInvoiceSplitConfig,
-} from "@/services/mock/handlers";
+} from "@/server/actions/api";
 import type {
   GroupPaymentSummary,
   Pembayaran,
@@ -290,7 +290,7 @@ export default function LaporanPembayaranPage() {
   }
 
   async function handleSplitSubmit(config: InvoiceSplitConfig) {
-    await saveInvoiceSplitConfig(config);
+    await saveInvoiceSplitConfig(groupData?.groupId ?? "", config);
     setSplitConfig(config);
     setActiveSplitId(config.splits[0]?.id ?? null);
     setShowSplitModal(false);

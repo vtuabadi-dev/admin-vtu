@@ -20,6 +20,7 @@ import { Select } from "@/shared/components/ui/Select";
 import { StatusBadge } from "@/shared/components/ui/Badge";
 import { Modal } from "@/shared/components/ui/Modal";
 import { Table } from "@/shared/components/ui/Table";
+import { ErrorState } from "@/shared/components/ui/ErrorState";
 import { formatDateShort } from "@/shared/lib/utils";
 import { getHotelCombinations, generateHotelLabel } from "@/shared/lib/hotel-utils";
 import type { Manifest, ManifestRow, Keberangkatan, Jamaah, HotelCombinationSummary } from "@/shared/types";
@@ -30,6 +31,7 @@ export default function ManifestPage() {
   const [keberangkatanList, setKeberangkatanList] = useState<Keberangkatan[]>([]);
   const [selectedKeberangkatan, setSelectedKeberangkatan] = useState("");
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [allJamaah, setAllJamaah] = useState<Jamaah[]>([]);
 
@@ -40,13 +42,29 @@ export default function ManifestPage() {
 
   const loadManifests = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
       const params = selectedKeberangkatan ? `?keberangkatanId=${selectedKeberangkatan}` : "";
-      const res = await fetch(`/api/manifests${params}`);
-      if (res.ok) {
-        const json = await res.json();
-        setManifests(json.data ?? []);
+      
+      const [res, kbrRes, jamRes] = await Promise.all([
+        fetch(`/api/manifests${params}`),
+        fetch("/api/keberangkatan"),
+        fetch("/api/jamaah")
+      ]);
+
+      if (!res.ok || !kbrRes.ok || !jamRes.ok) {
+        throw new Error("Gagal mengambil data dari server");
       }
+
+      const json = await res.json();
+      const kbrJson = await kbrRes.json();
+      const jamJson = await jamRes.json();
+
+      setManifests(json.data ?? []);
+      setKeberangkatanList(kbrJson.data ?? []);
+      setAllJamaah(jamJson.data ?? []);
+    } catch (err: any) {
+      setError(err instanceof Error ? err : new Error("Database Connection Error"));
     } finally {
       setLoading(false);
     }
@@ -55,11 +73,6 @@ export default function ManifestPage() {
   useEffect(() => {
     loadManifests();
   }, [loadManifests]);
-
-  useEffect(() => {
-    fetch("/api/keberangkatan").then(r => r.json()).then(j => setKeberangkatanList(j.data ?? []));
-    fetch("/api/jamaah").then(r => r.json()).then(j => setAllJamaah(j.data ?? []));
-  }, []);
 
   function handleGenerate() {
     setFormKeberangkatan("");
@@ -117,8 +130,8 @@ export default function ManifestPage() {
       kode,
       namaManifest: nama,
       templateId: formTemplate,
-      hotelMekkah: hotelMekkah ?? selectedKbr!.hotelMekkah,
-      hotelMadinah: hotelMadinah ?? selectedKbr!.hotelMadinah,
+      hotelMekkah: hotelMekkah ?? selectedKbr!.hotelMekkahId,
+      hotelMadinah: hotelMadinah ?? selectedKbr!.hotelMadinahId,
       status: "draft" as const,
       data: rows,
     });
@@ -195,7 +208,7 @@ export default function ManifestPage() {
           <Select
             options={keberangkatanList.map((k) => ({
               value: k.id,
-              label: `${k.kode} — ${k.namaPaket}`,
+              label: `${k.kode} — ${k.paketUmroh?.namaPaket || "-"}`,
             }))}
             placeholder="Semua Keberangkatan"
             value={selectedKeberangkatan}
@@ -218,6 +231,10 @@ export default function ManifestPage() {
       {loading ? (
         <div className="flex h-40 items-center justify-center text-sm text-muted-foreground">
           Memuat data manifest...
+        </div>
+      ) : error ? (
+        <div className="flex h-40 items-center justify-center">
+          <ErrorState onRetry={loadManifests} message={error.message} />
         </div>
       ) : manifests.length === 0 ? (
         <div className="flex h-40 items-center justify-center text-sm text-muted-foreground">
@@ -325,7 +342,7 @@ export default function ManifestPage() {
               label="Pilih Keberangkatan"
               options={keberangkatanList.map((k) => ({
                 value: k.id,
-                label: `${k.kode} — ${k.namaPaket}`,
+                label: `${k.kode} — ${k.paketUmroh?.namaPaket || "-"}`,
               }))}
               placeholder="-- Pilih Keberangkatan --"
               value={formKeberangkatan}

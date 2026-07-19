@@ -14,7 +14,7 @@ import {
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/shared/components/ui/Card";
 import { Button } from "@/shared/components/ui/Button";
 import { Tabs } from "@/shared/components/ui/Tabs";
-import { getManifestById } from "@/services/mock/handlers";
+import { getManifestById } from "@/server/actions/api";
 import { generateCSVContent, downloadAsCSV } from "@/shared/lib/export-utils";
 import type { Manifest, ManifestRow } from "@/shared/types";
 

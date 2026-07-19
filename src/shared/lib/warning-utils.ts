@@ -82,14 +82,15 @@ export function generatePackageWarnings(
   }
 
   // 5. Cek rooming belum penuh
-  const terisiPct = keberangkatan.kuota > 0 ? Math.round((keberangkatan.terisi / keberangkatan.kuota) * 100) : 0;
+  const currentMaxSeat = keberangkatan.maxSeat || 0;
+  const terisiPct = currentMaxSeat > 0 ? Math.round((keberangkatan.terisi / currentMaxSeat) * 100) : 0;
 
-  if (terisiPct < 50) {
+  if (terisiPct < 50 && currentMaxSeat > 0) {
     alerts.push({
       id: `wrn-kuota-${keberangkatan.id}`,
       tipe: "warning",
-      pesan: `Kuota paket baru terisi ${terisiPct}% (${keberangkatan.terisi}/${keberangkatan.kuota})`,
-      jumlahTerdampak: keberangkatan.kuota - keberangkatan.terisi,
+      pesan: `Kuota paket baru terisi ${terisiPct}% (${keberangkatan.terisi}/${currentMaxSeat})`,
+      jumlahTerdampak: currentMaxSeat - keberangkatan.terisi,
       module: "keberangkatan",
       link: `/admin/keberangkatan`,
       createdAt: now.toISOString(),
@@ -100,25 +101,8 @@ export function generatePackageWarnings(
   // 7. Cek orphan jamaah — page-level check (needs group data)
 
   // 8. Cek hotel combination conflict (Mekkah + Madinah pair tidak cocok)
-  const hotelCombinationIssues = jamaahList.filter((j) => {
-    if (!j.hotelMekkah || !j.hotelMadinah) return false;
-    const match = keberangkatan.hotelOptions.some(
-      (opt) => opt.hotelMekkah === j.hotelMekkah && opt.hotelMadinah === j.hotelMadinah
-    );
-    return !match;
-  });
-
-  if (hotelCombinationIssues.length > 0 && keberangkatan.hotelOptions.length > 0) {
-    alerts.push({
-      id: `wrn-hotel-combo-${keberangkatan.id}`,
-      tipe: "danger",
-      pesan: `${hotelCombinationIssues.length} jamaah memiliki kombinasi hotel tidak sesuai paket`,
-      jumlahTerdampak: hotelCombinationIssues.length,
-      module: "rooming",
-      link: `/admin/rooming/hotel`,
-      createdAt: now.toISOString(),
-    });
-  }
+  // Moved to PaketUmroh validation later.
+  
 
   // 9. Cek quad mix incomplete — page-level check (needs rooming data)
 

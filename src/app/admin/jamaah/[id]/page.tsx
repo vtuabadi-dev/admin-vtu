@@ -16,7 +16,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/shared/components/ui/Card";
 import { Button } from "@/shared/components/ui/Button";
 import { StatusBadge } from "@/shared/components/ui/Badge";
-import { getJamaahById, getJamaahReadiness, getJamaahProgress, getDerivedStatus } from "@/services/mock/handlers";
+import { getJamaahById, getJamaahReadiness, getJamaahProgress, getDerivedStatus } from "@/server/actions/api";
 import type { Jamaah, JamaahReadinessResult, JamaahProgress } from "@/shared/types";
 import { cn } from "@/shared/lib/utils";
 

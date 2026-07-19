@@ -26,7 +26,7 @@ import {
   getManifestList,
   getInvoiceList,
   getDocumentCompletionMatrix,
-} from "@/services/mock/handlers";
+} from "@/server/actions/api";
 
 // ── Helpers ──
 function getStatusLabel(s: string): string {
@@ -308,7 +308,7 @@ function LaporanKeberangkatan({
   search: string;
 }) {
   const filtered = useMemo(() => {
-    let pkgs = allPackages;
+    let pkgs: any[] = allPackages;
     if (selectedPackage !== "all") {
       pkgs = pkgs.filter((p) => p.id === selectedPackage);
     }
@@ -487,12 +487,12 @@ function LaporanDokumen({
   const filtered = useMemo(() => {
     if (!search) return matrixData;
     const q = search.toLowerCase();
-    return matrixData.filter((r) => r.namaLengkap.toLowerCase().includes(q) || r.kodeRegistrasi.toLowerCase().includes(q));
+    return matrixData.filter((r: any) => r.namaLengkap.toLowerCase().includes(q) || r.kodeRegistrasi.toLowerCase().includes(q));
   }, [matrixData, search]);
 
   const handleExport = () => {
     const headers = ["Nama", "Kode Registrasi", "Paspor", "Pas Foto", "Vaksin", "KTP", "KK", "Akta", "Completion %"];
-    const rows = filtered.map((r) => [
+    const rows = filtered.map((r: any) => [
       r.namaLengkap, r.kodeRegistrasi,
       r.dokumen.paspor?.status ?? "-", r.dokumen.pas_foto?.status ?? "-",
       r.dokumen.vaksin?.status ?? "-", r.dokumen.ktp?.status ?? "-",
@@ -502,7 +502,7 @@ function LaporanDokumen({
     exportCsv(headers, rows, `laporan-dokumen-${new Date().toISOString().slice(0, 10)}`);
   };
 
-  const lengkap = filtered.filter((r) => r.allMandatoryComplete).length;
+  const lengkap = filtered.filter((r: any) => r.allMandatoryComplete).length;
 
   return (
     <div className="space-y-4">
@@ -525,15 +525,15 @@ function LaporanDokumen({
             keyField="jamaahId"
             data={filtered.slice(0, 100)}
             columns={[
-              { key: "nama", header: "Nama Jamaah", accessor: (r) => <span className="font-medium text-sm">{r.namaLengkap}</span> },
-              { key: "kode", header: "Kode", accessor: (r) => <span className="font-mono text-xs">{r.kodeRegistrasi}</span> },
-              { key: "paspor", header: "Paspor", accessor: (r) => <DocCell status={r.dokumen.paspor?.status} />, className: "text-center" },
-              { key: "pasfoto", header: "Pas Foto", accessor: (r) => <DocCell status={r.dokumen.pas_foto?.status} />, className: "text-center" },
-              { key: "vaksin", header: "Vaksin", accessor: (r) => <DocCell status={r.dokumen.vaksin?.status} />, className: "text-center" },
-              { key: "ktp", header: "KTP", accessor: (r) => <DocCell status={r.dokumen.ktp?.status} />, className: "text-center" },
-              { key: "kk", header: "KK", accessor: (r) => <DocCell status={r.dokumen.kk?.status} />, className: "text-center" },
-              { key: "akta", header: "Akta", accessor: (r) => <DocCell status={r.dokumen.akta?.status} />, className: "text-center" },
-              { key: "pct", header: "%", accessor: (r) => <span className={`font-bold text-sm ${r.completionPercentage === 100 ? "text-success" : r.completionPercentage >= 67 ? "text-warning" : "text-destructive"}`}>{r.completionPercentage}%</span>, className: "text-center" },
+              { key: "nama", header: "Nama Jamaah", accessor: (r: any) => <span className="font-medium text-sm">{r.namaLengkap}</span> },
+              { key: "kode", header: "Kode", accessor: (r: any) => <span className="font-mono text-xs">{r.kodeRegistrasi}</span> },
+              { key: "paspor", header: "Paspor", accessor: (r: any) => <DocCell status={r.dokumen.paspor?.status} />, className: "text-center" },
+              { key: "pasfoto", header: "Pas Foto", accessor: (r: any) => <DocCell status={r.dokumen.pas_foto?.status} />, className: "text-center" },
+              { key: "vaksin", header: "Vaksin", accessor: (r: any) => <DocCell status={r.dokumen.vaksin?.status} />, className: "text-center" },
+              { key: "ktp", header: "KTP", accessor: (r: any) => <DocCell status={r.dokumen.ktp?.status} />, className: "text-center" },
+              { key: "kk", header: "KK", accessor: (r: any) => <DocCell status={r.dokumen.kk?.status} />, className: "text-center" },
+              { key: "akta", header: "Akta", accessor: (r: any) => <DocCell status={r.dokumen.akta?.status} />, className: "text-center" },
+              { key: "pct", header: "%", accessor: (r: any) => <span className={`font-bold text-sm ${r.completionPercentage === 100 ? "text-success" : r.completionPercentage >= 67 ? "text-warning" : "text-destructive"}`}>{r.completionPercentage}%</span>, className: "text-center" },
             ]}
           />
         </CardContent></Card>

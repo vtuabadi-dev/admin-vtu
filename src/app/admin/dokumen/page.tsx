@@ -586,7 +586,7 @@ export default function DokumenPage() {
                 <div className="flex flex-wrap items-center gap-3">
                   <div className="w-56">
                     <Select
-                      options={keberangkatanList.map((k) => ({ value: k.id, label: k.namaPaket }))}
+                      options={keberangkatanList.map((k) => ({ value: k.id, label: k.paketUmroh?.namaPaket || "-" }))}
                       placeholder="Pilih Paket Keberangkatan"
                       value={selectedPackage}
                       onChange={(e) => setSelectedPackage(e.target.value)}
@@ -856,7 +856,7 @@ export default function DokumenPage() {
                                     <p className="text-[10px] text-muted-foreground font-mono">{jamaah.nomorPeserta}</p>
                                   </td>
                                   <td className="px-3 py-2.5">
-                                    <span className="text-xs">{kbr?.namaPaket ?? "-"}</span>
+                                    <span className="text-xs">{kbr?.paketUmroh?.namaPaket ?? "-"}</span>
                                   </td>
                                   <td className="px-3 py-2.5">
                                     <span className="text-xs font-medium">{LABEL_DOKUMEN[doc.jenis] ?? doc.jenis}</span>

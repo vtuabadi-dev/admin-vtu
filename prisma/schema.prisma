@@ -94,6 +94,12 @@ enum StatusKeberangkatan {
   departed
   completed
   cancelled
+  AVAILABLE
+  FULL_SEAT
+  DEPARTED
+  COMPLETED
+  ARCHIVED
+  CANCELLED
 }
 
 enum StatusPembayaran {
@@ -282,37 +288,41 @@ model User {
 // ============================================================
 
 model Keberangkatan {
-  id               String              @id @default(cuid())
-  kode             String              @unique
-  namaPaket        String
-  hargaPaket       Int
-  tanggalBerangkat DateTime
-  tanggalPulang    DateTime
-  maskapai         String
-  maskapaiId       String?
-  nomorPenerbangan String
-  hotelMekkah      String
-  hotelMekkahId    String?
-  hotelMadinah     String
-  hotelMadinahId   String?
-  startingPointId  String?
-  packageTypeId    String?
-  pricingMode      PricingMode         @default(SINGLE)
-  durationDays     Int?
-  promoText        String?
-  description      String?
-  notes            String?
-  include          String[]
-  exclude          String[]
-  hotelOptions     Json // { hotelMekkah: string; hotelMadinah: string }[]
-  status           StatusKeberangkatan @default(scheduled)
-  kuota            Int
-  terisi           Int                 @default(0)
-  tenantId         String?
-  createdAt        DateTime            @default(now())
-  updatedAt        DateTime            @updatedAt
+  id                  String              @id @default(cuid())
+  kode                String              @unique
+  paketUmrohId        String? // Added for migration
+  namaPaket           String
+  hargaPaket          Int
+  tanggalBerangkat    DateTime
+  tanggalPulang       DateTime
+  maskapai            String
+  maskapaiId          String?
+  nomorPenerbangan    String
+  hotelMekkah         String
+  hotelMekkahId       String?
+  hotelMadinah        String
+  hotelMadinahId      String?
+  startingPointId     String?
+  packageTypeId       String?
+  pricingMode         PricingMode         @default(SINGLE)
+  durationDays        Int?
+  promoText           String?
+  description         String?
+  notes               String?
+  include             String[]
+  exclude             String[]
+  hotelOptions        Json // { hotelMekkah: string; hotelMadinah: string }[]
+  status              StatusKeberangkatan @default(scheduled)
+  kuota               Int
+  maxSeat             Int?
+  targetMaterialisasi Int?
+  terisi              Int                 @default(0)
+  tenantId            String?
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
 
   // Relations
+  paketUmroh         PaketUmroh?        @relation(fields: [paketUmrohId], references: [id])
   maskapaiMaster     MasterAirline?     @relation(fields: [maskapaiId], references: [id])
   hotelMekkahMaster  MasterHotel?       @relation("HotelMekkah", fields: [hotelMekkahId], references: [id])
   hotelMadinahMaster MasterHotel?       @relation("HotelMadinah", fields: [hotelMadinahId], references: [id])
@@ -326,6 +336,7 @@ model Keberangkatan {
   activityEvents       ActivityEvent[]
   autoDeadlines        AutoDeadline[]
 
+  @@index([paketUmrohId])
   @@index([status])
   @@index([tanggalBerangkat])
   @@index([maskapaiId])
@@ -1092,4 +1103,24 @@ model PackageDraft {
 
   @@index([status])
   @@map("package_drafts")
+}
+
+// DOMAIN: PAKET UMROH (PRODUCT AGGREGATE ROOT)
+// ============================================================
+
+model PaketUmroh {
+  id                  String @id @default(cuid())
+  namaPaket           String
+  deskripsi           String
+  hargaBase           Int
+  durasiHari          Int
+  hotelMekkahOptions  Json
+  hotelMadinahOptions Json
+
+  keberangkatan Keberangkatan[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("paket_umroh")
 }

@@ -7,7 +7,7 @@ import { StatusBadge, Badge } from "@/shared/components/ui/Badge";
 import { Table } from "@/shared/components/ui/Table";
 import { Button } from "@/shared/components/ui/Button";
 import { Input } from "@/shared/components/ui/Input";
-import { getPembayaranList, getAllPaymentSummaries, getKeberangkatanList } from "@/services/mock/handlers";
+import { getPembayaranList, getAllPaymentSummaries, getKeberangkatanList } from "@/server/actions/api";
 import type { Pembayaran, GroupPaymentSummary, Keberangkatan } from "@/shared/types";
 import { formatCurrency, formatDate } from "@/shared/lib/utils";
 
@@ -60,7 +60,7 @@ export default function HistoriPembayaranPage() {
           id: p.id,
           tanggal: p.tanggal,
           namaGroup: summary?.namaGroup ?? "-",
-          namaPaket: kbr?.namaPaket ?? "-",
+          namaPaket: kbr?.paketUmroh?.namaPaket ?? "-",
           invoiceNumber: p.invoiceId ? `INV-${p.invoiceId.slice(-6)}` : "-",
           jumlah: p.jumlah,
           metode: p.metode,

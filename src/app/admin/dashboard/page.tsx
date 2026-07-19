@@ -7,6 +7,7 @@ import { StatusBadge } from "@/shared/components/ui/Badge";
 import { Button } from "@/shared/components/ui/Button";
 import { Table } from "@/shared/components/ui/Table";
 import { Select } from "@/shared/components/ui/Select";
+import { ErrorState } from "@/shared/components/ui/ErrorState";
 import { OperationalAlertPanel } from "@/shared/components/OperationalAlertPanel";
 import { OperationalWarnings } from "@/shared/components/OperationalWarnings";
 import {
@@ -40,6 +41,7 @@ export default function AdminDashboardPage() {
   const [scores, setScores] = useState<Record<string, PackageReadinessScore>>({});
   const [intelMap, setIntelMap] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
   const [mobileAlertsOpen, setMobileAlertsOpen] = useState(false);
   const [pendingReviewCount, setPendingReviewCount] = useState(0);
   const [pendingDocReviewCount, setPendingDocReviewCount] = useState(0);
@@ -52,39 +54,46 @@ export default function AdminDashboardPage() {
   const [loadingPackage, setLoadingPackage] = useState(false);
 
   // ── Load global data ────────────────────────────────────────────
-  useEffect(() => {
-    async function load() {
-      try {
-        const [statsRes, alertsRes, kbrRes, payReviewRes, docReviewRes, invRes] = await Promise.all([
-          fetch("/api/dashboard/stats"),
-          fetch("/api/dashboard/alerts"),
-          fetch("/api/keberangkatan"),
-          fetch("/api/pembayaran/review"),
-          fetch("/api/dokumen/review"),
-          fetch("/api/invoices"),
-        ]);
+  const load = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const [statsRes, alertsRes, kbrRes, payReviewRes, docReviewRes, invRes] = await Promise.all([
+        fetch("/api/dashboard/stats"),
+        fetch("/api/dashboard/alerts"),
+        fetch("/api/keberangkatan"),
+        fetch("/api/pembayaran/review"),
+        fetch("/api/dokumen/review"),
+        fetch("/api/invoices"),
+      ]);
 
-        if (statsRes.ok) { const j = await statsRes.json(); setStats(j.data ?? j); }
-        if (alertsRes.ok) { const j = await alertsRes.json(); setAlerts(j.data ?? []); }
-        if (kbrRes.ok) { const j = await kbrRes.json(); setKbrList(j.data ?? []); }
-        if (payReviewRes.ok) { const j = await payReviewRes.json(); setPendingReviewCount((j.data ?? []).length); }
-        if (docReviewRes.ok) { const j = await docReviewRes.json(); setPendingDocReviewCount((j.data ?? []).length); }
-        if (invRes.ok) {
-          const j = await invRes.json();
-          const invoices = j.data ?? [];
-          const overdue = invoices
-            .filter((inv: any) => inv.status === "overdue")
-            .reduce((sum: number, inv: any) => sum + (inv.sisaTagihan ?? 0), 0);
-          setOverdueAmount(overdue);
-        }
-      } catch (err) {
-        console.error("Failed to load dashboard:", err);
-      } finally {
-        setLoading(false);
+      if (!statsRes.ok || !kbrRes.ok) {
+        throw new Error("Gagal memuat data dari server");
       }
+
+      if (statsRes.ok) { const j = await statsRes.json(); setStats(j.data ?? j); }
+      if (alertsRes.ok) { const j = await alertsRes.json(); setAlerts(j.data ?? []); }
+      if (kbrRes.ok) { const j = await kbrRes.json(); setKbrList(j.data ?? []); }
+      if (payReviewRes.ok) { const j = await payReviewRes.json(); setPendingReviewCount((j.data ?? []).length); }
+      if (docReviewRes.ok) { const j = await docReviewRes.json(); setPendingDocReviewCount((j.data ?? []).length); }
+      if (invRes.ok) {
+        const j = await invRes.json();
+        const invoices = j.data ?? [];
+        const overdue = invoices
+          .filter((inv: any) => inv.status === "overdue")
+          .reduce((sum: number, inv: any) => sum + (inv.sisaTagihan ?? 0), 0);
+        setOverdueAmount(overdue);
+      }
+    } catch (err: any) {
+      setError(err instanceof Error ? err : new Error("Database Connection Error"));
+    } finally {
+      setLoading(false);
     }
-    load();
   }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
 
   // ── Load per-package readiness after kbrList loads ──────────────
   useEffect(() => {
@@ -186,22 +195,17 @@ export default function AdminDashboardPage() {
     );
   }
 
-  // Guard: if stats failed to load, show fallback with retry
-  if (!stats) {
+  if (error || !stats) {
     return (
-      <div className="flex flex-col items-center justify-center h-64 gap-3">
-        <AlertTriangle className="h-8 w-8 text-muted-foreground/30" />
-        <p className="text-sm text-muted-foreground">Gagal memuat data dashboard.</p>
-        <Button size="sm" variant="outline" onClick={() => window.location.reload()}>
-          Muat Ulang
-        </Button>
+      <div className="flex items-center justify-center h-64">
+        <ErrorState onRetry={load} message={error?.message ?? "Gagal memuat data dashboard."} />
       </div>
     );
   }
 
   const pkgOptions = [
     { value: "all", label: "Semua Paket" },
-    ...kbrList.map((k) => ({ value: k.id, label: k.namaPaket })),
+    ...kbrList.map((k) => ({ value: k.id, label: k.paketUmroh?.namaPaket || "-" })),
   ];
 
   const criticalCount = displayAlerts.filter((a) => a.tipe === "danger").length;
@@ -250,7 +254,7 @@ export default function AdminDashboardPage() {
                 !isFiltered
                   ? { value: "3 bulan ini", positive: true }
                   : selectedKbr
-                    ? { value: `${selectedKbr.terisi}/${selectedKbr.kuota} terisi`, positive: true }
+                    ? { value: `${selectedKbr.terisi}/${selectedKbr.maxSeat} terisi`, positive: true }
                     : undefined
               }
             />
@@ -544,7 +548,7 @@ export default function AdminDashboardPage() {
                 <Package className="h-4 w-4 text-primary" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold">{selectedKbr.namaPaket}</p>
+                <p className="text-sm font-semibold">{selectedKbr.paketUmroh?.namaPaket || "-"}</p>
                 <p className="text-xs text-muted-foreground">
                   {selectedKbr.kode} &middot;{" "}
                   {new Date(selectedKbr.tanggalBerangkat).toLocaleDateString("id-ID", {
@@ -552,7 +556,7 @@ export default function AdminDashboardPage() {
                     month: "long",
                     year: "numeric",
                   })}{" "}
-                  &middot; {selectedKbr.maskapai} ({selectedKbr.nomorPenerbangan})
+                  &middot; {selectedKbr.maskapaiId || "-"} ({selectedKbr.nomorPenerbangan})
                 </p>
               </div>
               <StatusBadge status={selectedKbr.status} />
@@ -658,9 +662,9 @@ export default function AdminDashboardPage() {
                   data={filteredKbrList.map((k) => ({
                     id: k.id,
                     kode: k.kode,
-                    namaPaket: k.namaPaket,
+                    namaPaket: k.paketUmroh?.namaPaket || "-",
                     tanggalBerangkat: k.tanggalBerangkat,
-                    kuota: k.kuota,
+                    kuota: k.maxSeat,
                     terisi: k.terisi,
                     status: k.status,
                   }))}

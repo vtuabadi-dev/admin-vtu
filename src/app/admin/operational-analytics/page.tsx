@@ -31,7 +31,7 @@ import {
   getRoomingList,
   getPackageReadinessScore,
   getAutoWarnings,
-} from "@/services/mock/handlers";
+} from "@/server/actions/api";
 import type {
   Keberangkatan,
   Jamaah,
@@ -101,7 +101,7 @@ export default function OperationalAnalyticsPage() {
       // Load scores for all packages
       const scoreMap: Record<string, PackageReadinessScore> = {};
       await Promise.all(
-        kbr.map(async (pkg) => {
+        kbr.map(async (pkg: any) => {
           const score = await getPackageReadinessScore(pkg.id);
           if (score) scoreMap[pkg.id] = score;
         })
@@ -370,7 +370,7 @@ export default function OperationalAnalyticsPage() {
                 placeholder="Semua Paket"
                 options={keberangkatanList.map((k) => ({
                   value: k.id,
-                  label: `${k.kode} — ${k.namaPaket}`,
+                  label: `${k.kode} — ${k.paketUmroh?.namaPaket}`,
                 }))}
               />
             </div>
@@ -453,7 +453,7 @@ export default function OperationalAnalyticsPage() {
                       <div className="flex items-center justify-between">
                         <div>
                           <CardTitle className="text-base">
-                            {pkg.namaPaket}
+                            {pkg.paketUmroh?.namaPaket}
                           </CardTitle>
                           <CardDescription>{pkg.kode}</CardDescription>
                         </div>
@@ -620,7 +620,7 @@ export default function OperationalAnalyticsPage() {
                     <div className="flex items-center justify-between mb-2">
                       <div>
                         <p className="text-sm font-medium">
-                          {pkg.namaPaket}
+                          {pkg.paketUmroh?.namaPaket}
                         </p>
                         <p className="text-xs text-muted-foreground">
                           {pkg.kode}
@@ -710,7 +710,7 @@ export default function OperationalAnalyticsPage() {
                       return (
                         <tr key={pkg.id} className="border-b last:border-0">
                           <td className="py-3 pr-4">
-                            <p className="font-medium">{pkg.namaPaket}</p>
+                            <p className="font-medium">{pkg.paketUmroh?.namaPaket}</p>
                             <p className="text-xs text-muted-foreground">
                               {pkg.kode}
                             </p>

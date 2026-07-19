@@ -25,8 +25,8 @@ describe("Service layer integrity", () => {
     expect(exports.length).toBeGreaterThan(0);
   });
 
-  it.each(services)("%s all exports are functions", ({ name, mod }) => {
-    for (const [key, value] of Object.entries(mod)) {
+  it.each(services)("%s all exports are functions", ({ mod }) => {
+    for (const value of Object.values(mod)) {
       expect(typeof value).toBe("function");
     }
   });

@@ -7,7 +7,7 @@ import {
   addPembayaran,
   cancelInvoiceItem,
   getKeberangkatanList,
-} from "@/services/mock/handlers";
+} from "@/server/actions/api";
 import {
   Card,
   CardHeader,
@@ -118,7 +118,7 @@ export default function GroupPaymentDetailPage({ params }: { params: { groupId: 
       if (s) {
         setSummary(s);
         setAlokasiForm(
-          s.anggota.map((a) => ({ jamaahId: a.id, namaJamaah: a.namaLengkap, jumlah: "", checked: true }))
+          s.anggota.map((a: any) => ({ jamaahId: a.id, namaJamaah: a.namaLengkap, jumlah: "", checked: true }))
         );
       }
       setKbrList(k);
@@ -144,7 +144,7 @@ export default function GroupPaymentDetailPage({ params }: { params: { groupId: 
   const handleKirimPengingat = useCallback(() => {
     if (!summary || !selectedPaket) return;
     alert(
-      `Yth. ${summary.namaGroup}, tagihan sebesar ${formatCurrency(summary.sisaPembayaran)} untuk paket ${selectedPaket.namaPaket}. Mohon segera diselesaikan.`
+      `Yth. ${summary.namaGroup}, tagihan sebesar ${formatCurrency(summary.sisaPembayaran)} untuk paket ${selectedPaket.paketUmroh?.namaPaket || "-"}. Mohon segera diselesaikan.`
     );
   }, [summary, selectedPaket]);
 
@@ -272,7 +272,7 @@ export default function GroupPaymentDetailPage({ params }: { params: { groupId: 
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
                   <p className="text-muted-foreground">Paket</p>
-                  <p className="font-medium">{selectedPaket?.namaPaket ?? "-"}</p>
+                  <p className="font-medium">{selectedPaket?.paketUmroh?.namaPaket ?? "-"}</p>
                 </div>
                 <div>
                   <p className="text-muted-foreground">Anggota</p>

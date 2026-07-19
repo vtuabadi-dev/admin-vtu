@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/shared/components/ui
 import { StatCard } from "@/shared/components/ui/StatCard";
 import { StatusBadge } from "@/shared/components/ui/Badge";
 import { Table } from "@/shared/components/ui/Table";
-import { getAllPaymentSummaries, getKeberangkatanList } from "@/services/mock/handlers";
+import { getAllPaymentSummaries, getKeberangkatanList } from "@/server/actions/api";
 import type { GroupPaymentSummary, Keberangkatan } from "@/shared/types";
 import { formatCurrency } from "@/shared/lib/utils";
 
@@ -47,7 +47,7 @@ export default function TagihanBelumLunasPage() {
         id: s.groupId,
         kodeRegistrasi: s.kodeRegistrasi,
         namaGroup: s.namaGroup,
-        namaPaket: kbr?.namaPaket ?? "-",
+        namaPaket: kbr?.paketUmroh?.namaPaket ?? "-",
         totalTagihan: s.totalTagihan,
         totalPembayaran: s.totalPembayaran,
         sisaPembayaran: s.sisaPembayaran,

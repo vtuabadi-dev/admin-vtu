@@ -5,7 +5,7 @@ import { Clock, Send, AlertTriangle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/components/ui/Card";
 import { Button } from "@/shared/components/ui/Button";
 import { Badge } from "@/shared/components/ui/Badge";
-import { getAllPaymentSummaries, getKeberangkatanList } from "@/services/mock/handlers";
+import { getAllPaymentSummaries, getKeberangkatanList } from "@/server/actions/api";
 import type { GroupPaymentSummary, Keberangkatan } from "@/shared/types";
 
 interface PackageDeadline {
@@ -68,7 +68,7 @@ export default function JadwalReminderPage() {
         return {
           no: idx + 1,
           paketId: kbr.id,
-          namaPaket: kbr.namaPaket,
+          namaPaket: kbr.paketUmroh?.namaPaket || "-",
           tanggalBerangkat: kbr.tanggalBerangkat,
           deadline,
           sisaHari,
@@ -85,7 +85,7 @@ export default function JadwalReminderPage() {
 
     const messages = pkg.unpaidGroups.map((g) => {
       const groupKbr = kbrList.find((k) => k.jamaahIds.some((jid) => g.anggota.some((a) => a.id === jid)));
-      const namaPaket = groupKbr?.namaPaket ?? pkg.namaPaket;
+      const namaPaket = groupKbr?.paketUmroh?.namaPaket ?? pkg.namaPaket;
       return `Assalamu'alaikum Bapak/Ibu ${g.namaGroup}\n\nKami mengingatkan bahwa masih terdapat sisa tagihan sebesar Rp${g.sisaPembayaran.toLocaleString("id-ID")} untuk paket ${namaPaket}.\n\nBatas waktu pelunasan: ${pkg.deadline} (${pkg.sisaHari} hari lagi). Mohon segera diselesaikan.\n\nTerima kasih.`;
     });
 

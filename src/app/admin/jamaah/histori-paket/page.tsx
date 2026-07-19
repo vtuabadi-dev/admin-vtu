@@ -5,7 +5,7 @@ import { Plane } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/components/ui/Card";
 import { StatusBadge } from "@/shared/components/ui/Badge";
 import { Table } from "@/shared/components/ui/Table";
-import { getJamaahList, getKeberangkatanList } from "@/services/mock/handlers";
+import { getJamaahList, getKeberangkatanList } from "@/server/actions/api";
 import type { Jamaah, Keberangkatan } from "@/shared/types";
 import { formatDate } from "@/shared/lib/utils";
 
@@ -30,9 +30,9 @@ export default function HistoriPaketPage() {
       return kbrs.map((k) => ({
         id: `${jmh.id}-${k.id}`,
         namaJamaah: jmh.namaLengkap,
-        namaPaket: k.namaPaket,
+        namaPaket: k.paketUmroh?.namaPaket || "-",
         tanggalBerangkat: k.tanggalBerangkat,
-        maskapai: k.maskapai,
+        maskapai: k.maskapaiId || "-",
         status: k.status,
       }));
     });
