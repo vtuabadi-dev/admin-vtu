@@ -298,7 +298,7 @@ export function CrudTab<T extends { id: string; status?: string; [key: string]: 
         title={editingItem ? `Edit ${itemName}` : `Tambah ${itemName}`}
         description={`Silakan isi form di bawah untuk menyimpan ${itemName}.`}
       >
-        <form onSubmit={handleSave} className="space-y-4 mt-2">
+        <form onSubmit={handleSave} className="space-y-4 mt-2" autoComplete="off">
           {fields.map((field) => (
             <div key={field.name} className="flex flex-col gap-1.5">
               <label className="text-sm font-medium">{field.label}</label>
