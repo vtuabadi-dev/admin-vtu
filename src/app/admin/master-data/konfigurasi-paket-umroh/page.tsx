@@ -197,18 +197,18 @@ export default function MasterKonfigurasiPaketUmrohPage() {
                 title="Master Rute In-Out"
                 itemName="Rute In-Out"
                 initialData={MOCK_LANDING_PATTERN}
-                defaultNewItem={{ nama: "", kode: "", rute: "", status: "Aktif" }}
+                defaultNewItem={{ ruteIn: "", ruteOut: "", kode: "", status: "Aktif" }}
                 columns={[
-                  { key: "nama", header: "Nama Rute" },
+                  { key: "ruteIn", header: "Rute In (Landing)" },
+                  { key: "ruteOut", header: "Rute out (Take off)" },
                   { key: "kode", header: "Kode Rute", render: (item) => <span className="font-mono font-semibold text-xs">{item.kode}</span> },
-                  { key: "rute", header: "Rute Bandara" },
                   { key: "status", header: "Status" },
                   { key: "actions", header: "Aksi" },
                 ]}
                 fields={[
-                  { name: "nama", label: "Nama Rute", type: "text" },
+                  { name: "ruteIn", label: "Rute In (Landing)", type: "text" },
+                  { name: "ruteOut", label: "Rute out (Take off)", type: "text" },
                   { name: "kode", label: "Kode Rute", type: "text" },
-                  { name: "rute", label: "Rute Bandara (Format: CGK-MED-JED-CGK)", type: "text" },
                   { name: "status", label: "Status", type: "select", options: STATUS_OPTIONS },
                 ]}
               />
