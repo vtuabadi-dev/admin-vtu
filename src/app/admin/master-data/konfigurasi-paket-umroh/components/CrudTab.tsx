@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { Button } from "@/shared/components/ui/Button";
 import { Modal } from "@/shared/components/ui/Modal";
 import { Input } from "@/shared/components/ui/Input";
-import { Trash2, Edit3 } from "lucide-react";
+import { Trash2, Edit3, Settings } from "lucide-react";
 
 interface FieldConfig {
   name: string;
@@ -34,6 +34,7 @@ interface CrudTabProps<T extends { id: string; status?: string; [key: string]: a
   fields: FieldConfig[];
   defaultNewItem: Omit<T, "id">;
   filterField?: FilterConfig;
+  onSettingsClick?: () => void;
 }
 
 export function CrudTab<T extends { id: string; status?: string; [key: string]: any }>({
@@ -45,6 +46,7 @@ export function CrudTab<T extends { id: string; status?: string; [key: string]: 
   fields,
   defaultNewItem,
   filterField,
+  onSettingsClick,
 }: CrudTabProps<T>) {
   const [data, setData] = useState<T[]>(initialData || []);
   const [modalOpen, setModalOpen] = useState(false);
@@ -199,9 +201,16 @@ export function CrudTab<T extends { id: string; status?: string; [key: string]: 
             </select>
           )}
         </div>
-        <Button size="sm" onClick={handleOpenAdd} disabled={loading}>
-          Tambah {itemName}
-        </Button>
+        <div className="flex items-center gap-2">
+          {onSettingsClick && (
+            <Button variant="outline" size="sm" onClick={onSettingsClick} disabled={loading} title="Pengaturan">
+              <Settings className="h-4 w-4" />
+            </Button>
+          )}
+          <Button size="sm" onClick={handleOpenAdd} disabled={loading}>
+            Tambah {itemName}
+          </Button>
+        </div>
       </div>
 
       <div className="overflow-x-auto">

@@ -7,6 +7,8 @@ import {
 } from "@/shared/lib/mock-data";
 import { Tabs } from "@/shared/components/ui/Tabs";
 import { CrudTab } from "./components/CrudTab";
+import { Modal } from "@/shared/components/ui/Modal";
+import { Button } from "@/shared/components/ui/Button";
 
 const TABS = [
   { value: "jenis-paket", label: "Jenis Paket" },
@@ -24,6 +26,9 @@ const STATUS_OPTIONS = [
 
 export default function MasterKonfigurasiPaketUmrohPage() {
   const [cities, setCities] = useState<any[]>([]);
+  const [hotelCityIds, setHotelCityIds] = useState<string[]>([]);
+  const [selectedCityIds, setSelectedCityIds] = useState<string[]>([]);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   useEffect(() => {
     fetch("/api/master/cities")
@@ -31,10 +36,38 @@ export default function MasterKonfigurasiPaketUmrohPage() {
       .then((res) => {
         if (res.success) {
           setCities(res.data);
+          // Initial load from localStorage or scan default Saudi cities
+          const saved = localStorage.getItem("hotel_city_ids");
+          if (saved) {
+            const parsed = JSON.parse(saved);
+            setHotelCityIds(parsed);
+            setSelectedCityIds(parsed);
+          } else {
+            const defaults = res.data
+              .filter((c: any) => {
+                const nameLower = c.name.toLowerCase();
+                return nameLower.includes("mekkah") || nameLower.includes("makkah") || nameLower.includes("madinah") || nameLower.includes("jeddah");
+              })
+              .map((c: any) => c.id);
+            setHotelCityIds(defaults);
+            setSelectedCityIds(defaults);
+            localStorage.setItem("hotel_city_ids", JSON.stringify(defaults));
+          }
         }
       })
       .catch((err) => console.error("Failed to load cities for dropdown selection options", err));
   }, []);
+
+  const handleOpenSettings = () => {
+    setSelectedCityIds(hotelCityIds);
+    setSettingsOpen(true);
+  };
+
+  const handleSaveSettings = () => {
+    setHotelCityIds(selectedCityIds);
+    localStorage.setItem("hotel_city_ids", JSON.stringify(selectedCityIds));
+    setSettingsOpen(false);
+  };
 
   return (
     <div className="flex flex-col gap-6 p-6">
@@ -138,6 +171,7 @@ export default function MasterKonfigurasiPaketUmrohPage() {
                 title="Master Hotel"
                 itemName="Hotel"
                 apiEndpoint="/api/master/hotels"
+                onSettingsClick={handleOpenSettings}
                 defaultNewItem={{ nama: "", cityId: "", bintang: 5, status: "Aktif" }}
                 columns={[
                   { key: "nama", header: "Nama Hotel" },
@@ -155,14 +189,14 @@ export default function MasterKonfigurasiPaketUmrohPage() {
                 ]}
                 fields={[
                   { name: "nama", label: "Nama Hotel", type: "text" },
-                  { name: "cityId", label: "Kota Lokasi", type: "select", options: cities.map(c => ({ label: c.name, value: c.id })) },
+                  { name: "cityId", label: "Kota Lokasi", type: "select", options: cities.filter(c => hotelCityIds.includes(c.id)).map(c => ({ label: c.name, value: c.id })) },
                   { name: "bintang", label: "Rating Bintang (1-5)", type: "number" },
                   { name: "status", label: "Status", type: "select", options: STATUS_OPTIONS },
                 ]}
                 filterField={{
                   name: "cityId",
                   label: "Kota Lokasi",
-                  options: cities.map(c => ({ label: c.name, value: c.id }))
+                  options: cities.filter(c => hotelCityIds.includes(c.id)).map(c => ({ label: c.name, value: c.id }))
                 }}
               />
             )}
@@ -190,6 +224,51 @@ export default function MasterKonfigurasiPaketUmrohPage() {
           </div>
         )}
       </Tabs>
+
+      {/* Hotel City Settings Modal */}
+      <Modal
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        title="Pengaturan Kota Lokasi Hotel"
+        description="Pilih kota-kota dari master data yang dapat dijadikan sebagai lokasi hotel dan filter dropdown."
+      >
+        <div className="space-y-4 mt-4">
+          <div className="max-h-[300px] overflow-y-auto border rounded-md p-3 divide-y divide-border bg-card">
+            {cities.map((c) => (
+              <div key={c.id} className="flex items-center gap-3 py-2">
+                <input
+                  type="checkbox"
+                  id={`hotel-city-${c.id}`}
+                  checked={selectedCityIds.includes(c.id)}
+                  onChange={(e) => {
+                    if (e.target.checked) {
+                      setSelectedCityIds((prev) => [...prev, c.id]);
+                    } else {
+                      setSelectedCityIds((prev) => prev.filter((id) => id !== c.id));
+                    }
+                  }}
+                  className="h-4 w-4 rounded border-input text-primary focus:ring-primary cursor-pointer"
+                />
+                <label
+                  htmlFor={`hotel-city-${c.id}`}
+                  className="text-sm font-medium cursor-pointer select-none flex-grow"
+                >
+                  {c.name} <span className="text-xs text-muted-foreground font-semibold font-mono">({c.code})</span>
+                </label>
+              </div>
+            ))}
+          </div>
+
+          <div className="flex justify-end gap-2 pt-4 border-t">
+            <Button variant="outline" onClick={() => setSettingsOpen(false)}>
+              Batal
+            </Button>
+            <Button onClick={handleSaveSettings}>
+              Simpan Pengaturan
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }
