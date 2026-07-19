@@ -26,8 +26,8 @@ export const MOCK_STARTING_POINT = [
 ];
 
 export const MOCK_LANDING_PATTERN = [
-  { id: "L1", nama: "Jeddah -> Madinah", rute: "CGK-JED-MED-CGK", status: "Aktif" },
-  { id: "L2", nama: "Madinah -> Jeddah", rute: "CGK-MED-JED-CGK", status: "Aktif" },
+  { id: "L1", nama: "Jeddah -> Madinah", kode: "REG.C-M", rute: "CGK-JED-MED-CGK", status: "Aktif" },
+  { id: "L2", nama: "Madinah -> Jeddah", kode: "REG.C-J", rute: "CGK-MED-JED-CGK", status: "Aktif" },
 ];
 
 export const MOCK_KLASTER = [
