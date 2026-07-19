@@ -66,7 +66,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     
     // Rename nama/name to name
-    if (body.nama && !body.name) body.name = body.nama;
+    if (body.nama !== undefined) body.name = body.nama;
 
     // Generate unique code if not provided
     if (!body.code) {

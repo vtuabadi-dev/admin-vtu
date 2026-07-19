@@ -51,7 +51,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
     const body = await request.json();
     
     // Rename nama/name to name
-    if (body.nama && !body.name) body.name = body.nama;
+    if (body.nama !== undefined) body.name = body.nama;
 
     // Parse rating as number if it is string
     if (typeof body.bintang === "string" || typeof body.starRating === "string") {

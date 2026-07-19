@@ -48,9 +48,9 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
 
     const body = await request.json();
     // Rename nama/name to name
-    if (body.nama && !body.name) body.name = body.nama;
+    if (body.nama !== undefined) body.name = body.nama;
     // Map kode to code
-    if (body.kode && !body.code) body.code = body.kode;
+    if (body.kode !== undefined) body.code = body.kode;
     // Set isActive based on status string
     if (body.status === "Aktif") body.isActive = true;
     if (body.status === "Nonaktif") body.isActive = false;

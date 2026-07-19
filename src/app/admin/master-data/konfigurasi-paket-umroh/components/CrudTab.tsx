@@ -64,7 +64,8 @@ export function CrudTab<T extends { id: string; status?: string; [key: string]: 
         const mapped = resJson.data.map((item: any) => ({
           ...item,
           status: item.isActive === false ? "Nonaktif" : "Aktif",
-          nama: item.name || item.nama, // Fallback city name mapping
+          nama: item.name || item.nama,
+          kode: item.code || item.kode,
         }));
         setData(mapped);
       }

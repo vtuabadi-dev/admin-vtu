@@ -47,6 +47,11 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
     if (!perm.allowed) return NextResponse.json({ success: false, message: perm.reason }, { status: 403 });
 
     const body = await request.json();
+    if (body.nama !== undefined) body.name = body.nama;
+    if (body.kode !== undefined) body.code = body.kode;
+    if (body.status === "Aktif") body.isActive = true;
+    if (body.status === "Nonaktif") body.isActive = false;
+
     const parsed = updateAirlineSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json({ success: false, message: "Validation Error", data: parsed.error.format() }, { status: 400 });
