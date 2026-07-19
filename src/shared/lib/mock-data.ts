@@ -31,10 +31,10 @@ export const MOCK_LANDING_PATTERN = [
 ];
 
 export const MOCK_KLASTER = [
-  { id: "K1", nama: "Bronze", kapasitas: 45, status: "Aktif" },
-  { id: "K2", nama: "Silver", kapasitas: 40, status: "Aktif" },
-  { id: "K3", nama: "Gold", kapasitas: 30, status: "Aktif" },
-  { id: "K4", nama: "Platinum", kapasitas: 20, status: "Aktif" },
+  { id: "K1", nama: "Bronze", status: "Aktif" },
+  { id: "K2", nama: "Silver", status: "Aktif" },
+  { id: "K3", nama: "Gold", status: "Aktif" },
+  { id: "K4", nama: "Platinum", status: "Aktif" },
 ];
 
 export const MOCK_PERLENGKAPAN = [

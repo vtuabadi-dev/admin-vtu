@@ -274,16 +274,14 @@ export default function MasterKonfigurasiPaketUmrohPage() {
                 title="Master Klaster Seat"
                 itemName="Klaster"
                 initialData={MOCK_KLASTER}
-                defaultNewItem={{ nama: "", kapasitas: 45, status: "Aktif" }}
+                defaultNewItem={{ nama: "", status: "Aktif" }}
                 columns={[
                   { key: "nama", header: "Nama Klaster" },
-                  { key: "kapasitas", header: "Kapasitas Seat Max", render: (item) => <span>{item.kapasitas} Seat</span> },
                   { key: "status", header: "Status" },
                   { key: "actions", header: "Aksi" },
                 ]}
                 fields={[
                   { name: "nama", label: "Nama Klaster", type: "text" },
-                  { name: "kapasitas", label: "Kapasitas Maksimal Seat", type: "number" },
                   { name: "status", label: "Status", type: "select", options: STATUS_OPTIONS },
                 ]}
               />
