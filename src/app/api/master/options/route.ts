@@ -16,11 +16,12 @@ export async function GET(_request: NextRequest) {
       return NextResponse.json({ success: false, message: perm.reason }, { status: 403 });
     }
 
-    const [airlines, hotels, cities, packageTypes] = await Promise.all([
+    const [airlines, hotels, cities, packageTypes, routes] = await Promise.all([
       masterDataService.getAirlines({ isActive: true, limit: 100 }),
       masterDataService.getHotels({ isActive: true, limit: 100 }),
       masterDataService.getCities({ isActive: true, limit: 100 }),
       masterDataService.getPackageTypes({ isActive: true, limit: 100 }),
+      masterDataService.getRoutes({ isActive: true, limit: 100 }),
     ]);
 
     return NextResponse.json({
@@ -30,6 +31,7 @@ export async function GET(_request: NextRequest) {
         hotels: hotels.data,
         cities: cities.data,
         packageTypes: packageTypes.data,
+        routes: routes.data,
       },
     });
   } catch (error: any) {

@@ -312,6 +312,9 @@ model Keberangkatan {
   include             String[]
   exclude             String[]
   hotelOptions        Json // { hotelMekkah: string; hotelMadinah: string }[]
+  kodeIndividu        String?             @unique
+  paketGrupId         String?
+  driveFolderIds      Json?
   status              StatusKeberangkatan @default(scheduled)
   kuota               Int
   maxSeat             Int?
@@ -323,6 +326,7 @@ model Keberangkatan {
 
   // Relations
   paketUmroh         PaketUmroh?        @relation(fields: [paketUmrohId], references: [id])
+  paketGrup          PaketGrup?         @relation(fields: [paketGrupId], references: [id])
   maskapaiMaster     MasterAirline?     @relation(fields: [maskapaiId], references: [id])
   hotelMekkahMaster  MasterHotel?       @relation("HotelMekkah", fields: [hotelMekkahId], references: [id])
   hotelMadinahMaster MasterHotel?       @relation("HotelMadinah", fields: [hotelMadinahId], references: [id])
@@ -337,6 +341,7 @@ model Keberangkatan {
   autoDeadlines        AutoDeadline[]
 
   @@index([paketUmrohId])
+  @@index([paketGrupId])
   @@index([status])
   @@index([tanggalBerangkat])
   @@index([maskapaiId])
@@ -345,6 +350,38 @@ model Keberangkatan {
   @@index([startingPointId])
   @@index([packageTypeId])
   @@map("keberangkatan")
+}
+
+// ============================================================
+// CORE: Paket Grup (Group of Packages sharing a marketing campaign)
+// ============================================================
+
+model PaketGrup {
+  id        String   @id @default(cuid())
+  kodeGrup  String   @unique
+  namaPaket String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  keberangkatan Keberangkatan[]
+
+  @@map("paket_grup")
+}
+
+// ============================================================
+// MASTER DATA: Rute In-Out (Landing Patterns)
+// ============================================================
+
+model MasterRoute {
+  id        String   @id @default(cuid())
+  ruteIn    String
+  ruteOut   String
+  kode      String   @unique
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("master_routes")
 }
 
 // ============================================================

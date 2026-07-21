@@ -16,6 +16,7 @@ interface MasterDataOptions {
   hotels: any[];
   cities: any[];
   packageTypes: any[];
+  routes?: any[];
 }
 
 export default function GeneratePaketPage() {
@@ -98,26 +99,47 @@ export default function GeneratePaketPage() {
 
   const handleAutoGenerateName = () => {
     if (!options) return;
-    const jPaket = options.packageTypes.find(t => t.id === formData.jenisPaketId)?.name || "";
-    const airline = options.airlines.find(a => a.id === formData.maskapaiId)?.name || "";
-    const firstDate = departureDates[0] || "";
-    let monthName = "";
-    let year = "";
-    
-    if (firstDate) {
-      const d = new Date(firstDate);
+    const pkgTypeObj = options.packageTypes.find((t) => t.id === formData.jenisPaketId);
+    const pCode = (pkgTypeObj?.code || "REG").toUpperCase();
+    const pNameRaw = (pkgTypeObj?.name || "").trim().toUpperCase();
+
+    let prefix = "";
+    if (pCode === "REG") {
+      prefix = "PAKET UMROH";
+    } else if (pNameRaw.startsWith("UMROH PLUS")) {
+      prefix = pNameRaw;
+    } else if (pNameRaw) {
+      prefix = `UMROH PLUS ${pNameRaw.replace(/^PLUS\s+/i, "")}`;
+    } else {
+      prefix = `UMROH PLUS ${pCode}`;
+    }
+
+    const durasi = `${formData.durasiHari || 9} H`;
+
+    const startingObj = options.cities.find((c) => c.id === formData.startingPointId);
+    const sCode = (startingObj?.code || "JKT").toUpperCase();
+
+    const routeObj = (options as any)?.routes?.find((r: any) => r.id === formData.landingPatternId) || MOCK_LANDING_PATTERN.find((r: any) => r.id === formData.landingPatternId);
+    const rCode = (routeObj?.kode || "JED.C").toUpperCase();
+
+    const firstDateStr = departureDates[0];
+    let tglFormatted = "24 Jun 2026";
+    if (firstDateStr) {
+      const d = new Date(firstDateStr);
       if (!isNaN(d.getTime())) {
-        monthName = d.toLocaleString("id-ID", { month: "long" });
-        year = String(d.getFullYear());
+        const day = String(d.getDate()).padStart(2, "0");
+        const monthList = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agt", "Sep", "Okt", "Nov", "Des"];
+        const month = monthList[d.getMonth()];
+        const year = d.getFullYear();
+        tglFormatted = `${day} ${month} ${year}`;
       }
     }
 
-    let autoName = "";
-    if (jPaket) autoName += jPaket;
-    if (airline) autoName += (autoName ? ` ${airline}` : airline);
-    if (monthName && year) autoName += (autoName ? ` — ${monthName} ${year}` : `${monthName} ${year}`);
+    const airlineObj = options.airlines.find((a) => a.id === formData.maskapaiId);
+    const mCode = (airlineObj?.code || "SV").toUpperCase();
 
-    setFormData(prev => ({ ...prev, namaPaket: autoName }));
+    const autoName = `${prefix} ${durasi} ${sCode} ( ${rCode} ) - ${tglFormatted} (${mCode})`;
+    setFormData((prev) => ({ ...prev, namaPaket: autoName }));
   };
 
   const handleAutoGenerateCode = () => {
@@ -152,11 +174,9 @@ export default function GeneratePaketPage() {
   };
 
   useEffect(() => {
-    if (!formData.namaPaket) {
-      handleAutoGenerateName();
-    }
+    handleAutoGenerateName();
     handleAutoGenerateCode();
-  }, [formData.jenisPaketId, formData.maskapaiId, departureDates, options]);
+  }, [formData.jenisPaketId, formData.maskapaiId, formData.durasiHari, formData.startingPointId, formData.landingPatternId, departureDates, options]);
 
   // Cluster-specific configuration: Hotels + Pricing + Upgrades
   const [clusterConfigs, setClusterConfigs] = useState<Record<string, { 
@@ -470,11 +490,17 @@ export default function GeneratePaketPage() {
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">Rute In-Out</label>
-              <select name="landingPatternId" value={formData.landingPatternId} onChange={handleChange} className="w-full h-10 px-3 py-2 rounded-md border border-input bg-transparent">
+              <select name="landingPatternId" value={formData.landingPatternId} onChange={handleChange} className="w-full h-10 px-3 py-2 rounded-md border border-input bg-transparent" disabled={fetching}>
                 <option value="">-- Pilih Rute --</option>
-                {MOCK_LANDING_PATTERN.map((item) => (
-                  <option key={item.id} value={item.id}>{item.ruteIn} &rarr; {item.ruteOut} ({item.kode})</option>
-                ))}
+                {fetching ? (
+                  <option disabled>Loading rute in-out...</option>
+                ) : (
+                  (options?.routes && options.routes.length > 0 ? options.routes : MOCK_LANDING_PATTERN).map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.ruteIn} &rarr; {item.ruteOut} ({item.kode})
+                    </option>
+                  ))
+                )}
               </select>
             </div>
             <div className={colMode ? "md:col-span-2" : ""}>

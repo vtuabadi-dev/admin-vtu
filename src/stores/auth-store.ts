@@ -19,7 +19,7 @@ interface AuthState {
   lastActivity: number;
   sessionExpired: boolean;
 
-  login: (email: string, password: string, loginType: "admin" | "jamaah") => Promise<void>;
+  login: (email: string, password: string) => Promise<void>;
   logout: () => void;
   refreshSession: () => void;
   updateActivity: () => void;
@@ -28,8 +28,51 @@ interface AuthState {
   checkSessionExpired: () => boolean;
 }
 
-// Mock credentials removed by EEOS Data Eradication Mandate
-const INACTIVITY_TIMEOUT = 30 * 60 * 1000; // 30 minutes
+const OUTSIDE_WORK_HOURS_TIMEOUT = 3 * 60 * 60 * 1000; // 3 jam (10.800.000 ms)
+
+export function evaluateSessionExpired(
+  lastActivity: number,
+  now: number = Date.now(),
+  userRole?: OperationalRole
+): boolean {
+  if (!lastActivity) return false;
+
+  // Aturan jam kerja 08:00-17:00 HANYA diperuntukkan bagi role ADMIN (bukan Jamaah)
+  const isAdmin = userRole !== undefined && userRole !== "jamaah";
+
+  if (!isAdmin) {
+    // Untuk role Jamaah: batas inaktivitas 24 jam
+    const JAMAAH_TIMEOUT = 24 * 60 * 60 * 1000;
+    return now - lastActivity >= JAMAAH_TIMEOUT;
+  }
+
+  const lastDate = new Date(lastActivity);
+  const nowDate = new Date(now);
+
+  const nowHour = nowDate.getHours();
+  const lastHour = lastDate.getHours();
+
+  const isSameDay =
+    nowDate.getFullYear() === lastDate.getFullYear() &&
+    nowDate.getMonth() === lastDate.getMonth() &&
+    nowDate.getDate() === lastDate.getDate();
+
+  // Aksi terakhir pada jam kerja Admin (08:00 - 16:59:59)
+  const lastWasInWorkHours = lastHour >= 8 && lastHour < 17;
+
+  if (isSameDay && lastWasInWorkHours) {
+    // Jika sudah mencapai/melewati jam 17:00 (5 sore) tanpa aktivitas setelah jam 17:00
+    if (nowHour >= 17) {
+      return true;
+    }
+    // Selama jam kerja (08:00 - 16:59:59), Admin tetap login terus
+    return false;
+  }
+
+  // Di luar jam kerja Admin (< 08:00 atau >= 17:00) atau beda hari: logout jika inaktif 3 jam
+  const inactiveDuration = now - lastActivity;
+  return inactiveDuration >= OUTSIDE_WORK_HOURS_TIMEOUT;
+}
 
 export const useAuthStore = create<AuthState>()(
   persist(
@@ -42,7 +85,7 @@ export const useAuthStore = create<AuthState>()(
       lastActivity: Date.now(),
       sessionExpired: false,
 
-      login: async (email: string, password: string, loginType: "admin" | "jamaah") => {
+      login: async (email: string, password: string) => {
         const normalizedEmail = email.toLowerCase().trim();
 
         try {
@@ -63,18 +106,6 @@ export const useAuthStore = create<AuthState>()(
             const session = await res.json();
             if (session?.user) {
               const userRole = session.user.role as OperationalRole;
-
-              // Validate login type matches role
-              if (loginType === "admin" && userRole === "jamaah") {
-                await signOut({ redirect: false });
-                set({ loginError: "Akun ini adalah akun jamaah. Gunakan tab Jamaah Login.", isLoading: false });
-                return;
-              }
-              if (loginType === "jamaah" && userRole !== "jamaah") {
-                await signOut({ redirect: false });
-                set({ loginError: "Akun ini adalah akun admin. Gunakan tab Admin Login.", isLoading: false });
-                return;
-              }
 
               set({
                 user: {
@@ -116,11 +147,11 @@ export const useAuthStore = create<AuthState>()(
       },
 
       updateActivity: () => {
-        const { isAuthenticated, lastActivity, sessionExpired } = get();
+        const { isAuthenticated, lastActivity, sessionExpired, user } = get();
         if (!isAuthenticated || sessionExpired) return;
 
         const now = Date.now();
-        if (now - lastActivity > INACTIVITY_TIMEOUT) {
+        if (evaluateSessionExpired(lastActivity, now, user?.role)) {
           set({ sessionExpired: true });
         } else {
           set({ lastActivity: now });
@@ -132,9 +163,9 @@ export const useAuthStore = create<AuthState>()(
       setRememberMe: (value: boolean) => set({ rememberMe: value }),
 
       checkSessionExpired: () => {
-        const { lastActivity, isAuthenticated } = get();
+        const { lastActivity, isAuthenticated, user } = get();
         if (!isAuthenticated) return false;
-        const expired = Date.now() - lastActivity > INACTIVITY_TIMEOUT;
+        const expired = evaluateSessionExpired(lastActivity, Date.now(), user?.role);
         if (expired) {
           set({ sessionExpired: true });
         }

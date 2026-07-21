@@ -1,9 +1,18 @@
+import { prisma } from "../db/client";
 import { keberangkatanRepo } from "../repositories/keberangkatan.repository";
 import type { 
   PackageIntelligence, 
   FinalizationResult, 
   PackageReadinessScore 
 } from "@/shared/types";
+import {
+  generateKodeIndividu,
+  generateKodeGrup,
+  generateNamaPaket,
+  generatePackageFolderName,
+  getMonthFolderName,
+} from "./package-code.service";
+import { createPackageFolderHierarchy } from "../storage/google-drive";
 
 export const packageService = {
   async findAll(params?: { status?: string; limit?: number; offset?: number }) {
@@ -15,7 +24,126 @@ export const packageService = {
   },
 
   async create(data: any) {
-    return keberangkatanRepo.create(data);
+    // 1. Resolve master codes for package type, starting point, airline, and route
+    const [pkgType, startingPoint, airline, masterRoute] = await Promise.all([
+      data.packageTypeId ? prisma.masterPackageType.findUnique({ where: { id: data.packageTypeId } }) : null,
+      data.startingPointId ? prisma.masterCity.findUnique({ where: { id: data.startingPointId } }) : null,
+      data.maskapaiId ? prisma.masterAirline.findUnique({ where: { id: data.maskapaiId } }) : null,
+      data.landingPatternId ? prisma.masterRoute.findUnique({ where: { id: data.landingPatternId } }) : null,
+    ]);
+
+    const pCode = pkgType?.code || "REG";
+    const sCode = startingPoint?.code || "JKT";
+    const mCode = airline?.code || "SV";
+    const rCode = masterRoute?.kode || "JED.C";
+    const durasiHari = parseInt(data.durationDays || data.durasiHari || "9", 10);
+
+    // Support single or multiple departure dates
+    const departureDatesRaw: string[] = Array.isArray(data.departureDates) && data.departureDates.length > 0
+      ? data.departureDates
+      : [data.tanggalBerangkat || new Date().toISOString()];
+
+    const departureDates = departureDatesRaw.map((d) => new Date(d));
+    const firstDate = departureDates[0] || new Date();
+    const year = firstDate.getFullYear();
+
+    // 2. If multi-date, create PaketGrup
+    let paketGrupId: string | undefined;
+    let kodeGrup: string | undefined;
+
+    if (departureDates.length > 1) {
+      kodeGrup = generateKodeGrup({
+        tahun: year,
+        durasiHari,
+        packageTypeCode: pCode,
+        startingPointCode: sCode,
+        maskapaiCode: mCode,
+        tanggalList: departureDates,
+      });
+
+      const groupRecord = await prisma.paketGrup.create({
+        data: {
+          kodeGrup,
+          namaPaket: data.namaPaket || `${pCode} ${sCode} Group`,
+        },
+      });
+      paketGrupId = groupRecord.id;
+    }
+
+    // 3. Create Keberangkatan for each date
+    const createdList = [];
+
+    for (const depDate of departureDates) {
+      const depYear = depDate.getFullYear();
+      const retDate = new Date(depDate);
+      retDate.setDate(retDate.getDate() + durasiHari - 1);
+
+      const kodeIndividu = generateKodeIndividu({
+        tahun: depYear,
+        durasiHari,
+        packageTypeCode: pCode,
+        startingPointCode: sCode,
+        maskapaiCode: mCode,
+        tanggalBerangkat: depDate,
+      });
+
+      const formattedNamaPaket = generateNamaPaket({
+        packageTypeCode: pCode,
+        packageTypeName: pkgType?.name,
+        durasiHari,
+        startingPointCode: sCode,
+        routeCode: rCode,
+        tanggalBerangkat: depDate,
+        maskapaiCode: mCode,
+      });
+
+      const folderName = generatePackageFolderName({
+        startingPointCode: sCode,
+        tanggalBerangkat: depDate,
+        durasiHari,
+        packageTypeCode: pCode,
+        maskapaiCode: mCode,
+      });
+
+      const monthFolder = getMonthFolderName(depDate);
+
+      // Create Google Drive folder hierarchy for this package
+      let driveFolderIds: any = null;
+      try {
+        driveFolderIds = await createPackageFolderHierarchy(depYear, monthFolder, folderName);
+      } catch (e) {
+        console.error("[PackageService] Failed to create GDrive folder hierarchy:", e);
+      }
+
+      const created = await keberangkatanRepo.create({
+        kode: kodeIndividu,
+        kodeIndividu,
+        paketGrupId,
+        driveFolderIds,
+        namaPaket: data.namaPaket || formattedNamaPaket,
+        hargaPaket: parseInt(data.hargaBase || data.hargaPaket || "0", 10),
+        tanggalBerangkat: depDate.toISOString(),
+        tanggalPulang: retDate.toISOString(),
+        maskapai: airline?.name || data.maskapai || "Saudia",
+        maskapaiId: data.maskapaiId,
+        nomorPenerbangan: data.nomorPenerbangan || "SV-816",
+        hotelMekkah: data.hotelMekkah || "TBA",
+        hotelMekkahId: data.hotelMekkahId,
+        hotelMadinah: data.hotelMadinah || "TBA",
+        hotelMadinahId: data.hotelMadinahId,
+        startingPointId: data.startingPointId,
+        packageTypeId: data.packageTypeId,
+        kuota: parseInt(data.kapasitas || data.kuota || "45", 10),
+        maxSeat: parseInt(data.kapasitas || data.maxSeat || "45", 10),
+        terisi: 0,
+        status: "scheduled",
+        durationDays: durasiHari,
+      } as any);
+
+      createdList.push(created);
+    }
+
+    return departureDates.length === 1 ? createdList[0] : createdList;
   },
 
   async update(id: string, data: any) {

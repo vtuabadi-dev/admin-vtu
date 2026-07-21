@@ -3,8 +3,8 @@ import type { NextRequest } from "next/server";
 import { auth } from "@/server/auth";
 import { jamaahRepo, pembayaranRepo } from "@/server/repositories";
 import { getStorageAdapter } from "@/server/storage";
-import { paymentProofPath } from "@/services/storage/paths";
 import { checkRateLimit, rateLimitKey, getRateLimitConfig } from "@/server/lib/rate-limit";
+import { prisma } from "@/server/db/client";
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 const ALLOWED_EXTENSIONS = [".jpg", ".jpeg", ".png", ".pdf"];
@@ -39,8 +39,18 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: false, message: "Too many requests" }, { status: 429 });
   }
 
-  const jamaah = await jamaahRepo.findByUserId(session.user.id);
-  if (!jamaah) {
+  const jamaahRecord = await prisma.jamaah.findFirst({
+    where: { userId: session.user.id },
+    include: {
+      group: {
+        include: {
+          keberangkatan: true,
+        },
+      },
+    },
+  });
+
+  if (!jamaahRecord) {
     return NextResponse.json({ success: false, message: "Jamaah profile not found" }, { status: 404 });
   }
 
@@ -64,25 +74,34 @@ export async function POST(request: NextRequest) {
     let buktiUrl: string | undefined;
 
     if (file && file.size > 0) {
-      // Validate file
       if (file.size > MAX_FILE_SIZE) {
         return NextResponse.json({ success: false, message: "Ukuran file maksimal 5MB" }, { status: 400 });
       }
 
-      const ext = file.name.includes(".") ? `.${file.name.split(".").pop()?.toLowerCase()}` : "";
+      const rawExt = file.name.includes(".") ? file.name.split(".").pop()?.toLowerCase() || "jpg" : "jpg";
+      const ext = `.${rawExt}`;
       if (!ALLOWED_EXTENSIONS.includes(ext)) {
         return NextResponse.json({ success: false, message: "Format file tidak didukung (JPG, PNG, PDF)" }, { status: 400 });
       }
 
       const buffer = Buffer.from(await file.arrayBuffer());
+      const driveFolders = (jamaahRecord.group?.keberangkatan?.driveFolderIds as any) || {};
+
+      const manifestRow = await prisma.manifestRow.findFirst({
+        where: { jamaahId: jamaahRecord.id },
+        select: { nomorUrut: true },
+      });
+      const nomorManifest = String(manifestRow?.nomorUrut || "000").padStart(3, "0");
+      const cleanName = jamaahRecord.namaLengkap.toUpperCase().replace(/\s+/g, "-").replace(/[^A-Z0-9-]/g, "");
+      const formattedFileName = `${nomorManifest}-${jamaahRecord.registrationId}_${cleanName}_bukti_${Date.now()}.${rawExt}`;
+
       const storage = getStorageAdapter();
-      const storagePath = paymentProofPath(jamaah.id, ext.replace(".", ""));
-      await storage.upload(storagePath, buffer, file.type || "application/octet-stream");
-      buktiUrl = await storage.getUrl(storagePath);
+      const fileId = await storage.upload(formattedFileName, buffer, file.type || "image/jpeg", driveFolders.pembayaran);
+      buktiUrl = await storage.getUrl(fileId);
     }
 
     const payment = await pembayaranRepo.create({
-      groupId: jamaah.groupId,
+      groupId: jamaahRecord.groupId,
       jumlah,
       metode: "transfer",
       tanggal: new Date().toISOString(),
@@ -93,8 +112,8 @@ export async function POST(request: NextRequest) {
       nomorRekening: nomorRekening || undefined,
       catatan: catatan || undefined,
       alokasi: [{
-        jamaahId: jamaah.id,
-        namaJamaah: jamaah.namaLengkap,
+        jamaahId: jamaahRecord.id,
+        namaJamaah: jamaahRecord.namaLengkap,
         jumlah,
       }],
     } as any);

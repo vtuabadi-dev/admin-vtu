@@ -14,6 +14,8 @@ const JAMAAH_API_PREFIXES = [
 
 // SUPER_ADMIN-only routes (internal system infrastructure)
 const SUPER_ADMIN_ONLY_PREFIXES = [
+  "/admin/users",
+  "/api/admin/users",
   "/admin/audit-log",
   "/api/audit",
   "/admin/kesehatan-sistem",

@@ -133,6 +133,7 @@ const adminNav: NavSection[] = [
   {
     title: "LAINNYA",
     items: [
+      { label: "Manajemen User", href: "/admin/users", icon: Users },
       { label: "Laporan", href: "/admin/laporan", icon: BarChart3 },
       { label: "Pengaturan", href: "/admin/pengaturan", icon: Settings },
       { label: "Aturan Operasional", href: "/admin/pengaturan/aturan-operasional", icon: ScrollText },
