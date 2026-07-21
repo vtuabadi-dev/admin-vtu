@@ -1,6 +1,6 @@
 export interface StorageAdapter {
   /** Upload file buffer ke path, return URL atau path yang bisa diakses */
-  upload(path: string, buffer: Buffer, contentType: string): Promise<string>;
+  upload(path: string, buffer: Buffer, contentType: string, targetFolderId?: string): Promise<string>;
 
   /** Download file dari path, return buffer */
   download(path: string): Promise<Buffer>;

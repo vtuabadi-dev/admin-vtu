@@ -4,7 +4,7 @@ import type { Keberangkatan } from "@/shared/types";
 function mapKeberangkatan(row: any): Keberangkatan {
   return {
     id: row.id,
-    kode: row.kode,
+    kode: row.kodeIndividu || row.kode,
     paketUmrohId: row.paketUmrohId ?? "",
     status: row.status,
     terisi: row.terisi,
@@ -25,6 +25,9 @@ function mapKeberangkatan(row: any): Keberangkatan {
     tanggalBerangkat: row.tanggalBerangkat?.toISOString() ?? new Date().toISOString(),
     tanggalPulang: row.tanggalPulang?.toISOString() ?? new Date().toISOString(),
     nomorPenerbangan: row.nomorPenerbangan ?? "-",
+    kodeIndividu: row.kodeIndividu ?? undefined,
+    paketGrupId: row.paketGrupId ?? undefined,
+    driveFolderIds: row.driveFolderIds ?? undefined,
   };
 }
 
@@ -62,6 +65,9 @@ export const keberangkatanRepo = {
     const row = await prisma.keberangkatan.create({
       data: {
         kode: data.kode,
+        kodeIndividu: data.kodeIndividu || data.kode,
+        paketGrupId: data.paketGrupId,
+        driveFolderIds: data.driveFolderIds ? (data.driveFolderIds as any) : undefined,
         paketUmrohId: data.paketUmrohId,
         tanggalBerangkat: new Date(data.tanggalBerangkat),
         tanggalPulang: new Date(data.tanggalPulang),

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
-import { Plane, CalendarDays, Hotel, MapPin, Plus, Search, Trash2 } from "lucide-react";
+import { Plane, CalendarDays, Hotel, MapPin, Plus, Search, Trash2, Info, Copy, Check } from "lucide-react";
 import { useRouter } from "next/navigation";
 import {
   Card,
@@ -32,6 +32,15 @@ export default function KeberangkatanListPage() {
     new Date().getMonth() + 1
   );
   const [searchQuery, setSearchQuery] = useState("");
+  const [openInfoId, setOpenInfoId] = useState<string | null>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  const handleCopyId = async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    await navigator.clipboard.writeText(id);
+    setCopiedId(id);
+    setTimeout(() => setCopiedId(null), 1800);
+  };
 
   const load = async () => {
     try {
@@ -49,6 +58,19 @@ export default function KeberangkatanListPage() {
   useEffect(() => {
     load();
   }, []);
+
+  // Tutup popover ID Paket saat klik di luar
+  useEffect(() => {
+    if (!openInfoId) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      const btn = document.getElementById(`info-btn-${openInfoId}`);
+      if (btn && !btn.closest("[data-info-popover]") && !btn.contains(e.target as Node)) {
+        setOpenInfoId(null);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [openInfoId]);
 
   const handleDelete = async (id: string) => {
     if (confirm("Apakah Anda yakin ingin menghapus paket ini?")) {
@@ -225,7 +247,64 @@ export default function KeberangkatanListPage() {
                       {k.kode}
                     </p>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5">
+                    {/* Tombol ID Paket Tersembunyi */}
+                    <div className="relative">
+                      <button
+                        id={`info-btn-${k.id}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setOpenInfoId(openInfoId === k.id ? null : k.id);
+                        }}
+                        className={cn(
+                          "inline-flex items-center justify-center h-6 w-6 rounded-full text-[11px] font-bold border transition-colors",
+                          openInfoId === k.id
+                            ? "bg-primary text-primary-foreground border-primary"
+                            : "bg-muted/60 text-muted-foreground border-border hover:bg-primary/10 hover:text-primary hover:border-primary/40"
+                        )}
+                        title="Lihat ID Paket"
+                        aria-label="Tampilkan ID Paket"
+                      >
+                        !
+                      </button>
+                      {openInfoId === k.id && (
+                        <div
+                          className="absolute right-0 top-8 z-50 w-72 rounded-lg border bg-popover shadow-lg p-3 animate-in fade-in-0 zoom-in-95"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <div className="flex items-center justify-between mb-1.5">
+                            <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1">
+                              <Info className="h-3 w-3" /> ID Paket
+                            </span>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); setOpenInfoId(null); }}
+                              className="text-muted-foreground hover:text-foreground transition-colors"
+                              aria-label="Tutup"
+                            >
+                              <span className="text-xs">✕</span>
+                            </button>
+                          </div>
+                          <div className="flex items-center gap-2 bg-muted rounded-md px-2.5 py-1.5">
+                            <code className="text-xs font-mono flex-1 break-all text-foreground select-all">
+                              {k.id}
+                            </code>
+                            <button
+                              onClick={(e) => handleCopyId(k.id, e)}
+                              className="shrink-0 text-muted-foreground hover:text-primary transition-colors"
+                              title="Salin ID"
+                              aria-label="Salin ID Paket"
+                            >
+                              {copiedId === k.id
+                                ? <Check className="h-3.5 w-3.5 text-success" />
+                                : <Copy className="h-3.5 w-3.5" />}
+                            </button>
+                          </div>
+                          <p className="text-[10px] text-muted-foreground mt-1.5">
+                            Single Source of Truth — tidak berubah seumur hidup paket
+                          </p>
+                        </div>
+                      )}
+                    </div>
                     <span
                       className={cn(
                         "inline-flex items-center justify-center h-6 w-6 rounded-full text-[10px] font-bold",

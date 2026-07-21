@@ -3,8 +3,13 @@ import { hotelRepo } from "../repositories/master/hotel.repository";
 import { cityRepo } from "../repositories/master/city.repository";
 import { packageTypeRepo } from "../repositories/master/package-type.repository";
 import { hotelCityRepo } from "../repositories/master/hotel-city.repository";
+import { routeRepo } from "../repositories/master/route.repository";
 
 export const masterDataService = {
+  // Routes
+  async getRoutes(params?: { isActive?: boolean; limit?: number; offset?: number; search?: string }) {
+    return routeRepo.findAll(params);
+  },
   // Airline
   async getAirlines(params?: { isActive?: boolean; limit?: number; offset?: number; search?: string; sort?: string; order?: "asc" | "desc" }) {
     return airlineRepo.findAll(params);

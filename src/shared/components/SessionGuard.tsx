@@ -40,6 +40,20 @@ export function SessionGuard({ children, requiredRole = "any" }: SessionGuardPro
     }
   }, [hydrated, isLoading, isAuthenticated, isAdmin, isJamaah, requiredRole, router]);
 
+  // Periodic session expiration check (every 15 seconds)
+  const checkSessionExpired = useSession().checkSessionExpired;
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    checkSessionExpired();
+    const interval = setInterval(() => {
+      checkSessionExpired();
+    }, 15000);
+
+    return () => clearInterval(interval);
+  }, [isAuthenticated, checkSessionExpired]);
+
   // Handle session expired
   useEffect(() => {
     if (!sessionExpired) return;
@@ -84,7 +98,7 @@ export function SessionGuard({ children, requiredRole = "any" }: SessionGuardPro
           <div>
             <h2 className="text-lg font-semibold">Sesi Habis</h2>
             <p className="text-sm text-muted-foreground mt-1">
-              Sesi Anda telah berakhir karena tidak ada aktivitas selama 30 menit. Silakan login kembali.
+              Sesi Anda telah berakhir (jam kerja selesai pukul 17:00 / tidak ada aktivitas selama 3 jam di luar jam kerja). Silakan login kembali.
             </p>
           </div>
           <Button

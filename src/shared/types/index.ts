@@ -354,6 +354,9 @@ export interface Keberangkatan {
   hotelMekkah?: string;
   hotelMadinah?: string;
   kuota?: number;
+  kodeIndividu?: string;
+  paketGrupId?: string;
+  driveFolderIds?: any;
 }
 
 /** TODO: Multi-tenant — add tenantId: string */

@@ -72,10 +72,88 @@ async function apiFetch(url: string, options: RequestInit = {}): Promise<Respons
   return res;
 }
 
+export async function getOrCreateFolder(folderName: string, parentId?: string): Promise<string> {
+  const rootId = parentId || process.env.GOOGLE_DRIVE_FOLDER_ID!;
+  const query = `'${rootId}' in parents and name = '${folderName.replace(/'/g, "\\'")}' and mimeType = 'application/vnd.google.apps.folder' and trashed = false`;
+
+  const res = await apiFetch(`${DRIVE_API}/files?q=${encodeURIComponent(query)}&fields=files(id,name)`);
+  const data = await res.json();
+  if (data.files && data.files.length > 0) {
+    return data.files[0].id;
+  }
+
+  const createRes = await apiFetch(`${DRIVE_API}/files`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      name: folderName,
+      mimeType: "application/vnd.google.apps.folder",
+      parents: [rootId],
+    }),
+  });
+  const folder = await createRes.json();
+  return folder.id;
+}
+
+export interface DriveFolderRegistry {
+  rootPackageFolderId: string;
+  paspor: string;
+  ktp: string;
+  foto: string;
+  pembayaran: string;
+  dokumenLain: string;
+  manifest: string;
+  export: string;
+}
+
+export async function createPackageFolderHierarchy(
+  year: number,
+  monthFolderName: string,
+  packageFolderName: string
+): Promise<DriveFolderRegistry> {
+  if (!isGoogleDriveConfigured()) {
+    return {
+      rootPackageFolderId: "local-mock",
+      paspor: "local-mock",
+      ktp: "local-mock",
+      foto: "local-mock",
+      pembayaran: "local-mock",
+      dokumenLain: "local-mock",
+      manifest: "local-mock",
+      export: "local-mock",
+    };
+  }
+
+  const rootIndukId = await getOrCreateFolder("KELENGKAPAN DATA JAMAAH");
+  const yearId = await getOrCreateFolder(String(year), rootIndukId);
+  const monthId = await getOrCreateFolder(monthFolderName, yearId);
+  const packageFolderId = await getOrCreateFolder(packageFolderName, monthId);
+
+  const [paspor, ktp, foto, pembayaran, dokumenLain, manifest, exportFolder] = await Promise.all([
+    getOrCreateFolder("PASPOR", packageFolderId),
+    getOrCreateFolder("KTP", packageFolderId),
+    getOrCreateFolder("FOTO", packageFolderId),
+    getOrCreateFolder("PEMBAYARAN", packageFolderId),
+    getOrCreateFolder("DOKUMEN LAIN", packageFolderId),
+    getOrCreateFolder("MANIFEST", packageFolderId),
+    getOrCreateFolder("EXPORT", packageFolderId),
+  ]);
+
+  return {
+    rootPackageFolderId: packageFolderId,
+    paspor,
+    ktp,
+    foto,
+    pembayaran,
+    dokumenLain,
+    manifest,
+    export: exportFolder,
+  };
+}
+
 export function createGoogleDriveAdapter(): StorageAdapter {
   const folderId = process.env.GOOGLE_DRIVE_FOLDER_ID!;
 
-  // Validate folder ID format (Google Drive folder IDs are alphanumeric strings, typically 25-45 chars)
   if (!/^[a-zA-Z0-9_-]{15,60}$/.test(folderId)) {
     throw new Error(
       `[Google Drive] GOOGLE_DRIVE_FOLDER_ID format tidak valid: "${folderId}". ` +
@@ -88,21 +166,20 @@ export function createGoogleDriveAdapter(): StorageAdapter {
   }
 
   return {
-    async upload(path: string, buffer: Buffer, contentType: string): Promise<string> {
+    async upload(path: string, buffer: Buffer, contentType: string, targetFolderId?: string): Promise<string> {
       const fileName = getFileName(path);
+      const parentFolderId = targetFolderId || folderId;
 
-      // Step 1: Create file metadata
       const metaRes = await apiFetch(`${DRIVE_API}/files`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: fileName,
-          parents: [folderId],
+          parents: [parentFolderId],
         }),
       });
       const { id: fileId } = await metaRes.json();
 
-      // Step 2: Upload content via simple upload
       await apiFetch(`${DRIVE_UPLOAD}/files/${fileId}?uploadType=media`, {
         method: "PATCH",
         headers: { "Content-Type": contentType },

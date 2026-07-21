@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react";
 import { 
-  MOCK_LANDING_PATTERN, 
   MOCK_KLASTER 
 } from "@/shared/lib/mock-data";
 import { Tabs } from "@/shared/components/ui/Tabs";
@@ -157,7 +156,7 @@ export default function MasterKonfigurasiPaketUmrohPage() {
               <CrudTab
                 title="Master Rute In-Out"
                 itemName="Rute In-Out"
-                initialData={MOCK_LANDING_PATTERN}
+                apiEndpoint="/api/master/routes"
                 defaultNewItem={{ ruteIn: "", ruteOut: "", kode: "", status: "Aktif" }}
                 columns={[
                   { key: "ruteIn", header: "Rute In (Landing)" },
@@ -234,6 +233,7 @@ export default function MasterKonfigurasiPaketUmrohPage() {
               <CrudTab
                 title="Master Klaster Seat"
                 itemName="Klaster"
+                apiEndpoint="/api/master/clusters"
                 initialData={MOCK_KLASTER}
                 defaultNewItem={{ nama: "", status: "Aktif" }}
                 columns={[

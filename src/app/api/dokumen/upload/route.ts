@@ -2,14 +2,13 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { auth } from "@/server/auth";
 import { checkServerPermission } from "@/shared/lib/rbac-utils";
-import { getStorageAdapter, dokumenPath } from "@/server/storage";
-import { validateImageMetadata } from "@/server/services/ocr.service";
+import { getStorageAdapter } from "@/server/storage";
 import { dokumenRepo } from "@/server/repositories";
 import { checkRateLimit, rateLimitKey, getRateLimitConfig } from "@/server/lib/rate-limit";
 import type { DokumenJenis } from "@/shared/types";
+import { prisma } from "@/server/db/client";
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
-const VALID_MIME_TYPES = ["image/jpeg", "image/jpg"];
 const VALID_DOKUMEN_JENIS: DokumenJenis[] = ["ktp", "kk", "paspor", "akta", "pas_foto", "vaksin"];
 
 function sanitizeFilename(name: string): string {
@@ -42,47 +41,62 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, message: "file, jamaahId, and jenisDokumen are required" }, { status: 400 });
     }
 
-    // Validate jenisDokumen against allowed values
     const jenisDokumen = rawJenis as DokumenJenis;
     if (!VALID_DOKUMEN_JENIS.includes(jenisDokumen)) {
       return NextResponse.json({ success: false, message: "Jenis dokumen tidak valid" }, { status: 400 });
     }
 
-    // Validate jamaahId format (cuid — alphanumeric, no path chars)
     if (!/^[a-zA-Z0-9_-]+$/.test(jamaahId) || jamaahId.length > 64) {
       return NextResponse.json({ success: false, message: "Invalid jamaahId" }, { status: 400 });
-    }
-
-    // Validate MIME type from content, not just extension
-    const clientMime = (file.type || "").toLowerCase();
-    if (!VALID_MIME_TYPES.includes(clientMime)) {
-      return NextResponse.json({ success: false, message: "Hanya file JPG/JPEG yang diizinkan (invalid MIME type)" }, { status: 400 });
-    }
-
-    // Validate extension
-    const ext = sanitizeFilename(file.name).split(".").pop()?.toLowerCase();
-    if (ext !== "jpg" && ext !== "jpeg") {
-      return NextResponse.json({ success: false, message: "Hanya file JPG/JPEG yang diizinkan" }, { status: 400 });
     }
 
     if (file.size > MAX_FILE_SIZE) {
       return NextResponse.json({ success: false, message: "File terlalu besar (max 10MB)" }, { status: 400 });
     }
 
+    const ext = sanitizeFilename(file.name).split(".").pop()?.toLowerCase() || "jpg";
     const buffer = Buffer.from(await file.arrayBuffer());
 
-    // Magic bytes validation (double-check Content-Type bypass)
-    const metaCheck = validateImageMetadata(buffer);
-    if (!metaCheck.valid) {
-      return NextResponse.json({ success: false, message: "File tidak valid", details: metaCheck.issues }, { status: 400 });
+    // Fetch jamaah & keberangkatan folder registry for manifest-based naming
+    const jamaah = await prisma.jamaah.findUnique({
+      where: { id: jamaahId },
+      include: {
+        group: {
+          include: {
+            keberangkatan: true,
+          },
+        },
+      },
+    });
+
+    let targetFolderId: string | undefined;
+    let formattedFileName = `${jamaahId}_${jenisDokumen}.${ext}`;
+
+    if (jamaah) {
+      const driveFolders = (jamaah.group?.keberangkatan?.driveFolderIds as any) || {};
+      const regId = jamaah.registrationId || jamaah.id;
+      const cleanName = jamaah.namaLengkap.toUpperCase().replace(/\s+/g, "-").replace(/[^A-Z0-9-]/g, "");
+
+      // Get manifest number if available (fallback 000)
+      const manifestRow = await prisma.manifestRow.findFirst({
+        where: { jamaahId: jamaah.id },
+        select: { nomorUrut: true },
+      });
+      const nomorManifest = String(manifestRow?.nomorUrut || "000").padStart(3, "0");
+
+      formattedFileName = `${nomorManifest}-${regId}_${cleanName}.${ext}`;
+
+      // Pick subfolder by document type
+      if (jenisDokumen === "paspor") targetFolderId = driveFolders.paspor;
+      else if (jenisDokumen === "ktp") targetFolderId = driveFolders.ktp;
+      else if (jenisDokumen === "pas_foto") targetFolderId = driveFolders.foto;
+      else targetFolderId = driveFolders.dokumenLain;
     }
 
-    // Save file
     const storage = getStorageAdapter();
-    const storagePath = dokumenPath(jamaahId, jenisDokumen, ext);
-    await storage.upload(storagePath, buffer, file.type || "image/jpeg");
+    const fileId = await storage.upload(formattedFileName, buffer, file.type || "image/jpeg", targetFolderId);
 
-    // Find existing dokumen item untuk jamaah+jenis ini
+    // Update DB
     const semuaDokumen = await dokumenRepo.findByJamaah(jamaahId);
     const dokumenItem = semuaDokumen.find((d: { id: string; jenis: string }) => d.jenis === jenisDokumen);
 
@@ -90,13 +104,12 @@ export async function POST(request: NextRequest) {
       await dokumenRepo.updateFileStatus(dokumenItem.id, "valid");
     }
 
-    // OCR: diproses oleh service external (tidak di VPS aplikasi)
-
     return NextResponse.json({
       success: true,
       data: {
         dokumen: dokumenItem,
-        fileUrl: await storage.getUrl(storagePath),
+        fileUrl: await storage.getUrl(fileId),
+        fileId,
         status: "uploaded",
       },
     });

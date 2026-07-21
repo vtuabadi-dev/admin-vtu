@@ -1,7 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect } from "react";
 import { useAuthStore } from "@/stores/auth-store";
 import { useSession } from "@/shared/hooks/use-session";
 import { cn } from "@/shared/lib/utils";
@@ -17,13 +16,8 @@ import {
 } from "lucide-react";
 
 export default function LoginPage() {
-  const router = useRouter();
+  const { login, loginError, clearError, isAuthenticated, role } = useSession();
 
-  // Session hook provides auth primitives
-  const { login, loginError, clearError, isAuthenticated, role } =
-    useSession();
-
-  // Direct store access for remember-me and user (not exposed via useSession)
   const rememberMe = useAuthStore((s) => s.rememberMe);
   const setRememberMe = useAuthStore((s) => s.setRememberMe);
   const storeLoading = useAuthStore((s) => s.isLoading);
@@ -31,35 +25,19 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [loginType, setLoginType] = useState<"admin" | "jamaah">("admin");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [showDemo, setShowDemo] = useState(false);
 
-  // Redirect on successful login based on role
+  // Hard redirect on successful login based on role to avoid router stale cache
   useEffect(() => {
-    if (!isAuthenticated) return;
+    if (!isAuthenticated || !role) return;
 
     if (role === "jamaah") {
-      router.push("/jamaah/dashboard");
+      window.location.href = "/jamaah/dashboard";
     } else {
-      // Admin role (super_admin, admin_operasional, admin_pembayaran, etc.)
-      router.push("/admin/dashboard");
+      window.location.href = "/admin/dashboard";
     }
-  }, [isAuthenticated, role, router]);
+  }, [isAuthenticated, role]);
 
-  // Reset form and clear error when switching tabs
-  const handleTabSwitch = useCallback(
-    (type: "admin" | "jamaah") => {
-      if (type === loginType) return;
-      clearError();
-      setLoginType(type);
-      setEmail("");
-      setPassword("");
-    },
-    [loginType, clearError]
-  );
-
-  // Handle form submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isSubmitting) return;
@@ -68,15 +46,14 @@ export default function LoginPage() {
     setIsSubmitting(true);
 
     try {
-      await login(email, password, loginType);
+      await login(email, password);
     } catch {
-      // Login errors are set on the store; nothing to handle here
+      // Login errors are handled by store
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  // Show a full-page loading spinner while the auth store rehydrates
   if (storeLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -87,8 +64,6 @@ export default function LoginPage() {
       </div>
     );
   }
-
-  const isAdmin = loginType === "admin";
 
   return (
     <div className="w-full max-w-md">
@@ -106,49 +81,15 @@ export default function LoginPage() {
           </p>
         </div>
 
-        {/* ── Tab Selector ── */}
-        <div className="flex border-b border-border mb-6">
-          <button
-            type="button"
-            onClick={() => handleTabSwitch("admin")}
-            className={cn(
-              "flex-1 pb-3 text-sm font-medium transition-colors duration-200 relative",
-              isAdmin
-                ? "text-foreground"
-                : "text-muted-foreground hover:text-foreground"
-            )}
-          >
-            Admin
-            {isAdmin && (
-              <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-full" />
-            )}
-          </button>
-          <button
-            type="button"
-            onClick={() => handleTabSwitch("jamaah")}
-            className={cn(
-              "flex-1 pb-3 text-sm font-medium transition-colors duration-200 relative",
-              !isAdmin
-                ? "text-foreground"
-                : "text-muted-foreground hover:text-foreground"
-            )}
-          >
-            Jamaah
-            {!isAdmin && (
-              <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-full" />
-            )}
-          </button>
-        </div>
-
         {/* ── Login Form ── */}
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Email / Telepon */}
+          {/* Email */}
           <div className="space-y-2">
             <label
               htmlFor="email"
               className="text-sm font-medium text-foreground"
             >
-              {isAdmin ? "Email" : "Email / No. Telepon"}
+              Email
             </label>
             <div className="relative">
               <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
@@ -157,7 +98,7 @@ export default function LoginPage() {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder={isAdmin ? "admin@vtu.id" : "jamaah@email.com"}
+                placeholder="nama@email.com"
                 autoComplete="email"
                 required
                 disabled={isSubmitting}
@@ -203,7 +144,7 @@ export default function LoginPage() {
             </div>
           </div>
 
-          {/* Remember me + Forgot password */}
+          {/* Remember me */}
           <div className="flex items-center justify-between">
             <label className="flex items-center gap-2 cursor-pointer select-none">
               <input
@@ -220,11 +161,11 @@ export default function LoginPage() {
             <button
               type="button"
               onClick={() =>
-                alert("Fitur lupa password akan tersedia di production.")
+                alert("Silakan hubungi Super Admin jika Anda mengalami kendala login.")
               }
               className="text-xs text-muted-foreground hover:text-foreground transition-colors duration-200"
             >
-              Lupa Password?
+              Bantuan Login
             </button>
           </div>
 
@@ -287,44 +228,11 @@ export default function LoginPage() {
             </div>
             <a
               href="/register"
-              className="block w-full py-2.5 px-4 rounded-lg border-2 border-primary/20 bg-primary/5 text-primary text-sm font-medium hover:bg-primary/10 hover:border-primary/30 transition-colors duration-200"
+              className="block w-full py-2.5 px-4 rounded-lg border-2 border-primary/20 bg-primary/5 text-primary text-sm font-medium hover:bg-primary/10 hover:border-primary/30 transition-colors duration-200 text-center"
             >
               Portal Registrasi Jamaah
             </a>
           </div>
-        </div>
-
-        {/* ── Demo Credentials ── */}
-        <div className="mt-6">
-          <button
-            type="button"
-            onClick={() => setShowDemo((prev) => !prev)}
-            className="w-full text-xs text-muted-foreground hover:text-foreground transition-colors duration-200 text-center"
-          >
-            Klik untuk melihat kredensial demo
-          </button>
-          {showDemo && (
-            <div className="mt-3 p-3 bg-muted/50 rounded-lg border border-border space-y-3 transition-all duration-200">
-              <div className="text-xs space-y-0.5">
-                <p className="font-medium text-foreground">Admin:</p>
-                <p className="text-muted-foreground">
-                  Email: admin@vtu.id
-                </p>
-                <p className="text-muted-foreground">
-                  Password: admin123
-                </p>
-              </div>
-              <div className="text-xs space-y-0.5">
-                <p className="font-medium text-foreground">Jamaah:</p>
-                <p className="text-muted-foreground">
-                  Email: jamaah@email.com
-                </p>
-                <p className="text-muted-foreground">
-                  Password: jamaah123
-                </p>
-              </div>
-            </div>
-          )}
         </div>
       </div>
     </div>
