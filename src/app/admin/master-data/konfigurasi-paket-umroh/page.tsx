@@ -233,6 +233,7 @@ export default function MasterKonfigurasiPaketUmrohPage() {
               <CrudTab
                 title="Master Klaster Seat"
                 itemName="Klaster"
+                apiEndpoint="/api/master/clusters"
                 initialData={MOCK_KLASTER}
                 defaultNewItem={{ nama: "", status: "Aktif" }}
                 columns={[

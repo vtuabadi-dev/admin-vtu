@@ -1133,6 +1133,18 @@ model MasterPerlengkapan {
   @@map("master_perlengkapan")
 }
 
+model MasterCluster {
+  id        String   @id @default(cuid())
+  kode      String?  @unique
+  nama      String
+  status    String   @default("Aktif")
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("master_clusters")
+}
+
 // ============================================================
 // PACKAGE CREATION BOT (AI DRAFT)
 // ============================================================
