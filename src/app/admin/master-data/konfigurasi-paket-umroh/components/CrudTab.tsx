@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { Button } from "@/shared/components/ui/Button";
 import { Modal } from "@/shared/components/ui/Modal";
 import { Input } from "@/shared/components/ui/Input";
-import { Trash2, Edit3, Settings, Check, FileSpreadsheet } from "lucide-react";
+import { Trash2, Edit3, Settings, Check, FileSpreadsheet, Search } from "lucide-react";
 
 interface FieldConfig {
   name: string;
@@ -62,6 +62,7 @@ export function CrudTab<T extends { id: string; status?: string; [key: string]: 
   const [editingItem, setEditingItem] = useState<T | null>(null);
   const [formData, setFormData] = useState<any>(defaultNewItem);
   const [filterValue, setFilterValue] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(!!apiEndpoint);
 
   const fetchData = async () => {
@@ -213,14 +214,24 @@ export function CrudTab<T extends { id: string; status?: string; [key: string]: 
     }
   };
 
-  const filteredData = filterField && filterValue
-    ? data.filter((item) => String(item[filterField.name as keyof T]) === filterValue)
-    : data;
+  const filteredData = data.filter((item) => {
+    if (filterField && filterValue) {
+      if (String(item[filterField.name as keyof T]) !== filterValue) return false;
+    }
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      const nameMatch = String(item.nama || item.name || "").toLowerCase().includes(q);
+      const codeMatch = String(item.code || "").toLowerCase().includes(q);
+      const jarakMatch = String(item.jarakText || item.jarak || "").toLowerCase().includes(q);
+      return nameMatch || codeMatch || jarakMatch;
+    }
+    return true;
+  });
 
   return (
     <div>
-      <div className="p-4 border-b border-border flex justify-between items-center bg-muted/30">
-        <div className="flex items-center gap-4">
+      <div className="p-4 border-b border-border flex flex-col sm:flex-row gap-3 justify-between items-start sm:items-center bg-muted/30">
+        <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
           <h2 className="font-semibold text-lg">{title}</h2>
           {filterField && (
             <select
@@ -236,6 +247,17 @@ export function CrudTab<T extends { id: string; status?: string; [key: string]: 
               ))}
             </select>
           )}
+
+          <div className="relative flex-1 sm:w-60">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder={`Cari nama ${itemName.toLowerCase()}...`}
+              className="h-9 w-full pl-8 pr-3 text-xs rounded-md border border-input bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+            />
+          </div>
         </div>
         <div className="flex items-center gap-2">
           {onSettingsClick && (
