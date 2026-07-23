@@ -53,7 +53,7 @@ export async function GET(request: NextRequest) {
       ...wakafPakets.map((w) => w.namaPaketUmroh as string),
     ];
 
-    const uniquePakets = [...new Set(allPakets)].sort();
+    const uniquePakets = Array.from(new Set(allPakets)).sort();
 
     return NextResponse.json({ success: true, data: uniquePakets });
   } catch (error) {
