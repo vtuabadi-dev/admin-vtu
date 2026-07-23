@@ -635,36 +635,34 @@ function CacheTab() {
 // MAIN PAGE
 // ============================================================
 
-export default function OcrSettingsPage() {
+export function OcrSettingsTab() {
   return (
-    <PermissionGuard module="ocr-settings">
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">OCR Settings</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Kelola provider OCR, monitoring, dan cache. Perubahan langsung berlaku tanpa deploy ulang.
-          </p>
-        </div>
-
-        <Tabs
-          tabs={[
-            { value: "providers", label: "Providers" },
-            { value: "statistics", label: "Statistics" },
-            { value: "logs", label: "Usage Log" },
-            { value: "cache", label: "Cache" },
-          ]}
-        >
-          {(activeTab) => {
-            switch (activeTab) {
-              case "providers": return <ProvidersTab />;
-              case "statistics": return <StatisticsTab />;
-              case "logs": return <UsageLogTab />;
-              case "cache": return <CacheTab />;
-              default: return null;
-            }
-          }}
-        </Tabs>
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-lg font-semibold">Integrasi API OCR</h2>
+        <p className="text-sm text-muted-foreground mt-1">
+          Kelola provider OCR, monitoring, dan cache. Perubahan langsung berlaku tanpa deploy ulang.
+        </p>
       </div>
-    </PermissionGuard>
+
+      <Tabs
+        tabs={[
+          { value: "providers", label: "Providers" },
+          { value: "statistics", label: "Statistics" },
+          { value: "logs", label: "Usage Log" },
+          { value: "cache", label: "Cache" },
+        ]}
+      >
+        {(activeTab) => {
+          switch (activeTab) {
+            case "providers": return <ProvidersTab />;
+            case "statistics": return <StatisticsTab />;
+            case "logs": return <UsageLogTab />;
+            case "cache": return <CacheTab />;
+            default: return null;
+          }
+        }}
+      </Tabs>
+    </div>
   );
 }

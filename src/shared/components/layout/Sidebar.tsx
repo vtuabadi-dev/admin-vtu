@@ -152,7 +152,6 @@ const adminNav: NavSection[] = [
       { label: "Manajemen User", href: "/admin/users", icon: Users },
       { label: "Laporan", href: "/admin/laporan", icon: BarChart3 },
       { label: "Pengaturan", href: "/admin/pengaturan", icon: Settings },
-      { label: "Pengaturan OCR", href: "/admin/ocr-settings", icon: Settings },
       { label: "Aturan Operasional", href: "/admin/pengaturan/aturan-operasional", icon: ScrollText },
       { label: "Audit Trail", href: "/admin/audit-log", icon: Shield },
       { label: "Kesehatan Sistem", href: "/admin/kesehatan-sistem", icon: Activity },

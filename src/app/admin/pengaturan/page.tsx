@@ -6,6 +6,7 @@ import { PermissionGuard } from "@/shared/components/PermissionGuard";
 import { Tabs } from "@/shared/components/ui/Tabs";
 import { Select } from "@/shared/components/ui/Select";
 import { Button } from "@/shared/components/ui/Button";
+import { OcrSettingsTab } from "./components/OcrSettingsTab";
 
 // ── Settings section wrapper ──
 function SettingSection({ title, desc, children }: { title: string; desc?: string; children: React.ReactNode }) {
@@ -325,6 +326,7 @@ export default function PengaturanPage() {
             { value: "sistem", label: "Preferensi Sistem" },
             { value: "notifikasi", label: "Notifikasi" },
             { value: "operasional", label: "Aturan Operasional" },
+            { value: "ocr", label: "Integrasi OCR" },
             { value: "infra", label: "Infrastruktur" },
           ]}
         >
@@ -338,6 +340,8 @@ export default function PengaturanPage() {
                 return <NotifikasiSettings />;
               case "operasional":
                 return <AturanOperasional />;
+              case "ocr":
+                return <OcrSettingsTab />;
               case "infra":
                 return <DatabaseStorage />;
               default:
