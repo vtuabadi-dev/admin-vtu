@@ -82,7 +82,7 @@ export async function checkOcrHealth(): Promise<{
 }> {
   try {
     // ── DB-Driven mode: check provider table ──
-    if (process.env.OCR_DB_DRIVEN === "true") {
+    if (process.env.OCR_DB_DRIVEN !== "false") {
       const { ocrProviderRepo } = await import("@/server/repositories/ocr-provider.repository");
       const providers = await ocrProviderRepo.findAll();
       const active = providers.filter((p) => p.isActive && p.healthStatus === "active");
