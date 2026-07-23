@@ -35,6 +35,11 @@ interface CrudTabProps<T extends { id: string; status?: string; [key: string]: a
   defaultNewItem: Omit<T, "id">;
   filterField?: FilterConfig;
   onSettingsClick?: () => void;
+  renderFormExtra?: (
+    formData: any,
+    setFormData: React.Dispatch<React.SetStateAction<any>>,
+    isSubmitting: boolean
+  ) => React.ReactNode;
 }
 
 export function CrudTab<T extends { id: string; status?: string; [key: string]: any }>({
@@ -47,6 +52,7 @@ export function CrudTab<T extends { id: string; status?: string; [key: string]: 
   defaultNewItem,
   filterField,
   onSettingsClick,
+  renderFormExtra,
 }: CrudTabProps<T>) {
   const [data, setData] = useState<T[]>(initialData || []);
   const [modalOpen, setModalOpen] = useState(false);
@@ -371,6 +377,8 @@ export function CrudTab<T extends { id: string; status?: string; [key: string]: 
               )}
             </div>
           ))}
+
+          {renderFormExtra && renderFormExtra(formData, setFormData, loading)}
 
           <div className="flex justify-end gap-2 pt-4 border-t">
             <Button variant="outline" type="button" onClick={() => setModalOpen(false)} disabled={loading}>

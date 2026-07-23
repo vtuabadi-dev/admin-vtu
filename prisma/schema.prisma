@@ -1065,14 +1065,17 @@ model MasterAirline {
 }
 
 model MasterHotel {
-  id         String   @id @default(cuid())
-  code       String   @unique
-  name       String
-  cityId     String
-  starRating Int?
-  isActive   Boolean  @default(true)
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id                String   @id @default(cuid())
+  code              String   @unique
+  name              String
+  cityId            String
+  starRating        Int?
+  jarakText         String?
+  videoJarakUrl     String?
+  videoJarakDriveId String?
+  isActive          Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
   city                 MasterHotelCity @relation(fields: [cityId], references: [id])
   keberangkatanMekkah  Keberangkatan[] @relation("HotelMekkah")

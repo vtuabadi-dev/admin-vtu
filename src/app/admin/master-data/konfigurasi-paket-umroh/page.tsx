@@ -9,7 +9,7 @@ import { CrudTab } from "./components/CrudTab";
 import { Modal } from "@/shared/components/ui/Modal";
 import { Button } from "@/shared/components/ui/Button";
 import { Input } from "@/shared/components/ui/Input";
-import { Trash2 } from "lucide-react";
+import { Trash2, Upload, ExternalLink, Play } from "lucide-react";
 
 const TABS = [
   { value: "jenis-paket", label: "Jenis Paket" },
@@ -28,6 +28,8 @@ const STATUS_OPTIONS = [
 export default function MasterKonfigurasiPaketUmrohPage() {
   const [hotelCities, setHotelCities] = useState<any[]>([]);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [videoPreview, setVideoPreview] = useState<{ open: boolean; title: string; url: string }>({ open: false, title: "", url: "" });
+  const [uploadingVideo, setUploadingVideo] = useState(false);
 
   // Fetch hotel cities
   const fetchHotelCities = () => {
@@ -200,7 +202,7 @@ export default function MasterKonfigurasiPaketUmrohPage() {
                 itemName="Hotel"
                 apiEndpoint="/api/master/hotels"
                 onSettingsClick={handleOpenSettings}
-                defaultNewItem={{ nama: "", cityId: "", bintang: 5, status: "Aktif" }}
+                defaultNewItem={{ nama: "", cityId: "", bintang: 5, status: "Aktif", jarakText: "", videoJarakUrl: "", videoJarakDriveId: "" }}
                 columns={[
                   { key: "nama", header: "Nama Hotel" },
                   { 
@@ -208,10 +210,40 @@ export default function MasterKonfigurasiPaketUmrohPage() {
                     header: "Kota Lokasi", 
                     render: (item) => {
                       const city = hotelCities.find(c => c.id === item.cityId);
-                      return <span>{city ? city.name : item.cityId}</span>;
+                      return <span className="font-medium">{city ? city.name : item.cityId}</span>;
                     } 
                   },
                   { key: "bintang", header: "Rating Bintang", render: (item) => <span>{item.starRating || item.bintang || 5} ⭐</span> },
+                  {
+                    key: "jarakText",
+                    header: "Jarak ke Pelataran",
+                    render: (item) => {
+                      const city = hotelCities.find(c => c.id === item.cityId);
+                      const cityName = city?.name?.toUpperCase() || "";
+                      const isHolyCity = cityName.includes("MAKKAH") || cityName.includes("MEKKAH") || cityName.includes("MADINAH");
+                      if (!isHolyCity) return <span className="text-muted-foreground">-</span>;
+                      return <span className="font-semibold text-primary">{item.jarakText || item.jarak || "-"}</span>;
+                    }
+                  },
+                  {
+                    key: "videoJarakUrl",
+                    header: "Video Jarak",
+                    render: (item) => {
+                      const url = item.videoJarakUrl;
+                      if (!url) return <span className="text-muted-foreground text-xs">Belum ada video</span>;
+                      return (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-8 gap-1.5 text-xs border-primary/30 text-primary hover:bg-primary/5"
+                          onClick={() => setVideoPreview({ open: true, title: item.name || item.nama, url })}
+                        >
+                          <Play className="h-3.5 w-3.5 fill-primary text-primary" />
+                          Tonton Video
+                        </Button>
+                      );
+                    }
+                  },
                   { key: "status", header: "Status" },
                   { key: "actions", header: "Aksi" },
                 ]}
@@ -225,6 +257,106 @@ export default function MasterKonfigurasiPaketUmrohPage() {
                   name: "cityId",
                   label: "Kota Lokasi",
                   options: hotelCities.map(c => ({ label: c.name, value: c.id }))
+                }}
+                renderFormExtra={(formData, setFormData, isSubmitting) => {
+                  const selectedCity = hotelCities.find(c => c.id === formData.cityId);
+                  const cityName = selectedCity?.name?.toUpperCase() || "";
+                  const isHolyCity = cityName.includes("MAKKAH") || cityName.includes("MEKKAH") || cityName.includes("MADINAH");
+
+                  if (!isHolyCity) return null;
+
+                  const handleVideoFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+
+                    try {
+                      setUploadingVideo(true);
+                      const uploadData = new FormData();
+                      uploadData.append("file", file);
+                      uploadData.append("cityName", selectedCity?.name || "Makkah");
+                      uploadData.append("hotelName", formData.name || formData.nama || "Hotel");
+
+                      const res = await fetch("/api/master/hotels/upload-video", {
+                        method: "POST",
+                        body: uploadData,
+                      });
+                      const resJson = await res.json();
+                      if (resJson.success) {
+                        setFormData((prev: any) => ({
+                          ...prev,
+                          videoJarakUrl: resJson.data.videoUrl,
+                          videoJarakDriveId: resJson.data.fileId,
+                        }));
+                      } else {
+                        alert(`Gagal mengunggah video: ${resJson.message}`);
+                      }
+                    } catch (err) {
+                      console.error(err);
+                      alert("Terjadi kesalahan saat mengunggah video");
+                    } finally {
+                      setUploadingVideo(false);
+                    }
+                  };
+
+                  return (
+                    <div className="space-y-4 pt-3 border-t border-border mt-3 bg-muted/20 p-3 rounded-md">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold uppercase tracking-wider text-primary">Informasi Jarak ({selectedCity?.name})</span>
+                      </div>
+                      
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-sm font-medium">Jarak ke Pelataran</label>
+                        <Input
+                          type="text"
+                          name="jarakText"
+                          value={formData.jarakText ?? ""}
+                          onChange={(e) => setFormData((prev: any) => ({ ...prev, jarakText: e.target.value }))}
+                          placeholder="Misal: 150 meter / 3 menit jalan kaki"
+                        />
+                      </div>
+
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-sm font-medium flex items-center justify-between">
+                          <span>Video Jarak ke Pelataran</span>
+                          <span className="text-xs text-muted-foreground font-normal">Otomatis tersimpan di Google Drive</span>
+                        </label>
+
+                        <div className="flex items-center gap-2">
+                          <Input
+                            type="text"
+                            name="videoJarakUrl"
+                            value={formData.videoJarakUrl ?? ""}
+                            onChange={(e) => setFormData((prev: any) => ({ ...prev, videoJarakUrl: e.target.value }))}
+                            placeholder="https://drive.google.com/... atau unggah file video"
+                            className="text-xs"
+                          />
+                          <label className="cursor-pointer inline-flex items-center gap-1.5 px-3 py-2 bg-primary text-primary-foreground text-xs font-medium rounded-md hover:bg-primary/90 transition-colors whitespace-nowrap">
+                            <Upload className="h-3.5 w-3.5" />
+                            {uploadingVideo ? "Unggah..." : "Upload Video"}
+                            <input
+                              type="file"
+                              accept="video/*"
+                              className="hidden"
+                              onChange={handleVideoFileUpload}
+                              disabled={uploadingVideo || isSubmitting}
+                            />
+                          </label>
+                        </div>
+                        {formData.videoJarakUrl && (
+                          <div className="flex items-center justify-between bg-card border rounded p-2 text-xs text-muted-foreground mt-1">
+                            <span className="truncate max-w-[300px]">{formData.videoJarakUrl}</span>
+                            <button
+                              type="button"
+                              onClick={() => setVideoPreview({ open: true, title: formData.nama || "Preview Video", url: formData.videoJarakUrl })}
+                              className="text-primary hover:underline font-semibold flex items-center gap-1"
+                            >
+                              <Play className="h-3 w-3" /> Preview
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
                 }}
               />
             </div>
@@ -317,6 +449,42 @@ export default function MasterKonfigurasiPaketUmrohPage() {
  
           <div className="flex justify-end gap-2 pt-4 border-t">
             <Button onClick={() => setSettingsOpen(false)}>
+              Tutup
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Video Preview Modal */}
+      <Modal
+        open={videoPreview.open}
+        onClose={() => setVideoPreview({ open: false, title: "", url: "" })}
+        title={`Video Perjalanan Jarak — ${videoPreview.title}`}
+        description="Preview video perjalanan dari hotel ke pelataran."
+      >
+        <div className="space-y-4 mt-3">
+          <div className="aspect-video bg-black rounded-lg overflow-hidden flex items-center justify-center">
+            {videoPreview.url.includes(".mp4") || videoPreview.url.startsWith("/api/storage") ? (
+              <video src={videoPreview.url} controls className="w-full h-full object-contain" />
+            ) : (
+              <iframe
+                src={videoPreview.url.replace("/view", "/preview")}
+                className="w-full h-full border-0"
+                allow="autoplay"
+                title={videoPreview.title}
+              />
+            )}
+          </div>
+          <div className="flex justify-between items-center text-xs text-muted-foreground pt-2 border-t">
+            <a
+              href={videoPreview.url}
+              target="_blank"
+              rel="noreferrer"
+              className="text-primary hover:underline flex items-center gap-1"
+            >
+              <ExternalLink className="h-3 w-3" /> Buka di tab baru / Google Drive
+            </a>
+            <Button size="sm" variant="outline" onClick={() => setVideoPreview({ open: false, title: "", url: "" })}>
               Tutup
             </Button>
           </div>

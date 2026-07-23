@@ -67,7 +67,7 @@ export const masterDataService = {
   async getHotelById(id: string) {
     return hotelRepo.findById(id);
   },
-  async createHotel(data: { code: string; name: string; cityId: string; starRating?: number; isActive?: boolean }) {
+  async createHotel(data: { code: string; name: string; cityId: string; starRating?: number; jarakText?: string | null; videoJarakUrl?: string | null; videoJarakDriveId?: string | null; isActive?: boolean }) {
     const existingCode = await hotelRepo.findByCode(data.code);
     if (existingCode) throw new Error("DUPLICATE_CODE");
     const existingName = await hotelRepo.findByName(data.name);
@@ -75,10 +75,13 @@ export const masterDataService = {
     return hotelRepo.create({
       ...data,
       starRating: data.starRating ?? null,
+      jarakText: data.jarakText ?? null,
+      videoJarakUrl: data.videoJarakUrl ?? null,
+      videoJarakDriveId: data.videoJarakDriveId ?? null,
       isActive: data.isActive ?? true,
     });
   },
-  async updateHotel(id: string, data: { code?: string; name?: string; cityId?: string; starRating?: number; isActive?: boolean }) {
+  async updateHotel(id: string, data: { code?: string; name?: string; cityId?: string; starRating?: number; jarakText?: string | null; videoJarakUrl?: string | null; videoJarakDriveId?: string | null; isActive?: boolean }) {
     if (data.code) {
       const existing = await hotelRepo.findByCode(data.code);
       if (existing && existing.id !== id) throw new Error("DUPLICATE_CODE");

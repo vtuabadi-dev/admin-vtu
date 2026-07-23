@@ -29,6 +29,7 @@ export default async function PaketUmrohWorkspaceLayout({
 
   const tabs = [
     { label: "Informasi", href: `/admin/paket-umroh/${params.id}/informasi` },
+    { label: "Info Hotel", href: `/admin/paket-umroh/${params.id}/info-hotel` },
     // Placeholder tabs for future sprint
     { label: "Jamaah (Coming Soon)", href: `/admin/paket-umroh/${params.id}/jamaah` },
     { label: "Invoice (Coming Soon)", href: `/admin/paket-umroh/${params.id}/invoice` },
