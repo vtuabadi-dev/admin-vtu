@@ -77,6 +77,7 @@ const adminNav: NavSection[] = [
         icon: Plane,
         children: [
           { label: "Generate Paket", href: "/admin/paket-umroh/generate" },
+          { label: "Info Hotel", href: "/admin/paket-umroh/info-hotel" },
           { label: "Paket Aktif", href: "/admin/keberangkatan" },
         ],
       },
