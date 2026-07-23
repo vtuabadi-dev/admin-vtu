@@ -1211,6 +1211,7 @@ model BadalUmrohRegistration {
   status          String   @default("Pending") // Pending, Diproses, Selesai, Dibatalkan
   paymentStatus   String   @default("Belum Bayar") // Belum Bayar, Menunggu Konfirmasi, Lunas
   buktiBayarUrl   String?
+  petugasBadal    String?
   sertifikatUrl   String?
   videoUrl        String?
   createdAt       DateTime @default(now())

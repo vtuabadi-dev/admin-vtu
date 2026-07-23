@@ -93,6 +93,7 @@ const adminNav: NavSection[] = [
         children: [
           { label: "Manajemen Badal Umroh", href: "/admin/badal-umroh" },
           { label: "Manajemen Wakaf Qur'an", href: "/admin/wakaf-quran" },
+          { label: "Laporan Kolektif Per Paket", href: "/admin/laporan-paket" },
         ],
       },
     ],
