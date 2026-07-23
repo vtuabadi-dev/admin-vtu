@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { PermissionGuard } from "@/shared/components/PermissionGuard";
+
 import { Tabs } from "@/shared/components/ui/Tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/components/ui/Card";
 import { Badge } from "@/shared/components/ui/Badge";
