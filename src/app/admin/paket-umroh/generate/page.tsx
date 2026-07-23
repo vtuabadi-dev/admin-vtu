@@ -58,7 +58,8 @@ export default function GeneratePaketPage() {
   const removeFile = (index: number) => {
     setFlyerFiles(prev => prev.filter((_, i) => i !== index));
     setFlyerPreviews(prev => {
-      URL.revokeObjectURL(prev[index]);
+      const url = prev[index];
+      if (url) URL.revokeObjectURL(url);
       return prev.filter((_, i) => i !== index);
     });
   };
