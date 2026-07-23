@@ -827,7 +827,7 @@ export default function GeneratePaketPage() {
                   </p>
                 </div>
                 <span className="shrink-0 text-xs bg-muted px-2 py-1 rounded-md font-medium text-muted-foreground">
-                  {flyerFiles.length}/{flyerSlots.length} terisi
+                  {flyerFiles.length}/{MAX_FILES} terisi
                 </span>
               </div>
 
