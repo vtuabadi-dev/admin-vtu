@@ -7,6 +7,9 @@ import { Badge } from "@/shared/components/ui/Badge";
 import { Button } from "@/shared/components/ui/Button";
 import { MapPin, Star, ExternalLink, Building2, Eye } from "lucide-react";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export const metadata: Metadata = {
   title: "Info Hotel Paket Umroh | Admin VTU",
 };

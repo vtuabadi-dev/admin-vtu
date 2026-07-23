@@ -21,13 +21,27 @@ export default function WakafQuranRegisterPage() {
     catatan: "",
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsSubmitting(true);
-    setTimeout(() => {
+    try {
+      setIsSubmitting(true);
+      const res = await fetch("/api/wakaf-quran", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formData),
+      });
+      const resJson = await res.json();
+      if (resJson.success) {
+        setSubmitted(true);
+      } else {
+        alert(`Gagal menyimpan: ${resJson.message}`);
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Terjadi kesalahan saat mengirim pendaftaran.");
+    } finally {
       setIsSubmitting(false);
-      setSubmitted(true);
-    }, 1000);
+    }
   };
 
   return (
@@ -45,9 +59,9 @@ export default function WakafQuranRegisterPage() {
             <div className="mx-auto w-12 h-12 rounded-full bg-white/20 flex items-center justify-center mb-3">
               <BookOpen className="h-6 w-6 text-white" />
             </div>
-            <CardTitle className="text-xl font-bold">Portal Pendaftaran Wakaf Al-Qur'an</CardTitle>
+            <CardTitle className="text-xl font-bold">Portal Pendaftaran Wakaf Al-Qur&apos;an</CardTitle>
             <p className="text-sky-100 text-xs mt-1">
-              Program Penyaluran Wakaf Mushaf Al-Qur'an di Masjidil Haram Makkah & Masjid Nabawi Madinah.
+              Program Penyaluran Wakaf Mushaf Al-Qur&apos;an di Masjidil Haram Makkah & Masjid Nabawi Madinah.
             </p>
           </CardHeader>
 
@@ -57,14 +71,14 @@ export default function WakafQuranRegisterPage() {
                 <div className="mx-auto w-16 h-16 rounded-full bg-sky-100 dark:bg-sky-950 text-sky-600 flex items-center justify-center">
                   <CheckCircle2 className="h-8 w-8" />
                 </div>
-                <h3 className="text-lg font-bold text-foreground">Pendaftaran Wakaf Qur'an Berhasil!</h3>
+                <h3 className="text-lg font-bold text-foreground">Pendaftaran Wakaf Qur&apos;an Berhasil!</h3>
                 <p className="text-sm text-muted-foreground max-w-md mx-auto">
                   Jazakallah Khair Bpk/Ibu <span className="font-semibold text-foreground">{formData.namaPewakaf}</span>. Pendaftaran wakaf sebanyak <span className="font-semibold text-sky-600">{formData.jumlahMushaf} Mushaf</span> telah kami terima.
                 </p>
                 <div className="bg-muted/40 p-4 rounded-lg text-xs text-left max-w-md mx-auto space-y-1.5">
                   <p><strong>Pewakaf:</strong> {formData.namaPewakaf}</p>
                   <p><strong>Niat Atas Nama:</strong> {formData.niatAtasNama || formData.namaPewakaf}</p>
-                  <p><strong>Jumlah Mushaf:</strong> {formData.jumlahMushaf} Qur'an Standar Madinah</p>
+                  <p><strong>Jumlah Mushaf:</strong> {formData.jumlahMushaf} Qur&apos;an Standar Madinah</p>
                   <p><strong>Lokasi Penyaluran:</strong> {formData.lokasiWakaf}</p>
                 </div>
                 <div className="pt-4 flex justify-center gap-3">
@@ -127,12 +141,12 @@ export default function WakafQuranRegisterPage() {
 
                 <div className="space-y-3 pt-2">
                   <span className="font-bold text-xs uppercase tracking-wider text-sky-600 block flex items-center gap-1">
-                    <BookOpen className="h-3.5 w-3.5 text-sky-600" /> 2. Rincian Wakaf Al-Qur'an
+                    <BookOpen className="h-3.5 w-3.5 text-sky-600" /> 2. Rincian Wakaf Al-Qur&apos;an
                   </span>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <div className="space-y-1">
-                      <label className="font-medium text-foreground">Jumlah Mushaf Al-Qur'an</label>
+                      <label className="font-medium text-foreground">Jumlah Mushaf Al-Qur&apos;an</label>
                       <select
                         value={formData.jumlahMushaf}
                         onChange={(e) => setFormData((p) => ({ ...p, jumlahMushaf: parseInt(e.target.value, 10) }))}

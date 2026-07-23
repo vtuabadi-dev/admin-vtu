@@ -84,6 +84,19 @@ const adminNav: NavSection[] = [
     ],
   },
   {
+    title: "BADAL & WAKAF",
+    items: [
+      {
+        label: "Badal Umroh & Wakaf",
+        icon: HeartHandshake,
+        children: [
+          { label: "Manajemen Badal Umroh", href: "/admin/badal-umroh" },
+          { label: "Manajemen Wakaf Qur'an", href: "/admin/wakaf-quran" },
+        ],
+      },
+    ],
+  },
+  {
     title: "JAMAAH",
     items: [
       {

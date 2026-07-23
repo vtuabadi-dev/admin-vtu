@@ -22,13 +22,27 @@ export default function BadalUmrohRegisterPage() {
     catatan: "",
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsSubmitting(true);
-    setTimeout(() => {
+    try {
+      setIsSubmitting(true);
+      const res = await fetch("/api/badal-umroh", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formData),
+      });
+      const resJson = await res.json();
+      if (resJson.success) {
+        setSubmitted(true);
+      } else {
+        alert(`Gagal menyimpan: ${resJson.message}`);
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Terjadi kesalahan saat mengirim pendaftaran.");
+    } finally {
       setIsSubmitting(false);
-      setSubmitted(true);
-    }, 1000);
+    }
   };
 
   return (

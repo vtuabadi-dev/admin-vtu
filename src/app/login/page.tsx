@@ -252,7 +252,7 @@ export default function LoginPage() {
               >
                 <div className="flex items-center gap-2">
                   <BookOpen className="h-4 w-4 text-sky-600 dark:text-sky-400" />
-                  <span>Pendaftaran Wakaf Al-Qur'an</span>
+                  <span>Pendaftaran Wakaf Al-Qur&apos;an</span>
                 </div>
                 <span className="text-[10px] font-bold uppercase bg-sky-600 text-white px-2 py-0.5 rounded">Wakaf</span>
               </a>
