@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, ShieldCheck, KeyRound, Phone, HeartHandshake, BookOpen, CheckCircle2, Clock, ExternalLink, Download, Sparkles, AlertCircle } from "lucide-react";
+import { ArrowLeft, ShieldCheck, KeyRound, Phone, HeartHandshake, BookOpen, Clock, ExternalLink, Download, Sparkles, AlertCircle } from "lucide-react";
 import { Button } from "@/shared/components/ui/Button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/components/ui/Card";
 import { Input } from "@/shared/components/ui/Input";
@@ -169,6 +169,9 @@ export default function TrackBadalWakafPage() {
                 </div>
 
                 {/* Banner OTP Demo / Testing Helper */}
+                {successMsg && (
+                  <p className="text-emerald-600 dark:text-emerald-400 font-medium text-xs text-center">{successMsg}</p>
+                )}
                 {demoCode && (
                   <div className="p-3 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900 rounded-lg text-amber-800 dark:text-amber-200 text-center text-xs space-y-1">
                     <p className="font-semibold flex items-center justify-center gap-1">
