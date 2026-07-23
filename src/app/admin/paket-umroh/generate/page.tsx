@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/shared/components/ui/Button";
 import { Input } from "@/shared/components/ui/Input";
@@ -9,7 +9,7 @@ import {
   MOCK_LANDING_PATTERN, 
   MOCK_KLASTER
 } from "@/shared/lib/mock-data";
-import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X, Image as ImageIcon } from "lucide-react";
+import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X } from "lucide-react";
 
 interface MasterDataOptions {
   airlines: any[];
@@ -29,29 +29,52 @@ export default function GeneratePaketPage() {
   // Tab path selection
   const [pathMode, setPathMode] = useState<"manual" | "ocr">("manual");
 
-  // OCR state — multi-slot
-  type FlyerSlot = { id: number; file: File | null };
-  const [flyerSlots, setFlyerSlots] = useState<FlyerSlot[]>([{ id: 1, file: null }]);
-  const [nextSlotId, setNextSlotId] = useState(2);
+  // OCR state — multi-file drag-and-drop
+  const [flyerFiles, setFlyerFiles] = useState<File[]>([]);
+  const [flyerPreviews, setFlyerPreviews] = useState<string[]>([]);
+  const [isDragging, setIsDragging] = useState(false);
   const [caption, setCaption] = useState("");
   const [uploading, setUploading] = useState(false);
   const [ocrWarning, setOcrWarning] = useState("");
   const [ocrSuccess, setOcrSuccess] = useState(false);
+  const dropRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const addFlyerSlot = () => {
-    setFlyerSlots(prev => [...prev, { id: nextSlotId, file: null }]);
-    setNextSlotId(n => n + 1);
+  const MAX_FILES = 10;
+
+  const addFiles = useCallback((incoming: FileList | File[]) => {
+    const arr = Array.from(incoming).filter(f =>
+      f.type.startsWith("image/")
+    );
+    setFlyerFiles(prev => {
+      const combined = [...prev, ...arr].slice(0, MAX_FILES);
+      // Build previews for new files
+      const newPreviews = arr.slice(0, MAX_FILES - prev.length).map(f => URL.createObjectURL(f));
+      setFlyerPreviews(p => [...p, ...newPreviews].slice(0, MAX_FILES));
+      return combined;
+    });
+  }, []);
+
+  const removeFile = (index: number) => {
+    setFlyerFiles(prev => prev.filter((_, i) => i !== index));
+    setFlyerPreviews(prev => {
+      URL.revokeObjectURL(prev[index]);
+      return prev.filter((_, i) => i !== index);
+    });
   };
 
-  const removeFlyerSlot = (id: number) => {
-    setFlyerSlots(prev => prev.filter(s => s.id !== id));
+  const handleDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragging(false);
+    if (e.dataTransfer.files) addFiles(e.dataTransfer.files);
+  }, [addFiles]);
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragging(true);
   };
 
-  const setSlotFile = (id: number, file: File | null) => {
-    setFlyerSlots(prev => prev.map(s => s.id === id ? { ...s, file } : s));
-  };
-
-  const flyerFiles = flyerSlots.map(s => s.file).filter(Boolean) as File[];
+  const handleDragLeave = () => setIsDragging(false);
 
   // Main Form Data
   const [formData, setFormData] = useState({
@@ -807,81 +830,109 @@ export default function GeneratePaketPage() {
                 </span>
               </div>
 
-              {/* Multi-slot grid */}
-              <div className="grid grid-cols-2 gap-2.5">
-                {flyerSlots.map((slot, idx) => (
-                  <div
-                    key={slot.id}
-                    className={`relative group rounded-lg border-2 border-dashed transition-all ${
-                      slot.file
-                        ? "border-primary/40 bg-primary/5"
-                        : "border-border hover:border-primary/50 bg-muted/10"
-                    }`}
-                  >
-                    {/* Hidden file input */}
-                    <input
-                      type="file"
-                      accept=".jpg,.jpeg,.png"
-                      id={`flyer-slot-${slot.id}`}
-                      className="absolute inset-0 opacity-0 cursor-pointer z-10"
-                      onChange={(e) => {
-                        const f = e.target.files?.[0] ?? null;
-                        setSlotFile(slot.id, f);
-                        e.target.value = "";
-                      }}
-                    />
+              {/* ── Drag & Drop Zone ── */}
+              <div
+                ref={dropRef}
+                onDrop={handleDrop}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onClick={() => fileInputRef.current?.click()}
+                className={`relative rounded-xl border-2 border-dashed transition-all cursor-pointer select-none ${
+                  isDragging
+                    ? "border-primary bg-primary/10 scale-[1.01]"
+                    : flyerFiles.length > 0
+                    ? "border-primary/40 bg-primary/5"
+                    : "border-border hover:border-primary/50 hover:bg-muted/20"
+                }`}
+              >
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  className="hidden"
+                  onChange={(e) => { if (e.target.files) addFiles(e.target.files); e.target.value = ""; }}
+                />
 
-                    {/* Remove button — only show when > 1 slot */}
-                    {flyerSlots.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={(e) => { e.stopPropagation(); removeFlyerSlot(slot.id); }}
-                        className="absolute -top-2 -right-2 z-20 bg-red-500 hover:bg-red-600 text-white rounded-full p-0.5 shadow opacity-0 group-hover:opacity-100 transition-opacity"
-                        title="Hapus slot ini"
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    )}
-
-                    {/* Slot content */}
-                    <div className="flex flex-col items-center justify-center p-3 min-h-[100px] text-center pointer-events-none select-none">
-                      {slot.file ? (
-                        <>
-                          <div className="w-10 h-10 rounded-md bg-primary/10 flex items-center justify-center mb-1.5">
-                            <ImageIcon className="h-5 w-5 text-primary" />
-                          </div>
-                          <span className="text-xs font-medium text-primary line-clamp-2 break-all leading-tight">
-                            {slot.file.name}
-                          </span>
-                          <span className="text-[10px] text-muted-foreground mt-0.5">
-                            {(slot.file.size / 1024).toFixed(0)} KB
-                          </span>
-                        </>
-                      ) : (
-                        <>
-                          <Upload className="h-6 w-6 text-muted-foreground mb-1.5" />
-                          <span className="text-xs font-medium text-muted-foreground">
-                            Slot {idx + 1}
-                          </span>
-                          <span className="text-[10px] text-muted-foreground">Klik untuk pilih</span>
-                        </>
-                      )}
+                {flyerFiles.length === 0 ? (
+                  /* Empty state */
+                  <div className="flex flex-col items-center justify-center py-10 gap-3 pointer-events-none">
+                    <div className={`h-14 w-14 rounded-full flex items-center justify-center transition-colors ${
+                      isDragging ? "bg-primary/20" : "bg-muted"
+                    }`}>
+                      <Upload className={`h-7 w-7 transition-colors ${isDragging ? "text-primary" : "text-muted-foreground"}`} />
+                    </div>
+                    <div className="text-center">
+                      <p className="text-sm font-semibold text-foreground">
+                        {isDragging ? "Lepaskan untuk Unggah" : "Seret & Lepas Foto Flyer di Sini"}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        atau <span className="text-primary font-semibold underline">klik untuk memilih</span> — mendukung hingga {MAX_FILES} foto sekaligus
+                      </p>
+                      <p className="text-[11px] text-muted-foreground mt-1">Format: JPG, JPEG, PNG, WEBP</p>
                     </div>
                   </div>
-                ))}
+                ) : (
+                  /* Thumbnail grid */
+                  <div className="p-3 space-y-3">
+                    <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                      {flyerFiles.map((file, idx) => (
+                        <div key={idx} className="relative group aspect-square rounded-lg overflow-hidden border border-border shadow-sm">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={flyerPreviews[idx]}
+                            alt={file.name}
+                            className="w-full h-full object-cover"
+                          />
+                          {/* Hover overlay */}
+                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1 p-1">
+                            <span className="text-white text-[10px] font-medium text-center line-clamp-2 leading-tight">{file.name}</span>
+                            <span className="text-white/70 text-[10px]">{(file.size / 1024).toFixed(0)} KB</span>
+                          </div>
+                          {/* Remove button */}
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); removeFile(idx); }}
+                            className="absolute top-1 right-1 z-10 h-5 w-5 rounded-full bg-red-500 hover:bg-red-600 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                          {/* Index badge */}
+                          <div className="absolute bottom-1 left-1 h-4 min-w-4 rounded bg-black/60 text-white text-[10px] font-bold flex items-center justify-center px-1">
+                            {idx + 1}
+                          </div>
+                        </div>
+                      ))}
 
-                {/* Add slot button */}
-                <button
-                  type="button"
-                  onClick={addFlyerSlot}
-                  className="rounded-lg border-2 border-dashed border-border hover:border-primary/60 hover:bg-primary/5 transition-all flex flex-col items-center justify-center min-h-[100px] gap-1.5 text-muted-foreground hover:text-primary group"
-                  title="Tambah slot gambar baru"
-                >
-                  <div className="w-8 h-8 rounded-full border-2 border-current flex items-center justify-center group-hover:scale-110 transition-transform">
-                    <Plus className="h-4 w-4" />
+                      {/* Add more tile */}
+                      {flyerFiles.length < MAX_FILES && (
+                        <div
+                          onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click(); }}
+                          className="aspect-square rounded-lg border-2 border-dashed border-border hover:border-primary/60 hover:bg-primary/5 transition-all flex flex-col items-center justify-center gap-1 text-muted-foreground hover:text-primary cursor-pointer"
+                        >
+                          <Plus className="h-5 w-5" />
+                          <span className="text-[10px] font-medium">Tambah</span>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex items-center justify-between pt-1 border-t border-border">
+                      <p className="text-xs text-muted-foreground">
+                        <span className="font-semibold text-foreground">{flyerFiles.length}</span> foto dipilih
+                        {flyerFiles.length < MAX_FILES && (
+                          <span> · Bisa tambah {MAX_FILES - flyerFiles.length} lagi</span>
+                        )}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); flyerPreviews.forEach(URL.revokeObjectURL); setFlyerFiles([]); setFlyerPreviews([]); }}
+                        className="text-xs text-red-500 hover:text-red-600 font-medium flex items-center gap-1"
+                      >
+                        <X className="h-3 w-3" /> Hapus Semua
+                      </button>
+                    </div>
                   </div>
-                  <span className="text-[11px] font-medium">Tambah Slot</span>
-                </button>
+                )}
               </div>
 
               {/* Caption */}
