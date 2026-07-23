@@ -181,7 +181,7 @@ export default function AdminBadalUmrohPage() {
                       <span className="font-medium">{item.paketBadal}</span>
                       {item.catatan && (
                         <p className="text-[11px] text-muted-foreground italic truncate max-w-[180px]">
-                          "{item.catatan}"
+                          &quot;{item.catatan}&quot;
                         </p>
                       )}
                     </td>
