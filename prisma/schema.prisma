@@ -1194,20 +1194,25 @@ model PaketUmroh {
 // ============================================================
 
 model BadalUmrohRegistration {
-  id            String   @id @default(cuid())
-  namaPemohon   String
-  nomorWhatsapp String
-  emailPemohon  String?
-  namaAlmarhum  String
-  jenisKelamin  String   @default("L")
-  hubungan      String   @default("Orang Tua")
-  paketBadal    String   @default("Standard")
-  catatan       String?
-  status        String   @default("Pending") // Pending, Diproses, Selesai, Dibatalkan
-  sertifikatUrl String?
-  videoUrl      String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id              String   @id @default(cuid())
+  isJamaahVauza   Boolean  @default(false)
+  namaPaketUmroh  String?
+  namaTourLeader  String?
+  namaMuthowif    String?
+  namaPeserta     String?
+  namaPemohon     String
+  nomorWhatsapp   String
+  emailPemohon    String?
+  namaAlmarhum    String
+  jenisKelamin    String   @default("L")
+  hubungan        String   @default("Orang Tua")
+  paketBadal      String   @default("Standard")
+  catatan         String?
+  status          String   @default("Pending") // Pending, Diproses, Selesai, Dibatalkan
+  sertifikatUrl   String?
+  videoUrl        String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   @@index([status])
   @@map("badal_umroh_registrations")
@@ -1215,10 +1220,15 @@ model BadalUmrohRegistration {
 
 model WakafQuranRegistration {
   id                String   @id @default(cuid())
+  isJamaahVauza     Boolean  @default(false)
+  namaPaketUmroh    String?
+  namaTourLeader    String?
+  namaMuthowif      String?
+  namaPeserta       String?
   namaPewakaf       String
   nomorWhatsapp     String
   emailPewakaf      String?
-  jumlahMushaf     Int      @default(5)
+  jumlahMushaf       Int      @default(5)
   lokasiWakaf       String   @default("Masjidil Haram Makkah Al-Mukarramah")
   niatAtasNama      String?
   catatan           String?

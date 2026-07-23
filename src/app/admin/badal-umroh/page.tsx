@@ -165,13 +165,25 @@ export default function AdminBadalUmrohPage() {
                       </div>
                     </td>
                     <td className="px-4 py-3">
-                      <div className="flex flex-col">
-                        <span className="font-semibold">{item.namaPemohon}</span>
+                      <div className="flex flex-col gap-0.5">
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-semibold">{item.namaPeserta || item.namaPemohon}</span>
+                          {item.isJamaahVauza ? (
+                            <Badge className="bg-emerald-600 text-white text-[10px] px-1.5 py-0">Jamaah VTU</Badge>
+                          ) : (
+                            <Badge variant="outline" className="text-[10px] px-1.5 py-0">Umum</Badge>
+                          )}
+                        </div>
+                        {item.isJamaahVauza && item.namaPaketUmroh && (
+                          <span className="text-[11px] font-medium text-emerald-700 dark:text-emerald-300">
+                            {item.namaPaketUmroh} (TL: {item.namaTourLeader || "-"} / Muthowif: {item.namaMuthowif || "-"})
+                          </span>
+                        )}
                         <a
                           href={`https://wa.me/${item.nomorWhatsapp.replace(/[^0-9]/g, "")}`}
                           target="_blank"
                           rel="noreferrer"
-                          className="text-emerald-600 hover:underline flex items-center gap-1 text-[11px]"
+                          className="text-emerald-600 hover:underline flex items-center gap-1 text-[11px] pt-0.5"
                         >
                           <Phone className="h-3 w-3" /> {item.nomorWhatsapp}
                         </a>

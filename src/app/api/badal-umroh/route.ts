@@ -7,7 +7,21 @@ import { auth } from "@/server/auth";
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { namaPemohon, nomorWhatsapp, emailPemohon, namaAlmarhum, jenisKelamin, hubungan, paketBadal, catatan } = body;
+    const {
+      isJamaahVauza,
+      namaPaketUmroh,
+      namaTourLeader,
+      namaMuthowif,
+      namaPeserta,
+      namaPemohon,
+      nomorWhatsapp,
+      emailPemohon,
+      namaAlmarhum,
+      jenisKelamin,
+      hubungan,
+      paketBadal,
+      catatan,
+    } = body;
 
     if (!namaPemohon || !nomorWhatsapp || !namaAlmarhum) {
       return NextResponse.json({ success: false, message: "Mohon isi nama pemohon, WA, dan nama almarhum" }, { status: 400 });
@@ -15,6 +29,11 @@ export async function POST(request: NextRequest) {
 
     const reg = await prisma.badalUmrohRegistration.create({
       data: {
+        isJamaahVauza: Boolean(isJamaahVauza),
+        namaPaketUmroh: namaPaketUmroh ? String(namaPaketUmroh).trim() : null,
+        namaTourLeader: namaTourLeader ? String(namaTourLeader).trim() : null,
+        namaMuthowif: namaMuthowif ? String(namaMuthowif).trim() : null,
+        namaPeserta: namaPeserta ? String(namaPeserta).trim() : null,
         namaPemohon: String(namaPemohon).trim(),
         nomorWhatsapp: String(nomorWhatsapp).trim(),
         emailPemohon: emailPemohon ? String(emailPemohon).trim() : null,
