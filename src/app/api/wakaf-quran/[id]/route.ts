@@ -15,12 +15,14 @@ export async function PATCH(
 
     const { id } = params;
     const body = await request.json();
-    const { status, fotoPenyerahanUrl, catatan } = body;
+    const { status, paymentStatus, buktiBayarUrl, fotoPenyerahanUrl, catatan } = body;
 
     const updated = await prisma.wakafQuranRegistration.update({
       where: { id },
       data: {
         ...(status ? { status } : {}),
+        ...(paymentStatus ? { paymentStatus } : {}),
+        ...(buktiBayarUrl !== undefined ? { buktiBayarUrl } : {}),
         ...(fotoPenyerahanUrl !== undefined ? { fotoPenyerahanUrl } : {}),
         ...(catatan !== undefined ? { catatan } : {}),
       },

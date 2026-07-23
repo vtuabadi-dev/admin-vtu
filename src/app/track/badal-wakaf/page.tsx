@@ -2,11 +2,12 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, ShieldCheck, KeyRound, Phone, HeartHandshake, BookOpen, Clock, ExternalLink, Download, Sparkles, AlertCircle } from "lucide-react";
+import { ArrowLeft, ShieldCheck, KeyRound, Phone, HeartHandshake, BookOpen, Clock, ExternalLink, Download, Sparkles, AlertCircle, Upload, CheckCircle2, Plus, Heart } from "lucide-react";
 import { Button } from "@/shared/components/ui/Button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/components/ui/Card";
 import { Input } from "@/shared/components/ui/Input";
 import { Badge } from "@/shared/components/ui/Badge";
+import { Modal } from "@/shared/components/ui/Modal";
 
 export default function TrackBadalWakafPage() {
   const [step, setStep] = useState<"phone" | "otp" | "data">("phone");
@@ -26,6 +27,21 @@ export default function TrackBadalWakafPage() {
   }>({ badalList: [], wakafList: [], totalFound: 0 });
 
   const [activeTab, setActiveTab] = useState<"badal" | "wakaf">("badal");
+
+  // Modal Upload Bukti & Form Tambah Wakaf
+  const [uploadModalOpen, setUploadModalOpen] = useState(false);
+  const [selectedTarget, setSelectedTarget] = useState<{ type: "badal" | "wakaf"; id: string } | null>(null);
+  const [buktiUrlInput, setBuktiUrlInput] = useState("");
+  const [isUploading, setIsUploading] = useState(false);
+
+  // Modal Tambah Order Wakaf Baru
+  const [addWakafOpen, setAddWakafOpen] = useState(false);
+  const [newWakafForm, setNewWakafForm] = useState({
+    jumlahMushaf: 5,
+    lokasiWakaf: "Masjidil Haram Makkah Al-Mukarramah",
+    niatList: [""],
+    catatan: "",
+  });
 
   // Step 1: Kirim Kode OTP WA
   const handleSendOtp = async (e: React.FormEvent) => {
@@ -92,6 +108,90 @@ export default function TrackBadalWakafPage() {
     }
   };
 
+  // Upload Bukti Pembayaran
+  const handleUploadBuktiSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedTarget || !buktiUrlInput) return;
+    try {
+      setIsUploading(true);
+      const endpoint = selectedTarget.type === "badal" ? "/api/badal-umroh/upload-bukti" : "/api/wakaf-quran/upload-bukti";
+      const res = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: selectedTarget.id, buktiBayarUrl: buktiUrlInput }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert("Bukti pembayaran berhasil diunggah! Status pembayaran kini Menunggu Konfirmasi Admin.");
+        setUploadModalOpen(false);
+        setBuktiUrlInput("");
+        // Refresh data
+        const verifyRes = await fetch("/api/otp/verify", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ nomorWhatsapp, code: otpCode }),
+        });
+        const verifyJson = await verifyRes.json();
+        if (verifyJson.success) setResultData(verifyJson.data);
+      } else {
+        alert(`Gagal: ${data.message}`);
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Terjadi kesalahan saat mengunggah bukti bayar.");
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  // Submit Order Wakaf Baru Langsung dari Portal
+  const handleCreateNewWakaf = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      setIsUploading(true);
+      const firstItem = resultData.wakafList[0] || resultData.badalList[0];
+      const payload = {
+        isJamaahVauza: firstItem?.isJamaahVauza || false,
+        namaPaketUmroh: firstItem?.namaPaketUmroh || null,
+        namaTourLeader: firstItem?.namaTourLeader || null,
+        namaMuthowif: firstItem?.namaMuthowif || null,
+        namaPeserta: firstItem?.namaPeserta || firstItem?.namaPemohon || "Jamaah",
+        namaPewakaf: firstItem?.namaPewakaf || firstItem?.namaPemohon || "Jamaah",
+        nomorWhatsapp: nomorWhatsapp,
+        jumlahMushaf: newWakafForm.jumlahMushaf,
+        lokasiWakaf: newWakafForm.lokasiWakaf,
+        niatAtasNama: newWakafForm.niatList.filter((n) => n.trim()).join(", "),
+        catatan: newWakafForm.catatan,
+      };
+
+      const res = await fetch("/api/wakaf-quran", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert("Pesanan Wakaf Qur'an Baru berhasil dibuat!");
+        setAddWakafOpen(false);
+        // Refresh list
+        const verifyRes = await fetch("/api/otp/verify", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ nomorWhatsapp, code: otpCode }),
+        });
+        const verifyJson = await verifyRes.json();
+        if (verifyJson.success) setResultData(verifyJson.data);
+      } else {
+        alert(`Gagal: ${data.message}`);
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Terjadi kesalahan saat menambah pesanan wakaf.");
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 py-10 px-4 flex items-center justify-center">
       <div className="w-full max-w-3xl space-y-6">
@@ -107,9 +207,9 @@ export default function TrackBadalWakafPage() {
             <div className="mx-auto w-12 h-12 rounded-full bg-white/20 flex items-center justify-center mb-3">
               <ShieldCheck className="h-6 w-6 text-white" />
             </div>
-            <CardTitle className="text-xl font-bold">Portal Cek Status & Data Badal Umroh / Wakaf</CardTitle>
+            <CardTitle className="text-xl font-bold">Portal Cek Status & Pembayaran Badal Umroh / Wakaf</CardTitle>
             <p className="text-emerald-100 text-xs mt-1">
-              Verifikasi Keamanan OTP WA untuk Membuka Dokumen, Sertifikat, & Rekaman Video Execution Anda.
+              Verifikasi Kode OTP WA untuk Membuka Riwayat Order, Upload Bukti Pembayaran, & Cek Dokumen.
             </p>
           </CardHeader>
 
@@ -168,7 +268,6 @@ export default function TrackBadalWakafPage() {
                   </p>
                 </div>
 
-                {/* Banner OTP Demo / Testing Helper */}
                 {successMsg && (
                   <p className="text-emerald-600 dark:text-emerald-400 font-medium text-xs text-center">{successMsg}</p>
                 )}
@@ -222,7 +321,7 @@ export default function TrackBadalWakafPage() {
               </form>
             )}
 
-            {/* ── STEP 3: Tampilkan Data Terverifikasi ── */}
+            {/* ── STEP 3: Tampilkan Data Terverifikasi & Upload Bukti ── */}
             {step === "data" && (
               <div className="space-y-6">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b">
@@ -235,9 +334,18 @@ export default function TrackBadalWakafPage() {
                     </h3>
                   </div>
 
-                  <Button variant="outline" size="sm" onClick={() => setStep("phone")}>
-                    Keluar / Cek Nomor Lain
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      size="sm"
+                      onClick={() => setAddWakafOpen(true)}
+                      className="bg-sky-600 hover:bg-sky-700 text-white gap-1.5 text-xs"
+                    >
+                      <Plus className="h-4 w-4" /> Tambah Order Wakaf
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => setStep("phone")}>
+                      Keluar
+                    </Button>
+                  </div>
                 </div>
 
                 {resultData.totalFound === 0 ? (
@@ -297,12 +405,15 @@ export default function TrackBadalWakafPage() {
                                     {item.jenisKelamin === "L" ? "Almarhum (Laki-laki)" : "Almarhumah (Perempuan)"} — {item.hubungan}
                                   </p>
                                 </div>
-                                <Badge className={
-                                  item.status === "Selesai" ? "bg-emerald-600 text-white" :
-                                  item.status === "Diproses" ? "bg-blue-600 text-white" : "bg-amber-500 text-white"
-                                }>
-                                  {item.status}
-                                </Badge>
+                                <div className="flex items-center gap-1.5">
+                                  <Badge className={
+                                    item.paymentStatus === "Lunas" ? "bg-emerald-600 text-white" :
+                                    item.paymentStatus === "Menunggu Konfirmasi" ? "bg-amber-500 text-white" : "bg-rose-600 text-white"
+                                  }>
+                                    Status Bayar: {item.paymentStatus || "Belum Bayar"}
+                                  </Badge>
+                                  <Badge variant="outline">{item.status}</Badge>
+                                </div>
                               </div>
 
                               <div className="bg-muted/40 p-3 rounded-lg text-xs space-y-1 grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -324,9 +435,22 @@ export default function TrackBadalWakafPage() {
                                 )}
                               </div>
 
-                              {/* Media & Cert Links */}
-                              <div className="flex flex-wrap gap-2 pt-1">
-                                {item.sertifikatUrl ? (
+                              {/* Upload Bukti Bayar / Action Links */}
+                              <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-border/50">
+                                {item.paymentStatus !== "Lunas" && (
+                                  <Button
+                                    size="sm"
+                                    onClick={() => {
+                                      setSelectedTarget({ type: "badal", id: item.id });
+                                      setUploadModalOpen(true);
+                                    }}
+                                    className="bg-amber-600 hover:bg-amber-700 text-white text-xs gap-1.5"
+                                  >
+                                    <Upload className="h-3.5 w-3.5" /> Upload Bukti Pembayaran
+                                  </Button>
+                                )}
+
+                                {item.sertifikatUrl && (
                                   <a
                                     href={item.sertifikatUrl}
                                     target="_blank"
@@ -335,10 +459,6 @@ export default function TrackBadalWakafPage() {
                                   >
                                     <Download className="h-3.5 w-3.5" /> Download Sertifikat
                                   </a>
-                                ) : (
-                                  <span className="text-[11px] text-muted-foreground italic flex items-center gap-1">
-                                    <Clock className="h-3 w-3" /> Sertifikat sedang disiapkan oleh tim
-                                  </span>
                                 )}
 
                                 {item.videoUrl && (
@@ -371,12 +491,15 @@ export default function TrackBadalWakafPage() {
                                   <h4 className="font-bold text-sm text-sky-700 dark:text-sky-400">{item.jumlahMushaf} Mushaf Al-Qur&apos;an</h4>
                                   <p className="text-xs text-muted-foreground">{item.lokasiWakaf}</p>
                                 </div>
-                                <Badge className={
-                                  item.status === "Disalurkan" ? "bg-emerald-600 text-white" :
-                                  item.status === "Diproses" ? "bg-sky-600 text-white" : "bg-amber-500 text-white"
-                                }>
-                                  {item.status}
-                                </Badge>
+                                <div className="flex items-center gap-1.5">
+                                  <Badge className={
+                                    item.paymentStatus === "Lunas" ? "bg-emerald-600 text-white" :
+                                    item.paymentStatus === "Menunggu Konfirmasi" ? "bg-amber-500 text-white" : "bg-rose-600 text-white"
+                                  }>
+                                    Status Bayar: {item.paymentStatus || "Belum Bayar"}
+                                  </Badge>
+                                  <Badge variant="outline">{item.status}</Badge>
+                                </div>
                               </div>
 
                               <div className="bg-muted/40 p-3 rounded-lg text-xs space-y-1 grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -398,9 +521,22 @@ export default function TrackBadalWakafPage() {
                                 )}
                               </div>
 
-                              {/* Foto Penyerahan */}
-                              {item.fotoPenyerahanUrl && (
-                                <div className="pt-1">
+                              {/* Upload Bukti & Action Links */}
+                              <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-border/50">
+                                {item.paymentStatus !== "Lunas" && (
+                                  <Button
+                                    size="sm"
+                                    onClick={() => {
+                                      setSelectedTarget({ type: "wakaf", id: item.id });
+                                      setUploadModalOpen(true);
+                                    }}
+                                    className="bg-amber-600 hover:bg-amber-700 text-white text-xs gap-1.5"
+                                  >
+                                    <Upload className="h-3.5 w-3.5" /> Upload Bukti Pembayaran
+                                  </Button>
+                                )}
+
+                                {item.fotoPenyerahanUrl && (
                                   <a
                                     href={item.fotoPenyerahanUrl}
                                     target="_blank"
@@ -409,8 +545,8 @@ export default function TrackBadalWakafPage() {
                                   >
                                     <ExternalLink className="h-3.5 w-3.5" /> Lihat Foto Penyerahan Wakaf
                                   </a>
-                                </div>
-                              )}
+                                )}
+                              </div>
                             </div>
                           ))
                         )}
@@ -423,6 +559,79 @@ export default function TrackBadalWakafPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* ── MODAL UPLOAD BUKTI PEMBAYARAN ── */}
+      <Modal open={uploadModalOpen} onClose={() => setUploadModalOpen(false)} title="Upload Bukti Pembayaran">
+        <form onSubmit={handleUploadBuktiSubmit} className="space-y-4 text-xs">
+          <div className="space-y-1.5">
+            <label className="font-medium text-foreground">Tempel URL / Link Foto Bukti Transfer</label>
+            <Input
+              type="url"
+              required
+              value={buktiUrlInput}
+              onChange={(e) => setBuktiUrlInput(e.target.value)}
+              placeholder="https://image-cloud.com/bukti-transfer.jpg"
+              className="text-xs"
+            />
+            <p className="text-[11px] text-muted-foreground">
+              Unggah foto bukti struk/transfer Anda ke cloud image (seperti ImgBB/Google Drive) lalu tempelkan linknya di sini.
+            </p>
+          </div>
+
+          <div className="flex justify-end gap-2 pt-2">
+            <Button type="button" variant="outline" onClick={() => setUploadModalOpen(false)}>Batal</Button>
+            <Button type="submit" disabled={isUploading} className="bg-emerald-600 hover:bg-emerald-700 text-white">
+              {isUploading ? "Mengunggah..." : "Kirim Bukti Pembayaran"}
+            </Button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* ── MODAL TAMBAH ORDER WAKAF BARU ── */}
+      <Modal open={addWakafOpen} onClose={() => setAddWakafOpen(false)} title="Tambah Pesanan Wakaf Al-Qur'an Baru">
+        <form onSubmit={handleCreateNewWakaf} className="space-y-4 text-xs">
+          <div className="space-y-1.5">
+            <label className="font-medium text-foreground">Jumlah Mushaf (Angka Saja)</label>
+            <Input
+              type="number"
+              min={1}
+              required
+              value={newWakafForm.jumlahMushaf}
+              onChange={(e) => setNewWakafForm((p) => ({ ...p, jumlahMushaf: parseInt(e.target.value, 10) || 1 }))}
+              className="font-bold text-sm"
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="font-medium text-foreground">Lokasi Penyaluran</label>
+            <select
+              value={newWakafForm.lokasiWakaf}
+              onChange={(e) => setNewWakafForm((p) => ({ ...p, lokasiWakaf: e.target.value }))}
+              className="w-full h-9 px-3 rounded-md border border-input bg-background text-xs"
+            >
+              <option value="Masjidil Haram Makkah Al-Mukarramah">Masjidil Haram Makkah Al-Mukarramah</option>
+              <option value="Masjid Nabawi Madinah Al-Munawwarah">Masjid Nabawi Madinah Al-Munawwarah</option>
+            </select>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="font-medium text-foreground">Niat Atas Nama (Pisahkan dengan koma jika lebih dari satu)</label>
+            <Input
+              type="text"
+              placeholder="Contoh: Alm. H. Ahmad, Hj. Fatimah, Keluarga Besar Sugianto"
+              onChange={(e) => setNewWakafForm((p) => ({ ...p, niatList: e.target.value.split(",") }))}
+              className="text-xs"
+            />
+          </div>
+
+          <div className="flex justify-end gap-2 pt-2">
+            <Button type="button" variant="outline" onClick={() => setAddWakafOpen(false)}>Batal</Button>
+            <Button type="submit" disabled={isUploading} className="bg-sky-600 hover:bg-sky-700 text-white">
+              {isUploading ? "Memproses..." : "Tambah Order Wakaf"}
+            </Button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 }

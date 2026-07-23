@@ -1209,12 +1209,15 @@ model BadalUmrohRegistration {
   paketBadal      String   @default("Standard")
   catatan         String?
   status          String   @default("Pending") // Pending, Diproses, Selesai, Dibatalkan
+  paymentStatus   String   @default("Belum Bayar") // Belum Bayar, Menunggu Konfirmasi, Lunas
+  buktiBayarUrl   String?
   sertifikatUrl   String?
   videoUrl        String?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
   @@index([status])
+  @@index([paymentStatus])
   @@map("badal_umroh_registrations")
 }
 
@@ -1233,11 +1236,14 @@ model WakafQuranRegistration {
   niatAtasNama      String?
   catatan           String?
   status            String   @default("Pending") // Pending, Diproses, Disalurkan, Dibatalkan
+  paymentStatus     String   @default("Belum Bayar") // Belum Bayar, Menunggu Konfirmasi, Lunas
+  buktiBayarUrl     String?
   fotoPenyerahanUrl String?
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
   @@index([status])
+  @@index([paymentStatus])
   @@map("wakaf_quran_registrations")
 }
 

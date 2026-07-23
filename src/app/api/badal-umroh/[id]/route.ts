@@ -15,12 +15,14 @@ export async function PATCH(
 
     const { id } = params;
     const body = await request.json();
-    const { status, sertifikatUrl, videoUrl, catatan } = body;
+    const { status, paymentStatus, buktiBayarUrl, sertifikatUrl, videoUrl, catatan } = body;
 
     const updated = await prisma.badalUmrohRegistration.update({
       where: { id },
       data: {
         ...(status ? { status } : {}),
+        ...(paymentStatus ? { paymentStatus } : {}),
+        ...(buktiBayarUrl !== undefined ? { buktiBayarUrl } : {}),
         ...(sertifikatUrl !== undefined ? { sertifikatUrl } : {}),
         ...(videoUrl !== undefined ? { videoUrl } : {}),
         ...(catatan !== undefined ? { catatan } : {}),
