@@ -1,12 +1,12 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Card, CardContent } from "@/shared/components/ui/Card";
+import { Card } from "@/shared/components/ui/Card";
 import { Badge } from "@/shared/components/ui/Badge";
 import { Button } from "@/shared/components/ui/Button";
 import { Modal } from "@/shared/components/ui/Modal";
 import { Input } from "@/shared/components/ui/Input";
-import { BookOpen, Phone, ExternalLink, Trash2, Edit } from "lucide-react";
+import { BookOpen, Phone, Trash2, Edit } from "lucide-react";
 
 export default function AdminWakafQuranPage() {
   const [list, setList] = useState<any[]>([]);

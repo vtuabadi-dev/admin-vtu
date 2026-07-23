@@ -1,12 +1,12 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/shared/components/ui/Card";
+import { Card } from "@/shared/components/ui/Card";
 import { Badge } from "@/shared/components/ui/Badge";
 import { Button } from "@/shared/components/ui/Button";
 import { Modal } from "@/shared/components/ui/Modal";
 import { Input } from "@/shared/components/ui/Input";
-import { HeartHandshake, Phone, Mail, FileText, ExternalLink, Trash2, Edit, Send, CheckCircle2, Clock } from "lucide-react";
+import { HeartHandshake, Phone, Trash2, Edit } from "lucide-react";
 
 export default function AdminBadalUmrohPage() {
   const [list, setList] = useState<any[]>([]);
