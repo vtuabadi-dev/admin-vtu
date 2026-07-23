@@ -13,6 +13,8 @@ import {
   Lock,
   Loader2,
   X,
+  HeartHandshake,
+  BookOpen,
 } from "lucide-react";
 
 export default function LoginPage() {
@@ -215,23 +217,46 @@ export default function LoginPage() {
           </button>
         </form>
 
-        {/* ── Portal Registrasi Jamaah ── */}
+          {/* ── Portal Layanan Online & Pendaftaran ── */}
         <div className="mt-6 pt-5 border-t border-border">
-          <div className="text-center space-y-3">
-            <div>
-              <p className="text-sm font-medium text-foreground">
-                Belum menjadi jamaah?
-              </p>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Silakan lakukan pendaftaran online melalui portal registrasi.
+          <div className="space-y-3">
+            <div className="text-center">
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Portal Layanan & Pendaftaran Online
               </p>
             </div>
-            <a
-              href="/register"
-              className="block w-full py-2.5 px-4 rounded-lg border-2 border-primary/20 bg-primary/5 text-primary text-sm font-medium hover:bg-primary/10 hover:border-primary/30 transition-colors duration-200 text-center"
-            >
-              Portal Registrasi Jamaah
-            </a>
+            
+            <div className="space-y-2">
+              <a
+                href="/register"
+                className="flex items-center justify-between w-full py-2.5 px-4 rounded-lg border border-primary/20 bg-primary/5 text-primary text-xs font-medium hover:bg-primary/10 hover:border-primary/30 transition-colors duration-200"
+              >
+                <span>Portal Registrasi Jamaah Umroh</span>
+                <span className="text-[10px] font-bold uppercase bg-primary text-primary-foreground px-2 py-0.5 rounded">Daftar</span>
+              </a>
+
+              <a
+                href="/register/badal-umroh"
+                className="flex items-center justify-between w-full py-2.5 px-4 rounded-lg border border-emerald-500/20 bg-emerald-50/50 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-300 text-xs font-medium hover:bg-emerald-100/50 transition-colors duration-200"
+              >
+                <div className="flex items-center gap-2">
+                  <HeartHandshake className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                  <span>Pendaftaran Badal Umroh</span>
+                </div>
+                <span className="text-[10px] font-bold uppercase bg-emerald-600 text-white px-2 py-0.5 rounded">Badal</span>
+              </a>
+
+              <a
+                href="/register/wakaf-quran"
+                className="flex items-center justify-between w-full py-2.5 px-4 rounded-lg border border-sky-500/20 bg-sky-50/50 dark:bg-sky-950/20 text-sky-700 dark:text-sky-300 text-xs font-medium hover:bg-sky-100/50 transition-colors duration-200"
+              >
+                <div className="flex items-center gap-2">
+                  <BookOpen className="h-4 w-4 text-sky-600 dark:text-sky-400" />
+                  <span>Pendaftaran Wakaf Al-Qur'an</span>
+                </div>
+                <span className="text-[10px] font-bold uppercase bg-sky-600 text-white px-2 py-0.5 rounded">Wakaf</span>
+              </a>
+            </div>
           </div>
         </div>
       </div>
