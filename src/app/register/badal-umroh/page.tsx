@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { ArrowLeft, CheckCircle2, HeartHandshake, Send, UserCheck, Users, Compass, User, Phone, Mail, Sparkles } from "lucide-react";
+import { ArrowLeft, CheckCircle2, HeartHandshake, Send, UserCheck, Users, Compass, User, Sparkles } from "lucide-react";
 import { Button } from "@/shared/components/ui/Button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/components/ui/Card";
 import { Input } from "@/shared/components/ui/Input";
