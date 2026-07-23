@@ -156,11 +156,23 @@ export default function AdminWakafQuranPage() {
                       })}
                     </td>
                     <td className="px-4 py-3 font-bold text-foreground">
-                      <div className="flex flex-col">
-                        <span className="text-sm text-sky-700 dark:text-sky-400">{item.namaPewakaf}</span>
+                      <div className="flex flex-col gap-0.5">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-sm text-sky-700 dark:text-sky-400">{item.namaPeserta || item.namaPewakaf}</span>
+                          {item.isJamaahVauza ? (
+                            <Badge className="bg-sky-600 text-white text-[10px] px-1.5 py-0">Jamaah VTU</Badge>
+                          ) : (
+                            <Badge variant="outline" className="text-[10px] px-1.5 py-0">Umum</Badge>
+                          )}
+                        </div>
+                        {item.isJamaahVauza && item.namaPaketUmroh && (
+                          <span className="text-[11px] font-medium text-sky-700 dark:text-sky-300">
+                            {item.namaPaketUmroh} (TL: {item.namaTourLeader || "-"} / Muthowif: {item.namaMuthowif || "-"})
+                          </span>
+                        )}
                         {item.niatAtasNama && (
                           <span className="text-[11px] font-normal text-muted-foreground">
-                            Niat Atas Nama: {item.niatAtasNama}
+                            Niat: {item.niatAtasNama}
                           </span>
                         )}
                       </div>

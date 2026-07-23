@@ -7,7 +7,20 @@ import { auth } from "@/server/auth";
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { namaPewakaf, nomorWhatsapp, emailPewakaf, jumlahMushaf, lokasiWakaf, niatAtasNama, catatan } = body;
+    const {
+      isJamaahVauza,
+      namaPaketUmroh,
+      namaTourLeader,
+      namaMuthowif,
+      namaPeserta,
+      namaPewakaf,
+      nomorWhatsapp,
+      emailPewakaf,
+      jumlahMushaf,
+      lokasiWakaf,
+      niatAtasNama,
+      catatan,
+    } = body;
 
     if (!namaPewakaf || !nomorWhatsapp) {
       return NextResponse.json({ success: false, message: "Mohon isi nama pewakaf dan nomor WA" }, { status: 400 });
@@ -15,12 +28,17 @@ export async function POST(request: NextRequest) {
 
     const reg = await prisma.wakafQuranRegistration.create({
       data: {
+        isJamaahVauza: Boolean(isJamaahVauza),
+        namaPaketUmroh: namaPaketUmroh ? String(namaPaketUmroh).trim() : null,
+        namaTourLeader: namaTourLeader ? String(namaTourLeader).trim() : null,
+        namaMuthowif: namaMuthowif ? String(namaMuthowif).trim() : null,
+        namaPeserta: namaPeserta ? String(namaPeserta).trim() : null,
         namaPewakaf: String(namaPewakaf).trim(),
         nomorWhatsapp: String(nomorWhatsapp).trim(),
         emailPewakaf: emailPewakaf ? String(emailPewakaf).trim() : null,
         jumlahMushaf: typeof jumlahMushaf === "number" ? jumlahMushaf : parseInt(jumlahMushaf, 10) || 5,
         lokasiWakaf: lokasiWakaf || "Masjidil Haram Makkah Al-Mukarramah",
-        niatAtasNama: niatAtasNama ? String(niatAtasNama).trim() : null,
+        niatAtasNama: Array.isArray(niatAtasNama) ? niatAtasNama.filter(Boolean).join(", ") : (niatAtasNama ? String(niatAtasNama).trim() : null),
         catatan: catatan ? String(catatan).trim() : null,
         status: "Pending",
       },
