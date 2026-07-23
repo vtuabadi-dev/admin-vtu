@@ -15,6 +15,7 @@ import {
   X,
   HeartHandshake,
   BookOpen,
+  ShieldCheck,
 } from "lucide-react";
 
 export default function LoginPage() {
@@ -255,6 +256,17 @@ export default function LoginPage() {
                   <span>Pendaftaran Wakaf Al-Qur&apos;an</span>
                 </div>
                 <span className="text-[10px] font-bold uppercase bg-sky-600 text-white px-2 py-0.5 rounded">Wakaf</span>
+              </a>
+
+              <a
+                href="/track/badal-wakaf"
+                className="flex items-center justify-between w-full py-2.5 px-4 rounded-lg border border-amber-500/30 bg-amber-50/50 dark:bg-amber-950/20 text-amber-800 dark:text-amber-300 text-xs font-semibold hover:bg-amber-100/50 transition-colors duration-200"
+              >
+                <div className="flex items-center gap-2">
+                  <ShieldCheck className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                  <span>Cek Status Badal & Wakaf (OTP WA)</span>
+                </div>
+                <span className="text-[10px] font-bold uppercase bg-amber-600 text-white px-2 py-0.5 rounded">Cek Status</span>
               </a>
             </div>
           </div>
