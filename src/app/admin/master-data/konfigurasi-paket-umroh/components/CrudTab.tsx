@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { Button } from "@/shared/components/ui/Button";
 import { Modal } from "@/shared/components/ui/Modal";
 import { Input } from "@/shared/components/ui/Input";
-import { Trash2, Edit3, Settings, Check } from "lucide-react";
+import { Trash2, Edit3, Settings, Check, FileSpreadsheet } from "lucide-react";
 
 interface FieldConfig {
   name: string;
@@ -36,6 +36,7 @@ interface CrudTabProps<T extends { id: string; status?: string; [key: string]: a
   defaultNewItem: Omit<T, "id">;
   filterField?: FilterConfig;
   onSettingsClick?: () => void;
+  onImportClick?: () => void;
   renderFormExtra?: (
     formData: any,
     setFormData: React.Dispatch<React.SetStateAction<any>>,
@@ -53,6 +54,7 @@ export function CrudTab<T extends { id: string; status?: string; [key: string]: 
   defaultNewItem,
   filterField,
   onSettingsClick,
+  onImportClick,
   renderFormExtra,
 }: CrudTabProps<T>) {
   const [data, setData] = useState<T[]>(initialData || []);
@@ -239,6 +241,12 @@ export function CrudTab<T extends { id: string; status?: string; [key: string]: 
           {onSettingsClick && (
             <Button variant="outline" size="sm" onClick={onSettingsClick} disabled={loading} title="Pengaturan">
               <Settings className="h-4 w-4" />
+            </Button>
+          )}
+          {onImportClick && (
+            <Button variant="outline" size="sm" onClick={onImportClick} disabled={loading} className="gap-1.5 text-xs">
+              <FileSpreadsheet className="h-4 w-4 text-emerald-600" />
+              Import Excel
             </Button>
           )}
           <Button size="sm" onClick={handleOpenAdd} disabled={loading}>

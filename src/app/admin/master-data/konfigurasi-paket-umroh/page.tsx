@@ -9,7 +9,7 @@ import { CrudTab } from "./components/CrudTab";
 import { Modal } from "@/shared/components/ui/Modal";
 import { Button } from "@/shared/components/ui/Button";
 import { Input } from "@/shared/components/ui/Input";
-import { Trash2, Upload, ExternalLink, Play } from "lucide-react";
+import { Trash2, Upload, ExternalLink, Play, FileSpreadsheet, Download, CheckCircle2 } from "lucide-react";
 
 const TABS = [
   { value: "jenis-paket", label: "Jenis Paket" },
@@ -30,6 +30,12 @@ export default function MasterKonfigurasiPaketUmrohPage() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [videoPreview, setVideoPreview] = useState<{ open: boolean; title: string; url: string }>({ open: false, title: "", url: "" });
   const [uploadingVideo, setUploadingVideo] = useState(false);
+
+  // Excel Import States
+  const [importOpen, setImportOpen] = useState(false);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importing, setImporting] = useState(false);
+  const [importMessage, setImportMessage] = useState<string | null>(null);
 
   // Fetch hotel cities
   const fetchHotelCities = () => {
@@ -202,6 +208,7 @@ export default function MasterKonfigurasiPaketUmrohPage() {
                 itemName="Hotel"
                 apiEndpoint="/api/master/hotels"
                 onSettingsClick={handleOpenSettings}
+                onImportClick={() => { setImportMessage(null); setImportFile(null); setImportOpen(true); }}
                 defaultNewItem={{ nama: "", cityId: "", bintang: 5, jarakText: "", status: "Aktif", videoJarakUrl: "", videoJarakDriveId: "" }}
                 columns={[
                   { key: "nama", header: "Nama Hotel" },
@@ -451,6 +458,93 @@ export default function MasterKonfigurasiPaketUmrohPage() {
               Tutup
             </Button>
           </div>
+        </div>
+      </Modal>
+
+      {/* Import Excel Modal */}
+      <Modal
+        open={importOpen}
+        onClose={() => setImportOpen(false)}
+        title="Import Data Hotel (Excel)"
+        description="Unggah file spreadsheet Excel (.xlsx) untuk menambahkan data master hotel secara massal."
+      >
+        <div className="space-y-4 mt-3">
+          <div className="bg-sky-50 dark:bg-sky-950/30 border border-sky-200 dark:border-sky-800 p-3 rounded-md flex items-center justify-between text-xs">
+            <div className="flex items-center gap-2 text-sky-800 dark:text-sky-200">
+              <FileSpreadsheet className="h-4 w-4 text-sky-600" />
+              <span>Gunakan format kolom Excel standar</span>
+            </div>
+            <a
+              href="/api/master/hotels/template"
+              download
+              className="inline-flex items-center gap-1 font-semibold text-sky-700 dark:text-sky-300 hover:underline"
+            >
+              <Download className="h-3.5 w-3.5" /> Download Template (.xlsx)
+            </a>
+          </div>
+
+          <form
+            onSubmit={async (e) => {
+              e.preventDefault();
+              if (!importFile) return alert("Pilih file Excel terlebih dahulu");
+              try {
+                setImporting(true);
+                setImportMessage(null);
+                const uploadData = new FormData();
+                uploadData.append("file", importFile);
+
+                const res = await fetch("/api/master/hotels/import", {
+                  method: "POST",
+                  body: uploadData,
+                });
+                const resJson = await res.json();
+                if (resJson.success) {
+                  setImportMessage(resJson.message);
+                  setImportFile(null);
+                  fetchHotelCities();
+                  setTimeout(() => {
+                    window.location.reload();
+                  }, 1200);
+                } else {
+                  alert(`Gagal Impor: ${resJson.message}`);
+                }
+              } catch (err) {
+                console.error(err);
+                alert("Terjadi kesalahan saat mengimpor file");
+              } finally {
+                setImporting(false);
+              }
+            }}
+            className="space-y-4"
+          >
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-semibold text-muted-foreground">Pilih File Excel (.xlsx / .csv)</label>
+              <Input
+                type="file"
+                accept=".xlsx, .csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, text/csv"
+                onChange={(e) => setImportFile(e.target.files?.[0] || null)}
+                className="text-xs"
+                required
+              />
+            </div>
+
+            {importMessage && (
+              <div className="bg-emerald-50 text-emerald-800 border border-emerald-200 p-2.5 rounded text-xs flex items-center gap-2">
+                <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+                <span>{importMessage}</span>
+              </div>
+            )}
+
+            <div className="flex justify-end gap-2 pt-3 border-t">
+              <Button variant="outline" type="button" onClick={() => setImportOpen(false)} disabled={importing}>
+                Batal
+              </Button>
+              <Button type="submit" disabled={importing || !importFile} className="gap-1.5">
+                <FileSpreadsheet className="h-4 w-4" />
+                {importing ? "Mengimpor..." : "Import Data"}
+              </Button>
+            </div>
+          </form>
         </div>
       </Modal>
     </div>
