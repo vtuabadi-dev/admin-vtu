@@ -6,7 +6,7 @@ import { Badge } from "@/shared/components/ui/Badge";
 import { Button } from "@/shared/components/ui/Button";
 import { Modal } from "@/shared/components/ui/Modal";
 import { Input } from "@/shared/components/ui/Input";
-import { HeartHandshake, Phone, Trash2, Edit, CheckCircle2, Search, ExternalLink, ShieldCheck, BookOpen, Layers, CreditCard } from "lucide-react";
+import { HeartHandshake, Phone, Trash2, Edit, CheckCircle2, Search, ExternalLink, Layers, CreditCard } from "lucide-react";
 
 export default function AdminBadalUmrohPage() {
   const [activeTab, setActiveTab] = useState<"daftar" | "validasi" | "laporan">("daftar");
@@ -137,7 +137,6 @@ export default function AdminBadalUmrohPage() {
   };
 
   const validasiList = list.filter((item) => item.paymentStatus === "Menunggu Konfirmasi" || item.paymentStatus === "Belum Bayar");
-  const daftarUtamaList = list.filter((item) => item.paymentStatus === "Lunas" || statusFilter !== "ALL");
 
   return (
     <div className="flex flex-col gap-6 p-6">

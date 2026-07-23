@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, ShieldCheck, KeyRound, Phone, HeartHandshake, BookOpen, Clock, ExternalLink, Download, Sparkles, AlertCircle, Upload, CheckCircle2, Plus, Heart } from "lucide-react";
+import { ArrowLeft, ShieldCheck, KeyRound, Phone, HeartHandshake, BookOpen, Clock, ExternalLink, Download, Sparkles, AlertCircle, Upload, Plus } from "lucide-react";
 import { Button } from "@/shared/components/ui/Button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/components/ui/Card";
 import { Input } from "@/shared/components/ui/Input";
