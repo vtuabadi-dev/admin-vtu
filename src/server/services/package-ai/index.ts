@@ -87,21 +87,50 @@ export async function processPackageFlyer(
   }
 
   // Run OCR on the flyer directly from buffer (already read above)
-  // Use "paspor" jenis type since it's the closest document type
-  // for general text extraction from flyers
   const ocrResult = await processDocument(imageBuffer, "paspor", 0);
 
-  // Parse the caption text
-  const captionFields = parseCaption(caption);
+  let geminiData: Partial<PackageExtractionResult> = {};
+  let isGeminiSuccess = false;
 
-  // Extract additional fields from OCR text where caption may be missing
-  const ocrAirline = ocrResult.rawText
-    ? resolveAirline(ocrResult.rawText.trim())
-    : "";
+  try {
+    const { extractWithGemini } = await import("./gemini-extractor");
+    geminiData = await extractWithGemini(imagePath, ocrResult.rawText || "", caption);
+    isGeminiSuccess = true;
+  } catch (error) {
+    console.error("[processPackageFlyer] Gemini extraction failed, falling back to Regex:", error);
+  }
 
-  const ocrCity = ocrResult.rawText
-    ? resolveCity(ocrResult.rawText.trim())
-    : "";
+  if (isGeminiSuccess) {
+    return {
+      title: geminiData.title || "Untitled Package",
+      packageType: (geminiData.packageType as any) || "umroh_reguler",
+      departureCity: geminiData.departureCity || "",
+      landingRoute: geminiData.landingRoute,
+      airline: geminiData.airline || "",
+      hotelMekkah: geminiData.hotelMekkah || "",
+      hotelMadinah: geminiData.hotelMadinah || "",
+      roomUpgrade: geminiData.roomUpgrade,
+      hotelUpgrade: geminiData.hotelUpgrade,
+      durationDays: geminiData.durationDays || 0,
+      departureDates: geminiData.departureDates || [],
+      promoText: geminiData.promoText,
+      description: geminiData.description,
+      rawCaption: caption,
+      rawOcrText: ocrResult.rawText || "",
+      confidence: 1, // Gemini is confident
+    };
+  }
+
+  // --- FALLBACK REGEX PARSER ---
+  const combinedText = [caption, ocrResult.rawText].filter(Boolean).join("\n\n");
+  
+  // Parse the combined text
+  const captionFields = parseCaption(combinedText);
+
+  // We don't need additional fallback for ocrAirline / ocrCity since parseCaption now reads the OCR text too,
+  // but we leave it as a safe fallback just in case.
+  const ocrAirline = ocrResult.rawText ? resolveAirline(ocrResult.rawText.trim()) : "";
+  const ocrCity = ocrResult.rawText ? resolveCity(ocrResult.rawText.trim()) : "";
 
   // Build the final extraction result
   // Caption data takes priority for structured fields,

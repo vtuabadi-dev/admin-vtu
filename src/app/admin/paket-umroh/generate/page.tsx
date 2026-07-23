@@ -11,15 +11,16 @@ import {
 } from "@/shared/lib/mock-data";
 import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X } from "lucide-react";
 
-interface MasterDataOptions {
-  airlines: any[];
-  hotels: any[];
-  cities: any[];
-  packageTypes: any[];
-  routes?: any[];
-}
-
-export default function GeneratePaketPage() {
+  interface MasterDataOptions {
+    airlines: any[];
+    hotels: any[];
+    cities: any[];
+    packageTypes: any[];
+    routes?: any[];
+    clusters?: any[];
+  }
+  
+  export default function GeneratePaketPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -326,6 +327,18 @@ export default function GeneratePaketPage() {
           const mappedCity = matchCity(result.departureCity, options?.cities || []);
           const mappedPackageType = matchPackageType(result.packageType, options?.packageTypes || []);
           
+          const matchLandingRoute = (routeDesc: string, list: any[]) => {
+            if (!routeDesc) return "";
+            const clean = routeDesc.toLowerCase().replace(/[^a-z0-9]/g, "");
+            const match = list.find(item => {
+              const rClean = `${item.ruteIn}->${item.ruteOut}`.toLowerCase().replace(/[^a-z0-9]/g, "");
+              const cClean = (item.kode || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+              return rClean === clean || rClean.includes(clean) || clean.includes(rClean) || cClean === clean;
+            });
+            return match ? match.id : "";
+          };
+          const mappedLandingRoute = matchLandingRoute(result.landingRoute, options?.routes || []);
+          
           const mekkahCity = options?.cities.find(c => c.code === "MEK" || c.name.toLowerCase() === "mekkah");
           const madinahCity = options?.cities.find(c => c.code === "MED" || c.name.toLowerCase() === "madinah");
           const mekkahHotels = options?.hotels.filter(h => h.cityId === mekkahCity?.id) || [];
@@ -339,6 +352,7 @@ export default function GeneratePaketPage() {
           if (mappedPackageType) finalFormData.jenisPaketId = mappedPackageType;
           if (mappedCity) finalFormData.startingPointId = mappedCity;
           if (mappedAirline) finalFormData.maskapaiId = mappedAirline;
+          if (mappedLandingRoute) finalFormData.landingPatternId = mappedLandingRoute;
           if (mappedHotelMekkah) finalFormData.hotelMekkahId = mappedHotelMekkah;
           if (mappedHotelMadinah) finalFormData.hotelMadinahId = mappedHotelMadinah;
           if (result.durationDays) finalFormData.durasiHari = String(result.durationDays);
@@ -602,7 +616,7 @@ export default function GeneratePaketPage() {
                   💡 <strong>Info:</strong> Hotel, Harga Base, serta Harga Upgrade Kamar (Double & Triple) akan dikonfigurasi untuk masing-masing klaster di bawah ini.
                 </div>
                 <div className="space-y-3">
-                  {MOCK_KLASTER.map((klaster) => (
+                  {(options?.clusters || MOCK_KLASTER).map((klaster) => (
                     <div key={klaster.id} className="p-4 bg-card border rounded-md flex flex-col gap-3 shadow-sm">
                       <div className="flex items-center justify-between border-b pb-2">
                         <span className="text-sm font-bold text-primary">{klaster.nama} Seat Class</span>

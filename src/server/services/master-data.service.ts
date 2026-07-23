@@ -4,8 +4,13 @@ import { cityRepo } from "../repositories/master/city.repository";
 import { packageTypeRepo } from "../repositories/master/package-type.repository";
 import { hotelCityRepo } from "../repositories/master/hotel-city.repository";
 import { routeRepo } from "../repositories/master/route.repository";
+import { clusterRepo } from "../repositories/master/cluster.repository";
 
 export const masterDataService = {
+  // Clusters
+  async getClusters(params?: { isActive?: boolean; limit?: number; offset?: number; search?: string }) {
+    return clusterRepo.findAll(params);
+  },
   // Routes
   async getRoutes(params?: { isActive?: boolean; limit?: number; offset?: number; search?: string }) {
     return routeRepo.findAll(params);

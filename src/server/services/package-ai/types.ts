@@ -12,6 +12,7 @@ export interface PackageExtractionResult {
   title: string;
   packageType: "umroh_reguler" | "umroh_plus" | "haji_khusus" | "wisata_halal";
   departureCity: string;
+  landingRoute?: string;
   airline: string;
   hotelMekkah: string;
   hotelMadinah: string;

@@ -151,7 +151,14 @@ const HOTEL_CLEANUP_PATTERNS = [
  */
 export function resolveAirline(text: string): string {
   const cleaned = text.trim().toUpperCase();
-  return AIRLINE_ALIASES[cleaned] ?? text.trim();
+  if (AIRLINE_ALIASES[cleaned]) return AIRLINE_ALIASES[cleaned];
+  
+  if (cleaned.length > 20) {
+    for (const [alias, canonical] of Object.entries(AIRLINE_ALIASES)) {
+      if (cleaned.includes(alias)) return canonical;
+    }
+  }
+  return text.trim();
 }
 
 /**
@@ -161,7 +168,14 @@ export function resolveAirline(text: string): string {
  */
 export function resolveCity(text: string): string {
   const cleaned = text.trim().toUpperCase();
-  return CITY_ALIASES[cleaned] ?? text.trim();
+  if (CITY_ALIASES[cleaned]) return CITY_ALIASES[cleaned];
+  
+  if (cleaned.length > 20) {
+    for (const [alias, canonical] of Object.entries(CITY_ALIASES)) {
+      if (cleaned.includes(alias)) return canonical;
+    }
+  }
+  return text.trim();
 }
 
 /**

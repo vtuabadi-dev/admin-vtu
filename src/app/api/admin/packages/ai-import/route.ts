@@ -135,7 +135,7 @@ export async function POST(request: NextRequest) {
     };
 
     // Add warning if confidence is low
-    if (extractionResult.confidence < 50) {
+    if (extractionResult.confidence > 0 && extractionResult.confidence < 0.5) {
       responseData.warning =
         "Kualitas OCR rendah. Periksa hasil ekstraksi sebelum melanjutkan.";
     }
