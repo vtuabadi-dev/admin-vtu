@@ -202,7 +202,7 @@ export default function MasterKonfigurasiPaketUmrohPage() {
                 itemName="Hotel"
                 apiEndpoint="/api/master/hotels"
                 onSettingsClick={handleOpenSettings}
-                defaultNewItem={{ nama: "", cityId: "", bintang: 5, status: "Aktif", jarakText: "", videoJarakUrl: "", videoJarakDriveId: "" }}
+                defaultNewItem={{ nama: "", cityId: "", bintang: 5, jarakText: "", status: "Aktif", videoJarakUrl: "", videoJarakDriveId: "" }}
                 columns={[
                   { key: "nama", header: "Nama Hotel" },
                   { 
@@ -225,25 +225,6 @@ export default function MasterKonfigurasiPaketUmrohPage() {
                       return <span className="font-semibold text-primary">{item.jarakText || item.jarak || "-"}</span>;
                     }
                   },
-                  {
-                    key: "videoJarakUrl",
-                    header: "Video Jarak",
-                    render: (item) => {
-                      const url = item.videoJarakUrl;
-                      if (!url) return <span className="text-muted-foreground text-xs">Belum ada video</span>;
-                      return (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="h-8 gap-1.5 text-xs border-primary/30 text-primary hover:bg-primary/5"
-                          onClick={() => setVideoPreview({ open: true, title: item.name || item.nama, url })}
-                        >
-                          <Play className="h-3.5 w-3.5 fill-primary text-primary" />
-                          Tonton Video
-                        </Button>
-                      );
-                    }
-                  },
                   { key: "status", header: "Status" },
                   { key: "actions", header: "Aksi" },
                 ]}
@@ -251,6 +232,7 @@ export default function MasterKonfigurasiPaketUmrohPage() {
                   { name: "nama", label: "Nama Hotel", type: "text" },
                   { name: "cityId", label: "Kota Lokasi", type: "select", options: hotelCities.map(c => ({ label: c.name, value: c.id })) },
                   { name: "bintang", label: "Rating Bintang (1-5)", type: "number" },
+                  { name: "jarakText", label: "Jarak ke Pelataran (misal: 150m / 3 menit jalan kaki)", type: "text", required: false },
                   { name: "status", label: "Status", type: "select", options: STATUS_OPTIONS },
                 ]}
                 filterField={{
@@ -260,10 +242,6 @@ export default function MasterKonfigurasiPaketUmrohPage() {
                 }}
                 renderFormExtra={(formData, setFormData, isSubmitting) => {
                   const selectedCity = hotelCities.find(c => c.id === formData.cityId);
-                  const cityName = selectedCity?.name?.toUpperCase() || "";
-                  const isHolyCity = cityName.includes("MAKKAH") || cityName.includes("MEKKAH") || cityName.includes("MADINAH");
-
-                  if (!isHolyCity) return null;
 
                   const handleVideoFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
                     const file = e.target.files?.[0];
@@ -299,26 +277,11 @@ export default function MasterKonfigurasiPaketUmrohPage() {
                   };
 
                   return (
-                    <div className="space-y-4 pt-3 border-t border-border mt-3 bg-muted/20 p-3 rounded-md">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-bold uppercase tracking-wider text-primary">Informasi Jarak ({selectedCity?.name})</span>
-                      </div>
-                      
+                    <div className="space-y-3 pt-3 border-t border-border mt-3 bg-muted/20 p-3 rounded-md">
                       <div className="flex flex-col gap-1.5">
-                        <label className="text-sm font-medium">Jarak ke Pelataran</label>
-                        <Input
-                          type="text"
-                          name="jarakText"
-                          value={formData.jarakText ?? ""}
-                          onChange={(e) => setFormData((prev: any) => ({ ...prev, jarakText: e.target.value }))}
-                          placeholder="Misal: 150 meter / 3 menit jalan kaki"
-                        />
-                      </div>
-
-                      <div className="flex flex-col gap-1.5">
-                        <label className="text-sm font-medium flex items-center justify-between">
-                          <span>Video Jarak ke Pelataran</span>
-                          <span className="text-xs text-muted-foreground font-normal">Otomatis tersimpan di Google Drive</span>
+                        <label className="text-xs font-semibold text-muted-foreground flex items-center justify-between">
+                          <span>Video Jarak ke Pelataran (Opsional)</span>
+                          <span>Simpan di Google Drive</span>
                         </label>
 
                         <div className="flex items-center gap-2">
@@ -327,12 +290,12 @@ export default function MasterKonfigurasiPaketUmrohPage() {
                             name="videoJarakUrl"
                             value={formData.videoJarakUrl ?? ""}
                             onChange={(e) => setFormData((prev: any) => ({ ...prev, videoJarakUrl: e.target.value }))}
-                            placeholder="https://drive.google.com/... atau unggah file video"
-                            className="text-xs"
+                            placeholder="URL Video atau Upload File..."
+                            className="text-xs h-9"
                           />
-                          <label className="cursor-pointer inline-flex items-center gap-1.5 px-3 py-2 bg-primary text-primary-foreground text-xs font-medium rounded-md hover:bg-primary/90 transition-colors whitespace-nowrap">
+                          <label className="cursor-pointer inline-flex items-center gap-1.5 px-3 py-2 bg-primary text-primary-foreground text-xs font-medium rounded-md hover:bg-primary/90 transition-colors whitespace-nowrap h-9">
                             <Upload className="h-3.5 w-3.5" />
-                            {uploadingVideo ? "Unggah..." : "Upload Video"}
+                            {uploadingVideo ? "Uploading..." : "Upload Video"}
                             <input
                               type="file"
                               accept="video/*"
@@ -344,7 +307,7 @@ export default function MasterKonfigurasiPaketUmrohPage() {
                         </div>
                         {formData.videoJarakUrl && (
                           <div className="flex items-center justify-between bg-card border rounded p-2 text-xs text-muted-foreground mt-1">
-                            <span className="truncate max-w-[300px]">{formData.videoJarakUrl}</span>
+                            <span className="truncate max-w-[280px]">{formData.videoJarakUrl}</span>
                             <button
                               type="button"
                               onClick={() => setVideoPreview({ open: true, title: formData.nama || "Preview Video", url: formData.videoJarakUrl })}

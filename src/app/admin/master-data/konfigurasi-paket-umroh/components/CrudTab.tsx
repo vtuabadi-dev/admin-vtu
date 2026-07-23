@@ -11,6 +11,7 @@ interface FieldConfig {
   label: string;
   type: "text" | "number" | "select";
   options?: { label: string; value: any }[];
+  required?: boolean;
 }
 
 interface ColumnConfig<T> {
@@ -356,7 +357,7 @@ export function CrudTab<T extends { id: string; status?: string; [key: string]: 
                   value={formData[field.name] ?? ""}
                   onChange={handleInputChange}
                   className="w-full h-10 px-3 py-2 rounded-md border border-input bg-transparent text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                  required
+                  required={field.required !== false}
                 >
                   <option value="">-- Pilih --</option>
                   {field.options?.map((opt) => (
@@ -371,7 +372,7 @@ export function CrudTab<T extends { id: string; status?: string; [key: string]: 
                   name={field.name}
                   value={formData[field.name] ?? ""}
                   onChange={handleInputChange}
-                  required
+                  required={field.required !== false}
                   placeholder={`Masukkan ${field.label.toLowerCase()}...`}
                 />
               )}
