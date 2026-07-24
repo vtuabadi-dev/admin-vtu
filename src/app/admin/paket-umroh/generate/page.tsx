@@ -427,38 +427,9 @@ import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X } from "luc
     }, 800);
   };
 
-  // Filter hotels by cities with robust matching and fallback to master hotels
-  const mekkahCity = options?.cities.find(c => {
-    const name = (c.name || "").toLowerCase();
-    const code = (c.code || "").toLowerCase();
-    return code === "mek" || code === "mak" || code === "mkh" || name.includes("mekkah") || name.includes("makkah") || name.includes("mecca");
-  });
-
-  const madinahCity = options?.cities.find(c => {
-    const name = (c.name || "").toLowerCase();
-    const code = (c.code || "").toLowerCase();
-    return code === "med" || code === "mdn" || name.includes("madinah") || name.includes("medina");
-  });
-  
-  let mekkahHotels = options?.hotels?.filter(h => {
-    if (mekkahCity?.id && h.cityId === mekkahCity.id) return true;
-    const hName = (h.name || "").toLowerCase();
-    return hName.includes("mekkah") || hName.includes("makkah") || hName.includes("mecca");
-  }) || [];
-  
-  let madinahHotels = options?.hotels?.filter(h => {
-    if (madinahCity?.id && h.cityId === madinahCity.id) return true;
-    const hName = (h.name || "").toLowerCase();
-    return hName.includes("madinah") || hName.includes("medina");
-  }) || [];
-
-  // Fallback: If no city-specific filter matched, provide ALL master hotels from options
-  if (mekkahHotels.length === 0 && options?.hotels && options.hotels.length > 0) {
-    mekkahHotels = options.hotels;
-  }
-  if (madinahHotels.length === 0 && options?.hotels && options.hotels.length > 0) {
-    madinahHotels = options.hotels;
-  }
+  // Master hotels reference (providing ALL hotels from Master Data)
+  const mekkahHotels = options?.hotels || [];
+  const madinahHotels = options?.hotels || [];
 
   // Sub-component to render Wizard steps
   const renderWizardSteps = (colMode = false) => {
