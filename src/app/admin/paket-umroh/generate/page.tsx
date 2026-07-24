@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/shared/components/ui/Button";
 import { Input } from "@/shared/components/ui/Input";
+import { SearchableSelect } from "@/shared/components/ui/SearchableSelect";
 import { cn } from "@/shared/lib/utils";
 import { 
   MOCK_LANDING_PATTERN, 
@@ -442,16 +443,14 @@ import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X } from "luc
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium mb-1">Jenis Paket (Master Data)</label>
-                <select name="jenisPaketId" value={formData.jenisPaketId} onChange={handleChange} className="w-full h-10 px-3 py-2 rounded-md border border-input bg-transparent" disabled={fetching}>
-                  <option value="">-- Pilih Jenis Paket --</option>
-                  {fetching ? (
-                    <option disabled>Loading jenis paket...</option>
-                  ) : (
-                    options?.packageTypes.map((item) => (
-                      <option key={item.id} value={item.id}>{item.name}</option>
-                    ))
-                  )}
-                </select>
+                <SearchableSelect
+                  options={options?.packageTypes.map(t => ({ value: t.id, label: t.name })) || []}
+                  value={formData.jenisPaketId}
+                  onChange={(val) => setFormData(prev => ({ ...prev, jenisPaketId: val }))}
+                  placeholder="-- Pilih Jenis Paket --"
+                  searchPlaceholder="Cari jenis paket..."
+                  disabled={fetching}
+                />
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1">Nama Paket</label>
@@ -515,44 +514,36 @@ import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X } from "luc
           <div className={`p-4 bg-card border rounded-md grid grid-cols-1 ${colMode ? "md:grid-cols-2" : "md:grid-cols-3"} gap-4`}>
             <div>
               <label className="block text-sm font-medium mb-1">Starting Point</label>
-              <select name="startingPointId" value={formData.startingPointId} onChange={handleChange} className="w-full h-10 px-3 py-2 rounded-md border border-input bg-transparent" disabled={fetching}>
-                <option value="">-- Pilih Kota --</option>
-                {fetching ? (
-                  <option disabled>Loading starting points...</option>
-                ) : (
-                  options?.cities.map((item) => (
-                    <option key={item.id} value={item.id}>{item.name}</option>
-                  ))
-                )}
-              </select>
+              <SearchableSelect
+                options={options?.cities.map(c => ({ value: c.id, label: c.name })) || []}
+                value={formData.startingPointId}
+                onChange={(val) => setFormData(prev => ({ ...prev, startingPointId: val }))}
+                placeholder="-- Pilih Kota --"
+                searchPlaceholder="Cari kota starting point..."
+                disabled={fetching}
+              />
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">Rute In-Out</label>
-              <select name="landingPatternId" value={formData.landingPatternId} onChange={handleChange} className="w-full h-10 px-3 py-2 rounded-md border border-input bg-transparent" disabled={fetching}>
-                <option value="">-- Pilih Rute --</option>
-                {fetching ? (
-                  <option disabled>Loading rute in-out...</option>
-                ) : (
-                  (options?.routes && options.routes.length > 0 ? options.routes : MOCK_LANDING_PATTERN).map((item) => (
-                    <option key={item.id} value={item.id}>
-                      {item.ruteIn} &rarr; {item.ruteOut}
-                    </option>
-                  ))
-                )}
-              </select>
+              <SearchableSelect
+                options={(options?.routes && options.routes.length > 0 ? options.routes : MOCK_LANDING_PATTERN).map(r => ({ value: r.id, label: `${r.ruteIn} → ${r.ruteOut}` }))}
+                value={formData.landingPatternId}
+                onChange={(val) => setFormData(prev => ({ ...prev, landingPatternId: val }))}
+                placeholder="-- Pilih Rute --"
+                searchPlaceholder="Cari rute..."
+                disabled={fetching}
+              />
             </div>
             <div className={colMode ? "md:col-span-2" : ""}>
               <label className="block text-sm font-medium mb-1">Maskapai</label>
-              <select name="maskapaiId" value={formData.maskapaiId} onChange={handleChange} className="w-full h-10 px-3 py-2 rounded-md border border-input bg-transparent" disabled={fetching}>
-                <option value="">-- Pilih Maskapai --</option>
-                {fetching ? (
-                  <option disabled>Loading maskapai...</option>
-                ) : (
-                  options?.airlines.map((item) => (
-                    <option key={item.id} value={item.id}>{item.name}</option>
-                  ))
-                )}
-              </select>
+              <SearchableSelect
+                options={options?.airlines.map(a => ({ value: a.id, label: a.name })) || []}
+                value={formData.maskapaiId}
+                onChange={(val) => setFormData(prev => ({ ...prev, maskapaiId: val }))}
+                placeholder="-- Pilih Maskapai --"
+                searchPlaceholder="Cari maskapai..."
+                disabled={fetching}
+              />
             </div>
           </div>
         </div>
@@ -604,29 +595,25 @@ import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X } from "luc
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium mb-1">Hotel Mekkah</label>
-                    <select name="hotelMekkahId" value={formData.hotelMekkahId} onChange={handleChange} className="w-full h-10 px-3 py-2 rounded-md border border-input bg-transparent" disabled={fetching}>
-                      <option value="">-- Pilih Hotel Mekkah --</option>
-                      {fetching ? (
-                        <option disabled>Loading hotel Mekkah...</option>
-                      ) : (
-                        mekkahHotels.map((item) => (
-                          <option key={item.id} value={item.id}>{item.name}</option>
-                        ))
-                      )}
-                    </select>
+                    <SearchableSelect
+                      options={mekkahHotels.map(h => ({ value: h.id, label: h.name }))}
+                      value={formData.hotelMekkahId}
+                      onChange={(val) => setFormData(prev => ({ ...prev, hotelMekkahId: val }))}
+                      placeholder="-- Pilih Hotel Mekkah --"
+                      searchPlaceholder="Cari hotel Mekkah..."
+                      disabled={fetching}
+                    />
                   </div>
                   <div>
                     <label className="block text-sm font-medium mb-1">Hotel Madinah</label>
-                    <select name="hotelMadinahId" value={formData.hotelMadinahId} onChange={handleChange} className="w-full h-10 px-3 py-2 rounded-md border border-input bg-transparent" disabled={fetching}>
-                      <option value="">-- Pilih Hotel Madinah --</option>
-                      {fetching ? (
-                        <option disabled>Loading hotel Madinah...</option>
-                      ) : (
-                        madinahHotels.map((item) => (
-                          <option key={item.id} value={item.id}>{item.name}</option>
-                        ))
-                      )}
-                    </select>
+                    <SearchableSelect
+                      options={madinahHotels.map(h => ({ value: h.id, label: h.name }))}
+                      value={formData.hotelMadinahId}
+                      onChange={(val) => setFormData(prev => ({ ...prev, hotelMadinahId: val }))}
+                      placeholder="-- Pilih Hotel Madinah --"
+                      searchPlaceholder="Cari hotel Madinah..."
+                      disabled={fetching}
+                    />
                   </div>
                 </div>
                 
@@ -657,29 +644,25 @@ import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X } from "luc
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                         <div>
                           <label className="block text-xs font-semibold text-muted-foreground mb-1">Hotel Mekkah</label>
-                          <select 
-                            value={clusterConfigs[klaster.id]?.hotelMekkahId || ""} 
-                            onChange={(e) => handleClusterConfigChange(klaster.id, "hotelMekkahId", e.target.value)} 
-                            className="w-full h-9 px-2 text-xs rounded-md border border-input bg-background"
-                          >
-                            <option value="">-- Hotel Mekkah --</option>
-                            {mekkahHotels.map((h) => (
-                              <option key={h.id} value={h.id}>{h.name}</option>
-                            ))}
-                          </select>
+                          <SearchableSelect
+                            options={mekkahHotels.map(h => ({ value: h.id, label: h.name }))}
+                            value={clusterConfigs[klaster.id]?.hotelMekkahId || ""}
+                            onChange={(val) => handleClusterConfigChange(klaster.id, "hotelMekkahId", val)}
+                            placeholder="-- Hotel Mekkah --"
+                            searchPlaceholder="Cari hotel..."
+                            size="sm"
+                          />
                         </div>
                         <div>
                           <label className="block text-xs font-semibold text-muted-foreground mb-1">Hotel Madinah</label>
-                          <select 
-                            value={clusterConfigs[klaster.id]?.hotelMadinahId || ""} 
-                            onChange={(e) => handleClusterConfigChange(klaster.id, "hotelMadinahId", e.target.value)} 
-                            className="w-full h-9 px-2 text-xs rounded-md border border-input bg-background"
-                          >
-                            <option value="">-- Hotel Madinah --</option>
-                            {madinahHotels.map((h) => (
-                              <option key={h.id} value={h.id}>{h.name}</option>
-                            ))}
-                          </select>
+                          <SearchableSelect
+                            options={madinahHotels.map(h => ({ value: h.id, label: h.name }))}
+                            value={clusterConfigs[klaster.id]?.hotelMadinahId || ""}
+                            onChange={(val) => handleClusterConfigChange(klaster.id, "hotelMadinahId", val)}
+                            placeholder="-- Hotel Madinah --"
+                            searchPlaceholder="Cari hotel..."
+                            size="sm"
+                          />
                         </div>
                       </div>
 
