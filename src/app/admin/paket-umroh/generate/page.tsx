@@ -765,83 +765,93 @@ import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X } from "luc
                   💡 <strong>Info:</strong> Hotel, Harga Base, serta Harga Upgrade Kamar (Double & Triple) akan dikonfigurasi untuk masing-masing klaster di bawah ini.
                 </div>
                 <div className="space-y-3">
-                  {(options?.clusters || MOCK_KLASTER).map((klaster) => (
-                    <div key={klaster.id} className="p-4 bg-card border rounded-md flex flex-col gap-3 shadow-sm">
-                      <div className="flex items-center justify-between border-b pb-2">
-                        <span className="text-sm font-bold text-primary">{klaster.nama} Seat Class</span>
-                      </div>
-                      
-                      {/* Hotel Selection Row */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        <div>
-                          <label className="block text-xs font-semibold text-muted-foreground mb-1">Hotel Mekkah</label>
-                          <SearchableSelect
-                            id={`field-${klaster.id}-hotelMekkahId`}
-                            nextFocusId={`field-${klaster.id}-hotelMadinahId`}
-                            options={mekkahHotels.map(h => ({ value: h.id, label: h.name }))}
-                            value={clusterConfigs[klaster.id]?.hotelMekkahId || ""}
-                            onChange={(val) => handleClusterConfigChange(klaster.id, "hotelMekkahId", val)}
-                            placeholder="-- Hotel Mekkah --"
-                            searchPlaceholder="Cari hotel..."
-                            size="sm"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-semibold text-muted-foreground mb-1">Hotel Madinah</label>
-                          <SearchableSelect
-                            id={`field-${klaster.id}-hotelMadinahId`}
-                            nextFocusId={`field-${klaster.id}-hargaBase`}
-                            options={madinahHotels.map(h => ({ value: h.id, label: h.name }))}
-                            value={clusterConfigs[klaster.id]?.hotelMadinahId || ""}
-                            onChange={(val) => handleClusterConfigChange(klaster.id, "hotelMadinahId", val)}
-                            placeholder="-- Hotel Madinah --"
-                            searchPlaceholder="Cari hotel..."
-                            size="sm"
-                          />
-                        </div>
-                      </div>
+                  {(() => {
+                    const clustersList = options?.clusters && options.clusters.length > 0 ? options.clusters : MOCK_KLASTER;
+                    return clustersList.map((klaster, idx) => {
+                      const nextKlaster = clustersList[idx + 1];
+                      const nextFieldId = nextKlaster
+                        ? `field-${nextKlaster.id}-hotelMekkahId`
+                        : "field-tempDate";
 
-                      {/* Pricing Row */}
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1">
-                        <div>
-                          <label className="block text-xs font-semibold text-muted-foreground mb-1">Harga Base (Rp)</label>
-                          <Input 
-                            id={`field-${klaster.id}-hargaBase`}
-                            type="number" 
-                            placeholder="Misal: 35000000" 
-                            value={clusterConfigs[klaster.id]?.hargaBase || ""} 
-                            onChange={(e) => handleClusterConfigChange(klaster.id, "hargaBase", e.target.value)} 
-                            onKeyDown={(e) => handleKeyDownNext(e, `field-${klaster.id}-upgradeDouble`)}
-                            className="h-8 text-xs"
-                          />
+                      return (
+                        <div key={klaster.id} className="p-4 bg-card border rounded-md flex flex-col gap-3 shadow-sm">
+                          <div className="flex items-center justify-between border-b pb-2">
+                            <span className="text-sm font-bold text-primary">{klaster.nama} Seat Class</span>
+                          </div>
+                          
+                          {/* Hotel Selection Row */}
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div>
+                              <label className="block text-xs font-semibold text-muted-foreground mb-1">Hotel Mekkah</label>
+                              <SearchableSelect
+                                id={`field-${klaster.id}-hotelMekkahId`}
+                                nextFocusId={`field-${klaster.id}-hotelMadinahId`}
+                                options={mekkahHotels.map(h => ({ value: h.id, label: h.name }))}
+                                value={clusterConfigs[klaster.id]?.hotelMekkahId || ""}
+                                onChange={(val) => handleClusterConfigChange(klaster.id, "hotelMekkahId", val)}
+                                placeholder="-- Hotel Mekkah --"
+                                searchPlaceholder="Cari hotel..."
+                                size="sm"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-semibold text-muted-foreground mb-1">Hotel Madinah</label>
+                              <SearchableSelect
+                                id={`field-${klaster.id}-hotelMadinahId`}
+                                nextFocusId={`field-${klaster.id}-hargaBase`}
+                                options={madinahHotels.map(h => ({ value: h.id, label: h.name }))}
+                                value={clusterConfigs[klaster.id]?.hotelMadinahId || ""}
+                                onChange={(val) => handleClusterConfigChange(klaster.id, "hotelMadinahId", val)}
+                                placeholder="-- Hotel Madinah --"
+                                searchPlaceholder="Cari hotel..."
+                                size="sm"
+                              />
+                            </div>
+                          </div>
+
+                          {/* Pricing Row */}
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1">
+                            <div>
+                              <label className="block text-xs font-semibold text-muted-foreground mb-1">Harga Base (Rp)</label>
+                              <Input 
+                                id={`field-${klaster.id}-hargaBase`}
+                                type="number" 
+                                placeholder="Misal: 35000000" 
+                                value={clusterConfigs[klaster.id]?.hargaBase || ""} 
+                                onChange={(e) => handleClusterConfigChange(klaster.id, "hargaBase", e.target.value)} 
+                                onKeyDown={(e) => handleKeyDownNext(e, `field-${klaster.id}-upgradeDouble`)}
+                                className="h-8 text-xs"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-semibold text-muted-foreground mb-1">Harga Upgrade Double (Rp)</label>
+                              <Input 
+                                id={`field-${klaster.id}-upgradeDouble`}
+                                type="number" 
+                                placeholder="Misal: 5000000" 
+                                value={clusterConfigs[klaster.id]?.upgradeDouble || ""} 
+                                onChange={(e) => handleClusterConfigChange(klaster.id, "upgradeDouble", e.target.value)} 
+                                onKeyDown={(e) => handleKeyDownNext(e, `field-${klaster.id}-upgradeTriple`)}
+                                className="h-8 text-xs"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-semibold text-muted-foreground mb-1">Harga Upgrade Triple (Rp)</label>
+                              <Input 
+                                id={`field-${klaster.id}-upgradeTriple`}
+                                type="number" 
+                                placeholder="Misal: 3000000" 
+                                value={clusterConfigs[klaster.id]?.upgradeTriple || ""} 
+                                onChange={(e) => handleClusterConfigChange(klaster.id, "upgradeTriple", e.target.value)} 
+                                onKeyDown={(e) => handleKeyDownNext(e, nextFieldId)}
+                                className="h-8 text-xs"
+                              />
+                            </div>
+                          </div>
                         </div>
-                        <div>
-                          <label className="block text-xs font-semibold text-muted-foreground mb-1">Harga Upgrade Double (Rp)</label>
-                          <Input 
-                            id={`field-${klaster.id}-upgradeDouble`}
-                            type="number" 
-                            placeholder="Misal: 5000000" 
-                            value={clusterConfigs[klaster.id]?.upgradeDouble || ""} 
-                            onChange={(e) => handleClusterConfigChange(klaster.id, "upgradeDouble", e.target.value)} 
-                            onKeyDown={(e) => handleKeyDownNext(e, `field-${klaster.id}-upgradeTriple`)}
-                            className="h-8 text-xs"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-semibold text-muted-foreground mb-1">Harga Upgrade Triple (Rp)</label>
-                          <Input 
-                            id={`field-${klaster.id}-upgradeTriple`}
-                            type="number" 
-                            placeholder="Misal: 3000000" 
-                            value={clusterConfigs[klaster.id]?.upgradeTriple || ""} 
-                            onChange={(e) => handleClusterConfigChange(klaster.id, "upgradeTriple", e.target.value)} 
-                            onKeyDown={(e) => handleKeyDownNext(e, "field-tempDate")}
-                            className="h-8 text-xs"
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  ))}
+                      );
+                    });
+                  })()}
                 </div>
               </div>
             )}
