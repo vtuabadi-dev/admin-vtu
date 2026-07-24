@@ -428,9 +428,43 @@ import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X } from "luc
     }, 800);
   };
 
-  // Master hotels reference (providing ALL hotels from Master Data)
-  const mekkahHotels = options?.hotels || [];
-  const madinahHotels = options?.hotels || [];
+  // City-filtered master hotels (Makkah vs Madinah)
+  const mekkahCityIds = (options?.cities || [])
+    .filter(c => {
+      const name = (c.name || "").toLowerCase();
+      const code = (c.code || "").toLowerCase();
+      return code === "mek" || code === "mak" || code === "mkh" || name.includes("mekkah") || name.includes("makkah") || name.includes("mecca");
+    })
+    .map(c => c.id);
+
+  const madinahCityIds = (options?.cities || [])
+    .filter(c => {
+      const name = (c.name || "").toLowerCase();
+      const code = (c.code || "").toLowerCase();
+      return code === "med" || code === "mdn" || name.includes("madinah") || name.includes("medina");
+    })
+    .map(c => c.id);
+
+  const mekkahHotels = (options?.hotels || []).filter(h => {
+    const hName = (h.name || "").toLowerCase();
+    const cName = (h.city?.name || "").toLowerCase();
+    if (madinahCityIds.includes(h.cityId) || cName.includes("madinah") || cName.includes("medina") || hName.includes("madinah") || hName.includes("medina") || hName.includes("ohud") || hName.includes("aqeeq") || hName.includes("nabawi")) {
+      return false;
+    }
+    return true;
+  });
+
+  const madinahHotels = (options?.hotels || []).filter(h => {
+    const hName = (h.name || "").toLowerCase();
+    const cName = (h.city?.name || "").toLowerCase();
+    if (madinahCityIds.includes(h.cityId) || cName.includes("madinah") || cName.includes("medina") || hName.includes("madinah") || hName.includes("medina") || hName.includes("ohud") || hName.includes("aqeeq") || hName.includes("nabawi")) {
+      return true;
+    }
+    if (mekkahCityIds.includes(h.cityId) || cName.includes("mekkah") || cName.includes("makkah") || cName.includes("mecca") || hName.includes("mekkah") || hName.includes("makkah") || hName.includes("mecca")) {
+      return false;
+    }
+    return false;
+  });
 
   // Sub-component to render Wizard steps
   const renderWizardSteps = (colMode = false) => {

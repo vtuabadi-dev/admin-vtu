@@ -20,6 +20,7 @@ function mapMasterHotel(row: any): MasterHotel {
     code: row.code,
     name: row.name,
     cityId: row.cityId,
+    city: row.city ? { id: row.city.id, name: row.city.name, code: row.city.code } : undefined,
     starRating: row.starRating,
     jarakText: row.jarakText,
     videoJarakUrl: row.videoJarakUrl,
@@ -56,6 +57,7 @@ export const hotelRepo = {
         take: params?.limit ?? 100,
         skip: params?.offset ?? 0,
         orderBy,
+        include: { city: true },
       }),
       prisma.masterHotel.count({ where }),
     ]);
