@@ -483,28 +483,56 @@ import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X } from "luc
     }
     setLoading(true);
 
-    // Build payloads per departure date
     const isMultiDate = departureDates.length > 1;
-    const packages = departureDates.map((depDate) => {
+    const packagesPayload = departureDates.map((depDate) => {
       const returnDate = calculateReturnDate(depDate, formData.durasiHari);
       const indivCode = getIndividualCodeForDate(depDate);
+      const indivName = getIndividualNameForDate(depDate) || formData.namaPaket;
+      
+      let basePrice = Number(formData.hargaBase || 0);
+      if (formData.isAdaKlaster === "ya" && clusterConfigs) {
+        const firstClusterPrice = Object.values(clusterConfigs).find(c => Number(c.hargaBase) > 0)?.hargaBase;
+        if (firstClusterPrice) {
+          basePrice = Number(firstClusterPrice);
+        }
+      }
+      if (!basePrice || basePrice <= 0) {
+        basePrice = 35000000;
+      }
+
       return {
-        ...formData,
+        namaPaket: indivName,
         kodePaket: indivCode,
         kodeGrup: isMultiDate ? formData.kodeGrup : "",
+        deskripsi: `Kode: ${indivCode} | Keberangkatan: ${depDate} s/d ${returnDate}`,
+        hargaBase: basePrice,
+        durasiHari: Number(formData.durasiHari || 9),
+        hotelMekkahId: formData.hotelMekkahId,
+        hotelMadinahId: formData.hotelMadinahId,
         departureDates: [depDate],
         returnDate,
         clusterConfigs: formData.isAdaKlaster === "ya" ? clusterConfigs : null,
       };
     });
 
-    // TODO: replace with real API call
-    console.info("[handleGenerate] packages to create:", packages);
-
-    setTimeout(() => {
+    try {
+      const res = await fetch("/api/packages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ packages: packagesPayload }),
+      });
+      const resJson = await res.json();
+      if (resJson.success) {
+        setSuccess(true);
+      } else {
+        alert(`Gagal menyimpan paket: ${resJson.error || "Terjadi kesalahan server"}`);
+      }
+    } catch (err: any) {
+      console.error("Error generating packages:", err);
+      alert("Gagal menghubungkan ke server.");
+    } finally {
       setLoading(false);
-      setSuccess(true);
-    }, 800);
+    }
   };
 
   // City-filtered master hotels (Makkah vs Madinah)
