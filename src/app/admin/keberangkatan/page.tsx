@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
-import { Plane, CalendarDays, Hotel, MapPin, Plus, Search, Trash2, Info, Copy, Check } from "lucide-react";
+import { Plane, CalendarDays, Hotel, MapPin, Search, Trash2, Info, Copy, Check } from "lucide-react";
 import { useRouter } from "next/navigation";
 import {
   Card,
