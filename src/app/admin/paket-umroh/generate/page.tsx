@@ -198,6 +198,54 @@ import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X } from "luc
     setFormData(prev => ({ ...prev, kodePaket: individualCode, kodeGrup: groupCode }));
   };
 
+  // Helper to format date string to "03 Agt 2026"
+  const formatDateIndo = (dateStr: string) => {
+    if (!dateStr) return "";
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
+    const day = String(d.getDate()).padStart(2, "0");
+    const monthList = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agt", "Sep", "Okt", "Nov", "Des"];
+    const month = monthList[d.getMonth()];
+    const year = d.getFullYear();
+    return `${day} ${month} ${year}`;
+  };
+
+  // Auto-compute individual package name per departure date
+  const getIndividualNameForDate = (dateStr: string) => {
+    if (!options || !dateStr || !formData.jenisPaketId || !formData.startingPointId || !formData.landingPatternId || !formData.maskapaiId) {
+      return "";
+    }
+    const pkgTypeObj = options.packageTypes.find((t) => t.id === formData.jenisPaketId);
+    const pCode = (pkgTypeObj?.code || "REG").toUpperCase();
+    const pNameRaw = (pkgTypeObj?.name || "").trim().toUpperCase();
+
+    let prefix = "";
+    if (pCode === "REG") {
+      prefix = "PAKET UMROH";
+    } else if (pNameRaw.startsWith("UMROH PLUS")) {
+      prefix = pNameRaw;
+    } else if (pNameRaw) {
+      prefix = `UMROH PLUS ${pNameRaw.replace(/^PLUS\s+/i, "")}`;
+    } else {
+      prefix = `UMROH PLUS ${pCode}`;
+    }
+
+    const durasi = `${formData.durasiHari || 9} H`;
+
+    const startingObj = options.cities.find((c) => c.id === formData.startingPointId);
+    const sCode = (startingObj?.code || "JKT").toUpperCase();
+
+    const routeObj = (options as any)?.routes?.find((r: any) => r.id === formData.landingPatternId) || MOCK_LANDING_PATTERN.find((r: any) => r.id === formData.landingPatternId);
+    const rCode = (routeObj?.kode || "JED.C").toUpperCase();
+
+    const airlineObj = options.airlines.find((a) => a.id === formData.maskapaiId);
+    const mCode = (airlineObj?.code || "SV").toUpperCase();
+
+    const tglFormatted = formatDateIndo(dateStr);
+
+    return `${prefix} ${durasi} ${sCode} ( ${rCode} ) - ${tglFormatted} (${mCode})`;
+  };
+
   // Auto-compute individual code per departure date
   const getIndividualCodeForDate = (dateStr: string) => {
     if (!options || !dateStr || !formData.jenisPaketId || !formData.maskapaiId) return "";
@@ -539,7 +587,7 @@ import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X } from "luc
         <div className="flex flex-col gap-3">
           <h2 className="text-lg font-semibold">Langkah 1: Dasar Paket</h2>
           <div className="p-4 bg-card border rounded-md flex flex-col gap-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="flex flex-col gap-4">
               <div>
                 <label className="block text-sm font-medium mb-1">Jenis Paket (Master Data)</label>
                 <SearchableSelect
@@ -553,11 +601,35 @@ import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X } from "luc
                   disabled={fetching}
                 />
               </div>
+
               <div>
                 <label className="block text-sm font-medium mb-1">Nama Paket</label>
-                <div className="flex gap-2">
-                  <Input name="namaPaket" value={formData.namaPaket} readOnly className="bg-muted/30" placeholder="Otomatis terisi setelah data lengkap..." />
-                </div>
+                {departureDates.length <= 1 ? (
+                  <Input name="namaPaket" value={formData.namaPaket} readOnly className="bg-muted/30 font-medium" placeholder="Otomatis terisi setelah data lengkap..." />
+                ) : (
+                  <div className="space-y-3 border p-3 rounded-md bg-muted/5">
+                    <div>
+                      <label className="block text-xs font-semibold text-muted-foreground mb-1">Nama Paket Base (Grup)</label>
+                      <Input name="namaPaket" value={formData.namaPaket} readOnly className="bg-muted/30 font-medium text-xs" placeholder="Otomatis terisi setelah data lengkap..." />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-muted-foreground mb-2">
+                        Nama Paket Individual (ter-generate per tanggal keberangkatan - {departureDates.length} Paket)
+                      </label>
+                      <div className="space-y-2 max-h-[180px] overflow-y-auto pr-1">
+                        {departureDates.map((d, idx) => (
+                          <div key={idx} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-card border p-2.5 rounded-md text-xs shadow-sm">
+                            <span className="font-semibold text-primary">{getIndividualNameForDate(d) || formData.namaPaket}</span>
+                            <span className="text-muted-foreground bg-muted px-2 py-0.5 rounded text-[11px] shrink-0 font-mono">
+                              {formatDateIndo(d)}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
