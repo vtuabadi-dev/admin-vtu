@@ -483,12 +483,6 @@ import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X } from "luc
     }
     setLoading(true);
 
-    const isMultiDate = departureDates.length > 1;
-    const packagesPayload = departureDates.map((depDate) => {
-      const returnDate = calculateReturnDate(depDate, formData.durasiHari);
-      const indivCode = getIndividualCodeForDate(depDate);
-      const indivName = getIndividualNameForDate(depDate) || formData.namaPaket;
-      
     let basePrice = Number(formData.hargaBase || 0);
     if (formData.isAdaKlaster === "ya" && clusterConfigs) {
       const firstClusterPrice = Object.values(clusterConfigs).find(c => Number(c.hargaBase) > 0)?.hargaBase;
