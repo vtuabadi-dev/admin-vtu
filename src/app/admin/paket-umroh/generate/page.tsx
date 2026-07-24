@@ -4,7 +4,6 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/shared/components/ui/Button";
 import { Input } from "@/shared/components/ui/Input";
-import { AccordionSection } from "@/shared/components/ui";
 import { 
   MOCK_LANDING_PATTERN, 
   MOCK_KLASTER
@@ -431,7 +430,8 @@ import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X } from "luc
     return (
       <div className="flex flex-col gap-4">
         {/* Step 1: Dasar Paket */}
-        <AccordionSection title="Langkah 1: Dasar Paket" defaultOpen>
+        <div className="flex flex-col gap-3">
+          <h2 className="text-lg font-semibold">Langkah 1: Dasar Paket</h2>
           <div className="p-4 bg-card border rounded-md flex flex-col gap-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
@@ -508,10 +508,11 @@ import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X } from "luc
               )}
             </div>
           </div>
-        </AccordionSection>
+        </div>
 
         {/* Step 2: Penerbangan */}
-        <AccordionSection title="Langkah 2: Rute & Penerbangan" defaultOpen>
+        <div className="flex flex-col gap-3">
+          <h2 className="text-lg font-semibold">Langkah 2: Rute & Penerbangan</h2>
           <div className={`p-4 bg-card border rounded-md grid grid-cols-1 ${colMode ? "md:grid-cols-2" : "md:grid-cols-3"} gap-4`}>
             <div>
               <label className="block text-sm font-medium mb-1">Starting Point</label>
@@ -555,10 +556,11 @@ import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X } from "luc
               </select>
             </div>
           </div>
-        </AccordionSection>
+        </div>
 
         {/* Step 3: Akomodasi */}
-        <AccordionSection title="Langkah 3: Akomodasi & Hotel" defaultOpen>
+        <div className="flex flex-col gap-3">
+          <h2 className="text-lg font-semibold">Langkah 3: Akomodasi & Hotel</h2>
           <div className="p-4 bg-card border rounded-md flex flex-col gap-4">
             <div>
               <label className="block text-sm font-medium mb-1">Apakah paket ini menggunakan Klaster Seat?</label>
@@ -691,10 +693,11 @@ import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X } from "luc
               </div>
             )}
           </div>
-        </AccordionSection>
+        </div>
 
         {/* Step 4: Lainnya */}
-        <AccordionSection title="Langkah 4: Operasional & Harga" defaultOpen>
+        <div className="flex flex-col gap-3">
+          <h2 className="text-lg font-semibold">Langkah 4: Operasional & Harga</h2>
           <div className="p-4 bg-card border rounded-md flex flex-col gap-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
               <div>
@@ -771,7 +774,7 @@ import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X } from "luc
               </div>
             </div>
           </div>
-        </AccordionSection>
+        </div>
       </div>
     );
   };
