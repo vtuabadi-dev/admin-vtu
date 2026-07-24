@@ -123,6 +123,10 @@ import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X } from "luc
 
   const handleAutoGenerateName = () => {
     if (!options) return;
+    if (!formData.jenisPaketId || !formData.startingPointId || !formData.landingPatternId || !formData.maskapaiId || departureDates.length === 0) {
+      setFormData((prev) => ({ ...prev, namaPaket: "" }));
+      return;
+    }
     const pkgTypeObj = options.packageTypes.find((t) => t.id === formData.jenisPaketId);
     const pCode = (pkgTypeObj?.code || "REG").toUpperCase();
     const pNameRaw = (pkgTypeObj?.name || "").trim().toUpperCase();
@@ -168,6 +172,10 @@ import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X } from "luc
 
   const handleAutoGenerateCode = () => {
     if (!options) return;
+    if (!formData.jenisPaketId || !formData.maskapaiId || departureDates.length === 0) {
+      setFormData(prev => ({ ...prev, kodePaket: "", kodeGrup: "" }));
+      return;
+    }
     const jCode = options.packageTypes.find(t => t.id === formData.jenisPaketId)?.code || "PKG";
     const airCode = options.airlines.find(a => a.id === formData.maskapaiId)?.code || "AIR";
     const firstDate = departureDates[0] || "";
@@ -190,7 +198,7 @@ import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X } from "luc
 
   // Auto-compute individual code per departure date
   const getIndividualCodeForDate = (dateStr: string) => {
-    if (!options || !dateStr) return "";
+    if (!options || !dateStr || !formData.jenisPaketId || !formData.maskapaiId) return "";
     const jCode = options.packageTypes.find(t => t.id === formData.jenisPaketId)?.code || "PKG";
     const airCode = options.airlines.find(a => a.id === formData.maskapaiId)?.code || "AIR";
     const dStr = dateStr.replace(/-/g, "");
@@ -450,10 +458,7 @@ import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X } from "luc
               <div>
                 <label className="block text-sm font-medium mb-1">Nama Paket</label>
                 <div className="flex gap-2">
-                  <Input name="namaPaket" value={formData.namaPaket} onChange={handleChange} placeholder="Umroh Syawal 2026" />
-                  <Button type="button" variant="outline" onClick={handleAutoGenerateName} title="Generate Nama Otomatis">
-                    <Sparkles className="h-4 w-4 text-amber-500 fill-amber-500/20" />
-                  </Button>
+                  <Input name="namaPaket" value={formData.namaPaket} readOnly className="bg-muted/30" placeholder="Otomatis terisi setelah data lengkap..." />
                 </div>
               </div>
             </div>
@@ -462,17 +467,13 @@ import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X } from "luc
             <div className="border-t pt-4 space-y-3">
               <div className="flex items-center justify-between">
                 <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Kode Paket</label>
-                <Button type="button" variant="outline" onClick={handleAutoGenerateCode} className="h-7 text-xs px-2 gap-1">
-                  <Sparkles className="h-3 w-3 text-amber-500 fill-amber-500/20" />
-                  Regenerasi Kode
-                </Button>
               </div>
 
               {departureDates.length <= 1 ? (
                 /* Single date → only individual code */
                 <div>
                   <label className="block text-xs font-medium text-muted-foreground mb-1">Kode Paket Individual</label>
-                  <Input name="kodePaket" value={formData.kodePaket} onChange={handleChange} placeholder="REG-GIA-20260910" />
+                  <Input name="kodePaket" value={formData.kodePaket} readOnly className="bg-muted/30" placeholder="Otomatis terisi setelah data lengkap..." />
                   <p className="text-xs text-muted-foreground mt-1">
                     Kode ini unik untuk satu paket dengan satu tanggal keberangkatan.
                   </p>
@@ -482,7 +483,7 @@ import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X } from "luc
                 <div className="space-y-3">
                   <div>
                     <label className="block text-xs font-medium text-muted-foreground mb-1">Kode Paket Grup (Batch)</label>
-                    <Input name="kodeGrup" value={formData.kodeGrup} onChange={handleChange} placeholder="GRP-REG-GIA-260710" />
+                    <Input name="kodeGrup" value={formData.kodeGrup} readOnly className="bg-muted/30" placeholder="Otomatis terisi setelah data lengkap..." />
                     <p className="text-xs text-muted-foreground mt-1">
                       Kode grup menjadi pengikat seluruh paket yang dibuat dalam satu batch ini ({departureDates.length} paket).
                     </p>
@@ -522,7 +523,7 @@ import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X } from "luc
                   <option disabled>Loading starting points...</option>
                 ) : (
                   options?.cities.map((item) => (
-                    <option key={item.id} value={item.id}>{item.name} ({item.code})</option>
+                    <option key={item.id} value={item.id}>{item.name}</option>
                   ))
                 )}
               </select>
@@ -536,7 +537,7 @@ import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X } from "luc
                 ) : (
                   (options?.routes && options.routes.length > 0 ? options.routes : MOCK_LANDING_PATTERN).map((item) => (
                     <option key={item.id} value={item.id}>
-                      {item.ruteIn} &rarr; {item.ruteOut} ({item.kode})
+                      {item.ruteIn} &rarr; {item.ruteOut}
                     </option>
                   ))
                 )}

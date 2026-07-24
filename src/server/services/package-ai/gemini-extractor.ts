@@ -55,16 +55,22 @@ export async function extractWithGemini(
     `--- ATURAN EKSTRAKSI RUTE IN-OUT (LANDING) ---\n` +
     `Tentukan rute kedatangan dan kepulangan (Landing Route).\n` +
     `Rute WAJIB dipilih persis dari daftar ini -> [${routeOptions}]\n\n` +
-    `Pertama, tentukan Jenis Paket (Umroh Reguler atau Umroh Plus).\n` +
-    `A. JIKA JENIS PAKET = UMROH REGULER\n` +
-    `- Jika tertulis jelas 'LANDING JEDDAH OUT MADINAH' -> WAJIB pilih rute 'Jeddah -> Madinah'\n` +
-    `- Jika rute 'Jeddah - Makkah dulu' -> WAJIB pilih rute 'Jeddah -> Makkah' (out Jeddah/Madinah sesuai flyer)\n` +
-    `- Jika tertulis 'Landing Madinah' atau 'Out Jeddah' -> WAJIB pilih rute 'Madinah -> Jeddah'\n\n` +
-    `B. JIKA JENIS PAKET = UMROH PLUS (Singgah di Negara Lain)\n` +
-    `Petakan data Landing berdasarkan waktu kunjungan ke Arab Saudi & urutan kota suci. Khusus paket plus, WAJIB gunakan prefix 'Tour Dulu' atau 'Umroh Dulu'.\n` +
-    `- Umroh Dulu (Arab Saudi dulu), Madinah dulu -> 'Umroh Dulu - Madinah -> [Out]'\n` +
-    `- Tour Dulu (Negara lain dulu), Madinah dulu -> 'Tour Dulu -> Madinah -> [Out]'\n` +
-    `- Tour Dulu (Negara lain dulu), Makkah dulu -> 'Tour Dulu -> Makkah -> [Out]'\n\n` +
+    `Klasifikasi Rute Paket:\n` +
+    `1. PAKET REGULER:\n` +
+    `   - Landing Jeddah:\n` +
+    `     * JED.D-J: Landing Jeddah, kota pertama Madinah (.D), out dari Jeddah (-J). (Tujuan awal Madinah saat masuk Saudi, keluar via Jeddah)\n` +
+    `     * JED.C-M: Landing Jeddah, kota pertama Makkah (.C), out dari Madinah (-M). (Tujuan awal Makkah saat masuk Saudi, keluar via Madinah)\n` +
+    `     * JED.C-J: Landing Jeddah, kota pertama Makkah (.C), out dari Jeddah (-J). (Tujuan awal Makkah saat masuk Saudi, keluar via Jeddah)\n` +
+    `   - Landing Madinah:\n` +
+    `     * MED-J / Med-J: Landing Madinah, out dari Jeddah (-J).\n\n` +
+    `2. PAKET PLUS (Singgah di Negara Lain):\n` +
+    `   - Umroh Dulu (UD) - Destinasi pertama Arab Saudi dulu sebelum tour negara plus:\n` +
+    `     * UD.D-J: Umroh dulu, kota pertama Madinah (.D), out dari Jeddah (-J).\n` +
+    `     * UD.D-M: Umroh dulu, kota pertama Madinah (.D), out dari Madinah (-M).\n` +
+    `   - Tour Dulu (TD) - Tour ke negara plus dulu sebelum ke Saudi:\n` +
+    `     * TD.D-J: Tour dulu, kota pertama Madinah (.D), out dari Jeddah (-J).\n` +
+    `     * TD.C-J: Tour dulu, kota pertama Makkah (.C), out dari Jeddah (-J).\n` +
+    `     * TD.C-M: Tour dulu, kota pertama Makkah (.C), out dari Madinah (-M).\n\n` +
     `--- DATA UNTUK DIANALISA ---\n` +
     `1. TEKS HASIL SCAN OCR: ${rawOcrText}\n\n` +
     `2. TEKS CAPTION: ${caption}\n\n` +
