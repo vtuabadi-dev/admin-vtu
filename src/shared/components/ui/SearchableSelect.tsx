@@ -19,6 +19,8 @@ export interface SearchableSelectProps {
   disabled?: boolean;
   className?: string;
   size?: "sm" | "md";
+  id?: string;
+  nextFocusId?: string;
 }
 
 export function SearchableSelect({
@@ -30,9 +32,12 @@ export function SearchableSelect({
   disabled = false,
   className,
   size = "md",
+  id,
+  nextFocusId,
 }: SearchableSelectProps) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
+  const [highlightedIndex, setHighlightedIndex] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -49,9 +54,10 @@ export function SearchableSelect({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Focus search input when popover opens
+  // Focus search input when popover opens & reset highlight
   useEffect(() => {
     if (open) {
+      setHighlightedIndex(0);
       setTimeout(() => inputRef.current?.focus(), 50);
     } else {
       setSearch("");
@@ -66,9 +72,26 @@ export function SearchableSelect({
     return labelMatch || subMatch;
   });
 
+  const focusNextElement = () => {
+    if (nextFocusId) {
+      setTimeout(() => {
+        const nextEl = document.getElementById(nextFocusId);
+        if (nextEl) {
+          nextEl.focus();
+          if (nextEl.tagName === "BUTTON") {
+            nextEl.click();
+          } else if (nextEl instanceof HTMLInputElement) {
+            nextEl.select();
+          }
+        }
+      }, 120);
+    }
+  };
+
   const handleSelect = (val: string) => {
     onChange(val);
     setOpen(false);
+    focusNextElement();
   };
 
   const handleClear = (e: React.MouseEvent) => {
@@ -76,13 +99,40 @@ export function SearchableSelect({
     onChange("");
   };
 
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (!open) {
+      if (e.key === "Enter" || e.key === "ArrowDown") {
+        e.preventDefault();
+        setOpen(true);
+      }
+      return;
+    }
+
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setHighlightedIndex((prev) => (prev + 1) % (filteredOptions.length || 1));
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setHighlightedIndex((prev) => (prev - 1 + filteredOptions.length) % (filteredOptions.length || 1));
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      if (filteredOptions.length > 0 && highlightedIndex < filteredOptions.length) {
+        handleSelect(filteredOptions[highlightedIndex].value);
+      }
+    } else if (e.key === "Escape") {
+      setOpen(false);
+    }
+  };
+
   return (
     <div ref={containerRef} className={cn("relative w-full", className)}>
       {/* Trigger Button */}
       <button
+        id={id}
         type="button"
         disabled={disabled}
         onClick={() => setOpen((prev) => !prev)}
+        onKeyDown={handleKeyDown}
         className={cn(
           "flex w-full items-center justify-between rounded-md border border-input bg-transparent px-3 text-left shadow-sm transition-colors focus:outline-none focus:ring-1 focus:ring-primary disabled:cursor-not-allowed disabled:opacity-50",
           size === "sm" ? "h-8 text-xs" : "h-10 text-sm",
@@ -116,7 +166,11 @@ export function SearchableSelect({
               ref={inputRef}
               type="text"
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setHighlightedIndex(0);
+              }}
+              onKeyDown={handleKeyDown}
               placeholder={searchPlaceholder}
               className="w-full bg-transparent text-xs focus:outline-none placeholder:text-muted-foreground"
             />
@@ -138,18 +192,22 @@ export function SearchableSelect({
                 Tidak ada data yang cocok
               </div>
             ) : (
-              filteredOptions.map((opt) => {
+              filteredOptions.map((opt, idx) => {
                 const isSelected = opt.value === value;
+                const isHighlighted = idx === highlightedIndex;
                 return (
                   <button
                     key={opt.value}
                     type="button"
                     onClick={() => handleSelect(opt.value)}
+                    onMouseEnter={() => setHighlightedIndex(idx)}
                     className={cn(
                       "flex w-full items-center justify-between rounded-sm px-2.5 py-1.5 text-xs text-left transition-colors cursor-pointer",
                       isSelected
                         ? "bg-primary/10 text-primary font-medium"
-                        : "hover:bg-accent hover:text-accent-foreground text-foreground"
+                        : isHighlighted
+                        ? "bg-accent text-accent-foreground"
+                        : "text-foreground hover:bg-accent hover:text-accent-foreground"
                     )}
                   >
                     <div className="flex flex-col truncate pr-2">

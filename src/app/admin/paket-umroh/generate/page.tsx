@@ -245,6 +245,27 @@ import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X } from "luc
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
+  const focusNextId = (nextId: string) => {
+    setTimeout(() => {
+      const el = document.getElementById(nextId);
+      if (el) {
+        el.focus();
+        if (el.tagName === "BUTTON") {
+          el.click();
+        } else if (el instanceof HTMLInputElement) {
+          el.select();
+        }
+      }
+    }, 100);
+  };
+
+  const handleKeyDownNext = (e: React.KeyboardEvent<HTMLInputElement>, nextId: string) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      focusNextId(nextId);
+    }
+  };
+
   const handleClusterConfigChange = (
     clusterId: string, 
     field: "hotelMekkahId" | "hotelMadinahId" | "hargaBase" | "upgradeDouble" | "upgradeTriple", 
@@ -478,6 +499,8 @@ import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X } from "luc
               <div>
                 <label className="block text-sm font-medium mb-1">Jenis Paket (Master Data)</label>
                 <SearchableSelect
+                  id="field-jenisPaketId"
+                  nextFocusId="field-startingPointId"
                   options={options?.packageTypes.map(t => ({ value: t.id, label: t.name })) || []}
                   value={formData.jenisPaketId}
                   onChange={(val) => setFormData(prev => ({ ...prev, jenisPaketId: val }))}
@@ -549,6 +572,8 @@ import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X } from "luc
             <div>
               <label className="block text-sm font-medium mb-1">Starting Point</label>
               <SearchableSelect
+                id="field-startingPointId"
+                nextFocusId="field-landingPatternId"
                 options={options?.cities.map(c => ({ value: c.id, label: c.name })) || []}
                 value={formData.startingPointId}
                 onChange={(val) => setFormData(prev => ({ ...prev, startingPointId: val }))}
@@ -560,6 +585,8 @@ import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X } from "luc
             <div>
               <label className="block text-sm font-medium mb-1">Rute In-Out</label>
               <SearchableSelect
+                id="field-landingPatternId"
+                nextFocusId="field-maskapaiId"
                 options={(options?.routes && options.routes.length > 0 ? options.routes : MOCK_LANDING_PATTERN).map(r => ({ value: r.id, label: `${r.ruteIn} → ${r.ruteOut}` }))}
                 value={formData.landingPatternId}
                 onChange={(val) => setFormData(prev => ({ ...prev, landingPatternId: val }))}
@@ -571,6 +598,8 @@ import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X } from "luc
             <div className={colMode ? "md:col-span-2" : ""}>
               <label className="block text-sm font-medium mb-1">Maskapai</label>
               <SearchableSelect
+                id="field-maskapaiId"
+                nextFocusId={formData.isAdaKlaster === "ya" ? "field-K1-hotelMekkahId" : "field-hotelMekkahId"}
                 options={options?.airlines.map(a => ({ value: a.id, label: a.name })) || []}
                 value={formData.maskapaiId}
                 onChange={(val) => setFormData(prev => ({ ...prev, maskapaiId: val }))}
@@ -630,6 +659,8 @@ import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X } from "luc
                   <div>
                     <label className="block text-sm font-medium mb-1">Hotel Mekkah</label>
                     <SearchableSelect
+                      id="field-hotelMekkahId"
+                      nextFocusId="field-hotelMadinahId"
                       options={mekkahHotels.map(h => ({ value: h.id, label: h.name }))}
                       value={formData.hotelMekkahId}
                       onChange={(val) => setFormData(prev => ({ ...prev, hotelMekkahId: val }))}
@@ -641,6 +672,8 @@ import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X } from "luc
                   <div>
                     <label className="block text-sm font-medium mb-1">Hotel Madinah</label>
                     <SearchableSelect
+                      id="field-hotelMadinahId"
+                      nextFocusId="field-upgradeDouble"
                       options={madinahHotels.map(h => ({ value: h.id, label: h.name }))}
                       value={formData.hotelMadinahId}
                       onChange={(val) => setFormData(prev => ({ ...prev, hotelMadinahId: val }))}
@@ -654,11 +687,27 @@ import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X } from "luc
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t pt-4">
                   <div>
                     <label className="block text-sm font-medium mb-1">Harga Upgrade Double (Rp)</label>
-                    <Input type="number" name="upgradeDouble" value={formData.upgradeDouble} onChange={handleChange} placeholder="Misal: 5000000" />
+                    <Input 
+                      id="field-upgradeDouble" 
+                      type="number" 
+                      name="upgradeDouble" 
+                      value={formData.upgradeDouble} 
+                      onChange={handleChange} 
+                      onKeyDown={(e) => handleKeyDownNext(e, "field-upgradeTriple")} 
+                      placeholder="Misal: 5000000" 
+                    />
                   </div>
                   <div>
                     <label className="block text-sm font-medium mb-1">Harga Upgrade Triple (Rp)</label>
-                    <Input type="number" name="upgradeTriple" value={formData.upgradeTriple} onChange={handleChange} placeholder="Misal: 3000000" />
+                    <Input 
+                      id="field-upgradeTriple" 
+                      type="number" 
+                      name="upgradeTriple" 
+                      value={formData.upgradeTriple} 
+                      onChange={handleChange} 
+                      onKeyDown={(e) => handleKeyDownNext(e, "field-tempDate")} 
+                      placeholder="Misal: 3000000" 
+                    />
                   </div>
                 </div>
               </div>
@@ -679,6 +728,8 @@ import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X } from "luc
                         <div>
                           <label className="block text-xs font-semibold text-muted-foreground mb-1">Hotel Mekkah</label>
                           <SearchableSelect
+                            id={`field-${klaster.id}-hotelMekkahId`}
+                            nextFocusId={`field-${klaster.id}-hotelMadinahId`}
                             options={mekkahHotels.map(h => ({ value: h.id, label: h.name }))}
                             value={clusterConfigs[klaster.id]?.hotelMekkahId || ""}
                             onChange={(val) => handleClusterConfigChange(klaster.id, "hotelMekkahId", val)}
@@ -690,6 +741,8 @@ import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X } from "luc
                         <div>
                           <label className="block text-xs font-semibold text-muted-foreground mb-1">Hotel Madinah</label>
                           <SearchableSelect
+                            id={`field-${klaster.id}-hotelMadinahId`}
+                            nextFocusId={`field-${klaster.id}-hargaBase`}
                             options={madinahHotels.map(h => ({ value: h.id, label: h.name }))}
                             value={clusterConfigs[klaster.id]?.hotelMadinahId || ""}
                             onChange={(val) => handleClusterConfigChange(klaster.id, "hotelMadinahId", val)}
@@ -705,30 +758,36 @@ import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X } from "luc
                         <div>
                           <label className="block text-xs font-semibold text-muted-foreground mb-1">Harga Base (Rp)</label>
                           <Input 
+                            id={`field-${klaster.id}-hargaBase`}
                             type="number" 
                             placeholder="Misal: 35000000" 
                             value={clusterConfigs[klaster.id]?.hargaBase || ""} 
                             onChange={(e) => handleClusterConfigChange(klaster.id, "hargaBase", e.target.value)} 
+                            onKeyDown={(e) => handleKeyDownNext(e, `field-${klaster.id}-upgradeDouble`)}
                             className="h-8 text-xs"
                           />
                         </div>
                         <div>
                           <label className="block text-xs font-semibold text-muted-foreground mb-1">Harga Upgrade Double (Rp)</label>
                           <Input 
+                            id={`field-${klaster.id}-upgradeDouble`}
                             type="number" 
                             placeholder="Misal: 5000000" 
                             value={clusterConfigs[klaster.id]?.upgradeDouble || ""} 
                             onChange={(e) => handleClusterConfigChange(klaster.id, "upgradeDouble", e.target.value)} 
+                            onKeyDown={(e) => handleKeyDownNext(e, `field-${klaster.id}-upgradeTriple`)}
                             className="h-8 text-xs"
                           />
                         </div>
                         <div>
                           <label className="block text-xs font-semibold text-muted-foreground mb-1">Harga Upgrade Triple (Rp)</label>
                           <Input 
+                            id={`field-${klaster.id}-upgradeTriple`}
                             type="number" 
                             placeholder="Misal: 3000000" 
                             value={clusterConfigs[klaster.id]?.upgradeTriple || ""} 
                             onChange={(e) => handleClusterConfigChange(klaster.id, "upgradeTriple", e.target.value)} 
+                            onKeyDown={(e) => handleKeyDownNext(e, "field-tempDate")}
                             className="h-8 text-xs"
                           />
                         </div>
@@ -749,7 +808,13 @@ import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X } from "luc
               <div>
                 <label className="block text-sm font-medium mb-1">Tambah Tanggal Keberangkatan</label>
                 <div className="flex gap-2">
-                  <Input type="date" value={tempDate} onChange={(e) => setTempDate(e.target.value)} />
+                  <Input 
+                    id="field-tempDate" 
+                    type="date" 
+                    value={tempDate} 
+                    onChange={(e) => setTempDate(e.target.value)} 
+                    onKeyDown={(e) => handleKeyDownNext(e, "field-kapasitas")}
+                  />
                   <Button type="button" onClick={handleAddDate}>Tambah</Button>
                 </div>
               </div>
@@ -792,7 +857,15 @@ import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X } from "luc
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium mb-1">Kapasitas Seat (Maksimal Jamaah)</label>
-                <Input type="number" name="kapasitas" value={formData.kapasitas} onChange={handleChange} placeholder="Misal: 45" />
+                <Input 
+                  id="field-kapasitas" 
+                  type="number" 
+                  name="kapasitas" 
+                  value={formData.kapasitas} 
+                  onChange={handleChange} 
+                  onKeyDown={(e) => handleKeyDownNext(e, "field-durasiHari")}
+                  placeholder="Misal: 45" 
+                />
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1">Termasuk Perlengkapan?</label>
@@ -826,13 +899,29 @@ import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X } from "luc
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1">Durasi (Hari)</label>
-                <Input type="number" name="durasiHari" value={formData.durasiHari} onChange={handleChange} placeholder="9" />
+                <Input 
+                  id="field-durasiHari" 
+                  type="number" 
+                  name="durasiHari" 
+                  value={formData.durasiHari} 
+                  onChange={handleChange} 
+                  onKeyDown={(e) => handleKeyDownNext(e, formData.isAdaKlaster === "tidak" ? "field-hargaBase" : "field-submitBtn")}
+                  placeholder="9" 
+                />
               </div>
               <div>
                 {formData.isAdaKlaster === "tidak" ? (
                   <>
                     <label className="block text-sm font-medium mb-1">Harga Base (Rp)</label>
-                    <Input type="number" name="hargaBase" value={formData.hargaBase} onChange={handleChange} placeholder="35000000" />
+                    <Input 
+                      id="field-hargaBase" 
+                      type="number" 
+                      name="hargaBase" 
+                      value={formData.hargaBase} 
+                      onChange={handleChange} 
+                      onKeyDown={(e) => handleKeyDownNext(e, "field-submitBtn")}
+                      placeholder="35000000" 
+                    />
                   </>
                 ) : (
                   <div className="bg-muted/40 p-3 rounded-md border text-xs text-muted-foreground h-full flex items-center">
