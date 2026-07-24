@@ -5,6 +5,7 @@ export interface MasterHotel {
   code: string;
   name: string;
   cityId: string;
+  city?: { id: string; name: string; code: string } | null;
   starRating?: number | null;
   jarakText?: string | null;
   videoJarakUrl?: string | null;
