@@ -241,6 +241,16 @@ import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X } from "luc
       });
   }, []);
 
+  // Reset selected Rute In-Out if not valid for the selected package type
+  useEffect(() => {
+    if (formData.landingPatternId && filteredRoutes && filteredRoutes.length > 0) {
+      const isValid = filteredRoutes.some(r => r.id === formData.landingPatternId);
+      if (!isValid) {
+        setFormData(prev => ({ ...prev, landingPatternId: "" }));
+      }
+    }
+  }, [formData.jenisPaketId]);
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
@@ -487,6 +497,40 @@ import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X } from "luc
     return false;
   });
 
+  // Dynamic Route filtering based on selected Package Type (Reguler vs Plus)
+  const selectedPackageType = (options?.packageTypes || []).find(t => t.id === formData.jenisPaketId);
+  const isPlusPackage = selectedPackageType
+    ? (selectedPackageType.isPlus === true ||
+       (selectedPackageType.name || "").toLowerCase().includes("plus") ||
+       (selectedPackageType.code || "").toLowerCase().includes("plus"))
+    : false;
+
+  const allRoutes = (options?.routes && options.routes.length > 0 ? options.routes : MOCK_LANDING_PATTERN);
+  
+  const filteredRoutes = allRoutes.filter((r) => {
+    const ruteIn = (r.ruteIn || "").toLowerCase();
+    const ruteOut = (r.ruteOut || "").toLowerCase();
+    const kode = (r.kode || "").toLowerCase();
+
+    const isPlusRoute =
+      ruteIn.includes("umroh dulu") ||
+      ruteIn.includes("tour dulu") ||
+      ruteOut.includes("umroh dulu") ||
+      ruteOut.includes("tour dulu") ||
+      kode.startsWith("ud") ||
+      kode.startsWith("td") ||
+      kode.includes(".ud.") ||
+      kode.includes(".td.");
+
+    if (isPlusPackage) {
+      // Paket Plus -> HANYA tampilkan rute dengan "Umroh Dulu" / "Tour Dulu"
+      return isPlusRoute;
+    } else {
+      // Paket Reguler -> HANYA tampilkan 4 rute Reguler (selain Umroh Dulu & Tour Dulu)
+      return !isPlusRoute;
+    }
+  });
+
   // Sub-component to render Wizard steps
   const renderWizardSteps = (colMode = false) => {
     return (
@@ -587,10 +631,14 @@ import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X } from "luc
               <SearchableSelect
                 id="field-landingPatternId"
                 nextFocusId="field-maskapaiId"
-                options={(options?.routes && options.routes.length > 0 ? options.routes : MOCK_LANDING_PATTERN).map(r => ({ value: r.id, label: `${r.ruteIn} → ${r.ruteOut}` }))}
+                options={filteredRoutes.map(r => ({ 
+                  value: r.id, 
+                  label: `${r.ruteIn} → ${r.ruteOut}`,
+                  sublabel: r.kode ? `[${r.kode}]` : undefined
+                }))}
                 value={formData.landingPatternId}
                 onChange={(val) => setFormData(prev => ({ ...prev, landingPatternId: val }))}
-                placeholder="-- Pilih Rute --"
+                placeholder={isPlusPackage ? "-- Pilih Rute Plus --" : "-- Pilih Rute Reguler --"}
                 searchPlaceholder="Cari rute..."
                 disabled={fetching}
               />
