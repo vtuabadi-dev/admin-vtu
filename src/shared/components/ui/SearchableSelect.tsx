@@ -108,9 +108,9 @@ export function SearchableSelect({
 
       {/* Popover Content */}
       {open && (
-        <div className="absolute z-50 mt-1 max-h-60 w-full overflow-hidden rounded-md border border-border bg-popover text-popover-foreground shadow-lg animate-in fade-in-0 zoom-in-95">
+        <div className="absolute z-50 mt-1 max-h-60 w-full overflow-hidden rounded-md border border-border bg-background shadow-2xl animate-in fade-in-0 zoom-in-95">
           {/* Search Header */}
-          <div className="flex items-center border-b px-2.5 py-1.5 bg-muted/20">
+          <div className="flex items-center border-b px-2.5 py-1.5 bg-muted/40">
             <Search className="h-4 w-4 shrink-0 opacity-50 mr-2 text-muted-foreground" />
             <input
               ref={inputRef}
