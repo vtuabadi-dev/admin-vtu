@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/shared/components/ui/Button";
 import { Input } from "@/shared/components/ui/Input";
+import { cn } from "@/shared/lib/utils";
 import { 
   MOCK_LANDING_PATTERN, 
   MOCK_KLASTER
@@ -563,12 +564,42 @@ import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X } from "luc
         <div className="flex flex-col gap-3">
           <h2 className="text-lg font-semibold">Langkah 3: Akomodasi & Hotel</h2>
           <div className="p-4 bg-card border rounded-md flex flex-col gap-4">
-            <div>
-              <label className="block text-sm font-medium mb-1">Apakah paket ini menggunakan Klaster Seat?</label>
-              <select name="isAdaKlaster" value={formData.isAdaKlaster} onChange={handleChange} className="w-full h-10 px-3 py-2 rounded-md border border-input bg-transparent">
-                <option value="tidak">Tidak Menggunakan Klaster (Satu Macam Hotel)</option>
-                <option value="ya">Ya, Menggunakan Klaster Seat (Bronze, Silver, Gold, Platinum)</option>
-              </select>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between p-3.5 bg-muted/20 border rounded-lg gap-3">
+              <div>
+                <label className="text-sm font-semibold text-foreground block">Apakah paket ini menggunakan Klaster Seat?</label>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {formData.isAdaKlaster === "ya" 
+                    ? "Menggunakan Klaster Seat (Bronze, Silver, Gold, Platinum)" 
+                    : "Tidak Menggunakan Klaster (Satu Macam Hotel)"}
+                </p>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={formData.isAdaKlaster === "ya"}
+                  onClick={() => setFormData(prev => ({ ...prev, isAdaKlaster: prev.isAdaKlaster === "ya" ? "tidak" : "ya" }))}
+                  className={cn(
+                    "relative inline-flex h-7 w-14 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2",
+                    formData.isAdaKlaster === "ya" ? "bg-primary" : "bg-input"
+                  )}
+                >
+                  <span
+                    className={cn(
+                      "pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out",
+                      formData.isAdaKlaster === "ya" ? "translate-x-7" : "translate-x-0"
+                    )}
+                  />
+                </button>
+                <span className={cn(
+                  "text-xs font-semibold px-2.5 py-1 rounded-md border min-w-[55px] text-center transition-colors select-none",
+                  formData.isAdaKlaster === "ya" 
+                    ? "bg-primary/10 text-primary border-primary/30" 
+                    : "bg-background text-muted-foreground border-border"
+                )}>
+                  {formData.isAdaKlaster === "ya" ? "Ya" : "Tidak"}
+                </span>
+              </div>
             </div>
 
             {formData.isAdaKlaster === "tidak" ? (
@@ -751,11 +782,33 @@ import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X } from "luc
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1">Termasuk Perlengkapan?</label>
-                <select name="isAdaPerlengkapan" value={formData.isAdaPerlengkapan} onChange={handleChange} className="w-full h-10 px-3 py-2 rounded-md border border-input bg-transparent">
-                  <option value="">-- Pilih --</option>
-                  <option value="ya">Ya, Termasuk Perlengkapan</option>
-                  <option value="tidak">Tidak Termasuk</option>
-                </select>
+                <div className="flex items-center gap-2 h-10">
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={formData.isAdaPerlengkapan === "ya"}
+                    onClick={() => setFormData(prev => ({ ...prev, isAdaPerlengkapan: prev.isAdaPerlengkapan === "ya" ? "tidak" : "ya" }))}
+                    className={cn(
+                      "relative inline-flex h-7 w-14 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2",
+                      formData.isAdaPerlengkapan === "ya" ? "bg-primary" : "bg-input"
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        "pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out",
+                        formData.isAdaPerlengkapan === "ya" ? "translate-x-7" : "translate-x-0"
+                      )}
+                    />
+                  </button>
+                  <span className={cn(
+                    "text-xs font-semibold px-2.5 py-1 rounded-md border min-w-[55px] text-center transition-colors select-none",
+                    formData.isAdaPerlengkapan === "ya" 
+                      ? "bg-primary/10 text-primary border-primary/30" 
+                      : "bg-background text-muted-foreground border-border"
+                  )}>
+                    {formData.isAdaPerlengkapan === "ya" ? "Ya" : "Tidak"}
+                  </span>
+                </div>
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1">Durasi (Hari)</label>
