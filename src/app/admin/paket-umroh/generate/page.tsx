@@ -1106,8 +1106,53 @@ import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X } from "luc
       </div>
 
       {success && (
-        <div className="p-4 bg-green-100 text-green-700 border border-green-200 rounded-md">
-          Berhasil men-generate {departureDates.length} Paket Umroh untuk tanggal-tanggal: {departureDates.join(", ")}! (Ini adalah UI UAT menggunakan Database Live Master Data)
+        <div className="p-5 bg-emerald-50 border border-emerald-200 rounded-lg shadow-sm space-y-3 animate-in fade-in-0 duration-300">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 text-emerald-800 font-bold text-sm">
+              <span className="text-base">🎉</span>
+              <span>Berhasil Men-Generate {departureDates.length} Paket Umroh!</span>
+            </div>
+            <span className="text-xs bg-emerald-100 text-emerald-800 px-2.5 py-1 rounded-full font-semibold">
+              Status: Sukses
+            </span>
+          </div>
+
+          <p className="text-xs text-emerald-700">
+            Berikut adalah daftar {departureDates.length} Nama Paket yang telah berhasil ter-generate:
+          </p>
+
+          {/* List of Generated Package Names line by line */}
+          <div className="space-y-1.5 p-3 bg-white/90 border border-emerald-200 rounded-md max-h-[280px] overflow-y-auto">
+            {departureDates.map((d, idx) => {
+              const name = getIndividualNameForDate(d) || formData.namaPaket;
+              const code = getIndividualCodeForDate(d) || formData.kodePaket;
+              return (
+                <div key={idx} className="flex flex-col sm:flex-row sm:items-center justify-between p-2 rounded bg-emerald-50/60 border border-emerald-100 text-xs gap-2">
+                  <div className="flex items-center gap-2 truncate">
+                    <span className="font-mono text-[11px] font-bold text-emerald-900 bg-emerald-200/70 px-1.5 py-0.5 rounded shrink-0">
+                      #{idx + 1}
+                    </span>
+                    <span className="font-semibold text-emerald-950 truncate">{name}</span>
+                  </div>
+                  {code && (
+                    <span className="font-mono text-[11px] font-semibold text-emerald-800 shrink-0">
+                      [{code}]
+                    </span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="flex justify-end pt-1">
+            <Button
+              size="sm"
+              onClick={() => router.push("/admin/paket-umroh")}
+              className="bg-emerald-700 hover:bg-emerald-800 text-white text-xs"
+            >
+              Lihat Daftar Paket Aktif &rarr;
+            </Button>
+          </div>
         </div>
       )}
 
