@@ -427,12 +427,38 @@ import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X } from "luc
     }, 800);
   };
 
-  // Filter hotels by cities
-  const mekkahCity = options?.cities.find(c => c.code === "MEK" || c.name.toLowerCase() === "mekkah");
-  const madinahCity = options?.cities.find(c => c.code === "MED" || c.name.toLowerCase() === "madinah");
+  // Filter hotels by cities with robust matching and fallback to master hotels
+  const mekkahCity = options?.cities.find(c => {
+    const name = (c.name || "").toLowerCase();
+    const code = (c.code || "").toLowerCase();
+    return code === "mek" || code === "mak" || code === "mkh" || name.includes("mekkah") || name.includes("makkah") || name.includes("mecca");
+  });
+
+  const madinahCity = options?.cities.find(c => {
+    const name = (c.name || "").toLowerCase();
+    const code = (c.code || "").toLowerCase();
+    return code === "med" || code === "mdn" || name.includes("madinah") || name.includes("medina");
+  });
   
-  const mekkahHotels = options?.hotels.filter(h => h.cityId === mekkahCity?.id) || [];
-  const madinahHotels = options?.hotels.filter(h => h.cityId === madinahCity?.id) || [];
+  let mekkahHotels = options?.hotels?.filter(h => {
+    if (mekkahCity?.id && h.cityId === mekkahCity.id) return true;
+    const hName = (h.name || "").toLowerCase();
+    return hName.includes("mekkah") || hName.includes("makkah") || hName.includes("mecca");
+  }) || [];
+  
+  let madinahHotels = options?.hotels?.filter(h => {
+    if (madinahCity?.id && h.cityId === madinahCity.id) return true;
+    const hName = (h.name || "").toLowerCase();
+    return hName.includes("madinah") || hName.includes("medina");
+  }) || [];
+
+  // Fallback: If no city-specific filter matched, provide ALL master hotels from options
+  if (mekkahHotels.length === 0 && options?.hotels && options.hotels.length > 0) {
+    mekkahHotels = options.hotels;
+  }
+  if (madinahHotels.length === 0 && options?.hotels && options.hotels.length > 0) {
+    madinahHotels = options.hotels;
+  }
 
   // Sub-component to render Wizard steps
   const renderWizardSteps = (colMode = false) => {
@@ -613,7 +639,7 @@ import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X } from "luc
                         <option disabled>Loading hotel Mekkah...</option>
                       ) : (
                         mekkahHotels.map((item) => (
-                          <option key={item.id} value={item.id}>{item.name} ({item.starRating || 5}⭐)</option>
+                          <option key={item.id} value={item.id}>{item.name}</option>
                         ))
                       )}
                     </select>
@@ -626,7 +652,7 @@ import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X } from "luc
                         <option disabled>Loading hotel Madinah...</option>
                       ) : (
                         madinahHotels.map((item) => (
-                          <option key={item.id} value={item.id}>{item.name} ({item.starRating || 5}⭐)</option>
+                          <option key={item.id} value={item.id}>{item.name}</option>
                         ))
                       )}
                     </select>
