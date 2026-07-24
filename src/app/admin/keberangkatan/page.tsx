@@ -138,10 +138,6 @@ export default function KeberangkatanListPage() {
             Kelola jadwal dan paket keberangkatan umroh
           </p>
         </div>
-        <Button onClick={() => router.push("/admin/keberangkatan/tambah")}>
-          <Plus className="mr-2 h-4 w-4" />
-          Tambah Keberangkatan
-        </Button>
       </div>
 
       {/* Search */}

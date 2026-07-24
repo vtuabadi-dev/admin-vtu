@@ -489,43 +489,48 @@ import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X } from "luc
       const indivCode = getIndividualCodeForDate(depDate);
       const indivName = getIndividualNameForDate(depDate) || formData.namaPaket;
       
-      let basePrice = Number(formData.hargaBase || 0);
-      if (formData.isAdaKlaster === "ya" && clusterConfigs) {
-        const firstClusterPrice = Object.values(clusterConfigs).find(c => Number(c.hargaBase) > 0)?.hargaBase;
-        if (firstClusterPrice) {
-          basePrice = Number(firstClusterPrice);
-        }
+    let basePrice = Number(formData.hargaBase || 0);
+    if (formData.isAdaKlaster === "ya" && clusterConfigs) {
+      const firstClusterPrice = Object.values(clusterConfigs).find(c => Number(c.hargaBase) > 0)?.hargaBase;
+      if (firstClusterPrice) {
+        basePrice = Number(firstClusterPrice);
       }
-      if (!basePrice || basePrice <= 0) {
-        basePrice = 35000000;
-      }
+    }
+    if (!basePrice || basePrice <= 0) {
+      basePrice = 35000000;
+    }
 
-      return {
-        namaPaket: indivName,
-        kodePaket: indivCode,
-        kodeGrup: isMultiDate ? formData.kodeGrup : "",
-        deskripsi: `Kode: ${indivCode} | Keberangkatan: ${depDate} s/d ${returnDate}`,
-        hargaBase: basePrice,
-        durasiHari: Number(formData.durasiHari || 9),
-        hotelMekkahId: formData.hotelMekkahId,
-        hotelMadinahId: formData.hotelMadinahId,
-        departureDates: [depDate],
-        returnDate,
-        clusterConfigs: formData.isAdaKlaster === "ya" ? clusterConfigs : null,
-      };
-    });
+    const payload = {
+      packageTypeId: formData.jenisPaketId,
+      startingPointId: formData.startingPointId,
+      maskapaiId: formData.maskapaiId,
+      landingPatternId: formData.landingPatternId,
+      durasiHari: Number(formData.durasiHari || 9),
+      durationDays: Number(formData.durasiHari || 9),
+      departureDates: departureDates,
+      namaPaket: formData.namaPaket,
+      hargaBase: basePrice,
+      hargaPaket: basePrice,
+      hotelMekkahId: formData.hotelMekkahId,
+      hotelMadinahId: formData.hotelMadinahId,
+      kapasitas: Number(formData.kapasitas || 45),
+      kuota: Number(formData.kapasitas || 45),
+      maxSeat: Number(formData.kapasitas || 45),
+      isAdaKlaster: formData.isAdaKlaster,
+      clusterConfigs: formData.isAdaKlaster === "ya" ? clusterConfigs : null,
+    };
 
     try {
-      const res = await fetch("/api/packages", {
+      const res = await fetch("/api/keberangkatan", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ packages: packagesPayload }),
+        body: JSON.stringify(payload),
       });
       const resJson = await res.json();
       if (resJson.success) {
         setSuccess(true);
       } else {
-        alert(`Gagal menyimpan paket: ${resJson.error || "Terjadi kesalahan server"}`);
+        alert(`Gagal menyimpan keberangkatan: ${resJson.message || resJson.error || "Terjadi kesalahan server"}`);
       }
     } catch (err: any) {
       console.error("Error generating packages:", err);
@@ -1175,10 +1180,10 @@ import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X } from "luc
           <div className="flex justify-end pt-1">
             <Button
               size="sm"
-              onClick={() => router.push("/admin/paket-umroh")}
+              onClick={() => router.push("/admin/keberangkatan")}
               className="bg-emerald-700 hover:bg-emerald-800 text-white text-xs"
             >
-              Lihat Daftar Paket Aktif &rarr;
+              Lihat Daftar Paket Aktif (Keberangkatan) &rarr;
             </Button>
           </div>
         </div>
