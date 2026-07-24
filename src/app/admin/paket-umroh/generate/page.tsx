@@ -932,6 +932,24 @@ import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X } from "luc
             </div>
           </div>
         </div>
+
+        {/* Bottom Action Bar */}
+        <div className="flex items-center justify-between p-4 bg-card border rounded-md shadow-sm mt-2">
+          <p className="text-xs text-muted-foreground">
+            💡 Tekan <strong>Enter</strong> pada kolom terakhir untuk langsung memproses pembuatan paket.
+          </p>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => router.push("/admin/paket-umroh")}>Batal</Button>
+            <Button 
+              id="field-submitBtn" 
+              onClick={handleGenerate} 
+              disabled={loading || fetching}
+              className="px-6 font-semibold"
+            >
+              {loading ? "Memproses..." : `Generate ${departureDates.length > 0 ? departureDates.length : ""} Paket`}
+            </Button>
+          </div>
+        </div>
       </div>
     );
   };
@@ -947,7 +965,11 @@ import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X } from "luc
         </div>
         <div className="flex gap-2 shrink-0">
           <Button variant="outline" onClick={() => router.push("/admin/paket-umroh")}>Batal</Button>
-          <Button onClick={handleGenerate} disabled={loading || fetching}>
+          <Button 
+            id="field-submitBtnHeader" 
+            onClick={handleGenerate} 
+            disabled={loading || fetching}
+          >
             {loading ? "Memproses..." : `Generate ${departureDates.length > 0 ? departureDates.length : ""} Paket`}
           </Button>
         </div>

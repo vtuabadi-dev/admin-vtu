@@ -116,8 +116,9 @@ export function SearchableSelect({
       setHighlightedIndex((prev) => (prev - 1 + filteredOptions.length) % (filteredOptions.length || 1));
     } else if (e.key === "Enter") {
       e.preventDefault();
-      if (filteredOptions.length > 0 && highlightedIndex < filteredOptions.length) {
-        handleSelect(filteredOptions[highlightedIndex].value);
+      const targetOption = filteredOptions[highlightedIndex];
+      if (targetOption) {
+        handleSelect(targetOption.value);
       }
     } else if (e.key === "Escape") {
       setOpen(false);
