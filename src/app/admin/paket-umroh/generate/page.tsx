@@ -170,9 +170,9 @@ import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X } from "luc
     }
 
     const airlineObj = options.airlines.find((a) => a.id === formData.maskapaiId);
-    const mCode = (airlineObj?.code || "SV").toUpperCase();
+    const mLabel = (airlineObj?.name || airlineObj?.code || "SV").toUpperCase();
 
-    const autoName = `${prefix} ${durasi} ${sCode} ( ${rCode} ) - ${tglFormatted} (${mCode})`;
+    const autoName = `${prefix} ${durasi} ${sCode} ( ${rCode} ) - ${tglFormatted} (${mLabel})`;
     setFormData((prev) => ({ ...prev, namaPaket: autoName }));
   };
 
@@ -243,11 +243,11 @@ import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X } from "luc
     const rCode = (routeObj?.kode || "JED.C").toUpperCase();
 
     const airlineObj = options.airlines.find((a) => a.id === formData.maskapaiId);
-    const mCode = (airlineObj?.code || "SV").toUpperCase();
+    const mLabel = (airlineObj?.name || airlineObj?.code || "SV").toUpperCase();
 
     const tglFormatted = formatDateIndo(dateStr);
 
-    return `${prefix} ${durasi} ${sCode} ( ${rCode} ) - ${tglFormatted} (${mCode})`;
+    return `${prefix} ${durasi} ${sCode} ( ${rCode} ) - ${tglFormatted} (${mLabel})`;
   };
 
   // Auto-compute individual code per departure date

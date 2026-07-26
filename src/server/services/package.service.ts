@@ -86,8 +86,13 @@ export const packageService = {
       : [];
     const hotelMap = new Map(fetchedHotels.map(h => [h.id, h.name]));
 
-    let finalHotelMekkah = hotelMap.get(data.hotelMekkahId) || data.hotelMekkah || "TBA";
-    let finalHotelMadinah = hotelMap.get(data.hotelMadinahId) || data.hotelMadinah || "TBA";
+    const resolveHotel = (idOrName?: string) => {
+      if (!idOrName || !idOrName.trim()) return "TBA";
+      return hotelMap.get(idOrName) || idOrName;
+    };
+
+    let finalHotelMekkah = resolveHotel(data.hotelMekkahId || data.hotelMekkah);
+    let finalHotelMadinah = resolveHotel(data.hotelMadinahId || data.hotelMadinah);
     let hotelOptionsArray: any[] = [];
 
     if (data.isAdaKlaster === "ya" && data.clusterConfigs) {
@@ -99,9 +104,9 @@ export const packageService = {
 
       hotelOptionsArray = clusterIds.map(cId => {
         const cfg = data.clusterConfigs[cId];
-        const cName = clusterMap.get(cId) || cId;
-        const hMek = hotelMap.get(cfg.hotelMekkahId) || "TBA";
-        const hMed = hotelMap.get(cfg.hotelMadinahId) || "TBA";
+        const cName = clusterMap.get(cId) || cfg.clusterName || cId;
+        const hMek = resolveHotel(cfg.hotelMekkahId || cfg.hotelMekkah);
+        const hMed = resolveHotel(cfg.hotelMadinahId || cfg.hotelMadinah);
         return {
           clusterId: cId,
           clusterName: cName,
