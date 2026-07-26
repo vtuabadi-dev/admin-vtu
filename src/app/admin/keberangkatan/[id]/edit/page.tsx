@@ -14,6 +14,7 @@ import {
   Trash2,
   Save,
   CheckCircle2,
+  Clipboard,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/components/ui/Card";
 import { Button } from "@/shared/components/ui/Button";
@@ -169,6 +170,88 @@ export default function EditKeberangkatanPage() {
     setFlightSegments((prev) => {
       const updated = [...prev];
       updated[index] = { ...updated[index], [field]: value } as FlightSegment;
+      return updated;
+    });
+  };
+
+  const handlePasteTable = (
+    e: React.ClipboardEvent,
+    startRowIndex: number,
+    startColField: keyof FlightSegment
+  ) => {
+    const clipboardData = e.clipboardData.getData("text/plain");
+    if (!clipboardData || (!clipboardData.includes("\t") && !clipboardData.includes("\n"))) {
+      return; // Regular single field paste
+    }
+
+    e.preventDefault();
+
+    const lines = clipboardData
+      .split(/\r?\n/)
+      .filter((line) => line.trim().length > 0);
+
+    if (lines.length === 0) return;
+
+    const columnOrder: (keyof FlightSegment)[] = [
+      "tanggal",
+      "kodeFlight",
+      "pnr",
+      "asal",
+      "tujuan",
+      "jamBerangkat",
+      "jamTiba",
+    ];
+
+    const startColIndex = columnOrder.indexOf(startColField);
+    const targetColIndex = startColIndex >= 0 ? startColIndex : 0;
+
+    setFlightSegments((prev) => {
+      const updated = [...prev];
+
+      lines.forEach((line, rOffset) => {
+        const targetRow = startRowIndex + rOffset;
+        const cells = line.split("\t");
+
+        while (updated.length <= targetRow) {
+          updated.push({
+            tanggal: "",
+            kodeFlight: "",
+            pnr: "",
+            asal: "",
+            tujuan: "",
+            jamBerangkat: "",
+            jamTiba: "",
+          });
+        }
+
+        const rowObj = { ...updated[targetRow] };
+
+        cells.forEach((cellText, cOffset) => {
+          const cIndex = targetColIndex + cOffset;
+          if (cIndex < columnOrder.length) {
+            const field = columnOrder[cIndex];
+            if (field) {
+              let val = cellText.trim();
+
+              if (field === "tanggal") {
+                try {
+                  const parsed = new Date(val);
+                  if (!isNaN(parsed.getTime())) {
+                    val = parsed.toISOString().split("T")[0] ?? "";
+                  }
+                } catch {
+                  // Keep raw string if parse fails
+                }
+              }
+
+              (rowObj as any)[field] = val;
+            }
+          }
+        });
+
+        updated[targetRow] = rowObj as FlightSegment;
+      });
+
       return updated;
     });
   };
@@ -397,6 +480,14 @@ export default function EditKeberangkatanPage() {
             />
           </div>
 
+          {/* Banner Tip Paste Excel */}
+          <div className="p-3 rounded-md bg-blue-500/10 border border-blue-500/20 text-xs text-blue-700 dark:text-blue-300 flex items-center gap-2">
+            <Clipboard className="h-4 w-4 shrink-0 text-blue-500" />
+            <span>
+              <strong>Dukungan Copy-Paste Excel / Spreadsheet:</strong> Anda dapat me-copy 7 kolom sekaligus (Tanggal, Kode Flight, PNR, Asal, Tujuan, Jam Berangkat, Jam Tiba) dari Excel/Google Sheets, lalu <strong>Paste (Ctrl+V)</strong> pada sel pertama di bawah untuk otomatis mengisi seluruh tabel dan menambah baris otomatis!
+            </span>
+          </div>
+
           {/* Tabel Segment Penerbangan (Excel style matching User Screenshot) */}
           <div className="border rounded-lg overflow-x-auto shadow-sm">
             <table className="w-full text-xs text-left border-collapse min-w-[700px]">
@@ -429,6 +520,7 @@ export default function EditKeberangkatanPage() {
                         type="date"
                         value={segment.tanggal}
                         onChange={(e) => handleSegmentChange(idx, "tanggal", e.target.value)}
+                        onPaste={(e) => handlePasteTable(e, idx, "tanggal")}
                         className="h-8 text-xs font-mono px-2"
                       />
                     </td>
@@ -438,6 +530,7 @@ export default function EditKeberangkatanPage() {
                         placeholder="Misal: 1796"
                         value={segment.kodeFlight}
                         onChange={(e) => handleSegmentChange(idx, "kodeFlight", e.target.value)}
+                        onPaste={(e) => handlePasteTable(e, idx, "kodeFlight")}
                         className="h-8 text-xs font-mono uppercase px-2 font-bold"
                       />
                     </td>
@@ -447,6 +540,7 @@ export default function EditKeberangkatanPage() {
                         placeholder="ROYAL BRUNEI"
                         value={segment.pnr}
                         onChange={(e) => handleSegmentChange(idx, "pnr", e.target.value)}
+                        onPaste={(e) => handlePasteTable(e, idx, "pnr")}
                         className="h-8 text-xs font-mono uppercase px-2"
                       />
                     </td>
@@ -456,6 +550,7 @@ export default function EditKeberangkatanPage() {
                         placeholder="SUB"
                         value={segment.asal}
                         onChange={(e) => handleSegmentChange(idx, "asal", e.target.value)}
+                        onPaste={(e) => handlePasteTable(e, idx, "asal")}
                         className="h-8 text-xs font-mono uppercase text-center font-bold px-1"
                       />
                     </td>
@@ -465,6 +560,7 @@ export default function EditKeberangkatanPage() {
                         placeholder="JED"
                         value={segment.tujuan}
                         onChange={(e) => handleSegmentChange(idx, "tujuan", e.target.value)}
+                        onPaste={(e) => handlePasteTable(e, idx, "tujuan")}
                         className="h-8 text-xs font-mono uppercase text-center font-bold px-1"
                       />
                     </td>
@@ -474,6 +570,7 @@ export default function EditKeberangkatanPage() {
                         placeholder="05:00"
                         value={segment.jamBerangkat}
                         onChange={(e) => handleSegmentChange(idx, "jamBerangkat", e.target.value)}
+                        onPaste={(e) => handlePasteTable(e, idx, "jamBerangkat")}
                         className="h-8 text-xs font-mono text-center px-1"
                       />
                     </td>
@@ -483,6 +580,7 @@ export default function EditKeberangkatanPage() {
                         placeholder="09:15"
                         value={segment.jamTiba}
                         onChange={(e) => handleSegmentChange(idx, "jamTiba", e.target.value)}
+                        onPaste={(e) => handlePasteTable(e, idx, "jamTiba")}
                         className="h-8 text-xs font-mono text-center px-1"
                       />
                     </td>
