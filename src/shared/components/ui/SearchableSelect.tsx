@@ -40,6 +40,7 @@ export function SearchableSelect({
   const [highlightedIndex, setHighlightedIndex] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
 
   const selectedOption = options.find((opt) => opt.value === value);
 
@@ -63,6 +64,16 @@ export function SearchableSelect({
       setSearch("");
     }
   }, [open]);
+
+  // Auto scroll highlighted option into view when navigating with Arrow keys
+  useEffect(() => {
+    if (open && listRef.current) {
+      const highlightedEl = listRef.current.children[highlightedIndex] as HTMLElement;
+      if (highlightedEl) {
+        highlightedEl.scrollIntoView({ block: "nearest", behavior: "smooth" });
+      }
+    }
+  }, [highlightedIndex, open]);
 
   const filteredOptions = options.filter((opt) => {
     if (!search.trim()) return true;
@@ -192,7 +203,7 @@ export function SearchableSelect({
           </div>
 
           {/* Options List */}
-          <div className="max-h-48 overflow-y-auto p-1 space-y-0.5">
+          <div ref={listRef} className="max-h-48 overflow-y-auto p-1 space-y-0.5">
             {filteredOptions.length === 0 ? (
               <div className="py-4 text-center text-xs text-muted-foreground">
                 Tidak ada data yang cocok
