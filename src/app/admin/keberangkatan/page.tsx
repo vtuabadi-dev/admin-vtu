@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
-import { Plane, CalendarDays, Hotel, MapPin, Search, Trash2, Info, Copy, Check } from "lucide-react";
+import { Plane, CalendarDays, Calendar, Hotel, Search, Trash2, Info, Copy, Check, Pencil, FileText, X, UserCheck, UserPlus, Lock } from "lucide-react";
 import { useRouter } from "next/navigation";
 import {
   Card,
@@ -32,6 +32,96 @@ export default function KeberangkatanListPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [openInfoId, setOpenInfoId] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  // Edit Operational Info Modal State
+  const [editingPkg, setEditingPkg] = useState<Keberangkatan | null>(null);
+  const [editFormData, setEditFormData] = useState({
+    namaPaket: "",
+    tanggalBerangkat: "",
+    tanggalPulang: "",
+    nomorPenerbangan: "",
+    jamKeberangkatan: "",
+    jamKedatangan: "",
+    rutePenerbangan: "",
+    tourLeaderNama: "",
+    tourLeaderKontak: "",
+    muthowifNama: "",
+    muthowifKontak: "",
+    hotelMekkah: "",
+    hotelMadinah: "",
+  });
+  const [savingEdit, setSavingEdit] = useState(false);
+
+  const handleOpenEdit = (pkg: Keberangkatan) => {
+    setEditingPkg(pkg);
+    const meta = (pkg as any).driveFolderIds || {};
+    const flight = meta.flightDetails || {};
+    const tl = meta.tourLeader || {};
+    const muth = meta.muthowif || {};
+
+    const depStr: string = pkg.tanggalBerangkat ? (new Date(pkg.tanggalBerangkat).toISOString().split("T")[0] ?? "") : "";
+    const retStr: string = pkg.tanggalPulang ? (new Date(pkg.tanggalPulang).toISOString().split("T")[0] ?? "") : "";
+
+    setEditFormData({
+      namaPaket: pkg.namaPaket || "",
+      tanggalBerangkat: depStr,
+      tanggalPulang: retStr,
+      nomorPenerbangan: pkg.nomorPenerbangan || "",
+      jamKeberangkatan: flight.jamKeberangkatan || "",
+      jamKedatangan: flight.jamKedatangan || "",
+      rutePenerbangan: flight.rutePenerbangan || "",
+      tourLeaderNama: tl.nama || "",
+      tourLeaderKontak: tl.kontak || "",
+      muthowifNama: muth.nama || "",
+      muthowifKontak: muth.kontak || "",
+      hotelMekkah: pkg.hotelMekkah || "",
+      hotelMadinah: pkg.hotelMadinah || "",
+    });
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingPkg) return;
+    setSavingEdit(true);
+    try {
+      const res = await fetch(`/api/keberangkatan/${editingPkg.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          namaPaket: editFormData.namaPaket,
+          tanggalBerangkat: editFormData.tanggalBerangkat,
+          tanggalPulang: editFormData.tanggalPulang,
+          nomorPenerbangan: editFormData.nomorPenerbangan,
+          hotelMekkah: editFormData.hotelMekkah,
+          hotelMadinah: editFormData.hotelMadinah,
+          flightDetails: {
+            nomorPenerbangan: editFormData.nomorPenerbangan,
+            jamKeberangkatan: editFormData.jamKeberangkatan,
+            jamKedatangan: editFormData.jamKedatangan,
+            rutePenerbangan: editFormData.rutePenerbangan,
+          },
+          tourLeader: {
+            nama: editFormData.tourLeaderNama,
+            kontak: editFormData.tourLeaderKontak,
+          },
+          muthowif: {
+            nama: editFormData.muthowifNama,
+            kontak: editFormData.muthowifKontak,
+          },
+        }),
+      });
+      const resJson = await res.json();
+      if (resJson.success) {
+        setEditingPkg(null);
+        await load();
+      } else {
+        alert(resJson.message || "Gagal memperbarui paket");
+      }
+    } catch (err: any) {
+      alert("Error: " + err.message);
+    } finally {
+      setSavingEdit(false);
+    }
+  };
 
   const handleCopyId = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -339,19 +429,30 @@ export default function KeberangkatanListPage() {
                   </div>
                 </div>
 
-                {/* Maskapai */}
-                <div className="flex items-center gap-2 text-sm">
-                  <Plane className="h-4 w-4 text-muted-foreground shrink-0" />
-                  <div>
-                    <p className="text-xs text-muted-foreground">Maskapai</p>
-                    <p className="font-medium">
-                      {k.maskapai && !k.maskapai.startsWith("cm") ? k.maskapai : (k.maskapaiId || "-")}{" "}
-                      <span className="text-muted-foreground font-normal">
-                        ({k.nomorPenerbangan})
-                      </span>
-                    </p>
-                  </div>
-                </div>
+                {/* Petugas Lapangan (Tour Leader & Muthowif) */}
+                {(() => {
+                  const meta = (k as any).driveFolderIds || {};
+                  const tl = meta.tourLeader?.nama || (k as any).tourLeader?.nama;
+                  const muth = meta.muthowif?.nama || (k as any).muthowif?.nama;
+                  return (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs bg-muted/20 border p-2.5 rounded-md">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <UserCheck className="h-3.5 w-3.5 text-primary shrink-0" />
+                        <span className="text-muted-foreground font-medium shrink-0">TL:</span>
+                        <span className={cn("font-semibold truncate", tl ? "text-foreground" : "text-muted-foreground/70 italic")}>
+                          {tl || "Belum ada"}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <UserPlus className="h-3.5 w-3.5 text-primary shrink-0" />
+                        <span className="text-muted-foreground font-medium shrink-0">Muthowif:</span>
+                        <span className={cn("font-semibold truncate", muth ? "text-foreground" : "text-muted-foreground/70 italic")}>
+                          {muth || "Belum ada"}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })()}
 
                 {/* Hotel */}
                 <div className="flex items-start gap-2 text-sm">
@@ -435,8 +536,8 @@ export default function KeberangkatanListPage() {
                     className="flex-1"
                     onClick={() => router.push(`/admin/keberangkatan/${k.id}`)}
                   >
-                    <MapPin className="mr-1.5 h-3.5 w-3.5" />
-                    Detail
+                    <Calendar className="mr-1.5 h-3.5 w-3.5 text-primary" />
+                    Itinerary
                   </Button>
                   <Button
                     variant="outline"
@@ -444,13 +545,23 @@ export default function KeberangkatanListPage() {
                     className="flex-1"
                     onClick={() => router.push(`/admin/manifest`)}
                   >
-                    <Plane className="mr-1.5 h-3.5 w-3.5" />
+                    <FileText className="mr-1.5 h-3.5 w-3.5" />
                     Manifest
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="shrink-0"
+                    title="Edit Flight, Tour Leader & Muthowif"
+                    onClick={() => handleOpenEdit(k)}
+                  >
+                    <Pencil className="mr-1 h-3.5 w-3.5 text-muted-foreground" />
+                    Edit
                   </Button>
                   <Button
                     variant="destructive"
                     size="sm"
-                    className="shrink-0 px-2"
+                    className="shrink-0 px-2.5"
                     title="Hapus Paket"
                     onClick={() => handleDelete(k.id)}
                   >
@@ -461,6 +572,263 @@ export default function KeberangkatanListPage() {
             </Card>
           );
         })}
+        </div>
+      )}
+
+      {/* Modal Edit Detail Operasional (Flight, Tour Leader, Muthowif) */}
+      {editingPkg && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 animate-in fade-in-0">
+          <div className="bg-background border rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto flex flex-col">
+            <div className="flex items-center justify-between p-4 border-b">
+              <div>
+                <h3 className="text-base font-bold text-foreground">
+                  Edit Operasional Paket & Informasi Penerbangan
+                </h3>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Lengkapi info Flight, Tour Leader, Muthowif, dan Hotel untuk paket ini
+                </p>
+              </div>
+              <button
+                onClick={() => setEditingPkg(null)}
+                className="p-1 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="p-4 space-y-4 flex-1">
+              {/* Section 0: Locked ID Paket (Single Source of Truth) */}
+              <div className="flex flex-wrap items-center justify-between gap-2 p-3 rounded-lg border bg-muted/40 text-xs">
+                <div className="flex items-center gap-2">
+                  <span className="inline-flex items-center gap-1 font-semibold text-muted-foreground bg-muted px-2 py-1 rounded border">
+                    <Lock className="h-3 w-3 text-amber-500" />
+                    ID Paket:
+                  </span>
+                  <code className="font-mono font-bold text-foreground">{editingPkg.id}</code>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold text-muted-foreground">Kode:</span>
+                  <code className="font-mono text-primary font-bold">{editingPkg.kode}</code>
+                </div>
+                <span className="w-full text-[10px] text-muted-foreground italic">
+                  🔒 ID & Kode Paket bersifat permanen dan tidak dapat diubah untuk menjaga integritas transaksi.
+                </span>
+              </div>
+
+              {/* Section 1: Jadwal Keberangkatan & Kepulangan */}
+              <div className="space-y-3 p-3.5 rounded-lg border bg-muted/20">
+                <div className="flex items-center gap-2 text-sm font-semibold text-primary">
+                  <CalendarDays className="h-4 w-4" />
+                  Jadwal Keberangkatan & Kepulangan
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-muted-foreground mb-1">
+                      Tanggal Keberangkatan
+                    </label>
+                    <Input
+                      type="date"
+                      value={editFormData.tanggalBerangkat}
+                      onChange={(e) => setEditFormData(prev => ({ ...prev, tanggalBerangkat: e.target.value }))}
+                      className="h-8 text-xs font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-muted-foreground mb-1">
+                      Tanggal Kepulangan
+                    </label>
+                    <Input
+                      type="date"
+                      value={editFormData.tanggalPulang}
+                      onChange={(e) => setEditFormData(prev => ({ ...prev, tanggalPulang: e.target.value }))}
+                      className="h-8 text-xs font-mono"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Section 2: Informasi Flight */}
+              <div className="space-y-3 p-3.5 rounded-lg border bg-muted/20">
+                <div className="flex items-center gap-2 text-sm font-semibold text-primary">
+                  <Plane className="h-4 w-4" />
+                  Detail Flight (Informasi Penerbangan & Rute In-Out)
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-muted-foreground mb-1">
+                      Nomor Penerbangan (Flight No)
+                    </label>
+                    <Input
+                      type="text"
+                      placeholder="Misal: SV-816 / GA-980"
+                      value={editFormData.nomorPenerbangan}
+                      onChange={(e) => setEditFormData(prev => ({ ...prev, nomorPenerbangan: e.target.value }))}
+                      className="h-8 text-xs"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-muted-foreground mb-1">
+                      Rute Penerbangan / Bandara
+                    </label>
+                    <Input
+                      type="text"
+                      placeholder="Misal: SUB -> JED (Out MED)"
+                      value={editFormData.rutePenerbangan}
+                      onChange={(e) => setEditFormData(prev => ({ ...prev, rutePenerbangan: e.target.value }))}
+                      className="h-8 text-xs"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-muted-foreground mb-1">
+                      Jam Keberangkatan
+                    </label>
+                    <Input
+                      type="text"
+                      placeholder="Misal: 10:30 WIB"
+                      value={editFormData.jamKeberangkatan}
+                      onChange={(e) => setEditFormData(prev => ({ ...prev, jamKeberangkatan: e.target.value }))}
+                      className="h-8 text-xs"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-muted-foreground mb-1">
+                      Jam Kedatangan
+                    </label>
+                    <Input
+                      type="text"
+                      placeholder="Misal: 16:45 AST"
+                      value={editFormData.jamKedatangan}
+                      onChange={(e) => setEditFormData(prev => ({ ...prev, jamKedatangan: e.target.value }))}
+                      className="h-8 text-xs"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Section 2: Petugas Lapangan (Tour Leader & Muthowif) */}
+              <div className="space-y-3 p-3.5 rounded-lg border bg-muted/20">
+                <div className="flex items-center gap-2 text-sm font-semibold text-primary">
+                  <UserCheck className="h-4 w-4" />
+                  Petugas Lapangan (Tour Leader & Muthowif)
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-muted-foreground mb-1">
+                      Nama Tour Leader
+                    </label>
+                    <Input
+                      type="text"
+                      placeholder="Nama lengkap Tour Leader"
+                      value={editFormData.tourLeaderNama}
+                      onChange={(e) => setEditFormData(prev => ({ ...prev, tourLeaderNama: e.target.value }))}
+                      className="h-8 text-xs"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-muted-foreground mb-1">
+                      No. HP / WA Tour Leader
+                    </label>
+                    <Input
+                      type="text"
+                      placeholder="Misal: 08123456789"
+                      value={editFormData.tourLeaderKontak}
+                      onChange={(e) => setEditFormData(prev => ({ ...prev, tourLeaderKontak: e.target.value }))}
+                      className="h-8 text-xs"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-muted-foreground mb-1">
+                      Nama Muthowif
+                    </label>
+                    <Input
+                      type="text"
+                      placeholder="Nama lengkap Muthowif"
+                      value={editFormData.muthowifNama}
+                      onChange={(e) => setEditFormData(prev => ({ ...prev, muthowifNama: e.target.value }))}
+                      className="h-8 text-xs"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-muted-foreground mb-1">
+                      No. HP / WA Muthowif
+                    </label>
+                    <Input
+                      type="text"
+                      placeholder="Misal: +966 50 123 4567"
+                      value={editFormData.muthowifKontak}
+                      onChange={(e) => setEditFormData(prev => ({ ...prev, muthowifKontak: e.target.value }))}
+                      className="h-8 text-xs"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Section 3: Nama Paket & Hotel */}
+              <div className="space-y-3 p-3.5 rounded-lg border bg-muted/20">
+                <div className="flex items-center gap-2 text-sm font-semibold text-primary">
+                  <Hotel className="h-4 w-4" />
+                  Identitas Paket & Akomodasi
+                </div>
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-xs font-medium text-muted-foreground mb-1">
+                      Nama Paket Keberangkatan
+                    </label>
+                    <Input
+                      type="text"
+                      value={editFormData.namaPaket}
+                      onChange={(e) => setEditFormData(prev => ({ ...prev, namaPaket: e.target.value }))}
+                      className="h-8 text-xs"
+                    />
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-muted-foreground mb-1">
+                        Hotel Mekkah
+                      </label>
+                      <Input
+                        type="text"
+                        placeholder="Misal: Safwah Tower"
+                        value={editFormData.hotelMekkah}
+                        onChange={(e) => setEditFormData(prev => ({ ...prev, hotelMekkah: e.target.value }))}
+                        className="h-8 text-xs"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-muted-foreground mb-1">
+                        Hotel Madinah
+                      </label>
+                      <Input
+                        type="text"
+                        placeholder="Misal: Taiba Front"
+                        value={editFormData.hotelMadinah}
+                        onChange={(e) => setEditFormData(prev => ({ ...prev, hotelMadinah: e.target.value }))}
+                        className="h-8 text-xs"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 p-4 border-t bg-muted/30">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setEditingPkg(null)}
+                disabled={savingEdit}
+              >
+                Batal
+              </Button>
+              <Button
+                size="sm"
+                onClick={handleSaveEdit}
+                disabled={savingEdit}
+              >
+                {savingEdit ? "Menyimpan..." : "Simpan Perubahan"}
+              </Button>
+            </div>
+          </div>
         </div>
       )}
     </div>

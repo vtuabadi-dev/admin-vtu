@@ -222,6 +222,69 @@ export const packageService = {
     return keberangkatanRepo.update(id, data);
   },
 
+  async updateWithAudit(id: string, data: any, user: { userId: string; userName: string; role: string }) {
+    const before = await keberangkatanRepo.findById(id);
+    const updated = await keberangkatanRepo.update(id, data);
+
+    const changes: string[] = [];
+    if (data.tanggalBerangkat) {
+      const newDep = new Date(data.tanggalBerangkat).toISOString().split("T")[0];
+      const oldDep = before?.tanggalBerangkat ? new Date(before.tanggalBerangkat).toISOString().split("T")[0] : "";
+      if (newDep !== oldDep) changes.push(`Tgl Berangkat (${oldDep} -> ${newDep})`);
+    }
+    if (data.tanggalPulang) {
+      const newRet = new Date(data.tanggalPulang).toISOString().split("T")[0];
+      const oldRet = before?.tanggalPulang ? new Date(before.tanggalPulang).toISOString().split("T")[0] : "";
+      if (newRet !== oldRet) changes.push(`Tgl Pulang (${oldRet} -> ${newRet})`);
+    }
+    if (data.nomorPenerbangan && before?.nomorPenerbangan !== data.nomorPenerbangan) {
+      changes.push(`Flight No (${before?.nomorPenerbangan} -> ${data.nomorPenerbangan})`);
+    }
+    if (data.flightDetails?.rutePenerbangan) {
+      changes.push(`Rute Flight (${data.flightDetails.rutePenerbangan})`);
+    }
+    if (data.tourLeader?.nama) {
+      changes.push(`TL: ${data.tourLeader.nama}`);
+    }
+    if (data.muthowif?.nama) {
+      changes.push(`Muthowif: ${data.muthowif.nama}`);
+    }
+    if (changes.length === 0) changes.push("Memperbarui detail operasional paket");
+
+    const detailMsg = `Perubahan paket #${before?.kode || id} oleh ${user.userName}: ${changes.join(", ")}`;
+
+    try {
+      await prisma.auditEntry.create({
+        data: {
+          userId: user.userId || "system",
+          userName: user.userName || "Admin Operasional",
+          role: (user.role as any) || "super_admin",
+          module: "keberangkatan",
+          action: "EDIT_KEBERANGKATAN",
+          detail: detailMsg,
+          entityId: id,
+          entityType: "Keberangkatan",
+          before: JSON.stringify(before),
+          after: JSON.stringify(updated),
+        },
+      });
+
+      await prisma.activityEvent.create({
+        data: {
+          keberangkatanId: id,
+          type: "info",
+          message: detailMsg,
+          module: "keberangkatan",
+          triggeredBy: user.userName,
+        },
+      });
+    } catch (auditErr) {
+      console.error("Failed to record audit log:", auditErr);
+    }
+
+    return updated;
+  },
+
   async delete(id: string) {
     return keberangkatanRepo.delete(id);
   },

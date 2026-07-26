@@ -126,8 +126,14 @@ export const keberangkatanRepo = {
     return mapKeberangkatan(row);
   },
 
-  async update(id: string, data: Partial<Keberangkatan>) {
+  async update(id: string, data: Partial<Keberangkatan> & Record<string, any>) {
     const updateData: any = {};
+    if (data.namaPaket !== undefined) updateData.namaPaket = data.namaPaket;
+    if (data.hargaPaket !== undefined) updateData.hargaPaket = data.hargaPaket;
+    if (data.maskapai !== undefined) updateData.maskapai = data.maskapai;
+    if (data.hotelMekkah !== undefined) updateData.hotelMekkah = data.hotelMekkah;
+    if (data.hotelMadinah !== undefined) updateData.hotelMadinah = data.hotelMadinah;
+    if (data.hotelOptions !== undefined) updateData.hotelOptions = data.hotelOptions;
     if (data.paketUmrohId !== undefined) updateData.paketUmrohId = data.paketUmrohId;
     if (data.tanggalBerangkat !== undefined) updateData.tanggalBerangkat = new Date(data.tanggalBerangkat);
     if (data.tanggalPulang !== undefined) updateData.tanggalPulang = new Date(data.tanggalPulang);
@@ -142,10 +148,23 @@ export const keberangkatanRepo = {
     if (data.startingPointId !== undefined) updateData.startingPointId = data.startingPointId;
     if (data.packageTypeId !== undefined) updateData.packageTypeId = data.packageTypeId;
 
+    if (data.driveFolderIds !== undefined || data.tourLeader !== undefined || data.muthowif !== undefined || data.flightDetails !== undefined) {
+      const existing = await prisma.keberangkatan.findUnique({ where: { id }, select: { driveFolderIds: true } });
+      const currentMeta = (existing?.driveFolderIds as any) || {};
+      const newMeta = {
+        ...currentMeta,
+        ...(data.driveFolderIds && typeof data.driveFolderIds === "object" ? data.driveFolderIds : {}),
+      };
+      if (data.tourLeader !== undefined) newMeta.tourLeader = data.tourLeader;
+      if (data.muthowif !== undefined) newMeta.muthowif = data.muthowif;
+      if (data.flightDetails !== undefined) newMeta.flightDetails = data.flightDetails;
+      updateData.driveFolderIds = newMeta;
+    }
+
     const row = await prisma.keberangkatan.update({
       where: { id },
       data: updateData,
-      include: { groups: { include: { anggota: { select: { id: true } } } } },
+      include: DEFAULT_INCLUDE,
     });
     return mapKeberangkatan(row);
   },
