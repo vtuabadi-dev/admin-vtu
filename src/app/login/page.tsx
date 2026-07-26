@@ -76,7 +76,7 @@ export default function LoginPage() {
       <div className="bg-white rounded-3xl shadow-2xl overflow-hidden border border-emerald-900/10 grid grid-cols-1 lg:grid-cols-12 min-h-[580px]">
         
         {/* ── Left Side: Login Form (Col 1-5 on LG) ── */}
-        <div className="lg:col-span-5 p-8 sm:p-10 flex flex-col justify-center bg-gradient-to-b from-white via-[#f7faf8] to-[#edf4ee]">
+        <div className="lg:col-span-5 p-8 sm:p-10 flex flex-col justify-center bg-white">
           {/* Header */}
           <div className="text-center mb-8">
             <div className="inline-flex items-center justify-center h-14 w-14 rounded-2xl bg-gradient-to-tr from-emerald-800 to-teal-700 text-white shadow-md shadow-emerald-900/20 mb-3">
@@ -199,8 +199,8 @@ export default function LoginPage() {
           </form>
         </div>
 
-        {/* ── Right Side: Metallic Green Panel with Curved Edge & Service Boxes (Col 6-12 on LG) ── */}
-        <div className="lg:col-span-7 relative bg-gradient-to-br from-emerald-800 via-teal-900 to-emerald-950 text-white p-8 sm:p-10 flex flex-col justify-center rounded-3xl lg:rounded-l-[90px] shadow-2xl border-l border-white/10 overflow-hidden">
+        {/* ── Right Side: Metallic Green Panel with Continuous Smooth Curved Left Edge (Col 6-12 on LG) ── */}
+        <div className="lg:col-span-7 relative bg-gradient-to-br from-emerald-800 via-teal-900 to-emerald-950 text-white p-8 sm:p-10 flex flex-col justify-center rounded-t-3xl lg:rounded-t-none lg:rounded-l-[120px] border-l border-white/10 overflow-hidden">
           
           {/* Subtle Ambient Light Reflections */}
           <div className="absolute top-0 right-0 w-80 h-80 bg-emerald-400/10 rounded-full blur-3xl pointer-events-none" />
