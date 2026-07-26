@@ -367,18 +367,27 @@ export default function KeberangkatanListPage() {
                           try { optionsList = JSON.parse(optionsList); } catch { optionsList = []; }
                         }
                         if (Array.isArray(optionsList) && optionsList.length > 0) {
-                          return optionsList.map((opt: any, idx: number) => (
+                          // Clean out garbage empty TBA cluster items if valid clusters exist
+                          const validOptions = optionsList.filter((opt: any) => {
+                            const hasMek = opt.hotelMekkah && opt.hotelMekkah !== "TBA";
+                            const hasMed = opt.hotelMadinah && opt.hotelMadinah !== "TBA";
+                            const hasPrice = Number(opt.hargaBase || 0) > 0;
+                            return hasMek || hasMed || hasPrice;
+                          });
+                          const listToRender = validOptions.length > 0 ? validOptions : optionsList;
+
+                          return listToRender.map((opt: any, idx: number) => (
                             <div key={idx} className="flex flex-wrap items-center gap-1.5 text-xs bg-card border p-1.5 rounded-md shadow-xs">
                               {opt.clusterName && opt.clusterName !== "Reguler" && (
-                                <span className="font-bold text-primary text-[10px] bg-primary/10 border border-primary/20 px-1.5 py-0.5 rounded">
+                                <span className="font-bold text-primary text-[10px] bg-primary/10 border border-primary/20 px-1.5 py-0.5 rounded uppercase">
                                   {opt.clusterName}
                                 </span>
                               )}
-                              <span className="font-medium text-foreground">
+                              <span className="font-semibold text-foreground">
                                 {opt.hotelMekkah || k.hotelMekkah || "TBA"} <span className="text-muted-foreground font-normal text-[11px]">(Mekkah)</span>
                               </span>
                               <span className="text-muted-foreground font-semibold">&mdash;</span>
-                              <span className="font-medium text-foreground">
+                              <span className="font-semibold text-foreground">
                                 {opt.hotelMadinah || k.hotelMadinah || "TBA"} <span className="text-muted-foreground font-normal text-[11px]">(Madinah)</span>
                               </span>
                             </div>

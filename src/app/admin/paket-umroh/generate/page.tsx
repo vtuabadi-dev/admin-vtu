@@ -512,6 +512,20 @@ import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X } from "luc
       basePrice = 35000000;
     }
 
+    let activeClusterConfigs: Record<string, any> | null = null;
+    if (formData.isAdaKlaster === "ya" && clusterConfigs) {
+      activeClusterConfigs = {};
+      for (const [cId, cfg] of Object.entries(clusterConfigs as Record<string, any>)) {
+        if (!cfg) continue;
+        const hasMek = !!(cfg.hotelMekkahId);
+        const hasMed = !!(cfg.hotelMadinahId);
+        const hasPrice = Number(cfg.hargaBase || 0) > 0;
+        if (hasMek || hasMed || hasPrice) {
+          activeClusterConfigs[cId] = cfg;
+        }
+      }
+    }
+
     const payload = {
       packageTypeId: formData.jenisPaketId,
       startingPointId: formData.startingPointId,
@@ -529,7 +543,7 @@ import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X } from "luc
       kuota: Number(formData.kapasitas || 45),
       maxSeat: Number(formData.kapasitas || 45),
       isAdaKlaster: formData.isAdaKlaster,
-      clusterConfigs: formData.isAdaKlaster === "ya" ? clusterConfigs : null,
+      clusterConfigs: formData.isAdaKlaster === "ya" ? activeClusterConfigs : null,
     };
 
     try {

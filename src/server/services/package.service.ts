@@ -96,14 +96,22 @@ export const packageService = {
     let hotelOptionsArray: any[] = [];
 
     if (data.isAdaKlaster === "ya" && data.clusterConfigs) {
-      const clusterIds = Object.keys(data.clusterConfigs);
+      // Filter out empty garbage clusters (e.g. K1, K2, K3, K4 with no hotel and no price)
+      const validClusterEntries = Object.entries(data.clusterConfigs).filter(([, cfg]: [string, any]) => {
+        if (!cfg) return false;
+        const hMek = cfg.hotelMekkahId || cfg.hotelMekkah;
+        const hMed = cfg.hotelMadinahId || cfg.hotelMadinah;
+        const harga = Number(cfg.hargaBase || 0);
+        return (hMek && hMek.trim() !== "") || (hMed && hMed.trim() !== "") || harga > 0;
+      });
+
+      const clusterIds = validClusterEntries.map(([cId]) => cId);
       const masterClusters = clusterIds.length > 0
         ? await prisma.masterCluster.findMany({ where: { id: { in: clusterIds } } })
         : [];
       const clusterMap = new Map(masterClusters.map(c => [c.id, c.nama]));
 
-      hotelOptionsArray = clusterIds.map(cId => {
-        const cfg = data.clusterConfigs[cId];
+      hotelOptionsArray = validClusterEntries.map(([cId, cfg]: [string, any]) => {
         const cName = clusterMap.get(cId) || cfg.clusterName || cId;
         const hMek = resolveHotel(cfg.hotelMekkahId || cfg.hotelMekkah);
         const hMed = resolveHotel(cfg.hotelMadinahId || cfg.hotelMadinah);
@@ -118,8 +126,8 @@ export const packageService = {
         };
       });
 
-      const mekkahNames = Array.from(new Set(hotelOptionsArray.map(o => o.hotelMekkah).filter(n => n !== "TBA")));
-      const madinahNames = Array.from(new Set(hotelOptionsArray.map(o => o.hotelMadinah).filter(n => n !== "TBA")));
+      const mekkahNames = Array.from(new Set(hotelOptionsArray.map(o => o.hotelMekkah).filter(n => n && n !== "TBA")));
+      const madinahNames = Array.from(new Set(hotelOptionsArray.map(o => o.hotelMadinah).filter(n => n && n !== "TBA")));
 
       if (mekkahNames.length > 0) finalHotelMekkah = mekkahNames.join(" / ");
       if (madinahNames.length > 0) finalHotelMadinah = madinahNames.join(" / ");

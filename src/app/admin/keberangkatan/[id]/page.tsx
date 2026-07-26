@@ -617,12 +617,20 @@ export default function KeberangkatanDetailPage() {
                         try { optionsList = JSON.parse(optionsList); } catch { optionsList = []; }
                       }
                       if (Array.isArray(optionsList) && optionsList.length > 0) {
+                        const validOptions = optionsList.filter((opt: any) => {
+                          const hasMek = opt.hotelMekkah && opt.hotelMekkah !== "TBA";
+                          const hasMed = opt.hotelMadinah && opt.hotelMadinah !== "TBA";
+                          const hasPrice = Number(opt.hargaBase || 0) > 0;
+                          return hasMek || hasMed || hasPrice;
+                        });
+                        const listToRender = validOptions.length > 0 ? validOptions : optionsList;
+
                         return (
                           <div className="flex flex-col gap-2">
-                            {optionsList.map((opt: any, idx: number) => (
+                            {listToRender.map((opt: any, idx: number) => (
                               <div key={idx} className="flex flex-wrap items-center gap-2 p-2.5 rounded-lg border bg-card text-xs shadow-xs">
                                 {opt.clusterName && opt.clusterName !== "Reguler" && (
-                                  <span className="font-bold text-primary bg-primary/10 border border-primary/20 px-2 py-0.5 rounded text-[11px]">
+                                  <span className="font-bold text-primary bg-primary/10 border border-primary/20 px-2 py-0.5 rounded text-[11px] uppercase">
                                     {opt.clusterName}
                                   </span>
                                 )}
