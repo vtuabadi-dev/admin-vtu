@@ -152,6 +152,7 @@ export const packageService = {
         routeCode: rCode,
         tanggalBerangkat: depDate,
         maskapaiCode: mCode,
+        maskapaiName: airline?.name || data.maskapai,
       });
 
       const folderName = generatePackageFolderName({

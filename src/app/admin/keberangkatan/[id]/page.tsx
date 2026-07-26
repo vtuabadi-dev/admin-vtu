@@ -222,7 +222,7 @@ export default function KeberangkatanDetailPage() {
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
-            <h1 className="text-xl font-bold">{kbr.paketUmroh?.namaPaket || "-"}</h1>
+            <h1 className="text-xl font-bold">{kbr.namaPaket || kbr.paketUmroh?.namaPaket || "-"}</h1>
             <div className="flex items-center gap-2 mt-0.5">
               <span className="text-sm text-muted-foreground font-mono">{kbr.kode}</span>
               <span className="text-muted-foreground">·</span>
@@ -838,7 +838,7 @@ export default function KeberangkatanDetailPage() {
                           {generateReminderText(
                             reminderTarget.jamaah,
                             reminderTarget.missingLabels,
-                            kbr.paketUmroh?.namaPaket || "-"
+                            kbr.namaPaket || kbr.paketUmroh?.namaPaket || "-"
                           )}
                         </pre>
                       </div>

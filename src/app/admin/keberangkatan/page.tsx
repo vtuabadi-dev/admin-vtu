@@ -100,7 +100,7 @@ export default function KeberangkatanListPage() {
       const q = searchQuery.toLowerCase().trim();
       result = result.filter(
         (k) =>
-          (k.paketUmroh?.namaPaket || "").toLowerCase().includes(q) ||
+          (k.namaPaket || k.paketUmroh?.namaPaket || "").toLowerCase().includes(q) ||
           k.kode.toLowerCase().includes(q) ||
           (k.maskapaiId && k.maskapaiId.toLowerCase().includes(q)) ||
           (k.hotelMekkahId && k.hotelMekkahId.toLowerCase().includes(q)) ||
@@ -236,7 +236,7 @@ export default function KeberangkatanListPage() {
               <CardHeader className="pb-3">
                 <div className="flex items-start justify-between">
                   <div>
-                    <CardTitle className="text-base">{k.paketUmroh?.namaPaket || "-"}</CardTitle>
+                    <CardTitle className="text-base">{k.namaPaket || k.paketUmroh?.namaPaket || "-"}</CardTitle>
                     <p className="text-xs text-muted-foreground mt-0.5 font-mono">
                       {k.kode}
                     </p>
