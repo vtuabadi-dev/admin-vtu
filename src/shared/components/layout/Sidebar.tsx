@@ -123,7 +123,7 @@ const adminNav: NavSection[] = [
         children: [
           { label: "Monitoring Pembayaran", href: "/admin/pembayaran" },
           { label: "Jadwal Reminder", href: "/admin/pembayaran/reminder" },
-          { label: "Laporan Pembayaran", href: "/admin/pembayaran/laporan" },
+          { label: "Manajemen Invoice", href: "/admin/pembayaran/laporan" },
           { label: "Histori Pembayaran", href: "/admin/pembayaran/histori" },
           { label: "Peninjauan Pembayaran", href: "/admin/pembayaran/review" },
         ],

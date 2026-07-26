@@ -9,6 +9,8 @@
     "lint": "next lint",
     "db:migrate": "DATABASE_URL=${DIRECT_URL:-$DATABASE_URL} npx prisma migrate deploy",
     "db:seed": "DATABASE_URL=${DIRECT_URL:-$DATABASE_URL} npx prisma db seed",
+    "seed:dummy": "npx tsx scripts/seed-dummy-data.ts",
+    "clean:dummy": "npx tsx scripts/clean-dummy-data.ts",
     "postinstall": "prisma generate",
     "test": "vitest",
     "test:ui": "vitest --ui",

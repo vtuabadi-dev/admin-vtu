@@ -29,3 +29,10 @@ export function formatDateShort(date: string | Date): string {
     day: "numeric",
   }).format(new Date(date));
 }
+
+export function formatNumberWithDots(val: string | number): string {
+  if (val === undefined || val === null || val === "") return "";
+  const clean = String(val).replace(/\D/g, "");
+  if (!clean) return "";
+  return clean.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+}

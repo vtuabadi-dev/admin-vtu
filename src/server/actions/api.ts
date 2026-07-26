@@ -9,17 +9,71 @@ import { prisma } from "@/server/db/client";
 // ==========================================
 
 export async function getKeberangkatanList() {
-  return await prisma.keberangkatan.findMany({
-    orderBy: { createdAt: "desc" },
-    include: { paketUmroh: true },
-  }) as any;
+  try {
+    const list = await prisma.keberangkatan.findMany({
+      orderBy: { tanggalBerangkat: "asc" },
+      include: {
+        paketUmroh: true,
+        maskapaiMaster: true,
+        hotelMekkahMaster: true,
+        hotelMadinahMaster: true,
+        startingPoint: true,
+        packageType: true,
+      },
+    });
+    return list.map((k) => ({
+      ...k,
+      tanggalBerangkat: k.tanggalBerangkat ? k.tanggalBerangkat.toISOString() : new Date().toISOString(),
+      tanggalPulang: k.tanggalPulang ? k.tanggalPulang.toISOString() : new Date().toISOString(),
+      createdAt: k.createdAt ? k.createdAt.toISOString() : new Date().toISOString(),
+      updatedAt: k.updatedAt ? k.updatedAt.toISOString() : new Date().toISOString(),
+      maskapai: k.maskapaiMaster?.name || (k.maskapai && !k.maskapai.startsWith("cm") ? k.maskapai : undefined) || "Saudia",
+      hotelMekkah: k.hotelMekkahMaster?.name || (k.hotelMekkah && !k.hotelMekkah.startsWith("cm") ? k.hotelMekkah : undefined) || "TBA",
+      hotelMadinah: k.hotelMadinahMaster?.name || (k.hotelMadinah && !k.hotelMadinah.startsWith("cm") ? k.hotelMadinah : undefined) || "TBA",
+      hotelOptions: (k as any).hotelOptions ?? [],
+    })) as any;
+  } catch (err) {
+    console.error("getKeberangkatanList error:", err);
+    return [];
+  }
 }
 
 export async function getKeberangkatanById(id: string) {
-  return await prisma.keberangkatan.findUnique({
-    where: { id },
-    include: { paketUmroh: true },
-  }) as any;
+  if (!id) return null;
+  try {
+    const k = await prisma.keberangkatan.findFirst({
+      where: {
+        OR: [
+          { id },
+          { kode: id },
+          { kodeIndividu: id },
+        ],
+      },
+      include: {
+        paketUmroh: true,
+        maskapaiMaster: true,
+        hotelMekkahMaster: true,
+        hotelMadinahMaster: true,
+        startingPoint: true,
+        packageType: true,
+      },
+    });
+    if (!k) return null;
+    return {
+      ...k,
+      tanggalBerangkat: k.tanggalBerangkat ? k.tanggalBerangkat.toISOString() : new Date().toISOString(),
+      tanggalPulang: k.tanggalPulang ? k.tanggalPulang.toISOString() : new Date().toISOString(),
+      createdAt: k.createdAt ? k.createdAt.toISOString() : new Date().toISOString(),
+      updatedAt: k.updatedAt ? k.updatedAt.toISOString() : new Date().toISOString(),
+      maskapai: k.maskapaiMaster?.name || (k.maskapai && !k.maskapai.startsWith("cm") ? k.maskapai : undefined) || "Saudia",
+      hotelMekkah: k.hotelMekkahMaster?.name || (k.hotelMekkah && !k.hotelMekkah.startsWith("cm") ? k.hotelMekkah : undefined) || "TBA",
+      hotelMadinah: k.hotelMadinahMaster?.name || (k.hotelMadinah && !k.hotelMadinah.startsWith("cm") ? k.hotelMadinah : undefined) || "TBA",
+      hotelOptions: (k as any).hotelOptions ?? [],
+    } as any;
+  } catch (err) {
+    console.error("getKeberangkatanById error:", err);
+    return null;
+  }
 }
 
 export async function getJamaahList() {

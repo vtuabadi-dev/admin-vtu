@@ -74,7 +74,8 @@ export function SearchableSelect({
 
   const focusNextElement = () => {
     if (nextFocusId) {
-      setTimeout(() => {
+      let attempts = 0;
+      const tryFocus = () => {
         const nextEl = document.getElementById(nextFocusId);
         if (nextEl) {
           nextEl.focus();
@@ -83,8 +84,12 @@ export function SearchableSelect({
           } else if (nextEl instanceof HTMLInputElement) {
             nextEl.select();
           }
+        } else if (attempts < 5) {
+          attempts++;
+          setTimeout(tryFocus, 40);
         }
-      }, 120);
+      };
+      setTimeout(tryFocus, 40);
     }
   };
 

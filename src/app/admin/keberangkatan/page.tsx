@@ -28,9 +28,7 @@ export default function KeberangkatanListPage() {
   const [keberangkatan, setKeberangkatan] = useState<Keberangkatan[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
-  const [selectedMonth, setSelectedMonth] = useState<number | null>(
-    new Date().getMonth() + 1
-  );
+  const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [openInfoId, setOpenInfoId] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -347,7 +345,7 @@ export default function KeberangkatanListPage() {
                   <div>
                     <p className="text-xs text-muted-foreground">Maskapai</p>
                     <p className="font-medium">
-                      {k.maskapaiId || "-"}{" "}
+                      {k.maskapai && !k.maskapai.startsWith("cm") ? k.maskapai : (k.maskapaiId || "-")}{" "}
                       <span className="text-muted-foreground font-normal">
                         ({k.nomorPenerbangan})
                       </span>
@@ -359,15 +357,34 @@ export default function KeberangkatanListPage() {
                 <div className="flex items-start gap-2 text-sm">
                   <Hotel className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs text-muted-foreground mb-1">
-                      Hotel
+                    <p className="text-xs text-muted-foreground mb-1 font-semibold">
+                      Komposisi Hotel (Mekkah & Madinah)
                     </p>
-                    <div className="flex flex-wrap gap-1">
-                        <span
-                          className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium"
-                        >
-                          {k.hotelMekkahId || "-"} &mdash; {k.hotelMadinahId || "-"}
-                        </span>
+                    <div className="flex flex-col gap-1.5">
+                      {Array.isArray(k.hotelOptions) && k.hotelOptions.length > 0 ? (
+                        k.hotelOptions.map((opt: any, idx: number) => (
+                          <div key={idx} className="flex flex-wrap items-center gap-1.5 text-xs bg-card border p-1.5 rounded-md shadow-xs">
+                            {opt.clusterName && opt.clusterName !== "Reguler" && (
+                              <span className="font-bold text-primary text-[10px] bg-primary/10 border border-primary/20 px-1.5 py-0.5 rounded">
+                                {opt.clusterName}
+                              </span>
+                            )}
+                            <span className="font-medium text-foreground">
+                              {opt.hotelMekkah || "TBA"} <span className="text-muted-foreground font-normal text-[11px]">(Mekkah)</span>
+                            </span>
+                            <span className="text-muted-foreground font-semibold">&mdash;</span>
+                            <span className="font-medium text-foreground">
+                              {opt.hotelMadinah || "TBA"} <span className="text-muted-foreground font-normal text-[11px]">(Madinah)</span>
+                            </span>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="flex flex-wrap gap-1">
+                          <span className="inline-flex items-center rounded-md bg-muted/40 border px-2 py-1 text-xs font-medium">
+                            {(k.hotelMekkah && !k.hotelMekkah.startsWith("cm")) ? k.hotelMekkah : "TBA"} &mdash; {(k.hotelMadinah && !k.hotelMadinah.startsWith("cm")) ? k.hotelMadinah : "TBA"}
+                          </span>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>

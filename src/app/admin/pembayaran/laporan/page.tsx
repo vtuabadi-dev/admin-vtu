@@ -299,9 +299,9 @@ export default function LaporanPembayaranPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Laporan Pembayaran</h1>
+        <h1 className="text-2xl font-bold tracking-tight">Manajemen Invoice</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Pusat input pembayaran — masukkan kode registrasi group untuk memulai
+          Pusat input pembayaran & invoice — masukkan kode registrasi group untuk memulai
         </p>
       </div>
 

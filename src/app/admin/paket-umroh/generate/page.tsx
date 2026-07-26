@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/shared/components/ui/Button";
 import { Input } from "@/shared/components/ui/Input";
 import { SearchableSelect } from "@/shared/components/ui/SearchableSelect";
-import { cn } from "@/shared/lib/utils";
+import { cn, formatNumberWithDots } from "@/shared/lib/utils";
 import { 
   MOCK_LANDING_PATTERN, 
   MOCK_KLASTER
@@ -25,6 +25,10 @@ import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X } from "luc
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [generatedResult, setGeneratedResult] = useState<{
+    count: number;
+    items: { name: string; code: string; date: string }[];
+  } | null>(null);
   const [fetching, setFetching] = useState(true);
   const [options, setOptions] = useState<MasterDataOptions | null>(null);
 
@@ -303,6 +307,11 @@ import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X } from "luc
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
+  const handleCurrencyChange = (name: string, val: string) => {
+    const rawNumber = val.replace(/\D/g, "");
+    setFormData(prev => ({ ...prev, [name]: rawNumber }));
+  };
+
   const focusNextId = (nextId: string) => {
     setTimeout(() => {
       const el = document.getElementById(nextId);
@@ -476,7 +485,16 @@ import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X } from "luc
     }
   };
 
+  const scrollToTop = () => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    document.documentElement.scrollTo({ top: 0, behavior: "smooth" });
+    document.body.scrollTo({ top: 0, behavior: "smooth" });
+    const mainEl = document.querySelector("main");
+    if (mainEl) mainEl.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
   const handleGenerate = async () => {
+    scrollToTop();
     if (departureDates.length === 0) {
       alert("Mohon tambahkan minimal satu tanggal keberangkatan pada Langkah 4.");
       return;
@@ -522,7 +540,52 @@ import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X } from "luc
       });
       const resJson = await res.json();
       if (resJson.success) {
+        // Capture summary for success banner before resetting form
+        const summaryItems = departureDates.map(d => ({
+          name: getIndividualNameForDate(d) || formData.namaPaket,
+          code: getIndividualCodeForDate(d) || formData.kodePaket,
+          date: d,
+        }));
+        setGeneratedResult({
+          count: departureDates.length,
+          items: summaryItems,
+        });
         setSuccess(true);
+
+        // Reset form state to clean initial values
+        setFormData({
+          jenisPaketId: "",
+          namaPaket: "",
+          kodePaket: "",
+          kodeGrup: "",
+          startingPointId: "",
+          landingPatternId: "",
+          maskapaiId: "",
+          hotelMekkahId: "",
+          hotelMadinahId: "",
+          isAdaKlaster: "tidak",
+          kapasitas: "",
+          isAdaPerlengkapan: "",
+          hargaBase: "",
+          durasiHari: "9",
+          upgradeDouble: "",
+          upgradeTriple: "",
+        });
+        setDepartureDates([]);
+        setTempDate("");
+        setClusterConfigs({
+          "K1": { hotelMekkahId: "", hotelMadinahId: "", hargaBase: "", upgradeDouble: "", upgradeTriple: "" },
+          "K2": { hotelMekkahId: "", hotelMadinahId: "", hargaBase: "", upgradeDouble: "", upgradeTriple: "" },
+          "K3": { hotelMekkahId: "", hotelMadinahId: "", hargaBase: "", upgradeDouble: "", upgradeTriple: "" },
+          "K4": { hotelMekkahId: "", hotelMadinahId: "", hargaBase: "", upgradeDouble: "", upgradeTriple: "" },
+        });
+        setFlyerFiles([]);
+        setFlyerPreviews([]);
+        setCaption("");
+        setOcrWarning("");
+        setOcrSuccess(false);
+
+        scrollToTop();
       } else {
         alert(`Gagal menyimpan keberangkatan: ${resJson.message || resJson.error || "Terjadi kesalahan server"}`);
       }
@@ -746,7 +809,11 @@ import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X } from "luc
               <label className="block text-sm font-medium mb-1">Maskapai</label>
               <SearchableSelect
                 id="field-maskapaiId"
-                nextFocusId={formData.isAdaKlaster === "ya" ? "field-K1-hotelMekkahId" : "field-hotelMekkahId"}
+                nextFocusId={
+                  formData.isAdaKlaster === "ya"
+                    ? `field-${options?.clusters?.[0]?.id || "K1"}-hotelMekkahId`
+                    : "field-hotelMekkahId"
+                }
                 options={options?.airlines.map(a => ({ value: a.id, label: a.name })) || []}
                 value={formData.maskapaiId}
                 onChange={(val) => setFormData(prev => ({ ...prev, maskapaiId: val }))}
@@ -836,24 +903,26 @@ import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X } from "luc
                     <label className="block text-sm font-medium mb-1">Harga Upgrade Double (Rp)</label>
                     <Input 
                       id="field-upgradeDouble" 
-                      type="number" 
+                      type="text" 
+                      inputMode="numeric"
                       name="upgradeDouble" 
-                      value={formData.upgradeDouble} 
-                      onChange={handleChange} 
+                      value={formatNumberWithDots(formData.upgradeDouble)} 
+                      onChange={(e) => handleCurrencyChange("upgradeDouble", e.target.value)} 
                       onKeyDown={(e) => handleKeyDownNext(e, "field-upgradeTriple")} 
-                      placeholder="Misal: 5000000" 
+                      placeholder="Misal: 5.000.000" 
                     />
                   </div>
                   <div>
                     <label className="block text-sm font-medium mb-1">Harga Upgrade Triple (Rp)</label>
                     <Input 
                       id="field-upgradeTriple" 
-                      type="number" 
+                      type="text" 
+                      inputMode="numeric"
                       name="upgradeTriple" 
-                      value={formData.upgradeTriple} 
-                      onChange={handleChange} 
+                      value={formatNumberWithDots(formData.upgradeTriple)} 
+                      onChange={(e) => handleCurrencyChange("upgradeTriple", e.target.value)} 
                       onKeyDown={(e) => handleKeyDownNext(e, "field-tempDate")} 
-                      placeholder="Misal: 3000000" 
+                      placeholder="Misal: 3.000.000" 
                     />
                   </div>
                 </div>
@@ -866,10 +935,23 @@ import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X } from "luc
                 <div className="space-y-3">
                   {(() => {
                     const clustersList = options?.clusters && options.clusters.length > 0 ? options.clusters : MOCK_KLASTER;
+                    const firstCluster = clustersList[0];
+
                     return clustersList.map((klaster, idx) => {
                       const nextKlaster = clustersList[idx + 1];
-                      const nextFieldId = nextKlaster
+                      
+                      // Phase 1 Target: After filling Harga Base of cluster idx:
+                      // - If next cluster exists, jump to next cluster's Hotel Mekkah
+                      // - If last cluster, jump to FIRST cluster's Harga Upgrade Double
+                      const nextHargaBaseTarget = nextKlaster
                         ? `field-${nextKlaster.id}-hotelMekkahId`
+                        : `field-${firstCluster.id}-upgradeDouble`;
+
+                      // Phase 2 Target: After filling Harga Upgrade Triple of cluster idx:
+                      // - If next cluster exists, jump to next cluster's Harga Upgrade Double
+                      // - If last cluster, jump to Step 4 Date Input (field-tempDate)
+                      const nextUpgradeTripleTarget = nextKlaster
+                        ? `field-${nextKlaster.id}-upgradeDouble`
                         : "field-tempDate";
 
                       return (
@@ -914,11 +996,12 @@ import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X } from "luc
                               <label className="block text-xs font-semibold text-muted-foreground mb-1">Harga Base (Rp)</label>
                               <Input 
                                 id={`field-${klaster.id}-hargaBase`}
-                                type="number" 
-                                placeholder="Misal: 35000000" 
-                                value={clusterConfigs[klaster.id]?.hargaBase || ""} 
-                                onChange={(e) => handleClusterConfigChange(klaster.id, "hargaBase", e.target.value)} 
-                                onKeyDown={(e) => handleKeyDownNext(e, `field-${klaster.id}-upgradeDouble`)}
+                                type="text" 
+                                inputMode="numeric"
+                                placeholder="Misal: 35.000.000" 
+                                value={formatNumberWithDots(clusterConfigs[klaster.id]?.hargaBase || "")} 
+                                onChange={(e) => handleClusterConfigChange(klaster.id, "hargaBase", e.target.value.replace(/\D/g, ""))} 
+                                onKeyDown={(e) => handleKeyDownNext(e, nextHargaBaseTarget)}
                                 className="h-8 text-xs"
                               />
                             </div>
@@ -926,10 +1009,11 @@ import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X } from "luc
                               <label className="block text-xs font-semibold text-muted-foreground mb-1">Harga Upgrade Double (Rp)</label>
                               <Input 
                                 id={`field-${klaster.id}-upgradeDouble`}
-                                type="number" 
-                                placeholder="Misal: 5000000" 
-                                value={clusterConfigs[klaster.id]?.upgradeDouble || ""} 
-                                onChange={(e) => handleClusterConfigChange(klaster.id, "upgradeDouble", e.target.value)} 
+                                type="text" 
+                                inputMode="numeric"
+                                placeholder="Misal: 5.000.000" 
+                                value={formatNumberWithDots(clusterConfigs[klaster.id]?.upgradeDouble || "")} 
+                                onChange={(e) => handleClusterConfigChange(klaster.id, "upgradeDouble", e.target.value.replace(/\D/g, ""))} 
                                 onKeyDown={(e) => handleKeyDownNext(e, `field-${klaster.id}-upgradeTriple`)}
                                 className="h-8 text-xs"
                               />
@@ -938,11 +1022,12 @@ import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X } from "luc
                               <label className="block text-xs font-semibold text-muted-foreground mb-1">Harga Upgrade Triple (Rp)</label>
                               <Input 
                                 id={`field-${klaster.id}-upgradeTriple`}
-                                type="number" 
-                                placeholder="Misal: 3000000" 
-                                value={clusterConfigs[klaster.id]?.upgradeTriple || ""} 
-                                onChange={(e) => handleClusterConfigChange(klaster.id, "upgradeTriple", e.target.value)} 
-                                onKeyDown={(e) => handleKeyDownNext(e, nextFieldId)}
+                                type="text" 
+                                inputMode="numeric"
+                                placeholder="Misal: 3.000.000" 
+                                value={formatNumberWithDots(clusterConfigs[klaster.id]?.upgradeTriple || "")} 
+                                onChange={(e) => handleClusterConfigChange(klaster.id, "upgradeTriple", e.target.value.replace(/\D/g, ""))} 
+                                onKeyDown={(e) => handleKeyDownNext(e, nextUpgradeTripleTarget)}
                                 className="h-8 text-xs"
                               />
                             </div>
@@ -1072,12 +1157,13 @@ import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X } from "luc
                     <label className="block text-sm font-medium mb-1">Harga Base (Rp)</label>
                     <Input 
                       id="field-hargaBase" 
-                      type="number" 
+                      type="text" 
+                      inputMode="numeric"
                       name="hargaBase" 
-                      value={formData.hargaBase} 
-                      onChange={handleChange} 
+                      value={formatNumberWithDots(formData.hargaBase)} 
+                      onChange={(e) => handleCurrencyChange("hargaBase", e.target.value)} 
                       onKeyDown={(e) => handleKeyDownNext(e, "field-submitBtn")}
-                      placeholder="35000000" 
+                      placeholder="35.000.000" 
                     />
                   </>
                 ) : (
@@ -1132,46 +1218,60 @@ import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X } from "luc
         </div>
       </div>
 
-      {success && (
+      {success && generatedResult && (
         <div className="p-5 bg-emerald-50 border border-emerald-200 rounded-lg shadow-sm space-y-3 animate-in fade-in-0 duration-300">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 text-emerald-800 font-bold text-sm">
               <span className="text-base">🎉</span>
-              <span>Berhasil Men-Generate {departureDates.length} Paket Umroh!</span>
+              <span>Berhasil Men-Generate {generatedResult.count} Paket Umroh!</span>
             </div>
-            <span className="text-xs bg-emerald-100 text-emerald-800 px-2.5 py-1 rounded-full font-semibold">
-              Status: Sukses
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="text-xs bg-emerald-100 text-emerald-800 px-2.5 py-1 rounded-full font-semibold">
+                Status: Sukses
+              </span>
+              <button
+                type="button"
+                onClick={() => setSuccess(false)}
+                className="text-emerald-700 hover:text-emerald-950 font-bold text-xs px-1.5 py-0.5 rounded hover:bg-emerald-100 transition-colors"
+                title="Tutup Notifikasi"
+              >
+                ✕
+              </button>
+            </div>
           </div>
 
           <p className="text-xs text-emerald-700">
-            Berikut adalah daftar {departureDates.length} Nama Paket yang telah berhasil ter-generate:
+            Berikut adalah daftar {generatedResult.count} Nama Paket yang telah berhasil ter-generate:
           </p>
 
           {/* List of Generated Package Names line by line */}
           <div className="space-y-1.5 p-3 bg-white/90 border border-emerald-200 rounded-md max-h-[280px] overflow-y-auto">
-            {departureDates.map((d, idx) => {
-              const name = getIndividualNameForDate(d) || formData.namaPaket;
-              const code = getIndividualCodeForDate(d) || formData.kodePaket;
-              return (
-                <div key={idx} className="flex flex-col sm:flex-row sm:items-center justify-between p-2 rounded bg-emerald-50/60 border border-emerald-100 text-xs gap-2">
-                  <div className="flex items-center gap-2 truncate">
-                    <span className="font-mono text-[11px] font-bold text-emerald-900 bg-emerald-200/70 px-1.5 py-0.5 rounded shrink-0">
-                      #{idx + 1}
-                    </span>
-                    <span className="font-semibold text-emerald-950 truncate">{name}</span>
-                  </div>
-                  {code && (
-                    <span className="font-mono text-[11px] font-semibold text-emerald-800 shrink-0">
-                      [{code}]
-                    </span>
-                  )}
+            {generatedResult.items.map((item, idx) => (
+              <div key={idx} className="flex flex-col sm:flex-row sm:items-center justify-between p-2 rounded bg-emerald-50/60 border border-emerald-100 text-xs gap-2">
+                <div className="flex items-center gap-2 truncate">
+                  <span className="font-mono text-[11px] font-bold text-emerald-900 bg-emerald-200/70 px-1.5 py-0.5 rounded shrink-0">
+                    #{idx + 1}
+                  </span>
+                  <span className="font-semibold text-emerald-950 truncate">{item.name}</span>
                 </div>
-              );
-            })}
+                {item.code && (
+                  <span className="font-mono text-[11px] font-semibold text-emerald-800 shrink-0">
+                    [{item.code}]
+                  </span>
+                )}
+              </div>
+            ))}
           </div>
 
-          <div className="flex justify-end pt-1">
+          <div className="flex items-center justify-between pt-1">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setSuccess(false)}
+              className="text-xs border-emerald-300 text-emerald-800 hover:bg-emerald-100"
+            >
+              + Buat Paket Baru
+            </Button>
             <Button
               size="sm"
               onClick={() => router.push("/admin/keberangkatan")}

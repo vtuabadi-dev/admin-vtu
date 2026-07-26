@@ -2,6 +2,10 @@ import { prisma } from "@/server/db/client";
 import type { Keberangkatan } from "@/shared/types";
 
 function mapKeberangkatan(row: any): Keberangkatan {
+  const maskapaiName = row.maskapaiMaster?.name || (row.maskapai && !row.maskapai.startsWith("cm") ? row.maskapai : undefined) || "Saudia";
+  const mekkahName = row.hotelMekkahMaster?.name || (row.hotelMekkah && !row.hotelMekkah.startsWith("cm") ? row.hotelMekkah : undefined) || "TBA";
+  const madinahName = row.hotelMadinahMaster?.name || (row.hotelMadinah && !row.hotelMadinah.startsWith("cm") ? row.hotelMadinah : undefined) || "TBA";
+
   return {
     id: row.id,
     kode: row.kodeIndividu || row.kode,
@@ -18,9 +22,9 @@ function mapKeberangkatan(row: any): Keberangkatan {
     packageTypeId: row.packageTypeId ?? undefined,
     namaPaket: row.namaPaket ?? "-",
     hargaPaket: row.hargaPaket ?? 0,
-    maskapai: row.maskapai ?? "-",
-    hotelMekkah: row.hotelMekkah ?? "-",
-    hotelMadinah: row.hotelMadinah ?? "-",
+    maskapai: maskapaiName,
+    hotelMekkah: mekkahName,
+    hotelMadinah: madinahName,
     kuota: row.kuota ?? row.maxSeat ?? 0,
     tanggalBerangkat: row.tanggalBerangkat?.toISOString() ?? new Date().toISOString(),
     tanggalPulang: row.tanggalPulang?.toISOString() ?? new Date().toISOString(),
@@ -28,8 +32,16 @@ function mapKeberangkatan(row: any): Keberangkatan {
     kodeIndividu: row.kodeIndividu ?? undefined,
     paketGrupId: row.paketGrupId ?? undefined,
     driveFolderIds: row.driveFolderIds ?? undefined,
+    hotelOptions: row.hotelOptions ?? [],
   };
 }
+
+const DEFAULT_INCLUDE = {
+  maskapaiMaster: true,
+  hotelMekkahMaster: true,
+  hotelMadinahMaster: true,
+  groups: { include: { anggota: { select: { id: true } } } },
+};
 
 // ────────────────────────────────────────────────────────────
 // Queries
@@ -43,7 +55,7 @@ export const keberangkatanRepo = {
     const [rows, total] = await Promise.all([
       prisma.keberangkatan.findMany({
         where,
-        include: { groups: { include: { anggota: { select: { id: true } } } } },
+        include: DEFAULT_INCLUDE,
         take: params?.limit,
         skip: params?.offset,
         orderBy: { tanggalBerangkat: "asc" },
@@ -56,12 +68,12 @@ export const keberangkatanRepo = {
   async findById(id: string) {
     const row = await prisma.keberangkatan.findUnique({
       where: { id },
-      include: { groups: { include: { anggota: { select: { id: true } } } } },
+      include: DEFAULT_INCLUDE,
     });
     return row ? mapKeberangkatan(row) : null;
   },
 
-  async create(data: Omit<Keberangkatan, "id" | "jamaahIds">) {
+  async create(data: any) {
     const row = await prisma.keberangkatan.create({
       data: {
         kode: data.kode,
@@ -87,9 +99,9 @@ export const keberangkatanRepo = {
         hotelMekkah: data.hotelMekkah ?? "TBA",
         hotelMadinah: data.hotelMadinah ?? "TBA",
         kuota: data.kuota ?? data.maxSeat ?? 0,
-        hotelOptions: [],
+        hotelOptions: data.hotelOptions ? (data.hotelOptions as any) : [],
       },
-      include: { groups: { include: { anggota: { select: { id: true } } } } },
+      include: DEFAULT_INCLUDE,
     });
     return mapKeberangkatan(row);
   },

@@ -70,6 +70,63 @@ export const packageService = {
       paketGrupId = groupRecord.id;
     }
 
+    // Resolve hotel names (for single or cluster mode)
+    const hotelIdsToFetch = new Set<string>();
+    if (data.hotelMekkahId) hotelIdsToFetch.add(data.hotelMekkahId);
+    if (data.hotelMadinahId) hotelIdsToFetch.add(data.hotelMadinahId);
+    if (data.isAdaKlaster === "ya" && data.clusterConfigs) {
+      for (const cfg of Object.values(data.clusterConfigs as Record<string, any>)) {
+        if (cfg.hotelMekkahId) hotelIdsToFetch.add(cfg.hotelMekkahId);
+        if (cfg.hotelMadinahId) hotelIdsToFetch.add(cfg.hotelMadinahId);
+      }
+    }
+
+    const fetchedHotels = hotelIdsToFetch.size > 0
+      ? await prisma.masterHotel.findMany({ where: { id: { in: Array.from(hotelIdsToFetch) } } })
+      : [];
+    const hotelMap = new Map(fetchedHotels.map(h => [h.id, h.name]));
+
+    let finalHotelMekkah = hotelMap.get(data.hotelMekkahId) || data.hotelMekkah || "TBA";
+    let finalHotelMadinah = hotelMap.get(data.hotelMadinahId) || data.hotelMadinah || "TBA";
+    let hotelOptionsArray: any[] = [];
+
+    if (data.isAdaKlaster === "ya" && data.clusterConfigs) {
+      const clusterIds = Object.keys(data.clusterConfigs);
+      const masterClusters = clusterIds.length > 0
+        ? await prisma.masterCluster.findMany({ where: { id: { in: clusterIds } } })
+        : [];
+      const clusterMap = new Map(masterClusters.map(c => [c.id, c.nama]));
+
+      hotelOptionsArray = clusterIds.map(cId => {
+        const cfg = data.clusterConfigs[cId];
+        const cName = clusterMap.get(cId) || cId;
+        const hMek = hotelMap.get(cfg.hotelMekkahId) || "TBA";
+        const hMed = hotelMap.get(cfg.hotelMadinahId) || "TBA";
+        return {
+          clusterId: cId,
+          clusterName: cName,
+          hotelMekkah: hMek,
+          hotelMadinah: hMed,
+          hargaBase: Number(cfg.hargaBase || 0),
+          upgradeDouble: Number(cfg.upgradeDouble || 0),
+          upgradeTriple: Number(cfg.upgradeTriple || 0),
+        };
+      });
+
+      const mekkahNames = Array.from(new Set(hotelOptionsArray.map(o => o.hotelMekkah).filter(n => n !== "TBA")));
+      const madinahNames = Array.from(new Set(hotelOptionsArray.map(o => o.hotelMadinah).filter(n => n !== "TBA")));
+
+      if (mekkahNames.length > 0) finalHotelMekkah = mekkahNames.join(" / ");
+      if (madinahNames.length > 0) finalHotelMadinah = madinahNames.join(" / ");
+    } else {
+      hotelOptionsArray = [{
+        clusterName: "Reguler",
+        hotelMekkah: finalHotelMekkah,
+        hotelMadinah: finalHotelMadinah,
+        hargaBase: Number(data.hargaBase || data.hargaPaket || 0),
+      }];
+    }
+
     // 3. Create Keberangkatan for each date
     const createdList = [];
 
@@ -127,9 +184,9 @@ export const packageService = {
         maskapai: airline?.name || data.maskapai || "Saudia",
         maskapaiId: data.maskapaiId,
         nomorPenerbangan: data.nomorPenerbangan || "SV-816",
-        hotelMekkah: data.hotelMekkah || "TBA",
+        hotelMekkah: finalHotelMekkah,
         hotelMekkahId: data.hotelMekkahId,
-        hotelMadinah: data.hotelMadinah || "TBA",
+        hotelMadinah: finalHotelMadinah,
         hotelMadinahId: data.hotelMadinahId,
         startingPointId: data.startingPointId,
         packageTypeId: data.packageTypeId,
@@ -138,6 +195,7 @@ export const packageService = {
         terisi: 0,
         status: "scheduled",
         durationDays: durasiHari,
+        hotelOptions: hotelOptionsArray,
       } as any);
 
       createdList.push(created);

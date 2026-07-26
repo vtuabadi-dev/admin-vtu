@@ -119,30 +119,37 @@ export default function KeberangkatanDetailPage() {
     if (!id) return;
     async function load() {
       setLoading(true);
-      const [k, int, wrn, tl, fin, score, allJamaah, allGroups] = await Promise.all([
-        getKeberangkatanById(id),
-        getPackageIntelligence(id),
-        getAutoWarnings(id),
-        getOperationalTimeline(id),
-        getFinalizationResult(id),
-        getPackageReadinessScore(id),
-        getJamaahList(),
-        getGroupList(),
-      ]);
-      setKbr(k ?? null);
-      setIntel(int ?? null);
-      setWarnings(wrn);
-      setTimeline(tl ?? []);
-      setFinalization(fin ?? null);
-      setReadinessScore(score ?? null);
+      try {
+        const [k, int, wrn, tl, fin, score, allJamaah, allGroups] = await Promise.all([
+          getKeberangkatanById(id),
+          getPackageIntelligence(id).catch(() => null),
+          getAutoWarnings(id).catch(() => []),
+          getOperationalTimeline(id).catch(() => []),
+          getFinalizationResult(id).catch(() => null),
+          getPackageReadinessScore(id).catch(() => null),
+          getJamaahList().catch(() => []),
+          getGroupList().catch(() => []),
+        ]);
+        setKbr(k ?? null);
+        setIntel(int ?? null);
+        setWarnings(wrn || []);
+        setTimeline(tl ?? []);
+        setFinalization(fin ?? null);
+        setReadinessScore(score ?? null);
 
-      // Build doc rows from jamaah in this package
-      const pkgGroupIds = new Set(
-        allGroups.filter((g: any) => g.paketKeberangkatanId === id).map((g: any) => g.id)
-      );
-      const pkgJamaah = allJamaah.filter((j: any) => pkgGroupIds.has(j.groupId));
-      setDocRows(buildDocRows(pkgJamaah));
-      setLoading(false);
+        // Build doc rows from jamaah in this package
+        const safeGroups = Array.isArray(allGroups) ? allGroups : [];
+        const safeJamaah = Array.isArray(allJamaah) ? allJamaah : [];
+        const pkgGroupIds = new Set(
+          safeGroups.filter((g: any) => g.paketKeberangkatanId === id).map((g: any) => g.id)
+        );
+        const pkgJamaah = safeJamaah.filter((j: any) => pkgGroupIds.has(j.groupId));
+        setDocRows(buildDocRows(pkgJamaah));
+      } catch (err) {
+        console.error("Error loading keberangkatan detail:", err);
+      } finally {
+        setLoading(false);
+      }
     }
     load();
   }, [id]);

@@ -357,6 +357,7 @@ export interface Keberangkatan {
   kodeIndividu?: string;
   paketGrupId?: string;
   driveFolderIds?: any;
+  hotelOptions?: any;
 }
 
 /** TODO: Multi-tenant — add tenantId: string */
