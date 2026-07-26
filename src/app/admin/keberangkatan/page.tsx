@@ -361,30 +361,37 @@ export default function KeberangkatanListPage() {
                       Komposisi Hotel (Mekkah & Madinah)
                     </p>
                     <div className="flex flex-col gap-1.5">
-                      {Array.isArray(k.hotelOptions) && k.hotelOptions.length > 0 ? (
-                        k.hotelOptions.map((opt: any, idx: number) => (
-                          <div key={idx} className="flex flex-wrap items-center gap-1.5 text-xs bg-card border p-1.5 rounded-md shadow-xs">
-                            {opt.clusterName && opt.clusterName !== "Reguler" && (
-                              <span className="font-bold text-primary text-[10px] bg-primary/10 border border-primary/20 px-1.5 py-0.5 rounded">
-                                {opt.clusterName}
+                      {(() => {
+                        let optionsList = k.hotelOptions;
+                        if (typeof optionsList === "string") {
+                          try { optionsList = JSON.parse(optionsList); } catch { optionsList = []; }
+                        }
+                        if (Array.isArray(optionsList) && optionsList.length > 0) {
+                          return optionsList.map((opt: any, idx: number) => (
+                            <div key={idx} className="flex flex-wrap items-center gap-1.5 text-xs bg-card border p-1.5 rounded-md shadow-xs">
+                              {opt.clusterName && opt.clusterName !== "Reguler" && (
+                                <span className="font-bold text-primary text-[10px] bg-primary/10 border border-primary/20 px-1.5 py-0.5 rounded">
+                                  {opt.clusterName}
+                                </span>
+                              )}
+                              <span className="font-medium text-foreground">
+                                {opt.hotelMekkah || k.hotelMekkah || "TBA"} <span className="text-muted-foreground font-normal text-[11px]">(Mekkah)</span>
                               </span>
-                            )}
-                            <span className="font-medium text-foreground">
-                              {opt.hotelMekkah || "TBA"} <span className="text-muted-foreground font-normal text-[11px]">(Mekkah)</span>
-                            </span>
-                            <span className="text-muted-foreground font-semibold">&mdash;</span>
-                            <span className="font-medium text-foreground">
-                              {opt.hotelMadinah || "TBA"} <span className="text-muted-foreground font-normal text-[11px]">(Madinah)</span>
+                              <span className="text-muted-foreground font-semibold">&mdash;</span>
+                              <span className="font-medium text-foreground">
+                                {opt.hotelMadinah || k.hotelMadinah || "TBA"} <span className="text-muted-foreground font-normal text-[11px]">(Madinah)</span>
+                              </span>
+                            </div>
+                          ));
+                        }
+                        return (
+                          <div className="flex flex-wrap gap-1">
+                            <span className="inline-flex items-center rounded-md bg-muted/40 border px-2 py-1 text-xs font-medium">
+                              {k.hotelMekkah || "TBA"} &mdash; {k.hotelMadinah || "TBA"}
                             </span>
                           </div>
-                        ))
-                      ) : (
-                        <div className="flex flex-wrap gap-1">
-                          <span className="inline-flex items-center rounded-md bg-muted/40 border px-2 py-1 text-xs font-medium">
-                            {(k.hotelMekkah && !k.hotelMekkah.startsWith("cm")) ? k.hotelMekkah : "TBA"} &mdash; {(k.hotelMadinah && !k.hotelMadinah.startsWith("cm")) ? k.hotelMadinah : "TBA"}
-                          </span>
-                        </div>
-                      )}
+                        );
+                      })()}
                     </div>
                   </div>
                 </div>

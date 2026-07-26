@@ -3,8 +3,28 @@ import type { Keberangkatan } from "@/shared/types";
 
 function mapKeberangkatan(row: any): Keberangkatan {
   const maskapaiName = row.maskapaiMaster?.name || (row.maskapai && !row.maskapai.startsWith("cm") ? row.maskapai : undefined) || "Saudia";
-  const mekkahName = row.hotelMekkahMaster?.name || (row.hotelMekkah && !row.hotelMekkah.startsWith("cm") ? row.hotelMekkah : undefined) || "TBA";
-  const madinahName = row.hotelMadinahMaster?.name || (row.hotelMadinah && !row.hotelMadinah.startsWith("cm") ? row.hotelMadinah : undefined) || "TBA";
+  
+  let mekkahName = row.hotelMekkahMaster?.name || row.hotelMekkah;
+  if (!mekkahName || (typeof mekkahName === "string" && mekkahName.startsWith("cm") && mekkahName.length > 20)) {
+    mekkahName = "TBA";
+  }
+
+  let madinahName = row.hotelMadinahMaster?.name || row.hotelMadinah;
+  if (!madinahName || (typeof madinahName === "string" && madinahName.startsWith("cm") && madinahName.length > 20)) {
+    madinahName = "TBA";
+  }
+
+  let parsedHotelOptions = row.hotelOptions;
+  if (typeof parsedHotelOptions === "string") {
+    try {
+      parsedHotelOptions = JSON.parse(parsedHotelOptions);
+    } catch {
+      parsedHotelOptions = [];
+    }
+  }
+  if (!Array.isArray(parsedHotelOptions)) {
+    parsedHotelOptions = [];
+  }
 
   return {
     id: row.id,
@@ -32,7 +52,7 @@ function mapKeberangkatan(row: any): Keberangkatan {
     kodeIndividu: row.kodeIndividu ?? undefined,
     paketGrupId: row.paketGrupId ?? undefined,
     driveFolderIds: row.driveFolderIds ?? undefined,
-    hotelOptions: row.hotelOptions ?? [],
+    hotelOptions: parsedHotelOptions,
   };
 }
 
