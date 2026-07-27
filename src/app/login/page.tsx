@@ -71,9 +71,9 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="w-full max-w-5xl">
+    <div className="w-full max-w-6xl px-4 sm:px-6">
       {/* ── Main 2-Column Metallic Green & Sage Card Container ── */}
-      <div className="bg-white rounded-3xl shadow-2xl overflow-hidden border border-emerald-900/10 grid grid-cols-1 lg:grid-cols-12 min-h-[580px]">
+      <div className="bg-white rounded-3xl shadow-2xl overflow-hidden border border-emerald-900/10 grid grid-cols-1 lg:grid-cols-12 min-h-[600px]">
         
         {/* ── Left Side: Login Form (Col 1-5 on LG) ── */}
         <div className="lg:col-span-5 p-8 sm:p-10 flex flex-col justify-center bg-white">
@@ -215,13 +215,13 @@ export default function LoginPage() {
             <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white drop-shadow-sm">
               Layanan Jamaah & Publik
             </h2>
-            <p className="text-xs sm:text-sm text-emerald-100/80 mt-1.5 max-w-md mx-auto">
+            <p className="text-xs sm:text-sm text-emerald-100/80 mt-1.5 max-w-lg mx-auto">
               Akses cepat pendaftaran jamaah, badal umroh, wakaf Al-Qur&apos;an, serta pelacakan status secara langsung.
             </p>
           </div>
 
           {/* 4 Service Boxes Container (Matching Image 2 Layout) */}
-          <div className="relative z-10 space-y-3 max-w-lg mx-auto w-full">
+          <div className="relative z-10 space-y-3.5 max-w-xl mx-auto w-full">
             
             {/* Box 1: Portal Registrasi Jamaah Umroh */}
             <div className="flex items-center justify-between p-3.5 sm:p-4 rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 hover:bg-white/15 transition-all shadow-md group">
