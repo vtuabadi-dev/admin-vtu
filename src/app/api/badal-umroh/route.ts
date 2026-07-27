@@ -8,18 +8,14 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const {
-      isJamaahVauza,
-      namaPaketUmroh,
-      namaTourLeader,
-      namaMuthowif,
-      namaPeserta,
       namaPemohon,
       nomorWhatsapp,
-      emailPemohon,
       namaAlmarhum,
       jenisKelamin,
-      hubungan,
-      paketBadal,
+      metodeSouvenir,
+      alamatPengiriman,
+      buktiTransferUrl,
+      buktiBayarUrl,
       catatan,
     } = body;
 
@@ -27,21 +23,25 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, message: "Mohon isi nama pemohon, WA, dan nama almarhum" }, { status: 400 });
     }
 
+    const souvenirInfo = metodeSouvenir === "dikirim"
+      ? `Pengiriman Souvenir: Dikirim via Ekspedisi ke Alamat (${alamatPengiriman || "Alamat tidak diisi"})`
+      : "Pengambilan Souvenir: Diambil di Kantor VTU";
+
+    const finalCatatan = [catatan, souvenirInfo].filter(Boolean).join(" | ");
+    const proofUrl = buktiTransferUrl || buktiBayarUrl || null;
+
     const reg = await prisma.badalUmrohRegistration.create({
       data: {
-        isJamaahVauza: Boolean(isJamaahVauza),
-        namaPaketUmroh: namaPaketUmroh ? String(namaPaketUmroh).trim() : null,
-        namaTourLeader: namaTourLeader ? String(namaTourLeader).trim() : null,
-        namaMuthowif: namaMuthowif ? String(namaMuthowif).trim() : null,
-        namaPeserta: namaPeserta ? String(namaPeserta).trim() : null,
+        isJamaahVauza: false,
         namaPemohon: String(namaPemohon).trim(),
         nomorWhatsapp: String(nomorWhatsapp).trim(),
-        emailPemohon: emailPemohon ? String(emailPemohon).trim() : null,
         namaAlmarhum: String(namaAlmarhum).trim(),
         jenisKelamin: jenisKelamin || "L",
-        hubungan: hubungan || "Orang Tua",
-        paketBadal: paketBadal || "Standard",
-        catatan: catatan ? String(catatan).trim() : null,
+        hubungan: "Keluarga",
+        paketBadal: "Standard",
+        catatan: finalCatatan,
+        paymentStatus: proofUrl ? "Menunggu Konfirmasi" : "Belum Bayar",
+        buktiBayarUrl: proofUrl,
         status: "Pending",
       },
     });

@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, CheckCircle2, HeartHandshake, Send, UserCheck, Users, Compass, User, Sparkles } from "lucide-react";
+import { ArrowLeft, CheckCircle2, HeartHandshake, Send, User, Upload, Building2, Truck, FileCheck } from "lucide-react";
 import { Button } from "@/shared/components/ui/Button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/components/ui/Card";
 import { Input } from "@/shared/components/ui/Input";
@@ -10,58 +10,63 @@ import { Input } from "@/shared/components/ui/Input";
 export default function BadalUmrohRegisterPage() {
   const [submitted, setSubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [paketOptions, setPaketOptions] = useState<any[]>([]);
 
-  // State Pilihan Status Kejamaahan
-  const [isJamaahVauza, setIsJamaahVauza] = useState<boolean>(true);
-
-  // State Form
+  // State Form Simplified
   const [formData, setFormData] = useState({
-    namaPaketUmroh: "",
-    namaTourLeader: "",
-    namaMuthowif: "",
-    namaPeserta: "",
     namaPemohon: "",
     nomorWhatsapp: "",
-    emailPemohon: "",
     namaAlmarhum: "",
-    jenisKelamin: "L",
-    hubungan: "Orang Tua",
-    paketBadal: "Standard (Dokumentasi Sertifikat & Video Execution)",
-    catatan: "",
+    jenisKelamin: "L", // "L" | "P"
+    metodeSouvenir: "dikantor", // "dikantor" | "dikirim"
+    alamatPengiriman: "",
   });
 
-  // Fetch Daftar Paket Umroh untuk pilihan Jamaah Vauza
-  useEffect(() => {
-    fetch("/api/packages")
-      .then((res) => res.json())
-      .then((resJson) => {
-        if (resJson.success && Array.isArray(resJson.data)) {
-          setPaketOptions(resJson.data);
-        }
-      })
-      .catch((err) => console.error(err));
-  }, []);
+  const [buktiTransferFile, setBuktiTransferFile] = useState<File | null>(null);
+  const [buktiTransferPreview, setBuktiTransferPreview] = useState<string>("");
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      alert("Ukuran file bukti transfer maksimal 5MB");
+      return;
+    }
+
+    setBuktiTransferFile(file);
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setBuktiTransferPreview(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleRemoveFile = () => {
+    setBuktiTransferFile(null);
+    setBuktiTransferPreview("");
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
+
+    if (formData.metodeSouvenir === "dikirim" && !formData.alamatPengiriman.trim()) {
+      alert("Mohon lengkapi alamat pengiriman souvenir");
+      return;
+    }
+
+    setIsSubmitting(true);
+
     try {
-      setIsSubmitting(true);
-      
       const payload = {
-        isJamaahVauza,
-        namaPaketUmroh: isJamaahVauza ? formData.namaPaketUmroh : null,
-        namaTourLeader: isJamaahVauza ? formData.namaTourLeader : null,
-        namaMuthowif: isJamaahVauza ? formData.namaMuthowif : null,
-        namaPeserta: isJamaahVauza ? formData.namaPeserta : null,
-        namaPemohon: isJamaahVauza ? (formData.namaPeserta || formData.namaPemohon) : formData.namaPemohon,
+        namaPemohon: formData.namaPemohon,
         nomorWhatsapp: formData.nomorWhatsapp,
-        emailPemohon: formData.emailPemohon,
         namaAlmarhum: formData.namaAlmarhum,
         jenisKelamin: formData.jenisKelamin,
-        hubungan: formData.hubungan,
-        paketBadal: formData.paketBadal,
-        catatan: formData.catatan,
+        metodeSouvenir: formData.metodeSouvenir,
+        alamatPengiriman: formData.metodeSouvenir === "dikirim" ? formData.alamatPengiriman : null,
+        buktiTransferUrl: buktiTransferPreview || null,
       };
 
       const res = await fetch("/api/badal-umroh", {
@@ -69,6 +74,7 @@ export default function BadalUmrohRegisterPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
+
       const resJson = await res.json();
       if (resJson.success) {
         setSubmitted(true);
@@ -83,9 +89,23 @@ export default function BadalUmrohRegisterPage() {
     }
   };
 
+  const resetForm = () => {
+    setSubmitted(false);
+    setFormData({
+      namaPemohon: "",
+      nomorWhatsapp: "",
+      namaAlmarhum: "",
+      jenisKelamin: "L",
+      metodeSouvenir: "dikantor",
+      alamatPengiriman: "",
+    });
+    setBuktiTransferFile(null);
+    setBuktiTransferPreview("");
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 py-10 px-4 flex items-center justify-center">
-      <div className="w-full max-w-2xl space-y-6">
+      <div className="w-full max-w-xl space-y-6">
         <Link
           href="/login"
           className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
@@ -106,303 +126,246 @@ export default function BadalUmrohRegisterPage() {
 
           <CardContent className="p-6">
             {submitted ? (
-              <div className="text-center py-8 space-y-4">
+              <div className="text-center py-6 space-y-4">
                 <div className="mx-auto w-16 h-16 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-600 flex items-center justify-center">
                   <CheckCircle2 className="h-8 w-8" />
                 </div>
                 <h3 className="text-lg font-bold text-foreground">Pendaftaran Badal Umroh Berhasil!</h3>
                 <p className="text-sm text-muted-foreground max-w-md mx-auto">
-                  Terima kasih Bpk/Ibu <span className="font-semibold text-foreground">{formData.namaPeserta || formData.namaPemohon}</span>. Permohonan Badal Umroh untuk <span className="font-semibold text-emerald-600">{formData.namaAlmarhum}</span> telah kami terima.
+                  Terima kasih Bpk/Ibu <span className="font-semibold text-foreground">{formData.namaPemohon}</span>. Permohonan Badal Umroh untuk <span className="font-semibold text-emerald-600">{formData.namaAlmarhum}</span> telah kami terima.
                 </p>
-                <div className="bg-muted/40 p-4 rounded-lg text-xs text-left max-w-md mx-auto space-y-1.5">
-                  <p><strong>Status Kejamaahan:</strong> {isJamaahVauza ? "Jamaah Vauza Tiga Utama (VTU)" : "Pendaftaran Umum"}</p>
-                  {isJamaahVauza && (
-                    <>
-                      <p><strong>Paket Umroh:</strong> {formData.namaPaketUmroh || "-"}</p>
-                      <p><strong>Tour Leader / Muthowif:</strong> {formData.namaTourLeader || "-"} / {formData.namaMuthowif || "-"}</p>
-                      <p><strong>Nama Peserta Jamaah:</strong> {formData.namaPeserta}</p>
-                    </>
-                  )}
-                  <p><strong>Nama Almarhum/ah:</strong> {formData.namaAlmarhum}</p>
-                  <p><strong>Hubungan:</strong> {formData.hubungan}</p>
-                  <p><strong>Paket Badal:</strong> {formData.paketBadal}</p>
+
+                <div className="bg-muted/40 p-4 rounded-lg text-xs text-left max-w-md mx-auto space-y-2 border">
+                  <p><strong>Nama Pemohon:</strong> {formData.namaPemohon}</p>
+                  <p><strong>Nomor WhatsApp:</strong> {formData.nomorWhatsapp}</p>
+                  <p><strong>Nama Almarhum/ah:</strong> {formData.namaAlmarhum} ({formData.jenisKelamin === "L" ? "Laki-laki" : "Perempuan"})</p>
+                  <p><strong>Penyerahan Souvenir:</strong> {formData.metodeSouvenir === "dikirim" ? `Dikirim via Ekspedisi (${formData.alamatPengiriman})` : "Diambil di Kantor VTU"}</p>
+                  <p><strong>Status Bukti Pembayaran:</strong> {buktiTransferPreview ? "Terunggah (Menunggu Konfirmasi)" : "Belum Diunggah"}</p>
                 </div>
-                <div className="pt-4 flex justify-center gap-3">
+
+                <div className="pt-4 flex flex-wrap justify-center gap-3">
                   <a
-                    href={`https://wa.me/6281234567890?text=${encodeURIComponent(`Assalamu'alaikum Admin, saya ingin konfirmasi pendaftaran Badal Umroh atas nama Almarhum/ah: ${formData.namaAlmarhum} (Pemohon: ${formData.namaPeserta || formData.namaPemohon})`)}`}
+                    href={`https://wa.me/6281234567890?text=${encodeURIComponent(`Assalamu'alaikum Admin, saya telah mendaftar Badal Umroh atas nama Almarhum/ah: ${formData.namaAlmarhum} (Pemohon: ${formData.namaPemohon}, WA: ${formData.nomorWhatsapp}). Mohon konfirmasinya.`)}`}
                     target="_blank"
                     rel="noreferrer"
-                    className="inline-flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-xs rounded-lg transition-colors"
+                    className="inline-flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-xs rounded-lg transition-colors shadow-xs"
                   >
                     <Send className="h-3.5 w-3.5" /> Konfirmasi via WhatsApp
                   </a>
-                  <Button variant="outline" size="sm" onClick={() => setSubmitted(false)}>
+                  <Button variant="outline" size="sm" onClick={resetForm}>
                     Daftar Lagi
                   </Button>
                 </div>
               </div>
             ) : (
               <form onSubmit={handleSubmit} className="space-y-6 text-xs">
-                {/* ── Langkah 1: Pilihan Apakah Termasuk Jamaah Vauza ── */}
+                {/* ── 1. Data Pemohon ── */}
                 <div className="space-y-3 pb-4 border-b">
                   <span className="font-bold text-xs uppercase tracking-wider text-emerald-600 flex items-center gap-1.5">
-                    <UserCheck className="h-4 w-4 text-emerald-600" />
-                    1. Apakah Anda Termasuk Jamaah Vauza Tiga Utama (VTU)?
-                  </span>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-                    <button
-                      type="button"
-                      onClick={() => setIsJamaahVauza(true)}
-                      className={`p-3.5 rounded-lg border text-left flex items-start gap-3 transition-all ${
-                        isJamaahVauza
-                          ? "border-emerald-600 bg-emerald-50/70 dark:bg-emerald-950/40 text-emerald-950 dark:text-emerald-200 ring-2 ring-emerald-600/30"
-                          : "border-border bg-card hover:bg-muted/40 text-muted-foreground"
-                      }`}
-                    >
-                      <div className={`p-2 rounded-full ${isJamaahVauza ? "bg-emerald-600 text-white" : "bg-muted text-muted-foreground"}`}>
-                        <Sparkles className="h-4 w-4" />
-                      </div>
-                      <div>
-                        <p className="font-bold text-xs text-foreground">Ya, Saya Jamaah Vauza</p>
-                        <p className="text-[11px] text-muted-foreground mt-0.5">
-                          Sedang atau akan mengikuti perjalanan Umroh bersama Vauza Tiga Utama.
-                        </p>
-                      </div>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setIsJamaahVauza(false)}
-                      className={`p-3.5 rounded-lg border text-left flex items-start gap-3 transition-all ${
-                        !isJamaahVauza
-                          ? "border-emerald-600 bg-emerald-50/70 dark:bg-emerald-950/40 text-emerald-950 dark:text-emerald-200 ring-2 ring-emerald-600/30"
-                          : "border-border bg-card hover:bg-muted/40 text-muted-foreground"
-                      }`}
-                    >
-                      <div className={`p-2 rounded-full ${!isJamaahVauza ? "bg-emerald-600 text-white" : "bg-muted text-muted-foreground"}`}>
-                        <User className="h-4 w-4" />
-                      </div>
-                      <div>
-                        <p className="font-bold text-xs text-foreground">Bukan (Pendaftaran Umum)</p>
-                        <p className="text-[11px] text-muted-foreground mt-0.5">
-                          Mendaftarkan Badal Umroh secara umum tanpa terikat klaster paket jamaah.
-                        </p>
-                      </div>
-                    </button>
-                  </div>
-                </div>
-
-                {/* ── Langkah 2: Detail Data Pemohon / Klaster Jamaah ── */}
-                {isJamaahVauza ? (
-                  <div className="space-y-3 pb-4 border-b bg-emerald-50/30 dark:bg-emerald-950/10 p-4 rounded-lg border border-emerald-100 dark:border-emerald-900">
-                    <span className="font-bold text-xs uppercase tracking-wider text-emerald-700 dark:text-emerald-300 flex items-center gap-1.5">
-                      <Users className="h-4 w-4" />
-                      2. Data Paket Umroh & Rombongan Klaster Jamaah Vauza
-                    </span>
-
-                    {/* A. Pilih Paket Umroh */}
-                    <div className="space-y-1">
-                      <label className="font-medium text-foreground">A. Pilih Paket Umroh yang Dijalani</label>
-                      <select
-                        required
-                        value={formData.namaPaketUmroh}
-                        onChange={(e) => setFormData((p) => ({ ...p, namaPaketUmroh: e.target.value }))}
-                        className="w-full h-9 px-3 rounded-md border border-input bg-background text-xs focus:ring-1 focus:ring-primary"
-                      >
-                        <option value="">-- Pilih Paket Umroh --</option>
-                        {paketOptions.length > 0 ? (
-                          paketOptions.map((pkt) => (
-                            <option key={pkt.id} value={pkt.namaPaket}>
-                              {pkt.namaPaket} ({pkt.durasiHari} Hari)
-                            </option>
-                          ))
-                        ) : (
-                          <>
-                            <option value="Paket Umroh Reguler 9 Hari">Paket Umroh Reguler 9 Hari</option>
-                            <option value="Paket Umroh VIP 12 Hari">Paket Umroh VIP 12 Hari</option>
-                            <option value="Paket Umroh Ramadhan">Paket Umroh Ramadhan</option>
-                          </>
-                        )}
-                      </select>
-                    </div>
-
-                    {/* B. Tour Leader & Muthowif */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-                      <div className="space-y-1">
-                        <label className="font-medium text-foreground">B1. Nama Tour Leader (TL)</label>
-                        <Input
-                          type="text"
-                          required
-                          value={formData.namaTourLeader}
-                          onChange={(e) => setFormData((p) => ({ ...p, namaTourLeader: e.target.value }))}
-                          placeholder="Masukkan nama Tour Leader..."
-                          className="text-xs"
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <label className="font-medium text-foreground">B2. Nama Muthowif Pembimbing</label>
-                        <Input
-                          type="text"
-                          required
-                          value={formData.namaMuthowif}
-                          onChange={(e) => setFormData((p) => ({ ...p, namaMuthowif: e.target.value }))}
-                          placeholder="Masukkan nama Muthowif..."
-                          className="text-xs"
-                        />
-                      </div>
-                    </div>
-
-                    {/* C. Nama Peserta (Jamaah) & Kontak */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-                      <div className="space-y-1">
-                        <label className="font-medium text-foreground">C. Nama Peserta (Jamaah)</label>
-                        <Input
-                          type="text"
-                          required
-                          value={formData.namaPeserta}
-                          onChange={(e) => setFormData((p) => ({ ...p, namaPeserta: e.target.value, namaPemohon: e.target.value }))}
-                          placeholder="Nama lengkap peserta jamaah..."
-                          className="text-xs"
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <label className="font-medium text-foreground">Nomor WhatsApp Jamaah</label>
-                        <Input
-                          type="tel"
-                          required
-                          value={formData.nomorWhatsapp}
-                          onChange={(e) => setFormData((p) => ({ ...p, nomorWhatsapp: e.target.value }))}
-                          placeholder="0812xxxxxxx"
-                          className="text-xs"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="space-y-3 pb-4 border-b">
-                    <span className="font-bold text-xs uppercase tracking-wider text-emerald-600 flex items-center gap-1.5">
-                      <User className="h-4 w-4" />
-                      2. Data Pemohon / Penanggung Jawab (Pendaftaran Umum)
-                    </span>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <div className="space-y-1">
-                        <label className="font-medium text-foreground">Nama Lengkap Pemohon</label>
-                        <Input
-                          type="text"
-                          required
-                          value={formData.namaPemohon}
-                          onChange={(e) => setFormData((p) => ({ ...p, namaPemohon: e.target.value }))}
-                          placeholder="Masukkan nama Anda..."
-                          className="text-xs"
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <label className="font-medium text-foreground">Nomor WhatsApp / Telepon</label>
-                        <Input
-                          type="tel"
-                          required
-                          value={formData.nomorWhatsapp}
-                          onChange={(e) => setFormData((p) => ({ ...p, nomorWhatsapp: e.target.value }))}
-                          placeholder="0812xxxxxxx"
-                          className="text-xs"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="space-y-1">
-                      <label className="font-medium text-foreground">Email Pemohon (Opsional)</label>
-                      <Input
-                        type="email"
-                        value={formData.emailPemohon}
-                        onChange={(e) => setFormData((p) => ({ ...p, emailPemohon: e.target.value }))}
-                        placeholder="nama@email.com"
-                        className="text-xs"
-                      />
-                    </div>
-                  </div>
-                )}
-
-                {/* ── Langkah 3: Data Almarhum / Almarhumah yang Dibadalkan ── */}
-                <div className="space-y-3">
-                  <span className="font-bold text-xs uppercase tracking-wider text-emerald-600 flex items-center gap-1.5">
-                    <Compass className="h-4 w-4" />
-                    3. Data Almarhum / Almarhumah yang Dibadalkan
+                    <User className="h-4 w-4 text-emerald-600" />
+                    1. Data Pemohon / Yang Mengajukan
                   </span>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div className="space-y-1">
-                      <label className="font-medium text-foreground">Nama Almarhum / Almarhumah</label>
+                      <label className="font-semibold text-foreground block">
+                        Nama Yang Mengajukan <span className="text-red-500">*</span>
+                      </label>
+                      <Input
+                        type="text"
+                        required
+                        value={formData.namaPemohon}
+                        onChange={(e) => setFormData((p) => ({ ...p, namaPemohon: e.target.value }))}
+                        placeholder="Nama lengkap pemohon..."
+                        className="text-xs h-10"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="font-semibold text-foreground block">
+                        Nomor WhatsApp <span className="text-red-500">*</span>
+                      </label>
+                      <Input
+                        type="tel"
+                        required
+                        value={formData.nomorWhatsapp}
+                        onChange={(e) => setFormData((p) => ({ ...p, nomorWhatsapp: e.target.value }))}
+                        placeholder="Contoh: 081234567890"
+                        className="text-xs h-10"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* ── 2. Data Almarhum / Almarhumah ── */}
+                <div className="space-y-3 pb-4 border-b">
+                  <span className="font-bold text-xs uppercase tracking-wider text-emerald-600 flex items-center gap-1.5">
+                    <HeartHandshake className="h-4 w-4 text-emerald-600" />
+                    2. Data Almarhum / Almarhumah
+                  </span>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <label className="font-semibold text-foreground block">
+                        Nama Almarhum / Almarhumah <span className="text-red-500">*</span>
+                      </label>
                       <Input
                         type="text"
                         required
                         value={formData.namaAlmarhum}
                         onChange={(e) => setFormData((p) => ({ ...p, namaAlmarhum: e.target.value }))}
-                        placeholder="Fulan bin Fulan"
-                        className="text-xs"
+                        placeholder="Fulan bin Fulan / Fulanah binti Fulan"
+                        className="text-xs h-10"
                       />
                     </div>
-                    <div className="space-y-1">
-                      <label className="font-medium text-foreground">Jenis Kelamin Almarhum/ah</label>
-                      <select
-                        value={formData.jenisKelamin}
-                        onChange={(e) => setFormData((p) => ({ ...p, jenisKelamin: e.target.value }))}
-                        className="w-full h-9 px-3 rounded-md border border-input bg-background text-xs focus:ring-1 focus:ring-primary"
-                      >
-                        <option value="L">Laki-laki (Almarhum)</option>
-                        <option value="P">Perempuan (Almarhumah)</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div className="space-y-1">
-                      <label className="font-medium text-foreground">Hubungan Keluarga</label>
-                      <select
-                        value={formData.hubungan}
-                        onChange={(e) => setFormData((p) => ({ ...p, hubungan: e.target.value }))}
-                        className="w-full h-9 px-3 rounded-md border border-input bg-background text-xs focus:ring-1 focus:ring-primary"
-                      >
-                        <option value="Ayah / Ibu">Ayah / Ibu</option>
-                        <option value="Kakek / Nenek">Kakek / Nenek</option>
-                        <option value="Suami / Istri">Suami / Istri</option>
-                        <option value="Saudara Kandung">Saudara Kandung</option>
-                        <option value="Kerabat Lainnya">Kerabat Lainnya</option>
-                      </select>
-                    </div>
 
                     <div className="space-y-1">
-                      <label className="font-medium text-foreground">Pilihan Paket Badal</label>
-                      <select
-                        value={formData.paketBadal}
-                        onChange={(e) => setFormData((p) => ({ ...p, paketBadal: e.target.value }))}
-                        className="w-full h-9 px-3 rounded-md border border-input bg-background text-xs focus:ring-1 focus:ring-primary"
-                      >
-                        <option value="Standard (Dokumentasi Sertifikat & Video Execution)">Badal Umroh Standard + Sertifikat & Video Execution</option>
-                        <option value="VIP (Badal Umroh VIP + Sertifikat Cetak & Cuplikan Doa Khusus)">Badal Umroh VIP + Sertifikat Cetak & Cuplikan Doa Khusus</option>
-                      </select>
+                      <label className="font-semibold text-foreground block">
+                        Jenis Kelamin Almarhum/ah <span className="text-red-500">*</span>
+                      </label>
+                      <div className="grid grid-cols-2 gap-2 pt-0.5">
+                        <button
+                          type="button"
+                          onClick={() => setFormData((p) => ({ ...p, jenisKelamin: "L" }))}
+                          className={`h-10 rounded-lg border text-xs font-semibold flex items-center justify-center gap-1.5 transition-all ${
+                            formData.jenisKelamin === "L"
+                              ? "border-emerald-600 bg-emerald-50 text-emerald-950 ring-2 ring-emerald-600/30 font-bold"
+                              : "border-border bg-card text-muted-foreground hover:bg-muted/40"
+                          }`}
+                        >
+                          <span>👨 Laki-laki</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setFormData((p) => ({ ...p, jenisKelamin: "P" }))}
+                          className={`h-10 rounded-lg border text-xs font-semibold flex items-center justify-center gap-1.5 transition-all ${
+                            formData.jenisKelamin === "P"
+                              ? "border-emerald-600 bg-emerald-50 text-emerald-950 ring-2 ring-emerald-600/30 font-bold"
+                              : "border-border bg-card text-muted-foreground hover:bg-muted/40"
+                          }`}
+                        >
+                          <span>👩 Perempuan</span>
+                        </button>
+                      </div>
                     </div>
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="font-medium text-foreground">Doa Khusus / Catatan Tambahan (Opsional)</label>
-                    <textarea
-                      rows={3}
-                      value={formData.catatan}
-                      onChange={(e) => setFormData((p) => ({ ...p, catatan: e.target.value }))}
-                      placeholder="Tuliskan doa khusus yang ingin dibacakan saat tawaf/sa'i..."
-                      className="w-full p-2.5 rounded-md border border-input bg-background text-xs focus:ring-1 focus:ring-primary"
-                    />
                   </div>
                 </div>
 
+                {/* ── 3. Penyerahan Souvenir ── */}
+                <div className="space-y-3 pb-4 border-b">
+                  <span className="font-bold text-xs uppercase tracking-wider text-emerald-600 flex items-center gap-1.5">
+                    <Truck className="h-4 w-4 text-emerald-600" />
+                    3. Penyerahan / Pengambilan Souvenir & Sertifikat
+                  </span>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => setFormData((p) => ({ ...p, metodeSouvenir: "dikantor" }))}
+                      className={`p-3.5 rounded-lg border text-left flex items-start gap-3 transition-all ${
+                        formData.metodeSouvenir === "dikantor"
+                          ? "border-emerald-600 bg-emerald-50/70 text-emerald-950 ring-2 ring-emerald-600/30"
+                          : "border-border bg-card text-muted-foreground hover:bg-muted/40"
+                      }`}
+                    >
+                      <div className={`p-2 rounded-full ${formData.metodeSouvenir === "dikantor" ? "bg-emerald-600 text-white" : "bg-muted text-muted-foreground"}`}>
+                        <Building2 className="h-4 w-4" />
+                      </div>
+                      <div>
+                        <p className="font-bold text-xs text-foreground">Diambil di Kantor VTU</p>
+                        <p className="text-[11px] text-muted-foreground mt-0.5">
+                          Diambil langsung di Kantor Operasional Vauza Tiga Utama.
+                        </p>
+                      </div>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setFormData((p) => ({ ...p, metodeSouvenir: "dikirim" }))}
+                      className={`p-3.5 rounded-lg border text-left flex items-start gap-3 transition-all ${
+                        formData.metodeSouvenir === "dikirim"
+                          ? "border-emerald-600 bg-emerald-50/70 text-emerald-950 ring-2 ring-emerald-600/30"
+                          : "border-border bg-card text-muted-foreground hover:bg-muted/40"
+                      }`}
+                    >
+                      <div className={`p-2 rounded-full ${formData.metodeSouvenir === "dikirim" ? "bg-emerald-600 text-white" : "bg-muted text-muted-foreground"}`}>
+                        <Truck className="h-4 w-4" />
+                      </div>
+                      <div>
+                        <p className="font-bold text-xs text-foreground">Dikirim melalui Pengiriman</p>
+                        <p className="text-[11px] text-muted-foreground mt-0.5">
+                          Sertifikat & souvenir dikirimkan langsung ke alamat Anda.
+                        </p>
+                      </div>
+                    </button>
+                  </div>
+
+                  {formData.metodeSouvenir === "dikirim" && (
+                    <div className="space-y-1 pt-1 animate-in fade-in-0 duration-200">
+                      <label className="font-semibold text-foreground block">
+                        Alamat Lengkap Pengiriman <span className="text-red-500">*</span>
+                      </label>
+                      <textarea
+                        rows={3}
+                        required
+                        value={formData.alamatPengiriman}
+                        onChange={(e) => setFormData((p) => ({ ...p, alamatPengiriman: e.target.value }))}
+                        placeholder="Tuliskan alamat lengkap pengiriman (Nama Jalan, No. Rumah, RT/RW, Kelurahan, Kecamatan, Kota/Kabupaten, Kode Pos)..."
+                        className="w-full p-2.5 rounded-md border border-input bg-background text-xs focus:ring-1 focus:ring-primary"
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {/* ── 4. Upload Bukti Transfer ── */}
+                <div className="space-y-3">
+                  <span className="font-bold text-xs uppercase tracking-wider text-emerald-600 flex items-center gap-1.5">
+                    <FileCheck className="h-4 w-4 text-emerald-600" />
+                    4. Upload Bukti Transfer / Pembayaran
+                  </span>
+
+                  <div className="p-4 border rounded-lg bg-card space-y-3">
+                    {buktiTransferPreview ? (
+                      <div className="flex items-center gap-3 p-3 bg-emerald-50/60 border border-emerald-200 rounded-lg">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={buktiTransferPreview} alt="Bukti Transfer" className="h-16 w-16 object-cover rounded-md border shadow-xs" />
+                        <div className="flex-1 truncate">
+                          <p className="font-semibold text-xs text-emerald-950 truncate">{buktiTransferFile?.name || "Bukti Transfer"}</p>
+                          <p className="text-[11px] text-emerald-700 font-medium mt-0.5">
+                            {(buktiTransferFile?.size ? (buktiTransferFile.size / 1024).toFixed(0) : "0")} KB — Siap diunggah
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={handleRemoveFile}
+                          className="p-1.5 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-md transition-colors font-bold text-xs"
+                          title="Hapus Bukti Transfer"
+                        >
+                          Hapus
+                        </button>
+                      </div>
+                    ) : (
+                      <label className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-border hover:border-emerald-500 rounded-lg cursor-pointer bg-muted/20 hover:bg-muted/40 transition-all select-none">
+                        <Upload className="h-6 w-6 text-muted-foreground mb-2" />
+                        <span className="text-xs font-semibold text-foreground">Klik untuk Unggah Bukti Transfer</span>
+                        <span className="text-[11px] text-muted-foreground mt-0.5">Format: JPG, PNG, WEBP (Maksimal 5MB)</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleFileChange}
+                          className="hidden"
+                        />
+                      </label>
+                    )}
+                  </div>
+                </div>
+
+                {/* ── Submit Action Bar ── */}
                 <div className="pt-4 flex justify-end gap-2 border-t">
                   <Link href="/login">
                     <Button variant="outline" type="button">Batal</Button>
                   </Link>
-                  <Button type="submit" disabled={isSubmitting} className="bg-emerald-600 hover:bg-emerald-700 text-white">
-                    {isSubmitting ? "Kirim Pendaftaran..." : "Kirim Pendaftaran Badal Umroh"}
+                  <Button type="submit" disabled={isSubmitting} className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-6">
+                    {isSubmitting ? "Mengirim Pendaftaran..." : "Kirim Pendaftaran Badal Umroh"}
                   </Button>
                 </div>
               </form>
