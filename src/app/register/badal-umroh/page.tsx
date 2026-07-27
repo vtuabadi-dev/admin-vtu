@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { ArrowLeft, CheckCircle2, HeartHandshake, Send, User, Upload, Building2, Truck, FileCheck, Sparkles, UserCheck, ShieldCheck, Loader2, AlertCircle } from "lucide-react";
+import { ArrowLeft, CheckCircle2, HeartHandshake, Send, User, Upload, Building2, Truck, FileCheck, Sparkles, UserCheck, ShieldCheck, Loader2, AlertCircle, BadgeCheck } from "lucide-react";
 import { Button } from "@/shared/components/ui/Button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/components/ui/Card";
 import { Input } from "@/shared/components/ui/Input";
@@ -390,26 +390,45 @@ export default function BadalUmrohRegisterPage() {
                           </Button>
                         </div>
 
-                        {/* Status Verifikasi Badge */}
+                        {/* Indikator Status Verifikasi Jamaah */}
                         {jamaahVerified === true && (
-                          <div className="p-3 bg-emerald-100/90 border border-emerald-300 rounded-md text-emerald-950 flex items-start gap-2 animate-in fade-in-0 duration-200">
-                            <CheckCircle2 className="h-4 w-4 text-emerald-700 shrink-0 mt-0.5" />
-                            <div className="text-xs">
-                              <p className="font-bold text-emerald-900">{verifyMessage}</p>
-                              <p className="text-[11px] text-emerald-800 mt-0.5">
-                                Jamaah: <strong>{verifiedData?.namaLengkap}</strong> | No. Paspor/Identitas: <strong>{verifiedData?.nomorPaspor}</strong>
-                              </p>
+                          <div className="p-3.5 bg-emerald-50 border-2 border-emerald-500 rounded-lg text-emerald-950 space-y-2 animate-in fade-in-0 slide-in-from-top-2 duration-300 shadow-xs">
+                            <div className="flex items-center justify-between border-b border-emerald-200 pb-2">
+                              <div className="flex items-center gap-2">
+                                <BadgeCheck className="h-5 w-5 text-emerald-600 shrink-0" />
+                                <span className="font-bold text-xs uppercase tracking-wide text-emerald-900">
+                                  INDIKATOR: JAMAAH TERDAFTAR RESMI
+                                </span>
+                              </div>
+                              <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-600 text-white uppercase">
+                                ✓ Terverifikasi Rombongan
+                              </span>
+                            </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] pt-1">
+                              <div>
+                                <span className="text-emerald-700 block font-medium">Nama Terdaftar:</span>
+                                <strong className="text-emerald-950 font-bold text-xs">{verifiedData?.namaLengkap || namaPasporJamaah}</strong>
+                              </div>
+                              <div>
+                                <span className="text-emerald-700 block font-medium">Paket Umroh:</span>
+                                <strong className="text-emerald-950 font-bold text-xs">{verifiedData?.paketName || formData.namaPaketUmroh}</strong>
+                              </div>
                             </div>
                           </div>
                         )}
 
                         {jamaahVerified === false && (
-                          <div className="p-3 bg-red-50 border border-red-200 rounded-md text-red-900 flex items-start gap-2 animate-in fade-in-0 duration-200">
-                            <AlertCircle className="h-4 w-4 text-red-600 shrink-0 mt-0.5" />
-                            <div className="text-xs">
-                              <p className="font-bold text-red-800">Verifikasi Gagal</p>
-                              <p className="text-[11px] text-red-700 mt-0.5">{verifyMessage}</p>
+                          <div className="p-3.5 bg-red-50 border-2 border-red-400 rounded-lg text-red-950 space-y-1.5 animate-in fade-in-0 duration-200">
+                            <div className="flex items-center gap-2">
+                              <AlertCircle className="h-5 w-5 text-red-600 shrink-0" />
+                              <span className="font-bold text-xs text-red-900 uppercase">
+                                INDIKATOR: NAMA TIDAK TERDAFTAR
+                              </span>
                             </div>
+                            <p className="text-[11px] text-red-800 leading-relaxed">
+                              Nama &quot;<strong>{namaPasporJamaah}</strong>&quot; tidak ditemukan dalam daftar manifest paket <strong>{formData.namaPaketUmroh}</strong>. Pastikan ejaan sesuai paspor/KTP.
+                            </p>
                           </div>
                         )}
                       </div>
