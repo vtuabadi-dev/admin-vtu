@@ -109,7 +109,7 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // ── Process ─────────────────────────────────────────────
+    const isAdaKlaster = formData.get("isAdaKlaster") as string | null;
 
     // Convert File to Buffer
     const buffer = Buffer.from(await flyerFile.arrayBuffer());
@@ -117,8 +117,12 @@ export async function POST(request: NextRequest) {
     // Save flyer to temp storage (validates magic bytes)
     const flyerPath = saveFlyerImage(buffer, fileName);
 
+    const captionWithHint = isAdaKlaster === "ya"
+      ? `[MODUS KLASTER SEAT: AKTIF (Ekstrak rincian klaster Bronze, Silver, Gold, Platinum)]\n${caption}`
+      : caption;
+
     // Run AI processing pipeline
-    const extractionResult = await processPackageFlyer(flyerPath, caption);
+    const extractionResult = await processPackageFlyer(flyerPath, captionWithHint);
 
     // Create draft (always DRAFT — never auto-publish)
     const draft = await createPackageDraft(extractionResult, flyerPath);

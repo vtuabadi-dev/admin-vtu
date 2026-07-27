@@ -418,6 +418,7 @@ import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X } from "luc
         const bodyData = new FormData();
         bodyData.append("flyer", file);
         bodyData.append("caption", caption || `Proses dokumen flyer ${file.name}`);
+        bodyData.append("isAdaKlaster", formData.isAdaKlaster);
 
         const res = await fetch("/api/admin/packages/ai-import", {
           method: "POST",
@@ -1400,6 +1401,47 @@ import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X } from "luc
                 <span className="shrink-0 text-xs bg-muted px-2 py-1 rounded-md font-medium text-muted-foreground">
                   {flyerFiles.length}/{MAX_FILES} terisi
                 </span>
+              </div>
+
+              {/* ── Switch Klaster Seat Sebelum Ekstraksi ── */}
+              <div className="p-3 bg-muted/20 border rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <label className="text-xs font-semibold text-foreground block">
+                    Apakah paket ini menggunakan Klaster Seat?
+                  </label>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">
+                    {formData.isAdaKlaster === "ya" 
+                      ? "Menggunakan Klaster (Bronze, Silver, Gold, Platinum)" 
+                      : "Tidak Menggunakan Klaster (Satu Macam Hotel)"}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={formData.isAdaKlaster === "ya"}
+                    onClick={() => setFormData(prev => ({ ...prev, isAdaKlaster: prev.isAdaKlaster === "ya" ? "tidak" : "ya" }))}
+                    className={cn(
+                      "relative inline-flex h-7 w-14 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2",
+                      formData.isAdaKlaster === "ya" ? "bg-primary" : "bg-input"
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        "pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out",
+                        formData.isAdaKlaster === "ya" ? "translate-x-7" : "translate-x-0"
+                      )}
+                    />
+                  </button>
+                  <span className={cn(
+                    "text-xs font-semibold px-2.5 py-1 rounded-md border min-w-[55px] text-center transition-colors select-none",
+                    formData.isAdaKlaster === "ya" 
+                      ? "bg-primary/10 text-primary border-primary/30" 
+                      : "bg-background text-muted-foreground border-border"
+                  )}>
+                    {formData.isAdaKlaster === "ya" ? "Ya" : "Tidak"}
+                  </span>
+                </div>
               </div>
 
               {/* ── Drag & Drop Zone ── */}
