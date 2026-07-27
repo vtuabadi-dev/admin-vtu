@@ -709,18 +709,32 @@ import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X } from "luc
           <h2 className="text-lg font-semibold">Langkah 1: Dasar Paket</h2>
           <div className="p-4 bg-card border rounded-md flex flex-col gap-4">
             <div className="flex flex-col gap-4">
-              <div>
-                <label className="block text-sm font-medium mb-1">Jenis Paket (Master Data)</label>
-                <SearchableSelect
-                  id="field-jenisPaketId"
-                  nextFocusId="field-startingPointId"
-                  options={options?.packageTypes.map(t => ({ value: t.id, label: t.name })) || []}
-                  value={formData.jenisPaketId}
-                  onChange={(val) => setFormData(prev => ({ ...prev, jenisPaketId: val }))}
-                  placeholder="-- Pilih Jenis Paket --"
-                  searchPlaceholder="Cari jenis paket..."
-                  disabled={fetching}
-                />
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium mb-1">Jenis Paket (Master Data)</label>
+                  <SearchableSelect
+                    id="field-jenisPaketId"
+                    nextFocusId="field-durasiHari"
+                    options={options?.packageTypes.map(t => ({ value: t.id, label: t.name })) || []}
+                    value={formData.jenisPaketId}
+                    onChange={(val) => setFormData(prev => ({ ...prev, jenisPaketId: val }))}
+                    placeholder="-- Pilih Jenis Paket --"
+                    searchPlaceholder="Cari jenis paket..."
+                    disabled={fetching}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Durasi (Hari)</label>
+                  <Input 
+                    id="field-durasiHari" 
+                    type="number" 
+                    name="durasiHari" 
+                    value={formData.durasiHari} 
+                    onChange={handleChange} 
+                    onKeyDown={(e) => handleKeyDownNext(e, "field-startingPointId")}
+                    placeholder="9" 
+                  />
+                </div>
               </div>
 
               <div>
@@ -1179,7 +1193,7 @@ import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X } from "luc
                   name="kapasitas" 
                   value={formData.kapasitas} 
                   onChange={handleChange} 
-                  onKeyDown={(e) => handleKeyDownNext(e, "field-durasiHari")}
+                  onKeyDown={(e) => handleKeyDownNext(e, formData.isAdaKlaster === "tidak" ? "field-hargaBase" : "field-submitBtn")}
                   placeholder="Misal: 45" 
                 />
               </div>
@@ -1212,18 +1226,6 @@ import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X } from "luc
                     {formData.isAdaPerlengkapan === "ya" ? "Ya" : "Tidak"}
                   </span>
                 </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Durasi (Hari)</label>
-                <Input 
-                  id="field-durasiHari" 
-                  type="number" 
-                  name="durasiHari" 
-                  value={formData.durasiHari} 
-                  onChange={handleChange} 
-                  onKeyDown={(e) => handleKeyDownNext(e, formData.isAdaKlaster === "tidak" ? "field-hargaBase" : "field-submitBtn")}
-                  placeholder="9" 
-                />
               </div>
               <div>
                 {formData.isAdaKlaster === "tidak" ? (
