@@ -405,6 +405,10 @@ export default function BadalUmrohRegisterPage() {
                               </span>
                             </div>
 
+                            {verifyMessage && (
+                              <p className="text-xs font-semibold text-emerald-900">{verifyMessage}</p>
+                            )}
+
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] pt-1">
                               <div>
                                 <span className="text-emerald-700 block font-medium">Nama Terdaftar:</span>
@@ -427,7 +431,7 @@ export default function BadalUmrohRegisterPage() {
                               </span>
                             </div>
                             <p className="text-[11px] text-red-800 leading-relaxed">
-                              Nama &quot;<strong>{namaPasporJamaah}</strong>&quot; tidak ditemukan dalam daftar manifest paket <strong>{formData.namaPaketUmroh}</strong>. Pastikan ejaan sesuai paspor/KTP.
+                              {verifyMessage || `Nama "${namaPasporJamaah}" tidak ditemukan dalam daftar manifest paket ${formData.namaPaketUmroh}. Pastikan ejaan sesuai paspor/KTP.`}
                             </p>
                           </div>
                         )}
