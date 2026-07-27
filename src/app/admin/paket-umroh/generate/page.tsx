@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/shared/components/ui/Button";
 import { Input } from "@/shared/components/ui/Input";
@@ -103,20 +103,29 @@ import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X } from "luc
     upgradeTriple: "",
   });
 
-  // Multiple Departure Dates State
-  const [departureDates, setDepartureDates] = useState<string[]>([]);
-  const [tempDate, setTempDate] = useState("");
+  // Multiple Departure Dates State: Auto-expanding inputs array
+  const [departureDateInputs, setDepartureDateInputs] = useState<string[]>([""]);
 
-  const handleAddDate = () => {
-    if (!tempDate) return;
-    if (!departureDates.includes(tempDate)) {
-      setDepartureDates(prev => [...prev, tempDate].sort());
-    }
-    setTempDate("");
+  // Derived departure dates list (non-empty dates only)
+  const departureDates = useMemo(() => {
+    return departureDateInputs.filter(d => d.trim() !== "");
+  }, [departureDateInputs]);
+
+  const handleDateInputChange = (index: number, val: string) => {
+    setDepartureDateInputs(prev => {
+      const next = [...prev];
+      next[index] = val;
+      const filled = next.filter(d => d.trim() !== "");
+      return [...filled, ""];
+    });
   };
 
-  const handleRemoveDate = (val: string) => {
-    setDepartureDates(prev => prev.filter(d => d !== val));
+  const handleRemoveDateInput = (index: number) => {
+    setDepartureDateInputs(prev => {
+      const next = prev.filter((_, idx) => idx !== index);
+      const filled = next.filter(d => d.trim() !== "");
+      return [...filled, ""];
+    });
   };
 
   const calculateReturnDate = (depDateStr: string, durDaysStr: string) => {
@@ -456,11 +465,19 @@ import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X } from "luc
           
           if (result.departureDates && Array.isArray(result.departureDates)) {
             const extractedDates = result.departureDates.map((d: string) => d.split("T")[0]).filter(Boolean);
-            setDepartureDates(prev => Array.from(new Set([...prev, ...extractedDates])).sort());
+            setDepartureDateInputs(prev => {
+              const existing = prev.filter(d => d.trim() !== "");
+              const combined = Array.from(new Set([...existing, ...extractedDates])).sort();
+              return [...combined, ""];
+            });
           } else if (result.departureDates && typeof result.departureDates === "string") {
             const d = (result.departureDates as string).split("T")[0];
-            if (d && !departureDates.includes(d)) {
-              setDepartureDates(prev => [...prev, d].sort());
+            if (d) {
+              setDepartureDateInputs(prev => {
+                const existing = prev.filter(d => d.trim() !== "");
+                const combined = Array.from(new Set([...existing, d])).sort();
+                return [...combined, ""];
+              });
             }
           }
 
@@ -585,8 +602,7 @@ import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X } from "luc
           upgradeDouble: "",
           upgradeTriple: "",
         });
-        setDepartureDates([]);
-        setTempDate("");
+        setDepartureDateInputs([""]);
         setClusterConfigs({
           "K1": { hotelMekkahId: "", hotelMadinahId: "", hargaBase: "", upgradeDouble: "", upgradeTriple: "" },
           "K2": { hotelMekkahId: "", hotelMadinahId: "", hargaBase: "", upgradeDouble: "", upgradeTriple: "" },
@@ -1060,54 +1076,97 @@ import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X } from "luc
         <div className="flex flex-col gap-3">
           <h2 className="text-lg font-semibold">Langkah 4: Operasional & Harga</h2>
           <div className="p-4 bg-card border rounded-md flex flex-col gap-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
-              <div>
-                <label className="block text-sm font-medium mb-1">Tambah Tanggal Keberangkatan</label>
-                <div className="flex gap-2">
-                  <Input 
-                    id="field-tempDate" 
-                    type="date" 
-                    value={tempDate} 
-                    onChange={(e) => setTempDate(e.target.value)} 
-                    onKeyDown={(e) => handleKeyDownNext(e, "field-kapasitas")}
-                  />
-                  <Button type="button" onClick={handleAddDate}>Tambah</Button>
+            {/* Dynamic Auto-Expanding Tanggal Keberangkatan Inputs */}
+            <div className="flex flex-col gap-3 p-3 bg-muted/10 border rounded-lg">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <div>
+                  <label className="block text-sm font-semibold text-foreground">
+                    Tanggal Keberangkatan <span className="text-red-500">*</span>
+                  </label>
+                  <p className="text-xs text-muted-foreground">
+                    Tanggal pertama wajib diisi. Kolom kosong berikutnya bersifat opsional dan akan bertambah otomatis saat terisi.
+                  </p>
+                </div>
+                <div className="text-xs font-semibold text-emerald-800 bg-emerald-50 border border-emerald-200 px-3 py-1 rounded-full shadow-xs">
+                  {departureDates.length} Tanggal Terisi &rarr; {departureDates.length} Paket akan dibuat
                 </div>
               </div>
-              <div className="text-xs text-muted-foreground bg-muted/30 p-3 rounded-md border">
-                <strong>Catatan Tanggal Pulang:</strong> Tanggal kepulangan dihitung otomatis berdasarkan tanggal keberangkatan ditambah durasi hari paket dikurangi 1 hari.
-              </div>
-            </div>
 
-            {/* Departure Dates Chip/Badge List */}
-            <div className="space-y-2">
-              <label className="block text-xs font-semibold text-muted-foreground">
-                Tanggal Keberangkatan Terpilih ({departureDates.length} Tanggal &rarr; {departureDates.length} Paket akan dibuat)
-              </label>
-              {departureDates.length === 0 ? (
-                <div className="text-sm text-red-500 border border-red-200 bg-red-50/50 p-2.5 rounded-md">
-                  Belum ada tanggal keberangkatan yang dimasukkan. Gunakan form di atas untuk menambahkan tanggal.
-                </div>
-              ) : (
-                <div className="flex flex-wrap gap-2 max-h-[160px] overflow-y-auto border p-2.5 rounded-md bg-muted/10">
-                  {departureDates.map((d, idx) => (
-                    <div key={idx} className="flex items-center gap-2 bg-card border px-2.5 py-1.5 rounded-md text-xs shadow-sm">
-                      <span className="font-semibold">{d}</span>
-                      <span className="text-muted-foreground">
-                        (Pulang: {calculateReturnDate(d, formData.durasiHari)})
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveDate(d)}
-                        className="text-red-500 hover:text-red-700 hover:bg-red-50 px-1 py-0.5 rounded font-bold"
-                        title="Hapus tanggal"
-                      >
-                        &times;
-                      </button>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 pt-1">
+                {departureDateInputs.map((dateVal, index) => {
+                  const isRequired = index === 0;
+                  const returnDateStr = dateVal ? calculateReturnDate(dateVal, formData.durasiHari) : "";
+                  const formattedReturn = returnDateStr ? formatDateIndo(returnDateStr) : "";
+
+                  return (
+                    <div 
+                      key={index} 
+                      className={cn(
+                        "p-3 bg-card border rounded-lg flex flex-col gap-2 relative transition-all shadow-xs",
+                        isRequired && !dateVal ? "border-red-300 bg-red-50/10" : "hover:border-emerald-400 focus-within:border-emerald-500"
+                      )}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5">
+                          Tanggal #{index + 1}
+                          {isRequired ? (
+                            <span className="text-[10px] font-bold text-red-600 bg-red-50 border border-red-200 px-1.5 py-0.5 rounded">
+                              Wajib
+                            </span>
+                          ) : (
+                            <span className="text-[10px] text-muted-foreground bg-muted border px-1.5 py-0.5 rounded">
+                              Opsional
+                            </span>
+                          )}
+                        </span>
+                        {departureDateInputs.length > 1 && (index > 0 || dateVal !== "") && (
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveDateInput(index)}
+                            className="text-xs font-medium text-red-500 hover:text-red-700 hover:bg-red-50 px-1.5 py-0.5 rounded transition-colors"
+                            title="Hapus kolom tanggal ini"
+                          >
+                            Hapus
+                          </button>
+                        )}
+                      </div>
+
+                      <Input 
+                        id={`field-departureDate-${index}`} 
+                        type="date" 
+                        value={dateVal} 
+                        onChange={(e) => handleDateInputChange(index, e.target.value)} 
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            const nextEl = document.getElementById(`field-departureDate-${index + 1}`);
+                            if (nextEl) {
+                              nextEl.focus();
+                            } else {
+                              focusNextId("field-kapasitas");
+                            }
+                          }
+                        }}
+                        className={cn(
+                          "h-9 text-xs font-medium",
+                          isRequired && !dateVal && "border-red-300"
+                        )}
+                      />
+
+                      {dateVal ? (
+                        <div className="text-[11px] text-emerald-800 font-medium bg-emerald-50/80 border border-emerald-200/80 px-2 py-1 rounded flex items-center justify-between">
+                          <span>Pulang:</span>
+                          <strong className="text-emerald-950">{formattedReturn}</strong>
+                        </div>
+                      ) : (
+                        <div className="text-[11px] text-muted-foreground italic px-1">
+                          {isRequired ? "Pilih tanggal utama..." : "Isi untuk tambah lagi..."}
+                        </div>
+                      )}
                     </div>
-                  ))}
-                </div>
-              )}
+                  );
+                })}
+              </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
