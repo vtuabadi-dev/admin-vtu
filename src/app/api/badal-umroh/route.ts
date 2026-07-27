@@ -8,6 +8,8 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const {
+      isJamaahVauza,
+      namaPaketUmroh,
       namaPemohon,
       nomorWhatsapp,
       namaAlmarhum,
@@ -32,7 +34,8 @@ export async function POST(request: NextRequest) {
 
     const reg = await prisma.badalUmrohRegistration.create({
       data: {
-        isJamaahVauza: false,
+        isJamaahVauza: Boolean(isJamaahVauza),
+        namaPaketUmroh: isJamaahVauza && namaPaketUmroh ? String(namaPaketUmroh).trim() : null,
         namaPemohon: String(namaPemohon).trim(),
         nomorWhatsapp: String(nomorWhatsapp).trim(),
         namaAlmarhum: String(namaAlmarhum).trim(),

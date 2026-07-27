@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
-import { ArrowLeft, CheckCircle2, HeartHandshake, Send, User, Upload, Building2, Truck, FileCheck } from "lucide-react";
+import { ArrowLeft, CheckCircle2, HeartHandshake, Send, User, Upload, Building2, Truck, FileCheck, Sparkles, UserCheck } from "lucide-react";
 import { Button } from "@/shared/components/ui/Button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/components/ui/Card";
 import { Input } from "@/shared/components/ui/Input";
@@ -10,9 +10,14 @@ import { Input } from "@/shared/components/ui/Input";
 export default function BadalUmrohRegisterPage() {
   const [submitted, setSubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [paketOptions, setPaketOptions] = useState<any[]>([]);
+
+  // State Pilihan Status Kejamaahan
+  const [isJamaahVauza, setIsJamaahVauza] = useState<boolean>(true);
 
   // State Form Simplified
   const [formData, setFormData] = useState({
+    namaPaketUmroh: "",
     namaPemohon: "",
     nomorWhatsapp: "",
     namaAlmarhum: "",
@@ -23,6 +28,18 @@ export default function BadalUmrohRegisterPage() {
 
   const [buktiTransferFile, setBuktiTransferFile] = useState<File | null>(null);
   const [buktiTransferPreview, setBuktiTransferPreview] = useState<string>("");
+
+  // Fetch Daftar Paket Umroh untuk pilihan Jamaah Vauza
+  useEffect(() => {
+    fetch("/api/packages")
+      .then((res) => res.json())
+      .then((resJson) => {
+        if (resJson.success && Array.isArray(resJson.data)) {
+          setPaketOptions(resJson.data);
+        }
+      })
+      .catch((err) => console.error(err));
+  }, []);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -51,6 +68,11 @@ export default function BadalUmrohRegisterPage() {
     e.preventDefault();
     if (isSubmitting) return;
 
+    if (isJamaahVauza && !formData.namaPaketUmroh.trim()) {
+      alert("Mohon pilih paket umroh yang dijalani");
+      return;
+    }
+
     if (formData.metodeSouvenir === "dikirim" && !formData.alamatPengiriman.trim()) {
       alert("Mohon lengkapi alamat pengiriman souvenir");
       return;
@@ -60,6 +82,8 @@ export default function BadalUmrohRegisterPage() {
 
     try {
       const payload = {
+        isJamaahVauza,
+        namaPaketUmroh: isJamaahVauza ? formData.namaPaketUmroh : null,
         namaPemohon: formData.namaPemohon,
         nomorWhatsapp: formData.nomorWhatsapp,
         namaAlmarhum: formData.namaAlmarhum,
@@ -92,6 +116,7 @@ export default function BadalUmrohRegisterPage() {
   const resetForm = () => {
     setSubmitted(false);
     setFormData({
+      namaPaketUmroh: "",
       namaPemohon: "",
       nomorWhatsapp: "",
       namaAlmarhum: "",
@@ -136,6 +161,8 @@ export default function BadalUmrohRegisterPage() {
                 </p>
 
                 <div className="bg-muted/40 p-4 rounded-lg text-xs text-left max-w-md mx-auto space-y-2 border">
+                  <p><strong>Status Kejamaahan:</strong> {isJamaahVauza ? "Jamaah Vauza Tiga Utama (VTU)" : "Pendaftaran Umum"}</p>
+                  {isJamaahVauza && <p><strong>Paket Umroh:</strong> {formData.namaPaketUmroh || "-"}</p>}
                   <p><strong>Nama Pemohon:</strong> {formData.namaPemohon}</p>
                   <p><strong>Nomor WhatsApp:</strong> {formData.nomorWhatsapp}</p>
                   <p><strong>Nama Almarhum/ah:</strong> {formData.namaAlmarhum} ({formData.jenisKelamin === "L" ? "Laki-laki" : "Perempuan"})</p>
@@ -145,7 +172,7 @@ export default function BadalUmrohRegisterPage() {
 
                 <div className="pt-4 flex flex-wrap justify-center gap-3">
                   <a
-                    href={`https://wa.me/6281234567890?text=${encodeURIComponent(`Assalamu'alaikum Admin, saya telah mendaftar Badal Umroh atas nama Almarhum/ah: ${formData.namaAlmarhum} (Pemohon: ${formData.namaPemohon}, WA: ${formData.nomorWhatsapp}). Mohon konfirmasinya.`)}`}
+                    href={`https://wa.me/6281234567890?text=${encodeURIComponent(`Assalamu'alaikum Admin, saya mendaftar Badal Umroh atas nama Almarhum/ah: ${formData.namaAlmarhum} (Pemohon: ${formData.namaPemohon}, WA: ${formData.nomorWhatsapp}${isJamaahVauza ? `, Paket: ${formData.namaPaketUmroh}` : ""}). Mohon konfirmasinya.`)}`}
                     target="_blank"
                     rel="noreferrer"
                     className="inline-flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-xs rounded-lg transition-colors shadow-xs"
@@ -159,11 +186,94 @@ export default function BadalUmrohRegisterPage() {
               </div>
             ) : (
               <form onSubmit={handleSubmit} className="space-y-6 text-xs">
-                {/* ── 1. Data Pemohon ── */}
+                {/* ── 1. Status Kejamaahan ── */}
+                <div className="space-y-3 pb-4 border-b">
+                  <span className="font-bold text-xs uppercase tracking-wider text-emerald-600 flex items-center gap-1.5">
+                    <UserCheck className="h-4 w-4 text-emerald-600" />
+                    1. Apakah Anda Termasuk Jamaah Vauza Tiga Utama (VTU)?
+                  </span>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => setIsJamaahVauza(true)}
+                      className={`p-3.5 rounded-lg border text-left flex items-start gap-3 transition-all ${
+                        isJamaahVauza
+                          ? "border-emerald-600 bg-emerald-50/70 text-emerald-950 ring-2 ring-emerald-600/30 font-bold"
+                          : "border-border bg-card text-muted-foreground hover:bg-muted/40"
+                      }`}
+                    >
+                      <div className={`p-2 rounded-full ${isJamaahVauza ? "bg-emerald-600 text-white" : "bg-muted text-muted-foreground"}`}>
+                        <Sparkles className="h-4 w-4" />
+                      </div>
+                      <div>
+                        <p className="font-bold text-xs text-foreground">Ya, Saya Jamaah Vauza</p>
+                        <p className="text-[11px] text-muted-foreground mt-0.5">
+                          Sedang atau akan mengikuti perjalanan Umroh bersama Vauza.
+                        </p>
+                      </div>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsJamaahVauza(false);
+                        setFormData((p) => ({ ...p, namaPaketUmroh: "" }));
+                      }}
+                      className={`p-3.5 rounded-lg border text-left flex items-start gap-3 transition-all ${
+                        !isJamaahVauza
+                          ? "border-emerald-600 bg-emerald-50/70 text-emerald-950 ring-2 ring-emerald-600/30 font-bold"
+                          : "border-border bg-card text-muted-foreground hover:bg-muted/40"
+                      }`}
+                    >
+                      <div className={`p-2 rounded-full ${!isJamaahVauza ? "bg-emerald-600 text-white" : "bg-muted text-muted-foreground"}`}>
+                        <User className="h-4 w-4" />
+                      </div>
+                      <div>
+                        <p className="font-bold text-xs text-foreground">Bukan (Pendaftaran Umum)</p>
+                        <p className="text-[11px] text-muted-foreground mt-0.5">
+                          Mendaftarkan Badal Umroh secara umum tanpa terikat paket jamaah.
+                        </p>
+                      </div>
+                    </button>
+                  </div>
+
+                  {/* Jika Jamaah Vauza: Tampilkan pilihan paket umroh */}
+                  {isJamaahVauza && (
+                    <div className="space-y-1 pt-2 animate-in fade-in-0 duration-200">
+                      <label className="font-semibold text-foreground block">
+                        Pilih Paket Umroh yang Dijalani <span className="text-red-500">*</span>
+                      </label>
+                      <select
+                        required
+                        value={formData.namaPaketUmroh}
+                        onChange={(e) => setFormData((p) => ({ ...p, namaPaketUmroh: e.target.value }))}
+                        className="w-full h-10 px-3 rounded-md border border-input bg-background text-xs focus:ring-1 focus:ring-primary font-medium"
+                      >
+                        <option value="">-- Pilih Paket Umroh --</option>
+                        {paketOptions.length > 0 ? (
+                          paketOptions.map((pkt) => (
+                            <option key={pkt.id} value={pkt.namaPaket}>
+                              {pkt.namaPaket} ({pkt.durasiHari || 9} Hari)
+                            </option>
+                          ))
+                        ) : (
+                          <>
+                            <option value="Paket Umroh Reguler 9 Hari">Paket Umroh Reguler 9 Hari</option>
+                            <option value="Paket Umroh VIP 12 Hari">Paket Umroh VIP 12 Hari</option>
+                            <option value="Paket Umroh Ramadhan">Paket Umroh Ramadhan</option>
+                          </>
+                        )}
+                      </select>
+                    </div>
+                  )}
+                </div>
+
+                {/* ── 2. Data Pemohon ── */}
                 <div className="space-y-3 pb-4 border-b">
                   <span className="font-bold text-xs uppercase tracking-wider text-emerald-600 flex items-center gap-1.5">
                     <User className="h-4 w-4 text-emerald-600" />
-                    1. Data Pemohon / Yang Mengajukan
+                    2. Data Pemohon / Yang Mengajukan
                   </span>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -196,11 +306,11 @@ export default function BadalUmrohRegisterPage() {
                   </div>
                 </div>
 
-                {/* ── 2. Data Almarhum / Almarhumah ── */}
+                {/* ── 3. Data Almarhum / Almarhumah ── */}
                 <div className="space-y-3 pb-4 border-b">
                   <span className="font-bold text-xs uppercase tracking-wider text-emerald-600 flex items-center gap-1.5">
                     <HeartHandshake className="h-4 w-4 text-emerald-600" />
-                    2. Data Almarhum / Almarhumah
+                    3. Data Almarhum / Almarhumah
                   </span>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -250,11 +360,11 @@ export default function BadalUmrohRegisterPage() {
                   </div>
                 </div>
 
-                {/* ── 3. Penyerahan Souvenir ── */}
+                {/* ── 4. Penyerahan Souvenir ── */}
                 <div className="space-y-3 pb-4 border-b">
                   <span className="font-bold text-xs uppercase tracking-wider text-emerald-600 flex items-center gap-1.5">
                     <Truck className="h-4 w-4 text-emerald-600" />
-                    3. Penyerahan / Pengambilan Souvenir & Sertifikat
+                    4. Penyerahan / Pengambilan Souvenir & Sertifikat
                   </span>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
@@ -316,11 +426,11 @@ export default function BadalUmrohRegisterPage() {
                   )}
                 </div>
 
-                {/* ── 4. Upload Bukti Transfer ── */}
+                {/* ── 5. Upload Bukti Transfer ── */}
                 <div className="space-y-3">
                   <span className="font-bold text-xs uppercase tracking-wider text-emerald-600 flex items-center gap-1.5">
                     <FileCheck className="h-4 w-4 text-emerald-600" />
-                    4. Upload Bukti Transfer / Pembayaran
+                    5. Upload Bukti Transfer / Pembayaran
                   </span>
 
                   <div className="p-4 border rounded-lg bg-card space-y-3">
