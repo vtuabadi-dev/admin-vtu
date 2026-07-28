@@ -316,6 +316,72 @@ function extractDescription(caption: string): string | undefined {
   return descriptive.length > 0 ? descriptive.join("; ") : undefined;
 }
 
+/**
+ * Extract room upgrade prices (Double and Triple) specifically scanning caption text (from bottom lines first).
+ * Examples:
+ *   "Upgrade Double: 5.000.000, Triple: 3.000.000"
+ *   "Sekamar Berdua +5jt, Sekamar Bertiga +3jt"
+ *   "Double +5.000.000"
+ */
+export function extractRoomUpgradePrices(caption: string): { upgradeDouble?: string; upgradeTriple?: string } {
+  let upgradeDouble: string | undefined;
+  let upgradeTriple: string | undefined;
+
+  const lines = caption.split("\n").map(l => l.trim()).filter(Boolean);
+  const bottomToTopLines = [...lines].reverse();
+
+  const parseNumber = (text: string): string | undefined => {
+    // Check "5jt" or "5 juta" or "5,5jt"
+    const jtMatch = text.match(/(\d+(?:[\.,]\d+)?)\s*(?:jt|juta)/i);
+    if (jtMatch?.[1]) {
+      const num = parseFloat(jtMatch[1].replace(",", "."));
+      if (!isNaN(num)) return Math.round(num * 1000000).toString();
+    }
+    // Check "5.000.000" or "5000000"
+    const numMatch = text.match(/(\d{1,3}(?:\.\d{3})+|\d{6,8})/);
+    if (numMatch?.[1]) {
+      const numStr = numMatch[1].replace(/\D/g, "");
+      if (numStr.length >= 6) return numStr;
+    }
+    return undefined;
+  };
+
+  for (const line of bottomToTopLines) {
+    const lineUpper = line.toUpperCase();
+
+    if (!upgradeDouble && (lineUpper.includes("DOUBLE") || lineUpper.includes("BERDUA") || lineUpper.includes("BER 2") || lineUpper.includes("BER-2") || lineUpper.includes("TWIN"))) {
+      const price = parseNumber(line);
+      if (price) upgradeDouble = price;
+    }
+
+    if (!upgradeTriple && (lineUpper.includes("TRIPLE") || lineUpper.includes("BERTIGA") || lineUpper.includes("BER 3") || lineUpper.includes("BER-3"))) {
+      const price = parseNumber(line);
+      if (price) upgradeTriple = price;
+    }
+
+    if (upgradeDouble && upgradeTriple) break;
+  }
+
+  // Fallback regex scan across whole caption if line-by-line misses
+  if (!upgradeDouble) {
+    const dMatch = caption.match(/(?:DOUBLE|SEKAMAR\s*BERDUA|TWIN)\s*[:=+]?\s*(?:RP\.?)?\s*(\d+(?:[\.,]\d+)?\s*(?:JT|JUTA)|\d{1,3}(?:\.\d{3})+|\d{6,8})/i);
+    if (dMatch?.[1]) {
+      const price = parseNumber(dMatch[1]);
+      if (price) upgradeDouble = price;
+    }
+  }
+
+  if (!upgradeTriple) {
+    const tMatch = caption.match(/(?:TRIPLE|SEKAMAR\s*BERTIGA)\s*[:=+]?\s*(?:RP\.?)?\s*(\d+(?:[\.,]\d+)?\s*(?:JT|JUTA)|\d{1,3}(?:\.\d{3})+|\d{6,8})/i);
+    if (tMatch?.[1]) {
+      const price = parseNumber(tMatch[1]);
+      if (price) upgradeTriple = price;
+    }
+  }
+
+  return { upgradeDouble, upgradeTriple };
+}
+
 // ── Main Parser ──────────────────────────────────────────────
 
 /**
@@ -332,6 +398,7 @@ export function parseCaption(caption: string): Partial<PackageExtractionResult> 
   const dates = extractDates(trimmed);
   const promo = extractPromo(trimmed);
   const upgrades = extractUpgrade(trimmed);
+  const upgradePrices = extractRoomUpgradePrices(trimmed);
   const description = extractDescription(trimmed);
 
   // Title: first meaningful line or package type + duration
@@ -365,6 +432,8 @@ export function parseCaption(caption: string): Partial<PackageExtractionResult> 
     hotelMadinah,
     roomUpgrade: upgrades.roomUpgrade,
     hotelUpgrade: upgrades.hotelUpgrade,
+    upgradeDouble: upgradePrices.upgradeDouble,
+    upgradeTriple: upgradePrices.upgradeTriple,
     durationDays: duration,
     departureDates: dates,
     promoText: promo,

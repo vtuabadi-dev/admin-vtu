@@ -110,6 +110,7 @@ export async function processPackageFlyer(
       }
     }
 
+    const captionUpgrades = parseCaption(caption);
     return {
       title: geminiData.title || "Untitled Package",
       packageType: (geminiData.packageType as any) || "umroh_reguler",
@@ -120,6 +121,8 @@ export async function processPackageFlyer(
       hotelMadinah: geminiData.hotelMadinah || "",
       roomUpgrade: geminiData.roomUpgrade,
       hotelUpgrade: geminiData.hotelUpgrade,
+      upgradeDouble: geminiData.upgradeDouble || captionUpgrades.upgradeDouble,
+      upgradeTriple: geminiData.upgradeTriple || captionUpgrades.upgradeTriple,
       durationDays: geminiData.durationDays || 0,
       departureDates: dates,
       promoText: geminiData.promoText,

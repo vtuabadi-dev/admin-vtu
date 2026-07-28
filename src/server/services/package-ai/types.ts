@@ -18,6 +18,8 @@ export interface PackageExtractionResult {
   hotelMadinah: string;
   roomUpgrade?: string;
   hotelUpgrade?: string;
+  upgradeDouble?: string;
+  upgradeTriple?: string;
   durationDays: number;
   departureDates: string[];
   promoText?: string;

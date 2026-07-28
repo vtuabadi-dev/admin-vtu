@@ -476,6 +476,8 @@ import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X } from "luc
           if (mappedHotelMekkah) finalFormData.hotelMekkahId = mappedHotelMekkah;
           if (mappedHotelMadinah) finalFormData.hotelMadinahId = mappedHotelMadinah;
           if (result.durationDays) finalFormData.durasiHari = String(result.durationDays);
+          if (result.upgradeDouble) finalFormData.upgradeDouble = String(result.upgradeDouble).replace(/\D/g, "");
+          if (result.upgradeTriple) finalFormData.upgradeTriple = String(result.upgradeTriple).replace(/\D/g, "");
           
           if (result.departureDates && Array.isArray(result.departureDates)) {
             const extractedDates: string[] = result.departureDates
