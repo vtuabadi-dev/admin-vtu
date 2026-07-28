@@ -236,70 +236,70 @@ export default function LoginPage() {
           </div>
         </div>
 
-        {/* ── Right Side: Metallic Green Panel with Continuous Smooth Curved Left Edge (Col 6-12 on LG) ── */}
-        <div className="lg:col-span-7 relative bg-gradient-to-br from-emerald-800 via-teal-900 to-emerald-950 text-white p-8 sm:p-10 flex flex-col justify-center rounded-t-3xl lg:rounded-t-none lg:rounded-l-[120px] border-l border-white/10 overflow-hidden">
+        {/* ── Right Side: Poster Theme Emerald & Gold Panel (Col 6-12 on LG) ── */}
+        <div className="lg:col-span-7 relative bg-gradient-to-br from-[#041710] via-[#082C21] to-[#0E4334] text-white p-8 sm:p-10 flex flex-col justify-center rounded-t-3xl lg:rounded-t-none lg:rounded-l-[120px] border-l border-[#D4AF37]/30 overflow-hidden">
           
-          {/* Subtle Ambient Light Reflections */}
-          <div className="absolute top-0 right-0 w-80 h-80 bg-emerald-400/10 rounded-full blur-3xl pointer-events-none" />
-          <div className="absolute bottom-0 left-0 w-80 h-80 bg-teal-400/10 rounded-full blur-3xl pointer-events-none" />
+          {/* Subtle Gold & Emerald Ambient Light Reflections */}
+          <div className="absolute top-0 right-0 w-80 h-80 bg-[#D4AF37]/10 rounded-full blur-3xl pointer-events-none" />
+          <div className="absolute bottom-0 left-0 w-80 h-80 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
 
           {/* Panel Header */}
           <div className="relative z-10 text-center mb-6">
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 backdrop-blur-md text-[11px] font-semibold text-emerald-200 border border-white/15 mb-2">
-              <Compass className="h-3.5 w-3.5 text-emerald-300" />
-              <span>Portal Layanan Operasional</span>
+            <div className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-[#D4AF37]/15 backdrop-blur-md text-[11px] font-bold text-[#F5D061] border border-[#D4AF37]/40 mb-2">
+              <Compass className="h-3.5 w-3.5 text-[#F5D061]" />
+              <span>✦ Portal Layanan Operasional VTU ✦</span>
             </div>
-            <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white drop-shadow-sm">
-              Layanan Jamaah & Publik
+            <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-white drop-shadow-sm">
+              Layanan Jamaah & <span className="text-gold-gradient">Publik</span>
             </h2>
-            <p className="text-xs sm:text-sm text-emerald-100/80 mt-1.5 max-w-lg mx-auto">
+            <p className="text-xs sm:text-sm text-emerald-100/90 mt-1.5 max-w-lg mx-auto">
               Akses cepat pendaftaran jamaah, badal umroh, wakaf Al-Qur&apos;an, serta pelacakan status secara langsung.
             </p>
           </div>
 
-          {/* 4 Service Boxes Container (Matching Image 2 Layout) */}
+          {/* 4 Service Boxes Container */}
           <div className="relative z-10 space-y-3.5 max-w-xl mx-auto w-full">
             
             {/* Box 1: Portal Registrasi Jamaah Umroh */}
-            <div className="flex items-center justify-between p-3.5 sm:p-4 rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 hover:bg-white/15 transition-all shadow-md group">
+            <div className="flex items-center justify-between p-3.5 sm:p-4 rounded-2xl bg-white/10 backdrop-blur-md border border-[#D4AF37]/30 hover:border-[#D4AF37]/60 hover:bg-white/15 transition-all shadow-md group">
               <div className="flex items-center gap-3">
-                <div className="h-9 w-9 rounded-xl bg-blue-500/20 border border-blue-400/30 flex items-center justify-center text-blue-300">
+                <div className="h-9 w-9 rounded-xl bg-[#D4AF37]/20 border border-[#D4AF37]/40 flex items-center justify-center text-[#F5D061]">
                   <UserPlus className="h-4 w-4" />
                 </div>
-                <span className="text-xs sm:text-sm font-semibold text-white group-hover:text-blue-100 transition-colors">
+                <span className="text-xs sm:text-sm font-semibold text-white group-hover:text-emerald-100 transition-colors">
                   Portal Registrasi Jamaah Umroh
                 </span>
               </div>
               <a
                 href="/register"
-                className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-extrabold px-4 py-2 rounded-xl shadow-md transition-all active:scale-95 shrink-0"
+                className="bg-gradient-to-r from-[#F5D061] via-[#D4AF37] to-[#B8860B] hover:brightness-110 text-slate-950 text-xs font-black px-4 py-2 rounded-xl shadow-md transition-all active:scale-95 shrink-0"
               >
                 DAFTAR
               </a>
             </div>
 
             {/* Box 2: Pendaftaran Badal Umroh */}
-            <div className="flex items-center justify-between p-3.5 sm:p-4 rounded-2xl bg-emerald-950/40 backdrop-blur-md border border-emerald-400/30 hover:bg-emerald-900/40 transition-all shadow-md group">
+            <div className="flex items-center justify-between p-3.5 sm:p-4 rounded-2xl bg-[#082C21]/80 backdrop-blur-md border border-[#D4AF37]/40 hover:border-[#F5D061] hover:bg-[#0A2E23] transition-all shadow-md group">
               <div className="flex items-center gap-3">
-                <div className="h-9 w-9 rounded-xl bg-emerald-500/20 border border-emerald-400/30 flex items-center justify-center text-emerald-300">
+                <div className="h-9 w-9 rounded-xl bg-[#D4AF37]/25 border border-[#D4AF37]/50 flex items-center justify-center text-[#F5D061]">
                   <HeartHandshake className="h-4 w-4" />
                 </div>
-                <span className="text-xs sm:text-sm font-semibold text-emerald-50 group-hover:text-emerald-200 transition-colors">
+                <span className="text-xs sm:text-sm font-semibold text-[#FAF6EE] group-hover:text-[#F5D061] transition-colors">
                   Pendaftaran Badal Umroh
                 </span>
               </div>
               <a
                 href="/register/badal-umroh"
-                className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-extrabold px-4 py-2 rounded-xl shadow-md transition-all active:scale-95 shrink-0"
+                className="bg-gradient-to-r from-[#F5D061] via-[#D4AF37] to-[#B8860B] hover:brightness-110 text-slate-950 text-xs font-black px-4 py-2 rounded-xl shadow-md transition-all active:scale-95 shrink-0"
               >
                 BADAL
               </a>
             </div>
 
             {/* Box 3: Pendaftaran Wakaf Al-Qur'an */}
-            <div className="flex items-center justify-between p-3.5 sm:p-4 rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 hover:bg-white/15 transition-all shadow-md group">
+            <div className="flex items-center justify-between p-3.5 sm:p-4 rounded-2xl bg-white/10 backdrop-blur-md border border-[#D4AF37]/30 hover:border-[#D4AF37]/60 hover:bg-white/15 transition-all shadow-md group">
               <div className="flex items-center gap-3">
-                <div className="h-9 w-9 rounded-xl bg-sky-500/20 border border-sky-400/30 flex items-center justify-center text-sky-300">
+                <div className="h-9 w-9 rounded-xl bg-[#D4AF37]/20 border border-[#D4AF37]/40 flex items-center justify-center text-[#F5D061]">
                   <BookOpen className="h-4 w-4" />
                 </div>
                 <span className="text-xs sm:text-sm font-semibold text-white group-hover:text-sky-100 transition-colors">
@@ -308,14 +308,14 @@ export default function LoginPage() {
               </div>
               <a
                 href="/register/wakaf-quran"
-                className="bg-sky-600 hover:bg-sky-700 text-white text-xs font-extrabold px-4 py-2 rounded-xl shadow-md transition-all active:scale-95 shrink-0"
+                className="bg-gradient-to-r from-[#F5D061] via-[#D4AF37] to-[#B8860B] hover:brightness-110 text-slate-950 text-xs font-black px-4 py-2 rounded-xl shadow-md transition-all active:scale-95 shrink-0"
               >
                 WAKAF
               </a>
             </div>
 
             {/* Box 4: Cek Status Badal & Wakaf (OTP WA) */}
-            <div className="flex items-center justify-between p-3.5 sm:p-4 rounded-2xl bg-amber-950/40 backdrop-blur-md border border-amber-400/30 hover:bg-amber-900/40 transition-all shadow-md group">
+            <div className="flex items-center justify-between p-3.5 sm:p-4 rounded-2xl bg-[#041710]/90 backdrop-blur-md border border-[#D4AF37]/30 hover:border-[#D4AF37]/60 transition-all shadow-md group">
               <div className="flex items-center gap-3">
                 <div className="h-9 w-9 rounded-xl bg-amber-500/20 border border-amber-400/30 flex items-center justify-center text-amber-300">
                   <ShieldCheck className="h-4 w-4" />

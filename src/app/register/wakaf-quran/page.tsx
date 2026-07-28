@@ -109,14 +109,20 @@ export default function WakafQuranRegisterPage() {
           <ArrowLeft className="h-3.5 w-3.5" /> Kembali ke Portal Utama / Login
         </Link>
 
-        <Card className="border border-border shadow-sm overflow-hidden">
-          <CardHeader className="bg-sky-600 text-white p-6 text-center">
-            <div className="mx-auto w-12 h-12 rounded-full bg-white/20 flex items-center justify-center mb-3">
-              <BookOpen className="h-6 w-6 text-white" />
+        <Card className="border border-[#D4AF37]/30 shadow-xl overflow-hidden rounded-2xl bg-white">
+          <CardHeader className="bg-gradient-to-r from-[#041710] via-[#082C21] to-[#0E4334] text-white p-6 text-center border-b border-[#D4AF37]/30 relative overflow-hidden">
+            <div className="absolute -top-10 -right-10 w-40 h-40 bg-[#D4AF37]/10 rounded-full blur-2xl pointer-events-none" />
+            <div className="mx-auto w-14 h-14 rounded-2xl bg-gradient-to-br from-[#D4AF37]/20 to-[#F5D061]/30 border border-[#D4AF37]/50 flex items-center justify-center mb-3 shadow-md">
+              <BookOpen className="h-7 w-7 text-[#F5D061]" />
             </div>
-            <CardTitle className="text-xl font-bold">Portal Pendaftaran Wakaf Al-Qur&apos;an</CardTitle>
-            <p className="text-sky-100 text-xs mt-1">
-              Program Penyaluran Wakaf Mushaf Al-Qur&apos;an di Masjidil Haram Makkah & Masjid Nabawi Madinah.
+            <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-[#D4AF37]/15 border border-[#D4AF37]/40 text-[10px] font-bold text-[#F5D061] uppercase tracking-wider mb-2 mx-auto">
+              ✦ Program Wakaf Al-Qur&apos;an Makkah & Madinah ✦
+            </div>
+            <CardTitle className="text-xl sm:text-2xl font-black text-white tracking-tight">
+              Portal Pendaftaran <span className="text-gold-gradient">Wakaf Al-Qur&apos;an</span>
+            </CardTitle>
+            <p className="text-emerald-100/90 text-xs mt-1.5 max-w-md mx-auto leading-relaxed">
+              Program Penyaluran Wakaf Mushaf Al-Qur&apos;an di Masjidil Haram Makkah & Masjid Nabawi Madinah Al-Munawwarah.
             </p>
           </CardHeader>
 

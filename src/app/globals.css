@@ -88,4 +88,28 @@
   .dense-table th {
     @apply px-3 py-2;
   }
+
+  /* ── POSTER THEME UTILITIES (Emerald & Luxury Gold) ── */
+  .text-gold-gradient {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-[#F5D061] via-[#D4AF37] to-[#B8860B];
+  }
+  .bg-gold-gradient {
+    @apply bg-gradient-to-r from-[#F5D061] via-[#D4AF37] to-[#B8860B] text-slate-950 font-bold shadow-md shadow-amber-900/20 hover:brightness-110 transition-all;
+  }
+  .border-gold-accent {
+    border-color: rgba(212, 175, 55, 0.4);
+  }
+  .border-gold-accent-glow {
+    border-color: rgba(245, 208, 97, 0.6);
+    box-shadow: 0 0 15px rgba(212, 175, 55, 0.15);
+  }
+  .poster-emerald-bg {
+    background: linear-gradient(135deg, #051A13 0%, #062118 40%, #0A2E23 70%, #0F3D2E 100%);
+  }
+  .poster-card {
+    background-color: #FAF6EE;
+    border: 1.5px solid rgba(212, 175, 55, 0.5);
+    border-radius: 1rem;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  }
 }
