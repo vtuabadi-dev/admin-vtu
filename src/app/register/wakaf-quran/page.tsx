@@ -145,7 +145,7 @@ export default function WakafQuranRegisterPage() {
                 </div>
                 <div className="pt-4 flex justify-center gap-3">
                   <a
-                    href={`https://wa.me/6281234567890?text=${encodeURIComponent(`Assalamu'alaikum Admin, saya ingin konfirmasi pendaftaran Wakaf Qur'an atas nama: ${formData.namaPeserta || formData.namaPewakaf} (${formData.jumlahMushaf} Mushaf)`)}`}
+                    href={`https://wa.me/${(process.env.NEXT_PUBLIC_ADMIN_WHATSAPP || "6281234567890").replace(/[^0-9]/g, "")}?text=${encodeURIComponent(`Assalamu'alaikum Admin, saya ingin konfirmasi pendaftaran Wakaf Qur'an atas nama: ${formData.namaPeserta || formData.namaPewakaf} (${formData.jumlahMushaf} Mushaf)`)}`}
                     target="_blank"
                     rel="noreferrer"
                     className="inline-flex items-center gap-2 px-4 py-2.5 bg-sky-600 hover:bg-sky-700 text-white font-medium text-xs rounded-lg transition-colors"

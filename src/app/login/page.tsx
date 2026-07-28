@@ -18,6 +18,7 @@ import {
   ShieldCheck,
   UserPlus,
   Compass,
+  Zap,
 } from "lucide-react";
 
 export default function LoginPage() {
@@ -31,6 +32,21 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleInstantAdminLogin = async (targetEmail = "admin@vtu.id", targetPass = "admin123") => {
+    if (isSubmitting) return;
+    setEmail(targetEmail);
+    setPassword(targetPass);
+    clearError();
+    setIsSubmitting(true);
+    try {
+      await login(targetEmail, targetPass);
+    } catch {
+      // Login errors handled by store
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   // Hard redirect on successful login based on role
   useEffect(() => {
@@ -197,6 +213,27 @@ export default function LoginPage() {
               )}
             </button>
           </form>
+
+          {/* ── Instant Login Admin Section ── */}
+          <div className="mt-6 pt-5 border-t border-emerald-100 dark:border-emerald-900/40">
+            <div className="flex items-center justify-between mb-2.5">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-900 flex items-center gap-1.5">
+                <Zap className="h-4 w-4 text-amber-500 fill-amber-500 animate-bounce" /> Akses Cepat (Admin Only)
+              </span>
+              <span className="text-[10px] text-emerald-700/70 font-semibold bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                1-Click Instant Login
+              </span>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => handleInstantAdminLogin("admin@vtu.id", "admin123")}
+              disabled={isSubmitting}
+              className="w-full h-11 inline-flex items-center justify-center gap-2 rounded-xl font-extrabold text-xs bg-amber-500 hover:bg-amber-600 active:scale-[0.98] text-slate-950 shadow-md shadow-amber-500/20 transition-all duration-200 border border-amber-400 disabled:opacity-50"
+            >
+              ⚡ LOGIN INSTAN SUPER ADMIN (LEGACY)
+            </button>
+          </div>
         </div>
 
         {/* ── Right Side: Metallic Green Panel with Continuous Smooth Curved Left Edge (Col 6-12 on LG) ── */}

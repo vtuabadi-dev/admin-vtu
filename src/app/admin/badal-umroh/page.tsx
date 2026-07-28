@@ -25,7 +25,18 @@ import {
   Sparkles,
   Clock,
   FileText,
+  RefreshCw,
 } from "lucide-react";
+
+const DEFAULT_PETUGAS_BADAL_OPTIONS = [
+  "Ust. Ahmad Al-Makki",
+  "Ust. Abdullah Al-Faisal",
+  "Ust. Ridwan Seychan",
+  "Ust. Hamzah Makkah",
+  "Ust. Muhammad Zulkarnain",
+  "Ust. Farhan Basalamah",
+  "Ust. Zaki Mubarok",
+];
 
 export default function AdminBadalUmrohPage() {
   const [activeTab, setActiveTab] = useState<"validasi" | "pelaksanaan">("validasi");
@@ -52,7 +63,7 @@ export default function AdminBadalUmrohPage() {
   const fetchList = async () => {
     try {
       setLoading(true);
-      const res = await fetch(`/api/badal-umroh?status=ALL`);
+      const res = await fetch(`/api/badal-umroh?status=ALL`, { cache: "no-store" });
       const resJson = await res.json();
       if (resJson.success) {
         setList(resJson.data || []);
@@ -61,6 +72,28 @@ export default function AdminBadalUmrohPage() {
       console.error(err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleQuickUpdatePetugas = async (id: string, newPetugas: string) => {
+    try {
+      setSaving(true);
+      const res = await fetch(`/api/badal-umroh/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ petugasBadal: newPetugas }),
+      });
+      const resJson = await res.json();
+      if (resJson.success) {
+        fetchList();
+      } else {
+        alert(`Gagal memperbarui pelaksana badal: ${resJson.message}`);
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Gagal memperbarui pelaksana badal.");
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -192,32 +225,46 @@ export default function AdminBadalUmrohPage() {
           </p>
         </div>
 
-        <div className="flex items-center gap-2 border bg-muted/30 p-1 rounded-lg">
-          <button
-            onClick={() => setActiveTab("validasi")}
-            className={`px-3 py-1.5 text-xs font-bold rounded-md transition-colors relative ${
-              activeTab === "validasi"
-                ? "bg-background shadow text-emerald-700 dark:text-emerald-400 font-extrabold"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
+        <div className="flex items-center gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={fetchList}
+            disabled={loading}
+            className="h-9 text-xs font-semibold gap-1.5 bg-background shadow-xs hover:bg-muted"
+            title="Segarkan Data Badal Umroh"
           >
-            💳 Validasi Pembayaran ({validasiList.length})
-            {stats.needValidation > 0 && (
-              <span className="ml-1.5 px-1.5 py-0.5 rounded-full bg-rose-500 text-white text-[10px] font-bold">
-                {stats.needValidation}
-              </span>
-            )}
-          </button>
-          <button
-            onClick={() => setActiveTab("pelaksanaan")}
-            className={`px-3 py-1.5 text-xs font-bold rounded-md transition-colors ${
-              activeTab === "pelaksanaan"
-                ? "bg-background shadow text-emerald-700 dark:text-emerald-400 font-extrabold"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            🕋 Pelaksanaan Badal ({pelaksanaanList.length})
-          </button>
+            <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin text-emerald-600" : ""}`} />
+            Segarkan
+          </Button>
+
+          <div className="flex items-center gap-2 border bg-muted/30 p-1 rounded-lg">
+            <button
+              onClick={() => setActiveTab("validasi")}
+              className={`px-3 py-1.5 text-xs font-bold rounded-md transition-colors relative ${
+                activeTab === "validasi"
+                  ? "bg-background shadow text-emerald-700 dark:text-emerald-400 font-extrabold"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              💳 Validasi Pembayaran ({validasiList.length})
+              {stats.needValidation > 0 && (
+                <span className="ml-1.5 px-1.5 py-0.5 rounded-full bg-rose-500 text-white text-[10px] font-bold">
+                  {stats.needValidation}
+                </span>
+              )}
+            </button>
+            <button
+              onClick={() => setActiveTab("pelaksanaan")}
+              className={`px-3 py-1.5 text-xs font-bold rounded-md transition-colors ${
+                activeTab === "pelaksanaan"
+                  ? "bg-background shadow text-emerald-700 dark:text-emerald-400 font-extrabold"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              🕋 Pelaksanaan Badal ({pelaksanaanList.length})
+            </button>
+          </div>
         </div>
       </div>
 
@@ -477,14 +524,21 @@ export default function AdminBadalUmrohPage() {
                           </a>
                         </td>
                         <td className="px-4 py-3">
-                          {item.petugasBadal ? (
-                            <div className="flex items-center gap-1.5">
-                              <UserCheck className="h-3.5 w-3.5 text-emerald-600" />
-                              <span className="font-bold text-emerald-800 dark:text-emerald-300">{item.petugasBadal}</span>
-                            </div>
-                          ) : (
-                            <span className="text-amber-600 font-semibold italic text-[11px]">⚠ Belum Ditentukan</span>
-                          )}
+                          <select
+                            value={item.petugasBadal || ""}
+                            onChange={(e) => handleQuickUpdatePetugas(item.id, e.target.value)}
+                            disabled={saving}
+                            className="h-8 px-2 rounded-md border border-emerald-300 bg-emerald-50/50 text-emerald-950 text-xs font-semibold focus:ring-1 focus:ring-emerald-500"
+                            title="Pilih Pelaksana Badal"
+                          >
+                            <option value="">-- Pilih Pelaksana Badal --</option>
+                            {DEFAULT_PETUGAS_BADAL_OPTIONS.map((p) => (
+                              <option key={p} value={p}>{p}</option>
+                            ))}
+                            {item.petugasBadal && !DEFAULT_PETUGAS_BADAL_OPTIONS.includes(item.petugasBadal) && (
+                              <option value={item.petugasBadal}>{item.petugasBadal}</option>
+                            )}
+                          </select>
                         </td>
                         <td className="px-4 py-3">
                           <Badge
@@ -599,18 +653,38 @@ export default function AdminBadalUmrohPage() {
               </p>
             </div>
 
-            {/* Petugas Badal */}
+            {/* Petugas Badal Dropdown */}
             <div className="space-y-1.5">
               <label className="font-semibold text-foreground flex items-center gap-1.5">
-                <UserCheck className="h-4 w-4 text-emerald-600" /> Petugas Pelaksana Badal (di Makkah)
+                <UserCheck className="h-4 w-4 text-emerald-600" /> Pilih / Masukkan Petugas Pelaksana Badal (di Makkah)
               </label>
-              <Input
-                type="text"
-                value={petugasBadal}
-                onChange={(e) => setPetugasBadal(e.target.value)}
-                placeholder="Masukkan nama muthowif/petugas pelaksana..."
-                className="text-xs h-10"
-              />
+              <select
+                value={DEFAULT_PETUGAS_BADAL_OPTIONS.includes(petugasBadal) ? petugasBadal : (petugasBadal ? "CUSTOM" : "")}
+                onChange={(e) => {
+                  if (e.target.value === "CUSTOM") {
+                    setPetugasBadal("");
+                  } else {
+                    setPetugasBadal(e.target.value);
+                  }
+                }}
+                className="w-full h-10 px-3 rounded-md border border-input bg-background text-xs font-semibold"
+              >
+                <option value="">-- Pilih Muthowif / Pelaksana Badal --</option>
+                {DEFAULT_PETUGAS_BADAL_OPTIONS.map((opt) => (
+                  <option key={opt} value={opt}>{opt}</option>
+                ))}
+                <option value="CUSTOM">✍ Tulis Nama Kustom...</option>
+              </select>
+
+              {(!DEFAULT_PETUGAS_BADAL_OPTIONS.includes(petugasBadal) || petugasBadal === "") && (
+                <Input
+                  type="text"
+                  value={petugasBadal}
+                  onChange={(e) => setPetugasBadal(e.target.value)}
+                  placeholder="Ketik nama muthowif/petugas pelaksana kustom..."
+                  className="text-xs h-10 mt-1"
+                />
+              )}
             </div>
 
             {/* Status Execution & Payment Status */}

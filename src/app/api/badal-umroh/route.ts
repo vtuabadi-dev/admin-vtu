@@ -3,6 +3,9 @@ import type { NextRequest } from "next/server";
 import { prisma } from "@/server/db";
 import { auth } from "@/server/auth";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 // Public POST: Submit Pendaftaran Badal Umroh from Portal
 export async function POST(request: NextRequest) {
   try {
