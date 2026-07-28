@@ -283,25 +283,27 @@ export function Sidebar({ role }: SidebarProps) {
 
                 if (hasChildren) {
                   return (
-                    <li key={item.label}>
+                    <li key={item.label} className="my-1">
                       <button
                         onClick={() => toggleGroup(item.label)}
                         className={cn(
-                          "w-full flex items-center gap-3 rounded-lg px-3 py-2 text-xs font-semibold transition-all text-left",
+                          "w-full flex items-center gap-2.5 rounded-2xl px-3 py-2.5 text-xs font-bold transition-all text-left border shadow-xs",
                           active && !collapsed
-                            ? "bg-[#D4AF37]/20 text-[#F5D061] border-l-2 border-[#F5D061] font-bold"
-                            : "text-emerald-100/75 hover:bg-[#0E4334]/70 hover:text-white",
+                            ? "bg-[#0E4334] text-[#F5D061] border-[#D4AF37]/60 shadow-md"
+                            : "bg-[#062118]/60 text-emerald-100/90 hover:bg-[#0E4334]/80 hover:text-white border-[#D4AF37]/20",
                           collapsed && "justify-center px-2"
                         )}
                         title={collapsed ? item.label : undefined}
                       >
-                        <item.icon className="h-4 w-4 shrink-0" />
+                        <div className="flex h-7 w-7 items-center justify-center rounded-xl bg-[#D4AF37]/20 border border-[#D4AF37]/40 text-[#F5D061] shrink-0">
+                          <item.icon className="h-4 w-4" />
+                        </div>
                         {!collapsed && (
                           <>
-                            <span className="flex-1">{item.label}</span>
+                            <span className="flex-1 font-bold text-white tracking-wide">{item.label}</span>
                             <ChevronDown
                               className={cn(
-                                "h-3.5 w-3.5 shrink-0 transition-transform",
+                                "h-4 w-4 shrink-0 text-[#F5D061] transition-transform duration-200",
                                 isExpanded && "rotate-180"
                               )}
                             />
@@ -309,24 +311,31 @@ export function Sidebar({ role }: SidebarProps) {
                         )}
                       </button>
 
+                      {/* ── Sub-menu Box Container (Sage Green Box with Gold Border & Vertical Bar matching Image 7) ── */}
                       {!collapsed && isExpanded && (
-                        <ul className="mt-1 ml-3.5 space-y-1 border-l border-[#D4AF37]/30 pl-2.5">
-                          {item.children!.map((child) => (
-                            <li key={child.href}>
-                              <Link
-                                href={child.href}
-                                className={cn(
-                                  "block rounded-md px-2.5 py-1.5 text-[11px] font-semibold transition-all",
-                                  isChildActive(child.href)
-                                    ? "bg-[#D4AF37]/25 text-[#F5D061] font-bold"
-                                    : "text-emerald-100/70 hover:bg-[#0E4334]/60 hover:text-white"
-                                )}
-                              >
-                                {child.label}
-                              </Link>
-                            </li>
-                          ))}
-                        </ul>
+                        <div className="mt-2.5 mb-1.5 relative rounded-2xl p-2 bg-[#0E4334] border-2 border-[#D4AF37]/50 shadow-2xl overflow-hidden">
+                          {/* Left Vertical Gold Indicator Bar */}
+                          <div className="absolute left-2.5 top-2.5 bottom-2.5 w-1 bg-gradient-to-b from-[#F5D061] via-[#D4AF37] to-[#B8860B] rounded-full" />
+                          
+                          <ul className="pl-3 space-y-1">
+                            {item.children!.map((child) => (
+                              <li key={child.href}>
+                                <Link
+                                  href={child.href}
+                                  className={cn(
+                                    "flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-bold transition-all",
+                                    isChildActive(child.href)
+                                      ? "bg-gradient-to-r from-[#F5D061] via-[#D4AF37] to-[#B8860B] text-slate-950 font-black shadow-md"
+                                      : "text-emerald-100 hover:bg-[#165340] hover:text-[#F5D061]"
+                                  )}
+                                >
+                                  <div className="h-1.5 w-1.5 rounded-full bg-[#F5D061] shrink-0" />
+                                  <span className="truncate">{child.label}</span>
+                                </Link>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
                       )}
                     </li>
                   );
