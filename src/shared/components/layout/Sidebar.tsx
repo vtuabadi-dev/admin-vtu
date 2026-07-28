@@ -245,38 +245,37 @@ export function Sidebar({ role }: SidebarProps) {
   return (
     <aside
       className={cn(
-        "fixed left-0 top-0 z-40 h-screen border-r bg-card transition-all duration-200 flex flex-col",
+        "fixed left-0 top-0 z-40 h-screen border-r border-[#D4AF37]/30 bg-gradient-to-b from-[#041710] via-[#062118] to-[#0A2E23] text-white transition-all duration-200 flex flex-col shadow-2xl",
         collapsed ? "w-16" : "w-60"
       )}
     >
       {/* Logo */}
-      <div className="flex h-14 items-center border-b px-4">
+      <div className="flex h-14 items-center border-b border-[#D4AF37]/30 px-4">
         {!collapsed && (
-          <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary">
-              <Plane className="h-4 w-4 text-primary-foreground" />
+          <div className="flex items-center gap-2.5">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-tr from-[#F5D061] via-[#D4AF37] to-[#B8860B] text-slate-950 shadow-md">
+              <Plane className="h-4 w-4 text-slate-950" />
             </div>
-            <div className="text-sm font-semibold leading-tight">
-              <div>VTU</div>
-              <div className="text-[10px] text-muted-foreground font-normal">
-                Operational System
+            <div className="text-sm font-black leading-tight tracking-wide">
+              <div className="text-white">VTU <span className="text-[#F5D061] text-[10px] font-extrabold uppercase">Operasional</span></div>
+              <div className="text-[10px] text-emerald-200/70 font-medium">
+                Travel System
               </div>
             </div>
           </div>
         )}
         {collapsed && (
-          <div className="mx-auto flex h-8 w-8 items-center justify-center rounded-md bg-primary">
-            <Plane className="h-4 w-4 text-primary-foreground" />
+          <div className="mx-auto flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-tr from-[#F5D061] via-[#D4AF37] to-[#B8860B] text-slate-950 shadow-md">
+            <Plane className="h-4 w-4 text-slate-950" />
           </div>
         )}
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto py-3 px-2 space-y-5">
+      <nav className="flex-1 overflow-y-auto py-3 px-2 space-y-4">
         {sections.map((section) => (
           <div key={section.title}>
-            {/* Section title removed for a cleaner look */}
-            <ul className="space-y-0.5">
+            <ul className="space-y-1">
               {section.items.map((item) => {
                 const hasChildren = item.children !== undefined;
                 const active = isParentActive(item);
@@ -288,10 +287,10 @@ export function Sidebar({ role }: SidebarProps) {
                       <button
                         onClick={() => toggleGroup(item.label)}
                         className={cn(
-                          "w-full flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors text-left",
+                          "w-full flex items-center gap-3 rounded-lg px-3 py-2 text-xs font-semibold transition-all text-left",
                           active && !collapsed
-                            ? "bg-primary/10 text-primary"
-                            : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                            ? "bg-[#D4AF37]/20 text-[#F5D061] border-l-2 border-[#F5D061] font-bold"
+                            : "text-emerald-100/75 hover:bg-[#0E4334]/70 hover:text-white",
                           collapsed && "justify-center px-2"
                         )}
                         title={collapsed ? item.label : undefined}
@@ -311,16 +310,16 @@ export function Sidebar({ role }: SidebarProps) {
                       </button>
 
                       {!collapsed && isExpanded && (
-                        <ul className="mt-0.5 ml-4 space-y-0.5 border-l border-border pl-3">
+                        <ul className="mt-1 ml-3.5 space-y-1 border-l border-[#D4AF37]/30 pl-2.5">
                           {item.children!.map((child) => (
                             <li key={child.href}>
                               <Link
                                 href={child.href}
                                 className={cn(
-                                  "block rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
+                                  "block rounded-md px-2.5 py-1.5 text-[11px] font-semibold transition-all",
                                   isChildActive(child.href)
-                                    ? "bg-primary/10 text-primary"
-                                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                                    ? "bg-[#D4AF37]/25 text-[#F5D061] font-bold"
+                                    : "text-emerald-100/70 hover:bg-[#0E4334]/60 hover:text-white"
                                 )}
                               >
                                 {child.label}
@@ -338,10 +337,10 @@ export function Sidebar({ role }: SidebarProps) {
                     <Link
                       href={item.href!}
                       className={cn(
-                        "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                        "flex items-center gap-3 rounded-lg px-3 py-2 text-xs font-semibold transition-all",
                         active
-                          ? "bg-primary/10 text-primary"
-                          : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                          ? "bg-[#D4AF37]/20 text-[#F5D061] border-l-2 border-[#F5D061] font-bold shadow-xs"
+                          : "text-emerald-100/75 hover:bg-[#0E4334]/70 hover:text-white",
                         collapsed && "justify-center px-2"
                       )}
                       title={collapsed ? item.label : undefined}
@@ -358,24 +357,24 @@ export function Sidebar({ role }: SidebarProps) {
       </nav>
 
       {/* Footer */}
-      <div className="border-t p-2">
+      <div className="border-t border-[#D4AF37]/30 p-2.5 bg-[#041710]/50">
         {!collapsed && (
-          <div className="flex items-center gap-3 px-3 py-2">
+          <div className="flex items-center gap-2.5 px-2 py-1.5 mb-1">
             <div className={cn(
-              "flex h-8 w-8 items-center justify-center rounded-full text-xs font-medium",
-              superAdmin ? "bg-amber-100 text-amber-700" : "bg-muted"
+              "flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold shrink-0 border border-[#D4AF37]/40",
+              superAdmin ? "bg-[#D4AF37]/25 text-[#F5D061]" : "bg-emerald-900 text-emerald-100"
             )}>
               {avatarLetter}
             </div>
-            <div className="text-sm min-w-0">
-              <div className="font-medium truncate">{displayName}</div>
-              <div className="text-xs text-muted-foreground truncate">{displayEmail}</div>
+            <div className="text-xs min-w-0">
+              <div className="font-bold text-white truncate leading-tight">{displayName}</div>
+              <div className="text-[10px] text-emerald-200/70 truncate leading-tight">{displayEmail}</div>
             </div>
           </div>
         )}
         <button
           onClick={toggleSidebar}
-          className="flex w-full items-center justify-center rounded-md py-1.5 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+          className="flex w-full items-center justify-center rounded-lg py-1.5 text-emerald-200/80 hover:bg-[#0E4334] hover:text-white transition-colors"
         >
           {collapsed ? (
             <ChevronRight className="h-4 w-4" />
