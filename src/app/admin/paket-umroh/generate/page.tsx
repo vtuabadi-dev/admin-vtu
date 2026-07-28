@@ -1230,6 +1230,424 @@ import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X } from "luc
     );
   };
 
+  const renderOcrSingleCardForm = () => {
+    return (
+      <div className="p-5 bg-card border rounded-2xl shadow-sm space-y-5">
+        <div className="flex items-center justify-between border-b pb-3">
+          <div>
+            <h2 className="font-extrabold text-base text-foreground flex items-center gap-2">
+              <Sparkles className="h-4.5 w-4.5 text-amber-500 fill-amber-500/20" />
+              Formulir Verifikasi Hasil Ekstraksi OCR
+            </h2>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Semua data hasil scan flyer tersusun dalam satu formulir verifikasi tanpa pembagian langkah.
+            </p>
+          </div>
+          {ocrSuccess && (
+            <span className="text-xs bg-emerald-100 text-emerald-800 px-2.5 py-1 rounded-full font-bold">
+              Form Pre-filled
+            </span>
+          )}
+        </div>
+
+        {ocrDateInfo && (
+          <div className="p-4 bg-emerald-50 dark:bg-emerald-950/40 border-2 border-emerald-400 dark:border-emerald-700 rounded-xl space-y-2 shadow-sm">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div className="flex items-center gap-2 text-emerald-950 dark:text-emerald-100 font-extrabold text-sm">
+                <Sparkles className="h-5 w-5 text-amber-500 animate-bounce" />
+                <span>Hasil Ekstraksi OCR: Terdeteksi {ocrDateInfo.count} Tanggal Keberangkatan pada Flyer Utama!</span>
+              </div>
+              <span className="px-3 py-1 rounded-full bg-emerald-700 text-white font-black text-xs shadow-xs">
+                {ocrDateInfo.count} Kolom Tanggal Berhasil Dibuatkan
+              </span>
+            </div>
+            <p className="text-xs text-emerald-800 dark:text-emerald-200">
+              Sistem Google Vision OCR telah mendeteksi <strong>{ocrDateInfo.count} tanggal keberangkatan</strong> dari flyer utama dan otomatis membuatkan {ocrDateInfo.count} kolom input tanggal:
+            </p>
+            <div className="flex flex-wrap gap-2 pt-1">
+              {ocrDateInfo.dates.map((dStr, idx) => (
+                <span key={dStr} className="px-3 py-1 bg-white dark:bg-emerald-900 border border-emerald-300 dark:border-emerald-700 text-emerald-950 dark:text-emerald-100 text-xs font-bold rounded-lg shadow-xs">
+                  📅 Tanggal #{idx + 1}: {formatDateIndo(dStr)} ({dStr})
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ── 1. DASAR PAKET & PENERBANGAN ── */}
+        <div className="space-y-3">
+          <span className="text-xs font-bold uppercase tracking-wider text-emerald-800 dark:text-emerald-400 block border-b pb-1">
+            1. Dasar Paket & Penerbangan
+          </span>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className="md:col-span-2">
+              <label className="block text-xs font-semibold mb-1">Jenis Paket (Master Data)</label>
+              <SearchableSelect
+                id="field-ocr-jenisPaketId"
+                options={options?.packageTypes.map(t => ({ value: t.id, label: t.name })) || []}
+                value={formData.jenisPaketId}
+                onChange={(val) => setFormData(prev => ({ ...prev, jenisPaketId: val }))}
+                placeholder="-- Pilih Jenis Paket --"
+                searchPlaceholder="Cari jenis paket..."
+                disabled={fetching}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold mb-1">Durasi (Hari)</label>
+              <Input 
+                id="field-ocr-durasiHari" 
+                type="number" 
+                name="durasiHari" 
+                value={formData.durasiHari} 
+                onChange={handleChange} 
+                placeholder="9" 
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1">
+            <div>
+              <label className="block text-xs font-semibold mb-1">Starting Point</label>
+              <SearchableSelect
+                id="field-ocr-startingPointId"
+                options={options?.cities.map(c => ({ value: c.id, label: c.name })) || []}
+                value={formData.startingPointId}
+                onChange={(val) => setFormData(prev => ({ ...prev, startingPointId: val }))}
+                placeholder="-- Pilih Kota --"
+                searchPlaceholder="Cari kota starting point..."
+                disabled={fetching}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold mb-1">Rute In-Out</label>
+              <SearchableSelect
+                id="field-ocr-landingPatternId"
+                options={filteredRoutes.map(r => ({ 
+                  value: r.id, 
+                  label: `${r.ruteIn} → ${r.ruteOut}`,
+                  sublabel: r.kode ? `[${r.kode}]` : undefined
+                }))}
+                value={formData.landingPatternId}
+                onChange={(val) => setFormData(prev => ({ ...prev, landingPatternId: val }))}
+                placeholder={isPlusPackage ? "-- Pilih Rute Plus --" : "-- Pilih Rute Reguler --"}
+                searchPlaceholder="Cari rute..."
+                disabled={fetching}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold mb-1">Maskapai</label>
+              <SearchableSelect
+                id="field-ocr-maskapaiId"
+                options={options?.airlines.map(a => ({ value: a.id, label: a.name })) || []}
+                value={formData.maskapaiId}
+                onChange={(val) => setFormData(prev => ({ ...prev, maskapaiId: val }))}
+                placeholder="-- Pilih Maskapai --"
+                searchPlaceholder="Cari maskapai..."
+                disabled={fetching}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* ── 2. AKOMODASI & HOTEL ── */}
+        <div className="space-y-3 pt-2">
+          <span className="text-xs font-bold uppercase tracking-wider text-emerald-800 dark:text-emerald-400 block border-b pb-1">
+            2. Akomodasi & Hotel {formData.isAdaKlaster === "ya" ? "(Klaster Seat)" : ""}
+          </span>
+
+          {formData.isAdaKlaster === "tidak" ? (
+            <div className="space-y-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold mb-1">Hotel Mekkah</label>
+                  <SearchableSelect
+                    id="field-ocr-hotelMekkahId"
+                    options={mekkahHotels.map(h => ({ value: h.id, label: h.name }))}
+                    value={formData.hotelMekkahId}
+                    onChange={(val) => setFormData(prev => ({ ...prev, hotelMekkahId: val }))}
+                    placeholder="-- Pilih Hotel Mekkah --"
+                    searchPlaceholder="Cari hotel Mekkah..."
+                    disabled={fetching}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold mb-1">Hotel Madinah</label>
+                  <SearchableSelect
+                    id="field-ocr-hotelMadinahId"
+                    options={madinahHotels.map(h => ({ value: h.id, label: h.name }))}
+                    value={formData.hotelMadinahId}
+                    onChange={(val) => setFormData(prev => ({ ...prev, hotelMadinahId: val }))}
+                    placeholder="-- Pilih Hotel Madinah --"
+                    searchPlaceholder="Cari hotel Madinah..."
+                    disabled={fetching}
+                  />
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 border-t pt-3">
+                <div>
+                  <label className="block text-xs font-semibold mb-1">Harga Upgrade Double (Rp)</label>
+                  <Input 
+                    id="field-ocr-upgradeDouble" 
+                    type="text" 
+                    inputMode="numeric"
+                    name="upgradeDouble" 
+                    value={formatNumberWithDots(formData.upgradeDouble)} 
+                    onChange={(e) => handleCurrencyChange("upgradeDouble", e.target.value)} 
+                    placeholder="Misal: 5.000.000" 
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold mb-1">Harga Upgrade Triple (Rp)</label>
+                  <Input 
+                    id="field-ocr-upgradeTriple" 
+                    type="text" 
+                    inputMode="numeric"
+                    name="upgradeTriple" 
+                    value={formatNumberWithDots(formData.upgradeTriple)} 
+                    onChange={(e) => handleCurrencyChange("upgradeTriple", e.target.value)} 
+                    placeholder="Misal: 3.000.000" 
+                  />
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <div className="text-xs text-muted-foreground bg-amber-50/50 border border-amber-200 p-2.5 rounded-md">
+                💡 <strong>Info:</strong> Hotel, Harga Base, serta Harga Upgrade Kamar (Double & Triple) dikonfigurasi per klaster di bawah ini.
+              </div>
+              <div className="space-y-3">
+                {(options?.clusters && options.clusters.length > 0 ? options.clusters : MOCK_KLASTER).map((klaster) => (
+                  <div key={klaster.id} className="p-3.5 bg-card border rounded-lg flex flex-col gap-3 shadow-xs">
+                    <div className="flex items-center justify-between border-b pb-1.5">
+                      <span className="text-xs font-bold text-primary">{klaster.nama} Seat Class</span>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                      <div>
+                        <label className="block text-[11px] font-semibold text-muted-foreground mb-1">Hotel Mekkah</label>
+                        <SearchableSelect
+                          id={`field-ocr-${klaster.id}-hotelMekkahId`}
+                          options={mekkahHotels.map(h => ({ value: h.id, label: h.name }))}
+                          value={clusterConfigs[klaster.id]?.hotelMekkahId || ""}
+                          onChange={(val) => handleClusterConfigChange(klaster.id, "hotelMekkahId", val)}
+                          placeholder="-- Hotel Mekkah --"
+                          searchPlaceholder="Cari hotel..."
+                          size="sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-semibold text-muted-foreground mb-1">Hotel Madinah</label>
+                        <SearchableSelect
+                          id={`field-ocr-${klaster.id}-hotelMadinahId`}
+                          options={madinahHotels.map(h => ({ value: h.id, label: h.name }))}
+                          value={clusterConfigs[klaster.id]?.hotelMadinahId || ""}
+                          onChange={(val) => handleClusterConfigChange(klaster.id, "hotelMadinahId", val)}
+                          placeholder="-- Hotel Madinah --"
+                          searchPlaceholder="Cari hotel..."
+                          size="sm"
+                        />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5 pt-1">
+                      <div>
+                        <label className="block text-[11px] font-semibold text-muted-foreground mb-1">Harga Base (Rp)</label>
+                        <Input 
+                          type="text" 
+                          inputMode="numeric"
+                          placeholder="35.000.000" 
+                          value={formatNumberWithDots(clusterConfigs[klaster.id]?.hargaBase || "")} 
+                          onChange={(e) => handleClusterConfigChange(klaster.id, "hargaBase", e.target.value.replace(/\D/g, ""))} 
+                          className="h-8 text-xs"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-semibold text-muted-foreground mb-1">Upgrade Double (Rp)</label>
+                        <Input 
+                          type="text" 
+                          inputMode="numeric"
+                          placeholder="5.000.000" 
+                          value={formatNumberWithDots(clusterConfigs[klaster.id]?.upgradeDouble || "")} 
+                          onChange={(e) => handleClusterConfigChange(klaster.id, "upgradeDouble", e.target.value.replace(/\D/g, ""))} 
+                          className="h-8 text-xs"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-semibold text-muted-foreground mb-1">Upgrade Triple (Rp)</label>
+                        <Input 
+                          type="text" 
+                          inputMode="numeric"
+                          placeholder="3.000.000" 
+                          value={formatNumberWithDots(clusterConfigs[klaster.id]?.upgradeTriple || "")} 
+                          onChange={(e) => handleClusterConfigChange(klaster.id, "upgradeTriple", e.target.value.replace(/\D/g, ""))} 
+                          className="h-8 text-xs"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* ── 3. TANGGAL KEBERANGKATAN & HARGA ── */}
+        <div className="space-y-3 pt-2">
+          <span className="text-xs font-bold uppercase tracking-wider text-emerald-800 dark:text-emerald-400 block border-b pb-1">
+            3. Tanggal Keberangkatan & Harga Base
+          </span>
+
+          {/* Dynamic Tanggal Keberangkatan Inputs */}
+          <div className="flex flex-col gap-3 p-3 bg-muted/10 border rounded-lg">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div>
+                <label className="block text-xs font-semibold text-foreground">
+                  Tanggal Keberangkatan <span className="text-red-500">*</span>
+                </label>
+                <p className="text-[11px] text-muted-foreground">
+                  Otomatis terisi dari hasil scan flyer. Anda dapat mengubah atau menambah tanggal jika diperlukan.
+                </p>
+              </div>
+              <div className="text-xs font-semibold text-emerald-800 bg-emerald-50 border border-emerald-200 px-3 py-1 rounded-full shadow-xs">
+                {departureDates.length} Tanggal Terisi &rarr; {departureDates.length} Paket akan dibuat
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 pt-1">
+              {departureDateInputs.map((dateVal, index) => {
+                const isRequired = index === 0;
+                const returnDateStr = dateVal ? calculateReturnDate(dateVal, formData.durasiHari) : "";
+                const formattedReturn = returnDateStr ? formatDateIndo(returnDateStr) : "";
+
+                return (
+                  <div 
+                    key={index} 
+                    className={cn(
+                      "p-3 bg-card border rounded-lg flex flex-col gap-2 relative transition-all shadow-xs",
+                      isRequired && !dateVal ? "border-red-300 bg-red-50/10" : "hover:border-emerald-400 focus-within:border-emerald-500"
+                    )}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5">
+                        Tanggal #{index + 1}
+                        {isRequired ? (
+                          <span className="text-[10px] font-bold text-red-600 bg-red-50 border border-red-200 px-1.5 py-0.5 rounded">
+                            Wajib
+                          </span>
+                        ) : (
+                          <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                            Opsional
+                          </span>
+                        )}
+                      </span>
+                      {index > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveDateInput(index)}
+                          className="text-xs text-muted-foreground hover:text-red-600 p-0.5 rounded hover:bg-red-50 transition-colors"
+                          title="Hapus Tanggal Ini"
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </div>
+
+                    <Input 
+                      type="date"
+                      value={dateVal}
+                      onChange={(e) => handleDateInputChange(index, e.target.value)}
+                      className="h-9 text-xs"
+                    />
+
+                    {dateVal && (
+                      <div className="mt-1 p-2 bg-emerald-50/70 dark:bg-emerald-950/30 border border-emerald-200/80 rounded text-[11px] space-y-1">
+                        <div className="flex items-center justify-between text-emerald-900 dark:text-emerald-100 font-semibold">
+                          <span>✈ Keberangkatan:</span>
+                          <span>{formatDateIndo(dateVal)}</span>
+                        </div>
+                        <div className="flex items-center justify-between text-emerald-800 dark:text-emerald-300">
+                          <span>🛬 Kepulangan ({formData.durasiHari || 9}H):</span>
+                          <span>{formattedReturn || "-"}</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+            <div>
+              <label className="block text-xs font-semibold mb-1">Kapasitas Seat (Maksimal Jamaah)</label>
+              <Input 
+                type="number" 
+                name="kapasitas" 
+                value={formData.kapasitas} 
+                onChange={handleChange} 
+                placeholder="45" 
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold mb-1">Termasuk Perlengkapan?</label>
+              <div className="flex items-center gap-2 h-10">
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={formData.isAdaPerlengkapan === "ya"}
+                  onClick={() => setFormData(prev => ({ ...prev, isAdaPerlengkapan: prev.isAdaPerlengkapan === "ya" ? "tidak" : "ya" }))}
+                  className={cn(
+                    "relative inline-flex h-7 w-14 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2",
+                    formData.isAdaPerlengkapan === "ya" ? "bg-primary" : "bg-input"
+                  )}
+                >
+                  <span
+                    className={cn(
+                      "pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out",
+                      formData.isAdaPerlengkapan === "ya" ? "translate-x-7" : "translate-x-0"
+                    )}
+                  />
+                </button>
+                <span className={cn(
+                  "text-xs font-semibold px-2.5 py-1 rounded-md border min-w-[55px] text-center transition-colors select-none",
+                  formData.isAdaPerlengkapan === "ya" 
+                    ? "bg-primary/10 text-primary border-primary/30" 
+                    : "bg-background text-muted-foreground border-border"
+                )}>
+                  {formData.isAdaPerlengkapan === "ya" ? "Ya" : "Tidak"}
+                </span>
+              </div>
+            </div>
+            {formData.isAdaKlaster === "tidak" && (
+              <div className="md:col-span-2">
+                <label className="block text-xs font-semibold mb-1">Harga Base (Rp)</label>
+                <Input 
+                  type="text" 
+                  inputMode="numeric"
+                  name="hargaBase" 
+                  value={formatNumberWithDots(formData.hargaBase)} 
+                  onChange={(e) => handleCurrencyChange("hargaBase", e.target.value)} 
+                  placeholder="35.000.000" 
+                />
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="flex justify-end pt-3 border-t">
+          <Button 
+            id="field-ocr-submitBtn" 
+            onClick={handleGenerate} 
+            disabled={loading || fetching}
+            className="px-6 font-semibold bg-emerald-700 hover:bg-emerald-800 text-white"
+          >
+            {loading ? "Memproses..." : `Generate ${departureDates.length > 0 ? departureDates.length : ""} Paket`}
+          </Button>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="flex flex-col gap-6 p-6 max-w-7xl">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -1556,18 +1974,9 @@ import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X } from "luc
             </div>
           </div>
 
-          {/* Right Column: Verification Form */}
-          <div className="lg:col-span-7 space-y-4 border-l pl-2 lg:pl-6 border-border">
-            <div className="flex items-center justify-between pb-2 border-b">
-              <h2 className="font-semibold text-base flex items-center gap-1.5">
-                <Sparkles className="h-4 w-4 text-amber-500 fill-amber-500/20" />
-                Formulir Verifikasi Hasil Ekstraksi
-              </h2>
-              {ocrSuccess && (
-                <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded font-medium">Ready</span>
-              )}
-            </div>
-            {renderWizardSteps(true)}
+          {/* Right Column: Verification Form in Single Unified Box */}
+          <div className="lg:col-span-7 space-y-4">
+            {renderOcrSingleCardForm()}
           </div>
         </div>
       )}
