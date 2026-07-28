@@ -77,8 +77,57 @@ export function extractDates(caption: string): string[] {
   const dates: string[] = [];
   const currentYear = new Date().getFullYear();
 
-  const datePattern = /(\d{1,2})\s+(JANUARI|FEBRUARI|MARET|APRIL|MEI|JUNI|JULI|AGUSTUS|SEPTEMBER|OKTOBER|NOVEMBER|DESEMBER|JAN|FEB|MAR|APR|MEI|JUN|JUL|AGS|AGT|SEP|SEPT|OKT|NOV|DES)\s*(\d{4})?/gi;
+  // Pattern 1: Slash/dash dates like "12/10/2026", "12-10-2026", "2026-10-12"
+  const slashPattern = /(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/g;
+  let sMatch: RegExpExecArray | null;
+  while ((sMatch = slashPattern.exec(caption)) !== null) {
+    if (!sMatch[1] || !sMatch[2] || !sMatch[3]) continue;
+    let p1 = parseInt(sMatch[1], 10);
+    let p2 = parseInt(sMatch[2], 10);
+    let p3 = parseInt(sMatch[3], 10);
 
+    let year = p3;
+    if (year < 100) year += 2000;
+    
+    let day = p1;
+    let month = p2 - 1;
+
+    if (p1 > 1000) {
+      year = p1;
+      month = p2 - 1;
+      day = p3;
+    }
+
+    if (day >= 1 && day <= 31 && month >= 0 && month <= 11 && year >= 2024 && year <= 2035) {
+      const isoDate = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+      if (!dates.includes(isoDate)) dates.push(isoDate);
+    }
+  }
+
+  // Pattern 2: Multi-day dates before month: "12, 18, 25 OKTOBER 2026" or "12 & 25 OKT 2026"
+  const multiDayPattern = /((?:\d{1,2}\s*(?:,|\/|&|DAN|DAN\/ATAU)\s*)+\d{1,2})\s+(JANUARI|FEBRUARI|MARET|APRIL|MEI|JUNI|JULI|AGUSTUS|SEPTEMBER|OKTOBER|NOVEMBER|DESEMBER|JAN|FEB|MAR|APR|MEI|JUN|JUL|AGS|AGT|SEP|SEPT|OKT|NOV|DES)\s*(\d{4})?/gi;
+  let mMatch: RegExpExecArray | null;
+  while ((mMatch = multiDayPattern.exec(caption)) !== null) {
+    const daysStr = mMatch[1];
+    const monthNameStr = mMatch[2] ? mMatch[2].toUpperCase() : "";
+    const yearStr = mMatch[3];
+
+    if (!daysStr || !monthNameStr) continue;
+
+    const month = MONTH_MAP_IND[monthNameStr];
+    const year = yearStr ? parseInt(yearStr, 10) : currentYear;
+
+    if (month !== undefined && !isNaN(year)) {
+      const dayNumbers = daysStr.split(/[^0-9]+/).map(d => parseInt(d, 10)).filter(d => !isNaN(d) && d >= 1 && d <= 31);
+      for (const day of dayNumbers) {
+        const isoDate = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+        if (!dates.includes(isoDate)) dates.push(isoDate);
+      }
+    }
+  }
+
+  // Pattern 3: Standard single date: "15 JULI 2026", "22 JULI"
+  const datePattern = /(\d{1,2})\s+(JANUARI|FEBRUARI|MARET|APRIL|MEI|JUNI|JULI|AGUSTUS|SEPTEMBER|OKTOBER|NOVEMBER|DESEMBER|JAN|FEB|MAR|APR|MEI|JUN|JUL|AGS|AGT|SEP|SEPT|OKT|NOV|DES)\s*(\d{4})?/gi;
   let match: RegExpExecArray | null;
   while ((match = datePattern.exec(caption)) !== null) {
     const dayStr = match[1];

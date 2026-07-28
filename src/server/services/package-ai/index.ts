@@ -101,6 +101,15 @@ export async function processPackageFlyer(
   }
 
   if (isGeminiSuccess) {
+    let dates = geminiData.departureDates || [];
+    if (ocrResult.rawText) {
+      const ocrDates = parseCaption(ocrResult.rawText).departureDates || [];
+      const combined = Array.from(new Set([...dates, ...ocrDates])).sort();
+      if (combined.length > 0) {
+        dates = combined;
+      }
+    }
+
     return {
       title: geminiData.title || "Untitled Package",
       packageType: (geminiData.packageType as any) || "umroh_reguler",
@@ -112,7 +121,7 @@ export async function processPackageFlyer(
       roomUpgrade: geminiData.roomUpgrade,
       hotelUpgrade: geminiData.hotelUpgrade,
       durationDays: geminiData.durationDays || 0,
-      departureDates: geminiData.departureDates || [],
+      departureDates: dates,
       promoText: geminiData.promoText,
       description: geminiData.description,
       rawCaption: caption,
