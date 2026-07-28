@@ -44,7 +44,10 @@ export async function extractWithGemini(
     `--- ATURAN MASKAPAI ---\n` +
     `Ambil MASKAPAI INTERNASIONAL utama (Carrier Utama ke Saudi). ABAIKAN maskapai domestik/pengumpan.\n` +
     `Maskapai WAJIB dipilih persis dari daftar ini -> [${airlineOptions}]\n\n` +
-    `--- ATURAN KOTA KEBERANGKATAN (STARTING) ---\n` +
+    `--- ATURAN KOTA KEBERANGKATAN (STARTING POINT) ---\n` +
+    `Cari dengan teliti teks kota keberangkatan pada flyer, gambar, OCR, atau caption (cth: "Start Surabaya", "Start Jakarta", "Keberangkatan Surabaya", "Keberangkatan Jakarta", "Start SUB", "Start JKT", "Surabaya", "Jakarta").\n` +
+    `• Jika ada tulisan "Start Surabaya", "Surabaya", "Juanda", atau "SUB", WAJIB isi 'departureCity' dengan "Surabaya".\n` +
+    `• Jika ada tulisan "Start Jakarta", "Jakarta", "Soekarno Hatta", atau "JKT", WAJIB isi 'departureCity' dengan "Jakarta".\n` +
     `Kota keberangkatan WAJIB dipilih persis dari daftar ini -> [${cityOptions}]\n\n` +
     `--- ATURAN JENIS PAKET ---\n` +
     `Jenis paket WAJIB dipilih persis dari daftar ini -> [${typeOptions}]\n\n` +

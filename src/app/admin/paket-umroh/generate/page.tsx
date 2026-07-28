@@ -375,11 +375,23 @@ import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X } from "luc
   const matchCity = (name: string, list: any[]) => {
     if (!name) return "";
     const clean = name.toLowerCase().replace(/[^a-z0-9]/g, "");
-    const match = list.find(item => {
+    
+    let match = list.find(item => {
       const nClean = item.name.toLowerCase().replace(/[^a-z0-9]/g, "");
       const cClean = (item.code || "").toLowerCase().replace(/[^a-z0-9]/g, "");
-      return nClean.includes(clean) || clean.includes(nClean) || cClean === clean;
+      return nClean === clean || nClean.includes(clean) || clean.includes(nClean) || cClean === clean;
     });
+
+    if (!match) {
+      if (clean.includes("surabaya") || clean.includes("sub") || clean.includes("juanda") || clean.includes("startsurabaya")) {
+        match = list.find(item => (item.code || "").toUpperCase() === "SUB" || item.name.toLowerCase().includes("surabaya"));
+      } else if (clean.includes("jakarta") || clean.includes("jkt") || clean.includes("cgk") || clean.includes("soekarno") || clean.includes("startjakarta")) {
+        match = list.find(item => (item.code || "").toUpperCase() === "JKT" || item.name.toLowerCase().includes("jakarta"));
+      } else if (clean.includes("solo") || clean.includes("soc") || clean.includes("surakarta") || clean.includes("startsolo")) {
+        match = list.find(item => (item.code || "").toUpperCase() === "SOC" || item.name.toLowerCase().includes("solo"));
+      }
+    }
+
     return match ? match.id : "";
   };
 
