@@ -119,7 +119,7 @@ export function Shell({ children, role }: ShellProps) {
         </div>
 
         {/* Page content */}
-        <div className="p-6">{children}</div>
+        <div className="p-6 bg-arabic-pattern min-h-[calc(100vh-3.5rem)]">{children}</div>
       </main>
 
       {/* Overlays */}
