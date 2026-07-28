@@ -550,11 +550,11 @@ export default function BadalUmrohRegisterPage() {
                       </div>
                     </div>
 
-                    {/* ── 4. Penyerahan Souvenir ── */}
+                    {/* ── 4. Metode Penyerahan ── */}
                     <div className="space-y-3 pb-4 border-b">
                       <span className="font-bold text-xs uppercase tracking-wider text-emerald-600 flex items-center gap-1.5">
                         <Truck className="h-4 w-4 text-emerald-600" />
-                        4. Penyerahan / Pengambilan Souvenir & Sertifikat
+                        4. Metode Penyerahan Souvenir & Sertifikat
                       </span>
 
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">

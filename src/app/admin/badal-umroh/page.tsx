@@ -352,7 +352,8 @@ export default function AdminBadalUmrohPage() {
                     <th className="px-4 py-3">Tanggal</th>
                     <th className="px-4 py-3">Pemohon & Status Jamaah</th>
                     <th className="px-4 py-3">Data Almarhum / Almarhumah</th>
-                    <th className="px-4 py-3">Metode Souvenir</th>
+                    <th className="px-4 py-3">Metode Penyerahan</th>
+                    <th className="px-4 py-3">Pelaksana Badal</th>
                     <th className="px-4 py-3">Status Bayar</th>
                     <th className="px-4 py-3 text-center">Bukti TF</th>
                     <th className="px-4 py-3 text-right">Tindakan</th>
@@ -360,7 +361,7 @@ export default function AdminBadalUmrohPage() {
                 </thead>
                 <tbody className="divide-y divide-border">
                   {loading ? (
-                    <tr><td colSpan={7} className="px-4 py-8 text-center text-muted-foreground">Memuat data pendaftaran...</td></tr>
+                    <tr><td colSpan={8} className="px-4 py-8 text-center text-muted-foreground">Memuat data pendaftaran...</td></tr>
                   ) : validasiList.length > 0 ? (
                     validasiList.map((item) => (
                       <tr key={item.id} className="hover:bg-muted/40 transition-colors">
@@ -396,7 +397,7 @@ export default function AdminBadalUmrohPage() {
                           </div>
                         </td>
                         <td className="px-4 py-3">
-                          {item.catatan?.includes("Pengiriman Souvenir: Dikirim") ? (
+                          {item.catatan?.includes("Pengiriman Souvenir: Dikirim") || item.metodeSouvenir === "dikirim" ? (
                             <div className="space-y-0.5">
                               <span className="inline-flex items-center gap-1 text-[11px] font-bold text-sky-800 bg-sky-50 px-2 py-0.5 rounded border border-sky-200">
                                 <Truck className="h-3 w-3" /> Dikirim via Ekspedisi
@@ -410,6 +411,23 @@ export default function AdminBadalUmrohPage() {
                               <Building2 className="h-3 w-3" /> Diambil di Kantor VTU
                             </span>
                           )}
+                        </td>
+                        <td className="px-4 py-3">
+                          <select
+                            value={item.petugasBadal || ""}
+                            onChange={(e) => handleQuickUpdatePetugas(item.id, e.target.value)}
+                            disabled={saving}
+                            className="h-8 px-2 rounded-md border border-emerald-300 bg-emerald-50/50 text-emerald-950 text-xs font-semibold focus:ring-1 focus:ring-emerald-500"
+                            title="Pilih Pelaksana Badal"
+                          >
+                            <option value="">-- Pilih Pelaksana --</option>
+                            {DEFAULT_PETUGAS_BADAL_OPTIONS.map((p) => (
+                              <option key={p} value={p}>{p}</option>
+                            ))}
+                            {item.petugasBadal && !DEFAULT_PETUGAS_BADAL_OPTIONS.includes(item.petugasBadal) && (
+                              <option value={item.petugasBadal}>{item.petugasBadal}</option>
+                            )}
+                          </select>
                         </td>
                         <td className="px-4 py-3">
                           <Badge className={
@@ -458,7 +476,7 @@ export default function AdminBadalUmrohPage() {
                     ))
                   ) : (
                     <tr>
-                      <td colSpan={7} className="px-4 py-10 text-center text-muted-foreground">
+                      <td colSpan={8} className="px-4 py-10 text-center text-muted-foreground">
                         <CheckCircle2 className="h-8 w-8 mx-auto mb-2 text-emerald-500" />
                         Tidak ada antrian validasi. Seluruh pendaftaran telah terkonfirmasi Lunas.
                       </td>
@@ -491,7 +509,8 @@ export default function AdminBadalUmrohPage() {
                     <th className="px-4 py-3">Tanggal</th>
                     <th className="px-4 py-3">Almarhum / Almarhumah</th>
                     <th className="px-4 py-3">Pemohon & WA</th>
-                    <th className="px-4 py-3">Petugas Badal</th>
+                    <th className="px-4 py-3">Metode Penyerahan</th>
+                    <th className="px-4 py-3">Pelaksana Badal</th>
                     <th className="px-4 py-3">Status Execution</th>
                     <th className="px-4 py-3">Dokumen Execution</th>
                     <th className="px-4 py-3 text-right">Tindakan</th>
@@ -499,7 +518,7 @@ export default function AdminBadalUmrohPage() {
                 </thead>
                 <tbody className="divide-y divide-border">
                   {loading ? (
-                    <tr><td colSpan={7} className="px-4 py-8 text-center text-muted-foreground">Memuat data pelaksanaan...</td></tr>
+                    <tr><td colSpan={8} className="px-4 py-8 text-center text-muted-foreground">Memuat data pelaksanaan...</td></tr>
                   ) : pelaksanaanList.length > 0 ? (
                     pelaksanaanList.map((item) => (
                       <tr key={item.id} className="hover:bg-muted/40 transition-colors">
@@ -524,6 +543,19 @@ export default function AdminBadalUmrohPage() {
                           </a>
                         </td>
                         <td className="px-4 py-3">
+                          {item.catatan?.includes("Pengiriman Souvenir: Dikirim") || item.metodeSouvenir === "dikirim" ? (
+                            <div className="space-y-0.5">
+                              <span className="inline-flex items-center gap-1 text-[11px] font-bold text-sky-800 bg-sky-50 px-2 py-0.5 rounded border border-sky-200">
+                                <Truck className="h-3 w-3" /> Dikirim via Ekspedisi
+                              </span>
+                            </div>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                              <Building2 className="h-3 w-3" /> Diambil di Kantor VTU
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3">
                           <select
                             value={item.petugasBadal || ""}
                             onChange={(e) => handleQuickUpdatePetugas(item.id, e.target.value)}
@@ -531,7 +563,7 @@ export default function AdminBadalUmrohPage() {
                             className="h-8 px-2 rounded-md border border-emerald-300 bg-emerald-50/50 text-emerald-950 text-xs font-semibold focus:ring-1 focus:ring-emerald-500"
                             title="Pilih Pelaksana Badal"
                           >
-                            <option value="">-- Pilih Pelaksana Badal --</option>
+                            <option value="">-- Pilih Pelaksana --</option>
                             {DEFAULT_PETUGAS_BADAL_OPTIONS.map((p) => (
                               <option key={p} value={p}>{p}</option>
                             ))}
@@ -747,12 +779,12 @@ export default function AdminBadalUmrohPage() {
 
             {/* Catatan Tambahan */}
             <div className="space-y-1.5">
-              <label className="font-semibold text-foreground">Catatan / Alamat Pengiriman Souvenir</label>
+              <label className="font-semibold text-foreground">Catatan / Alamat Metode Penyerahan</label>
               <textarea
                 rows={3}
                 value={catatanText}
                 onChange={(e) => setCatatanText(e.target.value)}
-                placeholder="Catatan tambahan atau instruksi pengiriman souvenir..."
+                placeholder="Catatan tambahan atau instruksi metode penyerahan..."
                 className="w-full p-2.5 rounded-md border border-input bg-background text-xs"
               />
             </div>
