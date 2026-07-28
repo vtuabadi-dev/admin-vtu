@@ -43,6 +43,7 @@ import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X } from "luc
   const [uploading, setUploading] = useState(false);
   const [ocrWarning, setOcrWarning] = useState("");
   const [ocrSuccess, setOcrSuccess] = useState(false);
+  const [ocrDateInfo, setOcrDateInfo] = useState<{ count: number; dates: string[] } | null>(null);
   const dropRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -465,19 +466,24 @@ import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X } from "luc
           if (result.durationDays) finalFormData.durasiHari = String(result.durationDays);
           
           if (result.departureDates && Array.isArray(result.departureDates)) {
-            const extractedDates = result.departureDates.map((d: string) => d.split("T")[0]).filter(Boolean);
-            setDepartureDateInputs(prev => {
-              const existing = prev.filter(d => d.trim() !== "");
-              const combined = Array.from(new Set([...existing, ...extractedDates])).sort();
-              return [...combined, ""];
-            });
+            const extractedDates: string[] = result.departureDates
+              .map((d: any) => String(d).split("T")[0])
+              .filter((d: string): d is string => Boolean(d));
+            if (extractedDates.length > 0) {
+              const sortedDates: string[] = Array.from(new Set(extractedDates)).sort();
+              setDepartureDateInputs([...sortedDates, ""]);
+              setOcrDateInfo({
+                count: sortedDates.length,
+                dates: sortedDates,
+              });
+            }
           } else if (result.departureDates && typeof result.departureDates === "string") {
             const d = (result.departureDates as string).split("T")[0];
             if (d) {
-              setDepartureDateInputs(prev => {
-                const existing = prev.filter(d => d.trim() !== "");
-                const combined = Array.from(new Set([...existing, d])).sort();
-                return [...combined, ""];
+              setDepartureDateInputs([d, ""]);
+              setOcrDateInfo({
+                count: 1,
+                dates: [d],
               });
             }
           }
@@ -1014,6 +1020,31 @@ import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X } from "luc
         {/* Step 4: Lainnya */}
         <div className="flex flex-col gap-3">
           <h2 className="text-lg font-semibold">Langkah 4: Operasional & Harga</h2>
+
+          {ocrDateInfo && (
+            <div className="p-4 bg-emerald-50 dark:bg-emerald-950/40 border-2 border-emerald-400 dark:border-emerald-700 rounded-xl space-y-2 shadow-sm">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <div className="flex items-center gap-2 text-emerald-950 dark:text-emerald-100 font-extrabold text-sm">
+                  <Sparkles className="h-5 w-5 text-amber-500 animate-bounce" />
+                  <span>Hasil Ekstraksi OCR: Terdeteksi {ocrDateInfo.count} Tanggal Keberangkatan pada Flyer Utama!</span>
+                </div>
+                <span className="px-3 py-1 rounded-full bg-emerald-700 text-white font-black text-xs shadow-xs">
+                  {ocrDateInfo.count} Kolom Tanggal Berhasil Dibuatkan
+                </span>
+              </div>
+              <p className="text-xs text-emerald-800 dark:text-emerald-200">
+                Sistem Google Vision OCR telah mendeteksi <strong>{ocrDateInfo.count} tanggal keberangkatan</strong> dari flyer utama dan otomatis membuatkan {ocrDateInfo.count} kolom input tanggal:
+              </p>
+              <div className="flex flex-wrap gap-2 pt-1">
+                {ocrDateInfo.dates.map((dStr, idx) => (
+                  <span key={dStr} className="px-3 py-1 bg-white dark:bg-emerald-900 border border-emerald-300 dark:border-emerald-700 text-emerald-950 dark:text-emerald-100 text-xs font-bold rounded-lg shadow-xs">
+                    📅 Tanggal #{idx + 1}: {formatDateIndo(dStr)} ({dStr})
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div className="p-4 bg-card border rounded-md flex flex-col gap-4">
             {/* Dynamic Auto-Expanding Tanggal Keberangkatan Inputs */}
             <div className="flex flex-col gap-3 p-3 bg-muted/10 border rounded-lg">

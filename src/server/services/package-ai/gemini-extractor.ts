@@ -71,10 +71,13 @@ export async function extractWithGemini(
     `     * TD.D-J: Tour dulu, kota pertama Madinah (.D), out dari Jeddah (-J).\n` +
     `     * TD.C-J: Tour dulu, kota pertama Makkah (.C), out dari Jeddah (-J).\n` +
     `     * TD.C-M: Tour dulu, kota pertama Makkah (.C), out dari Madinah (-M).\n\n` +
+    `--- TUGAS UTAMA 1: HITUNG & EKSTRAK SEMUA TANGGAL KEBERANGKATAN ---\n` +
+    `Periksa flyer dengan teliti. Hitung dan temukan SEMUA tanggal keberangkatan yang ada di flyer utama (bisa 1, 2, 4, 5, 6, atau lebih tanggal keberangkatan).\n` +
+    `Kumpulkan SELURUH tanggal keberangkatan dalam array 'departureDates' (Format wajib: YYYY-MM-DD).\n\n` +
     `--- DATA UNTUK DIANALISA ---\n` +
     `1. TEKS HASIL SCAN OCR: ${rawOcrText}\n\n` +
     `2. TEKS CAPTION: ${caption}\n\n` +
-    `3. GAMBAR FLYER (Telah dilampirkan): Gunakan matamu untuk mencari TANGGAL KEBERANGKATAN yang mungkin layoutnya berantakan.`;
+    `3. GAMBAR FLYER (Telah dilampirkan): Gunakan matamu untuk mencari SEMUA TANGGAL KEBERANGKATAN yang mungkin tersebar di flyer.`;
 
   const model = genAI.getGenerativeModel({ 
     model: "gemini-1.5-flash",
@@ -98,7 +101,7 @@ export async function extractWithGemini(
           departureDates: {
             type: SchemaType.ARRAY,
             items: { type: SchemaType.STRING },
-            description: "Gunakan matamu membaca GAMBAR. Ekstrak SEMUA tanggal keberangkatan. Format wajib: YYYY-MM-DD. (Contoh: ['2026-06-27'])"
+            description: "ARRAY SEMUA TANGGAL KEBERANGKATAN. Hitung & ekstrak seluruh tanggal (cth 4, 5, 6 tanggal). Format: YYYY-MM-DD."
           }
         },
         required: ["title", "packageType", "durationDays", "departureCity", "airline", "departureDates", "landingRoute"]
