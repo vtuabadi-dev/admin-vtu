@@ -442,10 +442,39 @@ import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X } from "luc
         if (res.ok && resJson.success) {
           const result = resJson.data?.extractionResult ?? {};
           
-          // Form mapping
-          const mappedAirline = matchAirline(result.airline, options?.airlines || []);
-          const mappedCity = matchCity(result.departureCity, options?.cities || []);
-          const mappedPackageType = matchPackageType(result.packageType, options?.packageTypes || []);
+          // Form mapping with multi-layered fallback matching
+          const fullText = `${caption} ${result.rawOcrText || ""} ${file.name}`.toLowerCase();
+
+          let mappedAirline = matchAirline(result.airline, options?.airlines || []);
+          if (!mappedAirline && fullText) {
+            const found = (options?.airlines || []).find(a => {
+              const aName = a.name.toLowerCase().replace(/[^a-z0-9]/g, "");
+              const aCode = (a.code || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+              return (aName.length > 2 && fullText.includes(aName)) || (aCode.length >= 2 && fullText.includes(aCode));
+            });
+            if (found) mappedAirline = found.id;
+          }
+
+          let mappedCity = matchCity(result.departureCity, options?.cities || []);
+          if (!mappedCity && fullText) {
+            const found = (options?.cities || []).find(c => {
+              const cName = c.name.toLowerCase().replace(/[^a-z0-9]/g, "");
+              const cCode = (c.code || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+              return (cName.length > 2 && fullText.includes(cName)) || (cCode.length >= 3 && fullText.includes(cCode));
+            });
+            if (found) mappedCity = found.id;
+          }
+
+          let mappedPackageType = matchPackageType(result.packageType, options?.packageTypes || []);
+          if (!mappedPackageType && fullText) {
+            if (fullText.includes("plus")) {
+              const plusObj = options?.packageTypes.find(t => t.name.toLowerCase().includes("plus") || t.code.toLowerCase().includes("plus"));
+              if (plusObj) mappedPackageType = plusObj.id;
+            } else {
+              const regObj = options?.packageTypes.find(t => t.code === "REG" || t.name.toLowerCase().includes("reguler"));
+              if (regObj) mappedPackageType = regObj.id;
+            }
+          }
           
           const matchLandingRoute = (routeDesc: string, list: any[]) => {
             if (!routeDesc) return "";
@@ -457,15 +486,41 @@ import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X } from "luc
             });
             return match ? match.id : "";
           };
-          const mappedLandingRoute = matchLandingRoute(result.landingRoute, options?.routes || []);
           
-          const mekkahCity = options?.cities.find(c => c.code === "MEK" || c.name.toLowerCase() === "mekkah");
-          const madinahCity = options?.cities.find(c => c.code === "MED" || c.name.toLowerCase() === "madinah");
-          const mekkahHotels = options?.hotels.filter(h => h.cityId === mekkahCity?.id) || [];
-          const madinahHotels = options?.hotels.filter(h => h.cityId === madinahCity?.id) || [];
+          let mappedLandingRoute = matchLandingRoute(result.landingRoute, options?.routes || []);
+          if (!mappedLandingRoute && fullText) {
+            const routesList = options?.routes && options.routes.length > 0 ? options.routes : MOCK_LANDING_PATTERN;
+            let found = routesList.find(r => {
+              const code = (r.kode || "").toLowerCase();
+              return code && fullText.includes(code);
+            });
+            if (!found) {
+              if (fullText.includes("madinah") && fullText.includes("jeddah")) {
+                found = routesList.find(r => (r.kode || "").toUpperCase() === "JED.D-J" || (r.ruteIn || "").toLowerCase().includes("madinah"));
+              } else if (fullText.includes("jeddah")) {
+                found = routesList.find(r => (r.kode || "").toUpperCase() === "JED.C-J" || (r.ruteIn || "").toLowerCase().includes("jeddah"));
+              }
+            }
+            if (found) mappedLandingRoute = found.id;
+          }
 
-          const mappedHotelMekkah = matchHotel(result.hotelMekkah, mekkahHotels);
-          const mappedHotelMadinah = matchHotel(result.hotelMadinah, madinahHotels);
+          let mappedHotelMekkah = matchHotel(result.hotelMekkah, mekkahHotels);
+          if (!mappedHotelMekkah && fullText) {
+            const found = mekkahHotels.find(h => {
+              const hName = h.name.toLowerCase().replace(/[^a-z0-9]/g, "");
+              return hName.length > 3 && fullText.includes(hName);
+            });
+            if (found) mappedHotelMekkah = found.id;
+          }
+
+          let mappedHotelMadinah = matchHotel(result.hotelMadinah, madinahHotels);
+          if (!mappedHotelMadinah && fullText) {
+            const found = madinahHotels.find(h => {
+              const hName = h.name.toLowerCase().replace(/[^a-z0-9]/g, "");
+              return hName.length > 3 && fullText.includes(hName);
+            });
+            if (found) mappedHotelMadinah = found.id;
+          }
 
           // Merge fields (only overwrite if the new result has a value)
           if (result.title) finalFormData.namaPaket = result.title;
