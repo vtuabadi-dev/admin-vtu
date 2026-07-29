@@ -53,7 +53,7 @@ export async function extractWithGemini(
     `  - Jika ada kata "Jakarta", "Soekarno Hatta", "CGK", atau "JKT", WAJIB isi 'departureCity' dengan "Jakarta".\n` +
     `  - Jika ada kata "Solo", "Surakarta", "SOC", WAJIB isi 'departureCity' dengan "Solo".\n` +
     `  - Pilihan kota WAJIB dari daftar ini -> [${cityOptions}]\n` +
-    `• Maskapai: Ambil Maskapai Internasional utama (Carrier ke Saudi). WAJIB dari -> [${airlineOptions}]\n` +
+    `• Maskapai: WAJIB AMBIL MASKAPAI INTERNASIONAL UTAMA (Carrier Penerbangan ke Saudi / Timur Tengah, cth: Saudia Airlines, Garuda Indonesia, Royal Brunei, Emirates, Qatar Airways, Turkish Airlines, Oman Air, Etihad, Flynas, Lion Air). SANGAT DILARANG MENGAMBIL MASKAPAI DOMESTIK / FEEDER FLIGHT (seperti Pelita Air, Super Air Jet, Citilink Domestik). Jika caption/flyer menyebutkan "starting Surabaya by Pelita Airline" dan "starting Jakarta by Saudia Airlines", WAJIB PILIH SAUDIA AIRLINES! Maskapai WAJIB dari -> [${airlineOptions}]\n` +
     `• Hotel Mekkah & Madinah: Cari nama hotel untuk setiap klaster/kelas kamar dari daftar:\n` +
     `  - Hotel Mekkah: [${mekkahHotels}]\n` +
     `  - Hotel Madinah: [${madinahHotels}]\n` +

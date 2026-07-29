@@ -145,19 +145,47 @@ const HOTEL_CLEANUP_PATTERNS = [
 
 // ── Public API ───────────────────────────────────────────────
 
+const INTERNATIONAL_CARRIERS: Record<string, string> = {
+  "SAUDIA AIRLINES": "Saudia Airlines",
+  "SAUDIA": "Saudia Airlines",
+  "SAUDI ARABIAN": "Saudia Airlines",
+  "GARUDA INDONESIA": "Garuda Indonesia",
+  "GARUDA": "Garuda Indonesia",
+  "EMIRATES": "Emirates",
+  "QATAR AIRWAYS": "Qatar Airways",
+  "QATAR": "Qatar Airways",
+  "TURKISH AIRLINES": "Turkish Airlines",
+  "TURKISH": "Turkish Airlines",
+  "OMAN AIR": "Oman Air",
+  "OMAN": "Oman Air",
+  "ETIHAD": "Etihad Airways",
+  "ROYAL BRUNEI": "Royal Brunei",
+  "FLYNAS": "Flynas",
+  "SCOOT": "Scoot",
+};
+
 /**
  * Resolve an airline name from any common alias to canonical form.
+ * Prioritizes International Umrah Carriers over domestic feeder airlines (e.g. Pelita Air).
  * Returns the input text unchanged if no alias is found.
  */
 export function resolveAirline(text: string): string {
   const cleaned = text.trim().toUpperCase();
-  if (AIRLINE_ALIASES[cleaned]) return AIRLINE_ALIASES[cleaned];
-  
-  if (cleaned.length > 20) {
-    for (const [alias, canonical] of Object.entries(AIRLINE_ALIASES)) {
-      if (cleaned.includes(alias)) return canonical;
+
+  // First priority: Check if string matches or contains an International Umrah Carrier
+  for (const [alias, canonical] of Object.entries(INTERNATIONAL_CARRIERS)) {
+    if (cleaned.includes(alias)) {
+      return canonical;
     }
   }
+
+  // Second priority: Check all aliases in AIRLINE_ALIASES
+  for (const [alias, canonical] of Object.entries(AIRLINE_ALIASES)) {
+    if (cleaned.includes(alias)) {
+      return canonical;
+    }
+  }
+
   return text.trim();
 }
 
