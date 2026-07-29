@@ -4,6 +4,13 @@
 // images and caption text.
 // ============================================================
 
+export interface ClusterExtractionItem {
+  clusterName: string;
+  hotelMekkah?: string;
+  hotelMadinah?: string;
+  hargaBase?: string;
+}
+
 /**
  * Result of extracting package data from a flyer image + caption.
  * Fields are populated by OCR and caption parsing, then merged.
@@ -22,6 +29,7 @@ export interface PackageExtractionResult {
   upgradeTriple?: string;
   isAdaPerlengkapan?: "ya" | "tidak";
   hargaBase?: string;
+  clusters?: ClusterExtractionItem[];
   durationDays: number;
   departureDates: string[];
   promoText?: string;

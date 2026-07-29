@@ -535,6 +535,38 @@ import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X } from "luc
           if (result.isAdaPerlengkapan) finalFormData.isAdaPerlengkapan = result.isAdaPerlengkapan;
           if (result.upgradeDouble) finalFormData.upgradeDouble = String(result.upgradeDouble).replace(/\D/g, "");
           if (result.upgradeTriple) finalFormData.upgradeTriple = String(result.upgradeTriple).replace(/\D/g, "");
+
+          // Cluster Seat Box extraction (Silver, Gold, Platinum, Bronze)
+          if (result.clusters && Array.isArray(result.clusters) && result.clusters.length > 0) {
+            finalFormData.isAdaKlaster = "ya";
+            const updatedClusterConfigs: Record<string, any> = { ...clusterConfigs };
+            const clustersList = options?.clusters && options.clusters.length > 0 ? options.clusters : MOCK_KLASTER;
+
+            result.clusters.forEach((cItem: any) => {
+              const cNameClean = (cItem.clusterName || "").toLowerCase();
+              const matchedClusterObj = clustersList.find((c: any) => {
+                const nameLower = (c.nama || "").toLowerCase();
+                const codeLower = (c.kode || "").toLowerCase();
+                return cNameClean.includes(nameLower) || nameLower.includes(cNameClean) || (codeLower.length >= 2 && cNameClean.includes(codeLower));
+              });
+
+              if (matchedClusterObj) {
+                const cId = matchedClusterObj.id;
+                const cMekkahId = matchHotel(cItem.hotelMekkah, mekkahHotels);
+                const cMadinahId = matchHotel(cItem.hotelMadinah, madinahHotels);
+                const cHargaBase = String(cItem.hargaBase || "").replace(/\D/g, "");
+
+                updatedClusterConfigs[cId] = {
+                  ...updatedClusterConfigs[cId],
+                  ...(cMekkahId ? { hotelMekkahId: cMekkahId } : {}),
+                  ...(cMadinahId ? { hotelMadinahId: cMadinahId } : {}),
+                  ...(cHargaBase ? { hargaBase: cHargaBase } : {}),
+                };
+              }
+            });
+
+            setClusterConfigs(updatedClusterConfigs);
+          }
           
           if (result.departureDates && Array.isArray(result.departureDates)) {
             const extractedDates: string[] = result.departureDates

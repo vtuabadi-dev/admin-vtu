@@ -88,6 +88,16 @@ export async function extractWithGemini(
     `        * Umroh Dulu (UD): Ke Arab Saudi dulu untuk ibadah baru tour ke negara plus (UD.D-J, UD.D-M).\n` +
     `        * Tour Dulu (TD): Tour ke negara plus terlebih dahulu sebelum mendarat di Saudi (TD.D-J, TD.C-J, TD.C-M).\n\n` +
     `Rute WAJIB dipilih persis dari daftar ini -> [${routeOptions}]\n\n` +
+    `==========================================================\n` +
+    `4. ATURAN EKSTRAKSI KLASTER SEAT / KOTAK PAKET (SILVER, GOLD, PLATINUM, BRONZE)\n` +
+    `==========================================================\n` +
+    `Jika flyer utama memiliki KOTAK-KOTAK HORISONTAL KLASTER PAKET (cth: "SILVER PACKAGE", "GOLD PACKAGE", "PLATINUM PACKAGE", "BRONZE PACKAGE"):\n` +
+    `• Setiap satu kotak panjang mewakili SATU KLASTER SEAT UTUH yang berisi:\n` +
+    `  1. Nama Klaster (cth: "Silver Package", "Gold Package", "Platinum Package", "Bronze Package")\n` +
+    `  2. Hotel Mekkah persis di dalam kotak klaster tersebut (cth: "Grand Al-Massa" pada Silver, "Rayyana Grand Plaza" pada Gold, "Safwah Tower" pada Platinum)\n` +
+    `  3. Hotel Madinah persis di dalam kotak klaster tersebut (cth: "Durrat Al-Eiman" pada Silver, "Deyar Al-Eiman" pada Gold, "Taiba Front" pada Platinum)\n` +
+    `  4. Harga Base / Best Deal Price persis di dalam kotak klaster tersebut (cth: 38.9 Jt -> 38900000, 40.9 Jt -> 40900000, 44.9 Jt -> 44900000).\n` +
+    `• Masukkan SELURUH KLASTER yang ditemukan ke dalam array 'clusters'.\n\n` +
     `--- DATA UNTUK DIANALISA ---\n` +
     `1. TEKS HASIL SCAN OCR: ${rawOcrText}\n\n` +
     `2. TEKS CAPTION: ${caption}\n\n` +
@@ -116,6 +126,20 @@ export async function extractWithGemini(
           hotelUpgrade: { type: SchemaType.STRING, description: "Informasi opsional upgrade hotel" },
           promoText: { type: SchemaType.STRING, description: "Informasi opsional teks promo" },
           description: { type: SchemaType.STRING, description: "Deskripsi tambahan" },
+          clusters: {
+            type: SchemaType.ARRAY,
+            items: {
+              type: SchemaType.OBJECT,
+              properties: {
+                clusterName: { type: SchemaType.STRING, description: "Nama Klaster (cth: Silver Package, Gold Package, Platinum Package, Bronze Package)" },
+                hotelMekkah: { type: SchemaType.STRING, description: "Nama Hotel Mekkah persis di dalam kotak klaster ini" },
+                hotelMadinah: { type: SchemaType.STRING, description: "Nama Hotel Madinah persis di dalam kotak klaster ini" },
+                hargaBase: { type: SchemaType.STRING, description: "Harga Base / Best Deal Price dalam kotak klaster ini (hanya angka nominal, cth: 38900000 dari 38.9 Jt)" },
+              },
+              required: ["clusterName", "hotelMekkah", "hotelMadinah", "hargaBase"]
+            },
+            description: "ARRAY SETIAP KOTAK KLASTER SEAT PADA FLYER UTAMA (Silver, Gold, Platinum, Bronze)"
+          },
           departureDates: {
             type: SchemaType.ARRAY,
             items: { type: SchemaType.STRING },
