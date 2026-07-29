@@ -361,16 +361,6 @@ import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X } from "luc
   };
 
   // Helper matching functions for OCR results
-  const matchAirline = (name: string, list: any[]) => {
-    if (!name) return "";
-    const clean = name.toLowerCase().replace(/[^a-z0-9]/g, "");
-    const match = list.find(item => {
-      const nClean = item.name.toLowerCase().replace(/[^a-z0-9]/g, "");
-      const cClean = (item.code || "").toLowerCase().replace(/[^a-z0-9]/g, "");
-      return nClean.includes(clean) || clean.includes(nClean) || cClean === clean;
-    });
-    return match ? match.id : "";
-  };
 
   const matchCity = (name: string, list: any[]) => {
     if (!name) return "";
@@ -427,180 +417,216 @@ import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X } from "luc
       let finalFormData = { ...formData };
       let warningMessages: string[] = [];
 
-      for (const file of flyerFiles) {
-        const bodyData = new FormData();
-        bodyData.append("flyer", file);
-        bodyData.append("caption", caption || `Proses dokumen flyer ${file.name}`);
-        bodyData.append("isAdaKlaster", formData.isAdaKlaster);
+      // ── KRITIS: Hanya kirim Foto #1 (Flyer Utama) ke Gemini AI ──
+      // Foto #2, #3, #4 adalah itinerary/jadwal dan TIDAK boleh di-OCR karena akan menghasilkan data salah.
+      const flyerUtama = flyerFiles[0];
+      if (!flyerUtama) {
+        setOcrWarning("Tidak ada file flyer utama.");
+        setUploading(false);
+        return;
+      }
 
-        const res = await fetch("/api/admin/packages/ai-import", {
-          method: "POST",
-          body: bodyData,
-        });
+      const bodyData = new FormData();
+      bodyData.append("flyer", flyerUtama);
+      bodyData.append("caption", caption || `Proses dokumen flyer ${flyerUtama.name}`);
+      bodyData.append("isAdaKlaster", formData.isAdaKlaster);
 
-        const resJson = await res.json();
-        if (res.ok && resJson.success) {
-          const result = resJson.data?.extractionResult ?? {};
-          
-          // Form mapping with multi-layered fallback matching
-          const fullText = `${caption} ${result.rawOcrText || ""} ${file.name}`.toLowerCase();
+      const res = await fetch("/api/admin/packages/ai-import", {
+        method: "POST",
+        body: bodyData,
+      });
 
-          let mappedAirline = matchAirline(result.airline, options?.airlines || []);
-          if (!mappedAirline && fullText) {
-            const found = (options?.airlines || []).find(a => {
-              const aName = a.name.toLowerCase().replace(/[^a-z0-9]/g, "");
-              const aCode = (a.code || "").toLowerCase().replace(/[^a-z0-9]/g, "");
-              return (aName.length > 2 && fullText.includes(aName)) || (aCode.length >= 2 && fullText.includes(aCode));
-            });
-            if (found) mappedAirline = found.id;
-          }
+      const resJson = await res.json();
+      if (res.ok && resJson.success) {
+        const result = resJson.data?.extractionResult ?? {};
 
-          let mappedCity = matchCity(result.departureCity, options?.cities || []);
-          if (!mappedCity && fullText) {
-            const found = (options?.cities || []).find(c => {
-              const cName = c.name.toLowerCase().replace(/[^a-z0-9]/g, "");
-              const cCode = (c.code || "").toLowerCase().replace(/[^a-z0-9]/g, "");
-              return (cName.length > 2 && fullText.includes(cName)) || (cCode.length >= 3 && fullText.includes(cCode));
-            });
-            if (found) mappedCity = found.id;
-          }
+        // ── Debug Log: Lihat apa yang dikembalikan AI ──
+        console.log("[AI OCR] Extraction Result:", JSON.stringify(result, null, 2));
 
-          let mappedPackageType = matchPackageType(result.packageType, options?.packageTypes || []);
-          if (!mappedPackageType && fullText) {
-            if (fullText.includes("plus")) {
-              const plusObj = options?.packageTypes.find(t => t.name.toLowerCase().includes("plus") || t.code.toLowerCase().includes("plus"));
-              if (plusObj) mappedPackageType = plusObj.id;
-            } else {
-              const regObj = options?.packageTypes.find(t => t.code === "REG" || t.name.toLowerCase().includes("reguler"));
-              if (regObj) mappedPackageType = regObj.id;
+        // ── 1. AIRLINE MATCHING (Prioritaskan International Carriers) ──
+        let mappedAirline = "";
+        const airlineList = options?.airlines || [];
+        // Coba match langsung dari Gemini result
+        if (result.airline) {
+          const aiClean = result.airline.toLowerCase().replace(/[^a-z0-9]/g, "");
+          const exactMatch = airlineList.find(a => {
+            const nClean = a.name.toLowerCase().replace(/[^a-z0-9]/g, "");
+            const cClean = (a.code || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+            return nClean === aiClean || aiClean.includes(nClean) || nClean.includes(aiClean) || cClean === aiClean;
+          });
+          if (exactMatch) mappedAirline = exactMatch.id;
+        }
+        // Fallback: scan caption untuk International Carriers
+        if (!mappedAirline && caption) {
+          const captionUpper = caption.toUpperCase();
+          const INTL_CARRIERS = ["SAUDIA", "GARUDA", "EMIRATES", "QATAR", "TURKISH", "OMAN AIR", "ETIHAD", "ROYAL BRUNEI", "FLYNAS", "LION"];
+          for (const carrier of INTL_CARRIERS) {
+            if (captionUpper.includes(carrier)) {
+              const found = airlineList.find(a => a.name.toUpperCase().includes(carrier) || (a.code || "").toUpperCase().includes(carrier));
+              if (found) { mappedAirline = found.id; break; }
             }
           }
-          
-          const matchLandingRoute = (routeDesc: string, list: any[]) => {
-            if (!routeDesc) return "";
-            const clean = routeDesc.toLowerCase().replace(/[^a-z0-9]/g, "");
-            const match = list.find(item => {
-              const rClean = `${item.ruteIn}->${item.ruteOut}`.toLowerCase().replace(/[^a-z0-9]/g, "");
-              const cClean = (item.kode || "").toLowerCase().replace(/[^a-z0-9]/g, "");
-              return rClean === clean || rClean.includes(clean) || clean.includes(rClean) || cClean === clean;
+        }
+
+        // ── 2. CITY MATCHING (Prioritaskan Gemini result, bukan fullText) ──
+        let mappedCity = matchCity(result.departureCity, options?.cities || []);
+        // Fallback: cari keyword "Starting [City]" di caption
+        if (!mappedCity && caption) {
+          const startMatch = caption.match(/start(?:ing)?\s+(surabaya|jakarta|solo|medan|makassar|bandung|yogyakarta|jogja|bali|denpasar|palembang|balikpapan|lombok|aceh|pekanbaru|pontianak|banjarmasin|manado)/i);
+          if (startMatch?.[1]) {
+            mappedCity = matchCity(startMatch[1], options?.cities || []);
+          }
+        }
+
+        // ── 3. PACKAGE TYPE MATCHING ──
+        let mappedPackageType = matchPackageType(result.packageType, options?.packageTypes || []);
+        if (!mappedPackageType) {
+          const fullText = `${caption} ${result.rawOcrText || ""}`.toLowerCase();
+          if (fullText.includes("plus")) {
+            const plusObj = options?.packageTypes.find(t => t.name.toLowerCase().includes("plus") || t.code.toLowerCase().includes("plus"));
+            if (plusObj) mappedPackageType = plusObj.id;
+          } else {
+            const regObj = options?.packageTypes.find(t => t.code === "REG" || t.name.toLowerCase().includes("reguler"));
+            if (regObj) mappedPackageType = regObj.id;
+          }
+        }
+
+        // ── 4. LANDING ROUTE MATCHING (Preserve dots and dashes in kode) ──
+        let mappedLandingRoute = "";
+        const routesList = options?.routes && options.routes.length > 0 ? options.routes : MOCK_LANDING_PATTERN;
+        if (result.landingRoute) {
+          const aiRoute = result.landingRoute.toUpperCase().trim();
+          // Exact kode match first (preserve dots/dashes)
+          let found = routesList.find(r => (r.kode || "").toUpperCase().trim() === aiRoute);
+          // Partial kode match
+          if (!found) {
+            found = routesList.find(r => {
+              const rKode = (r.kode || "").toUpperCase().trim();
+              return rKode && (aiRoute.includes(rKode) || rKode.includes(aiRoute));
             });
-            return match ? match.id : "";
-          };
-          
-          let mappedLandingRoute = matchLandingRoute(result.landingRoute, options?.routes || []);
-          if (!mappedLandingRoute && fullText) {
-            const routesList = options?.routes && options.routes.length > 0 ? options.routes : MOCK_LANDING_PATTERN;
-            let found = routesList.find(r => {
-              const code = (r.kode || "").toLowerCase();
-              return code && fullText.includes(code);
+          }
+          // Fallback: match ruteIn/ruteOut
+          if (!found) {
+            const aiClean = aiRoute.toLowerCase().replace(/[^a-z0-9]/g, "");
+            found = routesList.find(r => {
+              const rClean = `${r.ruteIn || ""}${r.ruteOut || ""}`.toLowerCase().replace(/[^a-z0-9]/g, "");
+              return rClean.includes(aiClean) || aiClean.includes(rClean);
             });
-            if (!found) {
-              if (fullText.includes("madinah") && fullText.includes("jeddah")) {
-                found = routesList.find(r => (r.kode || "").toUpperCase() === "JED.D-J" || (r.ruteIn || "").toLowerCase().includes("madinah"));
-              } else if (fullText.includes("jeddah")) {
-                found = routesList.find(r => (r.kode || "").toUpperCase() === "JED.C-J" || (r.ruteIn || "").toLowerCase().includes("jeddah"));
-              }
-            }
+          }
+          if (found) mappedLandingRoute = found.id;
+        }
+        // Fallback: scan caption for "landing jeddah out madinah"
+        if (!mappedLandingRoute && caption) {
+          const captionLower = caption.toLowerCase();
+          const landingMatch = captionLower.match(/landing\s+(jeddah|madinah|medina)/i);
+          const outMatch = captionLower.match(/out\s+(jeddah|madinah|medina)/i);
+          if (landingMatch && outMatch) {
+            const landing = landingMatch[1]!.toLowerCase().includes("jed") ? "JED" : "MED";
+            const out = outMatch[1]!.toLowerCase().includes("jed") ? "J" : "M";
+            // Try to match JED.?-M or JED.?-J pattern
+            const found = routesList.find(r => {
+              const kode = (r.kode || "").toUpperCase();
+              return kode.startsWith(landing) && kode.endsWith(`-${out}`);
+            });
             if (found) mappedLandingRoute = found.id;
           }
-
-          let mappedHotelMekkah = matchHotel(result.hotelMekkah, mekkahHotels);
-          if (!mappedHotelMekkah && fullText) {
-            const found = mekkahHotels.find(h => {
-              const hName = h.name.toLowerCase().replace(/[^a-z0-9]/g, "");
-              return hName.length > 3 && fullText.includes(hName);
-            });
-            if (found) mappedHotelMekkah = found.id;
-          }
-
-          let mappedHotelMadinah = matchHotel(result.hotelMadinah, madinahHotels);
-          if (!mappedHotelMadinah && fullText) {
-            const found = madinahHotels.find(h => {
-              const hName = h.name.toLowerCase().replace(/[^a-z0-9]/g, "");
-              return hName.length > 3 && fullText.includes(hName);
-            });
-            if (found) mappedHotelMadinah = found.id;
-          }
-
-          // Merge fields (only overwrite if the new result has a value)
-          if (result.title) finalFormData.namaPaket = result.title;
-          if (mappedPackageType) finalFormData.jenisPaketId = mappedPackageType;
-          if (mappedCity) finalFormData.startingPointId = mappedCity;
-          if (mappedAirline) finalFormData.maskapaiId = mappedAirline;
-          if (mappedLandingRoute) finalFormData.landingPatternId = mappedLandingRoute;
-          if (mappedHotelMekkah) finalFormData.hotelMekkahId = mappedHotelMekkah;
-          if (mappedHotelMadinah) finalFormData.hotelMadinahId = mappedHotelMadinah;
-          if (result.durationDays) finalFormData.durasiHari = String(result.durationDays);
-          if (result.hargaBase) finalFormData.hargaBase = String(result.hargaBase).replace(/\D/g, "");
-          if (result.isAdaPerlengkapan) finalFormData.isAdaPerlengkapan = result.isAdaPerlengkapan;
-          if (result.upgradeDouble) finalFormData.upgradeDouble = String(result.upgradeDouble).replace(/\D/g, "");
-          if (result.upgradeTriple) finalFormData.upgradeTriple = String(result.upgradeTriple).replace(/\D/g, "");
-
-          // Cluster Seat Box extraction (Silver, Gold, Platinum, Bronze)
-          if (result.clusters && Array.isArray(result.clusters) && result.clusters.length > 0) {
-            finalFormData.isAdaKlaster = "ya";
-            const updatedClusterConfigs: Record<string, any> = { ...clusterConfigs };
-            const clustersList = options?.clusters && options.clusters.length > 0 ? options.clusters : MOCK_KLASTER;
-
-            result.clusters.forEach((cItem: any) => {
-              const cNameClean = (cItem.clusterName || "").toLowerCase();
-              const matchedClusterObj = clustersList.find((c: any) => {
-                const nameLower = (c.nama || "").toLowerCase();
-                const codeLower = (c.kode || "").toLowerCase();
-                return cNameClean.includes(nameLower) || nameLower.includes(cNameClean) || (codeLower.length >= 2 && cNameClean.includes(codeLower));
-              });
-
-              if (matchedClusterObj) {
-                const cId = matchedClusterObj.id;
-                const cMekkahId = matchHotel(cItem.hotelMekkah, mekkahHotels);
-                const cMadinahId = matchHotel(cItem.hotelMadinah, madinahHotels);
-                const cHargaBase = String(cItem.hargaBase || "").replace(/\D/g, "");
-                const cUpgradeDouble = String(cItem.upgradeDouble || "").replace(/\D/g, "");
-                const cUpgradeTriple = String(cItem.upgradeTriple || "").replace(/\D/g, "");
-
-                updatedClusterConfigs[cId] = {
-                  ...updatedClusterConfigs[cId],
-                  ...(cMekkahId ? { hotelMekkahId: cMekkahId } : {}),
-                  ...(cMadinahId ? { hotelMadinahId: cMadinahId } : {}),
-                  ...(cHargaBase ? { hargaBase: cHargaBase } : {}),
-                  ...(cUpgradeDouble ? { upgradeDouble: cUpgradeDouble } : {}),
-                  ...(cUpgradeTriple ? { upgradeTriple: cUpgradeTriple } : {}),
-                };
-              }
-            });
-
-            setClusterConfigs(updatedClusterConfigs);
-          }
-          
-          if (result.departureDates && Array.isArray(result.departureDates)) {
-            const extractedDates: string[] = result.departureDates
-              .map((d: any) => String(d).split("T")[0])
-              .filter((d: string): d is string => Boolean(d));
-            if (extractedDates.length > 0) {
-              const sortedDates: string[] = Array.from(new Set(extractedDates)).sort();
-              setDepartureDateInputs([...sortedDates, ""]);
-              setOcrDateInfo({
-                count: sortedDates.length,
-                dates: sortedDates,
-              });
-            }
-          } else if (result.departureDates && typeof result.departureDates === "string") {
-            const d = (result.departureDates as string).split("T")[0];
-            if (d) {
-              setDepartureDateInputs([d, ""]);
-              setOcrDateInfo({
-                count: 1,
-                dates: [d],
-              });
-            }
-          }
-
-          if (resJson.data?.warning) {
-            warningMessages.push(`${file.name}: ${resJson.data.warning}`);
-          }
-        } else {
-          warningMessages.push(`${file.name}: ${resJson.message || "Gagal ekstraksi"}`);
         }
+
+        // ── 5. HOTEL MATCHING ──
+        let mappedHotelMekkah = matchHotel(result.hotelMekkah, mekkahHotels);
+        let mappedHotelMadinah = matchHotel(result.hotelMadinah, madinahHotels);
+
+        // ── 6. MERGE FIELDS INTO FORM ──
+        if (result.title) finalFormData.namaPaket = result.title;
+        if (mappedPackageType) finalFormData.jenisPaketId = mappedPackageType;
+        if (mappedCity) finalFormData.startingPointId = mappedCity;
+        if (mappedAirline) finalFormData.maskapaiId = mappedAirline;
+        if (mappedLandingRoute) finalFormData.landingPatternId = mappedLandingRoute;
+        if (mappedHotelMekkah) finalFormData.hotelMekkahId = mappedHotelMekkah;
+        if (mappedHotelMadinah) finalFormData.hotelMadinahId = mappedHotelMadinah;
+        if (result.durationDays) finalFormData.durasiHari = String(result.durationDays);
+        if (result.hargaBase) finalFormData.hargaBase = String(result.hargaBase).replace(/\D/g, "");
+        if (result.isAdaPerlengkapan) finalFormData.isAdaPerlengkapan = result.isAdaPerlengkapan;
+        if (result.upgradeDouble) finalFormData.upgradeDouble = String(result.upgradeDouble).replace(/\D/g, "");
+        if (result.upgradeTriple) finalFormData.upgradeTriple = String(result.upgradeTriple).replace(/\D/g, "");
+
+        // ── 7. CLUSTER SEAT BOX EXTRACTION ──
+        if (result.clusters && Array.isArray(result.clusters) && result.clusters.length > 0) {
+          finalFormData.isAdaKlaster = "ya";
+          const updatedClusterConfigs: Record<string, any> = { ...clusterConfigs };
+          const clustersList = options?.clusters && options.clusters.length > 0 ? options.clusters : MOCK_KLASTER;
+
+          console.log("[AI OCR] Clusters from AI:", result.clusters);
+          console.log("[AI OCR] Master Clusters:", clustersList);
+
+          result.clusters.forEach((cItem: any) => {
+            const cNameClean = (cItem.clusterName || "").toLowerCase();
+            const matchedClusterObj = clustersList.find((c: any) => {
+              // Handle both "nama" (Prisma indo) and "name" (Prisma en) field names
+              const nameLower = (c.nama || c.name || "").toLowerCase();
+              const codeLower = (c.kode || c.code || "").toLowerCase();
+              return cNameClean.includes(nameLower) || nameLower.includes(cNameClean) 
+                || (codeLower.length >= 2 && cNameClean.includes(codeLower))
+                // Match "Silver Package" -> "Silver", "Gold Package" -> "Gold"
+                || cNameClean.replace(/\s*package\s*/gi, "") === nameLower
+                || nameLower.replace(/\s*package\s*/gi, "") === cNameClean.replace(/\s*package\s*/gi, "");
+            });
+
+            if (matchedClusterObj) {
+              const cId = matchedClusterObj.id;
+              const cMekkahId = matchHotel(cItem.hotelMekkah, mekkahHotels);
+              const cMadinahId = matchHotel(cItem.hotelMadinah, madinahHotels);
+              const cHargaBase = String(cItem.hargaBase || "").replace(/\D/g, "");
+              const cUpgradeDouble = String(cItem.upgradeDouble || "").replace(/\D/g, "");
+              const cUpgradeTriple = String(cItem.upgradeTriple || "").replace(/\D/g, "");
+
+              updatedClusterConfigs[cId] = {
+                ...updatedClusterConfigs[cId],
+                ...(cMekkahId ? { hotelMekkahId: cMekkahId } : {}),
+                ...(cMadinahId ? { hotelMadinahId: cMadinahId } : {}),
+                ...(cHargaBase ? { hargaBase: cHargaBase } : {}),
+                ...(cUpgradeDouble ? { upgradeDouble: cUpgradeDouble } : {}),
+                ...(cUpgradeTriple ? { upgradeTriple: cUpgradeTriple } : {}),
+              };
+
+              console.log(`[AI OCR] Cluster "${cItem.clusterName}" -> Matched ID: ${cId}`, updatedClusterConfigs[cId]);
+            } else {
+              console.warn(`[AI OCR] Cluster "${cItem.clusterName}" -> NO MATCH in master data`);
+            }
+          });
+
+          setClusterConfigs(updatedClusterConfigs);
+        }
+
+        // ── 8. DEPARTURE DATES ──
+        if (result.departureDates && Array.isArray(result.departureDates)) {
+          const extractedDates: string[] = result.departureDates
+            .map((d: any) => String(d).split("T")[0])
+            .filter((d: string): d is string => Boolean(d));
+          if (extractedDates.length > 0) {
+            const sortedDates: string[] = Array.from(new Set(extractedDates)).sort();
+            setDepartureDateInputs([...sortedDates, ""]);
+            setOcrDateInfo({
+              count: sortedDates.length,
+              dates: sortedDates,
+            });
+          }
+        } else if (result.departureDates && typeof result.departureDates === "string") {
+          const d = (result.departureDates as string).split("T")[0];
+          if (d) {
+            setDepartureDateInputs([d, ""]);
+            setOcrDateInfo({
+              count: 1,
+              dates: [d],
+            });
+          }
+        }
+
+        if (resJson.data?.warning) {
+          warningMessages.push(`${flyerUtama.name}: ${resJson.data.warning}`);
+        }
+      } else {
+        warningMessages.push(`${flyerUtama.name}: ${resJson.message || "Gagal ekstraksi"}`);
       }
 
       setFormData(finalFormData);
