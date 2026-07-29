@@ -70,26 +70,24 @@ export async function extractWithGemini(
     `  - 'upgradeDouble': Nominal upgrade kamar berdua (cth: 7500000 dari "Sekamar Berdua + Rp 7.500.000").\n` +
     `  - 'upgradeTriple': Nominal upgrade kamar bertiga (cth: 5000000 dari "Sekamar Bertiga + Rp 5.000.000").\n\n` +
     `==========================================================\n` +
-    `3. SUMBER DATA: ITINERARY (ANALISIS RUTE IN-OUT PESAWAT)\n` +
+    `3. SUMBER DATA: ITINERARY & FLYER UTAMA (ANALISIS RUTE IN-OUT PESAWAT)\n` +
     `==========================================================\n` +
-    `Pahami alur rute penerbangan dan urutan perjalanan dari ITINERARY / FLYER untuk menentukan 'landingRoute'.\n` +
+    `Cara Menentukan Rute In-Out (Landing Route):\n` +
+    `a) PERIKSA FLYER UTAMA & TEKS OCR:\n` +
+    `   - Cari teks/badge bertuliskan "LANDING [JEDDAH/MADINAH]" dan "OUT [JEDDAH/MADINAH]" pada flyer utama (cth: "FLIGHT BY LANDING JEDDAH OUT MADINAH" atau "LANDING JEDDAH OUT JEDDAH").\n` +
+    `   - Ini memberikan informasi pasti Kota Landing (In) dan Kota Kepulangan (Out).\n` +
+    `b) PERIKSA ITINERARY PERJALANAN (Untuk Kota Tujuan Pertama Setelah Landing):\n` +
+    `   - Untuk menentukan kota tujuan pertama setelah mendarat (apakah langsung ke MAKKAH untuk Umroh (.C) atau ziarah ke MADINAH dulu (.D)), WAJIB periksa urutan itinerary hari pertama/kedua!\n` +
+    `c) KODE RUTE SINKRON:\n` +
+    `   - 1. PAKET REGULER:\n` +
+    `        * JED.D-J: Landing Jeddah, kota tujuan pertama Madinah (.D), selesai Makkah lalu out dari Jeddah (-J).\n` +
+    `        * JED.C-M: Landing Jeddah, kota tujuan pertama Makkah (.C) langsung Umroh, selesai ziarah Madinah lalu out dari Madinah (-M).\n` +
+    `        * JED.C-J: Landing Jeddah, kota tujuan pertama Makkah (.C) langsung Umroh, ziarah Madinah, lalu out kembali via Jeddah (-J).\n` +
+    `        * MED-J / Med-J: Landing di bandara Madinah, ziarah Madinah, lanjut Makkah, lalu out dari Jeddah (-J).\n` +
+    `   - 2. PAKET PLUS (Singgah Negara Lain: Istanbul, Dubai, Qatar, Oman, Taif, Jordan, Cairo, dll):\n` +
+    `        * Umroh Dulu (UD): Ke Arab Saudi dulu untuk ibadah baru tour ke negara plus (UD.D-J, UD.D-M).\n` +
+    `        * Tour Dulu (TD): Tour ke negara plus terlebih dahulu sebelum mendarat di Saudi (TD.D-J, TD.C-J, TD.C-M).\n\n` +
     `Rute WAJIB dipilih persis dari daftar ini -> [${routeOptions}]\n\n` +
-    `PANDUAN PEMAHAMAN RUTE ITINERARY:\n` +
-    `1. PAKET REGULER:\n` +
-    `   - Landing Jeddah:\n` +
-    `     * JED.D-J: Landing Jeddah, ziarah/kota pertama Madinah (.D), selesai Makkah lalu pulang via Jeddah (-J).\n` +
-    `     * JED.C-M: Landing Jeddah, kota pertama Makkah (.C) langsung Umroh, selesai ziarah Madinah lalu pulang via Madinah (-M).\n` +
-    `     * JED.C-J: Landing Jeddah, kota pertama Makkah (.C) langsung Umroh, ziarah Madinah, lalu pulang kembali via Jeddah (-J).\n` +
-    `   - Landing Madinah:\n` +
-    `     * MED-J / Med-J: Landing di bandara Madinah, ziarah Madinah, lanjut Makkah, lalu pulang via Jeddah (-J).\n\n` +
-    `2. PAKET PLUS (Singgah di Negara Lain: Istanbul, Dubai, Qatar, Oman, Taif, Jordan, Cairo, dll):\n` +
-    `   - Umroh Dulu (UD) -> Ke Arab Saudi dulu untuk ibadah baru tour ke negara plus:\n` +
-    `     * UD.D-J: Umroh dulu, kota pertama Madinah (.D), out dari Jeddah (-J).\n` +
-    `     * UD.D-M: Umroh dulu, kota pertama Madinah (.D), out dari Madinah (-M).\n` +
-    `   - Tour Dulu (TD) -> Tour ke negara plus terlebih dahulu sebelum tiba di Saudi:\n` +
-    `     * TD.D-J: Tour dulu, kota pertama Madinah (.D), out dari Jeddah (-J).\n` +
-    `     * TD.C-J: Tour dulu, kota pertama Makkah (.C), out dari Jeddah (-J).\n` +
-    `     * TD.C-M: Tour dulu, kota pertama Makkah (.C), out dari Madinah (-M).\n\n` +
     `--- DATA UNTUK DIANALISA ---\n` +
     `1. TEKS HASIL SCAN OCR: ${rawOcrText}\n\n` +
     `2. TEKS CAPTION: ${caption}\n\n` +
