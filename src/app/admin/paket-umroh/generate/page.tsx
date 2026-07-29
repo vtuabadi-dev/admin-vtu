@@ -955,7 +955,7 @@ import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X } from "luc
                       value={formatNumberWithDots(formData.upgradeDouble)} 
                       onChange={(e) => handleCurrencyChange("upgradeDouble", e.target.value)} 
                       onKeyDown={(e) => handleKeyDownNext(e, "field-upgradeTriple")} 
-                      placeholder="Misal: 5.000.000" 
+                      placeholder="Rp -" 
                     />
                   </div>
                   <div>
@@ -968,7 +968,7 @@ import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X } from "luc
                       value={formatNumberWithDots(formData.upgradeTriple)} 
                       onChange={(e) => handleCurrencyChange("upgradeTriple", e.target.value)} 
                       onKeyDown={(e) => handleKeyDownNext(e, "field-tempDate")} 
-                      placeholder="Misal: 3.000.000" 
+                      placeholder="Rp -" 
                     />
                   </div>
                 </div>
@@ -1044,7 +1044,7 @@ import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X } from "luc
                                 id={`field-${klaster.id}-hargaBase`}
                                 type="text" 
                                 inputMode="numeric"
-                                placeholder="Misal: 35.000.000" 
+                                placeholder="Rp -" 
                                 value={formatNumberWithDots(clusterConfigs[klaster.id]?.hargaBase || "")} 
                                 onChange={(e) => handleClusterConfigChange(klaster.id, "hargaBase", e.target.value.replace(/\D/g, ""))} 
                                 onKeyDown={(e) => handleKeyDownNext(e, nextHargaBaseTarget)}
@@ -1057,7 +1057,7 @@ import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X } from "luc
                                 id={`field-${klaster.id}-upgradeDouble`}
                                 type="text" 
                                 inputMode="numeric"
-                                placeholder="Misal: 5.000.000" 
+                                placeholder="Rp -" 
                                 value={formatNumberWithDots(clusterConfigs[klaster.id]?.upgradeDouble || "")} 
                                 onChange={(e) => handleClusterConfigChange(klaster.id, "upgradeDouble", e.target.value.replace(/\D/g, ""))} 
                                 onKeyDown={(e) => handleKeyDownNext(e, `field-${klaster.id}-upgradeTriple`)}
@@ -1070,7 +1070,7 @@ import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X } from "luc
                                 id={`field-${klaster.id}-upgradeTriple`}
                                 type="text" 
                                 inputMode="numeric"
-                                placeholder="Misal: 3.000.000" 
+                                placeholder="Rp -" 
                                 value={formatNumberWithDots(clusterConfigs[klaster.id]?.upgradeTriple || "")} 
                                 onChange={(e) => handleClusterConfigChange(klaster.id, "upgradeTriple", e.target.value.replace(/\D/g, ""))} 
                                 onKeyDown={(e) => handleKeyDownNext(e, nextUpgradeTripleTarget)}
@@ -1265,7 +1265,7 @@ import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X } from "luc
                       value={formatNumberWithDots(formData.hargaBase)} 
                       onChange={(e) => handleCurrencyChange("hargaBase", e.target.value)} 
                       onKeyDown={(e) => handleKeyDownNext(e, "field-submitBtn")}
-                      placeholder="35.000.000" 
+                      placeholder="Rp -" 
                     />
                   </>
                 ) : (
@@ -1464,7 +1464,7 @@ import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X } from "luc
                     name="upgradeDouble" 
                     value={formatNumberWithDots(formData.upgradeDouble)} 
                     onChange={(e) => handleCurrencyChange("upgradeDouble", e.target.value)} 
-                    placeholder="Misal: 5.000.000" 
+                    placeholder="Rp -" 
                   />
                 </div>
                 <div>
@@ -1476,7 +1476,7 @@ import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X } from "luc
                     name="upgradeTriple" 
                     value={formatNumberWithDots(formData.upgradeTriple)} 
                     onChange={(e) => handleCurrencyChange("upgradeTriple", e.target.value)} 
-                    placeholder="Misal: 3.000.000" 
+                    placeholder="Rp -" 
                   />
                 </div>
               </div>
@@ -1524,7 +1524,7 @@ import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X } from "luc
                         <Input 
                           type="text" 
                           inputMode="numeric"
-                          placeholder="35.000.000" 
+                          placeholder="Rp -" 
                           value={formatNumberWithDots(clusterConfigs[klaster.id]?.hargaBase || "")} 
                           onChange={(e) => handleClusterConfigChange(klaster.id, "hargaBase", e.target.value.replace(/\D/g, ""))} 
                           className="h-8 text-xs"
@@ -1535,7 +1535,7 @@ import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X } from "luc
                         <Input 
                           type="text" 
                           inputMode="numeric"
-                          placeholder="5.000.000" 
+                          placeholder="Rp -" 
                           value={formatNumberWithDots(clusterConfigs[klaster.id]?.upgradeDouble || "")} 
                           onChange={(e) => handleClusterConfigChange(klaster.id, "upgradeDouble", e.target.value.replace(/\D/g, ""))} 
                           className="h-8 text-xs"
@@ -1546,7 +1546,7 @@ import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X } from "luc
                         <Input 
                           type="text" 
                           inputMode="numeric"
-                          placeholder="3.000.000" 
+                          placeholder="Rp -" 
                           value={formatNumberWithDots(clusterConfigs[klaster.id]?.upgradeTriple || "")} 
                           onChange={(e) => handleClusterConfigChange(klaster.id, "upgradeTriple", e.target.value.replace(/\D/g, ""))} 
                           className="h-8 text-xs"
