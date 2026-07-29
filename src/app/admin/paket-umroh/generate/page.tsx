@@ -1841,7 +1841,7 @@ import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X } from "luc
                 <div>
                   <h2 className="font-semibold text-base">Ekstraksi Dokumen Flyer</h2>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    Unggah flyer dalam format JPG/JPEG. Tambah slot untuk mengekstraksi dari beberapa gambar sekaligus.
+                    Unggah flyer (format JPG/PNG). <strong>Foto #1 (pertama)</strong> otomatis dijadikan sebagai <strong>Flyer Utama</strong> untuk ekstraksi tanggal & harga.
                   </p>
                 </div>
                 <span className="shrink-0 text-xs bg-muted px-2 py-1 rounded-md font-medium text-muted-foreground">
@@ -1937,7 +1937,13 @@ import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X } from "luc
                   <div className="p-3 space-y-3">
                     <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
                       {flyerFiles.map((file, idx) => (
-                        <div key={idx} className="relative group aspect-square rounded-lg overflow-hidden border border-border shadow-sm">
+                        <div
+                          key={idx}
+                          className={cn(
+                            "relative group aspect-square rounded-lg overflow-hidden border shadow-sm transition-all",
+                            idx === 0 ? "ring-2 ring-emerald-500 border-emerald-500" : "border-border"
+                          )}
+                        >
                           {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img
                             src={flyerPreviews[idx]}
@@ -1957,10 +1963,20 @@ import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X } from "luc
                           >
                             <X className="h-3 w-3" />
                           </button>
-                          {/* Index badge */}
-                          <div className="absolute bottom-1 left-1 h-4 min-w-4 rounded bg-black/60 text-white text-[10px] font-bold flex items-center justify-center px-1">
-                            {idx + 1}
-                          </div>
+                          {/* Index & Flyer Utama Badge */}
+                          {idx === 0 ? (
+                            <div className="absolute bottom-1 left-1 right-1 z-10 bg-emerald-600/95 backdrop-blur-xs text-white text-[9px] font-extrabold px-1.5 py-0.5 rounded flex items-center justify-between shadow-xs">
+                              <span className="truncate flex items-center gap-1">
+                                <Sparkles className="h-2.5 w-2.5 text-amber-300 fill-amber-300 shrink-0" />
+                                Flyer Utama
+                              </span>
+                              <span className="text-[10px] opacity-90">#1</span>
+                            </div>
+                          ) : (
+                            <div className="absolute bottom-1 left-1 h-4 min-w-4 rounded bg-black/60 text-white text-[10px] font-bold flex items-center justify-center px-1">
+                              {idx + 1}
+                            </div>
+                          )}
                         </div>
                       ))}
 
@@ -1977,11 +1993,9 @@ import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X } from "luc
                     </div>
 
                     <div className="flex items-center justify-between pt-1 border-t border-border">
-                      <p className="text-xs text-muted-foreground">
+                      <p className="text-xs text-muted-foreground flex items-center gap-1.5">
                         <span className="font-semibold text-foreground">{flyerFiles.length}</span> foto dipilih
-                        {flyerFiles.length < MAX_FILES && (
-                          <span> · Bisa tambah {MAX_FILES - flyerFiles.length} lagi</span>
-                        )}
+                        <span className="text-[11px] text-emerald-700 dark:text-emerald-400 font-semibold">(Foto #1 = Flyer Utama)</span>
                       </p>
                       <button
                         type="button"
