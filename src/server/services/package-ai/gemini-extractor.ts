@@ -88,16 +88,18 @@ export async function extractWithGemini(
     `        * Umroh Dulu (UD): Ke Arab Saudi dulu untuk ibadah baru tour ke negara plus (UD.D-J, UD.D-M).\n` +
     `        * Tour Dulu (TD): Tour ke negara plus terlebih dahulu sebelum mendarat di Saudi (TD.D-J, TD.C-J, TD.C-M).\n\n` +
     `Rute WAJIB dipilih persis dari daftar ini -> [${routeOptions}]\n\n` +
+    `=============================================================================================================\n` +
+    `4. ATURAN EKSTRAKSI KLASTER SEAT / KOTAK PAKET & CAPTION HARGA PER-KLASTER\n` +
     `==========================================================\n` +
-    `4. ATURAN EKSTRAKSI KLASTER SEAT / KOTAK PAKET (SILVER, GOLD, PLATINUM, BRONZE)\n` +
-    `==========================================================\n` +
-    `Jika flyer utama memiliki KOTAK-KOTAK HORISONTAL KLASTER PAKET (cth: "SILVER PACKAGE", "GOLD PACKAGE", "PLATINUM PACKAGE", "BRONZE PACKAGE"):\n` +
-    `• Setiap satu kotak panjang mewakili SATU KLASTER SEAT UTUH yang berisi:\n` +
+    `Bila flyer utama atau caption memiliki data KLASTER PAKET (cth: "SILVER", "GOLD", "PLATINUM", "BRONZE"):\n` +
+    `• Setiap klaster mewakili SATU KLASTER SEAT UTUH yang berisi:\n` +
     `  1. Nama Klaster (cth: "Silver Package", "Gold Package", "Platinum Package", "Bronze Package")\n` +
-    `  2. Hotel Mekkah persis di dalam kotak klaster tersebut (cth: "Grand Al-Massa" pada Silver, "Rayyana Grand Plaza" pada Gold, "Safwah Tower" pada Platinum)\n` +
-    `  3. Hotel Madinah persis di dalam kotak klaster tersebut (cth: "Durrat Al-Eiman" pada Silver, "Deyar Al-Eiman" pada Gold, "Taiba Front" pada Platinum)\n` +
-    `  4. Harga Base / Best Deal Price persis di dalam kotak klaster tersebut (cth: 38.9 Jt -> 38900000, 40.9 Jt -> 40900000, 44.9 Jt -> 44900000).\n` +
-    `• Masukkan SELURUH KLASTER yang ditemukan ke dalam array 'clusters'.\n\n` +
+    `  2. Hotel Mekkah untuk klaster tersebut (dari flyer/caption)\n` +
+    `  3. Hotel Madinah untuk klaster tersebut (dari flyer/caption)\n` +
+    `  4. Harga Base klaster (dari flyer atau dari caption seperti "Silver Rp 38.900.000", "Gold Rp 40.900.000", "Platinum Rp 44.900.000").\n` +
+    `  5. Upgrade Double klaster (dari caption rincian per klaster, cth: Sekamar Berdua Platinum: + Rp 7.500.000 -> 7500000).\n` +
+    `  6. Upgrade Triple klaster (dari caption rincian per klaster, cth: Sekamar Bertiga Platinum: + Rp 5.000.000 -> 5000000).\n` +
+    `• Masukkan SELURUH KLASTER yang ditemukan pada flyer & caption ke dalam array 'clusters'.\n\n` +
     `--- DATA UNTUK DIANALISA ---\n` +
     `1. TEKS HASIL SCAN OCR: ${rawOcrText}\n\n` +
     `2. TEKS CAPTION: ${caption}\n\n` +
@@ -118,10 +120,10 @@ export async function extractWithGemini(
           hotelMekkah: { type: SchemaType.STRING, description: "Hotel Mekkah dari Flyer Utama" },
           hotelMadinah: { type: SchemaType.STRING, description: "Hotel Madinah dari Flyer Utama" },
           landingRoute: { type: SchemaType.STRING, description: "Rute In-Out pesawat dari analisis alur itinerary" },
-          isAdaPerlengkapan: { type: SchemaType.STRING, description: "Dari Caption: 'ya' jika termasuk perlengkapan, 'tidak' jika belum/tidak termasuk" },
-          hargaBase: { type: SchemaType.STRING, description: "Harga base paket dari Flyer Utama (hanya angka nominal)" },
-          upgradeDouble: { type: SchemaType.STRING, description: "Harga upgrade kamar double dari Caption (hanya angka nominal)" },
-          upgradeTriple: { type: SchemaType.STRING, description: "Harga upgrade kamar triple dari Caption (hanya angka nominal)" },
+          isAdaPerlengkapan: { type: SchemaType.STRING, description: "Dari Caption: 'ya' jika termasuk perlengkapan (cth: Perlengkapan umroh under Termasuk), 'tidak' jika belum/tidak termasuk" },
+          hargaBase: { type: SchemaType.STRING, description: "Harga base paket (hanya angka nominal)" },
+          upgradeDouble: { type: SchemaType.STRING, description: "Harga upgrade kamar double umum dari Caption (hanya angka nominal)" },
+          upgradeTriple: { type: SchemaType.STRING, description: "Harga upgrade kamar triple umum dari Caption (hanya angka nominal)" },
           roomUpgrade: { type: SchemaType.STRING, description: "Informasi opsional upgrade kamar" },
           hotelUpgrade: { type: SchemaType.STRING, description: "Informasi opsional upgrade hotel" },
           promoText: { type: SchemaType.STRING, description: "Informasi opsional teks promo" },
@@ -132,13 +134,15 @@ export async function extractWithGemini(
               type: SchemaType.OBJECT,
               properties: {
                 clusterName: { type: SchemaType.STRING, description: "Nama Klaster (cth: Silver Package, Gold Package, Platinum Package, Bronze Package)" },
-                hotelMekkah: { type: SchemaType.STRING, description: "Nama Hotel Mekkah persis di dalam kotak klaster ini" },
-                hotelMadinah: { type: SchemaType.STRING, description: "Nama Hotel Madinah persis di dalam kotak klaster ini" },
-                hargaBase: { type: SchemaType.STRING, description: "Harga Base / Best Deal Price dalam kotak klaster ini (hanya angka nominal, cth: 38900000 dari 38.9 Jt)" },
+                hotelMekkah: { type: SchemaType.STRING, description: "Nama Hotel Mekkah persis di dalam kotak klaster ini atau caption" },
+                hotelMadinah: { type: SchemaType.STRING, description: "Nama Hotel Madinah persis di dalam kotak klaster ini atau caption" },
+                hargaBase: { type: SchemaType.STRING, description: "Harga Base klaster dari flyer atau caption (hanya angka nominal, cth: 38900000 dari Rp 38.900.000)" },
+                upgradeDouble: { type: SchemaType.STRING, description: "Harga upgrade kamar berdua khusus klaster ini dari caption (hanya angka nominal, cth: 7500000 dari + Rp 7.500.000)" },
+                upgradeTriple: { type: SchemaType.STRING, description: "Harga upgrade kamar bertiga khusus klaster ini dari caption (hanya angka nominal, cth: 5000000 dari + Rp 5.000.000)" },
               },
-              required: ["clusterName", "hotelMekkah", "hotelMadinah", "hargaBase"]
+              required: ["clusterName"]
             },
-            description: "ARRAY SETIAP KOTAK KLASTER SEAT PADA FLYER UTAMA (Silver, Gold, Platinum, Bronze)"
+            description: "ARRAY SETIAP KLASTER SEAT BESERTA HARGA BASE & UPGRADE KAMAR PER KLASTER (Silver, Gold, Platinum, Bronze)"
           },
           departureDates: {
             type: SchemaType.ARRAY,

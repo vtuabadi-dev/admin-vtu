@@ -382,6 +382,101 @@ export function extractRoomUpgradePrices(caption: string): { upgradeDouble?: str
   return { upgradeDouble, upgradeTriple };
 }
 
+/**
+ * Detect equipment inclusion from caption text.
+ * Returns "ya" if caption mentions included equipment ("Perlengkapan umroh", "Free perlengkapan", etc.).
+ */
+export function extractEquipmentStatus(caption: string): "ya" | "tidak" | undefined {
+  const upper = caption.toUpperCase();
+  if (upper.includes("PERLENGKAPAN UMROH") || upper.includes("FREE PERLENGKAPAN") || upper.includes("TERMASUK PERLENGKAPAN") || upper.includes("PERLENGKAPAN")) {
+    const tidakIndex = upper.indexOf("TIDAK TERMASUK");
+    const perlengkapanIndex = upper.indexOf("PERLENGKAPAN");
+    if (tidakIndex !== -1 && perlengkapanIndex > tidakIndex) {
+      return "tidak";
+    }
+    return "ya";
+  }
+  return undefined;
+}
+
+/**
+ * Extract per-cluster base prices and upgrade prices from caption text.
+ * Examples:
+ *   "Silver Rp. 38.900.000"
+ *   "Gold Rp. 40.900.000"
+ *   "Platinum Rp. 44.900.000"
+ *   "Platinum"
+ *   "Sekamar Berdua : + Rp. 7.500.000/pax"
+ *   "Sekamar Bertiga : + Rp. 5.000.000/pax"
+ */
+export function extractClustersFromCaption(caption: string): import("./types").ClusterExtractionItem[] {
+  const clusterMap: Record<string, import("./types").ClusterExtractionItem> = {};
+  const lines = caption.split("\n").map(l => l.trim()).filter(Boolean);
+  const clusterNames = ["SILVER", "GOLD", "PLATINUM", "BRONZE"];
+
+  const parseNominal = (text: string): string | undefined => {
+    const jtMatch = text.match(/(\d+(?:[\.,]\d+)?)\s*(?:jt|juta)/i);
+    if (jtMatch?.[1]) {
+      const num = parseFloat(jtMatch[1].replace(",", "."));
+      if (!isNaN(num)) return Math.round(num * 1000000).toString();
+    }
+    const numMatch = text.match(/(\d{1,3}(?:\.\d{3})+|\d{6,8})/);
+    if (numMatch?.[1]) {
+      const numStr = numMatch[1].replace(/\D/g, "");
+      if (numStr.length >= 6) return numStr;
+    }
+    return undefined;
+  };
+
+  // 1. Scan for base price lines like "Silver Rp. 38.900.000"
+  lines.forEach(line => {
+    const lineUpper = line.toUpperCase();
+    for (const cName of clusterNames) {
+      if (lineUpper.includes(cName)) {
+        const price = parseNominal(line);
+        if (price) {
+          if (!clusterMap[cName]) {
+            clusterMap[cName] = { clusterName: `${cName.charAt(0) + cName.slice(1).toLowerCase()} Package` };
+          }
+          clusterMap[cName]!.hargaBase = price;
+        }
+      }
+    }
+  });
+
+  // 2. Scan for per-cluster upgrade sections (e.g. Platinum \n Sekamar Berdua: + Rp 7.500.000)
+  let currentCluster: string | null = null;
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]!;
+    const lineUpper = line.toUpperCase();
+
+    const matchedHeading = clusterNames.find(cn => lineUpper === cn || lineUpper === `${cn} PACKAGE`);
+    if (matchedHeading) {
+      currentCluster = matchedHeading;
+      if (!clusterMap[currentCluster]) {
+        clusterMap[currentCluster] = { clusterName: `${currentCluster.charAt(0) + currentCluster.slice(1).toLowerCase()} Package` };
+      }
+      continue;
+    }
+
+    if (currentCluster) {
+      if (lineUpper.includes("SEKAMAR BERDUA") || lineUpper.includes("DOUBLE") || lineUpper.includes("TWIN")) {
+        const price = parseNominal(line);
+        if (price) {
+          clusterMap[currentCluster]!.upgradeDouble = price;
+        }
+      } else if (lineUpper.includes("SEKAMAR BERTIGA") || lineUpper.includes("TRIPLE")) {
+        const price = parseNominal(line);
+        if (price) {
+          clusterMap[currentCluster]!.upgradeTriple = price;
+        }
+      }
+    }
+  }
+
+  return Object.values(clusterMap);
+}
+
 // ── Main Parser ──────────────────────────────────────────────
 
 /**
@@ -400,6 +495,8 @@ export function parseCaption(caption: string): Partial<PackageExtractionResult> 
   const upgrades = extractUpgrade(trimmed);
   const upgradePrices = extractRoomUpgradePrices(trimmed);
   const description = extractDescription(trimmed);
+  const equipmentStatus = extractEquipmentStatus(trimmed);
+  const captionClusters = extractClustersFromCaption(trimmed);
 
   // Title: first meaningful line or package type + duration
   const firstLine = trimmed.split("\n")[0]?.trim() ?? "";
@@ -434,6 +531,8 @@ export function parseCaption(caption: string): Partial<PackageExtractionResult> 
     hotelUpgrade: upgrades.hotelUpgrade,
     upgradeDouble: upgradePrices.upgradeDouble,
     upgradeTriple: upgradePrices.upgradeTriple,
+    isAdaPerlengkapan: equipmentStatus,
+    clusters: captionClusters.length > 0 ? captionClusters : undefined,
     durationDays: duration,
     departureDates: dates,
     promoText: promo,

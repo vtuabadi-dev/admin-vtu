@@ -9,6 +9,8 @@ export interface ClusterExtractionItem {
   hotelMekkah?: string;
   hotelMadinah?: string;
   hargaBase?: string;
+  upgradeDouble?: string;
+  upgradeTriple?: string;
 }
 
 /**

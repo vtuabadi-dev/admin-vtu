@@ -555,12 +555,16 @@ import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X } from "luc
                 const cMekkahId = matchHotel(cItem.hotelMekkah, mekkahHotels);
                 const cMadinahId = matchHotel(cItem.hotelMadinah, madinahHotels);
                 const cHargaBase = String(cItem.hargaBase || "").replace(/\D/g, "");
+                const cUpgradeDouble = String(cItem.upgradeDouble || "").replace(/\D/g, "");
+                const cUpgradeTriple = String(cItem.upgradeTriple || "").replace(/\D/g, "");
 
                 updatedClusterConfigs[cId] = {
                   ...updatedClusterConfigs[cId],
                   ...(cMekkahId ? { hotelMekkahId: cMekkahId } : {}),
                   ...(cMadinahId ? { hotelMadinahId: cMadinahId } : {}),
                   ...(cHargaBase ? { hargaBase: cHargaBase } : {}),
+                  ...(cUpgradeDouble ? { upgradeDouble: cUpgradeDouble } : {}),
+                  ...(cUpgradeTriple ? { upgradeTriple: cUpgradeTriple } : {}),
                 };
               }
             });
