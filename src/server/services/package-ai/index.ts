@@ -123,6 +123,8 @@ export async function processPackageFlyer(
       hotelUpgrade: geminiData.hotelUpgrade,
       upgradeDouble: geminiData.upgradeDouble || captionUpgrades.upgradeDouble,
       upgradeTriple: geminiData.upgradeTriple || captionUpgrades.upgradeTriple,
+      isAdaPerlengkapan: geminiData.isAdaPerlengkapan as any,
+      hargaBase: geminiData.hargaBase,
       durationDays: geminiData.durationDays || 0,
       departureDates: dates,
       promoText: geminiData.promoText,

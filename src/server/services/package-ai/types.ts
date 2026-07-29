@@ -20,6 +20,8 @@ export interface PackageExtractionResult {
   hotelUpgrade?: string;
   upgradeDouble?: string;
   upgradeTriple?: string;
+  isAdaPerlengkapan?: "ya" | "tidak";
+  hargaBase?: string;
   durationDays: number;
   departureDates: string[];
   promoText?: string;

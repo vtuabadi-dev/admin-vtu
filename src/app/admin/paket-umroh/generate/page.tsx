@@ -531,6 +531,8 @@ import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X } from "luc
           if (mappedHotelMekkah) finalFormData.hotelMekkahId = mappedHotelMekkah;
           if (mappedHotelMadinah) finalFormData.hotelMadinahId = mappedHotelMadinah;
           if (result.durationDays) finalFormData.durasiHari = String(result.durationDays);
+          if (result.hargaBase) finalFormData.hargaBase = String(result.hargaBase).replace(/\D/g, "");
+          if (result.isAdaPerlengkapan) finalFormData.isAdaPerlengkapan = result.isAdaPerlengkapan;
           if (result.upgradeDouble) finalFormData.upgradeDouble = String(result.upgradeDouble).replace(/\D/g, "");
           if (result.upgradeTriple) finalFormData.upgradeTriple = String(result.upgradeTriple).replace(/\D/g, "");
           

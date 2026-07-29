@@ -40,47 +40,60 @@ export async function extractWithGemini(
   const base64Image = imageBuffer.toString("base64");
   const mimeType = "image/jpeg";
 
-  const prompt = `Kamu adalah sistem data entry travel umroh ahli. Analisa GAMBAR TERLAMPIR, TEKS OCR, dan CAPTION berikut.\n\n` +
-    `--- ATURAN MASKAPAI ---\n` +
-    `Ambil MASKAPAI INTERNASIONAL utama (Carrier Utama ke Saudi). ABAIKAN maskapai domestik/pengumpan.\n` +
-    `Maskapai WAJIB dipilih persis dari daftar ini -> [${airlineOptions}]\n\n` +
-    `--- ATURAN KOTA KEBERANGKATAN (STARTING POINT) ---\n` +
-    `Cari dengan teliti teks kota keberangkatan pada flyer, gambar, OCR, atau caption (cth: "Start Surabaya", "Start Jakarta", "Keberangkatan Surabaya", "Keberangkatan Jakarta", "Start SUB", "Start JKT", "Surabaya", "Jakarta").\n` +
-    `• Jika ada tulisan "Start Surabaya", "Surabaya", "Juanda", atau "SUB", WAJIB isi 'departureCity' dengan "Surabaya".\n` +
-    `• Jika ada tulisan "Start Jakarta", "Jakarta", "Soekarno Hatta", atau "JKT", WAJIB isi 'departureCity' dengan "Jakarta".\n` +
-    `Kota keberangkatan WAJIB dipilih persis dari daftar ini -> [${cityOptions}]\n\n` +
-    `--- ATURAN JENIS PAKET ---\n` +
-    `Jenis paket WAJIB dipilih persis dari daftar ini -> [${typeOptions}]\n\n` +
-    `--- ATURAN HOTEL ---\n` +
-    `Pilih hotel yang paling mendekati dari daftar berikut:\n` +
-    `- Hotel Mekkah: [${mekkahHotels}]\n` +
-    `- Hotel Madinah: [${madinahHotels}]\n\n` +
-    `--- ATURAN EKSTRAKSI RUTE IN-OUT (LANDING) ---\n` +
-    `Tentukan rute kedatangan dan kepulangan (Landing Route).\n` +
+  const prompt = `Kamu adalah sistem AI data entry travel umroh yang sangat teliti. Analisa GAMBAR FLYER UTAMA (GAMBAR TERLAMPIR), TEKS OCR, dan TEKS CAPTION dengan mengikuti ATURAN HIRARKI PENGAMBILAN DATA berikut.\n\n` +
+    `==========================================================\n` +
+    `1. SUMBER DATA: FLYER UTAMA (GAMBAR FLYER #1 & TEKS FLYER)\n` +
+    `==========================================================\n` +
+    `Bidang berikut WAJIB diekstrak dari GAMBAR FLYER UTAMA / TEKS FLYER:\n` +
+    `• Jenis Paket: Pilih persis dari daftar -> [${typeOptions}]\n` +
+    `• Durasi (Hari): Jumlah total hari perjalanan (cth: 9, 12, 14 hari)\n` +
+    `• Starting Point (Kota Keberangkatan):\n` +
+    `  - CARI KATA KUNCI "START" PADA FLYER (cth: "Start Surabaya", "Start Jakarta", "Start Solo", "Start SUB", "Start JKT", "Start SOC").\n` +
+    `  - Jika ada kata "Surabaya", "Juanda", atau "SUB", WAJIB isi 'departureCity' dengan "Surabaya".\n` +
+    `  - Jika ada kata "Jakarta", "Soekarno Hatta", "CGK", atau "JKT", WAJIB isi 'departureCity' dengan "Jakarta".\n` +
+    `  - Jika ada kata "Solo", "Surakarta", "SOC", WAJIB isi 'departureCity' dengan "Solo".\n` +
+    `  - Pilihan kota WAJIB dari daftar ini -> [${cityOptions}]\n` +
+    `• Maskapai: Ambil Maskapai Internasional utama (Carrier ke Saudi). WAJIB dari -> [${airlineOptions}]\n` +
+    `• Hotel Mekkah & Madinah: Cari nama hotel untuk setiap klaster/kelas kamar dari daftar:\n` +
+    `  - Hotel Mekkah: [${mekkahHotels}]\n` +
+    `  - Hotel Madinah: [${madinahHotels}]\n` +
+    `• Harga Base Paket: Ekstrak harga dasar paket (klaster ataupun non-klaster) dari flyer (hanya angka nominal).\n` +
+    `• Tanggal Keberangkatan: Cari dan kumpulkan SEMUA tanggal keberangkatan yang ada di flyer utama (bisa 1, 2, 4, 5, 6 atau lebih tanggal). Format wajib YYYY-MM-DD.\n\n` +
+    `==========================================================\n` +
+    `2. SUMBER DATA: CAPTION (TEKS SOSIAL MEDIA / DESKRIPSI)\n` +
+    `==========================================================\n` +
+    `Bidang berikut WAJIB diekstrak khusus dari TEKS CAPTION:\n` +
+    `• Termasuk Perlengkapan ('isAdaPerlengkapan'):\n` +
+    `  - Jika caption menyebutkan "Termasuk Perlengkapan", "Free Perlengkapan", "All In Perlengkapan", isi 'isAdaPerlengkapan' = "ya".\n` +
+    `  - Jika caption menyebutkan "Belum Termasuk Perlengkapan", "Tanpa Perlengkapan", isi 'isAdaPerlengkapan' = "tidak".\n` +
+    `• Harga Upgrade Kamar Double & Triple:\n` +
+    `  - 'upgradeDouble': Nominal upgrade kamar berdua (cth: 7500000 dari "Sekamar Berdua + Rp 7.500.000").\n` +
+    `  - 'upgradeTriple': Nominal upgrade kamar bertiga (cth: 5000000 dari "Sekamar Bertiga + Rp 5.000.000").\n\n` +
+    `==========================================================\n` +
+    `3. SUMBER DATA: ITINERARY (ANALISIS RUTE IN-OUT PESAWAT)\n` +
+    `==========================================================\n` +
+    `Pahami alur rute penerbangan dan urutan perjalanan dari ITINERARY / FLYER untuk menentukan 'landingRoute'.\n` +
     `Rute WAJIB dipilih persis dari daftar ini -> [${routeOptions}]\n\n` +
-    `Klasifikasi Rute Paket:\n` +
+    `PANDUAN PEMAHAMAN RUTE ITINERARY:\n` +
     `1. PAKET REGULER:\n` +
     `   - Landing Jeddah:\n` +
-    `     * JED.D-J: Landing Jeddah, kota pertama Madinah (.D), out dari Jeddah (-J). (Tujuan awal Madinah saat masuk Saudi, keluar via Jeddah)\n` +
-    `     * JED.C-M: Landing Jeddah, kota pertama Makkah (.C), out dari Madinah (-M). (Tujuan awal Makkah saat masuk Saudi, keluar via Madinah)\n` +
-    `     * JED.C-J: Landing Jeddah, kota pertama Makkah (.C), out dari Jeddah (-J). (Tujuan awal Makkah saat masuk Saudi, keluar via Jeddah)\n` +
+    `     * JED.D-J: Landing Jeddah, ziarah/kota pertama Madinah (.D), selesai Makkah lalu pulang via Jeddah (-J).\n` +
+    `     * JED.C-M: Landing Jeddah, kota pertama Makkah (.C) langsung Umroh, selesai ziarah Madinah lalu pulang via Madinah (-M).\n` +
+    `     * JED.C-J: Landing Jeddah, kota pertama Makkah (.C) langsung Umroh, ziarah Madinah, lalu pulang kembali via Jeddah (-J).\n` +
     `   - Landing Madinah:\n` +
-    `     * MED-J / Med-J: Landing Madinah, out dari Jeddah (-J).\n\n` +
-    `2. PAKET PLUS (Singgah di Negara Lain):\n` +
-    `   - Umroh Dulu (UD) - Destinasi pertama Arab Saudi dulu sebelum tour negara plus:\n` +
+    `     * MED-J / Med-J: Landing di bandara Madinah, ziarah Madinah, lanjut Makkah, lalu pulang via Jeddah (-J).\n\n` +
+    `2. PAKET PLUS (Singgah di Negara Lain: Istanbul, Dubai, Qatar, Oman, Taif, Jordan, Cairo, dll):\n` +
+    `   - Umroh Dulu (UD) -> Ke Arab Saudi dulu untuk ibadah baru tour ke negara plus:\n` +
     `     * UD.D-J: Umroh dulu, kota pertama Madinah (.D), out dari Jeddah (-J).\n` +
     `     * UD.D-M: Umroh dulu, kota pertama Madinah (.D), out dari Madinah (-M).\n` +
-    `   - Tour Dulu (TD) - Tour ke negara plus dulu sebelum ke Saudi:\n` +
+    `   - Tour Dulu (TD) -> Tour ke negara plus terlebih dahulu sebelum tiba di Saudi:\n` +
     `     * TD.D-J: Tour dulu, kota pertama Madinah (.D), out dari Jeddah (-J).\n` +
     `     * TD.C-J: Tour dulu, kota pertama Makkah (.C), out dari Jeddah (-J).\n` +
     `     * TD.C-M: Tour dulu, kota pertama Makkah (.C), out dari Madinah (-M).\n\n` +
-    `--- TUGAS UTAMA 1: HITUNG & EKSTRAK SEMUA TANGGAL KEBERANGKATAN ---\n` +
-    `Periksa flyer dengan teliti. Hitung dan temukan SEMUA tanggal keberangkatan yang ada di flyer utama (bisa 1, 2, 4, 5, 6, atau lebih tanggal keberangkatan).\n` +
-    `Kumpulkan SELURUH tanggal keberangkatan dalam array 'departureDates' (Format wajib: YYYY-MM-DD).\n\n` +
     `--- DATA UNTUK DIANALISA ---\n` +
     `1. TEKS HASIL SCAN OCR: ${rawOcrText}\n\n` +
     `2. TEKS CAPTION: ${caption}\n\n` +
-    `3. GAMBAR FLYER (Telah dilampirkan): Gunakan matamu untuk mencari SEMUA TANGGAL KEBERANGKATAN yang mungkin tersebar di flyer.`;
+    `3. GAMBAR FLYER UTAMA (Telah dilampirkan): Analisa visual flyer utama & rute itinerary.`;
 
   const model = genAI.getGenerativeModel({ 
     model: "gemini-1.5-flash",
@@ -89,22 +102,26 @@ export async function extractWithGemini(
       responseSchema: {
         type: SchemaType.OBJECT,
         properties: {
-          title: { type: SchemaType.STRING, description: "Buatkan judul singkat dan menarik untuk paket ini. Format: [Jenis Paket] [Durasi] Hari [Tahun]" },
-          packageType: { type: SchemaType.STRING },
-          durationDays: { type: SchemaType.INTEGER, description: "Jumlah total durasi hari perjalanan" },
-          departureCity: { type: SchemaType.STRING },
-          airline: { type: SchemaType.STRING },
-          hotelMekkah: { type: SchemaType.STRING },
-          hotelMadinah: { type: SchemaType.STRING },
-          landingRoute: { type: SchemaType.STRING, description: "Rute In-Out pesawat (Landing dan Takeoff)" },
-          roomUpgrade: { type: SchemaType.STRING, description: "Informasi opsional upgrade kamar (cth: Double, Triple)" },
+          title: { type: SchemaType.STRING, description: "Judul singkat paket. Format: [Jenis Paket] [Durasi] Hari [Tahun]" },
+          packageType: { type: SchemaType.STRING, description: "Jenis Paket dari Flyer Utama" },
+          durationDays: { type: SchemaType.INTEGER, description: "Jumlah total durasi hari perjalanan dari Flyer Utama" },
+          departureCity: { type: SchemaType.STRING, description: "Starting Point dari kata kunci 'START' di Flyer Utama" },
+          airline: { type: SchemaType.STRING, description: "Maskapai penerbangan dari Flyer Utama" },
+          hotelMekkah: { type: SchemaType.STRING, description: "Hotel Mekkah dari Flyer Utama" },
+          hotelMadinah: { type: SchemaType.STRING, description: "Hotel Madinah dari Flyer Utama" },
+          landingRoute: { type: SchemaType.STRING, description: "Rute In-Out pesawat dari analisis alur itinerary" },
+          isAdaPerlengkapan: { type: SchemaType.STRING, description: "Dari Caption: 'ya' jika termasuk perlengkapan, 'tidak' jika belum/tidak termasuk" },
+          hargaBase: { type: SchemaType.STRING, description: "Harga base paket dari Flyer Utama (hanya angka nominal)" },
+          upgradeDouble: { type: SchemaType.STRING, description: "Harga upgrade kamar double dari Caption (hanya angka nominal)" },
+          upgradeTriple: { type: SchemaType.STRING, description: "Harga upgrade kamar triple dari Caption (hanya angka nominal)" },
+          roomUpgrade: { type: SchemaType.STRING, description: "Informasi opsional upgrade kamar" },
           hotelUpgrade: { type: SchemaType.STRING, description: "Informasi opsional upgrade hotel" },
-          promoText: { type: SchemaType.STRING, description: "Informasi opsional teks promo atau diskon khusus" },
-          description: { type: SchemaType.STRING, description: "Informasi opsional deskripsi tambahan" },
+          promoText: { type: SchemaType.STRING, description: "Informasi opsional teks promo" },
+          description: { type: SchemaType.STRING, description: "Deskripsi tambahan" },
           departureDates: {
             type: SchemaType.ARRAY,
             items: { type: SchemaType.STRING },
-            description: "ARRAY SEMUA TANGGAL KEBERANGKATAN. Hitung & ekstrak seluruh tanggal (cth 4, 5, 6 tanggal). Format: YYYY-MM-DD."
+            description: "ARRAY SEMUA TANGGAL KEBERANGKATAN dari Flyer Utama (Format: YYYY-MM-DD)"
           }
         },
         required: ["title", "packageType", "durationDays", "departureCity", "airline", "departureDates", "landingRoute"]
