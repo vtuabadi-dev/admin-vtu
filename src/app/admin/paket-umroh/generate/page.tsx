@@ -617,8 +617,12 @@ export default function GeneratePaketPage() {
         }
 
         // ── 5. HOTEL MATCHING ──
-        let mappedHotelMekkah = matchHotel(result.hotelMekkah, mekkahHotels);
-        let mappedHotelMadinah = matchHotel(result.hotelMadinah, madinahHotels);
+        const allHotelsList = options?.hotels || [];
+        const mekkahHotelsList = mekkahHotels.length > 0 ? mekkahHotels : allHotelsList;
+        const madinahHotelsList = madinahHotels.length > 0 ? madinahHotels : allHotelsList;
+
+        let mappedHotelMekkah = matchHotel(result.hotelMekkah, mekkahHotelsList);
+        let mappedHotelMadinah = matchHotel(result.hotelMadinah, madinahHotelsList);
 
         // ── 6. MERGE FIELDS INTO FORM ──
         if (result.title) finalFormData.namaPaket = result.title;
@@ -658,8 +662,8 @@ export default function GeneratePaketPage() {
 
             if (matchedClusterObj) {
               const cId = matchedClusterObj.id;
-              const cMekkahId = matchHotel(cItem.hotelMekkah, mekkahHotels);
-              const cMadinahId = matchHotel(cItem.hotelMadinah, madinahHotels);
+              const cMekkahId = matchHotel(cItem.hotelMekkah, mekkahHotelsList);
+              const cMadinahId = matchHotel(cItem.hotelMadinah, madinahHotelsList);
               const cHargaBase = String(cItem.hargaBase || "").replace(/\D/g, "");
               const cUpgradeDouble = String(cItem.upgradeDouble || "").replace(/\D/g, "");
               const cUpgradeTriple = String(cItem.upgradeTriple || "").replace(/\D/g, "");

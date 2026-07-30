@@ -26,19 +26,44 @@ export async function extractWithGemini(
     masterDataService.getHotels({ isActive: true, limit: 100 }),
   ]);
 
+  // Extract master data options
   const airlineOptions = airlines.data.map(a => a.name).join(", ");
   const cityOptions = cities.data.map(c => c.name).join(", ");
   const typeOptions = packageTypes.data.map(t => t.name).join(", ");
   const routeOptions = routes.data.map(r => `${r.ruteIn} -> ${r.ruteOut}`).join(", ");
   
-  const mekkahCity = cities.data.find(c => c.code === "MEK" || c.name.toLowerCase() === "mekkah");
-  const madinahCity = cities.data.find(c => c.code === "MED" || c.name.toLowerCase() === "madinah");
-  const mekkahHotels = hotels.data.filter(h => h.cityId === mekkahCity?.id).map(h => h.name).join(", ");
-  const madinahHotels = hotels.data.filter(h => h.cityId === madinahCity?.id).map(h => h.name).join(", ");
+  // Extract all hotel names from Master Hotel table
+  const allMasterHotelNames = hotels.data.map(h => h.name);
+
+  // Filter hotels for Mekkah & Madinah
+  const mekkahHotelsList = hotels.data.filter(h => {
+    const hName = (h.name || "").toLowerCase();
+    const cName = (h.city?.name || "").toLowerCase();
+    const cCode = (h.city?.code || "").toLowerCase();
+    return cCode === "mek" || cCode === "mkh" || cCode === "mak" ||
+           cName.includes("mekkah") || cName.includes("makkah") || cName.includes("mecca") ||
+           hName.includes("makkah") || hName.includes("mekkah") || hName.includes("mecca");
+  });
+
+  const madinahHotelsList = hotels.data.filter(h => {
+    const hName = (h.name || "").toLowerCase();
+    const cName = (h.city?.name || "").toLowerCase();
+    const cCode = (h.city?.code || "").toLowerCase();
+    return cCode === "med" || cCode === "mdn" ||
+           cName.includes("madinah") || cName.includes("medina") ||
+           hName.includes("madinah") || hName.includes("medina") || hName.includes("nabawi") || hName.includes("ohud");
+  });
+
+  const mekkahHotelsStr = (mekkahHotelsList.length > 0 ? mekkahHotelsList.map(h => h.name) : allMasterHotelNames).join(", ");
+  const madinahHotelsStr = (madinahHotelsList.length > 0 ? madinahHotelsList.map(h => h.name) : allMasterHotelNames).join(", ");
+  const allHotelsStr = allMasterHotelNames.join(", ");
 
   const imageBuffer = fs.readFileSync(imagePath);
   const base64Image = imageBuffer.toString("base64");
   const mimeType = "image/jpeg";
+
+  // Filter out OCR error strings if vision provider is not configured
+  const cleanOcrText = rawOcrText.includes("No OCR providers configured") ? "" : rawOcrText;
 
   const prompt = `Kamu adalah sistem AI data entry travel umroh yang sangat teliti. Analisa GAMBAR FLYER UTAMA (GAMBAR TERLAMPIR), TEKS OCR, dan TEKS CAPTION dengan mengikuti ATURAN HIRARKI PENGAMBILAN DATA berikut.\n\n` +
     `==========================================================\n` +
@@ -54,9 +79,11 @@ export async function extractWithGemini(
     `  - Jika ada kata "Solo", "Surakarta", "SOC", WAJIB isi 'departureCity' dengan "Solo".\n` +
     `  - Pilihan kota WAJIB dari daftar ini -> [${cityOptions}]\n` +
     `• Maskapai: WAJIB AMBIL MASKAPAI INTERNASIONAL UTAMA (Carrier Penerbangan ke Saudi / Timur Tengah, cth: Saudia Airlines, Garuda Indonesia, Royal Brunei, Emirates, Qatar Airways, Turkish Airlines, Oman Air, Etihad, Flynas, Lion Air). SANGAT DILARANG MENGAMBIL MASKAPAI DOMESTIK / FEEDER FLIGHT (seperti Pelita Air, Super Air Jet, Citilink Domestik). Jika caption/flyer menyebutkan "starting Surabaya by Pelita Airline" dan "starting Jakarta by Saudia Airlines", WAJIB PILIH SAUDIA AIRLINES! Maskapai WAJIB dari -> [${airlineOptions}]\n` +
-    `• Hotel Mekkah & Madinah: Cari nama hotel untuk setiap klaster/kelas kamar dari daftar:\n` +
-    `  - Hotel Mekkah: [${mekkahHotels}]\n` +
-    `  - Hotel Madinah: [${madinahHotels}]\n` +
+    `• Hotel Mekkah & Madinah: Cari nama hotel untuk setiap klaster/kelas kamar. PILIH NAMA HOTEL YANG PALING SESUAI DARI REFERENSI MASTER HOTEL BERIKUT:\n` +
+    `  - Referensi Master Hotel Mekkah: [${mekkahHotelsStr}]\n` +
+    `  - Referensi Master Hotel Madinah: [${madinahHotelsStr}]\n` +
+    `  - Seluruh Master Hotel: [${allHotelsStr}]\n` +
+    `  - Jika nama hotel pada flyer mirip (cth: "Anjum Makkah 5*"), pilih persis nama yang ada di Referensi Master Hotel (cth: "ANJUM HOTEL MAKKAH").\n` +
     `• Harga Base Paket: Ekstrak harga dasar paket (klaster ataupun non-klaster) dari flyer (hanya angka nominal).\n` +
     `• Tanggal Keberangkatan: Cari dan kumpulkan SEMUA tanggal keberangkatan yang ada di flyer utama (bisa 1, 2, 4, 5, 6 atau lebih tanggal). Format wajib YYYY-MM-DD.\n\n` +
     `==========================================================\n` +
@@ -101,7 +128,7 @@ export async function extractWithGemini(
     `  6. Upgrade Triple klaster (dari caption rincian per klaster, cth: Sekamar Bertiga Platinum: + Rp 5.000.000 -> 5000000).\n` +
     `• Masukkan SELURUH KLASTER yang ditemukan pada flyer & caption ke dalam array 'clusters'.\n\n` +
     `--- DATA UNTUK DIANALISA ---\n` +
-    `1. TEKS HASIL SCAN OCR: ${rawOcrText}\n\n` +
+    `1. TEKS HASIL SCAN OCR: ${cleanOcrText}\n\n` +
     `2. TEKS CAPTION: ${caption}\n\n` +
     `3. GAMBAR FLYER UTAMA (Telah dilampirkan): Analisa visual flyer utama & rute itinerary.`;
 
