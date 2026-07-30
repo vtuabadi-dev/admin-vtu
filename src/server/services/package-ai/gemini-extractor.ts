@@ -1,6 +1,6 @@
 import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
-import fs from "fs";
-import { masterDataService } from "@/server/services/master-data.service";
+import * as fs from "fs";
+import { masterDataService } from "../master-data.service";
 import type { PackageExtractionResult } from "./types";
 
 const getGeminiApiKey = () => {
