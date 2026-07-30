@@ -21,7 +21,15 @@ import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X } from "luc
     clusters?: any[];
   }
   
-  export default function GeneratePaketPage() {
+interface DepartureDateRowState {
+  departureDate: string;
+  arrivalDate: string;
+  source: 'OCR' | 'Manual' | '-';
+  status: 'Generated' | 'Edited' | '-';
+  isManualOverride: boolean;
+}
+
+export default function GeneratePaketPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -104,37 +112,94 @@ import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X } from "luc
     upgradeTriple: "",
   });
 
-  // Multiple Departure Dates State: Auto-expanding inputs array
-  const [departureDateInputs, setDepartureDateInputs] = useState<string[]>([""]);
+  const [departureDateRows, setDepartureDateRows] = useState<DepartureDateRowState[]>([
+    { departureDate: "", arrivalDate: "", source: "-", status: "-", isManualOverride: false }
+  ]);
 
   // Derived departure dates list (non-empty dates only)
   const departureDates = useMemo(() => {
-    return departureDateInputs.filter(d => d.trim() !== "");
-  }, [departureDateInputs]);
+    return departureDateRows
+      .map(r => r.departureDate)
+      .filter(d => d && d.trim() !== "");
+  }, [departureDateRows]);
 
-  const handleDateInputChange = (index: number, val: string) => {
-    setDepartureDateInputs(prev => {
-      const next = [...prev];
-      next[index] = val;
-      const filled = next.filter(d => d.trim() !== "");
-      return [...filled, ""];
-    });
-  };
-
-  const handleRemoveDateInput = (index: number) => {
-    setDepartureDateInputs(prev => {
-      const next = prev.filter((_, idx) => idx !== index);
-      const filled = next.filter(d => d.trim() !== "");
-      return [...filled, ""];
-    });
-  };
-
-  const calculateReturnDate = (depDateStr: string, durDaysStr: string) => {
+  const calculateReturnDate = (depDateStr: string, durDaysStr: string): string => {
     if (!depDateStr) return "";
     const date = new Date(depDateStr);
     const days = parseInt(durDaysStr, 10) || 9;
-    date.setDate(date.getDate() + days - 1);
-    return date.toISOString().split("T")[0];
+    date.setDate(date.getDate() + Math.max(0, days - 1));
+    return date.toISOString().split("T")[0] || "";
+  };
+
+  const handleDepartureDateChange = (index: number, val: string) => {
+    setDepartureDateRows(prev => {
+      const next = [...prev];
+      const curr = next[index] || { departureDate: "", arrivalDate: "", source: "Manual", status: "Generated", isManualOverride: false };
+      
+      let arrDate = curr.arrivalDate;
+      if (!curr.isManualOverride) {
+        arrDate = val ? calculateReturnDate(val, formData.durasiHari) : "";
+      } else if (curr.isManualOverride && val && window.confirm("Tanggal Kepulangan telah diubah secara manual. Apakah Anda ingin menghitung ulang secara otomatis?")) {
+        arrDate = calculateReturnDate(val, formData.durasiHari);
+        curr.isManualOverride = false;
+      }
+
+      next[index] = {
+        ...curr,
+        departureDate: val,
+        arrivalDate: arrDate,
+        source: curr.source === "-" ? "Manual" : curr.source,
+        status: curr.isManualOverride ? "Edited" : (val ? "Generated" : "-"),
+      };
+
+      // Auto Row (BR-DATE-04): ensure last row is always empty
+      const filled = next.filter(r => r.departureDate.trim() !== "" || r.arrivalDate.trim() !== "");
+      return [
+        ...filled,
+        { departureDate: "", arrivalDate: "", source: "-", status: "-", isManualOverride: false }
+      ];
+    });
+  };
+
+  const handleArrivalDateChange = (index: number, val: string) => {
+    setDepartureDateRows(prev => {
+      const next = [...prev];
+      const curr = next[index] || { departureDate: "", arrivalDate: "", source: "Manual", status: "Generated", isManualOverride: false };
+      
+      next[index] = {
+        ...curr,
+        arrivalDate: val,
+        status: val ? "Edited" : curr.status,
+        isManualOverride: true,
+      };
+      return next;
+    });
+  };
+
+  const handleRecalculateArrival = (index: number) => {
+    setDepartureDateRows(prev => {
+      const next = [...prev];
+      const curr = next[index];
+      if (!curr || !curr.departureDate) return prev;
+      next[index] = {
+        ...curr,
+        arrivalDate: calculateReturnDate(curr.departureDate, formData.durasiHari),
+        status: "Generated",
+        isManualOverride: false,
+      };
+      return next;
+    });
+  };
+
+  const handleRemoveDateRow = (index: number) => {
+    setDepartureDateRows(prev => {
+      const next = prev.filter((_, idx) => idx !== index);
+      const filled = next.filter(r => r.departureDate.trim() !== "" || r.arrivalDate.trim() !== "");
+      return [
+        ...filled,
+        { departureDate: "", arrivalDate: "", source: "-", status: "-", isManualOverride: false }
+      ];
+    });
   };
 
   const handleAutoGenerateName = () => {
@@ -605,7 +670,15 @@ import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X } from "luc
             .filter((d: string): d is string => Boolean(d));
           if (extractedDates.length > 0) {
             const sortedDates: string[] = Array.from(new Set(extractedDates)).sort();
-            setDepartureDateInputs([...sortedDates, ""]);
+            const ocrRows: DepartureDateRowState[] = sortedDates.map(dateStr => ({
+              departureDate: dateStr,
+              arrivalDate: calculateReturnDate(dateStr, finalFormData.durasiHari),
+              source: "OCR",
+              status: "Generated",
+              isManualOverride: false,
+            }));
+            ocrRows.push({ departureDate: "", arrivalDate: "", source: "-", status: "-", isManualOverride: false });
+            setDepartureDateRows(ocrRows);
             setOcrDateInfo({
               count: sortedDates.length,
               dates: sortedDates,
@@ -614,7 +687,10 @@ import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X } from "luc
         } else if (result.departureDates && typeof result.departureDates === "string") {
           const d = (result.departureDates as string).split("T")[0];
           if (d) {
-            setDepartureDateInputs([d, ""]);
+            setDepartureDateRows([
+              { departureDate: d, arrivalDate: calculateReturnDate(d, finalFormData.durasiHari), source: "OCR", status: "Generated", isManualOverride: false },
+              { departureDate: "", arrivalDate: "", source: "-", status: "-", isManualOverride: false }
+            ]);
             setOcrDateInfo({
               count: 1,
               dates: [d],
@@ -742,7 +818,7 @@ import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X } from "luc
           upgradeDouble: "",
           upgradeTriple: "",
         });
-        setDepartureDateInputs([""]);
+        setDepartureDateRows([{ departureDate: "", arrivalDate: "", source: "-", status: "-", isManualOverride: false }]);
         setClusterConfigs({
           "K1": { hotelMekkahId: "", hotelMadinahId: "", hargaBase: "", upgradeDouble: "", upgradeTriple: "" },
           "K2": { hotelMekkahId: "", hotelMadinahId: "", hargaBase: "", upgradeDouble: "", upgradeTriple: "" },
@@ -1197,80 +1273,94 @@ import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X } from "luc
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 pt-1">
-                {departureDateInputs.map((dateVal, index) => {
-                  const isRequired = index === 0;
-                  const returnDateStr = dateVal ? calculateReturnDate(dateVal, formData.durasiHari) : "";
-                  const formattedReturn = returnDateStr ? formatDateIndo(returnDateStr) : "";
+              {/* Departure Dates Table Layout (CR-03 & CR-06 BR-DATE-01..04) */}
+              <div className="overflow-x-auto border rounded-xl shadow-xs bg-card pt-1">
+                <table className="w-full text-xs text-left">
+                  <thead className="bg-emerald-50/70 dark:bg-emerald-950/40 text-emerald-900 dark:text-emerald-200 uppercase text-[10px] font-extrabold border-b border-emerald-200/60 dark:border-emerald-800/60">
+                    <tr>
+                      <th className="px-3 py-2.5 text-center w-12">No</th>
+                      <th className="px-3 py-2.5">Tanggal Keberangkatan</th>
+                      <th className="px-3 py-2.5">Tanggal Kepulangan (Editable)</th>
+                      <th className="px-3 py-2.5 text-center w-24">Sumber</th>
+                      <th className="px-3 py-2.5 text-center w-28">Status</th>
+                      <th className="px-3 py-2.5 text-center w-16">Aksi</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border/60">
+                    {departureDateRows.map((row, index) => {
+                      const isLastEmpty = index === departureDateRows.length - 1 && !row.departureDate && !row.arrivalDate;
 
-                  return (
-                    <div 
-                      key={index} 
-                      className={cn(
-                        "p-3 bg-card border rounded-lg flex flex-col gap-2 relative transition-all shadow-xs",
-                        isRequired && !dateVal ? "border-red-300 bg-red-50/10" : "hover:border-emerald-400 focus-within:border-emerald-500"
-                      )}
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5">
-                          Tanggal #{index + 1}
-                          {isRequired ? (
-                            <span className="text-[10px] font-bold text-red-600 bg-red-50 border border-red-200 px-1.5 py-0.5 rounded">
-                              Wajib
+                      return (
+                        <tr key={index} className={cn("hover:bg-muted/30 transition-colors", isLastEmpty && "bg-muted/10")}>
+                          <td className="px-3 py-2 text-center font-bold text-muted-foreground">
+                            {index + 1}
+                          </td>
+                          <td className="px-3 py-2">
+                            <Input
+                              type="date"
+                              value={row.departureDate}
+                              onChange={(e) => handleDepartureDateChange(index, e.target.value)}
+                              className="h-8 text-xs font-mono max-w-[170px]"
+                            />
+                          </td>
+                          <td className="px-3 py-2">
+                            <div className="flex items-center gap-1.5">
+                              <Input
+                                type="date"
+                                value={row.arrivalDate}
+                                onChange={(e) => handleArrivalDateChange(index, e.target.value)}
+                                className={cn(
+                                  "h-8 text-xs font-mono max-w-[170px]",
+                                  row.isManualOverride && "border-amber-400 bg-amber-50/40 text-amber-950 font-semibold dark:bg-amber-950/30 dark:text-amber-200"
+                                )}
+                              />
+                              {row.isManualOverride && row.departureDate && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleRecalculateArrival(index)}
+                                  className="text-[10px] text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950 border border-amber-300 dark:border-amber-700 hover:bg-amber-100 px-1.5 py-1 rounded transition-colors flex items-center gap-1 whitespace-nowrap"
+                                  title="Hitung ulang tanggal kepulangan secara otomatis"
+                                >
+                                  ↻ Hitung Ulang
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-3 py-2 text-center">
+                            <span className={cn(
+                              "px-2 py-0.5 rounded text-[10px] font-bold border inline-block",
+                              row.source === "OCR" ? "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950 dark:text-blue-200 dark:border-blue-800" :
+                              row.source === "Manual" ? "bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950 dark:text-purple-200 dark:border-purple-800" : "bg-muted text-muted-foreground border-transparent"
+                            )}>
+                              {row.source}
                             </span>
-                          ) : (
-                            <span className="text-[10px] text-muted-foreground bg-muted border px-1.5 py-0.5 rounded">
-                              Opsional
+                          </td>
+                          <td className="px-3 py-2 text-center">
+                            <span className={cn(
+                              "px-2 py-0.5 rounded text-[10px] font-bold border inline-block",
+                              row.status === "Edited" ? "bg-amber-50 text-amber-800 border-amber-300 dark:bg-amber-950 dark:text-amber-200 dark:border-amber-800" :
+                              row.status === "Generated" ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-200 dark:border-emerald-800" : "bg-muted text-muted-foreground border-transparent"
+                            )}>
+                              {row.status}
                             </span>
-                          )}
-                        </span>
-                        {departureDateInputs.length > 1 && (index > 0 || dateVal !== "") && (
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveDateInput(index)}
-                            className="text-xs font-medium text-red-500 hover:text-red-700 hover:bg-red-50 px-1.5 py-0.5 rounded transition-colors"
-                            title="Hapus kolom tanggal ini"
-                          >
-                            Hapus
-                          </button>
-                        )}
-                      </div>
-
-                      <Input 
-                        id={`field-departureDate-${index}`} 
-                        type="date" 
-                        value={dateVal} 
-                        onChange={(e) => handleDateInputChange(index, e.target.value)} 
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") {
-                            e.preventDefault();
-                            const nextEl = document.getElementById(`field-departureDate-${index + 1}`);
-                            if (nextEl) {
-                              nextEl.focus();
-                            } else {
-                              focusNextId("field-kapasitas");
-                            }
-                          }
-                        }}
-                        className={cn(
-                          "h-9 text-xs font-medium",
-                          isRequired && !dateVal && "border-red-300"
-                        )}
-                      />
-
-                      {dateVal ? (
-                        <div className="text-[11px] text-emerald-800 font-medium bg-emerald-50/80 border border-emerald-200/80 px-2 py-1 rounded flex items-center justify-between">
-                          <span>Pulang:</span>
-                          <strong className="text-emerald-950">{formattedReturn}</strong>
-                        </div>
-                      ) : (
-                        <div className="text-[11px] text-muted-foreground italic px-1">
-                          {isRequired ? "Pilih tanggal utama..." : "Isi untuk tambah lagi..."}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
+                          </td>
+                          <td className="px-3 py-2 text-center">
+                            {!isLastEmpty && (
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveDateRow(index)}
+                                className="text-xs text-muted-foreground hover:text-red-600 p-1 rounded hover:bg-red-50 dark:hover:bg-red-950 transition-colors"
+                                title="Hapus Baris Tanggal"
+                              >
+                                ✕
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
             </div>
 
@@ -1646,67 +1736,94 @@ import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X } from "luc
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 pt-1">
-              {departureDateInputs.map((dateVal, index) => {
-                const isRequired = index === 0;
-                const returnDateStr = dateVal ? calculateReturnDate(dateVal, formData.durasiHari) : "";
-                const formattedReturn = returnDateStr ? formatDateIndo(returnDateStr) : "";
+            {/* Departure Dates Table Layout (CR-03 & CR-06 BR-DATE-01..04) */}
+            <div className="overflow-x-auto border rounded-xl shadow-xs bg-card pt-1">
+              <table className="w-full text-xs text-left">
+                <thead className="bg-emerald-50/70 dark:bg-emerald-950/40 text-emerald-900 dark:text-emerald-200 uppercase text-[10px] font-extrabold border-b border-emerald-200/60 dark:border-emerald-800/60">
+                  <tr>
+                    <th className="px-3 py-2.5 text-center w-12">No</th>
+                    <th className="px-3 py-2.5">Tanggal Keberangkatan</th>
+                    <th className="px-3 py-2.5">Tanggal Kepulangan (Editable)</th>
+                    <th className="px-3 py-2.5 text-center w-24">Sumber</th>
+                    <th className="px-3 py-2.5 text-center w-28">Status</th>
+                    <th className="px-3 py-2.5 text-center w-16">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border/60">
+                  {departureDateRows.map((row, index) => {
+                    const isLastEmpty = index === departureDateRows.length - 1 && !row.departureDate && !row.arrivalDate;
 
-                return (
-                  <div 
-                    key={index} 
-                    className={cn(
-                      "p-3 bg-card border rounded-lg flex flex-col gap-2 relative transition-all shadow-xs",
-                      isRequired && !dateVal ? "border-red-300 bg-red-50/10" : "hover:border-emerald-400 focus-within:border-emerald-500"
-                    )}
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5">
-                        Tanggal #{index + 1}
-                        {isRequired ? (
-                          <span className="text-[10px] font-bold text-red-600 bg-red-50 border border-red-200 px-1.5 py-0.5 rounded">
-                            Wajib
+                    return (
+                      <tr key={index} className={cn("hover:bg-muted/30 transition-colors", isLastEmpty && "bg-muted/10")}>
+                        <td className="px-3 py-2 text-center font-bold text-muted-foreground">
+                          {index + 1}
+                        </td>
+                        <td className="px-3 py-2">
+                          <Input
+                            type="date"
+                            value={row.departureDate}
+                            onChange={(e) => handleDepartureDateChange(index, e.target.value)}
+                            className="h-8 text-xs font-mono max-w-[170px]"
+                          />
+                        </td>
+                        <td className="px-3 py-2">
+                          <div className="flex items-center gap-1.5">
+                            <Input
+                              type="date"
+                              value={row.arrivalDate}
+                              onChange={(e) => handleArrivalDateChange(index, e.target.value)}
+                              className={cn(
+                                "h-8 text-xs font-mono max-w-[170px]",
+                                row.isManualOverride && "border-amber-400 bg-amber-50/40 text-amber-950 font-semibold dark:bg-amber-950/30 dark:text-amber-200"
+                              )}
+                            />
+                            {row.isManualOverride && row.departureDate && (
+                              <button
+                                type="button"
+                                onClick={() => handleRecalculateArrival(index)}
+                                className="text-[10px] text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950 border border-amber-300 dark:border-amber-700 hover:bg-amber-100 px-1.5 py-1 rounded transition-colors flex items-center gap-1 whitespace-nowrap"
+                                title="Hitung ulang tanggal kepulangan secara otomatis"
+                              >
+                                ↻ Hitung Ulang
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-3 py-2 text-center">
+                          <span className={cn(
+                            "px-2 py-0.5 rounded text-[10px] font-bold border inline-block",
+                            row.source === "OCR" ? "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950 dark:text-blue-200 dark:border-blue-800" :
+                            row.source === "Manual" ? "bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950 dark:text-purple-200 dark:border-purple-800" : "bg-muted text-muted-foreground border-transparent"
+                          )}>
+                            {row.source}
                           </span>
-                        ) : (
-                          <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
-                            Opsional
+                        </td>
+                        <td className="px-3 py-2 text-center">
+                          <span className={cn(
+                            "px-2 py-0.5 rounded text-[10px] font-bold border inline-block",
+                            row.status === "Edited" ? "bg-amber-50 text-amber-800 border-amber-300 dark:bg-amber-950 dark:text-amber-200 dark:border-amber-800" :
+                            row.status === "Generated" ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-200 dark:border-emerald-800" : "bg-muted text-muted-foreground border-transparent"
+                          )}>
+                            {row.status}
                           </span>
-                        )}
-                      </span>
-                      {index > 0 && (
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveDateInput(index)}
-                          className="text-xs text-muted-foreground hover:text-red-600 p-0.5 rounded hover:bg-red-50 transition-colors"
-                          title="Hapus Tanggal Ini"
-                        >
-                          ✕
-                        </button>
-                      )}
-                    </div>
-
-                    <Input 
-                      type="date"
-                      value={dateVal}
-                      onChange={(e) => handleDateInputChange(index, e.target.value)}
-                      className="h-9 text-xs"
-                    />
-
-                    {dateVal && (
-                      <div className="mt-1 p-2 bg-emerald-50/70 dark:bg-emerald-950/30 border border-emerald-200/80 rounded text-[11px] space-y-1">
-                        <div className="flex items-center justify-between text-emerald-900 dark:text-emerald-100 font-semibold">
-                          <span>✈ Keberangkatan:</span>
-                          <span>{formatDateIndo(dateVal)}</span>
-                        </div>
-                        <div className="flex items-center justify-between text-emerald-800 dark:text-emerald-300">
-                          <span>🛬 Kepulangan ({formData.durasiHari || 9}H):</span>
-                          <span>{formattedReturn || "-"}</span>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
+                        </td>
+                        <td className="px-3 py-2 text-center">
+                          {!isLastEmpty && (
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveDateRow(index)}
+                              className="text-xs text-muted-foreground hover:text-red-600 p-1 rounded hover:bg-red-50 dark:hover:bg-red-950 transition-colors"
+                              title="Hapus Baris Tanggal"
+                            >
+                              ✕
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
           </div>
 
