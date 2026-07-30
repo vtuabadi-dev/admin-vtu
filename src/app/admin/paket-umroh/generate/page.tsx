@@ -464,30 +464,54 @@ export default function GeneratePaketPage() {
     return match ? match.id : "";
   };
 
-  const matchHotel = (name: string, list: any[]) => {
-    if (!name || !list || list.length === 0) return "";
-    const clean = name.toLowerCase().replace(/[^a-z0-9\s]/g, "").trim();
-    if (!clean) return "";
+  const calculateSimilarity = (str1: string, str2: string): number => {
+    if (!str1 || !str2) return 0;
+    const s1 = str1.toLowerCase().replace(/[^a-z0-9\s]/g, "").trim();
+    const s2 = str2.toLowerCase().replace(/[^a-z0-9\s]/g, "").trim();
+    if (!s1 || !s2) return 0;
+    if (s1 === s2) return 1.0;
+    if (s1.includes(s2) || s2.includes(s1)) return 0.85;
 
-    // 1. Direct substring search
-    let match = list.find(item => {
-      const nClean = (item.name || "").toLowerCase().replace(/[^a-z0-9\s]/g, "");
-      return nClean.includes(clean) || clean.includes(nClean);
-    });
+    const stopWords = new Set(["hotel", "makkah", "mekkah", "madinah", "medina", "star", "bintang", "room", "resort", "suite", "suites", "tower", "towers"]);
+    const words1 = s1.split(/\s+/).filter(w => w.length >= 3 && !stopWords.has(w));
+    const words2 = s2.split(/\s+/).filter(w => w.length >= 3 && !stopWords.has(w));
 
-    // 2. Token overlap search (e.g. "anjum" in "Anjum Hotel Makkah")
-    if (!match) {
-      const stopWords = ["hotel", "makkah", "mekkah", "madinah", "medina", "star", "bintang", "room", "resort", "suite", "suites", "tower", "towers"];
-      const tokens = clean.split(/\s+/).filter(t => t.length >= 3 && !stopWords.includes(t));
-      if (tokens.length > 0) {
-        match = list.find(item => {
-          const nClean = (item.name || "").toLowerCase();
-          return tokens.some(t => nClean.includes(t));
-        });
+    if (words1.length === 0 || words2.length === 0) {
+      const rawW1 = s1.split(/\s+/).filter(w => w.length >= 3);
+      const rawW2 = s2.split(/\s+/).filter(w => w.length >= 3);
+      if (rawW1.length === 0 || rawW2.length === 0) return 0;
+      let matches = 0;
+      for (const w1 of rawW1) {
+        if (rawW2.some(w2 => w2.includes(w1) || w1.includes(w2))) matches++;
+      }
+      return (2.0 * matches) / (rawW1.length + rawW2.length);
+    }
+
+    let matches = 0;
+    for (const w1 of words1) {
+      if (words2.some(w2 => w2.includes(w1) || w1.includes(w2))) {
+        matches++;
       }
     }
 
-    return match ? match.id : "";
+    return (2.0 * matches) / (words1.length + words2.length);
+  };
+
+  const matchHotel = (name: string, list: any[]) => {
+    if (!name || !list || list.length === 0) return "";
+    let bestMatchId = "";
+    let highestScore = 0;
+
+    for (const item of list) {
+      const score = calculateSimilarity(name, item.name || "");
+      if (score > highestScore) {
+        highestScore = score;
+        bestMatchId = item.id;
+      }
+    }
+
+    // Minimum threshold score of 0.20 to select best match with highest similarity
+    return highestScore >= 0.20 ? bestMatchId : "";
   };
 
   // OCR Processing Handler

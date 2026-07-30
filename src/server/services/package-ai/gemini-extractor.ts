@@ -79,11 +79,11 @@ export async function extractWithGemini(
     `  - Jika ada kata "Solo", "Surakarta", "SOC", WAJIB isi 'departureCity' dengan "Solo".\n` +
     `  - Pilihan kota WAJIB dari daftar ini -> [${cityOptions}]\n` +
     `• Maskapai: WAJIB AMBIL MASKAPAI INTERNASIONAL UTAMA (Carrier Penerbangan ke Saudi / Timur Tengah, cth: Saudia Airlines, Garuda Indonesia, Royal Brunei, Emirates, Qatar Airways, Turkish Airlines, Oman Air, Etihad, Flynas, Lion Air). SANGAT DILARANG MENGAMBIL MASKAPAI DOMESTIK / FEEDER FLIGHT (seperti Pelita Air, Super Air Jet, Citilink Domestik). Jika caption/flyer menyebutkan "starting Surabaya by Pelita Airline" dan "starting Jakarta by Saudia Airlines", WAJIB PILIH SAUDIA AIRLINES! Maskapai WAJIB dari -> [${airlineOptions}]\n` +
-    `• Hotel Mekkah & Madinah: Cari nama hotel untuk setiap klaster/kelas kamar. PILIH NAMA HOTEL YANG PALING SESUAI DARI REFERENSI MASTER HOTEL BERIKUT:\n` +
+    `• Hotel Mekkah & Madinah: Cari nama hotel untuk setiap klaster/kelas kamar pada flyer & caption. DILARANG MENUNTUT KECAMATAN 100% PERSIS. BANDINGKAN TEKS HOTEL DI FLYER DENGAN DAFTAR REFERENSI MASTER HOTEL BERIKUT, DAN WAJIB PILIH NAMA HOTEL YANG MEMILIKI KEMIRIPAN (SIMILARITY) TERTINGGI:\n` +
     `  - Referensi Master Hotel Mekkah: [${mekkahHotelsStr}]\n` +
     `  - Referensi Master Hotel Madinah: [${madinahHotelsStr}]\n` +
     `  - Seluruh Master Hotel: [${allHotelsStr}]\n` +
-    `  - Jika nama hotel pada flyer mirip (cth: "Anjum Makkah 5*"), pilih persis nama yang ada di Referensi Master Hotel (cth: "ANJUM HOTEL MAKKAH").\n` +
+    `  - ATURAN SIMILARITY: Jika di flyer/caption tertulis misal "Anjum Makkah 5*", "Hotel Anjum", "Anjum 5*", atau "Anjum Tower", PILIH PERSIS NAMA "ANJUM HOTEL MAKKAH" dari daftar di atas karena memiliki similarity tertinggi!\n` +
     `• Harga Base Paket: Ekstrak harga dasar paket (klaster ataupun non-klaster) dari flyer (hanya angka nominal).\n` +
     `• Tanggal Keberangkatan: Cari dan kumpulkan SEMUA tanggal keberangkatan yang ada di flyer utama (bisa 1, 2, 4, 5, 6 atau lebih tanggal). Format wajib YYYY-MM-DD.\n\n` +
     `==========================================================\n` +
