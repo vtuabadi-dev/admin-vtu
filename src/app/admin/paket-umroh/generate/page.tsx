@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/shared/components/ui/Button";
 import { Input } from "@/shared/components/ui/Input";
 import { SearchableSelect } from "@/shared/components/ui/SearchableSelect";
-import { cn, formatNumberWithDots, formatDateDdMmmmTttt } from "@/shared/lib/utils";
+import { cn, formatNumberWithDots, formatDateDdMmmmTttt, normalizeToIsoDate } from "@/shared/lib/utils";
 import { 
   MOCK_LANDING_PATTERN, 
   MOCK_KLASTER
@@ -713,7 +713,7 @@ export default function GeneratePaketPage() {
         // ── 8. DEPARTURE DATES ──
         if (result.departureDates && Array.isArray(result.departureDates)) {
           const extractedDates: string[] = result.departureDates
-            .map((d: any) => String(d).split("T")[0])
+            .map((d: any) => normalizeToIsoDate(String(d).split("T")[0] ?? ""))
             .filter((d: string): d is string => Boolean(d));
           if (extractedDates.length > 0) {
             const sortedDates: string[] = Array.from(new Set(extractedDates)).sort();
@@ -732,7 +732,7 @@ export default function GeneratePaketPage() {
             });
           }
         } else if (result.departureDates && typeof result.departureDates === "string") {
-          const d = (result.departureDates as string).split("T")[0];
+          const d = normalizeToIsoDate((result.departureDates as string).split("T")[0] ?? "");
           if (d) {
             setDepartureDateRows([
               { departureDate: d, arrivalDate: calculateReturnDate(d, finalFormData.durasiHari), source: "OCR", status: "Generated", isManualOverride: false },
