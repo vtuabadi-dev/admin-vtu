@@ -273,6 +273,25 @@ function ProvidersTab() {
     }
   };
 
+  const handleReactivate = async (id: string, label: string) => {
+    try {
+      const res = await fetch(`/api/admin/ocr/providers/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "reactivate" }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert(`🎉 Provider ${label} berhasil diaktifkan kembali (status Active)!`);
+        fetchProviders();
+      } else {
+        alert("Gagal mengaktifkan kembali: " + data.message);
+      }
+    } catch (err) {
+      alert("Gagal mengaktifkan kembali: " + (err as Error).message);
+    }
+  };
+
   const handleTest = async (id: string) => {
     setTestingId(id);
     try {
@@ -350,17 +369,22 @@ function ProvidersTab() {
                   <td className="px-4 py-2.5 text-right font-mono text-xs">{formatMs(p.averageLatencyMs)}</td>
                   <td className="px-4 py-2.5">
                     <div className="flex items-center justify-center gap-1">
-                      <button onClick={() => handleTest(p.id)} disabled={testingId === p.id} className="p-1 hover:bg-muted rounded" title="Test Connection">
+                      <button onClick={() => handleTest(p.id)} disabled={testingId === p.id} className="p-1 hover:bg-muted rounded text-slate-400 hover:text-white" title="Test Connection">
                         {testingId === p.id ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <Activity className="h-3.5 w-3.5" />}
                       </button>
-                      <button onClick={() => { setEditing(p); setModalOpen(true); }} className="p-1 hover:bg-muted rounded" title="Edit">
+                      {p.healthStatus !== "active" && (
+                        <button onClick={() => handleReactivate(p.id, p.label)} className="p-1 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 rounded border border-emerald-500/30" title="Aktifkan Kembali Status (Reset Health Status ke Active)">
+                          <Zap className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+                      <button onClick={() => { setEditing(p); setModalOpen(true); }} className="p-1 hover:bg-muted rounded text-slate-400 hover:text-white" title="Edit">
                         <Edit3 className="h-3.5 w-3.5" />
                       </button>
                       <button onClick={() => handleToggle(p.id)} className="p-1 hover:bg-muted rounded" title={p.isActive ? "Nonaktifkan" : "Aktifkan"}>
-                        {p.isActive ? <PowerOff className="h-3.5 w-3.5 text-warning" /> : <Power className="h-3.5 w-3.5 text-success" />}
+                        {p.isActive ? <PowerOff className="h-3.5 w-3.5 text-amber-400" /> : <Power className="h-3.5 w-3.5 text-emerald-400" />}
                       </button>
-                      <button onClick={() => handleDelete(p.id)} className="p-1 hover:bg-muted rounded" title="Hapus">
-                        <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                      <button onClick={() => handleDelete(p.id)} className="p-1 hover:bg-muted rounded text-red-400 hover:text-red-300" title="Hapus">
+                        <Trash2 className="h-3.5 w-3.5" />
                       </button>
                     </div>
                   </td>

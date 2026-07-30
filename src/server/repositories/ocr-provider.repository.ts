@@ -146,9 +146,28 @@ export const ocrProviderRepo = {
       }
     }
 
+    const nextIsActive = !current.isActive;
     const row = await prisma.ocrProvider.update({
       where: { id },
-      data: { isActive: !current.isActive },
+      data: {
+        isActive: nextIsActive,
+        ...(nextIsActive ? { healthStatus: "active", consecutiveErrors: 0, cooldownUntil: null } : {}),
+      },
+    });
+    return mapProvider(row);
+  },
+
+  async reactivate(id: string): Promise<OcrProviderRecord> {
+    const row = await prisma.ocrProvider.update({
+      where: { id },
+      data: {
+        isActive: true,
+        healthStatus: "active",
+        consecutiveErrors: 0,
+        cooldownUntil: null,
+        lastErrorAt: null,
+        lastErrorMsg: null,
+      },
     });
     return mapProvider(row);
   },
@@ -255,7 +274,12 @@ export const ocrProviderRepo = {
     if (isNewDay) {
       await prisma.ocrProvider.update({
         where: { id },
-        data: { dailyUsage: 0 },
+        data: {
+          dailyUsage: 0,
+          consecutiveErrors: 0,
+          healthStatus: "active",
+          cooldownUntil: null,
+        },
       });
       return true;
     }
