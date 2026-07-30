@@ -110,7 +110,10 @@ export async function process(
   }
 
   // ── 5. Rotation: select current provider ────────────
-  const selection = selectProvider(eligible);
+  let selection = selectProvider(eligible);
+  if (!selection && eligible.length > 0) {
+    selection = { provider: eligible[0]!, isNewSlot: true };
+  }
   if (!selection) {
     return {
       success: false,
