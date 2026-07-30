@@ -67,6 +67,11 @@ export async function loadProviders(): Promise<OcrProviderRecord[]> {
 
   try {
     _providersCache = await ocrProviderRepo.findActive();
+    if (!_providersCache || _providersCache.length === 0) {
+      // Auto-recovery: If all providers were disabled, reset health status to active
+      await ocrProviderRepo.resetAllDisabledProviders();
+      _providersCache = await ocrProviderRepo.findActive();
+    }
     _cacheTimestamp = now;
     logger.debug(`[OCR Registry] Loaded ${_providersCache.length} providers from DB`);
     return _providersCache;

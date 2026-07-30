@@ -76,10 +76,19 @@ export const ocrProviderRepo = {
   },
 
   async findActive(): Promise<OcrProviderRecord[]> {
-    const rows = await prisma.ocrProvider.findMany({
+    let rows = await prisma.ocrProvider.findMany({
       where: { isActive: true, healthStatus: { notIn: ["disabled", "error"] } },
       orderBy: { rotationOrder: "asc" },
     });
+    
+    // Fallback: If all active providers are marked disabled/error, attempt any provider with an API key
+    if (rows.length === 0) {
+      rows = await prisma.ocrProvider.findMany({
+        where: { apiKey: { not: "" } },
+        orderBy: { rotationOrder: "asc" },
+      });
+    }
+
     return rows.map(mapProvider);
   },
 
@@ -474,6 +483,13 @@ export const ocrProviderRepo = {
 
   async flushAllCache(): Promise<number> {
     const result = await prisma.ocrCacheEntry.deleteMany();
+    return result.count;
+  },
+
+  async resetAllDisabledProviders(): Promise<number> {
+    const result = await prisma.ocrProvider.updateMany({
+      data: { healthStatus: "active", isActive: true, cooldownUntil: null },
+    });
     return result.count;
   },
 

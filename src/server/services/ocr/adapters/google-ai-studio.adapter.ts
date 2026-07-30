@@ -86,7 +86,7 @@ export const googleAiStudioAdapter: OcrAdapter = {
             body: JSON.stringify({
               contents: [{
                 parts: [
-                  { text: `Extract all text and key details from this ${jenis} document image exactly as written.` },
+                  { text: "Extract all plain text, prices, dates, hotel names, and details from this image exactly as written, word for word." },
                   { inline_data: { mime_type: mimeType, data: base64 } }
                 ]
               }]
