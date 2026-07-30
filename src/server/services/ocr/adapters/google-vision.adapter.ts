@@ -71,7 +71,12 @@ export const googleVisionAdapter: OcrAdapter = {
     const apiKey = config.apiKey;
     const base64 = imageBuffer.toString("base64");
 
+    let mimeType = "image/jpeg";
+    if (imageBuffer[0] === 0x89 && imageBuffer[1] === 0x50) mimeType = "image/png";
+    else if (imageBuffer[0] === 0x52 && imageBuffer[1] === 0x49) mimeType = "image/webp";
+
     try {
+      // 1. Try Google Cloud Vision API
       const res = await fetch(
         `https://vision.googleapis.com/v1/images:annotate?key=${apiKey}`,
         {
@@ -85,12 +90,31 @@ export const googleVisionAdapter: OcrAdapter = {
           }),
           signal: AbortSignal.timeout(config.timeout ?? 30000),
         },
-      );
+      ).catch(() => null);
 
-      if (!res.ok) {
-        // Fallback: If key is Google AI Studio key, try Gemini 1.5 Flash Vision OCR
+      if (res && res.ok) {
+        const data = await res.json();
+        const fullText: string = data?.responses?.[0]?.fullTextAnnotation?.text ?? "";
+        const expectedFields = getExpectedFields(jenis);
+        const fields = expectedFields.map((field) => {
+          const value = extractField(fullText, field);
+          return { field, value, confidence: value ? 0.9 : 0 };
+        });
+
+        return {
+          success: true,
+          fields,
+          rawText: fullText,
+          overallConfidence: fullText ? 0.9 : 0,
+          processingTimeMs: Date.now() - start,
+          retryCount,
+        };
+      }
+
+      // 2. Fallback: If Key is a Google AI Studio (Gemini) Key, try Gemini Flash models
+      for (const modelName of ["gemini-2.0-flash", "gemini-1.5-flash"]) {
         const geminiRes = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+          `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`,
           {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -98,7 +122,7 @@ export const googleVisionAdapter: OcrAdapter = {
               contents: [{
                 parts: [
                   { text: "Extract all plain text from this image exactly as written." },
-                  { inline_data: { mime_type: "image/jpeg", data: base64 } }
+                  { inline_data: { mime_type: mimeType, data: base64 } }
                 ]
               }]
             }),
@@ -106,7 +130,7 @@ export const googleVisionAdapter: OcrAdapter = {
           }
         ).catch(() => null);
 
-        if (geminiRes?.ok) {
+        if (geminiRes && geminiRes.ok) {
           const gData = await geminiRes.json();
           const fullText = gData?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
           const expectedFields = getExpectedFields(jenis);
@@ -123,28 +147,11 @@ export const googleVisionAdapter: OcrAdapter = {
             retryCount,
           };
         }
-
-        const text = await res.text().catch(() => "");
-        throw { statusCode: res.status, message: text.slice(0, 500) };
       }
 
-      const data = await res.json();
-      const fullText: string = data?.responses?.[0]?.fullTextAnnotation?.text ?? "";
-
-      const expectedFields = getExpectedFields(jenis);
-      const fields = expectedFields.map((field) => {
-        const value = extractField(fullText, field);
-        return { field, value, confidence: value ? 0.9 : 0 };
-      });
-
-      return {
-        success: true,
-        fields,
-        rawText: fullText,
-        overallConfidence: fullText ? 0.9 : 0,
-        processingTimeMs: Date.now() - start,
-        retryCount,
-      };
+      // If both Cloud Vision & Gemini Vision failed, handle error without disabling Google AI Studio keys
+      const text = res ? await res.text().catch(() => "") : "Gemini & Vision OCR request failed";
+      throw { statusCode: res?.status || 500, message: text.slice(0, 500) };
     } catch (err: any) {
       const statusCode = err?.statusCode;
       if (statusCode) {
