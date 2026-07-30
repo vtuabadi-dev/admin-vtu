@@ -76,7 +76,46 @@ export const googleVisionAdapter: OcrAdapter = {
     else if (imageBuffer[0] === 0x52 && imageBuffer[1] === 0x49) mimeType = "image/webp";
 
     try {
-      // 1. Try Google Cloud Vision API
+      // 1. Primary: Try Google AI Studio (Gemini 2.0 Flash / 1.5 Flash) API first
+      for (const modelName of ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro"]) {
+        const geminiRes = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              contents: [{
+                parts: [
+                  { text: "Extract all plain text from this image exactly as written." },
+                  { inline_data: { mime_type: mimeType, data: base64 } }
+                ]
+              }]
+            }),
+            signal: AbortSignal.timeout(config.timeout ?? 30000),
+          }
+        ).catch(() => null);
+
+        if (geminiRes && geminiRes.ok) {
+          const gData = await geminiRes.json();
+          const fullText = gData?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+          const expectedFields = getExpectedFields(jenis);
+          const fields = expectedFields.map((field) => {
+            const value = extractField(fullText, field);
+            return { field, value, confidence: value ? 0.9 : 0 };
+          });
+
+          return {
+            success: true,
+            fields,
+            rawText: fullText,
+            overallConfidence: fullText ? 0.9 : 0,
+            processingTimeMs: Date.now() - start,
+            retryCount,
+          };
+        }
+      }
+
+      // 2. Secondary Fallback: Try Google Cloud Vision API endpoint
       const res = await fetch(
         `https://vision.googleapis.com/v1/images:annotate?key=${apiKey}`,
         {
@@ -111,51 +150,11 @@ export const googleVisionAdapter: OcrAdapter = {
         };
       }
 
-      // 2. Fallback: If Key is a Google AI Studio (Gemini) Key, try Gemini Flash models
-      for (const modelName of ["gemini-2.0-flash", "gemini-1.5-flash"]) {
-        const geminiRes = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              contents: [{
-                parts: [
-                  { text: "Extract all plain text from this image exactly as written." },
-                  { inline_data: { mime_type: mimeType, data: base64 } }
-                ]
-              }]
-            }),
-            signal: AbortSignal.timeout(config.timeout ?? 30000),
-          }
-        ).catch(() => null);
-
-        if (geminiRes && geminiRes.ok) {
-          const gData = await geminiRes.json();
-          const fullText = gData?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
-          const expectedFields = getExpectedFields(jenis);
-          const fields = expectedFields.map((field) => {
-            const value = extractField(fullText, field);
-            return { field, value, confidence: value ? 0.9 : 0 };
-          });
-          return {
-            success: true,
-            fields,
-            rawText: fullText,
-            overallConfidence: fullText ? 0.9 : 0,
-            processingTimeMs: Date.now() - start,
-            retryCount,
-          };
-        }
-      }
-
-      // If both Cloud Vision & Gemini Vision failed, handle error without disabling Google AI Studio keys
-      const text = res ? await res.text().catch(() => "") : "Gemini & Vision OCR request failed";
-      throw { statusCode: res?.status || 500, message: text.slice(0, 500) };
+      throw { statusCode: 500, message: "Panggilan API Google AI Studio / Vision tidak dapat memproses gambar." };
     } catch (err: any) {
       const statusCode = err?.statusCode;
       if (statusCode) {
-        throw err; // Re-throw structured error for health monitor
+        throw err;
       }
       throw { statusCode: undefined, message: err?.message || String(err) };
     }
@@ -175,7 +174,17 @@ export const googleVisionAdapter: OcrAdapter = {
 
   async testConnection(config: OcrAdapterConfig): Promise<{ ok: boolean; message: string }> {
     try {
-      // 1. Check Google Cloud Vision API endpoint
+      // 1. Primary: Check Google AI Studio (Gemini) API Key
+      const resGemini = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models?key=${config.apiKey}`,
+        { signal: AbortSignal.timeout(10000) }
+      ).catch(() => null);
+
+      if (resGemini && resGemini.ok) {
+        return { ok: true, message: "Connected! (Google AI Studio API Key Valid 🎉)" };
+      }
+
+      // 2. Secondary: Check Google Cloud Vision API
       const res = await fetch(
         `https://vision.googleapis.com/v1/images:annotate?key=${config.apiKey}`,
         {
@@ -183,39 +192,19 @@ export const googleVisionAdapter: OcrAdapter = {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             requests: [{
-              image: { content: "iVBORw0KGgo=" }, // minimal 1x1 pixel PNG
+              image: { content: "iVBORw0KGgo=" },
               features: [{ type: "TEXT_DETECTION", maxResults: 1 }],
             }],
           }),
           signal: AbortSignal.timeout(10000),
         },
-      );
+      ).catch(() => null);
 
-      if (res.ok || res.status === 429) {
+      if (res && (res.ok || res.status === 429)) {
         return { ok: true, message: "Connected! (Google Cloud Vision API Valid)" };
       }
 
-      // 2. Check if key is a valid Google AI Studio (Gemini) API Key
-      const resGemini = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models?key=${config.apiKey}`,
-        { signal: AbortSignal.timeout(10000) }
-      ).catch(() => null);
-
-      if (resGemini?.ok) {
-        return { ok: true, message: "Connected! (Google AI Studio / Gemini API Key Valid 🎉)" };
-      }
-
-      const text = await res.text().catch(() => "");
-      let reason = "Periksa API key / Google AI Studio Key";
-      try {
-        const json = JSON.parse(text);
-        if (json?.error?.message) {
-          reason = json.error.message;
-        }
-      } catch (e) {
-        if (text) reason = text.slice(0, 200);
-      }
-      return { ok: false, message: `Authentication failed (HTTP ${res.status}): ${reason}` };
+      return { ok: false, message: "Authentication failed — Kunci Google AI Studio tidak valid." };
     } catch (err: any) {
       return { ok: false, message: err?.message || "Connection failed" };
     }
