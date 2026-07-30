@@ -136,73 +136,81 @@ export async function extractWithGemini(
     `2. TEKS CAPTION: ${cleanCaption}\n\n` +
     `3. GAMBAR FLYER UTAMA (Telah dilampirkan): Analisa visual flyer utama & rute itinerary.`;
 
-  const model = genAI.getGenerativeModel({ 
-    model: "gemini-1.5-flash",
-    generationConfig: {
-      responseMimeType: "application/json",
-      responseSchema: {
-        type: SchemaType.OBJECT,
-        properties: {
-          title: { type: SchemaType.STRING, description: "Judul singkat paket. Format: [Jenis Paket] [Durasi] Hari [Tahun]" },
-          packageType: { type: SchemaType.STRING, description: "Jenis Paket dari Flyer Utama" },
-          durationDays: { type: SchemaType.INTEGER, description: "Jumlah total durasi hari perjalanan dari Flyer Utama" },
-          departureCity: { type: SchemaType.STRING, description: "Starting Point dari kata kunci 'START' di Flyer Utama" },
-          airline: { type: SchemaType.STRING, description: "Maskapai penerbangan dari Flyer Utama" },
-          hotelMekkah: { type: SchemaType.STRING, description: "Hotel Mekkah dari Flyer Utama" },
-          hotelMadinah: { type: SchemaType.STRING, description: "Hotel Madinah dari Flyer Utama" },
-          landingRoute: { type: SchemaType.STRING, description: "Rute In-Out pesawat dari analisis alur itinerary" },
-          isAdaPerlengkapan: { type: SchemaType.STRING, description: "Dari Caption: 'ya' jika termasuk perlengkapan (cth: Perlengkapan umroh under Termasuk), 'tidak' jika belum/tidak termasuk" },
-          hargaBase: { type: SchemaType.STRING, description: "Harga base paket (hanya angka nominal)" },
-          upgradeDouble: { type: SchemaType.STRING, description: "Harga upgrade kamar double umum dari Caption (hanya angka nominal)" },
-          upgradeTriple: { type: SchemaType.STRING, description: "Harga upgrade kamar triple umum dari Caption (hanya angka nominal)" },
-          roomUpgrade: { type: SchemaType.STRING, description: "Informasi opsional upgrade kamar" },
-          hotelUpgrade: { type: SchemaType.STRING, description: "Informasi opsional upgrade hotel" },
-          promoText: { type: SchemaType.STRING, description: "Informasi opsional teks promo" },
-          description: { type: SchemaType.STRING, description: "Deskripsi tambahan" },
-          clusters: {
-            type: SchemaType.ARRAY,
-            items: {
-              type: SchemaType.OBJECT,
-              properties: {
-                clusterName: { type: SchemaType.STRING, description: "Nama Klaster (cth: Silver Package, Gold Package, Platinum Package, Bronze Package)" },
-                hotelMekkah: { type: SchemaType.STRING, description: "Nama Hotel Mekkah persis di dalam kotak klaster ini atau caption" },
-                hotelMadinah: { type: SchemaType.STRING, description: "Nama Hotel Madinah persis di dalam kotak klaster ini atau caption" },
-                hargaBase: { type: SchemaType.STRING, description: "Harga Base klaster dari flyer atau caption (hanya angka nominal, cth: 38900000 dari Rp 38.900.000)" },
-                upgradeDouble: { type: SchemaType.STRING, description: "Harga upgrade kamar berdua khusus klaster ini dari caption (hanya angka nominal, cth: 7500000 dari + Rp 7.500.000)" },
-                upgradeTriple: { type: SchemaType.STRING, description: "Harga upgrade kamar bertiga khusus klaster ini dari caption (hanya angka nominal, cth: 5000000 dari + Rp 5.000.000)" },
+  const candidateModels = ["gemini-1.5-flash", "gemini-2.0-flash", "gemini-1.5-pro"];
+  let lastError: any = null;
+
+  for (const modelName of candidateModels) {
+    try {
+      const model = genAI.getGenerativeModel({ 
+        model: modelName,
+        generationConfig: {
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: SchemaType.OBJECT,
+            properties: {
+              title: { type: SchemaType.STRING, description: "Judul singkat paket. Format: [Jenis Paket] [Durasi] Hari [Tahun]" },
+              packageType: { type: SchemaType.STRING, description: "Jenis Paket dari Flyer Utama" },
+              durationDays: { type: SchemaType.INTEGER, description: "Jumlah total durasi hari perjalanan dari Flyer Utama" },
+              departureCity: { type: SchemaType.STRING, description: "Starting Point dari kata kunci 'START' di Flyer Utama" },
+              airline: { type: SchemaType.STRING, description: "Maskapai penerbangan dari Flyer Utama" },
+              hotelMekkah: { type: SchemaType.STRING, description: "Hotel Mekkah dari Flyer Utama" },
+              hotelMadinah: { type: SchemaType.STRING, description: "Hotel Madinah dari Flyer Utama" },
+              landingRoute: { type: SchemaType.STRING, description: "Rute In-Out pesawat dari analisis alur itinerary" },
+              isAdaPerlengkapan: { type: SchemaType.STRING, description: "Dari Caption: 'ya' jika termasuk perlengkapan (cth: Perlengkapan umroh under Termasuk), 'tidak' jika belum/tidak termasuk" },
+              hargaBase: { type: SchemaType.STRING, description: "Harga base paket (hanya angka nominal)" },
+              upgradeDouble: { type: SchemaType.STRING, description: "Harga upgrade kamar double umum dari Caption (hanya angka nominal)" },
+              upgradeTriple: { type: SchemaType.STRING, description: "Harga upgrade kamar triple umum dari Caption (hanya angka nominal)" },
+              roomUpgrade: { type: SchemaType.STRING, description: "Informasi opsional upgrade kamar" },
+              hotelUpgrade: { type: SchemaType.STRING, description: "Informasi opsional upgrade hotel" },
+              promoText: { type: SchemaType.STRING, description: "Informasi opsional teks promo" },
+              description: { type: SchemaType.STRING, description: "Deskripsi tambahan" },
+              clusters: {
+                type: SchemaType.ARRAY,
+                items: {
+                  type: SchemaType.OBJECT,
+                  properties: {
+                    clusterName: { type: SchemaType.STRING, description: "Nama Klaster (cth: Silver Package, Gold Package, Platinum Package, Bronze Package)" },
+                    hotelMekkah: { type: SchemaType.STRING, description: "Nama Hotel Mekkah persis di dalam kotak klaster ini atau caption" },
+                    hotelMadinah: { type: SchemaType.STRING, description: "Nama Hotel Madinah persis di dalam kotak klaster ini atau caption" },
+                    hargaBase: { type: SchemaType.STRING, description: "Harga Base klaster dari flyer atau caption (hanya angka nominal, cth: 38900000 dari Rp 38.900.000)" },
+                    upgradeDouble: { type: SchemaType.STRING, description: "Harga upgrade kamar berdua khusus klaster ini dari caption (hanya angka nominal, cth: 7500000 dari + Rp 7.500.000)" },
+                    upgradeTriple: { type: SchemaType.STRING, description: "Harga upgrade kamar bertiga khusus klaster ini dari caption (hanya angka nominal, cth: 5000000 dari + Rp 5.000.000)" },
+                  },
+                  required: ["clusterName"]
+                },
+                description: "ARRAY SETIAP KLASTER SEAT BESERTA HARGA BASE & UPGRADE KAMAR PER KLASTER (Silver, Gold, Platinum, Bronze)"
               },
-              required: ["clusterName"]
+              departureDates: {
+                type: SchemaType.ARRAY,
+                items: { type: SchemaType.STRING },
+                description: "ARRAY SEMUA TANGGAL KEBERANGKATAN dari Flyer Utama (Format: YYYY-MM-DD)"
+              }
             },
-            description: "ARRAY SETIAP KLASTER SEAT BESERTA HARGA BASE & UPGRADE KAMAR PER KLASTER (Silver, Gold, Platinum, Bronze)"
-          },
-          departureDates: {
-            type: SchemaType.ARRAY,
-            items: { type: SchemaType.STRING },
-            description: "ARRAY SEMUA TANGGAL KEBERANGKATAN dari Flyer Utama (Format: YYYY-MM-DD)"
+            required: ["title", "packageType", "durationDays", "departureCity", "airline", "departureDates", "landingRoute"]
           }
-        },
-        required: ["title", "packageType", "durationDays", "departureCity", "airline", "departureDates", "landingRoute"]
-      }
-    }
-  });
-
-  try {
-    const result = await model.generateContent([
-      prompt,
-      {
-        inlineData: {
-          data: base64Image,
-          mimeType
         }
-      }
-    ]);
+      });
 
-    const responseText = result.response.text();
-    const parsed = JSON.parse(responseText);
+      const result = await model.generateContent([
+        prompt,
+        {
+          inlineData: {
+            data: base64Image,
+            mimeType
+          }
+        }
+      ]);
 
-    return parsed;
-  } catch (error) {
-    console.error("[Gemini Extractor] Error calling Gemini API:", error);
-    throw new Error("Gagal memproses dengan Gemini AI. Harap periksa API Key Anda.");
+      const responseText = result.response.text();
+      const parsed = JSON.parse(responseText);
+
+      return parsed;
+    } catch (error) {
+      lastError = error;
+      console.warn(`[Gemini Extractor] Model ${modelName} failed, trying next candidate...`, error);
+    }
   }
+
+  console.error("[Gemini Extractor] All candidate Gemini models failed:", lastError);
+  throw new Error("Gagal memproses dengan Gemini AI. Harap periksa API Key Anda.");
 }
