@@ -3,9 +3,27 @@ import * as fs from "fs";
 import { masterDataService } from "../master-data.service";
 import type { PackageExtractionResult } from "./types";
 
-const getGeminiApiKey = () => {
-  const key = process.env.GEMINI_API_KEY || process.env.GOOGLE_VISION_API_KEY;
-  if (!key) throw new Error("GEMINI_API_KEY is not defined in environment variables");
+const getGeminiApiKey = async (): Promise<string> => {
+  let key = process.env.GEMINI_API_KEY || process.env.GOOGLE_VISION_API_KEY;
+  if (!key) {
+    try {
+      const { ocrProviderRepo } = await import("@/server/repositories/ocr-provider.repository");
+      const activeProviders = await ocrProviderRepo.findActive();
+      if (activeProviders.length > 0 && activeProviders[0]?.apiKey) {
+        key = activeProviders[0].apiKey;
+      } else {
+        const allProviders = await ocrProviderRepo.findAll();
+        const firstWithKey = allProviders.find((p) => p.apiKey?.trim());
+        if (firstWithKey) key = firstWithKey.apiKey;
+      }
+    } catch (e) {
+      console.warn("[gemini-extractor] Failed to fetch API key from DB:", e);
+    }
+  }
+
+  if (!key) {
+    throw new Error("API Key untuk AI/OCR belum tersedia. Harap aktifkan provider di menu Pengaturan -> Integrasi OCR.");
+  }
   return key;
 };
 
@@ -14,7 +32,7 @@ export async function extractWithGemini(
   rawOcrText: string,
   caption: string
 ): Promise<Partial<PackageExtractionResult> & { landingRoute?: string }> {
-  const apiKey = getGeminiApiKey();
+  const apiKey = await getGeminiApiKey();
   const genAI = new GoogleGenerativeAI(apiKey);
 
   // Fetch master data
