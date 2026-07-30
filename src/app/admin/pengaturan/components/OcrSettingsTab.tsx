@@ -356,7 +356,11 @@ function ProvidersTab() {
                 <tr key={p.id} className="border-t hover:bg-muted/30">
                   <td className="px-4 py-2.5 text-muted-foreground">{p.rotationOrder}</td>
                   <td className="px-4 py-2.5 font-medium">{p.label}</td>
-                  <td className="px-4 py-2.5 text-muted-foreground capitalize">{p.providerType.replace("_", " ")}</td>
+                  <td className="px-4 py-2.5 text-muted-foreground font-medium">
+                    {p.providerType === "google_vision" || (p.providerType as string) === "google_ai_studio"
+                      ? "Google AI Studio"
+                      : p.providerType.replace("_", " ")}
+                  </td>
                   <td className="px-4 py-2.5">{healthBadge(p.healthStatus)}</td>
                   <td className="px-4 py-2.5 text-right font-mono text-xs">
                     {p.dailyUsage}{p.dailyLimit ? ` / ${p.dailyLimit}` : ""}
