@@ -191,16 +191,7 @@ export default function GeneratePaketPage() {
     });
   };
 
-  const handleRemoveDateRow = (index: number) => {
-    setDepartureDateRows(prev => {
-      const next = prev.filter((_, idx) => idx !== index);
-      const filled = next.filter(r => r.departureDate.trim() !== "" || r.arrivalDate.trim() !== "");
-      return [
-        ...filled,
-        { departureDate: "", arrivalDate: "", source: "-", status: "-", isManualOverride: false }
-      ];
-    });
-  };
+
 
   const handleAutoGenerateName = () => {
     if (!options) return;
@@ -1281,9 +1272,6 @@ export default function GeneratePaketPage() {
                       <th className="px-3 py-2.5 text-center w-12">No</th>
                       <th className="px-3 py-2.5">Tanggal Keberangkatan</th>
                       <th className="px-3 py-2.5">Tanggal Kepulangan (Editable)</th>
-                      <th className="px-3 py-2.5 text-center w-24">Sumber</th>
-                      <th className="px-3 py-2.5 text-center w-28">Status</th>
-                      <th className="px-3 py-2.5 text-center w-16">Aksi</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border/60">
@@ -1300,7 +1288,7 @@ export default function GeneratePaketPage() {
                               type="date"
                               value={row.departureDate}
                               onChange={(e) => handleDepartureDateChange(index, e.target.value)}
-                              className="h-8 text-xs font-mono max-w-[170px]"
+                              className="h-8 text-xs font-mono max-w-[200px]"
                             />
                           </td>
                           <td className="px-3 py-2">
@@ -1310,7 +1298,7 @@ export default function GeneratePaketPage() {
                                 value={row.arrivalDate}
                                 onChange={(e) => handleArrivalDateChange(index, e.target.value)}
                                 className={cn(
-                                  "h-8 text-xs font-mono max-w-[170px]",
+                                  "h-8 text-xs font-mono max-w-[200px]",
                                   row.isManualOverride && "border-amber-400 bg-amber-50/40 text-amber-950 font-semibold dark:bg-amber-950/30 dark:text-amber-200"
                                 )}
                               />
@@ -1325,36 +1313,6 @@ export default function GeneratePaketPage() {
                                 </button>
                               )}
                             </div>
-                          </td>
-                          <td className="px-3 py-2 text-center">
-                            <span className={cn(
-                              "px-2 py-0.5 rounded text-[10px] font-bold border inline-block",
-                              row.source === "OCR" ? "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950 dark:text-blue-200 dark:border-blue-800" :
-                              row.source === "Manual" ? "bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950 dark:text-purple-200 dark:border-purple-800" : "bg-muted text-muted-foreground border-transparent"
-                            )}>
-                              {row.source}
-                            </span>
-                          </td>
-                          <td className="px-3 py-2 text-center">
-                            <span className={cn(
-                              "px-2 py-0.5 rounded text-[10px] font-bold border inline-block",
-                              row.status === "Edited" ? "bg-amber-50 text-amber-800 border-amber-300 dark:bg-amber-950 dark:text-amber-200 dark:border-amber-800" :
-                              row.status === "Generated" ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-200 dark:border-emerald-800" : "bg-muted text-muted-foreground border-transparent"
-                            )}>
-                              {row.status}
-                            </span>
-                          </td>
-                          <td className="px-3 py-2 text-center">
-                            {!isLastEmpty && (
-                              <button
-                                type="button"
-                                onClick={() => handleRemoveDateRow(index)}
-                                className="text-xs text-muted-foreground hover:text-red-600 p-1 rounded hover:bg-red-50 dark:hover:bg-red-950 transition-colors"
-                                title="Hapus Baris Tanggal"
-                              >
-                                ✕
-                              </button>
-                            )}
                           </td>
                         </tr>
                       );
@@ -1744,9 +1702,6 @@ export default function GeneratePaketPage() {
                     <th className="px-3 py-2.5 text-center w-12">No</th>
                     <th className="px-3 py-2.5">Tanggal Keberangkatan</th>
                     <th className="px-3 py-2.5">Tanggal Kepulangan (Editable)</th>
-                    <th className="px-3 py-2.5 text-center w-24">Sumber</th>
-                    <th className="px-3 py-2.5 text-center w-28">Status</th>
-                    <th className="px-3 py-2.5 text-center w-16">Aksi</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border/60">
@@ -1763,7 +1718,7 @@ export default function GeneratePaketPage() {
                             type="date"
                             value={row.departureDate}
                             onChange={(e) => handleDepartureDateChange(index, e.target.value)}
-                            className="h-8 text-xs font-mono max-w-[170px]"
+                            className="h-8 text-xs font-mono max-w-[200px]"
                           />
                         </td>
                         <td className="px-3 py-2">
@@ -1773,7 +1728,7 @@ export default function GeneratePaketPage() {
                               value={row.arrivalDate}
                               onChange={(e) => handleArrivalDateChange(index, e.target.value)}
                               className={cn(
-                                "h-8 text-xs font-mono max-w-[170px]",
+                                "h-8 text-xs font-mono max-w-[200px]",
                                 row.isManualOverride && "border-amber-400 bg-amber-50/40 text-amber-950 font-semibold dark:bg-amber-950/30 dark:text-amber-200"
                               )}
                             />
@@ -1788,36 +1743,6 @@ export default function GeneratePaketPage() {
                               </button>
                             )}
                           </div>
-                        </td>
-                        <td className="px-3 py-2 text-center">
-                          <span className={cn(
-                            "px-2 py-0.5 rounded text-[10px] font-bold border inline-block",
-                            row.source === "OCR" ? "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950 dark:text-blue-200 dark:border-blue-800" :
-                            row.source === "Manual" ? "bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950 dark:text-purple-200 dark:border-purple-800" : "bg-muted text-muted-foreground border-transparent"
-                          )}>
-                            {row.source}
-                          </span>
-                        </td>
-                        <td className="px-3 py-2 text-center">
-                          <span className={cn(
-                            "px-2 py-0.5 rounded text-[10px] font-bold border inline-block",
-                            row.status === "Edited" ? "bg-amber-50 text-amber-800 border-amber-300 dark:bg-amber-950 dark:text-amber-200 dark:border-amber-800" :
-                            row.status === "Generated" ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-200 dark:border-emerald-800" : "bg-muted text-muted-foreground border-transparent"
-                          )}>
-                            {row.status}
-                          </span>
-                        </td>
-                        <td className="px-3 py-2 text-center">
-                          {!isLastEmpty && (
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveDateRow(index)}
-                              className="text-xs text-muted-foreground hover:text-red-600 p-1 rounded hover:bg-red-50 dark:hover:bg-red-950 transition-colors"
-                              title="Hapus Baris Tanggal"
-                            >
-                              ✕
-                            </button>
-                          )}
                         </td>
                       </tr>
                     );
