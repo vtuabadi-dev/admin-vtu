@@ -219,3 +219,45 @@ function getDefaultLanding(packageType?: string): string {
       return 'Jeddah';
   }
 }
+
+
+/**
+ * Resolve Route In-Out strictly from itinerary travel chronology (BR-ROUTE-01).
+ * Never infer based on city frequency. Follows travel order (e.g. Jakarta -> Landing -> First Destination -> Out).
+ */
+export function resolveRouteFromItineraryChronology(
+  itinerary: ItineraryDay[]
+): ExtractionField {
+  if (itinerary.length === 0) {
+    return createMissingField('RECOMMENDED');
+  }
+
+  // Filter non-Indonesian cities in travel order
+  const nonIndoCities = itinerary
+    .map(d => d.city)
+    .filter(c => c && !['Jakarta', 'Surabaya', 'Medan', 'Makassar', 'Solo', 'Yogyakarta', 'Bali', 'Bandung'].includes(c));
+
+  if (nonIndoCities.length === 0) {
+    return createMissingField('RECOMMENDED');
+  }
+
+  const landing = nonIndoCities[0];
+  const firstDest = nonIndoCities.find(c => c !== landing) || landing;
+
+  let routeCode = 'JED.D-J';
+  if (landing === 'Jeddah') {
+    if (firstDest === 'Madinah') {
+      routeCode = 'JED.D-J';
+    } else if (firstDest === 'Mekkah') {
+      routeCode = 'JED.C-M';
+    }
+  } else if (landing === 'Madinah') {
+    routeCode = 'MED-J';
+  }
+
+  return createExtractedField(routeCode, 'itinerary_ocr', 0.85, 'RECOMMENDED', {
+    patternMatch: 0.90,
+    contextConsistency: 0.90,
+  });
+}
+

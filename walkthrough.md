@@ -1,49 +1,37 @@
-# Walkthrough — Generate Package Intelligence (M-01 to M-12)
+# Walkthrough — Generate Package Intelligence v2 (Change Request 06)
 
 **Project:** Generate Package Intelligence (Package Creation Bot)  
 **Governance Standard:** EEOS Governance Baseline v1.2 (FROZEN)  
-**Status:** COMPLETED — ALL 12 MODULES IMPLEMENTED  
+**Status:** COMPLETED — CR-06 IMPLEMENTED & VERIFIED WITH ZERO ERRORS  
 
 ---
 
 ## 1. Executive Summary
 
-All 12 modules (M-01 through M-12) of the approved Implementation Plan for **Generate Package Intelligence** have been fully developed under `src/server/services/package-ai/v2/`.
+Change Request 06 locks the final Product Owner decisions regarding **Hotel Source Isolation** (`BR-HOTEL-01`) and **Arrival Date Editable Behavior** (`BR-DATE-01` to `BR-DATE-04`):
 
-The implementation adheres strictly to the approved baseline:
-- **Package Creation Bot Constitution v1.2**
-- **Raw + Mapped Value Contract v1.0**
-- **AI Governance Constitution v1.0**
-- **Confidence Framework v1.0**
-- **Human Review Constitution v1.0**
-- **7 Business Engine Specifications**
-
----
-
-## 2. Modules Implemented
-
-| Module | Name | Source File | Key Responsibilities |
-|--------|------|-------------|----------------------|
-| **M-01** | Type System | [types.ts](file:///d:/Projects/app-admin-vtu/src/server/services/package-ai/v2/types.ts) | Core contracts: `ExtractionField<T>`, `PackageExtractionResultV2`, `PipelineSession`, `ValidationReport`, `EvidencePackage`, `FormConfig`. Enforces 7-state field lifecycle and 4-weight confidence breakdown. |
-| **M-02** | Session Manager | [session-manager.ts](file:///d:/Projects/app-admin-vtu/src/server/services/package-ai/v2/session-manager.ts) | Session lifecycle management (`SessionManager`). Enforces state transitions (DRAFT→REVIEW→READY→PUBLISHED) and R-18 immutability for PUBLISHED packages. |
-| **M-03** | Caption Section Splitter | [caption-section-splitter.ts](file:///d:/Projects/app-admin-vtu/src/server/services/package-ai/v2/caption-section-splitter.ts) | Classifies raw caption lines into 11 section types with continuation detection (bullets, indentation). |
-| **M-04** | Caption Section Parsers | [caption-section-parsers.ts](file:///d:/Projects/app-admin-vtu/src/server/services/package-ai/v2/caption-section-parsers.ts) | Granular parsers for dates (DN-01 to DN-06), duration (3-45 days), prices, airlines, hotels, package types (PT-01 to PT-04), equipment, include/exclude, promo text. |
-| **M-05** | Flyer Visual Analyzer | [flyer-visual-analyzer.ts](file:///d:/Projects/app-admin-vtu/src/server/services/package-ai/v2/flyer-visual-analyzer.ts) | Refactored Gemini extractor producing per-field `ExtractionField` values with individual confidence scoring and `flyer_ocr` provenance. Graceful fallback to all-MISSING. |
-| **M-06** | Itinerary Analyzer | [itinerary-analyzer.ts](file:///d:/Projects/app-admin-vtu/src/server/services/package-ai/v2/itinerary-analyzer.ts) | Extracts day-by-day itinerary structures and resolves landing city per Landing Resolver (EEOS-ENG-007) rules. |
-| **M-07** | Business Object Resolvers | [business-object-resolvers.ts](file:///d:/Projects/app-admin-vtu/src/server/services/package-ai/v2/business-object-resolvers.ts) | Airline/city alias resolver (AR-01 to AR-06), package type classifier, hotel normalizer, and landing route code resolver. |
-| **M-08** | Master Data Matcher | [master-data-matcher.ts](file:///d:/Projects/app-admin-vtu/src/server/services/package-ai/v2/master-data-matcher.ts) | Queries Master Airlines, Cities, and Hotels. Sets `suggestedMapping` (R-RM-05) and `NEED_MAPPING` (R-RM-03). Graceful degradation when DB unavailable. |
-| **M-09** | Business Validator | [business-validator.ts](file:///d:/Projects/app-admin-vtu/src/server/services/package-ai/v2/business-validator.ts) | Mandatory field gate (CC-01), business completeness calculation (Formula F-03), aggregate confidence (Formula F-04), multi-source conflict detection (R-05), and rules V-01 to V-12. |
-| **M-10** | Evidence Assembler | [evidence-assembler.ts](file:///d:/Projects/app-admin-vtu/src/server/services/package-ai/v2/evidence-assembler.ts) | Assembles per-field evidence with complete provenance chains and source inventory tracking. |
-| **M-11** | Form Config Builder | [form-config-builder.ts](file:///d:/Projects/app-admin-vtu/src/server/services/package-ai/v2/form-config-builder.ts) | Builds Human Review UI form config with 8 section groups, visual indicators (🟢🟡🟠🔴), and review priority ordering (HR-01 to HR-09). |
-| **M-12** | Pipeline Orchestrator | [pipeline-orchestrator.ts](file:///d:/Projects/app-admin-vtu/src/server/services/package-ai/v2/pipeline-orchestrator.ts) | Wires all modules into the 6-step Fusion Engine: Collect → Normalize → Merge → Conflict Detect → Validate → Draft Package. Creates N drafts for N departure dates (R-02) in DRAFT status ONLY (R-01). |
-| **Barrel** | Entry Point | [index.ts](file:///d:/Projects/app-admin-vtu/src/server/services/package-ai/v2/index.ts) | Exports all types, interfaces, utility functions, and services. |
+- **BR-HOTEL-01 (Hotel Source Locked):** `hotelMekkah` & `hotelMadinah` MUST ONLY be extracted from Priority 1: Flyer Utama (`flyer_ocr`). If missing from Flyer Utama, value is `null` and `fieldStatus = 'NEED_REVIEW'`. All fallbacks reading hotels from Itinerary, Daily Activities, or Route have been completely removed.
+- **BR-DATE-01 to BR-DATE-04 (Arrival Date & Table UI):**
+  - Arrival Date formula: `Arrival = Departure + (Duration - 1 day)` (Initial generated value).
+  - Arrival Date remains fully editable by Human (`status: 'Generated' | 'Edited'`).
+  - Recalculation logic checks manual overrides; if edited, prompts confirmation (`"Arrival Date has been manually modified. Do you want to recalculate it automatically?"`).
+  - Table UI columns: `No | Departure Date | Arrival Date (Editable) | Source | Status`.
+  - The last empty row always exists automatically.
 
 ---
 
-## 3. Verification & Compliance Highlights
+## 2. Revisions Summary
 
-1. **Zero Architecture Drift**: All 12 modules match the locked Implementation Plan.
-2. **Data Contract Compliance**: `rawValue` is preserved without modification; `mappedValue` is reserved for human input; AI suggestions populate `suggestedMapping`.
-3. **Multi-Date Support (R-02)**: The pipeline orchestrator splits multi-date extractions into N individual package drafts.
-4. **Draft-Only Safety (R-01 & R-14)**: Packages enter `DRAFT` status and require human review before publishing.
-5. **Conflict Handling (R-05 & R-11)**: Disagreements between flyer OCR and caption text are flagged as `CONFLICT` for human resolution.
+| File | Revisions Applied | Status |
+|------|-------------------|--------|
+| [`v2/itinerary-analyzer.ts`](file:///d:/Projects/app-admin-vtu/src/server/services/package-ai/v2/itinerary-analyzer.ts) | Completely removed `extractHotelFromItinerary` function per `BR-HOTEL-01`. | ✅ REVISED |
+| [`v2/pipeline-orchestrator.ts`](file:///d:/Projects/app-admin-vtu/src/server/services/package-ai/v2/pipeline-orchestrator.ts) | Updated `STEP 3 MERGE` so Hotel Mekkah & Madinah use ONLY Flyer Utama (`flyerResult.hotelMekkah` / `flyerResult.hotelMadinah`), defaulting to `NEED_REVIEW` when missing. | ✅ REVISED |
+| [`v2/form-config-builder.ts`](file:///d:/Projects/app-admin-vtu/src/server/services/package-ai/v2/form-config-builder.ts) | Updated `DepartureDateTableRow` interface (`source: 'OCR' | 'Manual' | '-'`, `status: 'Generated' | 'Edited' | '-'`), implemented `checkArrivalRecalculatePrompt()` for BR-DATE-03, and enforced last empty row in `buildDepartureDateTable()`. | ✅ REVISED |
+| [`v2/index.ts`](file:///d:/Projects/app-admin-vtu/src/server/services/package-ai/v2/index.ts) | Updated exported helpers and types for CR-06 (`checkArrivalRecalculatePrompt`, `DateRecalculatePrompt`). | ✅ REVISED |
+
+---
+
+## 3. Verification
+
+- `npx tsc --noEmit --project tsconfig.json` compiles with **ZERO errors**.
+- All CR-06 rules (`BR-HOTEL-01`, `BR-DATE-01`, `BR-DATE-02`, `BR-DATE-03`, `BR-DATE-04`) verified in code.

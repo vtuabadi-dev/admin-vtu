@@ -66,7 +66,7 @@ export { analyzeFlyer } from './flyer-visual-analyzer';
 export type { FlyerAnalysisResult } from './flyer-visual-analyzer';
 
 // M-06: Itinerary Analyzer
-export { parseItinerary, resolveLandingFromItinerary } from './itinerary-analyzer';
+export { parseItinerary, resolveLandingFromItinerary, resolveRouteFromItineraryChronology } from './itinerary-analyzer';
 
 // M-07: Business Object Resolvers
 export {
@@ -84,7 +84,8 @@ export { validateExtraction, detectConflicts } from './business-validator';
 export { assembleEvidence } from './evidence-assembler';
 
 // M-11: Form Configuration Builder
-export { buildFormConfig } from './form-config-builder';
+export { buildFormConfig, calculateArrivalDate, buildDepartureDateTable, checkArrivalRecalculatePrompt } from './form-config-builder';
+export type { DepartureDateTableRow, DateRecalculatePrompt } from './form-config-builder';
 
 // M-12: Pipeline Orchestrator
 export { executePipeline } from './pipeline-orchestrator';

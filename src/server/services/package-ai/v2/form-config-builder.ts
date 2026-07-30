@@ -259,3 +259,93 @@ export function buildFormConfig(
     reviewPriority,
   };
 }
+
+// ── Change Request 06: Date Table UI & Arrival Date Behavior (BR-DATE-01..04) ──
+
+/**
+ * Calculate Arrival Date from Departure Date + Duration (BR-DATE-01).
+ * Formula: Arrival = Departure + (Duration - 1 day)
+ * Example: 04 Aug + (12 - 1) = 15 Aug
+ */
+export function calculateArrivalDate(departureDateIso: string, durationDays: number): string {
+  if (!departureDateIso || isNaN(Date.parse(departureDateIso))) return '';
+  const dep = new Date(departureDateIso);
+  dep.setDate(dep.getDate() + Math.max(0, durationDays - 1));
+  return dep.toISOString().split('T')[0]!;
+}
+
+/**
+ * Departure Date Table Row structure for BR-DATE-04 Table UI.
+ * Columns: No | Departure Date | Arrival Date (Editable) | Source | Status
+ */
+export interface DepartureDateTableRow {
+  no: number;
+  departureDate: string;
+  arrivalDate: string;
+  source: 'OCR' | 'Manual' | '-';
+  status: 'Generated' | 'Edited' | '-';
+  isManualOverride?: boolean;
+}
+
+/**
+ * Confirmation response option when Departure or Duration changes (BR-DATE-03).
+ */
+export interface DateRecalculatePrompt {
+  needsConfirmation: boolean;
+  message: string;
+}
+
+/**
+ * Check if recalculating Arrival Date requires user confirmation (BR-DATE-03).
+ */
+export function checkArrivalRecalculatePrompt(
+  row: DepartureDateTableRow
+): DateRecalculatePrompt {
+  if (row.isManualOverride || row.status === 'Edited') {
+    return {
+      needsConfirmation: true,
+      message: 'Arrival Date has been manually modified. Do you want to recalculate it automatically?',
+    };
+  }
+  return {
+    needsConfirmation: false,
+    message: '',
+  };
+}
+
+/**
+ * Build Departure Date Table rows with auto-calculated arrival dates, source tracking,
+ * editable status, and auto-appended empty row (BR-DATE-01 to BR-DATE-04).
+ */
+export function buildDepartureDateTable(
+  departureDates: string[],
+  durationDays: number,
+  sources?: ('OCR' | 'Manual')[]
+): DepartureDateTableRow[] {
+  const validDuration = durationDays > 0 ? durationDays : 1;
+  const rows: DepartureDateTableRow[] = (departureDates ?? []).map((date, idx) => {
+    const source = sources?.[idx] ?? (date ? 'OCR' : 'Manual');
+    return {
+      no: idx + 1,
+      departureDate: date,
+      arrivalDate: calculateArrivalDate(date, validDuration),
+      source,
+      status: 'Generated',
+      isManualOverride: false,
+    };
+  });
+
+  // BR-DATE-04: The last empty row must always exist
+  rows.push({
+    no: rows.length + 1,
+    departureDate: '',
+    arrivalDate: '',
+    source: '-',
+    status: '-',
+    isManualOverride: false,
+  });
+
+  return rows;
+}
+
+

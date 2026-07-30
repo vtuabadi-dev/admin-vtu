@@ -73,6 +73,7 @@ export interface FlyerAnalysisResult {
   airline: ExtractionField;
   hotelMekkah: ExtractionField;
   hotelMadinah: ExtractionField;
+  landingCity: ExtractionField;
   landingRoute: ExtractionField;
   departureDates: ExtractionField<string[]>;
   pricingMode: ExtractionField<PricingMode>;
@@ -275,6 +276,7 @@ function transformGeminiResponse(raw: GeminiRawResponse): FlyerAnalysisResult {
     airline: toExtractedOrMissing(raw.airline, 'MANDATORY', 'airline'),
     hotelMekkah: toExtractedOrMissing(raw.hotelMekkah, 'RECOMMENDED', 'hotelMekkah'),
     hotelMadinah: toExtractedOrMissing(raw.hotelMadinah, 'RECOMMENDED', 'hotelMadinah'),
+    landingCity: createMissingField('RECOMMENDED'),
     landingRoute: toExtractedOrMissing(raw.landingRoute, 'RECOMMENDED', 'landingRoute'),
 
     departureDates: raw.departureDates && raw.departureDates.length > 0
@@ -332,6 +334,7 @@ function createEmptyFlyerResult(): FlyerAnalysisResult {
     airline: createMissingField('MANDATORY'),
     hotelMekkah: createMissingField('RECOMMENDED'),
     hotelMadinah: createMissingField('RECOMMENDED'),
+    landingCity: createMissingField('RECOMMENDED'),
     landingRoute: createMissingField('RECOMMENDED'),
     departureDates: createMissingField<string[]>('MANDATORY'),
     pricingMode: createExtractedField<PricingMode>('SINGLE', 'flyer_ocr', 0.50, 'MANDATORY'),

@@ -36,7 +36,7 @@ import {
   parsePricingMode, parsePromoText,
 } from './caption-section-parsers';
 import { analyzeFlyer, type FlyerAnalysisResult } from './flyer-visual-analyzer';
-import { parseItinerary, resolveLandingFromItinerary } from './itinerary-analyzer';
+import { parseItinerary, resolveLandingFromItinerary, resolveRouteFromItineraryChronology } from './itinerary-analyzer';
 import {
   resolveAirlineName, resolveCityName, classifyPackageType,
   normalizeHotelName, resolveLandingRoute,
@@ -71,38 +71,18 @@ function saveTempImage(buffer: Buffer, prefix: string): string {
 // ── Merge Logic ──────────────────────────────────────────────
 
 /**
- * Merge two ExtractionField values with priority logic.
- * Higher confidence wins. If equal, earlier source (flyer > caption) wins.
+ * Merge fields according to Source Priority Matrix (CR-01 & CR-02).
+ * Evaluates priority list sequentially and selects first non-MISSING value.
  */
-function mergeField<T>(
-  primary: ExtractionField<T>,
-  secondary: ExtractionField<T>
+function mergeByPriority<T>(
+  priorityList: (ExtractionField<T> | null | undefined)[]
 ): ExtractionField<T> {
-  // If primary is MISSING, use secondary
-  if (primary.fieldStatus === 'MISSING' && secondary.fieldStatus !== 'MISSING') {
-    return secondary;
+  for (const field of priorityList) {
+    if (field && field.fieldStatus !== 'MISSING' && field.rawValue !== null && field.rawValue !== undefined) {
+      return field;
+    }
   }
-  // If secondary is MISSING, use primary
-  if (secondary.fieldStatus === 'MISSING') {
-    return primary;
-  }
-  // Both have values — prefer higher confidence
-  if (secondary.confidence > primary.confidence) {
-    return {
-      ...secondary,
-      confidenceFactors: {
-        ...secondary.confidenceFactors,
-        sourceAgreement: primary.rawValue === secondary.rawValue ? 1.0 : 0.50,
-      },
-    };
-  }
-  return {
-    ...primary,
-    confidenceFactors: {
-      ...primary.confidenceFactors,
-      sourceAgreement: primary.rawValue === secondary.rawValue ? 1.0 : 0.50,
-    },
-  };
+  return priorityList.find(f => f !== null && f !== undefined) ?? createMissingField<T>('OPTIONAL');
 }
 
 // ── Draft ID Generation ──────────────────────────────────────
@@ -119,7 +99,7 @@ function generateDraftId(): string {
  * 6-Step Fusion Engine:
  * 1. COLLECT    — Upload flyer, caption, itinerary; run OCR
  * 2. NORMALIZE  — Parse caption sections, normalize dates/prices
- * 3. MERGE      — Combine caption + flyer + itinerary data
+ * 3. MERGE      — Combine data using Source Priority Matrix (CR-01, CR-02)
  * 4. CONFLICT   — Detect disagreements between sources
  * 5. VALIDATE   — Run business validation (V-01 to V-12)
  * 6. DRAFT      — Create N drafts for N dates (R-02)
@@ -208,6 +188,7 @@ export async function executePipeline(input: PipelineInput): Promise<PipelineOut
       airline: createMissingField('MANDATORY'),
       hotelMekkah: createMissingField('RECOMMENDED'),
       hotelMadinah: createMissingField('RECOMMENDED'),
+      landingCity: createMissingField('RECOMMENDED'),
       landingRoute: createMissingField('RECOMMENDED'),
       departureDates: createMissingField('MANDATORY'),
       pricingMode: createExtractedField('SINGLE' as const, 'flyer_ocr', 0.50, 'MANDATORY'),
@@ -228,32 +209,58 @@ export async function executePipeline(input: PipelineInput): Promise<PipelineOut
 
   const itineraryDays = itineraryField.rawValue ?? [];
   const landingFromItinerary = resolveLandingFromItinerary(itineraryDays);
+  const routeFromItinerary = resolveRouteFromItineraryChronology(itineraryDays);
 
   // ═══════════════════════════════════════════════════════════
-  // STEP 3: MERGE (Combine all sources)
+  // STEP 3: MERGE (Source Priority Matrix — CR-06 BR-HOTEL-01)
   // ═══════════════════════════════════════════════════════════
+
+  // Hotel Mekkah & Madinah: Priority 1: Flyer Utama ONLY (BR-HOTEL-01). If missing -> fieldStatus = NEED_REVIEW.
+  const hotelMekkahField = flyerResult.hotelMekkah.fieldStatus !== 'MISSING'
+    ? flyerResult.hotelMekkah
+    : {
+        ...createMissingField('RECOMMENDED'),
+        fieldStatus: 'NEED_REVIEW' as const,
+      };
+
+  const hotelMadinahField = flyerResult.hotelMadinah.fieldStatus !== 'MISSING'
+    ? flyerResult.hotelMadinah
+    : {
+        ...createMissingField('RECOMMENDED'),
+        fieldStatus: 'NEED_REVIEW' as const,
+      };
 
   const merged: PackageExtractionResultV2 = {
-    startingPoint: mergeField(captionCity, flyerResult.departureCity),
-    packageType: mergeField(captionPackageType, flyerResult.packageType),
-    durationDays: mergeField(captionDuration, flyerResult.durationDays),
+    // Starting Point: Flyer > Caption
+    startingPoint: mergeByPriority([flyerResult.departureCity, captionCity]),
+    // Package Type: Flyer > Caption
+    packageType: mergeByPriority([flyerResult.packageType, captionPackageType]),
+    // Duration: Flyer > Caption
+    durationDays: mergeByPriority([flyerResult.durationDays, captionDuration]),
     programName: createMissingField('OPTIONAL'),
 
-    departureDates: mergeField(captionDates, flyerResult.departureDates),
+    // Departure Dates: Flyer > Caption
+    departureDates: mergeByPriority([flyerResult.departureDates, captionDates]),
 
-    airline: mergeField(captionAirline, flyerResult.airline),
-    landingCity: mergeField(landingFromItinerary, createMissingField('RECOMMENDED')),
-    landingRoute: mergeField(
-      flyerResult.landingRoute,
-      createMissingField('RECOMMENDED')
-    ),
+    // Maskapai: Priority 1: Flyer, 2: Caption, 3: Itinerary
+    airline: mergeByPriority([flyerResult.airline, captionAirline]),
 
-    pricingMode: mergeField(captionPricingMode, flyerResult.pricingMode),
-    price: mergeField(captionPrice, flyerResult.price),
+    // Landing Airport: Priority 1: Itinerary, 2: Flyer
+    landingCity: mergeByPriority([landingFromItinerary, flyerResult.landingCity]),
+
+    // Route In-Out: Priority ONLY Itinerary (BR-ROUTE-01)
+    landingRoute: routeFromItinerary.fieldStatus !== 'MISSING'
+      ? routeFromItinerary
+      : mergeByPriority([flyerResult.landingRoute]),
+
+    // Harga Base: Priority 1: Flyer Utama, 2: Caption (Itinerary MUST NEVER be used - BR-SOURCE-01)
+    pricingMode: mergeByPriority([flyerResult.pricingMode, captionPricingMode]),
+    price: mergeByPriority([flyerResult.price, captionPrice]),
     clusters: flyerResult.clusters,
 
-    hotelMekkah: mergeField(captionHotelMekkah, flyerResult.hotelMekkah),
-    hotelMadinah: mergeField(captionHotelMadinah, flyerResult.hotelMadinah),
+    // Hotel Mekkah & Madinah: ONLY Flyer Utama (BR-HOTEL-01 - no Itinerary/caption/route fallback)
+    hotelMekkah: hotelMekkahField,
+    hotelMadinah: hotelMadinahField,
 
     perlengkapan: createMissingField('OPTIONAL'),
     include: captionInclude,
@@ -261,13 +268,14 @@ export async function executePipeline(input: PipelineInput): Promise<PipelineOut
 
     itineraryDraft: itineraryField,
 
-    promoText: mergeField(captionPromo, flyerResult.promoText),
+    promoText: mergeByPriority([flyerResult.promoText, captionPromo]),
     description: flyerResult.description,
     notes: createMissingField('OPTIONAL'),
 
-    upgradeDouble: mergeField(captionUpgrades.upgradeDouble, flyerResult.upgradeDouble),
-    upgradeTriple: mergeField(captionUpgrades.upgradeTriple, flyerResult.upgradeTriple),
-    isAdaPerlengkapan: mergeField(captionEquipment, flyerResult.isAdaPerlengkapan),
+    // Harga Upgrade Kamar: Priority ONLY Caption (BR-UPGRADE-01 — Flyer & Itinerary forbidden)
+    upgradeDouble: captionUpgrades.upgradeDouble,
+    upgradeTriple: captionUpgrades.upgradeTriple,
+    isAdaPerlengkapan: mergeByPriority([captionEquipment, flyerResult.isAdaPerlengkapan]),
   };
 
   // ═══════════════════════════════════════════════════════════
