@@ -10,7 +10,7 @@ export type { OcrResult, OcrField, ImageMetaCheck };
 
 // ── Provider Registry ──────────────────────────────────────
 
-export type OcrProviderType = "google_vision" | "external_api";
+export type OcrProviderType = "google_vision" | "google_ai_studio" | "external_api";
 
 export type OcrHealthStatus = "active" | "cooldown" | "disabled" | "error";
 

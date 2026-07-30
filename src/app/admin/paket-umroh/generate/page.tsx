@@ -1303,7 +1303,7 @@ export default function GeneratePaketPage() {
                 </span>
               </div>
               <p className="text-xs text-emerald-800 dark:text-emerald-200">
-                Sistem Google Vision OCR telah mendeteksi <strong>{ocrDateInfo.count} tanggal keberangkatan</strong> dari flyer utama dan otomatis membuatkan {ocrDateInfo.count} kolom input tanggal:
+                Sistem Google AI Studio (Gemini) telah mendeteksi <strong>{ocrDateInfo.count} tanggal keberangkatan</strong> dari flyer utama dan otomatis membuatkan {ocrDateInfo.count} kolom input tanggal:
               </p>
               <div className="flex flex-wrap gap-2 pt-1">
                 {ocrDateInfo.dates.map((dStr, idx) => (
@@ -1511,7 +1511,7 @@ export default function GeneratePaketPage() {
               </span>
             </div>
             <p className="text-xs text-emerald-800 dark:text-emerald-200">
-              Sistem Google Vision OCR telah mendeteksi <strong>{ocrDateInfo.count} tanggal keberangkatan</strong> dari flyer utama dan otomatis membuatkan {ocrDateInfo.count} kolom input tanggal:
+              Sistem Google AI Studio (Gemini) telah mendeteksi <strong>{ocrDateInfo.count} tanggal keberangkatan</strong> dari flyer utama dan otomatis membuatkan {ocrDateInfo.count} kolom input tanggal:
             </p>
             <div className="flex flex-wrap gap-2 pt-1">
               {ocrDateInfo.dates.map((dStr, idx) => (

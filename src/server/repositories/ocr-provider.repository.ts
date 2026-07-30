@@ -486,19 +486,19 @@ export const ocrProviderRepo = {
     const keys: { label: string; key: string }[] = [];
 
     // Primary key (comma-separated)
-    const mainKey = process.env.GOOGLE_VISION_API_KEY;
+    const mainKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_VISION_API_KEY;
     if (mainKey) {
       const parts = mainKey.split(",").map((k) => k.trim()).filter(Boolean);
       parts.forEach((key, i) => {
-        keys.push({ label: `Google Vision #${i + 1}`, key });
+        keys.push({ label: `Google AI Studio #${i + 1}`, key });
       });
     }
 
-    // Additional keys (GOOGLE_VISION_API_KEY_2 ... _20)
+    // Additional keys (GOOGLE_VISION_API_KEY_2 ... _20 or GEMINI_API_KEY_2 ... _20)
     for (let i = 2; i <= 20; i++) {
-      const extra = process.env[`GOOGLE_VISION_API_KEY_${i}`];
+      const extra = process.env[`GEMINI_API_KEY_${i}`] || process.env[`GOOGLE_VISION_API_KEY_${i}`];
       if (extra?.trim()) {
-        keys.push({ label: `Google Vision #${keys.length + 1}`, key: extra.trim() });
+        keys.push({ label: `Google AI Studio #${keys.length + 1}`, key: extra.trim() });
       }
     }
 
@@ -507,7 +507,7 @@ export const ocrProviderRepo = {
     await prisma.ocrProvider.createMany({
       data: keys.map((k, i) => ({
         label: k.label,
-        providerType: "google_vision" as const,
+        providerType: "google_ai_studio" as const,
         apiKey: k.key,
         rotationOrder: i,
         rotationCount: 2,

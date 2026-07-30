@@ -178,11 +178,11 @@ function ProviderFormModal({
   return (
     <Modal open={open} onClose={onClose} title={initial ? "Edit Provider" : "Tambah Provider"} size="lg">
       <div className="space-y-4">
-        <Input label="Label" value={form.label} onChange={(e) => setForm({ ...form, label: e.target.value })} placeholder="Google Vision #1" />
+        <Input label="Label" value={form.label} onChange={(e) => setForm({ ...form, label: e.target.value })} placeholder="Google AI Studio #1" />
         <Select
           label="Provider Type"
           options={[
-            { value: "google_vision", label: "Google Vision" },
+            { value: "google_vision", label: "Google AI Studio (Gemini)" },
             { value: "external_api", label: "External API" },
           ]}
           value={form.providerType}

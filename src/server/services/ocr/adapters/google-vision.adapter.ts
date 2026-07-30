@@ -58,8 +58,8 @@ function extractField(text: string, field: string): string {
 
 // ── Adapter Implementation ───────────────────────────────
 
-export const googleVisionAdapter: OcrAdapter = {
-  type: "google_vision",
+export const googleAiStudioAdapter: OcrAdapter = {
+  type: "google_ai_studio",
 
   async recognize(
     imageBuffer: Buffer,
@@ -210,3 +210,5 @@ export const googleVisionAdapter: OcrAdapter = {
     }
   },
 };
+
+export const googleVisionAdapter = googleAiStudioAdapter;
