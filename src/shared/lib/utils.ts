@@ -36,3 +36,19 @@ export function formatNumberWithDots(val: string | number): string {
   if (!clean) return "";
   return clean.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
 }
+
+export function formatDateDdMmmmTttt(dateStr: string): string {
+  if (!dateStr || !dateStr.includes("-")) return "";
+  const parts = dateStr.split("-");
+  if (parts.length < 3) return "";
+  const year = parts[0];
+  const monthIdx = parseInt(parts[1], 10) - 1;
+  const day = parts[2].padStart(2, "0");
+  const MONTHS_ID = [
+    "Januari", "Februari", "Maret", "April", "Mei", "Juni",
+    "Juli", "Agustus", "September", "Oktober", "November", "Desember"
+  ];
+  if (monthIdx < 0 || monthIdx > 11) return dateStr;
+  return `${day}/${MONTHS_ID[monthIdx]}/${year}`;
+}
+

@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/shared/components/ui/Button";
 import { Input } from "@/shared/components/ui/Input";
 import { SearchableSelect } from "@/shared/components/ui/SearchableSelect";
-import { cn, formatNumberWithDots } from "@/shared/lib/utils";
+import { cn, formatNumberWithDots, formatDateDdMmmmTttt } from "@/shared/lib/utils";
 import { 
   MOCK_LANDING_PATTERN, 
   MOCK_KLASTER
@@ -1782,33 +1782,47 @@ export default function GeneratePaketPage() {
                           {index + 1}
                         </td>
                         <td className="px-3 py-2">
-                          <Input
-                            type="date"
-                            value={row.departureDate}
-                            onChange={(e) => handleDepartureDateChange(index, e.target.value)}
-                            className="h-8 text-xs font-mono max-w-[200px]"
-                          />
-                        </td>
-                        <td className="px-3 py-2">
-                          <div className="flex items-center gap-1.5">
+                          <div className="flex flex-col gap-1">
                             <Input
                               type="date"
-                              value={row.arrivalDate}
-                              onChange={(e) => handleArrivalDateChange(index, e.target.value)}
-                              className={cn(
-                                "h-8 text-xs font-mono max-w-[200px]",
-                                row.isManualOverride && "border-amber-400 bg-amber-50/40 text-amber-950 font-semibold dark:bg-amber-950/30 dark:text-amber-200"
-                              )}
+                              value={row.departureDate}
+                              onChange={(e) => handleDepartureDateChange(index, e.target.value)}
+                              className="h-8 text-xs font-mono max-w-[200px]"
                             />
-                            {row.isManualOverride && row.departureDate && (
-                              <button
-                                type="button"
-                                onClick={() => handleRecalculateArrival(index)}
-                                className="text-[10px] text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950 border border-amber-300 dark:border-amber-700 hover:bg-amber-100 px-1.5 py-1 rounded transition-colors flex items-center gap-1 whitespace-nowrap"
-                                title="Hitung ulang tanggal kepulangan secara otomatis"
-                              >
-                                ↻ Hitung Ulang
-                              </button>
+                            {row.departureDate && (
+                              <span className="text-[11px] font-semibold text-emerald-800 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-200 dark:border-emerald-800 w-fit">
+                                🛫 {formatDateDdMmmmTttt(row.departureDate)}
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-3 py-2">
+                          <div className="flex flex-col gap-1">
+                            <div className="flex items-center gap-1.5">
+                              <Input
+                                type="date"
+                                value={row.arrivalDate}
+                                onChange={(e) => handleArrivalDateChange(index, e.target.value)}
+                                className={cn(
+                                  "h-8 text-xs font-mono max-w-[200px]",
+                                  row.isManualOverride && "border-amber-400 bg-amber-50/40 text-amber-950 font-semibold dark:bg-amber-950/30 dark:text-amber-200"
+                                )}
+                              />
+                              {row.isManualOverride && row.departureDate && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleRecalculateArrival(index)}
+                                  className="text-[10px] text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950 border border-amber-300 dark:border-amber-700 hover:bg-amber-100 px-1.5 py-1 rounded transition-colors flex items-center gap-1 whitespace-nowrap"
+                                  title="Hitung ulang tanggal kepulangan secara otomatis"
+                                >
+                                  ↻ Hitung Ulang
+                                </button>
+                              )}
+                            </div>
+                            {row.arrivalDate && (
+                              <span className="text-[11px] font-semibold text-emerald-800 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-200 dark:border-emerald-800 w-fit">
+                                🛬 {formatDateDdMmmmTttt(row.arrivalDate)}
+                              </span>
                             )}
                           </div>
                         </td>
