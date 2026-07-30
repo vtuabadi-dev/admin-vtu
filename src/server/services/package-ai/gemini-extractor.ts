@@ -85,7 +85,10 @@ export async function extractWithGemini(
     `  - Seluruh Master Hotel: [${allHotelsStr}]\n` +
     `  - ATURAN SIMILARITY: Jika di flyer/caption tertulis misal "Anjum Makkah 5*", "Hotel Anjum", "Anjum 5*", atau "Anjum Tower", PILIH PERSIS NAMA "ANJUM HOTEL MAKKAH" dari daftar di atas karena memiliki similarity tertinggi!\n` +
     `• Harga Base Paket: Ekstrak harga dasar paket (klaster ataupun non-klaster) dari flyer (hanya angka nominal).\n` +
-    `• Tanggal Keberangkatan: Cari dan kumpulkan SEMUA tanggal keberangkatan yang ada di flyer utama (bisa 1, 2, 4, 5, 6 atau lebih tanggal). Format wajib YYYY-MM-DD.\n\n` +
+    `• Tanggal Keberangkatan: Cari dan kumpulkan SEMUA tanggal keberangkatan yang ada di flyer utama & caption (contoh di flyer: "12 JULI 2026 | 4 AGUSTUS 2026 | 6 SEPTEMBER 2026 | 15 SEPTEMBER 2026 | 4 OKTOBER 2026 | 13 OKTOBER 2026 | 4 NOVEMBER 2026 | 25 NOVEMBER 2026").\n` +
+    `  - ATURAN DETEKSI TANGGAL: Satu tanggal adalah yang diawali dengan angka TANGGAL (1-31) + Nama Bulan + diakhiri TAHUN 4-digit (cth: 2026).\n` +
+    `  - ABAIKAN TANDA PIPE '|': Tanda '|' adalah pemisah antar tanggal, sehingga setiap tanggal diantara tanda '|' adalah TANGGAL TERPISAH YANG BERBEDABEDA!\n` +
+    `  - Ekstrak KESELURUH TANGGAL (bisa 1, 2, 4, 6, 8 atau lebih) ke dalam array 'departureDates' dengan format wajib 'YYYY-MM-DD'.\n\n` +
     `==========================================================\n` +
     `2. SUMBER DATA: CAPTION (TEKS SOSIAL MEDIA / DESKRIPSI)\n` +
     `==========================================================\n` +
