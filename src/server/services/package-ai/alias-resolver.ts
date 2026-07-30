@@ -170,6 +170,7 @@ const INTERNATIONAL_CARRIERS: Record<string, string> = {
  * Returns the input text unchanged if no alias is found.
  */
 export function resolveAirline(text: string): string {
+  if (!text || text.includes("No OCR providers configured")) return "";
   const cleaned = text.trim().toUpperCase();
 
   // First priority: Check if string matches or contains an International Umrah Carrier
@@ -186,24 +187,23 @@ export function resolveAirline(text: string): string {
     }
   }
 
-  return text.trim();
+  return "";
 }
 
 /**
  * Resolve a city name from any common alias (airport code, shorthand)
  * to canonical Indonesian city name.
- * Returns the input text unchanged if no alias is found.
+ * Returns empty string if no alias is found.
  */
 export function resolveCity(text: string): string {
+  if (!text || text.includes("No OCR providers configured")) return "";
   const cleaned = text.trim().toUpperCase();
   if (CITY_ALIASES[cleaned]) return CITY_ALIASES[cleaned];
   
-  if (cleaned.length > 20) {
-    for (const [alias, canonical] of Object.entries(CITY_ALIASES)) {
-      if (cleaned.includes(alias)) return canonical;
-    }
+  for (const [alias, canonical] of Object.entries(CITY_ALIASES)) {
+    if (cleaned.includes(alias)) return canonical;
   }
-  return text.trim();
+  return "";
 }
 
 /**

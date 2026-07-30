@@ -137,19 +137,16 @@ export async function processPackageFlyer(
   }
 
   // --- FALLBACK REGEX PARSER ---
-  const combinedText = [caption, ocrResult.rawText].filter(Boolean).join("\n\n");
+  const cleanOcrText = ocrResult.rawText?.includes("No OCR providers configured") ? "" : (ocrResult.rawText || "");
+  const combinedText = [caption, cleanOcrText].filter(Boolean).join("\n\n");
   
   // Parse the combined text
   const captionFields = parseCaption(combinedText);
 
-  // We don't need additional fallback for ocrAirline / ocrCity since parseCaption now reads the OCR text too,
-  // but we leave it as a safe fallback just in case.
-  const ocrAirline = ocrResult.rawText ? resolveAirline(ocrResult.rawText.trim()) : "";
-  const ocrCity = ocrResult.rawText ? resolveCity(ocrResult.rawText.trim()) : "";
+  const ocrAirline = cleanOcrText ? resolveAirline(cleanOcrText.trim()) : "";
+  const ocrCity = cleanOcrText ? resolveCity(cleanOcrText.trim()) : "";
 
   // Build the final extraction result
-  // Caption data takes priority for structured fields,
-  // OCR provides supplemental data
   const result: PackageExtractionResult = {
     title: captionFields.title || "Untitled Package",
     packageType: captionFields.packageType || "umroh_reguler",
@@ -159,13 +156,18 @@ export async function processPackageFlyer(
     hotelMadinah: captionFields.hotelMadinah || "",
     roomUpgrade: captionFields.roomUpgrade,
     hotelUpgrade: captionFields.hotelUpgrade,
+    upgradeDouble: captionFields.upgradeDouble,
+    upgradeTriple: captionFields.upgradeTriple,
+    isAdaPerlengkapan: captionFields.isAdaPerlengkapan,
+    hargaBase: captionFields.hargaBase,
+    clusters: captionFields.clusters,
     durationDays: captionFields.durationDays || 0,
     departureDates: captionFields.departureDates || [],
     promoText: captionFields.promoText,
     description: captionFields.description,
     rawCaption: caption,
-    rawOcrText: ocrResult.rawText || "",
-    confidence: ocrResult.overallConfidence || 0,
+    rawOcrText: cleanOcrText,
+    confidence: isGeminiSuccess ? 1 : 0.7,
   };
 
   return result;

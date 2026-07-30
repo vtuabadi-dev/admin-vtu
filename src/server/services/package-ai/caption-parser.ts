@@ -551,18 +551,24 @@ export function parseCaption(caption: string): Partial<PackageExtractionResult> 
   const firstLine = trimmed.split("\n")[0]?.trim() ?? "";
   const title = firstLine || `Paket ${PACKAGE_TYPE_LABELS[packageType] ?? packageType}${duration ? ` ${duration} Hari` : ""}`;
 
-  // Departure city: "BERANGKAT JAKARTA" or "BERANGKAT DARI JAKARTA"
+  // Departure city: "BERANGKAT JAKARTA", "STARTING SURABAYA", etc.
   let departureCity = "";
-  const cityMatch = trimmed.match(/BERANGKAT\s+(?:DARI\s+)?(.+?)(?:$|\n)/i);
+  const cityMatch = trimmed.match(/(?:BERANGKAT\s+(?:DARI\s+)?|START(?:ING)?\s+)(.+?)(?:$|\n|\*|\|)/i);
   if (cityMatch?.[1]) {
     departureCity = resolveCity(cityMatch[1].trim());
   }
+  if (!departureCity) {
+    departureCity = resolveCity(trimmed);
+  }
 
-  // Airline: "MASKAPAI SAUDIA" or "MASKAPAI: SAUDIA"
+  // Airline: "MASKAPAI SAUDIA", "FLIGHT BY SAUDIA", or scan entire text
   let airline = "";
   const airlineMatch = trimmed.match(/MASKAPAI\s*[:=]?\s*(.+?)(?:$|\n)/i);
   if (airlineMatch?.[1]) {
     airline = resolveAirline(airlineMatch[1].trim());
+  }
+  if (!airline) {
+    airline = resolveAirline(trimmed);
   }
 
   // Hotels
