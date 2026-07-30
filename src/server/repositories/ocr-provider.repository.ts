@@ -96,7 +96,7 @@ export const ocrProviderRepo = {
     const row = await prisma.ocrProvider.create({
       data: {
         label: input.label,
-        providerType: input.providerType,
+        providerType: (input.providerType === "google_ai_studio" ? "google_vision" : input.providerType) as any,
         apiKey: input.apiKey,
         apiUrl: input.apiUrl ?? null,
         apiHeaderName: input.apiHeaderName ?? null,
@@ -507,7 +507,7 @@ export const ocrProviderRepo = {
     await prisma.ocrProvider.createMany({
       data: keys.map((k, i) => ({
         label: k.label,
-        providerType: "google_ai_studio" as const,
+        providerType: "google_vision" as const,
         apiKey: k.key,
         rotationOrder: i,
         rotationCount: 2,

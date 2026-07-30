@@ -7,7 +7,7 @@
 // ============================================================
 
 import { ocrProviderRepo } from "@/server/repositories/ocr-provider.repository";
-import { googleAiStudioAdapter, googleVisionAdapter } from "./adapters/google-vision.adapter";
+import { googleAiStudioAdapter } from "./adapters/google-vision.adapter";
 import { externalApiAdapter } from "./adapters/external-api.adapter";
 import type { OcrAdapter, OcrAdapterConfig } from "./adapters/adapter.interface";
 import type { OcrProviderRecord } from "./types";
