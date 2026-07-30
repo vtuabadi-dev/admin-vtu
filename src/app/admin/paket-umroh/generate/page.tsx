@@ -52,6 +52,18 @@ export default function GeneratePaketPage() {
   const [ocrWarning, setOcrWarning] = useState("");
   const [ocrSuccess, setOcrSuccess] = useState(false);
   const [ocrDateInfo, setOcrDateInfo] = useState<{ count: number; dates: string[] } | null>(null);
+  const [rawOcrResult, setRawOcrResult] = useState<{
+    extracted: any;
+    mapped: {
+      airline: string | null;
+      city: string | null;
+      packageType: string | null;
+      route: string | null;
+      hotelMekkah: string | null;
+      hotelMadinah: string | null;
+    };
+  } | null>(null);
+  const [activeCanvasTab, setActiveCanvasTab] = useState<"summary" | "json">("summary");
   const dropRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -453,12 +465,28 @@ export default function GeneratePaketPage() {
   };
 
   const matchHotel = (name: string, list: any[]) => {
-    if (!name) return "";
-    const clean = name.toLowerCase().replace(/[^a-z0-9]/g, "");
-    const match = list.find(item => {
-      const nClean = item.name.toLowerCase().replace(/[^a-z0-9]/g, "");
+    if (!name || !list || list.length === 0) return "";
+    const clean = name.toLowerCase().replace(/[^a-z0-9\s]/g, "").trim();
+    if (!clean) return "";
+
+    // 1. Direct substring search
+    let match = list.find(item => {
+      const nClean = (item.name || "").toLowerCase().replace(/[^a-z0-9\s]/g, "");
       return nClean.includes(clean) || clean.includes(nClean);
     });
+
+    // 2. Token overlap search (e.g. "anjum" in "Anjum Hotel Makkah")
+    if (!match) {
+      const stopWords = ["hotel", "makkah", "mekkah", "madinah", "medina", "star", "bintang", "room", "resort", "suite", "suites", "tower", "towers"];
+      const tokens = clean.split(/\s+/).filter(t => t.length >= 3 && !stopWords.includes(t));
+      if (tokens.length > 0) {
+        match = list.find(item => {
+          const nClean = (item.name || "").toLowerCase();
+          return tokens.some(t => nClean.includes(t));
+        });
+      }
+    }
+
     return match ? match.id : "";
   };
 
@@ -688,6 +716,18 @@ export default function GeneratePaketPage() {
             });
           }
         }
+
+        setRawOcrResult({
+          extracted: result,
+          mapped: {
+            airline: mappedAirline ? (airlineList.find(a => a.id === mappedAirline)?.name || mappedAirline) : null,
+            city: mappedCity ? (options?.cities?.find(c => c.id === mappedCity)?.name || mappedCity) : null,
+            packageType: mappedPackageType ? (options?.packageTypes?.find(p => p.id === mappedPackageType)?.name || mappedPackageType) : null,
+            route: mappedLandingRoute ? (routesList.find((r: any) => r.id === mappedLandingRoute)?.kode || mappedLandingRoute) : null,
+            hotelMekkah: mappedHotelMekkah ? (options?.hotels?.find(h => h.id === mappedHotelMekkah)?.name || mappedHotelMekkah) : null,
+            hotelMadinah: mappedHotelMadinah ? (options?.hotels?.find(h => h.id === mappedHotelMadinah)?.name || mappedHotelMadinah) : null,
+          }
+        });
 
         if (resJson.data?.warning) {
           warningMessages.push(`${flyerUtama.name}: ${resJson.data.warning}`);
@@ -2158,6 +2198,173 @@ export default function GeneratePaketPage() {
                 <div className="flex items-center gap-2 bg-green-50 border border-green-200 text-green-800 text-xs p-3 rounded-md">
                   <Sparkles className="h-4 w-4 text-green-600" />
                   <div>Data berhasil diekstraksi dari {flyerFiles.length} brosur! Silakan verifikasi formulir di sebelah kanan.</div>
+                </div>
+              )}
+
+              {/* ── CANVAS INSPEKSI HASIL EKSTRAKSI AI / OCR ── */}
+              {rawOcrResult && (
+                <div className="p-4 bg-slate-900 text-slate-100 rounded-xl border border-slate-700 shadow-xl space-y-4 my-3">
+                  <div className="flex items-center justify-between flex-wrap gap-2 border-b border-slate-700 pb-3">
+                    <div className="flex items-center gap-2">
+                      <div className="p-2 bg-emerald-500/20 text-emerald-400 rounded-lg">
+                        <Sparkles className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <h3 className="font-extrabold text-sm text-white flex items-center gap-2">
+                          Canvas Inspeksi Hasil Ekstraksi AI
+                          <span className="text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded-full font-mono">
+                            Raw & Mapped Data
+                          </span>
+                        </h3>
+                        <p className="text-xs text-slate-400">
+                          Data mentah hasil scan flyer sebelum dimasukkan ke dalam formulir master.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1 bg-slate-800 p-1 rounded-lg border border-slate-700">
+                      <button
+                        type="button"
+                        onClick={() => setActiveCanvasTab("summary")}
+                        className={cn(
+                          "px-2.5 py-1 text-xs font-bold rounded-md transition-colors",
+                          activeCanvasTab === "summary"
+                            ? "bg-emerald-600 text-white shadow-xs"
+                            : "text-slate-400 hover:text-white"
+                        )}
+                      >
+                        📊 Ringkasan Data
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setActiveCanvasTab("json")}
+                        className={cn(
+                          "px-2.5 py-1 text-xs font-bold rounded-md transition-colors",
+                          activeCanvasTab === "json"
+                            ? "bg-emerald-600 text-white shadow-xs"
+                            : "text-slate-400 hover:text-white"
+                        )}
+                      >
+                        {`{ }`} Raw JSON
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Tab 1: Ringkasan Status Mapping */}
+                  {activeCanvasTab === "summary" && (
+                    <div className="space-y-3 text-xs">
+                      <div className="grid grid-cols-1 gap-3">
+                        {/* Main Package Fields */}
+                        <div className="p-3 bg-slate-800/80 rounded-lg border border-slate-700/80 space-y-2">
+                          <h4 className="font-bold text-emerald-400 text-xs uppercase tracking-wider border-b border-slate-700 pb-1 flex items-center justify-between">
+                            <span>Dasar Paket & Penerbangan</span>
+                            <span className="text-[10px] text-slate-400">Scan Result</span>
+                          </h4>
+                          <div className="space-y-1.5 font-mono text-[11px]">
+                            <div className="flex justify-between items-center bg-slate-900/60 p-1.5 rounded">
+                              <span className="text-slate-400 font-sans">Jenis Paket:</span>
+                              <span className="text-slate-200">{rawOcrResult.extracted.packageType || "-"} ➔ <strong className={rawOcrResult.mapped.packageType ? "text-emerald-400" : "text-amber-400"}>{rawOcrResult.mapped.packageType || "REG"}</strong></span>
+                            </div>
+                            <div className="flex justify-between items-center bg-slate-900/60 p-1.5 rounded">
+                              <span className="text-slate-400 font-sans">Starting Point:</span>
+                              <span className="text-slate-200">{rawOcrResult.extracted.departureCity || "-"} ➔ <strong className={rawOcrResult.mapped.city ? "text-emerald-400" : "text-red-400"}>{rawOcrResult.mapped.city || "Unmatched ❌"}</strong></span>
+                            </div>
+                            <div className="flex justify-between items-center bg-slate-900/60 p-1.5 rounded">
+                              <span className="text-slate-400 font-sans">Maskapai:</span>
+                              <span className="text-slate-200">{rawOcrResult.extracted.airline || "-"} ➔ <strong className={rawOcrResult.mapped.airline ? "text-emerald-400" : "text-red-400"}>{rawOcrResult.mapped.airline || "Unmatched ❌"}</strong></span>
+                            </div>
+                            <div className="flex justify-between items-center bg-slate-900/60 p-1.5 rounded">
+                              <span className="text-slate-400 font-sans">Rute In-Out:</span>
+                              <span className="text-slate-200">{rawOcrResult.extracted.landingRoute || "-"} ➔ <strong className={rawOcrResult.mapped.route ? "text-emerald-400" : "text-amber-400"}>{rawOcrResult.mapped.route || "Unmatched ❌"}</strong></span>
+                            </div>
+                            <div className="flex justify-between items-center bg-slate-900/60 p-1.5 rounded">
+                              <span className="text-slate-400 font-sans">Durasi:</span>
+                              <span className="text-emerald-400 font-bold">{rawOcrResult.extracted.durationDays || "-"} Hari</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Dates & Base Hotel */}
+                        <div className="p-3 bg-slate-800/80 rounded-lg border border-slate-700/80 space-y-2">
+                          <h4 className="font-bold text-emerald-400 text-xs uppercase tracking-wider border-b border-slate-700 pb-1 flex items-center justify-between">
+                            <span>Hotel & Tanggal Keberangkatan</span>
+                            <span className="text-[10px] text-slate-400">Flyer #1</span>
+                          </h4>
+                          <div className="space-y-1.5 font-mono text-[11px]">
+                            <div className="flex justify-between items-center bg-slate-900/60 p-1.5 rounded">
+                              <span className="text-slate-400 font-sans">Hotel Mekkah:</span>
+                              <span className="text-slate-200">{rawOcrResult.extracted.hotelMekkah || "-"} ➔ <strong className={rawOcrResult.mapped.hotelMekkah ? "text-emerald-400" : "text-amber-400"}>{rawOcrResult.mapped.hotelMekkah || "Belum Terhubung ⚠️"}</strong></span>
+                            </div>
+                            <div className="flex justify-between items-center bg-slate-900/60 p-1.5 rounded">
+                              <span className="text-slate-400 font-sans">Hotel Madinah:</span>
+                              <span className="text-slate-200">{rawOcrResult.extracted.hotelMadinah || "-"} ➔ <strong className={rawOcrResult.mapped.hotelMadinah ? "text-emerald-400" : "text-amber-400"}>{rawOcrResult.mapped.hotelMadinah || "Belum Terhubung ⚠️"}</strong></span>
+                            </div>
+                            <div className="flex justify-between items-center bg-slate-900/60 p-1.5 rounded">
+                              <span className="text-slate-400 font-sans">Harga Base:</span>
+                              <span className="text-emerald-400 font-bold">Rp {formatNumberWithDots(String(rawOcrResult.extracted.hargaBase || 0))}</span>
+                            </div>
+                            <div className="flex justify-between items-center bg-slate-900/60 p-1.5 rounded">
+                              <span className="text-slate-400 font-sans">Tanggal Terdeteksi:</span>
+                              <span className="text-emerald-400 font-bold">{Array.isArray(rawOcrResult.extracted.departureDates) ? rawOcrResult.extracted.departureDates.join(", ") : (rawOcrResult.extracted.departureDates || "-")}</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Klaster Seat Details if available */}
+                      {rawOcrResult.extracted.clusters && rawOcrResult.extracted.clusters.length > 0 && (
+                        <div className="p-3 bg-slate-800/80 rounded-lg border border-slate-700/80 space-y-2">
+                          <h4 className="font-bold text-amber-400 text-xs uppercase tracking-wider border-b border-slate-700 pb-1">
+                            Data Klaster Extracted ({rawOcrResult.extracted.clusters.length} Klaster Ditemukan)
+                          </h4>
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-left border-collapse text-[10px] font-mono">
+                              <thead>
+                                <tr className="bg-slate-900/80 text-slate-400 border-b border-slate-700">
+                                  <th className="p-1">Klaster</th>
+                                  <th className="p-1">Hotel Mekkah</th>
+                                  <th className="p-1">Hotel Madinah</th>
+                                  <th className="p-1">Harga Base</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-700/50">
+                                {rawOcrResult.extracted.clusters.map((c: any, idx: number) => (
+                                  <tr key={idx} className="hover:bg-slate-700/30">
+                                    <td className="p-1 font-bold text-amber-300">{c.clusterName || `Klaster #${idx+1}`}</td>
+                                    <td className="p-1 text-slate-300">{c.hotelMekkah || "-"}</td>
+                                    <td className="p-1 text-slate-300">{c.hotelMadinah || "-"}</td>
+                                    <td className="p-1 text-emerald-400 font-bold">Rp {formatNumberWithDots(String(c.hargaBase || 0))}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Tab 2: Raw JSON View */}
+                  {activeCanvasTab === "json" && (
+                    <div className="space-y-2">
+                      <div className="flex justify-between items-center">
+                        <span className="text-[11px] text-slate-400 font-mono">Payload JSON Gemini AI:</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            navigator.clipboard.writeText(JSON.stringify(rawOcrResult.extracted, null, 2));
+                            alert("Raw JSON berhasil disalin ke clipboard!");
+                          }}
+                          className="text-[10px] bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-slate-700 px-2 py-0.5 rounded transition-colors"
+                        >
+                          📋 Salin JSON
+                        </button>
+                      </div>
+                      <pre className="p-3 bg-slate-950 border border-slate-800 rounded-lg text-emerald-400 font-mono text-[11px] overflow-x-auto max-h-[300px] overflow-y-auto">
+                        {JSON.stringify(rawOcrResult.extracted, null, 2)}
+                      </pre>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
