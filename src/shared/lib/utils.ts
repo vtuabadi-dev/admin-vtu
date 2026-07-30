@@ -41,14 +41,16 @@ export function formatDateDdMmmmTttt(dateStr: string): string {
   if (!dateStr || !dateStr.includes("-")) return "";
   const parts = dateStr.split("-");
   if (parts.length < 3) return "";
-  const year = parts[0];
-  const monthIdx = parseInt(parts[1], 10) - 1;
-  const day = parts[2].padStart(2, "0");
+  const year = parts[0] ?? "";
+  const rawMonth = parts[1] ?? "";
+  const rawDay = parts[2] ?? "";
+  const monthIdx = parseInt(rawMonth, 10) - 1;
+  const day = rawDay.padStart(2, "0");
   const MONTHS_ID = [
     "Januari", "Februari", "Maret", "April", "Mei", "Juni",
     "Juli", "Agustus", "September", "Oktober", "November", "Desember"
   ];
-  if (monthIdx < 0 || monthIdx > 11) return dateStr;
+  if (isNaN(monthIdx) || monthIdx < 0 || monthIdx > 11) return dateStr;
   return `${day}/${MONTHS_ID[monthIdx]}/${year}`;
 }
 
