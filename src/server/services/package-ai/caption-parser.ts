@@ -575,6 +575,26 @@ export function parseCaption(caption: string): Partial<PackageExtractionResult> 
   const hotelMekkah = extractHotel(trimmed, "mekkah");
   const hotelMadinah = extractHotel(trimmed, "madinah");
 
+  const MONTHS_IND = [
+    "Januari", "Februari", "Maret", "April", "Mei", "Juni",
+    "Juli", "Agustus", "September", "Oktober", "November", "Desember"
+  ];
+
+  const departureDateDetails = dates.map((isoDate) => {
+    const parts = isoDate.split("-");
+    const year = parts[0] ?? "";
+    const monthIdx = parseInt(parts[1] ?? "1", 10) - 1;
+    const day = parts[2]?.padStart(2, "0") ?? "";
+    const monthName = MONTHS_IND[monthIdx] ?? "";
+    return {
+      dd: day,
+      mmmm: monthName,
+      tttt: year,
+      formatted: `${day}/${monthName}/${year}`,
+      iso: isoDate
+    };
+  });
+
   return {
     title,
     packageType,
@@ -590,6 +610,7 @@ export function parseCaption(caption: string): Partial<PackageExtractionResult> 
     clusters: captionClusters.length > 0 ? captionClusters : undefined,
     durationDays: duration,
     departureDates: dates,
+    departureDateDetails,
     promoText: promo,
     description,
     rawCaption: trimmed,

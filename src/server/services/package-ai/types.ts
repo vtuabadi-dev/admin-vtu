@@ -13,6 +13,14 @@ export interface ClusterExtractionItem {
   upgradeTriple?: string;
 }
 
+export interface DepartureDateDetail {
+  dd: string;
+  mmmm: string;
+  tttt: string;
+  formatted: string;
+  iso: string;
+}
+
 /**
  * Result of extracting package data from a flyer image + caption.
  * Fields are populated by OCR and caption parsing, then merged.
@@ -34,6 +42,7 @@ export interface PackageExtractionResult {
   clusters?: ClusterExtractionItem[];
   durationDays: number;
   departureDates: string[];
+  departureDateDetails?: DepartureDateDetail[];
   promoText?: string;
   description?: string;
   rawCaption: string;

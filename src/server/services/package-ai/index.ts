@@ -163,6 +163,7 @@ export async function processPackageFlyer(
     clusters: captionFields.clusters,
     durationDays: captionFields.durationDays || 0,
     departureDates: captionFields.departureDates || [],
+    departureDateDetails: captionFields.departureDateDetails,
     promoText: captionFields.promoText,
     description: captionFields.description,
     rawCaption: caption,
