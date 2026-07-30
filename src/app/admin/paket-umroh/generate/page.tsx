@@ -63,7 +63,7 @@ export default function GeneratePaketPage() {
       hotelMadinah: string | null;
     };
   } | null>(null);
-  const [activeCanvasTab, setActiveCanvasTab] = useState<"summary" | "json">("summary");
+  const [activeCanvasTab, setActiveCanvasTab] = useState<"summary" | "json" | "dates">("summary");
   const dropRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -2289,6 +2289,18 @@ export default function GeneratePaketPage() {
                       >
                         {`{ }`} Raw JSON
                       </button>
+                      <button
+                        type="button"
+                        onClick={() => setActiveCanvasTab("dates")}
+                        className={cn(
+                          "px-2.5 py-1 text-xs font-bold rounded-md transition-colors",
+                          activeCanvasTab === "dates"
+                            ? "bg-emerald-600 text-white shadow-xs"
+                            : "text-slate-400 hover:text-white"
+                        )}
+                      >
+                        📅 Inspeksi Tanggal
+                      </button>
                     </div>
                   </div>
 
@@ -2405,6 +2417,131 @@ export default function GeneratePaketPage() {
                       <pre className="p-3 bg-slate-950 border border-slate-800 rounded-lg text-emerald-400 font-mono text-[11px] overflow-x-auto max-h-[300px] overflow-y-auto">
                         {JSON.stringify(rawOcrResult.extracted, null, 2)}
                       </pre>
+                    </div>
+                  )}
+
+                  {/* Tab 3: Detailed Date Extraction & Pattern Inspector */}
+                  {activeCanvasTab === "dates" && (
+                    <div className="space-y-3 text-xs">
+                      {/* Engine Diagnostic Badge */}
+                      <div className="p-3 bg-slate-800/80 rounded-lg border border-slate-700 space-y-2">
+                        <div className="flex justify-between items-center flex-wrap gap-2 border-b border-slate-700 pb-2">
+                          <span className="font-bold text-emerald-400 uppercase tracking-wider text-[11px]">
+                            🔍 Diagnostik Mesin Ekstraksi Tanggal
+                          </span>
+                          <span className="text-[10px] bg-slate-900 border border-slate-700 px-2 py-0.5 rounded text-slate-300 font-mono">
+                            Confidence Score: <strong className={rawOcrResult.extracted.confidence >= 0.8 ? "text-emerald-400" : "text-amber-400"}>{rawOcrResult.extracted.confidence ?? 0.7}</strong>
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-2 font-mono text-[11px]">
+                          <div className="bg-slate-900/80 p-2 rounded border border-slate-800">
+                            <span className="text-slate-400 text-[10px] block">Provider AI/OCR:</span>
+                            <span className="text-emerald-400 font-bold">
+                              {rawOcrResult.extracted.confidence >= 0.8 ? "Gemini Vision AI (Image)" : "Regex Engine Fallback"}
+                            </span>
+                          </div>
+                          <div className="bg-slate-900/80 p-2 rounded border border-slate-800">
+                            <span className="text-slate-400 text-[10px] block">Jumlah Tanggal Terbaca:</span>
+                            <span className="text-emerald-400 font-bold">
+                              {(rawOcrResult.extracted.departureDates?.length || 0)} Tanggal
+                            </span>
+                          </div>
+                          <div className="bg-slate-900/80 p-2 rounded border border-slate-800">
+                            <span className="text-slate-400 text-[10px] block">Aturan Pola Aktif:</span>
+                            <span className="text-amber-300 font-bold">
+                              2 Angka + Nama Bulan + 4 Angka Tahun
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Detailed Table of Extracted Dates */}
+                      {rawOcrResult.extracted.departureDates && rawOcrResult.extracted.departureDates.length > 0 ? (
+                        <div className="p-3 bg-slate-800/80 rounded-lg border border-slate-700 space-y-2">
+                          <h4 className="font-bold text-emerald-400 text-xs uppercase tracking-wider border-b border-slate-700 pb-1 flex justify-between items-center">
+                            <span>Rincian Hasil Ekstraksi Tanggal ({rawOcrResult.extracted.departureDates.length} Tanggal)</span>
+                            <span className="text-[10px] text-slate-400 font-mono">Format dd / mmmm / tttt</span>
+                          </h4>
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-left border-collapse text-[11px] font-mono">
+                              <thead>
+                                <tr className="bg-slate-900/90 text-slate-400 border-b border-slate-700">
+                                  <th className="p-2 w-10 text-center">No</th>
+                                  <th className="p-2">dd (Tanggal)</th>
+                                  <th className="p-2">mmmm (Bulan)</th>
+                                  <th className="p-2">tttt (Tahun)</th>
+                                  <th className="p-2">Format Teks dd/mmmm/tttt</th>
+                                  <th className="p-2">ISO Standard YYYY-MM-DD</th>
+                                  <th className="p-2 text-center">Status Match</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-700/60">
+                                {rawOcrResult.extracted.departureDates.map((dateStr: string, idx: number) => {
+                                  const parts = String(dateStr).split("-");
+                                  const year = parts[0] ?? "";
+                                  const rawMonth = parts[1] ?? "";
+                                  const day = (parts[2] ?? "").padStart(2, "0");
+                                  const MONTHS_ID = [
+                                    "Januari", "Februari", "Maret", "April", "Mei", "Juni",
+                                    "Juli", "Agustus", "September", "Oktober", "November", "Desember"
+                                  ];
+                                  const mIdx = parseInt(rawMonth, 10) - 1;
+                                  const monthName = MONTHS_ID[mIdx] ?? rawMonth;
+
+                                  return (
+                                    <tr key={idx} className="hover:bg-slate-700/40 transition-colors">
+                                      <td className="p-2 text-center font-bold text-slate-400">{idx + 1}</td>
+                                      <td className="p-2 font-bold text-amber-300">{day}</td>
+                                      <td className="p-2 font-bold text-emerald-300">{monthName}</td>
+                                      <td className="p-2 font-bold text-sky-300">{year}</td>
+                                      <td className="p-2 font-bold text-emerald-400 bg-slate-900/50 rounded px-2">
+                                        {day}/{monthName}/{year}
+                                      </td>
+                                      <td className="p-2 font-mono text-slate-300">{dateStr}</td>
+                                      <td className="p-2 text-center">
+                                        <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] px-2 py-0.5 rounded-full">
+                                          ✓ Valid Match
+                                        </span>
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      ) : (
+                        /* Diagnostic Box when no dates are extracted */
+                        <div className="p-4 bg-amber-950/40 border border-amber-500/40 rounded-lg space-y-2 text-amber-200 text-xs">
+                          <div className="flex items-center gap-2 font-bold text-amber-400">
+                            <span>⚠️ Tanggal Belum Terekstraksi (departureDates: [])</span>
+                          </div>
+                          <p className="text-[11px] leading-relaxed text-slate-300">
+                            <strong>Mengapa tanggal belum muncul?</strong><br />
+                            1. Teks caption yang dimasukkan tidak memiliki baris daftar tanggal.<br />
+                            2. Posisi tanggal berada di dalam gambar flyer fisik (<code className="bg-slate-900 text-emerald-400 px-1 py-0.5 rounded font-mono">CONFIRMED DATE</code>).<br />
+                            3. Provider Vision API / Gemini API Key belum aktif pada environment lokal ini, sehingga gambar fisik flyer belum dipindai oleh Gemini AI Vision.
+                          </p>
+                          <div className="p-2 bg-slate-900 rounded text-[11px] font-mono text-emerald-300 border border-slate-800">
+                            💡 <strong>Solusi Quick Test:</strong> Tambahkan teks tanggal di kolom caption, misal:<br />
+                            <code className="text-amber-300 font-bold block mt-1">12 JULI 2026 | 4 AGUSTUS 2026 | 6 SEPTEMBER 2026 | 15 SEPTEMBER 2026</code>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Rule Trace & Text Source */}
+                      <div className="p-3 bg-slate-800/80 rounded-lg border border-slate-700 space-y-2">
+                        <h4 className="font-bold text-slate-300 text-xs uppercase tracking-wider border-b border-slate-700 pb-1">
+                          📄 Teks Mentah Yang Dipindai Sistem
+                        </h4>
+                        <div className="space-y-1 text-[11px] font-mono">
+                          <span className="text-slate-400 block text-[10px]">Raw Caption:</span>
+                          <pre className="p-2 bg-slate-950 rounded text-slate-300 overflow-x-auto max-h-[100px] overflow-y-auto whitespace-pre-wrap">
+                            {rawOcrResult.extracted.rawCaption || caption || "Kosong"}
+                          </pre>
+                        </div>
+                      </div>
                     </div>
                   )}
                 </div>
