@@ -147,7 +147,17 @@ export const googleVisionAdapter: OcrAdapter = {
         },
       );
       if (res.status === 401 || res.status === 403) {
-        return { ok: false, message: `Authentication failed (HTTP ${res.status}) — periksa API key` };
+        const text = await res.text().catch(() => "");
+        let reason = "Periksa API key / Google Cloud Console";
+        try {
+          const json = JSON.parse(text);
+          if (json?.error?.message) {
+            reason = json.error.message;
+          }
+        } catch (e) {
+          if (text) reason = text.slice(0, 200);
+        }
+        return { ok: false, message: `Authentication failed (HTTP ${res.status}): ${reason}` };
       }
       if (res.ok || res.status === 429) {
         return { ok: true, message: res.status === 429 ? "Connected (rate limited)" : "Connected" };
