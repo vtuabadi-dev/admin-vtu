@@ -486,6 +486,43 @@ export function extractClustersFromCaption(caption: string): import("./types").C
     }
   }
 
+  // 3. Scan for slash-separated hotel lines like:
+  // "Hotel Makkah : Grand Al Massa / Rayyana Grand Plaza / Safwah Tower 5 malam"
+  let foundMekkahHotels: string[] = [];
+  let foundMadinahHotels: string[] = [];
+
+  lines.forEach(line => {
+    const lineUpper = line.toUpperCase();
+    if (lineUpper.includes("HOTEL MAKKAH") || lineUpper.includes("HOTEL MEKKAH")) {
+      const parts = line.split(/[:=]/);
+      if (parts[1]) {
+        const rawHotels = parts[1].replace(/\d+\s*malam/gi, "").trim();
+        foundMekkahHotels = rawHotels.split(/[/|]/).map(h => h.trim()).filter(Boolean);
+      }
+    } else if (lineUpper.includes("HOTEL MADINAH") || lineUpper.includes("HOTEL MEDINA")) {
+      const parts = line.split(/[:=]/);
+      if (parts[1]) {
+        const rawHotels = parts[1].replace(/\d+\s*malam/gi, "").trim();
+        foundMadinahHotels = rawHotels.split(/[/|]/).map(h => h.trim()).filter(Boolean);
+      }
+    }
+  });
+
+  const presentClusters = Object.keys(clusterMap);
+  const orderedClusters = presentClusters.length > 0 ? presentClusters : ["SILVER", "GOLD", "PLATINUM"];
+
+  orderedClusters.forEach((cName, idx) => {
+    if (!clusterMap[cName]) {
+      clusterMap[cName] = { clusterName: `${cName.charAt(0) + cName.slice(1).toLowerCase()} Package` };
+    }
+    if (foundMekkahHotels[idx]) {
+      clusterMap[cName]!.hotelMekkah = foundMekkahHotels[idx];
+    }
+    if (foundMadinahHotels[idx]) {
+      clusterMap[cName]!.hotelMadinah = foundMadinahHotels[idx];
+    }
+  });
+
   return Object.values(clusterMap);
 }
 
@@ -497,7 +534,7 @@ export function extractClustersFromCaption(caption: string): import("./types").C
  * that can be extracted from text alone.
  */
 export function parseCaption(caption: string): Partial<PackageExtractionResult> {
-  const trimmed = caption.trim();
+  const trimmed = caption.replace(/^\[MODUS KLASTER SEAT:.*\]\s*/gi, "").trim();
   if (!trimmed) return {};
 
   const packageType = detectPackageType(trimmed);

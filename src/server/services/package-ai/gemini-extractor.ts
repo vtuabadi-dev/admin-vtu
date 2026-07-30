@@ -62,7 +62,8 @@ export async function extractWithGemini(
   const base64Image = imageBuffer.toString("base64");
   const mimeType = "image/jpeg";
 
-  // Filter out OCR error strings if vision provider is not configured
+  // Clean hint prefix and OCR error strings
+  const cleanCaption = caption.replace(/^\[MODUS KLASTER SEAT:.*\]\s*/gi, "").trim();
   const cleanOcrText = rawOcrText.includes("No OCR providers configured") ? "" : rawOcrText;
 
   const prompt = `Kamu adalah sistem AI data entry travel umroh yang sangat teliti. Analisa GAMBAR FLYER UTAMA (GAMBAR TERLAMPIR), TEKS OCR, dan TEKS CAPTION dengan mengikuti ATURAN HIRARKI PENGAMBILAN DATA berikut.\n\n` +
@@ -132,7 +133,7 @@ export async function extractWithGemini(
     `• Masukkan SELURUH KLASTER yang ditemukan pada flyer & caption ke dalam array 'clusters'.\n\n` +
     `--- DATA UNTUK DIANALISA ---\n` +
     `1. TEKS HASIL SCAN OCR: ${cleanOcrText}\n\n` +
-    `2. TEKS CAPTION: ${caption}\n\n` +
+    `2. TEKS CAPTION: ${cleanCaption}\n\n` +
     `3. GAMBAR FLYER UTAMA (Telah dilampirkan): Analisa visual flyer utama & rute itinerary.`;
 
   const model = genAI.getGenerativeModel({ 
