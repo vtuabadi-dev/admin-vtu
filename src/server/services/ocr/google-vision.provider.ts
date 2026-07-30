@@ -107,21 +107,27 @@ export function createGoogleVisionProvider(): OcrProvider {
       const start = Date.now();
       const base64 = imageBuffer.toString("base64");
 
+      let mimeType = "image/jpeg";
+      if (imageBuffer[0] === 0x89 && imageBuffer[1] === 0x50) mimeType = "image/png";
+      else if (imageBuffer[0] === 0x52 && imageBuffer[1] === 0x49) mimeType = "image/webp";
+
       let lastError = "";
       for (let attempt = 0; attempt < keys.length; attempt++) {
         const apiKey = getNextApiKey(keys)!;
 
         try {
           const res = await fetch(
-            `https://vision.googleapis.com/v1/images:annotate?key=${apiKey}`,
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
             {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
-                requests: [{
-                  image: { content: base64 },
-                  features: [{ type: "TEXT_DETECTION", maxResults: 1 }],
-                }],
+                contents: [{
+                  parts: [
+                    { text: "Extract all plain text from this image exactly as written." },
+                    { inline_data: { mime_type: mimeType, data: base64 } }
+                  ]
+                }]
               }),
               signal: AbortSignal.timeout(30000),
             },
@@ -138,7 +144,7 @@ export function createGoogleVisionProvider(): OcrProvider {
             return {
               success: false,
               fields: [],
-              rawText: text,
+              rawText: `Google AI Studio API error (HTTP ${res.status}): ${text.slice(0, 200)}`,
               overallConfidence: 0,
               processingTimeMs: Date.now() - start,
               retryCount,
@@ -146,7 +152,7 @@ export function createGoogleVisionProvider(): OcrProvider {
           }
 
           const data = await res.json();
-          const fullText: string = data?.responses?.[0]?.fullTextAnnotation?.text ?? "";
+          const fullText: string = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
 
           const expectedFields = getExpectedFields(jenis);
           const fields = expectedFields.map((field) => {
