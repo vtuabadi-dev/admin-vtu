@@ -2,7 +2,7 @@
 // Unit test: KTP field extraction from Google Vision OCR text
 
 import { describe, it, expect } from "vitest";
-import { extractField } from "../google-vision.provider";
+import { extractField } from "../google-ai-studio.provider";
 
 // ── Realistic OCR output from Google Vision (TEXT_DETECTION) ──
 

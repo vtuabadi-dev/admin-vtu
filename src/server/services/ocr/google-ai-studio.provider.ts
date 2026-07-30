@@ -39,7 +39,7 @@ const FIELD_PATTERNS: Record<string, RegExp[]> = {
   ],
 };
 
-function extractField(text: string, field: string): string {
+export function extractField(text: string, field: string): string {
   const patterns = FIELD_PATTERNS[field] ?? [];
   for (const regex of patterns) {
     const match = text.match(regex);

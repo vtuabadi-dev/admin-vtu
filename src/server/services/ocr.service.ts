@@ -80,8 +80,8 @@ async function getProvider(): Promise<OcrProvider> {
         break;
       }
 
-      const { createGoogleVisionProvider } = await import("./ocr/google-vision.provider");
-      _provider = createGoogleVisionProvider();
+      const { createGoogleAiStudioProvider } = await import("./ocr/google-ai-studio.provider");
+      _provider = createGoogleAiStudioProvider();
       break;
     }
 
@@ -92,8 +92,7 @@ async function getProvider(): Promise<OcrProvider> {
           "[OCR] Production memerlukan OCR_API_URL saat OCR_PROVIDER=external-api.\n" +
           "Set di environment variables Vercel:\n" +
           "  OCR_API_URL=<ocr-service-url>\n" +
-          "  OCR_API_KEY=<api-key>\n" +
-          "Atau ganti ke: OCR_PROVIDER=google-vision"
+          "  OCR_API_KEY=<api-key>"
         );
       }
       _provider = createExternalApiProvider();
@@ -111,8 +110,9 @@ async function getProvider(): Promise<OcrProvider> {
       break;
   }
 
-  await _provider.initialize?.();
-  return _provider;
+  const activeProvider = _provider ?? placeholderProvider;
+  await activeProvider.initialize?.();
+  return activeProvider;
 }
 
 export function setOcrProvider(provider: OcrProvider): void {
