@@ -19,6 +19,7 @@ export async function reactivateExpiredCooldowns(
 ): Promise<number> {
   let reactivated = 0;
 
+  // 1. Reactivate naturally expired cooldowns
   for (const p of providers) {
     if (checkCooldownExpiry(p)) {
       await ocrProviderRepo.updateHealth(p.id, {
@@ -27,6 +28,27 @@ export async function reactivateExpiredCooldowns(
         consecutiveErrors: 0,
       });
       // Update in-memory for this request
+      p.healthStatus = "active";
+      p.cooldownUntil = null;
+      p.consecutiveErrors = 0;
+      reactivated++;
+    }
+  }
+
+  // 2. AUTOMATIC ALL-COOLDOWN EMERGENCY RESET:
+  // If ALL active providers with API keys are in cooldown (0 available non-cooldown keys),
+  // emergency-reset ALL active providers back to active status immediately!
+  const activeProviders = providers.filter((p) => p.isActive && p.apiKey?.trim());
+  const nonCooldownCount = activeProviders.filter((p) => !isInCooldown(p)).length;
+
+  if (activeProviders.length > 0 && nonCooldownCount === 0) {
+    console.log(`[CooldownManager] ⚡ ALL ${activeProviders.length} active API keys are in cooldown! Emergency reset ALL active keys to ACTIVE status.`);
+    for (const p of activeProviders) {
+      await ocrProviderRepo.updateHealth(p.id, {
+        healthStatus: "active",
+        cooldownUntil: null,
+        consecutiveErrors: 0,
+      });
       p.healthStatus = "active";
       p.cooldownUntil = null;
       p.consecutiveErrors = 0;

@@ -214,6 +214,18 @@ export const ocrProviderRepo = {
     await prisma.ocrProvider.update({ where: { id }, data: updates as any });
   },
 
+  async resetAllCooldowns(): Promise<number> {
+    const result = await prisma.ocrProvider.updateMany({
+      where: { healthStatus: "cooldown" },
+      data: {
+        healthStatus: "active",
+        cooldownUntil: null,
+        consecutiveErrors: 0,
+      },
+    });
+    return result.count;
+  },
+
   async recordSuccess(
     id: string,
     latencyMs: number,

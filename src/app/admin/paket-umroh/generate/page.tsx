@@ -2793,7 +2793,7 @@ export default function GeneratePaketPage() {
                           <div className="bg-slate-900/80 p-2 rounded border border-slate-800">
                             <span className="text-slate-400 text-[10px] block">Provider AI/OCR:</span>
                             <span className="text-emerald-400 font-bold">
-                              {rawOcrResult.extracted.confidence >= 0.8 ? "Gemini Vision AI (Image)" : "Regex Engine Fallback"}
+                              {rawOcrResult.extracted.confidence >= 0.8 ? "Google AI Studio Multimodal" : "Regex Engine Fallback"}
                             </span>
                           </div>
                           <div className="bg-slate-900/80 p-2 rounded border border-slate-800">

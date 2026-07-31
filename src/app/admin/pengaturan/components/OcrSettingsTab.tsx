@@ -319,15 +319,37 @@ function ProvidersTab() {
     }
   };
 
+  const handleResetAllCooldowns = async () => {
+    try {
+      const res = await fetch("/api/admin/ocr/reset-cooldowns", { method: "POST" });
+      const data = await res.json();
+      if (data.success) {
+        alert(`🎉 Berhasil mereset ${data.resetCount} provider dari status Cooldown ke Active!`);
+        fetchProviders();
+      } else {
+        alert("Gagal mereset cooldown: " + data.message);
+      }
+    } catch (err) {
+      alert("Gagal mereset cooldown: " + (err as Error).message);
+    }
+  };
+
   if (loading) return <p className="text-sm text-muted-foreground text-center py-8">Memuat provider...</p>;
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">{providers.length} provider terdaftar</p>
-        <Button onClick={() => { setEditing(null); setModalOpen(true); }} className="gap-1.5">
-          <Plus className="h-3.5 w-3.5" /> Tambah Provider
-        </Button>
+        <div className="flex items-center gap-2">
+          {providers.some(p => p.healthStatus === "cooldown") && (
+            <Button variant="outline" onClick={handleResetAllCooldowns} className="gap-1.5 border-amber-500/40 text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/30">
+              <Zap className="h-3.5 w-3.5 text-amber-500" /> Reset Semua Cooldown ({providers.filter(p => p.healthStatus === "cooldown").length})
+            </Button>
+          )}
+          <Button onClick={() => { setEditing(null); setModalOpen(true); }} className="gap-1.5">
+            <Plus className="h-3.5 w-3.5" /> Tambah Provider
+          </Button>
+        </div>
       </div>
 
       {providers.length === 0 ? (
