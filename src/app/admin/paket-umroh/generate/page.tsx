@@ -47,7 +47,8 @@ export default function GeneratePaketPage() {
 
   // Mode Generator (Buat Paket Baru vs Pecah Starting Point)
   const [generateMode, setGenerateMode] = useState<"new" | "split">("new");
-  const [existingGroups, setExistingGroups] = useState<any[]>([]);
+  const [existingGroupsData, setExistingGroupsData] = useState<{ groups: any[]; individuals: any[] }>({ groups: [], individuals: [] });
+  const [parentTypeFilter, setParentTypeFilter] = useState<"group" | "individual">("group");
   const [loadingGroups, setLoadingGroups] = useState(false);
   const [selectedParentGroupId, setSelectedParentGroupId] = useState<string>("");
   const [showPairingCanvas, setShowPairingCanvas] = useState(false);
@@ -393,8 +394,11 @@ export default function GeneratePaketPage() {
       fetch("/api/admin/existing-groups")
         .then(res => res.json())
         .then(res => {
-          if (res.success) {
-            setExistingGroups(res.data || []);
+          if (res.success && res.data) {
+            setExistingGroupsData({
+              groups: Array.isArray(res.data.groups) ? res.data.groups : [],
+              individuals: Array.isArray(res.data.individuals) ? res.data.individuals : [],
+            });
           }
           setLoadingGroups(false);
         })
@@ -1939,9 +1943,16 @@ export default function GeneratePaketPage() {
     );
   };
 
+  const availableParentOptions = useMemo(() => {
+    return parentTypeFilter === "group"
+      ? existingGroupsData.groups
+      : existingGroupsData.individuals;
+  }, [existingGroupsData, parentTypeFilter]);
+
   const selectedParentGroup = useMemo(() => {
-    return existingGroups.find(g => g.id === selectedParentGroupId) || null;
-  }, [existingGroups, selectedParentGroupId]);
+    const all = [...existingGroupsData.groups, ...existingGroupsData.individuals];
+    return all.find(g => g.id === selectedParentGroupId) || null;
+  }, [existingGroupsData, selectedParentGroupId]);
 
   return (
     <div className="flex flex-col gap-6 p-6 max-w-7xl">
@@ -2041,36 +2052,79 @@ export default function GeneratePaketPage() {
         {/* Selected Parent Group Selector when in "split" mode */}
         {generateMode === "split" && (
           <div className="mt-4 p-4 bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-700/60 rounded-xl space-y-3">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between flex-wrap gap-2">
               <span className="text-xs font-extrabold text-amber-800 dark:text-amber-300 uppercase tracking-wider flex items-center gap-1.5">
                 <Split className="h-4 w-4" /> Langkah 1: Pilih Paket Induk Eksisting
+                {loadingGroups && <Loader2 className="h-3.5 w-3.5 animate-spin text-amber-600 ml-1" />}
               </span>
-              {loadingGroups && <span className="text-xs text-amber-600 dark:text-amber-400">Memuat paket grup...</span>}
+
+              {/* Type Filter Tabs: Group vs Individual */}
+              <div className="flex items-center gap-1 bg-amber-100/80 dark:bg-amber-900/60 p-1 rounded-lg border border-amber-300 dark:border-amber-700">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setParentTypeFilter("group");
+                    setSelectedParentGroupId("");
+                  }}
+                  className={cn(
+                    "px-3 py-1 text-xs font-bold rounded-md transition-all flex items-center gap-1.5",
+                    parentTypeFilter === "group"
+                      ? "bg-amber-600 text-white shadow-xs"
+                      : "text-amber-900 dark:text-amber-200 hover:bg-amber-200/50"
+                  )}
+                >
+                  🏷️ Paket Grup ({existingGroupsData.groups.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setParentTypeFilter("individual");
+                    setSelectedParentGroupId("");
+                  }}
+                  className={cn(
+                    "px-3 py-1 text-xs font-bold rounded-md transition-all flex items-center gap-1.5",
+                    parentTypeFilter === "individual"
+                      ? "bg-amber-600 text-white shadow-xs"
+                      : "text-amber-900 dark:text-amber-200 hover:bg-amber-200/50"
+                  )}
+                >
+                  👤 Paket Individu ({existingGroupsData.individuals.length})
+                </button>
+              </div>
             </div>
 
             <SearchableSelect
-              options={existingGroups.map(g => ({
-                value: g.id,
-                label: `${g.namaPaket} (${g.startingCity}) - ${g.dateCount} Tanggal [${g.kodeGrup}]`,
-              }))}
+              options={availableParentOptions.map(g => {
+                const itemNames = g.items?.map((it: any) => `${it.date}: ${it.namaPaket}`).join(" | ") || "";
+                return {
+                  value: g.id,
+                  label: `${g.namaPaket} (${g.startingCity}) - ${g.dateCount} Tanggal`,
+                  sublabel: `[${g.kodeGrup}] ${itemNames ? `• ${itemNames}` : ""}`,
+                };
+              })}
               value={selectedParentGroupId}
               onChange={(val) => setSelectedParentGroupId(val)}
-              placeholder="-- Pilih Paket Induk Eksisting --"
-              searchPlaceholder="Cari kode grup / nama paket..."
+              placeholder={parentTypeFilter === "group" ? "-- Pilih Paket Induk (Bentuk Grup Multi-Tanggal) --" : "-- Pilih Paket Induk (Bentuk Individu 1 Tanggal) --"}
+              searchPlaceholder="Cari kode grup, nama paket, atau tanggal..."
             />
 
             {/* Selected Parent Group Info Summary Card */}
             {selectedParentGroup && (
-              <div className="p-3 bg-slate-900 border border-slate-800 rounded-lg text-xs space-y-2 text-slate-300 font-mono shadow-inner">
+              <div className="p-3 bg-slate-900 border border-slate-800 rounded-lg text-xs space-y-2.5 text-slate-300 font-mono shadow-inner">
                 <div className="flex justify-between items-center text-emerald-400 font-bold border-b border-slate-800 pb-1.5">
-                  <span>Paket Induk: {selectedParentGroup.namaPaket}</span>
+                  <span className="flex items-center gap-2">
+                    <span>Paket Induk: {selectedParentGroup.namaPaket}</span>
+                    <span className="text-[10px] bg-slate-800 px-2 py-0.5 rounded text-amber-300 border border-slate-700">
+                      {selectedParentGroup.type === "group" ? "🏷️ Paket Grup" : "👤 Paket Individu"}
+                    </span>
+                  </span>
                   <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2.5 py-0.5 rounded-full text-[10px]">
                     {selectedParentGroup.dateCount} Tanggal
                   </span>
                 </div>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-[11px]">
                   <div>
-                    <span className="text-slate-400 block text-[10px]">Kode Grup:</span>
+                    <span className="text-slate-400 block text-[10px]">Kode Paket / Grup:</span>
                     <strong className="text-white text-[10px] break-all">{selectedParentGroup.kodeGrup}</strong>
                   </div>
                   <div>
@@ -2084,6 +2138,26 @@ export default function GeneratePaketPage() {
                   <div>
                     <span className="text-slate-400 block text-[10px]">Total Kuota Rombongan:</span>
                     <strong className="text-sky-300">{selectedParentGroup.totalCapacity} Seat</strong>
+                  </div>
+                </div>
+
+                {/* List of Individual Package Names inside this Group */}
+                <div className="pt-2 border-t border-slate-800 space-y-1.5">
+                  <span className="text-[10px] text-amber-400 font-bold uppercase tracking-wider block">
+                    📋 Rincian Nama Paket Dalam Kode Grup ({selectedParentGroup.items?.length || 0} Keberangkatan):
+                  </span>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-1.5 max-h-36 overflow-y-auto pr-1">
+                    {selectedParentGroup.items?.map((item: any, idx: number) => (
+                      <div key={item.id} className="p-2 bg-slate-950/80 rounded border border-slate-800 flex items-center justify-between text-[11px]">
+                        <div className="truncate mr-2">
+                          <span className="text-emerald-400 font-bold mr-1.5">#{idx + 1}</span>
+                          <span className="text-slate-200 font-medium">{item.namaPaket}</span>
+                        </div>
+                        <span className="text-[10px] text-amber-300 font-mono shrink-0 bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20">
+                          📅 {formatDateDdMmmmTttt(item.date)}
+                        </span>
+                      </div>
+                    ))}
                   </div>
                 </div>
 
@@ -2144,7 +2218,8 @@ export default function GeneratePaketPage() {
                     maxSeat: pairs[0]?.childSeat || 20,
                     isAdaKlaster: formData.isAdaKlaster,
                     clusterConfigs: formData.isAdaKlaster === "ya" ? clusterConfigs : null,
-                    paketGrupId: selectedParentGroupId,
+                    paketGrupId: selectedParentGroup.type === "group" ? selectedParentGroupId : undefined,
+                    parentKeberangkatanId: selectedParentGroup.type === "individual" ? selectedParentGroup.keberangkatanId : undefined,
                     kodeGrup: selectedParentGroup.kodeGrup,
                     pairedItems: pairs,
                   };

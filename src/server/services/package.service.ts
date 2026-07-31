@@ -47,11 +47,41 @@ export const packageService = {
     const firstDate = departureDates[0] || new Date();
     const year = firstDate.getFullYear();
 
-    // 2. If multi-date, create PaketGrup
-    let paketGrupId: string | undefined;
-    let kodeGrup: string | undefined;
+    // 2. If multi-date or splitting individual parent package, create/link PaketGrup
+    let paketGrupId: string | undefined = data.paketGrupId;
+    let kodeGrup: string | undefined = data.kodeGrup;
 
-    if (departureDates.length > 1) {
+    if (data.parentKeberangkatanId && !paketGrupId) {
+      const parentKeb = await prisma.keberangkatan.findUnique({
+        where: { id: data.parentKeberangkatanId },
+      });
+
+      if (parentKeb) {
+        const finalKodeGrup = data.kodeGrup || generateKodeGrup({
+          tahun: year,
+          durasiHari,
+          packageTypeCode: pCode,
+          startingPointCode: sCode,
+          maskapaiCode: mCode,
+          tanggalList: departureDates,
+        });
+        kodeGrup = finalKodeGrup;
+
+        const groupRecord = await prisma.paketGrup.create({
+          data: {
+            kodeGrup: finalKodeGrup,
+            namaPaket: parentKeb.namaPaket || `${pCode} ${sCode} Group`,
+          },
+        });
+        paketGrupId = groupRecord.id;
+
+        // Update parent to be part of this group
+        await prisma.keberangkatan.update({
+          where: { id: data.parentKeberangkatanId },
+          data: { paketGrupId },
+        });
+      }
+    } else if (!paketGrupId && departureDates.length > 1) {
       kodeGrup = generateKodeGrup({
         tahun: year,
         durasiHari,

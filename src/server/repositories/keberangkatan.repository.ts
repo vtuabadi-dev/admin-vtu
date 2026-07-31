@@ -263,27 +263,40 @@ export const keberangkatanRepo = {
   },
 
   async findExistingGroupsForSplit() {
-    const groups = await prisma.paketGrup.findMany({
-      include: {
-        keberangkatan: {
-          include: {
-            startingPoint: true,
-            maskapaiMaster: true,
-            packageType: true,
+    const [groups, standaloneKeberangkatan] = await Promise.all([
+      prisma.paketGrup.findMany({
+        include: {
+          keberangkatan: {
+            include: {
+              startingPoint: true,
+              maskapaiMaster: true,
+              packageType: true,
+            },
+            orderBy: { tanggalBerangkat: "asc" },
           },
-          orderBy: { tanggalBerangkat: "asc" },
         },
-      },
-      orderBy: { createdAt: "desc" },
-    });
+        orderBy: { createdAt: "desc" },
+      }),
+      prisma.keberangkatan.findMany({
+        where: { paketGrupId: null },
+        include: {
+          startingPoint: true,
+          maskapaiMaster: true,
+          packageType: true,
+        },
+        orderBy: { tanggalBerangkat: "desc" },
+        take: 50,
+      }),
+    ]);
 
-    return groups.map((g) => {
+    const groupList = groups.map((g) => {
       const dates = g.keberangkatan.map((k) => k.tanggalBerangkat.toISOString().split("T")[0]!);
       const firstK = g.keberangkatan[0];
       const startingName = firstK?.startingPoint?.name || "Jakarta";
 
       return {
         id: g.id,
+        type: "group",
         kodeGrup: g.kodeGrup,
         namaPaket: g.namaPaket,
         startingCity: startingName,
@@ -300,5 +313,37 @@ export const keberangkatanRepo = {
         })),
       };
     });
+
+    const individualList = standaloneKeberangkatan.map((k) => {
+      const dateStr = k.tanggalBerangkat.toISOString().split("T")[0]!;
+      const startingName = k.startingPoint?.name || "Jakarta";
+
+      return {
+        id: `ind-${k.id}`,
+        keberangkatanId: k.id,
+        type: "individual",
+        kodeGrup: k.kodeIndividu || k.kode,
+        namaPaket: k.namaPaket,
+        startingCity: startingName,
+        startingPointId: k.startingPointId,
+        dateCount: 1,
+        dates: [dateStr],
+        totalCapacity: k.kuota || k.maxSeat || 45,
+        items: [
+          {
+            id: k.id,
+            kode: k.kode,
+            namaPaket: k.namaPaket,
+            date: dateStr,
+            seat: k.kuota || k.maxSeat || 45,
+          },
+        ],
+      };
+    });
+
+    return {
+      groups: groupList,
+      individuals: individualList,
+    };
   },
 };
