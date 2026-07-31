@@ -13,10 +13,40 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const namaPaket = searchParams.get("namaPaket");
 
+    // Resolve all package names in group if package belongs to a combined PaketGrup
+    let targetPackageNames: string[] | null = null;
+    if (namaPaket && namaPaket !== "ALL") {
+      const matchKeb = await prisma.keberangkatan.findFirst({
+        where: {
+          OR: [
+            { namaPaket: namaPaket },
+            { kode: namaPaket },
+            { kodeIndividu: namaPaket },
+          ],
+        },
+        select: { paketGrupId: true },
+      });
+
+      if (matchKeb?.paketGrupId) {
+        const groupMembers = await prisma.keberangkatan.findMany({
+          where: { paketGrupId: matchKeb.paketGrupId },
+          select: { namaPaket: true, kode: true, kodeIndividu: true },
+        });
+
+        targetPackageNames = Array.from(
+          new Set(
+            groupMembers.flatMap((g) => [g.namaPaket, g.kode, g.kodeIndividu]).filter(Boolean) as string[]
+          )
+        );
+      } else {
+        targetPackageNames = [namaPaket];
+      }
+    }
+
     // Fetch Badal Umroh (Confirmed/Lunas or All)
     const badalWhere: any = {};
-    if (namaPaket && namaPaket !== "ALL") {
-      badalWhere.namaPaketUmroh = namaPaket;
+    if (targetPackageNames && targetPackageNames.length > 0) {
+      badalWhere.namaPaketUmroh = { in: targetPackageNames };
     }
 
     const badalList = await prisma.badalUmrohRegistration.findMany({
@@ -39,8 +69,8 @@ export async function GET(request: NextRequest) {
 
     // Fetch Wakaf Quran (Without exposing pewakaf name in collective view)
     const wakafWhere: any = {};
-    if (namaPaket && namaPaket !== "ALL") {
-      wakafWhere.namaPaketUmroh = namaPaket;
+    if (targetPackageNames && targetPackageNames.length > 0) {
+      wakafWhere.namaPaketUmroh = { in: targetPackageNames };
     }
 
     const wakafList = await prisma.wakafQuranRegistration.findMany({

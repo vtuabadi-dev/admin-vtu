@@ -10,7 +10,9 @@ import {
   MOCK_LANDING_PATTERN, 
   MOCK_KLASTER
 } from "@/shared/lib/mock-data";
-import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X } from "lucide-react";
+import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X, Split, Layers } from "lucide-react";
+import { generateVtuGroupCode } from "@/shared/lib/group-code.helper";
+import { PairingCanvas } from "./components/PairingCanvas";
 
   interface MasterDataOptions {
     airlines: any[];
@@ -42,6 +44,13 @@ export default function GeneratePaketPage() {
 
   // Tab path selection
   const [pathMode, setPathMode] = useState<"manual" | "ocr">("manual");
+
+  // Mode Generator (Buat Paket Baru vs Pecah Starting Point)
+  const [generateMode, setGenerateMode] = useState<"new" | "split">("new");
+  const [existingGroups, setExistingGroups] = useState<any[]>([]);
+  const [loadingGroups, setLoadingGroups] = useState(false);
+  const [selectedParentGroupId, setSelectedParentGroupId] = useState<string>("");
+  const [showPairingCanvas, setShowPairingCanvas] = useState(false);
 
   // OCR state — multi-file drag-and-drop
   const [flyerFiles, setFlyerFiles] = useState<File[]>([]);
@@ -260,22 +269,29 @@ export default function GeneratePaketPage() {
       setFormData(prev => ({ ...prev, kodePaket: "", kodeGrup: "" }));
       return;
     }
-    const jCode = options.packageTypes.find(t => t.id === formData.jenisPaketId)?.code || "PKG";
-    const airCode = options.airlines.find(a => a.id === formData.maskapaiId)?.code || "AIR";
+    const pkgTypeObj = options.packageTypes.find(t => t.id === formData.jenisPaketId);
+    const startingObj = options.cities.find(c => c.id === formData.startingPointId);
+    const airlineObj = options.airlines.find(a => a.id === formData.maskapaiId);
+    const routeObj = (options as any)?.routes?.find((r: any) => r.id === formData.landingPatternId);
+
+    const jCode = pkgTypeObj?.code || "PKG";
+    const airCode = airlineObj?.code || "AIR";
     const firstDate = departureDates[0] || "";
     const dateStr = firstDate ? firstDate.replace(/-/g, "") : "";
     
-    // Individual code uses first departure date
+    // Individual code
     const individualCode = `${jCode}-${airCode}${dateStr ? `-${dateStr}` : ""}`.toUpperCase();
     
-    // Group code is generated only for multi-date batches (no specific date suffix)
-    const now = new Date();
-    const batchStamp = now.getFullYear().toString().slice(-2) + 
-      String(now.getMonth() + 1).padStart(2, "0") + 
-      String(now.getDate()).padStart(2, "0");
-    const groupCode = departureDates.length > 1 
-      ? `GRP-${jCode}-${airCode}-${batchStamp}`.toUpperCase()
-      : "";
+    // VTU Group Code
+    const groupCode = generateVtuGroupCode({
+      packageTypeName: pkgTypeObj?.name || "UMR",
+      durationDays: formData.durasiHari || 9,
+      startingCityCode: startingObj?.code || "JKT",
+      dates: departureDates,
+      airlineCode: airlineObj?.code || "SV",
+      routeCode: routeObj?.kode || "TD",
+      hasClusters: formData.isAdaKlaster === "ya",
+    });
 
     setFormData(prev => ({ ...prev, kodePaket: individualCode, kodeGrup: groupCode }));
   };
@@ -370,6 +386,24 @@ export default function GeneratePaketPage() {
         setFetching(false);
       });
   }, []);
+
+  useEffect(() => {
+    if (generateMode === "split") {
+      setLoadingGroups(true);
+      fetch("/api/admin/existing-groups")
+        .then(res => res.json())
+        .then(res => {
+          if (res.success) {
+            setExistingGroups(res.data || []);
+          }
+          setLoadingGroups(false);
+        })
+        .catch(err => {
+          console.error("Failed to load existing groups:", err);
+          setLoadingGroups(false);
+        });
+    }
+  }, [generateMode]);
 
   // Reset selected Rute In-Out if not valid for the selected package type
   useEffect(() => {
@@ -1905,12 +1939,23 @@ export default function GeneratePaketPage() {
     );
   };
 
+  const selectedParentGroup = useMemo(() => {
+    return existingGroups.find(g => g.id === selectedParentGroupId) || null;
+  }, [existingGroups, selectedParentGroupId]);
+
   return (
     <div className="flex flex-col gap-6 p-6 max-w-7xl">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Generate Paket Umroh</h1>
-          <p className="text-muted-foreground mt-1">
+          <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
+            Generate Paket Umroh
+            {generateMode === "split" && (
+              <span className="text-xs font-bold px-3 py-1 bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded-full">
+                ✂️ Mode Pecah Starting Point
+              </span>
+            )}
+          </h1>
+          <p className="text-muted-foreground mt-1 text-xs">
             Wizard perakitan paket (Transaction Data) yang mengambil referensi dari Master Data.
           </p>
         </div>
@@ -1918,13 +1963,223 @@ export default function GeneratePaketPage() {
           <Button variant="outline" onClick={() => router.push("/admin/paket-umroh")}>Batal</Button>
           <Button 
             id="field-submitBtnHeader" 
-            onClick={handleGenerate} 
-            disabled={loading || fetching}
+            onClick={() => {
+              if (generateMode === "split" && selectedParentGroup) {
+                setShowPairingCanvas(true);
+              } else {
+                handleGenerate();
+              }
+            }} 
+            disabled={loading || fetching || (generateMode === "split" && (!selectedParentGroupId || (selectedParentGroup && departureDates.length !== selectedParentGroup.dateCount)))}
+            className={cn(generateMode === "split" ? "bg-amber-600 hover:bg-amber-500 text-white font-bold" : "")}
           >
-            {loading ? "Memproses..." : `Generate ${departureDates.length > 0 ? departureDates.length : ""} Paket`}
+            {loading ? "Memproses..." : generateMode === "split" ? `Lanjut Canvas Pairing (${departureDates.length} Tanggal)` : `Generate ${departureDates.length > 0 ? departureDates.length : ""} Paket`}
           </Button>
         </div>
       </div>
+
+      {/* ── LANGKAH 0: MODE GENERATOR PAKET (Buat Baru vs Pecah Starting Point) ── */}
+      <div className="p-5 bg-card border rounded-2xl shadow-sm space-y-4">
+        <div className="flex items-center justify-between border-b pb-2">
+          <label className="text-xs font-extrabold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+            <Layers className="h-4 w-4 text-emerald-500" /> Modus Inventarisasi Paket
+          </label>
+          <span className="text-[11px] text-muted-foreground">Pilih alur pembuatan paket yang sesuai</span>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <button
+            type="button"
+            onClick={() => {
+              setGenerateMode("new");
+              setShowPairingCanvas(false);
+            }}
+            className={cn(
+              "p-4 rounded-xl border text-left transition-all flex items-start gap-3.5",
+              generateMode === "new"
+                ? "bg-primary/10 border-primary text-foreground shadow-sm ring-1 ring-primary"
+                : "bg-background border-border text-muted-foreground hover:bg-muted/50"
+            )}
+          >
+            <div className={cn("p-2.5 rounded-xl shrink-0 mt-0.5", generateMode === "new" ? "bg-primary text-primary-foreground" : "bg-muted")}>
+              <Layers className="h-5 w-5" />
+            </div>
+            <div>
+              <div className="font-bold text-sm text-foreground flex items-center gap-1.5">
+                📦 Buat Paket Baru (Fresh Single Starting Point)
+              </div>
+              <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                Membuat paket keberangkatan baru dari nol untuk 1 Starting Point pertama (Jalur Manual / OCR).
+              </p>
+            </div>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setGenerateMode("split")}
+            className={cn(
+              "p-4 rounded-xl border text-left transition-all flex items-start gap-3.5",
+              generateMode === "split"
+                ? "bg-amber-500/10 border-amber-500 text-foreground shadow-sm ring-1 ring-amber-500"
+                : "bg-background border-border text-muted-foreground hover:bg-muted/50"
+            )}
+          >
+            <div className={cn("p-2.5 rounded-xl shrink-0 mt-0.5", generateMode === "split" ? "bg-amber-500 text-white" : "bg-muted")}>
+              <Split className="h-5 w-5" />
+            </div>
+            <div>
+              <div className="font-bold text-sm text-foreground flex items-center gap-1.5">
+                ✂️ Pecah Starting Point Paket (Dual Starting Point)
+              </div>
+              <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                Menghubungkan paket cabang (Starting Ke-2) dengan Paket Induk eksisting melalui Canvas Drag &amp; Drop.
+              </p>
+            </div>
+          </button>
+        </div>
+
+        {/* Selected Parent Group Selector when in "split" mode */}
+        {generateMode === "split" && (
+          <div className="mt-4 p-4 bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-700/60 rounded-xl space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-extrabold text-amber-800 dark:text-amber-300 uppercase tracking-wider flex items-center gap-1.5">
+                <Split className="h-4 w-4" /> Langkah 1: Pilih Paket Induk Eksisting
+              </span>
+              {loadingGroups && <span className="text-xs text-amber-600 dark:text-amber-400">Memuat paket grup...</span>}
+            </div>
+
+            <SearchableSelect
+              options={existingGroups.map(g => ({
+                value: g.id,
+                label: `${g.namaPaket} (${g.startingCity}) - ${g.dateCount} Tanggal [${g.kodeGrup}]`,
+              }))}
+              value={selectedParentGroupId}
+              onChange={(val) => setSelectedParentGroupId(val)}
+              placeholder="-- Pilih Paket Induk Eksisting --"
+              searchPlaceholder="Cari kode grup / nama paket..."
+            />
+
+            {/* Selected Parent Group Info Summary Card */}
+            {selectedParentGroup && (
+              <div className="p-3 bg-slate-900 border border-slate-800 rounded-lg text-xs space-y-2 text-slate-300 font-mono shadow-inner">
+                <div className="flex justify-between items-center text-emerald-400 font-bold border-b border-slate-800 pb-1.5">
+                  <span>Paket Induk: {selectedParentGroup.namaPaket}</span>
+                  <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2.5 py-0.5 rounded-full text-[10px]">
+                    {selectedParentGroup.dateCount} Tanggal
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-[11px]">
+                  <div>
+                    <span className="text-slate-400 block text-[10px]">Kode Grup:</span>
+                    <strong className="text-white text-[10px] break-all">{selectedParentGroup.kodeGrup}</strong>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block text-[10px]">Starting Point #1:</span>
+                    <strong className="text-amber-300">{selectedParentGroup.startingCity}</strong>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block text-[10px]">Jumlah Tanggal Induk:</span>
+                    <strong className="text-emerald-400">{selectedParentGroup.dateCount} Tanggal</strong>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block text-[10px]">Total Kuota Rombongan:</span>
+                    <strong className="text-sky-300">{selectedParentGroup.totalCapacity} Seat</strong>
+                  </div>
+                </div>
+
+                {/* Date Count Validation Indicator */}
+                <div className="pt-2 border-t border-slate-800 flex items-center justify-between text-[11px]">
+                  <span className="text-slate-400">Status Validasi Kecocokan Jumlah Tanggal:</span>
+                  {departureDates.length === selectedParentGroup.dateCount ? (
+                    <span className="text-emerald-400 font-bold bg-emerald-500/20 px-2 py-0.5 rounded border border-emerald-500/30">
+                      ✓ COCOK ({departureDates.length} dari {selectedParentGroup.dateCount} Tanggal)
+                    </span>
+                  ) : (
+                    <span className="text-amber-400 font-bold bg-amber-500/20 px-2 py-0.5 rounded border border-amber-500/30">
+                      ⚠️ BELUM COCOK ({departureDates.length} dari {selectedParentGroup.dateCount} Tanggal)
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* ── PAIRING CANVAS DRAG & DROP MODAL / STEP ── */}
+      {showPairingCanvas && selectedParentGroup && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+          <div className="w-full max-w-5xl my-auto">
+            <PairingCanvas
+              parentStartingCity={selectedParentGroup.startingCity}
+              childStartingCity={options?.cities.find(c => c.id === formData.startingPointId)?.name || "Surabaya"}
+              parentItems={selectedParentGroup.items}
+              initialChildItems={departureDates.map((d, i) => ({
+                tempId: `child-${i}`,
+                name: getIndividualNameForDate(d) || `Paket ${options?.cities.find(c => c.id === formData.startingPointId)?.name || "Surabaya"} #${i + 1}`,
+                date: d,
+              }))}
+              totalGroupCapacity={selectedParentGroup.totalCapacity || 45}
+              onCancel={() => setShowPairingCanvas(false)}
+              onConfirm={async (pairs) => {
+                setLoading(true);
+                try {
+                  const childCityName = options?.cities.find(c => c.id === formData.startingPointId)?.name || "Surabaya";
+
+                  const payload = {
+                    packageTypeId: formData.jenisPaketId,
+                    startingPointId: formData.startingPointId,
+                    maskapaiId: formData.maskapaiId,
+                    landingPatternId: formData.landingPatternId,
+                    durasiHari: Number(formData.durasiHari || 9),
+                    durationDays: Number(formData.durasiHari || 9),
+                    departureDates: pairs.map(p => p.childDate),
+                    namaPaket: formData.namaPaket || `Umroh ${childCityName}`,
+                    hargaBase: Number(formData.hargaBase || 35000000),
+                    hargaPaket: Number(formData.hargaBase || 35000000),
+                    hotelMekkahId: formData.hotelMekkahId,
+                    hotelMadinahId: formData.hotelMadinahId,
+                    kapasitas: pairs[0]?.childSeat || 20,
+                    kuota: pairs[0]?.childSeat || 20,
+                    maxSeat: pairs[0]?.childSeat || 20,
+                    isAdaKlaster: formData.isAdaKlaster,
+                    clusterConfigs: formData.isAdaKlaster === "ya" ? clusterConfigs : null,
+                    paketGrupId: selectedParentGroupId,
+                    kodeGrup: selectedParentGroup.kodeGrup,
+                    pairedItems: pairs,
+                  };
+
+                  const res = await fetch("/api/keberangkatan", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload),
+                  });
+
+                  const resJson = await res.json();
+                  if (resJson.success) {
+                    setSuccess(true);
+                    setShowPairingCanvas(false);
+                    setGeneratedResult({
+                      count: pairs.length,
+                      items: pairs.map(p => ({
+                        name: p.childName,
+                        code: `${childCityName}-${p.childDate}`,
+                        date: p.childDate,
+                      })),
+                    });
+                  } else {
+                    alert(resJson.message || "Gagal menyimpan pasangan paket.");
+                  }
+                } catch (e: any) {
+                  alert("Terjadi kesalahan: " + e?.message);
+                } finally {
+                  setLoading(false);
+                }
+              }}
+            />
+          </div>
+        </div>
+      )}
 
       {success && generatedResult && (
         <div className="p-5 bg-emerald-50 border border-emerald-200 rounded-lg shadow-sm space-y-3 animate-in fade-in-0 duration-300">

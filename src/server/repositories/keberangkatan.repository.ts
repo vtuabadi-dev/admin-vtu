@@ -262,4 +262,43 @@ export const keberangkatanRepo = {
     });
   },
 
+  async findExistingGroupsForSplit() {
+    const groups = await prisma.paketGrup.findMany({
+      include: {
+        keberangkatan: {
+          include: {
+            startingPoint: true,
+            maskapaiMaster: true,
+            packageType: true,
+          },
+          orderBy: { tanggalBerangkat: "asc" },
+        },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    return groups.map((g) => {
+      const dates = g.keberangkatan.map((k) => k.tanggalBerangkat.toISOString().split("T")[0]!);
+      const firstK = g.keberangkatan[0];
+      const startingName = firstK?.startingPoint?.name || "Jakarta";
+
+      return {
+        id: g.id,
+        kodeGrup: g.kodeGrup,
+        namaPaket: g.namaPaket,
+        startingCity: startingName,
+        startingPointId: firstK?.startingPointId,
+        dateCount: g.keberangkatan.length,
+        dates,
+        totalCapacity: g.keberangkatan.reduce((sum, k) => sum + (k.kuota || k.maxSeat || 0), 0),
+        items: g.keberangkatan.map((k) => ({
+          id: k.id,
+          kode: k.kode,
+          namaPaket: k.namaPaket,
+          date: k.tanggalBerangkat.toISOString().split("T")[0]!,
+          seat: k.kuota || k.maxSeat || 0,
+        })),
+      };
+    });
+  },
 };

@@ -215,6 +215,21 @@ export const packageService = {
       createdList.push(created);
     }
 
+    // 4. If pairedItems (parent seat adjustments) passed, update parent departure seat capacities!
+    if (Array.isArray(data.pairedItems) && data.pairedItems.length > 0) {
+      for (const pair of data.pairedItems) {
+        if (pair.parentId && typeof pair.parentSeat === "number") {
+          await prisma.keberangkatan.update({
+            where: { id: pair.parentId },
+            data: {
+              kuota: pair.parentSeat,
+              maxSeat: pair.parentSeat,
+            },
+          });
+        }
+      }
+    }
+
     return departureDates.length === 1 ? createdList[0] : createdList;
   },
 
