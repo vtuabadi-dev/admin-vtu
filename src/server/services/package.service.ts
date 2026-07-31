@@ -236,6 +236,7 @@ export const packageService = {
         packageTypeId: data.packageTypeId,
         kuota: parseInt(data.kapasitas || data.kuota || "45", 10),
         maxSeat: parseInt(data.kapasitas || data.maxSeat || "45", 10),
+        targetMaterialisasi: parseInt(data.targetMaterialisasi || data.targetMaterialis || "30", 10),
         terisi: 0,
         status: "scheduled",
         durationDays: durasiHari,

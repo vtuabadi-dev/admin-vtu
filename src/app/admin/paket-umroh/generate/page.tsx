@@ -126,7 +126,8 @@ export default function GeneratePaketPage() {
     hotelMekkahId: "",
     hotelMadinahId: "",
     isAdaKlaster: "tidak",
-    kapasitas: "",
+    kapasitas: "45",
+    targetMaterialisasi: "30",
     isAdaPerlengkapan: "",
     hargaBase: "",
     durasiHari: "9",
@@ -872,6 +873,7 @@ export default function GeneratePaketPage() {
       kapasitas: Number(formData.kapasitas || 45),
       kuota: Number(formData.kapasitas || 45),
       maxSeat: Number(formData.kapasitas || 45),
+      targetMaterialisasi: Number(formData.targetMaterialisasi || 30),
       isAdaKlaster: formData.isAdaKlaster,
       clusterConfigs: formData.isAdaKlaster === "ya" ? activeClusterConfigs : null,
     };
@@ -908,7 +910,8 @@ export default function GeneratePaketPage() {
           hotelMekkahId: "",
           hotelMadinahId: "",
           isAdaKlaster: "tidak",
-          kapasitas: "",
+          kapasitas: "45",
+          targetMaterialisasi: "30",
           isAdaPerlengkapan: "",
           hargaBase: "",
           durasiHari: "9",
@@ -1428,7 +1431,7 @@ export default function GeneratePaketPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <label className="block text-sm font-medium mb-1">Kapasitas Seat (Maksimal Jamaah)</label>
                 <Input 
@@ -1437,8 +1440,20 @@ export default function GeneratePaketPage() {
                   name="kapasitas" 
                   value={formData.kapasitas} 
                   onChange={handleChange} 
-                  onKeyDown={(e) => handleKeyDownNext(e, formData.isAdaKlaster === "tidak" ? "field-hargaBase" : "field-submitBtn")}
+                  onKeyDown={(e) => handleKeyDownNext(e, "field-targetMaterialisasi")}
                   placeholder="Misal: 45" 
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Minimal Seat Materialisasi (Kuota Aman)</label>
+                <Input 
+                  id="field-targetMaterialisasi" 
+                  type="number" 
+                  name="targetMaterialisasi" 
+                  value={formData.targetMaterialisasi} 
+                  onChange={handleChange} 
+                  onKeyDown={(e) => handleKeyDownNext(e, formData.isAdaKlaster === "tidak" ? "field-hargaBase" : "field-submitBtn")}
+                  placeholder="Misal: 30" 
                 />
               </div>
               <div>
@@ -1872,7 +1887,7 @@ export default function GeneratePaketPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1">
             <div>
               <label className="block text-xs font-semibold mb-1">Kapasitas Seat (Maksimal Jamaah)</label>
               <Input 
@@ -1881,6 +1896,16 @@ export default function GeneratePaketPage() {
                 value={formData.kapasitas} 
                 onChange={handleChange} 
                 placeholder="45" 
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold mb-1">Minimal Seat Materialisasi (Kuota Aman)</label>
+              <Input 
+                type="number" 
+                name="targetMaterialisasi" 
+                value={formData.targetMaterialisasi} 
+                onChange={handleChange} 
+                placeholder="30" 
               />
             </div>
             <div>
