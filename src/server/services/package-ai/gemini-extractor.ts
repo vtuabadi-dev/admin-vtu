@@ -30,9 +30,12 @@ const getGeminiApiKey = async (): Promise<string> => {
 export async function extractWithGemini(
   imagePath: string,
   rawOcrText: string,
-  caption: string
+  caption: string,
+  apiKeyOverride?: string
 ): Promise<Partial<PackageExtractionResult> & { landingRoute?: string }> {
-  const apiKey = await getGeminiApiKey();
+  const apiKey = apiKeyOverride || (await getGeminiApiKey());
+  const keySuffix = apiKey.slice(-6);
+  console.log(`[Gemini Extractor] ▶ Extractor started using key=***${keySuffix}`);
   const genAI = new GoogleGenerativeAI(apiKey);
 
   // Fetch master data

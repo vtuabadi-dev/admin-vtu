@@ -69,100 +69,93 @@ export const googleAiStudioAdapter: OcrAdapter = {
   ): Promise<OcrResult> {
     const start = Date.now();
     const apiKey = config.apiKey;
+    const keySuffix = apiKey.slice(-6); // Last 6 chars for logging (safe)
     const base64 = imageBuffer.toString("base64");
+    const imgSizeKB = Math.round(imageBuffer.length / 1024);
 
     let mimeType = "image/jpeg";
     if (imageBuffer[0] === 0x89 && imageBuffer[1] === 0x50) mimeType = "image/png";
     else if (imageBuffer[0] === 0x52 && imageBuffer[1] === 0x49) mimeType = "image/webp";
 
-    let lastStatusCode: number | undefined;
-    let lastErrorMessage = "";
+    // ── Single model call — quota is per-KEY, not per-model ──
+    // Trying multiple models with the same key wastes quota!
+    const modelName = "gemini-2.0-flash";
+
+    console.log(
+      `[AI Studio Adapter] ▶ CALL API | model=${modelName} | key=***${keySuffix} | jenis=${jenis} | imgSize=${imgSizeKB}KB | retry=#${retryCount}`
+    );
 
     try {
-      // Pure 100% Google AI Studio (Gemini Flash Multimodal OCR)
-      for (const modelName of ["gemini-2.0-flash", "gemini-2.5-flash", "gemini-2.0-flash-lite"]) {
-        let geminiRes: Response | null = null;
-
-        try {
-          geminiRes = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`,
-            {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                contents: [{
-                  parts: [
-                    { text: "Extract all plain text, prices, dates, hotel names, and details from this image exactly as written, word for word." },
-                    { inline_data: { mime_type: mimeType, data: base64 } }
-                  ]
-                }]
-              }),
-              signal: AbortSignal.timeout(config.timeout ?? 30000),
-            }
-          );
-        } catch (fetchErr: any) {
-          // Network error or timeout — record and try next model
-          lastErrorMessage = fetchErr?.message || String(fetchErr);
-          const isTimeout = lastErrorMessage.includes("timeout") || lastErrorMessage.includes("abort");
-          if (isTimeout) {
-            lastStatusCode = undefined;
-            lastErrorMessage = `Timeout pada model ${modelName}: ${lastErrorMessage}`;
-          }
-          continue;
+      const fetchStart = Date.now();
+      const geminiRes = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [{
+              parts: [
+                { text: "Extract all plain text, prices, dates, hotel names, and details from this image exactly as written, word for word." },
+                { inline_data: { mime_type: mimeType, data: base64 } }
+              ]
+            }]
+          }),
+          signal: AbortSignal.timeout(config.timeout ?? 30000),
         }
+      );
+      const fetchMs = Date.now() - fetchStart;
 
-        if (geminiRes && geminiRes.ok) {
-          const gData = await geminiRes.json();
-          const fullText = gData?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
-          const expectedFields = getExpectedFields(jenis);
-          const fields = expectedFields.map((field) => {
-            const value = extractField(fullText, field);
-            return { field, value, confidence: value ? 0.9 : 0 };
-          });
+      console.log(
+        `[AI Studio Adapter] ◀ RESPONSE | model=${modelName} | key=***${keySuffix} | HTTP ${geminiRes.status} | ${fetchMs}ms`
+      );
 
-          return {
-            success: true,
-            fields,
-            rawText: fullText,
-            overallConfidence: fullText ? 0.9 : 0,
-            processingTimeMs: Date.now() - start,
-            retryCount,
-          };
-        }
+      if (geminiRes.ok) {
+        const gData = await geminiRes.json();
+        const fullText = gData?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+        const textLen = fullText.length;
+        const expectedFields = getExpectedFields(jenis);
+        const fields = expectedFields.map((field) => {
+          const value = extractField(fullText, field);
+          return { field, value, confidence: value ? 0.9 : 0 };
+        });
 
-        // Response exists but NOT ok — capture the REAL status code
-        if (geminiRes) {
-          lastStatusCode = geminiRes.status;
-          const errBody = await geminiRes.text().catch(() => "");
-          lastErrorMessage = `Model ${modelName} HTTP ${geminiRes.status}: ${errBody.slice(0, 300)}`;
+        console.log(
+          `[AI Studio Adapter] ✅ SUCCESS | key=***${keySuffix} | textLength=${textLen} chars | totalMs=${Date.now() - start}ms`
+        );
 
-          // 401 = invalid key, no point trying other models
-          if (geminiRes.status === 401) {
-            throw { statusCode: 401, message: `API key tidak valid (HTTP 401). ${errBody.slice(0, 200)}` };
-          }
-
-          // 403/429 = quota/rate limit, might apply to all models under the same key
-          if (geminiRes.status === 403 || geminiRes.status === 429) {
-            // Try next model, but if all fail we'll throw the real 403/429
-            continue;
-          }
-
-          // Other errors (5xx etc) — try next model
-          continue;
-        }
+        return {
+          success: true,
+          fields,
+          rawText: fullText,
+          overallConfidence: fullText ? 0.9 : 0,
+          processingTimeMs: Date.now() - start,
+          retryCount,
+        };
       }
 
-      // All 3 models failed — throw the REAL last status code, not a fake 401
-      throw {
-        statusCode: lastStatusCode || 500,
-        message: lastErrorMessage || "Semua model Google AI Studio gagal merespons.",
-      };
+      // NOT ok — capture real status code
+      const errBody = await geminiRes.text().catch(() => "");
+      const errMsg = `Model ${modelName} HTTP ${geminiRes.status}: ${errBody.slice(0, 300)}`;
+
+      console.error(
+        `[AI Studio Adapter] ❌ FAIL | key=***${keySuffix} | HTTP ${geminiRes.status} | ${errMsg.slice(0, 150)}`
+      );
+
+      // Throw with REAL status code — let gateway handle retry with different KEY
+      throw { statusCode: geminiRes.status, message: errMsg };
+
     } catch (err: any) {
-      const statusCode = err?.statusCode;
-      if (statusCode) {
+      // If it already has statusCode, re-throw as-is
+      if (err?.statusCode) {
         throw err;
       }
-      throw { statusCode: undefined, message: err?.message || String(err) };
+      // Network/timeout error
+      const msg = err?.message || String(err);
+      const isTimeout = msg.includes("timeout") || msg.includes("abort");
+      console.error(
+        `[AI Studio Adapter] ❌ ${isTimeout ? "TIMEOUT" : "NETWORK ERROR"} | key=***${keySuffix} | ${msg.slice(0, 150)}`
+      );
+      throw { statusCode: undefined, message: msg };
     }
   },
 

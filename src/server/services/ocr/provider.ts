@@ -17,6 +17,8 @@ export interface OcrResult {
   overallConfidence: number;
   processingTimeMs: number;
   retryCount: number;
+  providerId?: string;
+  apiKeyUsed?: string;
 }
 
 export interface ImageMetaCheck {

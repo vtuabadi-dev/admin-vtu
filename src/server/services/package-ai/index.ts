@@ -94,7 +94,9 @@ export async function processPackageFlyer(
 
   try {
     const { extractWithGemini } = await import("./gemini-extractor");
-    geminiData = await extractWithGemini(imagePath, ocrResult.rawText || "", caption);
+    const apiKeyToUse = ocrResult.apiKeyUsed || undefined;
+    console.log(`[processPackageFlyer] ▶ Pipeline started | keyUsed=***${apiKeyToUse ? apiKeyToUse.slice(-6) : "default"}`);
+    geminiData = await extractWithGemini(imagePath, ocrResult.rawText || "", caption, apiKeyToUse);
     isGeminiSuccess = true;
   } catch (error) {
     console.error("[processPackageFlyer] Gemini extraction failed, falling back to Regex:", error);

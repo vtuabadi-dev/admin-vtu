@@ -89,8 +89,16 @@ export async function process(
   );
 
   if (eligible.length === 0) {
-    // Fallback: If no provider is strictly active, try any active provider with an API key
-    eligible = providers.filter((p) => p.isActive && p.apiKey?.trim());
+    // Fallback: If all active providers are in cooldown, pick the one with oldest cooldown (least recently used)
+    const activeWithKey = providers.filter((p) => p.isActive && p.apiKey?.trim());
+    if (activeWithKey.length > 0) {
+      activeWithKey.sort((a, b) => {
+        const tA = a.cooldownUntil ? new Date(a.cooldownUntil).getTime() : 0;
+        const tB = b.cooldownUntil ? new Date(b.cooldownUntil).getTime() : 0;
+        return tA - tB;
+      });
+      eligible = activeWithKey;
+    }
   }
 
   if (eligible.length === 0) {
@@ -227,8 +235,20 @@ async function attemptWithProvider(
         });
       }
 
+      // Put provider in 45s post-success cooldown so NEXT extraction automatically rotates to next API key!
+      await ocrProviderRepo.updateHealth(currentProvider.id, {
+        healthStatus: "cooldown",
+        cooldownUntil: new Date(Date.now() + 45_000),
+      });
+
+      console.log(
+        `[OCR Gateway] SUCCESS | provider=${currentProvider.label} (id=${currentProvider.id}) | key=***${currentProvider.apiKey.slice(-6)} | Cooldown 45s set for rotation`
+      );
+
       result.processingTimeMs = Date.now() - startTime;
       result.retryCount = retryCount;
+      result.providerId = currentProvider.id;
+      result.apiKeyUsed = currentProvider.apiKey;
       return result;
 
     } catch (err: any) {
