@@ -263,87 +263,99 @@ export const keberangkatanRepo = {
   },
 
   async findExistingGroupsForSplit() {
-    const [groups, standaloneKeberangkatan] = await Promise.all([
-      prisma.paketGrup.findMany({
-        include: {
-          keberangkatan: {
-            include: {
-              startingPoint: true,
-              maskapaiMaster: true,
-              packageType: true,
-            },
-            orderBy: { tanggalBerangkat: "asc" },
-          },
-        },
-        orderBy: { createdAt: "desc" },
-      }),
-      prisma.keberangkatan.findMany({
-        where: { paketGrupId: null },
+    try {
+      const allKeberangkatan = await prisma.keberangkatan.findMany({
         include: {
           startingPoint: true,
           maskapaiMaster: true,
           packageType: true,
         },
-        orderBy: { tanggalBerangkat: "desc" },
-        take: 50,
-      }),
-    ]);
+        orderBy: { tanggalBerangkat: "asc" },
+      });
 
-    const groupList = groups.map((g) => {
-      const dates = g.keberangkatan.map((k) => k.tanggalBerangkat.toISOString().split("T")[0]!);
-      const firstK = g.keberangkatan[0];
-      const startingName = firstK?.startingPoint?.name || "Jakarta";
+      // Group items by paketGrupId (for grouped packages)
+      const groupMap = new Map<string, typeof allKeberangkatan>();
+      const standaloneList: typeof allKeberangkatan = [];
 
-      return {
-        id: g.id,
-        type: "group",
-        kodeGrup: g.kodeGrup,
-        namaPaket: g.namaPaket,
-        startingCity: startingName,
-        startingPointId: firstK?.startingPointId,
-        dateCount: g.keberangkatan.length,
-        dates,
-        totalCapacity: g.keberangkatan.reduce((sum, k) => sum + (k.kuota || k.maxSeat || 0), 0),
-        items: g.keberangkatan.map((k) => ({
-          id: k.id,
-          kode: k.kode,
-          namaPaket: k.namaPaket,
-          date: k.tanggalBerangkat.toISOString().split("T")[0]!,
-          seat: k.kuota || k.maxSeat || 0,
-        })),
-      };
-    });
+      for (const k of allKeberangkatan) {
+        if (k.paketGrupId) {
+          if (!groupMap.has(k.paketGrupId)) {
+            groupMap.set(k.paketGrupId, []);
+          }
+          groupMap.get(k.paketGrupId)!.push(k);
+        } else {
+          standaloneList.push(k);
+        }
+      }
 
-    const individualList = standaloneKeberangkatan.map((k) => {
-      const dateStr = k.tanggalBerangkat.toISOString().split("T")[0]!;
-      const startingName = k.startingPoint?.name || "Jakarta";
+      // Format Grouped Packages
+      const groupList: any[] = [];
+      for (const [groupId, items] of Array.from(groupMap.entries())) {
+        if (!items || items.length === 0) continue;
+        const firstK = items[0]!;
+        const startingName = firstK.startingPoint?.name || 
+          (firstK.namaPaket.includes("SURABAYA") || firstK.namaPaket.includes("SBY") ? "Surabaya" :
+           firstK.namaPaket.includes("SOLO") || firstK.namaPaket.includes("SOC") ? "Solo" : "Jakarta");
 
-      return {
-        id: `ind-${k.id}`,
-        keberangkatanId: k.id,
-        type: "individual",
-        kodeGrup: k.kodeIndividu || k.kode,
-        namaPaket: k.namaPaket,
-        startingCity: startingName,
-        startingPointId: k.startingPointId,
-        dateCount: 1,
-        dates: [dateStr],
-        totalCapacity: k.kuota || k.maxSeat || 45,
-        items: [
-          {
+        const dates = items.map((k: any) => k.tanggalBerangkat.toISOString().split("T")[0]!);
+
+        groupList.push({
+          id: groupId,
+          type: "group",
+          kodeGrup: firstK.kode.startsWith("#") ? firstK.kode : (firstK.kodeIndividu || firstK.kode),
+          namaPaket: firstK.namaPaket.split("-")[0]?.trim() || firstK.namaPaket,
+          startingCity: startingName,
+          startingPointId: firstK.startingPointId,
+          dateCount: items.length,
+          dates,
+          totalCapacity: items.reduce((sum: number, k: any) => sum + (k.kuota || k.maxSeat || 45), 0),
+          items: items.map((k: any) => ({
             id: k.id,
             kode: k.kode,
             namaPaket: k.namaPaket,
-            date: dateStr,
+            date: k.tanggalBerangkat.toISOString().split("T")[0]!,
             seat: k.kuota || k.maxSeat || 45,
-          },
-        ],
-      };
-    });
+          })),
+        });
+      }
 
-    return {
-      groups: groupList,
-      individuals: individualList,
-    };
+      // Format Individual / Standalone Packages
+      const individualList = standaloneList.map((k) => {
+        const dateStr = k.tanggalBerangkat.toISOString().split("T")[0]!;
+        const startingName = k.startingPoint?.name || 
+          (k.namaPaket.includes("SURABAYA") || k.namaPaket.includes("SBY") ? "Surabaya" :
+           k.namaPaket.includes("SOLO") || k.namaPaket.includes("SOC") ? "Solo" : "Jakarta");
+
+        return {
+          id: k.id,
+          keberangkatanId: k.id,
+          type: "individual",
+          kodeGrup: k.kodeIndividu || k.kode,
+          namaPaket: k.namaPaket,
+          startingCity: startingName,
+          startingPointId: k.startingPointId,
+          dateCount: 1,
+          dates: [dateStr],
+          totalCapacity: k.kuota || k.maxSeat || 45,
+          items: [
+            {
+              id: k.id,
+              kode: k.kode,
+              namaPaket: k.namaPaket,
+              date: dateStr,
+              seat: k.kuota || k.maxSeat || 45,
+            },
+          ],
+        };
+      });
+
+      return {
+        groups: groupList,
+        individuals: individualList,
+      };
+    } catch (error) {
+      console.error("[findExistingGroupsForSplit error]", error);
+      return { groups: [], individuals: [] };
+    }
   },
 };

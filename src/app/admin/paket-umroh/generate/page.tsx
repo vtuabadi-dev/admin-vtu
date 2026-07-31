@@ -389,26 +389,27 @@ export default function GeneratePaketPage() {
       });
   }, []);
 
-  useEffect(() => {
-    if (generateMode === "split") {
-      setLoadingGroups(true);
-      fetch("/api/admin/existing-groups")
-        .then(res => res.json())
-        .then(res => {
-          if (res.success && res.data) {
-            setExistingGroupsData({
-              groups: Array.isArray(res.data.groups) ? res.data.groups : [],
-              individuals: Array.isArray(res.data.individuals) ? res.data.individuals : [],
-            });
-          }
-          setLoadingGroups(false);
-        })
-        .catch(err => {
-          console.error("Failed to load existing groups:", err);
-          setLoadingGroups(false);
+  const fetchExistingGroups = useCallback(async () => {
+    setLoadingGroups(true);
+    try {
+      const res = await fetch("/api/admin/existing-groups");
+      const resJson = await res.json();
+      if (resJson.success && resJson.data) {
+        setExistingGroupsData({
+          groups: Array.isArray(resJson.data.groups) ? resJson.data.groups : [],
+          individuals: Array.isArray(resJson.data.individuals) ? resJson.data.individuals : [],
         });
+      }
+    } catch (err) {
+      console.error("Failed to load existing groups:", err);
+    } finally {
+      setLoadingGroups(false);
     }
-  }, [generateMode]);
+  }, []);
+
+  useEffect(() => {
+    fetchExistingGroups();
+  }, [fetchExistingGroups]);
 
   // Reset selected Rute In-Out if not valid for the selected package type
   useEffect(() => {
@@ -930,6 +931,7 @@ export default function GeneratePaketPage() {
         setCaption("");
         setOcrWarning("");
         setOcrSuccess(false);
+        fetchExistingGroups();
 
         scrollToTop();
       } else {
