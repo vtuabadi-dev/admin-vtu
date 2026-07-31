@@ -3,28 +3,46 @@ import * as fs from "fs";
 import { masterDataService } from "../master-data.service";
 import type { PackageExtractionResult } from "./types";
 
-const getGeminiApiKey = async (): Promise<string> => {
-  let key = process.env.GEMINI_API_KEY || process.env.GOOGLE_VISION_API_KEY;
-  if (!key) {
-    try {
-      const { ocrProviderRepo } = await import("@/server/repositories/ocr-provider.repository");
-      const activeProviders = await ocrProviderRepo.findActive();
-      if (activeProviders.length > 0 && activeProviders[0]?.apiKey) {
-        key = activeProviders[0].apiKey;
-      } else {
-        const allProviders = await ocrProviderRepo.findAll();
-        const firstWithKey = allProviders.find((p) => p.apiKey?.trim());
-        if (firstWithKey) key = firstWithKey.apiKey;
+const getGeminiApiKey = async (apiKeyOverride?: string): Promise<{ key: string; providerId?: string }> => {
+  if (apiKeyOverride) return { key: apiKeyOverride };
+
+  try {
+    const { loadProviders } = await import("@/server/services/ocr/registry");
+    const { selectProvider } = await import("@/server/services/ocr/rotation-engine");
+    const { reactivateExpiredCooldowns, isInCooldown } = await import("@/server/services/ocr/cooldown-manager");
+
+    let providers = await loadProviders();
+    await reactivateExpiredCooldowns(providers);
+
+    let eligible = providers.filter(
+      (p) => p.isActive && p.healthStatus === "active" && !isInCooldown(p)
+    );
+
+    if (eligible.length === 0) {
+      const activeWithKey = providers.filter((p) => p.isActive && p.apiKey?.trim());
+      if (activeWithKey.length > 0) {
+        activeWithKey.sort((a, b) => {
+          const tA = a.cooldownUntil ? new Date(a.cooldownUntil).getTime() : 0;
+          const tB = b.cooldownUntil ? new Date(b.cooldownUntil).getTime() : 0;
+          return tA - tB;
+        });
+        eligible = activeWithKey;
       }
-    } catch (e) {
-      console.warn("[gemini-extractor] Failed to fetch API key from DB:", e);
     }
+
+    const selection = selectProvider(eligible.length > 0 ? eligible : providers);
+    if (selection?.provider?.apiKey) {
+      return { key: selection.provider.apiKey, providerId: selection.provider.id };
+    }
+  } catch (e) {
+    console.warn("[gemini-extractor] Failed to fetch API key from DB:", e);
   }
 
-  if (!key) {
+  const envKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_VISION_API_KEY || "";
+  if (!envKey) {
     throw new Error("API Key untuk AI/OCR belum tersedia. Harap aktifkan provider di menu Pengaturan -> Integrasi OCR.");
   }
-  return key;
+  return { key: envKey };
 };
 
 export async function extractWithGemini(
@@ -32,10 +50,10 @@ export async function extractWithGemini(
   rawOcrText: string,
   caption: string,
   apiKeyOverride?: string
-): Promise<Partial<PackageExtractionResult> & { landingRoute?: string }> {
-  const apiKey = apiKeyOverride || (await getGeminiApiKey());
+): Promise<Partial<PackageExtractionResult> & { landingRoute?: string; rawText?: string }> {
+  const { key: apiKey, providerId } = await getGeminiApiKey(apiKeyOverride);
   const keySuffix = apiKey.slice(-6);
-  console.log(`[Gemini Extractor] ▶ Extractor started using key=***${keySuffix}`);
+  console.log(`[Gemini Extractor] ▶ 1-Pass Extractor started | key=***${keySuffix}`);
   const genAI = new GoogleGenerativeAI(apiKey);
 
   // Fetch master data
@@ -185,6 +203,7 @@ export async function extractWithGemini(
               hotelUpgrade: { type: SchemaType.STRING, description: "Informasi opsional upgrade hotel" },
               promoText: { type: SchemaType.STRING, description: "Informasi opsional teks promo" },
               description: { type: SchemaType.STRING, description: "Deskripsi tambahan" },
+              rawText: { type: SchemaType.STRING, description: "Bacakan dan ekstrak seluruh teks mentah murni yang ada pada gambar flyer fisik ini secara lengkap tanpa terlewat" },
               clusters: {
                 type: SchemaType.ARRAY,
                 items: {
@@ -224,6 +243,19 @@ export async function extractWithGemini(
 
       const responseText = result.response.text();
       const parsed = JSON.parse(responseText);
+
+      if (providerId) {
+        try {
+          const { ocrProviderRepo } = await import("@/server/repositories/ocr-provider.repository");
+          await ocrProviderRepo.updateHealth(providerId, {
+            healthStatus: "cooldown",
+            cooldownUntil: new Date(Date.now() + 45_000),
+          });
+          console.log(`[Gemini Extractor] ✅ SUCCESS in 1-PASS | providerId=${providerId} | Cooldown 45s set`);
+        } catch (e) {
+          // ignore
+        }
+      }
 
       return parsed;
     } catch (error) {

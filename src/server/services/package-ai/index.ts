@@ -86,26 +86,41 @@ export async function processPackageFlyer(
     );
   }
 
-  // Run OCR on the flyer directly from buffer (already read above)
-  const ocrResult = await processDocument(imageBuffer, "paspor", 0);
-
-  let geminiData: Partial<PackageExtractionResult> = {};
+  const startMs = Date.now();
+  let geminiData: Partial<PackageExtractionResult> & { rawText?: string } = {};
   let isGeminiSuccess = false;
+  let rawOcrText = "";
 
+  // ── 1-PASS EXTRACTION (Fast 1-API-Call Pipeline) ──
   try {
     const { extractWithGemini } = await import("./gemini-extractor");
-    const apiKeyToUse = ocrResult.apiKeyUsed || undefined;
-    console.log(`[processPackageFlyer] ▶ Pipeline started | keyUsed=***${apiKeyToUse ? apiKeyToUse.slice(-6) : "default"}`);
-    geminiData = await extractWithGemini(imagePath, ocrResult.rawText || "", caption, apiKeyToUse);
+    geminiData = await extractWithGemini(imagePath, "", caption);
     isGeminiSuccess = true;
+    rawOcrText = geminiData.rawText || "";
+    console.log(`[processPackageFlyer] ✅ 1-Pass Extraction finished in ${Date.now() - startMs}ms`);
   } catch (error) {
-    console.error("[processPackageFlyer] Gemini extraction failed, falling back to Regex:", error);
+    console.warn("[processPackageFlyer] 1-Pass extraction failed, falling back to 2-pass OCR Gateway:", error);
+  }
+
+  // ── FALLBACK (If 1-Pass failed) ──
+  if (!isGeminiSuccess || !rawOcrText) {
+    const ocrResult = await processDocument(imageBuffer, "paspor", 0);
+    rawOcrText = ocrResult.rawText || "";
+    if (!isGeminiSuccess) {
+      try {
+        const { extractWithGemini } = await import("./gemini-extractor");
+        geminiData = await extractWithGemini(imagePath, rawOcrText, caption, ocrResult.apiKeyUsed);
+        isGeminiSuccess = true;
+      } catch (error) {
+        console.error("[processPackageFlyer] Fallback extraction failed:", error);
+      }
+    }
   }
 
   if (isGeminiSuccess) {
     let dates = geminiData.departureDates || [];
-    if (ocrResult.rawText) {
-      const ocrDates = parseCaption(ocrResult.rawText).departureDates || [];
+    if (rawOcrText) {
+      const ocrDates = parseCaption(rawOcrText).departureDates || [];
       const combined = Array.from(new Set([...dates, ...ocrDates])).sort();
       if (combined.length > 0) {
         dates = combined;
@@ -133,13 +148,13 @@ export async function processPackageFlyer(
       promoText: geminiData.promoText,
       description: geminiData.description,
       rawCaption: caption,
-      rawOcrText: ocrResult.rawText || "",
+      rawOcrText: rawOcrText,
       confidence: 1, // Gemini is confident
     };
   }
 
   // --- FALLBACK REGEX PARSER ---
-  const cleanOcrText = ocrResult.rawText?.includes("No OCR providers configured") ? "" : (ocrResult.rawText || "");
+  const cleanOcrText = rawOcrText.includes("No OCR providers configured") ? "" : rawOcrText;
   const combinedText = [caption, cleanOcrText].filter(Boolean).join("\n\n");
   
   // Parse the combined text
