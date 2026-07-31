@@ -204,7 +204,6 @@ export async function extractWithGemini(
               hotelUpgrade: { type: SchemaType.STRING, description: "Informasi opsional upgrade hotel" },
               promoText: { type: SchemaType.STRING, description: "Informasi opsional teks promo" },
               description: { type: SchemaType.STRING, description: "Deskripsi tambahan" },
-              rawText: { type: SchemaType.STRING, description: "Bacakan dan ekstrak seluruh teks mentah murni yang ada pada gambar flyer fisik ini secara lengkap tanpa terlewat" },
               clusters: {
                 type: SchemaType.ARRAY,
                 items: {

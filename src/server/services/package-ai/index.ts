@@ -9,11 +9,10 @@
 
 import * as fs from "fs";
 import * as path from "path";
-import { processDocument, validateImageMetadata } from "@/server/services/ocr.service";
+import { validateImageMetadata } from "@/server/services/ocr.service";
 import { keberangkatanRepo } from "@/server/repositories";
 import { parseCaption } from "./caption-parser";
 import { buildPackageDraft } from "./package-builder";
-import { resolveAirline, resolveCity } from "./alias-resolver";
 import type { PackageExtractionResult, PackageDraft, PackageDraftStatus } from "./types";
 
 // ── In-Memory Draft Storage ──────────────────────────────────
@@ -87,108 +86,73 @@ export async function processPackageFlyer(
   }
 
   const startMs = Date.now();
+
+  // ── STEP 1: REGEX & LOCAL STRING PARSER FIRST (0 API TOKENS) ──
+  const localParsed = parseCaption(caption || "");
+  const hasDates = Array.isArray(localParsed.departureDates) && localParsed.departureDates.length > 0;
+  const hasDuration = (localParsed.durationDays || 0) > 0;
+  const hasAirline = !!localParsed.airline;
+  const hasCity = !!localParsed.departureCity;
+  const hasPrice = !!localParsed.hargaBase;
+
+  // If local parser extracted dates, duration, airline, city & price, NO NEED TO CALL GEMINI API!
+  if (hasDates && hasDuration && hasAirline && hasCity && hasPrice) {
+    console.log(`[processPackageFlyer] ⚡ 100% Parsed locally via Regex/Parser in ${Date.now() - startMs}ms! Skipping Gemini API call to conserve token quota.`);
+    return {
+      ...localParsed,
+      title: localParsed.title || "Untitled Package",
+      packageType: localParsed.packageType || "umroh_reguler",
+      departureCity: localParsed.departureCity || "",
+      airline: localParsed.airline || "",
+      hotelMekkah: localParsed.hotelMekkah || "",
+      hotelMadinah: localParsed.hotelMadinah || "",
+      durationDays: localParsed.durationDays || 9,
+      departureDates: localParsed.departureDates || [],
+      rawCaption: caption,
+      rawOcrText: "",
+      confidence: 0.95,
+    };
+  }
+
+  // ── STEP 2: SMART GEMINI AI COMPLETION (Only for missing fields) ──
   let geminiData: Partial<PackageExtractionResult> & { rawText?: string } = {};
   let isGeminiSuccess = false;
-  let rawOcrText = "";
 
-  // ── 1-PASS EXTRACTION (Fast 1-API-Call Pipeline) ──
   try {
     const { extractWithGemini } = await import("./gemini-extractor");
     geminiData = await extractWithGemini(imagePath, "", caption);
     isGeminiSuccess = true;
-    rawOcrText = geminiData.rawText || "";
-    console.log(`[processPackageFlyer] ✅ 1-Pass Extraction finished in ${Date.now() - startMs}ms`);
+    console.log(`[processPackageFlyer] ✅ Gemini AI completion finished in ${Date.now() - startMs}ms`);
   } catch (error) {
-    console.warn("[processPackageFlyer] 1-Pass extraction failed, falling back to 2-pass OCR Gateway:", error);
+    console.warn("[processPackageFlyer] Gemini extraction failed/cooldown, falling back to local parsed data:", error);
   }
 
-  // ── FALLBACK (If 1-Pass failed) ──
-  if (!isGeminiSuccess || !rawOcrText) {
-    const ocrResult = await processDocument(imageBuffer, "paspor", 0);
-    rawOcrText = ocrResult.rawText || "";
-    if (!isGeminiSuccess) {
-      try {
-        const { extractWithGemini } = await import("./gemini-extractor");
-        geminiData = await extractWithGemini(imagePath, rawOcrText, caption, ocrResult.apiKeyUsed);
-        isGeminiSuccess = true;
-      } catch (error) {
-        console.error("[processPackageFlyer] Fallback extraction failed:", error);
-      }
-    }
-  }
+  // Combine local parsed data with Gemini AI completion
+  const mergedDates = Array.from(new Set([...(localParsed.departureDates || []), ...(geminiData.departureDates || [])])).sort();
 
-  if (isGeminiSuccess) {
-    let dates = geminiData.departureDates || [];
-    if (rawOcrText) {
-      const ocrDates = parseCaption(rawOcrText).departureDates || [];
-      const combined = Array.from(new Set([...dates, ...ocrDates])).sort();
-      if (combined.length > 0) {
-        dates = combined;
-      }
-    }
-
-    const captionUpgrades = parseCaption(caption);
-    return {
-      title: geminiData.title || "Untitled Package",
-      packageType: (geminiData.packageType as any) || "umroh_reguler",
-      departureCity: geminiData.departureCity || "",
-      landingRoute: geminiData.landingRoute,
-      airline: geminiData.airline || "",
-      hotelMekkah: geminiData.hotelMekkah || "",
-      hotelMadinah: geminiData.hotelMadinah || "",
-      roomUpgrade: geminiData.roomUpgrade,
-      hotelUpgrade: geminiData.hotelUpgrade,
-      upgradeDouble: geminiData.upgradeDouble || captionUpgrades.upgradeDouble,
-      upgradeTriple: geminiData.upgradeTriple || captionUpgrades.upgradeTriple,
-      isAdaPerlengkapan: geminiData.isAdaPerlengkapan as any,
-      hargaBase: geminiData.hargaBase,
-      clusters: geminiData.clusters,
-      durationDays: geminiData.durationDays || 0,
-      departureDates: dates,
-      promoText: geminiData.promoText,
-      description: geminiData.description,
-      rawCaption: caption,
-      rawOcrText: rawOcrText,
-      confidence: 1, // Gemini is confident
-    };
-  }
-
-  // --- FALLBACK REGEX PARSER ---
-  const cleanOcrText = rawOcrText.includes("No OCR providers configured") ? "" : rawOcrText;
-  const combinedText = [caption, cleanOcrText].filter(Boolean).join("\n\n");
-  
-  // Parse the combined text
-  const captionFields = parseCaption(combinedText);
-
-  const ocrAirline = cleanOcrText ? resolveAirline(cleanOcrText.trim()) : "";
-  const ocrCity = cleanOcrText ? resolveCity(cleanOcrText.trim()) : "";
-
-  // Build the final extraction result
-  const result: PackageExtractionResult = {
-    title: captionFields.title || "Untitled Package",
-    packageType: captionFields.packageType || "umroh_reguler",
-    departureCity: captionFields.departureCity || ocrCity || "",
-    airline: captionFields.airline || ocrAirline || "",
-    hotelMekkah: captionFields.hotelMekkah || "",
-    hotelMadinah: captionFields.hotelMadinah || "",
-    roomUpgrade: captionFields.roomUpgrade,
-    hotelUpgrade: captionFields.hotelUpgrade,
-    upgradeDouble: captionFields.upgradeDouble,
-    upgradeTriple: captionFields.upgradeTriple,
-    isAdaPerlengkapan: captionFields.isAdaPerlengkapan,
-    hargaBase: captionFields.hargaBase,
-    clusters: captionFields.clusters,
-    durationDays: captionFields.durationDays || 0,
-    departureDates: captionFields.departureDates || [],
-    departureDateDetails: captionFields.departureDateDetails,
-    promoText: captionFields.promoText,
-    description: captionFields.description,
+  return {
+    title: geminiData.title || localParsed.title || "Untitled Package",
+    packageType: (geminiData.packageType as any) || localParsed.packageType || "umroh_reguler",
+    departureCity: geminiData.departureCity || localParsed.departureCity || "",
+    landingRoute: geminiData.landingRoute || (localParsed as any).landingRoute,
+    airline: geminiData.airline || localParsed.airline || "",
+    hotelMekkah: geminiData.hotelMekkah || localParsed.hotelMekkah || "",
+    hotelMadinah: geminiData.hotelMadinah || localParsed.hotelMadinah || "",
+    roomUpgrade: geminiData.roomUpgrade || localParsed.roomUpgrade,
+    hotelUpgrade: geminiData.hotelUpgrade || localParsed.hotelUpgrade,
+    upgradeDouble: geminiData.upgradeDouble || localParsed.upgradeDouble,
+    upgradeTriple: geminiData.upgradeTriple || localParsed.upgradeTriple,
+    isAdaPerlengkapan: (geminiData.isAdaPerlengkapan as any) || localParsed.isAdaPerlengkapan,
+    hargaBase: geminiData.hargaBase || localParsed.hargaBase,
+    clusters: geminiData.clusters || localParsed.clusters,
+    durationDays: geminiData.durationDays || localParsed.durationDays || 0,
+    departureDates: mergedDates,
+    promoText: geminiData.promoText || localParsed.promoText,
+    description: geminiData.description || localParsed.description,
     rawCaption: caption,
-    rawOcrText: cleanOcrText,
-    confidence: isGeminiSuccess ? 1 : 0.7,
+    rawOcrText: "",
+    confidence: isGeminiSuccess ? 1 : 0.8,
   };
-
-  return result;
 }
 
 // ── Draft Management ─────────────────────────────────────────

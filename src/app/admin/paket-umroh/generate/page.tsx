@@ -73,7 +73,7 @@ export default function GeneratePaketPage() {
       hotelMadinah: string | null;
     };
   } | null>(null);
-  const [activeCanvasTab, setActiveCanvasTab] = useState<"summary" | "json" | "dates" | "ocr_text">("summary");
+  const [activeCanvasTab, setActiveCanvasTab] = useState<"summary" | "json" | "dates">("summary");
   const dropRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -2631,18 +2631,6 @@ export default function GeneratePaketPage() {
                       >
                         📅 Inspeksi Tanggal
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => setActiveCanvasTab("ocr_text")}
-                        className={cn(
-                          "px-2.5 py-1 text-xs font-bold rounded-md transition-colors",
-                          activeCanvasTab === "ocr_text"
-                            ? "bg-emerald-600 text-white shadow-xs"
-                            : "text-slate-400 hover:text-white"
-                        )}
-                      >
-                        📄 Raw Teks AI Studio
-                      </button>
                     </div>
                   </div>
 
@@ -2883,45 +2871,6 @@ export default function GeneratePaketPage() {
                             {rawOcrResult.extracted.rawCaption || caption || "Kosong"}
                           </pre>
                         </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Tab 4: Pure Raw Text Extracted by AI Studio (No Regex / No Parser) */}
-                  {activeCanvasTab === "ocr_text" && (
-                    <div className="space-y-3 text-xs">
-                      <div className="p-3 bg-slate-800/80 rounded-lg border border-slate-700 space-y-2">
-                        <div className="flex justify-between items-center border-b border-slate-700 pb-2 flex-wrap gap-2">
-                          <span className="font-bold text-emerald-400 uppercase tracking-wider text-[11px]">
-                            📄 Teks Mentah Hasil Ekstraksi Gambar Flyer (Pure Google AI Studio)
-                          </span>
-                          <span className="text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded font-mono font-bold">
-                            Tanpa Regex & Tanpa Parser
-                          </span>
-                        </div>
-                        <p className="text-[11px] text-slate-300 leading-relaxed">
-                          Seluruh teks murni yang terbaca oleh model <strong>Google AI Studio (Gemini Flash Multimodal)</strong> langsung dari gambar flyer fisik tanpa melalui penyaringan regex atau manipulasi string.
-                        </p>
-                      </div>
-
-                      <div className="p-3 bg-slate-800/80 rounded-lg border border-slate-700 space-y-2">
-                        <div className="flex justify-between items-center">
-                          <span className="text-[11px] text-slate-400 font-mono">Teks Flyer Fisik Yang Terbaca AI Studio:</span>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const rawText = rawOcrResult.extracted.rawOcrText || rawOcrResult.extracted.rawCaption || "Teks flyer kosong";
-                              navigator.clipboard.writeText(rawText);
-                              alert("Teks mentah AI Studio berhasil disalin ke clipboard!");
-                            }}
-                            className="text-[10px] bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-slate-700 px-2.5 py-1 rounded transition-colors font-medium"
-                          >
-                            📋 Salin Teks Mentah
-                          </button>
-                        </div>
-                        <pre className="p-3 bg-slate-950 border border-slate-800 rounded-lg text-slate-200 font-mono text-[11px] leading-relaxed overflow-x-auto max-h-[350px] overflow-y-auto whitespace-pre-wrap">
-                          {rawOcrResult.extracted.rawOcrText || rawOcrResult.extracted.rawCaption || "Belum ada teks flyer yang dipindai dari gambar."}
-                        </pre>
                       </div>
                     </div>
                   )}
