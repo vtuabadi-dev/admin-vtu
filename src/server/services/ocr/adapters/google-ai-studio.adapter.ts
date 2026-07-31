@@ -80,7 +80,7 @@ export const googleAiStudioAdapter: OcrAdapter = {
 
     try {
       // Pure 100% Google AI Studio (Gemini Flash Multimodal OCR)
-      for (const modelName of ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro"]) {
+      for (const modelName of ["gemini-2.0-flash", "gemini-2.5-flash", "gemini-2.0-flash-lite"]) {
         let geminiRes: Response | null = null;
 
         try {
