@@ -75,25 +75,41 @@ export const googleAiStudioAdapter: OcrAdapter = {
     if (imageBuffer[0] === 0x89 && imageBuffer[1] === 0x50) mimeType = "image/png";
     else if (imageBuffer[0] === 0x52 && imageBuffer[1] === 0x49) mimeType = "image/webp";
 
+    let lastStatusCode: number | undefined;
+    let lastErrorMessage = "";
+
     try {
       // Pure 100% Google AI Studio (Gemini Flash Multimodal OCR)
       for (const modelName of ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro"]) {
-        const geminiRes = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              contents: [{
-                parts: [
-                  { text: "Extract all plain text, prices, dates, hotel names, and details from this image exactly as written, word for word." },
-                  { inline_data: { mime_type: mimeType, data: base64 } }
-                ]
-              }]
-            }),
-            signal: AbortSignal.timeout(config.timeout ?? 30000),
+        let geminiRes: Response | null = null;
+
+        try {
+          geminiRes = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                contents: [{
+                  parts: [
+                    { text: "Extract all plain text, prices, dates, hotel names, and details from this image exactly as written, word for word." },
+                    { inline_data: { mime_type: mimeType, data: base64 } }
+                  ]
+                }]
+              }),
+              signal: AbortSignal.timeout(config.timeout ?? 30000),
+            }
+          );
+        } catch (fetchErr: any) {
+          // Network error or timeout — record and try next model
+          lastErrorMessage = fetchErr?.message || String(fetchErr);
+          const isTimeout = lastErrorMessage.includes("timeout") || lastErrorMessage.includes("abort");
+          if (isTimeout) {
+            lastStatusCode = undefined;
+            lastErrorMessage = `Timeout pada model ${modelName}: ${lastErrorMessage}`;
           }
-        ).catch(() => null);
+          continue;
+        }
 
         if (geminiRes && geminiRes.ok) {
           const gData = await geminiRes.json();
@@ -113,9 +129,34 @@ export const googleAiStudioAdapter: OcrAdapter = {
             retryCount,
           };
         }
+
+        // Response exists but NOT ok — capture the REAL status code
+        if (geminiRes) {
+          lastStatusCode = geminiRes.status;
+          const errBody = await geminiRes.text().catch(() => "");
+          lastErrorMessage = `Model ${modelName} HTTP ${geminiRes.status}: ${errBody.slice(0, 300)}`;
+
+          // 401 = invalid key, no point trying other models
+          if (geminiRes.status === 401) {
+            throw { statusCode: 401, message: `API key tidak valid (HTTP 401). ${errBody.slice(0, 200)}` };
+          }
+
+          // 403/429 = quota/rate limit, might apply to all models under the same key
+          if (geminiRes.status === 403 || geminiRes.status === 429) {
+            // Try next model, but if all fail we'll throw the real 403/429
+            continue;
+          }
+
+          // Other errors (5xx etc) — try next model
+          continue;
+        }
       }
 
-      throw { statusCode: 401, message: "Panggilan Google AI Studio API gagal — periksa Kunci API Google AI Studio Anda." };
+      // All 3 models failed — throw the REAL last status code, not a fake 401
+      throw {
+        statusCode: lastStatusCode || 500,
+        message: lastErrorMessage || "Semua model Google AI Studio gagal merespons.",
+      };
     } catch (err: any) {
       const statusCode = err?.statusCode;
       if (statusCode) {
