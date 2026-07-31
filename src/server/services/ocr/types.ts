@@ -183,10 +183,10 @@ export const DEFAULT_GATEWAY_CONFIG: GatewayConfig = {
   rotationStrategy: "FIXED_ROUND_ROBIN",
   defaultRotationCount: 2,
   cooldownEnabled: true,
-  retryEnabled: true,
+  retryEnabled: false,
   cacheEnabled: true,
   cacheTtlHours: 24,
-  maxRetries: 5, // up to 5 different providers
+  maxRetries: 0, // STRICT: 1 extraction request = 1 API Key only (no multi-key cascade retry)
 };
 
 // ── Adapter ────────────────────────────────────────────────

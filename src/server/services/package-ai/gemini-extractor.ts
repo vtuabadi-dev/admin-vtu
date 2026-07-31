@@ -51,6 +51,7 @@ export async function extractWithGemini(
   caption: string,
   apiKeyOverride?: string
 ): Promise<Partial<PackageExtractionResult> & { landingRoute?: string; rawText?: string }> {
+  const startMs = Date.now();
   const { key: apiKey, providerId } = await getGeminiApiKey(apiKeyOverride);
   const keySuffix = apiKey.slice(-6);
   console.log(`[Gemini Extractor] ▶ 1-Pass Extractor started | key=***${keySuffix}`);
@@ -247,11 +248,21 @@ export async function extractWithGemini(
       if (providerId) {
         try {
           const { ocrProviderRepo } = await import("@/server/repositories/ocr-provider.repository");
+          const { logUsage } = await import("@/server/services/ocr/statistics-engine");
           await ocrProviderRepo.updateHealth(providerId, {
             healthStatus: "cooldown",
             cooldownUntil: new Date(Date.now() + 45_000),
           });
-          console.log(`[Gemini Extractor] ✅ SUCCESS in 1-PASS | providerId=${providerId} | Cooldown 45s set`);
+          await logUsage({
+            providerId,
+            requestType: "ocr",
+            documentType: "paspor",
+            success: true,
+            confidence: 0.95,
+            latencyMs: Date.now() - startMs,
+            imageSize: imageBuffer.length,
+          });
+          console.log(`[Gemini Extractor] ✅ SUCCESS logged in Usage Log | providerId=${providerId} | Cooldown 45s set`);
         } catch (e) {
           // ignore
         }
@@ -261,6 +272,24 @@ export async function extractWithGemini(
     } catch (error) {
       lastError = error;
       console.warn(`[Gemini Extractor] Model ${modelName} failed, trying next candidate...`, error);
+    }
+  }
+
+  if (providerId) {
+    try {
+      const { logUsage } = await import("@/server/services/ocr/statistics-engine");
+      await logUsage({
+        providerId,
+        requestType: "ocr",
+        documentType: "paspor",
+        success: false,
+        latencyMs: Date.now() - startMs,
+        errorCode: String(lastError?.statusCode || 500),
+        errorMessage: String(lastError?.message || lastError),
+        imageSize: imageBuffer.length,
+      });
+    } catch (e) {
+      // ignore
     }
   }
 
