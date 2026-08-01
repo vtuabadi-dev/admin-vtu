@@ -79,7 +79,7 @@ export const googleAiStudioAdapter: OcrAdapter = {
 
     // ── Single model call — quota is per-KEY, not per-model ──
     // Trying multiple models with the same key wastes quota!
-    const modelName = "gemini-2.0-flash";
+    const modelName = "gemini-2.5-flash";
 
     console.log(
       `[AI Studio Adapter] ▶ CALL API | model=${modelName} | key=***${keySuffix} | jenis=${jenis} | imgSize=${imgSizeKB}KB | retry=#${retryCount}`

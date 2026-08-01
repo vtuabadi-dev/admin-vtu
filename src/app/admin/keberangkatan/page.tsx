@@ -455,7 +455,7 @@ export default function KeberangkatanListPage() {
                     variant="outline"
                     size="sm"
                     className="flex-1"
-                    onClick={() => router.push(`/admin/manifest`)}
+                    onClick={() => router.push(`/admin/manifest?paketId=${k.id}`)}
                   >
                     <FileText className="mr-1.5 h-3.5 w-3.5" />
                     Manifest

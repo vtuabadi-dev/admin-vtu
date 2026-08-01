@@ -168,7 +168,7 @@ export async function extractWithGemini(
     `2. TEKS CAPTION: ${cleanCaption}\n\n` +
     `3. GAMBAR FLYER UTAMA (Telah dilampirkan): Analisa visual flyer utama & rute itinerary.`;
 
-  const candidateModels = ["gemini-2.0-flash", "gemini-2.5-flash", "gemini-2.0-flash-lite"];
+  const candidateModels = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-2.0-flash-lite"];
   let lastError: any = null;
 
   // Outer Loop: Try API Keys in sequence
