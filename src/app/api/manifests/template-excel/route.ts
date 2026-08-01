@@ -27,6 +27,8 @@ export async function GET() {
       { header: "TGL LAHIR (*)", key: "tanggalLahir", width: 16 },
       { header: "STATUS MENIKAH", key: "statusMenikah", width: 18 },
       { header: "NO TELP/HP", key: "noTelp", width: 18 },
+      { header: "KOTA/KAB (*)", key: "kota", width: 24 },
+      { header: "PULAU (*)", key: "pulau", width: 18 },
       { header: "ALAMAT", key: "alamat", width: 35 },
     ];
 
@@ -47,6 +49,8 @@ export async function GET() {
         tanggalLahir: "03/03/1999",
         statusMenikah: "Belum Menikah",
         noTelp: "081234567890",
+        kota: "JAKARTA SELATAN",
+        pulau: "JAWA",
         alamat: "Jl. Tebet Raya No. 45, Jakarta Selatan",
       },
       {
@@ -64,6 +68,8 @@ export async function GET() {
         tanggalLahir: "17/07/2000",
         statusMenikah: "Belum Menikah",
         noTelp: "081987654321",
+        kota: "JAKARTA SELATAN",
+        pulau: "JAWA",
         alamat: "Jl. Tebet Raya No. 45, Jakarta Selatan",
       },
       {
@@ -81,6 +87,8 @@ export async function GET() {
         tanggalLahir: "15/05/1992",
         statusMenikah: "Menikah",
         noTelp: "081122334455",
+        kota: "KOTA SURABAYA",
+        pulau: "JAWA",
         alamat: "Jl. Pemuda No. 12, Surabaya",
       },
     ]);

@@ -51,6 +51,29 @@ function getSingleSourceOfTruthName(j: any): string {
   return j.namaLengkap || "-";
 }
 
+function derivePulau(provinsi?: string, kota?: string): string {
+  const text = `${provinsi || ""} ${kota || ""}`.toLowerCase();
+  if (/jakarta|jawa|yogyakarta|jogja|banten|surabaya|bandung|semarang|tebet|depok|bogor|bekasi|tangerang|solo|surakarta|malang|kediri/i.test(text)) {
+    return "JAWA";
+  }
+  if (/sumatera|aceh|riau|jambi|bengkulu|lampung|bangka|belitung|medan|padang|palembang|pekanbaru/i.test(text)) {
+    return "SUMATERA";
+  }
+  if (/kalimantan|pontianak|banjarmasin|samarinda|balikpapan|palangkaraya|tarakan/i.test(text)) {
+    return "KALIMANTAN";
+  }
+  if (/sulawesi|makassar|manado|palu|kendari|gorontalo|mamuju/i.test(text)) {
+    return "SULAWESI";
+  }
+  if (/bali|nusa tenggara|ntb|ntt|denpasar|mataram|kupang/i.test(text)) {
+    return "BALI & NUSA TENGGARA";
+  }
+  if (/maluku|papua|jayapura|ambon|ternate|sorong|merauke/i.test(text)) {
+    return "MALUKU & PAPUA";
+  }
+  return "JAWA";
+}
+
 function calculateAge(birthDateInput?: string | Date): string {
   if (!birthDateInput) return "-";
   const birthDate = new Date(birthDateInput);
@@ -190,7 +213,8 @@ function ManifestPageContent() {
       const sotName = getSingleSourceOfTruthName(j).toLowerCase();
       const regId = (j.registrationId || j.groupId || "").toLowerCase();
       const noId = (j.nomorPaspor || j.nik || "").toLowerCase();
-      return sotName.includes(q) || regId.includes(q) || noId.includes(q);
+      const kotaStr = (j.kota || "").toLowerCase();
+      return sotName.includes(q) || regId.includes(q) || noId.includes(q) || kotaStr.includes(q);
     });
   }, [activePackageJamaah, searchQuery]);
 
@@ -360,6 +384,10 @@ function ManifestPageContent() {
         const nama = getVal(6);
         if (!nama) return; // Skip empty rows
 
+        const kota = getVal(15);
+        const pulauInput = getVal(16);
+        const pulau = pulauInput || derivePulau("", kota);
+
         parsedRows.push({
           rombongan: getVal(1),
           noJamaah: getVal(2),
@@ -375,7 +403,9 @@ function ManifestPageContent() {
           tanggalLahir: getVal(12),
           statusMenikah: getVal(13),
           noTelp: getVal(14),
-          alamat: getVal(15),
+          kota,
+          pulau,
+          alamat: getVal(17),
         });
       });
 
@@ -506,7 +536,7 @@ function ManifestPageContent() {
                 <div className="relative flex-1 sm:w-64">
                   <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
                   <Input
-                    placeholder="Cari jamaah, NIK, paspor..."
+                    placeholder="Cari jamaah, NIK, paspor, kota..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="pl-8 h-8 text-xs"
@@ -659,6 +689,12 @@ function ManifestPageContent() {
                       <th className="px-3 py-3 font-bold uppercase tracking-wider text-[10px] text-stone-700 dark:text-stone-300 border-r border-stone-200/70 dark:border-stone-800/70 min-w-[110px]">
                         NO TELP/HP
                       </th>
+                      <th className="px-3 py-3 font-bold uppercase tracking-wider text-[10px] text-stone-700 dark:text-stone-300 border-r border-stone-200/70 dark:border-stone-800/70 min-w-[140px]">
+                        KOTA/KAB (*)
+                      </th>
+                      <th className="px-3 py-3 font-bold uppercase tracking-wider text-[10px] text-stone-700 dark:text-stone-300 border-r border-stone-200/70 dark:border-stone-800/70 w-28">
+                        PULAU (*)
+                      </th>
                       <th className="px-3 py-3 font-bold uppercase tracking-wider text-[10px] text-stone-700 dark:text-stone-300 min-w-[200px]">
                         ALAMAT
                       </th>
@@ -667,7 +703,7 @@ function ManifestPageContent() {
                   <tbody className="divide-y divide-stone-200/60 dark:divide-stone-800/60">
                     {filteredActiveJamaah.length === 0 ? (
                       <tr>
-                        <td colSpan={16} className="px-4 py-12 text-center text-stone-500">
+                        <td colSpan={18} className="px-4 py-12 text-center text-stone-500">
                           <div className="space-y-3">
                             <p>Belum ada data jamaah terdaftar pada paket ini.</p>
                             <Button
@@ -708,6 +744,8 @@ function ManifestPageContent() {
 
                           const tipeKamarDisplay = j.tipeKamar || (group.groupObj as any)?.roomUpgrade || "Upgrade Double";
                           const statusMenikahDisplay = j.statusMenikah || "Belum Menikah";
+                          const kotaDisplay = j.kota || "JAKARTA SELATAN";
+                          const pulauDisplay = j.provinsi && j.provinsi !== "-" ? j.provinsi : derivePulau(j.provinsi, j.kota);
 
                           return (
                             <tr
@@ -800,6 +838,16 @@ function ManifestPageContent() {
                               {/* NO TELP/HP */}
                               <td className="px-3 py-2.5 border-r border-stone-200/50 dark:border-stone-800/50 font-mono">
                                 {j.nomorTelepon || "-"}
+                              </td>
+
+                              {/* KOTA/KAB */}
+                              <td className="px-3 py-2.5 border-r border-stone-200/50 dark:border-stone-800/50 font-semibold text-stone-800 dark:text-stone-200">
+                                {kotaDisplay}
+                              </td>
+
+                              {/* PULAU */}
+                              <td className="px-3 py-2.5 border-r border-stone-200/50 dark:border-stone-800/50 font-bold uppercase text-[10px] text-amber-800 dark:text-amber-300">
+                                {pulauDisplay}
                               </td>
 
                               {/* ALAMAT */}
@@ -930,7 +978,7 @@ function ManifestPageContent() {
           if (!submittingImport) setImportModalOpen(false);
         }}
         title={`Import Excel Manifest — ${activePackage?.namaPaket || activePackage?.kode || "Paket Aktif"}`}
-        description="Unggah file Excel 16-kolom untuk memasukkan data jamaah & rombongan sekaligus"
+        description="Unggah file Excel terformat untuk memasukkan data jamaah, KOTA/KAB, PULAU & rombongan sekaligus"
         size="xl"
       >
         <div className="space-y-5">
@@ -939,10 +987,10 @@ function ManifestPageContent() {
             <div className="space-y-0.5">
               <p className="text-xs font-bold text-amber-900 dark:text-amber-200 flex items-center gap-1.5">
                 <FileSpreadsheet className="h-4 w-4 text-amber-600" />
-                Template Excel Manifest Standard (16 Kolom)
+                Template Excel Manifest Standard (Termasuk KOTA/KAB & PULAU)
               </p>
               <p className="text-[11px] text-amber-700 dark:text-amber-400">
-                Gunakan template standar agar format kolom (Rombongan, Nama, Paspor/NIK, Tgl Lahir) sesuai.
+                Gunakan template standar agar format kolom (Rombongan, Nama, Paspor/NIK, Kota, Pulau) sesuai.
               </p>
             </div>
             <Button
@@ -1005,12 +1053,12 @@ function ManifestPageContent() {
                   <thead className="bg-stone-100 dark:bg-stone-900 sticky top-0 font-bold border-b text-[11px] text-stone-700 dark:text-stone-300">
                     <tr>
                       <th className="p-2 border-r">NO</th>
-                      <th className="p-2 border-r min-w-[160px]">ROMBONGAN</th>
+                      <th className="p-2 border-r min-w-[150px]">ROMBONGAN</th>
                       <th className="p-2 border-r">NAMA</th>
                       <th className="p-2 border-r">NO ID</th>
-                      <th className="p-2 border-r">IDENTITAS</th>
-                      <th className="p-2 border-r">TGL LAHIR</th>
-                      <th className="p-2">KAMAR</th>
+                      <th className="p-2 border-r">KOTA/KAB</th>
+                      <th className="p-2 border-r">PULAU</th>
+                      <th className="p-2">ALAMAT</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y text-stone-700 dark:text-stone-300">
@@ -1020,9 +1068,9 @@ function ManifestPageContent() {
                         <td className="p-2 font-mono text-[11px] font-bold text-amber-700 dark:text-amber-400">{r.rombongan || "-"}</td>
                         <td className="p-2 font-bold text-stone-900 dark:text-white">{r.nama}</td>
                         <td className="p-2 font-mono">{r.noId || "-"}</td>
-                        <td className="p-2 font-semibold">{r.jenisIdentitas || "KTP"}</td>
-                        <td className="p-2 font-mono">{r.tanggalLahir || "-"}</td>
-                        <td className="p-2 uppercase">{r.kamar || "DOUBLE"}</td>
+                        <td className="p-2 font-semibold text-stone-800 dark:text-stone-200">{r.kota || "JAKARTA SELATAN"}</td>
+                        <td className="p-2 font-bold uppercase text-amber-800 dark:text-amber-300 text-[10px]">{r.pulau || "JAWA"}</td>
+                        <td className="p-2 truncate max-w-[180px]">{r.alamat || "-"}</td>
                       </tr>
                     ))}
                   </tbody>

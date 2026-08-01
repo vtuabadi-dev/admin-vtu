@@ -18,6 +18,8 @@ export interface ExcelImportRowInput {
   tanggalLahir?: string;
   statusMenikah?: string;
   noTelp?: string;
+  kota?: string;
+  pulau?: string;
   alamat?: string;
 }
 
@@ -130,8 +132,8 @@ export async function POST(req: Request) {
             nomorTelepon: firstMember.noTelp || "-",
             email: `pst-${baseSeq}-1@jamaah.vtu.id`,
             alamat: firstMember.alamat || "-",
-            provinsi: "-",
-            kota: "-",
+            provinsi: firstMember.pulau || "JAWA",
+            kota: firstMember.kota || "JAKARTA",
             kecamatan: "-",
             kelurahan: "-",
             status: registeredStatus,
@@ -174,8 +176,8 @@ export async function POST(req: Request) {
               nomorTelepon: m.noTelp || "-",
               email: `${memberNoPeserta.toLowerCase()}@jamaah.vtu.id`,
               alamat: m.alamat || "-",
-              provinsi: "-",
-              kota: "-",
+              provinsi: m.pulau || "JAWA",
+              kota: m.kota || "JAKARTA",
               kecamatan: "-",
               kelurahan: "-",
               status: registeredStatus,
