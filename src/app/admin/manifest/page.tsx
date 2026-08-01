@@ -17,6 +17,9 @@ import {
   Printer,
   Sparkles,
   ArrowLeft,
+  FileSpreadsheet,
+  Upload,
+  CheckCircle2,
 } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/shared/components/ui/Card";
 import { Button } from "@/shared/components/ui/Button";
@@ -109,6 +112,13 @@ function ManifestPageContent() {
   const [formKeberangkatan, setFormKeberangkatan] = useState("");
   const [formTemplate, setFormTemplate] = useState("default");
   const [formNama, setFormNama] = useState("");
+
+  // Excel Import Modal state
+  const [importModalOpen, setImportModalOpen] = useState(false);
+  const [excelFile, setExcelFile] = useState<File | null>(null);
+  const [excelPreviewRows, setExcelPreviewRows] = useState<any[]>([]);
+  const [parsingExcel, setParsingExcel] = useState(false);
+  const [submittingImport, setSubmittingImport] = useState(false);
 
   // Sync state if URL search param changes
   useEffect(() => {
@@ -314,6 +324,100 @@ function ManifestPageContent() {
     }
   }
 
+  // ── Excel Import Parsing & Execution ────────────────────────
+
+  async function handleExcelFileChange(file: File) {
+    setExcelFile(file);
+    setParsingExcel(true);
+    setExcelPreviewRows([]);
+
+    try {
+      const ExcelJS = await import("exceljs");
+      const workbook = new ExcelJS.Workbook();
+      const arrayBuffer = await file.arrayBuffer();
+      await workbook.xlsx.load(arrayBuffer);
+      const worksheet = workbook.worksheets[0];
+
+      if (!worksheet) {
+        setParsingExcel(false);
+        return;
+      }
+
+      const parsedRows: any[] = [];
+      worksheet.eachRow((row, rowNumber) => {
+        if (rowNumber === 1) return; // Skip header row
+        const values = row.values as any[];
+        if (!values || values.length < 2) return;
+
+        const getVal = (colIdx: number) => {
+          const cell = values[colIdx];
+          if (cell === null || cell === undefined) return "";
+          if (typeof cell === "object" && cell.text) return String(cell.text).trim();
+          if (typeof cell === "object" && cell.result) return String(cell.result).trim();
+          return String(cell).trim();
+        };
+
+        const nama = getVal(6);
+        if (!nama) return; // Skip empty rows
+
+        parsedRows.push({
+          rombongan: getVal(1),
+          noJamaah: getVal(2),
+          idRegister: getVal(3),
+          noId: getVal(4),
+          jenisIdentitas: getVal(5),
+          nama,
+          hotelMekkah: getVal(7),
+          hotelMadinah: getVal(8),
+          kamar: getVal(9),
+          jenisKelamin: getVal(10),
+          tempatLahir: getVal(11),
+          tanggalLahir: getVal(12),
+          statusMenikah: getVal(13),
+          noTelp: getVal(14),
+          alamat: getVal(15),
+        });
+      });
+
+      setExcelPreviewRows(parsedRows);
+    } catch (err) {
+      console.error("Failed to parse Excel file:", err);
+    } finally {
+      setParsingExcel(false);
+    }
+  }
+
+  async function doExecuteExcelImport() {
+    if (!activePackage || excelPreviewRows.length === 0) return;
+    setSubmittingImport(true);
+
+    try {
+      const res = await fetch("/api/manifests/import-excel", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          keberangkatanId: activePackage.id,
+          rows: excelPreviewRows,
+        }),
+      });
+
+      const json = await res.json();
+      if (res.ok && json.success) {
+        setImportModalOpen(false);
+        setExcelFile(null);
+        setExcelPreviewRows([]);
+        await loadAllData();
+      } else {
+        alert(json.message || "Gagal mengimpor data Excel");
+      }
+    } catch (err) {
+      console.error("Failed to execute excel import:", err);
+      alert("Terjadi kesalahan server saat mengimpor Excel");
+    } finally {
+      setSubmittingImport(false);
+    }
+  }
+
   // Counter variable for global sequential NO JAMAAH
   let globalNoJamaahCounter = 1;
 
@@ -343,6 +447,20 @@ function ManifestPageContent() {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {activePackage && (
+            <Button
+              variant="secondary"
+              className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs"
+              onClick={() => {
+                setExcelFile(null);
+                setExcelPreviewRows([]);
+                setImportModalOpen(true);
+              }}
+            >
+              <FileSpreadsheet className="mr-2 h-4 w-4" />
+              Import Excel Manifest
+            </Button>
+          )}
           <Button onClick={handleGenerate}>
             <Plus className="mr-2 h-4 w-4" />
             Generate Manifest Baru
@@ -471,9 +589,24 @@ function ManifestPageContent() {
                 <Sparkles className="h-3.5 w-3.5 text-amber-500" />
                 Data Jamaah Manifest Paket ({filteredActiveJamaah.length} Pax)
               </p>
-              <span className="text-[11px] text-muted-foreground italic">
-                * Single Source of Truth: Nama Paspor &gt; KTP &gt; Registrasi Awal
-              </span>
+              <div className="flex items-center gap-3">
+                <Button
+                  variant="link"
+                  size="sm"
+                  className="text-xs text-emerald-600 dark:text-emerald-400 h-auto p-0 hover:underline"
+                  onClick={() => {
+                    setExcelFile(null);
+                    setExcelPreviewRows([]);
+                    setImportModalOpen(true);
+                  }}
+                >
+                  <FileSpreadsheet className="mr-1 h-3.5 w-3.5" />
+                  + Import Excel ke Paket Ini
+                </Button>
+                <span className="text-[11px] text-muted-foreground italic">
+                  * Single Source of Truth: Nama Paspor &gt; KTP &gt; Registrasi Awal
+                </span>
+              </div>
             </div>
 
             <div className="rounded-xl border border-stone-200 dark:border-stone-800 bg-card shadow-sm overflow-hidden">
@@ -535,7 +668,21 @@ function ManifestPageContent() {
                     {filteredActiveJamaah.length === 0 ? (
                       <tr>
                         <td colSpan={16} className="px-4 py-12 text-center text-stone-500">
-                          Belum ada data jamaah terdaftar pada paket ini.
+                          <div className="space-y-3">
+                            <p>Belum ada data jamaah terdaftar pada paket ini.</p>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                setExcelFile(null);
+                                setExcelPreviewRows([]);
+                                setImportModalOpen(true);
+                              }}
+                            >
+                              <FileSpreadsheet className="mr-2 h-4 w-4 text-emerald-600" />
+                              Import Data Jamaah dari File Excel
+                            </Button>
+                          </div>
                         </td>
                       </tr>
                     ) : (
@@ -775,6 +922,134 @@ function ManifestPageContent() {
           )}
         </div>
       )}
+
+      {/* MODAL IMPORT EXCEL MANIFEST */}
+      <Modal
+        open={importModalOpen}
+        onClose={() => {
+          if (!submittingImport) setImportModalOpen(false);
+        }}
+        title={`Import Excel Manifest — ${activePackage?.namaPaket || activePackage?.kode || "Paket Aktif"}`}
+        description="Unggah file Excel 16-kolom untuk memasukkan data jamaah & rombongan sekaligus"
+        size="xl"
+      >
+        <div className="space-y-5">
+          {/* Download Template Bar */}
+          <div className="flex items-center justify-between p-3.5 rounded-lg border border-amber-200 dark:border-amber-900 bg-amber-50/50 dark:bg-amber-950/20">
+            <div className="space-y-0.5">
+              <p className="text-xs font-bold text-amber-900 dark:text-amber-200 flex items-center gap-1.5">
+                <FileSpreadsheet className="h-4 w-4 text-amber-600" />
+                Template Excel Manifest Standard (16 Kolom)
+              </p>
+              <p className="text-[11px] text-amber-700 dark:text-amber-400">
+                Gunakan template standar agar format kolom (Rombongan, Nama, Paspor/NIK, Tgl Lahir) sesuai.
+              </p>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              className="bg-white dark:bg-stone-900 border-amber-300 dark:border-amber-800 text-amber-900 dark:text-amber-200 shrink-0"
+              onClick={() => window.open("/api/manifests/template-excel", "_blank")}
+            >
+              <Download className="mr-1.5 h-3.5 w-3.5 text-amber-600" />
+              Download Template
+            </Button>
+          </div>
+
+          {/* Upload Area */}
+          <div className="border-2 border-dashed border-stone-300 dark:border-stone-700 rounded-xl p-6 text-center bg-stone-50/50 dark:bg-stone-900/50 hover:bg-stone-100/50 transition-colors">
+            <input
+              type="file"
+              accept=".xlsx, .xls, .csv"
+              id="excel-file-input"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) handleExcelFileChange(f);
+              }}
+            />
+            <label htmlFor="excel-file-input" className="cursor-pointer space-y-2 block">
+              <div className="w-12 h-12 rounded-full bg-emerald-100 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mx-auto">
+                <Upload className="h-6 w-6" />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-stone-800 dark:text-stone-200">
+                  {excelFile ? excelFile.name : "Klik atau seret file Excel ke sini"}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Format didukung: .XLSX, .XLS, .CSV
+                </p>
+              </div>
+            </label>
+          </div>
+
+          {/* Live Preview Table */}
+          {parsingExcel ? (
+            <div className="flex h-32 items-center justify-center text-xs text-muted-foreground">
+              Membaca dan memproses file Excel...
+            </div>
+          ) : excelPreviewRows.length > 0 ? (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-xs px-1">
+                <span className="font-bold text-stone-800 dark:text-stone-200 flex items-center gap-1.5">
+                  <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                  Pratinjau Data Excel ({excelPreviewRows.length} Baris Jamaah)
+                </span>
+                <span className="text-stone-500 font-mono text-[11px]">
+                  Siap Diimpor ke Paket
+                </span>
+              </div>
+
+              <div className="max-h-60 overflow-y-auto border border-stone-200 dark:border-stone-800 rounded-lg text-xs">
+                <table className="w-full border-collapse text-left">
+                  <thead className="bg-stone-100 dark:bg-stone-900 sticky top-0 font-bold border-b text-[11px] text-stone-700 dark:text-stone-300">
+                    <tr>
+                      <th className="p-2 border-r">NO</th>
+                      <th className="p-2 border-r min-w-[160px]">ROMBONGAN</th>
+                      <th className="p-2 border-r">NAMA</th>
+                      <th className="p-2 border-r">NO ID</th>
+                      <th className="p-2 border-r">IDENTITAS</th>
+                      <th className="p-2 border-r">TGL LAHIR</th>
+                      <th className="p-2">KAMAR</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y text-stone-700 dark:text-stone-300">
+                    {excelPreviewRows.map((r, i) => (
+                      <tr key={i} className="hover:bg-stone-50 dark:hover:bg-stone-850">
+                        <td className="p-2 text-center font-mono">{i + 1}</td>
+                        <td className="p-2 font-mono text-[11px] font-bold text-amber-700 dark:text-amber-400">{r.rombongan || "-"}</td>
+                        <td className="p-2 font-bold text-stone-900 dark:text-white">{r.nama}</td>
+                        <td className="p-2 font-mono">{r.noId || "-"}</td>
+                        <td className="p-2 font-semibold">{r.jenisIdentitas || "KTP"}</td>
+                        <td className="p-2 font-mono">{r.tanggalLahir || "-"}</td>
+                        <td className="p-2 uppercase">{r.kamar || "DOUBLE"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ) : null}
+
+          {/* Modal Footer */}
+          <div className="flex items-center justify-between pt-3 border-t">
+            <Button
+              variant="outline"
+              disabled={submittingImport}
+              onClick={() => setImportModalOpen(false)}
+            >
+              Batal
+            </Button>
+            <Button
+              disabled={excelPreviewRows.length === 0 || submittingImport}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white"
+              onClick={doExecuteExcelImport}
+            >
+              {submittingImport ? "Mengimpor Data..." : `Import ${excelPreviewRows.length} Jamaah Sekarang`}
+            </Button>
+          </div>
+        </div>
+      </Modal>
 
       {/* Generate Manifest Modal */}
       <Modal
