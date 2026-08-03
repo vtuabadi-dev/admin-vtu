@@ -231,7 +231,7 @@ export async function POST(req: Request) {
           terisi: { increment: totalJamaahImported },
         },
       });
-    });
+    }, { maxWait: 20000, timeout: 120000 });
 
     return NextResponse.json({
       success: true,
