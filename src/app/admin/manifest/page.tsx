@@ -74,6 +74,34 @@ function derivePulau(provinsi?: string, kota?: string): string {
   return "JAWA";
 }
 
+function getPasporDetails(j: any) {
+  let pasporDoc: any = null;
+  if (j.dokumen && Array.isArray(j.dokumen)) {
+    pasporDoc = j.dokumen.find((d: any) => d.jenis === "paspor");
+  }
+
+  const noPaspor = j.nomorPaspor && j.nomorPaspor !== "-"
+    ? j.nomorPaspor
+    : pasporDoc?.manualData?.nomorPaspor || pasporDoc?.ocrData?.nomorPaspor || "-";
+
+  const tglDikeluarkan = j.tglDikeluarkanPaspor
+    || pasporDoc?.manualData?.tanggalDikeluarkan
+    || pasporDoc?.ocrData?.tanggalDikeluarkan
+    || "-";
+
+  const tglHabis = j.masaBerlakuPaspor
+    || pasporDoc?.manualData?.tanggalHabis
+    || pasporDoc?.ocrData?.tanggalHabis
+    || "-";
+
+  const kotaPaspor = j.kotaPaspor
+    || pasporDoc?.manualData?.kotaPaspor
+    || pasporDoc?.ocrData?.kotaPaspor
+    || "-";
+
+  return { noPaspor, tglDikeluarkan, tglHabis, kotaPaspor };
+}
+
 function calculateAge(birthDateInput?: string | Date): string {
   if (!birthDateInput) return "-";
   const birthDate = new Date(birthDateInput);
@@ -84,11 +112,14 @@ function calculateAge(birthDateInput?: string | Date): string {
   if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
     age--;
   }
-  return age > 0 ? `${age} Thn` : "-";
+  return age >= 0 ? `${age} Thn` : "-";
 }
 
 function formatDisplayDate(dateInput?: string | Date): string {
-  if (!dateInput) return "-";
+  if (!dateInput || dateInput === "-") return "-";
+  if (typeof dateInput === "string" && /^\d{2}\/\d{2}\/\d{4}$/.test(dateInput)) {
+    return dateInput;
+  }
   const d = new Date(dateInput);
   if (isNaN(d.getTime())) return "-";
   const day = String(d.getDate()).padStart(2, "0");
@@ -384,9 +415,23 @@ function ManifestPageContent() {
         const nama = getVal(6);
         if (!nama) return; // Skip empty rows
 
-        const kota = getVal(15);
-        const pulauInput = getVal(16);
+        const noPaspor = getVal(7);
+        const tglDikeluarkan = getVal(8);
+        const tglHabis = getVal(9);
+        const kotaPaspor = getVal(10);
+        const hotelMekkah = getVal(11);
+        const hotelMadinah = getVal(12);
+        const kamar = getVal(13);
+        const jenisKelamin = getVal(14);
+        const tempatLahir = getVal(15);
+        const tanggalLahir = getVal(16);
+        const umur = getVal(17) || calculateAge(tanggalLahir);
+        const statusMenikah = getVal(18);
+        const noTelp = getVal(19);
+        const kota = getVal(20);
+        const pulauInput = getVal(21);
         const pulau = pulauInput || derivePulau("", kota);
+        const alamat = getVal(22);
 
         parsedRows.push({
           rombongan: getVal(1),
@@ -395,17 +440,22 @@ function ManifestPageContent() {
           noId: getVal(4),
           jenisIdentitas: getVal(5),
           nama,
-          hotelMekkah: getVal(7),
-          hotelMadinah: getVal(8),
-          kamar: getVal(9),
-          jenisKelamin: getVal(10),
-          tempatLahir: getVal(11),
-          tanggalLahir: getVal(12),
-          statusMenikah: getVal(13),
-          noTelp: getVal(14),
+          noPaspor,
+          tglDikeluarkan,
+          tglHabis,
+          kotaPaspor,
+          hotelMekkah,
+          hotelMadinah,
+          kamar,
+          jenisKelamin,
+          tempatLahir,
+          tanggalLahir,
+          umur,
+          statusMenikah,
+          noTelp,
           kota,
           pulau,
-          alamat: getVal(17),
+          alamat,
         });
       });
 
@@ -663,6 +713,18 @@ function ManifestPageContent() {
                         NAMA
                       </th>
                       <th className="px-3 py-3 font-bold uppercase tracking-wider text-[10px] text-stone-700 dark:text-stone-300 border-r border-stone-200/70 dark:border-stone-800/70 min-w-[130px]">
+                        NO PASPOR
+                      </th>
+                      <th className="px-3 py-3 font-bold uppercase tracking-wider text-[10px] text-stone-700 dark:text-stone-300 border-r border-stone-200/70 dark:border-stone-800/70 min-w-[130px]">
+                        TGL DIKELUARKAN
+                      </th>
+                      <th className="px-3 py-3 font-bold uppercase tracking-wider text-[10px] text-stone-700 dark:text-stone-300 border-r border-stone-200/70 dark:border-stone-800/70 min-w-[130px]">
+                        TGL HABIS
+                      </th>
+                      <th className="px-3 py-3 font-bold uppercase tracking-wider text-[10px] text-stone-700 dark:text-stone-300 border-r border-stone-200/70 dark:border-stone-800/70 min-w-[130px]">
+                        KOTA PASPOR
+                      </th>
+                      <th className="px-3 py-3 font-bold uppercase tracking-wider text-[10px] text-stone-700 dark:text-stone-300 border-r border-stone-200/70 dark:border-stone-800/70 min-w-[130px]">
                         HOTEL MAKKAH
                       </th>
                       <th className="px-3 py-3 font-bold uppercase tracking-wider text-[10px] text-stone-700 dark:text-stone-300 border-r border-stone-200/70 dark:border-stone-800/70 min-w-[130px]">
@@ -703,7 +765,7 @@ function ManifestPageContent() {
                   <tbody className="divide-y divide-stone-200/60 dark:divide-stone-800/60">
                     {filteredActiveJamaah.length === 0 ? (
                       <tr>
-                        <td colSpan={18} className="px-4 py-12 text-center text-stone-500">
+                        <td colSpan={22} className="px-4 py-12 text-center text-stone-500">
                           <div className="space-y-3">
                             <p>Belum ada data jamaah terdaftar pada paket ini.</p>
                             <Button
@@ -730,12 +792,13 @@ function ManifestPageContent() {
                           const currentNoJamaah = globalNoJamaahCounter++;
                           const isFirstInGroup = memberIdx === 0;
 
-                          // Single Source of Truth Name Resolution
+                          // Single Source of Truth Name & Paspor Resolution
                           const namaSot = getSingleSourceOfTruthName(j);
+                          const pasporInfo = getPasporDetails(j);
 
                           // Flexible ID Resolution
-                          const hasPaspor = Boolean(j.nomorPaspor && j.nomorPaspor.trim());
-                          const noId = hasPaspor ? j.nomorPaspor : j.nik || "-";
+                          const hasPaspor = Boolean(pasporInfo.noPaspor && pasporInfo.noPaspor !== "-");
+                          const noId = hasPaspor ? pasporInfo.noPaspor : j.nik || "-";
                           const jenisIdentitas = hasPaspor ? "PASPOR" : j.nik ? "KTP" : "-";
 
                           // ID Register Format
@@ -793,6 +856,26 @@ function ManifestPageContent() {
                               {/* NAMA */}
                               <td className="px-3 py-2.5 font-bold text-stone-900 dark:text-white border-r border-stone-200/50 dark:border-stone-800/50">
                                 {namaSot}
+                              </td>
+
+                              {/* NO PASPOR */}
+                              <td className="px-3 py-2.5 font-mono font-semibold text-stone-800 dark:text-stone-200 border-r border-stone-200/50 dark:border-stone-800/50">
+                                {pasporInfo.noPaspor}
+                              </td>
+
+                              {/* TGL DIKELUARKAN */}
+                              <td className="px-3 py-2.5 font-mono text-stone-700 dark:text-stone-300 border-r border-stone-200/50 dark:border-stone-800/50">
+                                {formatDisplayDate(pasporInfo.tglDikeluarkan)}
+                              </td>
+
+                              {/* TGL HABIS */}
+                              <td className="px-3 py-2.5 font-mono text-stone-700 dark:text-stone-300 border-r border-stone-200/50 dark:border-stone-800/50">
+                                {formatDisplayDate(pasporInfo.tglHabis)}
+                              </td>
+
+                              {/* KOTA PASPOR */}
+                              <td className="px-3 py-2.5 border-r border-stone-200/50 dark:border-stone-800/50 font-semibold text-stone-800 dark:text-stone-200">
+                                {pasporInfo.kotaPaspor}
                               </td>
 
                               {/* HOTEL MAKKAH */}

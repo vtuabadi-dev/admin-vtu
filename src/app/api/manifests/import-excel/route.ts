@@ -10,12 +10,17 @@ export interface ExcelImportRowInput {
   noId?: string;
   jenisIdentitas?: string;
   nama?: string;
+  noPaspor?: string;
+  tglDikeluarkan?: string;
+  tglHabis?: string;
+  kotaPaspor?: string;
   hotelMekkah?: string;
   hotelMadinah?: string;
   kamar?: string;
   jenisKelamin?: string;
   tempatLahir?: string;
   tanggalLahir?: string;
+  umur?: string;
   statusMenikah?: string;
   noTelp?: string;
   kota?: string;
@@ -116,6 +121,9 @@ export async function POST(req: Request) {
         });
 
         // 2. Create leader Jamaah
+        const leaderPasporNo = firstMember.noPaspor || (hasPaspor ? (firstMember.noId || "-") : "-");
+        const leaderPasporExpiry = firstMember.tglHabis ? parseDateInput(firstMember.tglHabis) : new Date("2030-12-31");
+
         const leaderJamaah = await tx.jamaah.create({
           data: {
             registrationId: `${kodeRegistrasi}-1`,
@@ -127,8 +135,8 @@ export async function POST(req: Request) {
             tempatLahir: firstMember.tempatLahir || "JAKARTA",
             tanggalLahir: parseDateInput(firstMember.tanggalLahir),
             nik: hasPaspor ? "-" : (firstMember.noId || "-"),
-            nomorPaspor: hasPaspor ? (firstMember.noId || "-") : "-",
-            masaBerlakuPaspor: new Date("2030-12-31"),
+            nomorPaspor: leaderPasporNo,
+            masaBerlakuPaspor: leaderPasporExpiry,
             nomorTelepon: firstMember.noTelp || "-",
             email: `pst-${baseSeq}-1@jamaah.vtu.id`,
             alamat: firstMember.alamat || "-",
@@ -139,6 +147,19 @@ export async function POST(req: Request) {
             status: registeredStatus,
             hotelMekkah: firstMember.hotelMekkah || keberangkatan.hotelMekkah || "Safwah Tower",
             hotelMadinah: firstMember.hotelMadinah || keberangkatan.hotelMadinah || "Durrat Al Eiman",
+            dokumen: {
+              create: {
+                jenis: "paspor",
+                wajib: false,
+                status: "verified",
+                manualData: {
+                  nomorPaspor: leaderPasporNo,
+                  tanggalDikeluarkan: firstMember.tglDikeluarkan || "-",
+                  tanggalHabis: firstMember.tglHabis || "-",
+                  kotaPaspor: firstMember.kotaPaspor || "-",
+                },
+              },
+            },
           },
         });
 
@@ -159,6 +180,8 @@ export async function POST(req: Request) {
           const memberRegistrationId = `${kodeRegistrasi}-${mSeq}`;
           const mJk: JenisKelamin = (m.jenisKelamin?.toUpperCase() === "P" || m.jenisKelamin?.toUpperCase() === "PEREMPUAN") ? "P" : "L";
           const mHasPaspor = m.jenisIdentitas?.toUpperCase() === "PASPOR" || Boolean(m.noId && m.noId.length < 12);
+          const mPasporNo = m.noPaspor || (mHasPaspor ? (m.noId || "-") : "-");
+          const mPasporExpiry = m.tglHabis ? parseDateInput(m.tglHabis) : new Date("2030-12-31");
 
           await tx.jamaah.create({
             data: {
@@ -171,8 +194,8 @@ export async function POST(req: Request) {
               tempatLahir: m.tempatLahir || "JAKARTA",
               tanggalLahir: parseDateInput(m.tanggalLahir),
               nik: mHasPaspor ? "-" : (m.noId || "-"),
-              nomorPaspor: mHasPaspor ? (m.noId || "-") : "-",
-              masaBerlakuPaspor: new Date("2030-12-31"),
+              nomorPaspor: mPasporNo,
+              masaBerlakuPaspor: mPasporExpiry,
               nomorTelepon: m.noTelp || "-",
               email: `${memberNoPeserta.toLowerCase()}@jamaah.vtu.id`,
               alamat: m.alamat || "-",
@@ -183,6 +206,19 @@ export async function POST(req: Request) {
               status: registeredStatus,
               hotelMekkah: m.hotelMekkah || keberangkatan.hotelMekkah || "Safwah Tower",
               hotelMadinah: m.hotelMadinah || keberangkatan.hotelMadinah || "Durrat Al Eiman",
+              dokumen: {
+                create: {
+                  jenis: "paspor",
+                  wajib: false,
+                  status: "verified",
+                  manualData: {
+                    nomorPaspor: mPasporNo,
+                    tanggalDikeluarkan: m.tglDikeluarkan || "-",
+                    tanggalHabis: m.tglHabis || "-",
+                    kotaPaspor: m.kotaPaspor || "-",
+                  },
+                },
+              },
             },
           });
         }
