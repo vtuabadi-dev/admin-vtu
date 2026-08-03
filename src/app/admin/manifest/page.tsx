@@ -388,48 +388,95 @@ function ManifestPageContent() {
         return;
       }
 
+      const colMap: Record<string, number> = {};
+
+      // 1. Detect headers dynamically on row 1
+      const headerRow = worksheet.getRow(1);
+      if (headerRow && headerRow.values) {
+        (headerRow.values as any[]).forEach((cellVal, colIdx) => {
+          if (!cellVal) return;
+          const str = String(typeof cellVal === "object" && cellVal.text ? cellVal.text : cellVal)
+            .toLowerCase()
+            .replace(/[^a-z0-9]/g, "");
+
+          if (/nama/i.test(str) && !colMap.nama) colMap.nama = colIdx;
+          else if (/nopaspor|paspor|passport/i.test(str) && !colMap.noPaspor) colMap.noPaspor = colIdx;
+          else if (/dikeluarkan|tglkeluar|issue/i.test(str) && !colMap.tglDikeluarkan) colMap.tglDikeluarkan = colIdx;
+          else if (/tglhabis|masaberlaku|expir/i.test(str) && !colMap.tglHabis) colMap.tglHabis = colIdx;
+          else if (/kotapaspor|placeissue/i.test(str) && !colMap.kotaPaspor) colMap.kotaPaspor = colIdx;
+          else if (/hotelmakkah|mekkah|makkah/i.test(str) && !colMap.hotelMekkah) colMap.hotelMekkah = colIdx;
+          else if (/hotelmadinah|madinah|medina/i.test(str) && !colMap.hotelMadinah) colMap.hotelMadinah = colIdx;
+          else if (/kamar|room/i.test(str) && !colMap.kamar) colMap.kamar = colIdx;
+          else if (/jk|kelamin|sex|gender/i.test(str) && !colMap.jenisKelamin) colMap.jenisKelamin = colIdx;
+          else if (/tempatlahir|pob/i.test(str) && !colMap.tempatLahir) colMap.tempatLahir = colIdx;
+          else if (/tgllahir|tanggallahir|dob/i.test(str) && !colMap.tanggalLahir) colMap.tanggalLahir = colIdx;
+          else if (/umur|age/i.test(str) && !colMap.umur) colMap.umur = colIdx;
+          else if (/menikah|marital/i.test(str) && !colMap.statusMenikah) colMap.statusMenikah = colIdx;
+          else if (/telp|hp|phone|wa/i.test(str) && !colMap.noTelp) colMap.noTelp = colIdx;
+          else if (/kotakab|kota/i.test(str) && !colMap.kota) colMap.kota = colIdx;
+          else if (/provinsi|pulau|prov/i.test(str) && !colMap.provinsi) colMap.provinsi = colIdx;
+          else if (/alamat|address/i.test(str) && !colMap.alamat) colMap.alamat = colIdx;
+          else if (/rombongan|keluarga|group/i.test(str) && !colMap.rombongan) colMap.rombongan = colIdx;
+          else if (/nojamaah|urut/i.test(str) && !colMap.noJamaah) colMap.noJamaah = colIdx;
+          else if (/idregister|register/i.test(str) && !colMap.idRegister) colMap.idRegister = colIdx;
+          else if (/noid|nik/i.test(str) && !colMap.noId) colMap.noId = colIdx;
+          else if (/jenisid|identitas/i.test(str) && !colMap.jenisIdentitas) colMap.jenisIdentitas = colIdx;
+        });
+      }
+
       const parsedRows: any[] = [];
       worksheet.eachRow((row, rowNumber) => {
         if (rowNumber === 1) return; // Skip header row
         const values = row.values as any[];
         if (!values || values.length < 2) return;
 
-        const getVal = (colIdx: number) => {
-          const cell = values[colIdx];
+        const getValByKey = (key: string, defaultIdx: number) => {
+          const idx = colMap[key] ?? defaultIdx;
+          const cell = values[idx];
           if (cell === null || cell === undefined) return "";
           if (typeof cell === "object" && cell.text) return String(cell.text).trim();
           if (typeof cell === "object" && cell.result) return String(cell.result).trim();
           return String(cell).trim();
         };
 
-        const nama = getVal(6);
-        if (!nama) return; // Skip empty rows
+        let rawNama = getValByKey("nama", 6);
+        // Fallback search across common columns if header wasn't mapped
+        if (!rawNama) {
+          rawNama = getValByKey("", 6) || getValByKey("", 4) || getValByKey("", 5) || getValByKey("", 3);
+        }
 
-        const noPaspor = getVal(7);
-        const tglDikeluarkan = getVal(8);
-        const tglHabis = getVal(9);
-        const kotaPaspor = getVal(10);
-        const hotelMekkah = getVal(11);
-        const hotelMadinah = getVal(12);
-        const kamar = getVal(13);
-        const jenisKelamin = getVal(14);
-        const tempatLahir = getVal(15);
-        const tanggalLahir = getVal(16);
-        const umur = getVal(17) || calculateAge(tanggalLahir);
-        const statusMenikah = getVal(18);
-        const noTelp = getVal(19);
-        const kota = getVal(20);
-        const provinsiInput = getVal(21);
+        const rombongan = getValByKey("rombongan", 1);
+        const noId = getValByKey("noId", 4);
+        const noPaspor = getValByKey("noPaspor", 7);
+
+        // Skip completely empty lines
+        if (!rawNama && !noId && !noPaspor && !rombongan) return;
+
+        const finalNama = rawNama || `Jamaah ${parsedRows.length + 1}`;
+        const tglDikeluarkan = getValByKey("tglDikeluarkan", 8);
+        const tglHabis = getValByKey("tglHabis", 9);
+        const kotaPaspor = getValByKey("kotaPaspor", 10);
+        const hotelMekkah = getValByKey("hotelMekkah", 11);
+        const hotelMadinah = getValByKey("hotelMadinah", 12);
+        const kamar = getValByKey("kamar", 13);
+        const jenisKelamin = getValByKey("jenisKelamin", 14);
+        const tempatLahir = getValByKey("tempatLahir", 15);
+        const tanggalLahir = getValByKey("tanggalLahir", 16);
+        const umur = getValByKey("umur", 17) || calculateAge(tanggalLahir);
+        const statusMenikah = getValByKey("statusMenikah", 18);
+        const noTelp = getValByKey("noTelp", 19);
+        const kota = getValByKey("kota", 20);
+        const provinsiInput = getValByKey("provinsi", 21);
         const provinsi = provinsiInput || deriveProvinsi(provinsiInput, kota);
-        const alamat = getVal(22);
+        const alamat = getValByKey("alamat", 22);
 
         parsedRows.push({
-          rombongan: getVal(1),
-          noJamaah: getVal(2),
-          idRegister: getVal(3),
-          noId: getVal(4),
-          jenisIdentitas: getVal(5),
-          nama,
+          rombongan,
+          noJamaah: getValByKey("noJamaah", 2),
+          idRegister: getValByKey("idRegister", 3),
+          noId,
+          jenisIdentitas: getValByKey("jenisIdentitas", 5),
+          nama: finalNama,
           noPaspor,
           tglDikeluarkan,
           tglHabis,
@@ -477,6 +524,7 @@ function ManifestPageContent() {
         setExcelFile(null);
         setExcelPreviewRows([]);
         await loadAllData();
+        router.refresh();
       } else {
         alert(json.message || "Gagal mengimpor data Excel");
       }
@@ -1130,7 +1178,7 @@ function ManifestPageContent() {
                       <th className="p-2 border-r">NAMA</th>
                       <th className="p-2 border-r">NO ID</th>
                       <th className="p-2 border-r">KOTA/KAB</th>
-                      <th className="p-2 border-r">PULAU</th>
+                      <th className="p-2 border-r">PROVINSI</th>
                       <th className="p-2">ALAMAT</th>
                     </tr>
                   </thead>
@@ -1142,13 +1190,17 @@ function ManifestPageContent() {
                         <td className="p-2 font-bold text-stone-900 dark:text-white">{r.nama}</td>
                         <td className="p-2 font-mono">{r.noId || "-"}</td>
                         <td className="p-2 font-semibold text-stone-800 dark:text-stone-200">{r.kota || "JAKARTA SELATAN"}</td>
-                        <td className="p-2 font-bold uppercase text-amber-800 dark:text-amber-300 text-[10px]">{r.pulau || "JAWA"}</td>
+                        <td className="p-2 font-bold uppercase text-amber-800 dark:text-amber-300 text-[10px]">{r.provinsi || r.pulau || "DKI JAKARTA"}</td>
                         <td className="p-2 truncate max-w-[180px]">{r.alamat || "-"}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
+            </div>
+          ) : excelFile && !parsingExcel && excelPreviewRows.length === 0 ? (
+            <div className="p-4 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 text-amber-800 dark:text-amber-300 text-xs text-center font-medium">
+              ⚠️ Tidak ada data jamaah terdeteksi pada file ini. Pastikan file Excel berisi baris nama yang valid atau gunakan tombol <strong>Download Template</strong> di atas.
             </div>
           ) : null}
 
