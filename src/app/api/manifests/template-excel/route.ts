@@ -33,7 +33,7 @@ export async function GET() {
       { header: "STATUS MENIKAH", key: "statusMenikah", width: 18 },
       { header: "NO TELP/HP", key: "noTelp", width: 18 },
       { header: "KOTA/KAB (*)", key: "kota", width: 24 },
-      { header: "PULAU (*)", key: "pulau", width: 18 },
+      { header: "PROVINSI (*)", key: "provinsi", width: 22 },
       { header: "ALAMAT", key: "alamat", width: 35 },
     ];
 
@@ -60,7 +60,7 @@ export async function GET() {
         statusMenikah: "Belum Menikah",
         noTelp: "081234567890",
         kota: "JAKARTA SELATAN",
-        pulau: "JAWA",
+        provinsi: "DKI JAKARTA",
         alamat: "Jl. Tebet Raya No. 45, Jakarta Selatan",
       },
       {
@@ -84,7 +84,7 @@ export async function GET() {
         statusMenikah: "Belum Menikah",
         noTelp: "081987654321",
         kota: "JAKARTA SELATAN",
-        pulau: "JAWA",
+        provinsi: "DKI JAKARTA",
         alamat: "Jl. Tebet Raya No. 45, Jakarta Selatan",
       },
       {
@@ -108,7 +108,7 @@ export async function GET() {
         statusMenikah: "Menikah",
         noTelp: "081122334455",
         kota: "KOTA SURABAYA",
-        pulau: "JAWA",
+        provinsi: "JAWA TIMUR",
         alamat: "Jl. Pemuda No. 12, Surabaya",
       },
     ]);

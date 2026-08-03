@@ -24,7 +24,7 @@ export interface ExcelImportRowInput {
   statusMenikah?: string;
   noTelp?: string;
   kota?: string;
-  pulau?: string;
+  provinsi?: string;
   alamat?: string;
 }
 
@@ -140,7 +140,7 @@ export async function POST(req: Request) {
             nomorTelepon: firstMember.noTelp || "-",
             email: `pst-${baseSeq}-1@jamaah.vtu.id`,
             alamat: firstMember.alamat || "-",
-            provinsi: firstMember.pulau || "JAWA",
+            provinsi: firstMember.provinsi || "DKI JAKARTA",
             kota: firstMember.kota || "JAKARTA",
             kecamatan: "-",
             kelurahan: "-",
@@ -199,7 +199,7 @@ export async function POST(req: Request) {
               nomorTelepon: m.noTelp || "-",
               email: `${memberNoPeserta.toLowerCase()}@jamaah.vtu.id`,
               alamat: m.alamat || "-",
-              provinsi: m.pulau || "JAWA",
+              provinsi: m.provinsi || "DKI JAKARTA",
               kota: m.kota || "JAKARTA",
               kecamatan: "-",
               kelurahan: "-",

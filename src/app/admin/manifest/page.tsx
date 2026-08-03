@@ -51,27 +51,17 @@ function getSingleSourceOfTruthName(j: any): string {
   return j.namaLengkap || "-";
 }
 
-function derivePulau(provinsi?: string, kota?: string): string {
-  const text = `${provinsi || ""} ${kota || ""}`.toLowerCase();
-  if (/jakarta|jawa|yogyakarta|jogja|banten|surabaya|bandung|semarang|tebet|depok|bogor|bekasi|tangerang|solo|surakarta|malang|kediri/i.test(text)) {
-    return "JAWA";
-  }
-  if (/sumatera|aceh|riau|jambi|bengkulu|lampung|bangka|belitung|medan|padang|palembang|pekanbaru/i.test(text)) {
-    return "SUMATERA";
-  }
-  if (/kalimantan|pontianak|banjarmasin|samarinda|balikpapan|palangkaraya|tarakan/i.test(text)) {
-    return "KALIMANTAN";
-  }
-  if (/sulawesi|makassar|manado|palu|kendari|gorontalo|mamuju/i.test(text)) {
-    return "SULAWESI";
-  }
-  if (/bali|nusa tenggara|ntb|ntt|denpasar|mataram|kupang/i.test(text)) {
-    return "BALI & NUSA TENGGARA";
-  }
-  if (/maluku|papua|jayapura|ambon|ternate|sorong|merauke/i.test(text)) {
-    return "MALUKU & PAPUA";
-  }
-  return "JAWA";
+function deriveProvinsi(provinsi?: string, kota?: string): string {
+  if (provinsi && provinsi.trim() && provinsi !== "-") return provinsi.trim();
+  const text = `${kota || ""}`.toLowerCase();
+  if (/jakarta|tebet/i.test(text)) return "DKI JAKARTA";
+  if (/depok|bogor|bekasi|bandung/i.test(text)) return "JAWA BARAT";
+  if (/tangerang|banten/i.test(text)) return "BANTEN";
+  if (/semarang|solo|surakarta/i.test(text)) return "JAWA TENGAH";
+  if (/surabaya|malang|kediri/i.test(text)) return "JAWA TIMUR";
+  if (/yogyakarta|jogja/i.test(text)) return "DI YOGYAKARTA";
+  if (/medan|padang|palembang/i.test(text)) return "SUMATERA UTARA";
+  return "DKI JAKARTA";
 }
 
 function getPasporDetails(j: any) {
@@ -429,8 +419,8 @@ function ManifestPageContent() {
         const statusMenikah = getVal(18);
         const noTelp = getVal(19);
         const kota = getVal(20);
-        const pulauInput = getVal(21);
-        const pulau = pulauInput || derivePulau("", kota);
+        const provinsiInput = getVal(21);
+        const provinsi = provinsiInput || deriveProvinsi(provinsiInput, kota);
         const alamat = getVal(22);
 
         parsedRows.push({
@@ -454,7 +444,7 @@ function ManifestPageContent() {
           statusMenikah,
           noTelp,
           kota,
-          pulau,
+          provinsi,
           alamat,
         });
       });
@@ -755,7 +745,7 @@ function ManifestPageContent() {
                         KOTA/KAB (*)
                       </th>
                       <th className="px-3 py-3 font-bold uppercase tracking-wider text-[10px] text-stone-700 dark:text-stone-300 border-r border-stone-200/70 dark:border-stone-800/70 w-28">
-                        PULAU (*)
+                        PROVINSI (*)
                       </th>
                       <th className="px-3 py-3 font-bold uppercase tracking-wider text-[10px] text-stone-700 dark:text-stone-300 min-w-[200px]">
                         ALAMAT
@@ -808,7 +798,7 @@ function ManifestPageContent() {
                           const tipeKamarDisplay = j.tipeKamar || (group.groupObj as any)?.roomUpgrade || "Upgrade Double";
                           const statusMenikahDisplay = j.statusMenikah || "Belum Menikah";
                           const kotaDisplay = j.kota || "JAKARTA SELATAN";
-                          const pulauDisplay = j.provinsi && j.provinsi !== "-" ? j.provinsi : derivePulau(j.provinsi, j.kota);
+                          const provinsiDisplay = j.provinsi && j.provinsi !== "-" ? j.provinsi : deriveProvinsi(j.provinsi, j.kota);
 
                           return (
                             <tr
@@ -928,9 +918,9 @@ function ManifestPageContent() {
                                 {kotaDisplay}
                               </td>
 
-                              {/* PULAU */}
+                              {/* PROVINSI */}
                               <td className="px-3 py-2.5 border-r border-stone-200/50 dark:border-stone-800/50 font-bold uppercase text-[10px] text-amber-800 dark:text-amber-300">
-                                {pulauDisplay}
+                                {provinsiDisplay}
                               </td>
 
                               {/* ALAMAT */}
