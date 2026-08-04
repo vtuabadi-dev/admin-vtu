@@ -70,6 +70,10 @@ const adminNav: NavSection[] = [
             label: "Master Badal & Wakaf",
             href: "/admin/master/badal-wakaf",
           },
+          {
+            label: "Master Petugas",
+            href: "/admin/master/petugas",
+          },
         ],
       },
     ],

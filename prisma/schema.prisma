@@ -1148,6 +1148,19 @@ model MasterCluster {
   @@map("master_clusters")
 }
 
+model MasterPetugas {
+  id        String   @id @default(cuid())
+  kode      String?  @unique
+  nama      String
+  tipe      String   // "TOUR_LEADER" or "MUTHOWIF"
+  noHp      String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("master_petugas")
+}
+
 // ============================================================
 // PACKAGE CREATION BOT (AI DRAFT)
 // ============================================================
