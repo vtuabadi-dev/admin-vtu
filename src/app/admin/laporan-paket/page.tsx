@@ -11,7 +11,19 @@ import {
   Search,
   CalendarDays,
   X,
+  MessageCircle,
+  Copy,
 } from "lucide-react";
+import { Button } from "@/shared/components/ui/Button";
+import { Modal } from "@/shared/components/ui/Modal";
+
+const formatRupiah = (val: number) => {
+  return new Intl.NumberFormat("id-ID", {
+    style: "currency",
+    currency: "IDR",
+    maximumFractionDigits: 0,
+  }).format(val);
+};
 
 const BULAN_LIST = [
   { value: "1", label: "Januari" },
@@ -165,6 +177,52 @@ export default function AdminLaporanPaketPage() {
   const [loadingLaporan, setLoadingLaporan] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
 
+  // Data Master Harga
+  const [hargaBadal, setHargaBadal] = useState<number>(0);
+  const [hargaWakaf, setHargaWakaf] = useState<number>(0);
+
+  // WA Template State
+  const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
+  const [waTemplate, setWaTemplate] = useState("");
+
+  useEffect(() => {
+    fetch("/api/master/harga-layanan")
+      .then((res) => res.json())
+      .then((json) => {
+        if (json.success && json.data) {
+          setHargaBadal(json.data.BADAL_UMROH || 0);
+          setHargaWakaf(json.data.WAKAF_QURAN || 0);
+        }
+      })
+      .catch(console.error);
+  }, []);
+
+  const generateWaTemplate = () => {
+    let msg = `*LAPORAN KOLEKTIF BADAL UMROH & WAKAF QURAN*\n`;
+    msg += `*PAKET:* ${selectedPaket}\n\n`;
+
+    if (laporanBadal.length > 0) {
+      msg += `*Daftar Badal Umroh (${laporanBadal.length} Data)*\n`;
+      laporanBadal.forEach((b, i) => {
+        msg += `${i + 1}. ${b.namaAlmarhum} (${b.jenisKelamin === "L" ? "L" : "P"} - ${b.hubungan})\n`;
+      });
+      msg += `\n`;
+    }
+
+    if (laporanWakaf.length > 0) {
+      const totalMushaf = laporanWakaf.reduce((sum, w) => sum + (w.jumlahMushaf || 0), 0);
+      msg += `*Daftar Wakaf Al-Quran (${totalMushaf} Mushaf)*\n`;
+      laporanWakaf.forEach((w, i) => {
+        msg += `${i + 1}. ${w.niatAtasNama || "Hamba Allah"} (${w.jumlahMushaf} Mushaf) - ${w.lokasiWakaf}\n`;
+      });
+      msg += `\n`;
+    }
+
+    msg += `Demikian laporan kolektif paket ini.`;
+    setWaTemplate(msg);
+    setIsTemplateModalOpen(true);
+  };
+
   // Fetch daftar paket whenever bulan/tahun changes
   useEffect(() => {
     const fetchPaket = async () => {
@@ -226,11 +284,19 @@ export default function AdminLaporanPaketPage() {
     <div className="flex flex-col gap-6 p-6">
       {/* Header */}
       <div>
-        <div className="flex items-center gap-2">
-          <Layers className="h-6 w-6 text-emerald-600" />
-          <h1 className="text-2xl font-bold tracking-tight text-foreground">
-            Laporan Kolektif Per Paket Umroh
-          </h1>
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-2">
+            <Layers className="h-6 w-6 text-emerald-600" />
+            <h1 className="text-2xl font-bold tracking-tight text-foreground">
+              Laporan Kolektif Per Paket Umroh
+            </h1>
+          </div>
+          {selectedPaket && !loadingLaporan && hasSearched && (
+            <Button onClick={generateWaTemplate} className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2">
+              <MessageCircle className="h-4 w-4" />
+              Kirim / Salin Template WA
+            </Button>
+          )}
         </div>
         <p className="text-xs text-muted-foreground mt-1">
           Pilih bulan, tahun, lalu cari paket umroh untuk menampilkan rekapitulasi niat badal & wakaf kolektif.
@@ -339,24 +405,38 @@ export default function AdminLaporanPaketPage() {
         <>
           {/* Summary Cards */}
           <div className="grid grid-cols-2 gap-4">
-            <Card className="p-4 flex items-center gap-4 border-emerald-200 dark:border-emerald-900 bg-emerald-50 dark:bg-emerald-950/30">
-              <div className="h-10 w-10 rounded-full bg-emerald-600 flex items-center justify-center shrink-0">
-                <HeartHandshake className="h-5 w-5 text-white" />
+            <Card className="p-4 flex items-center justify-between border-emerald-200 dark:border-emerald-900 bg-emerald-50 dark:bg-emerald-950/30">
+              <div className="flex items-center gap-4">
+                <div className="h-10 w-10 rounded-full bg-emerald-600 flex items-center justify-center shrink-0">
+                  <HeartHandshake className="h-5 w-5 text-white" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-emerald-700 dark:text-emerald-400">{laporanBadal.length}</p>
+                  <p className="text-xs text-muted-foreground font-medium">Almarhum/ah Dibadalkan</p>
+                </div>
               </div>
-              <div>
-                <p className="text-2xl font-bold text-emerald-700 dark:text-emerald-400">{laporanBadal.length}</p>
-                <p className="text-xs text-muted-foreground font-medium">Almarhum/ah Dibadalkan</p>
+              <div className="text-right">
+                <p className="text-lg font-bold text-emerald-700 dark:text-emerald-400">{formatRupiah(laporanBadal.length * hargaBadal)}</p>
+                <p className="text-[10px] text-muted-foreground">Estimasi Pendapatan Badal</p>
               </div>
             </Card>
-            <Card className="p-4 flex items-center gap-4 border-sky-200 dark:border-sky-900 bg-sky-50 dark:bg-sky-950/30">
-              <div className="h-10 w-10 rounded-full bg-sky-600 flex items-center justify-center shrink-0">
-                <BookOpen className="h-5 w-5 text-white" />
+            <Card className="p-4 flex items-center justify-between border-sky-200 dark:border-sky-900 bg-sky-50 dark:bg-sky-950/30">
+              <div className="flex items-center gap-4">
+                <div className="h-10 w-10 rounded-full bg-sky-600 flex items-center justify-center shrink-0">
+                  <BookOpen className="h-5 w-5 text-white" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-sky-700 dark:text-sky-400">
+                    {laporanWakaf.reduce((sum: number, w: any) => sum + (w.jumlahMushaf || 0), 0)}
+                  </p>
+                  <p className="text-xs text-muted-foreground font-medium">Total Mushaf Diwakafkan</p>
+                </div>
               </div>
-              <div>
-                <p className="text-2xl font-bold text-sky-700 dark:text-sky-400">
-                  {laporanWakaf.reduce((sum: number, w: any) => sum + (w.jumlahMushaf || 0), 0)}
+              <div className="text-right">
+                <p className="text-lg font-bold text-sky-700 dark:text-sky-400">
+                  {formatRupiah(laporanWakaf.reduce((sum: number, w: any) => sum + (w.jumlahMushaf || 0), 0) * hargaWakaf)}
                 </p>
-                <p className="text-xs text-muted-foreground font-medium">Total Mushaf Diwakafkan</p>
+                <p className="text-[10px] text-muted-foreground">Estimasi Pendapatan Wakaf</p>
               </div>
             </Card>
           </div>
@@ -469,6 +549,36 @@ export default function AdminLaporanPaketPage() {
           </Card>
         </>
       )}
+
+      {/* Modal WA Template */}
+      <Modal isOpen={isTemplateModalOpen} onClose={() => setIsTemplateModalOpen(false)} title="Konfigurasi Template WhatsApp" maxWidth="max-w-2xl">
+        <div className="space-y-4 pt-2">
+          <p className="text-sm text-muted-foreground">
+            Teks laporan ini dibuat secara otomatis. Anda dapat menyesuaikannya sebelum menyalin atau mengirimnya langsung via WhatsApp.
+          </p>
+          <textarea
+            className="w-full h-80 p-3 text-sm rounded-lg border border-input bg-background font-mono"
+            value={waTemplate}
+            onChange={(e) => setWaTemplate(e.target.value)}
+          />
+          <div className="flex items-center justify-end gap-3 pt-2">
+            <Button variant="outline" onClick={() => {
+              navigator.clipboard.writeText(waTemplate);
+              alert("Template berhasil disalin ke clipboard!");
+            }} className="gap-2">
+              <Copy className="h-4 w-4" /> Salin Teks
+            </Button>
+            <a
+              href={`https://wa.me/?text=${encodeURIComponent(waTemplate)}`}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-10 px-4 py-2 bg-emerald-600 text-white hover:bg-emerald-700 gap-2"
+            >
+              <MessageCircle className="h-4 w-4" /> Buka WhatsApp Desktop/Web
+            </a>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

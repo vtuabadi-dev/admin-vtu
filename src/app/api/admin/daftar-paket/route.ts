@@ -28,32 +28,46 @@ export async function GET(request: NextRequest) {
 
     const badalWhere: any = { namaPaketUmroh: { not: null } };
     const wakafWhere: any = { namaPaketUmroh: { not: null } };
+    const kebWhere: any = {};
     if (dateFilter) {
       badalWhere.createdAt = dateFilter;
       wakafWhere.createdAt = dateFilter;
+      kebWhere.tanggalBerangkat = dateFilter;
     }
 
-    const [badalPakets, wakafPakets] = await Promise.all([
+    const [badalPakets, wakafPakets, keberangkatans] = await Promise.all([
       prisma.badalUmrohRegistration.findMany({
         where: badalWhere,
         select: { namaPaketUmroh: true },
         distinct: ["namaPaketUmroh"],
-        orderBy: { namaPaketUmroh: "asc" },
       }),
       prisma.wakafQuranRegistration.findMany({
         where: wakafWhere,
         select: { namaPaketUmroh: true },
         distinct: ["namaPaketUmroh"],
-        orderBy: { namaPaketUmroh: "asc" },
+      }),
+      prisma.keberangkatan.findMany({
+        where: kebWhere,
+        select: { namaPaket: true, paketGrupId: true },
+        distinct: ["paketGrupId", "namaPaket"],
       }),
     ]);
+
+    const groupIds = keberangkatans.map(k => k.paketGrupId).filter(Boolean) as string[];
+    const groups = groupIds.length > 0 ? await prisma.paketGrup.findMany({
+      where: { id: { in: groupIds } },
+      select: { id: true, namaPaket: true },
+    }) : [];
+
+    const groupMap = new Map(groups.map(g => [g.id, g.namaPaket]));
 
     const allPakets = [
       ...badalPakets.map((b) => b.namaPaketUmroh as string),
       ...wakafPakets.map((w) => w.namaPaketUmroh as string),
+      ...keberangkatans.map(k => k.paketGrupId && groupMap.has(k.paketGrupId) ? groupMap.get(k.paketGrupId)! : k.namaPaket),
     ];
 
-    const uniquePakets = Array.from(new Set(allPakets)).sort();
+    const uniquePakets = Array.from(new Set(allPakets.filter(Boolean))).sort();
 
     return NextResponse.json({ success: true, data: uniquePakets });
   } catch (error) {
