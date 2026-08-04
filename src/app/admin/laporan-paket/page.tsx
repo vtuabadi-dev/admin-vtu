@@ -551,7 +551,7 @@ export default function AdminLaporanPaketPage() {
       )}
 
       {/* Modal WA Template */}
-      <Modal isOpen={isTemplateModalOpen} onClose={() => setIsTemplateModalOpen(false)} title="Konfigurasi Template WhatsApp" maxWidth="max-w-2xl">
+      <Modal open={isTemplateModalOpen} onClose={() => setIsTemplateModalOpen(false)} title="Konfigurasi Template WhatsApp" size="lg">
         <div className="space-y-4 pt-2">
           <p className="text-sm text-muted-foreground">
             Teks laporan ini dibuat secara otomatis. Anda dapat menyesuaikannya sebelum menyalin atau mengirimnya langsung via WhatsApp.
