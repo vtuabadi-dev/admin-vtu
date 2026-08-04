@@ -222,11 +222,17 @@ export default function MasterPetugasPage() {
           </div>
         </CardHeader>
         <CardContent className="p-0">
-          <Table
-            columns={columns}
-            data={data}
-            keyField="id"
-          />
+          {loading ? (
+            <div className="flex justify-center items-center p-8 text-sm text-muted-foreground">
+              Memuat data...
+            </div>
+          ) : (
+            <Table
+              columns={columns}
+              data={data}
+              keyField="id"
+            />
+          )}
         </CardContent>
       </Card>
 
