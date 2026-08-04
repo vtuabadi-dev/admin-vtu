@@ -127,6 +127,7 @@ export default function MasterPetugasPage() {
 
   const columns = [
     {
+      key: "nama",
       header: "NAMA",
       accessor: (row: Petugas) => (
         <div className="flex items-center gap-2">
@@ -136,6 +137,7 @@ export default function MasterPetugasPage() {
       ),
     },
     {
+      key: "noHp",
       header: "NO TELEPON",
       accessor: (row: Petugas) => (
         <div className="flex items-center gap-2">
@@ -145,6 +147,7 @@ export default function MasterPetugasPage() {
       ),
     },
     {
+      key: "status",
       header: "STATUS",
       accessor: (row: Petugas) => (
         <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium ${
@@ -155,6 +158,7 @@ export default function MasterPetugasPage() {
       ),
     },
     {
+      key: "aksi",
       header: "AKSI",
       accessor: (row: Petugas) => (
         <div className="flex items-center gap-2">
