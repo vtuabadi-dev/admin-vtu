@@ -169,7 +169,7 @@ export default function MasterPetugasPage() {
     },
   ];
 
-  if (error) return <ErrorState title="Gagal Memuat Data" description={error} onRetry={fetchData} />;
+  if (error) return <ErrorState title="Gagal Memuat Data" message={error} onRetry={fetchData} />;
 
   return (
     <div className="space-y-6">
