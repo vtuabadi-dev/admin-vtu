@@ -2,10 +2,20 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, CheckCircle2, HeartHandshake, Send, User, Upload, Building2, Truck, FileCheck, Sparkles, UserCheck, ShieldCheck, Loader2, AlertCircle, BadgeCheck, Trash2 } from "lucide-react";
+import { ArrowLeft, CheckCircle2, HeartHandshake, Send, User, Upload, Building2, Truck, FileCheck, Sparkles, UserCheck, ShieldCheck, Loader2, AlertCircle, BadgeCheck, Trash2, CreditCard } from "lucide-react";
 import { Button } from "@/shared/components/ui/Button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/components/ui/Card";
 import { Input } from "@/shared/components/ui/Input";
+
+const HARGA_PER_BADAL = 2500000; // Rp 2.500.000 per Badal Umroh
+
+const formatRupiah = (val: number) => {
+  return new Intl.NumberFormat("id-ID", {
+    style: "currency",
+    currency: "IDR",
+    maximumFractionDigits: 0,
+  }).format(val);
+};
 
 export default function BadalUmrohRegisterPage() {
   const [submitted, setSubmitted] = useState(false);
@@ -323,13 +333,14 @@ export default function BadalUmrohRegisterPage() {
                       </li>
                     ))}
                   </ul>
+                  <p><strong>Total Harga Order:</strong> <span className="font-bold text-emerald-700">{formatRupiah(listAlmarhum.length * HARGA_PER_BADAL)}</span> ({listAlmarhum.length} x {formatRupiah(HARGA_PER_BADAL)} — Sudah Termasuk Ongkir ✓)</p>
                   <p><strong>Penyerahan Souvenir:</strong> {formData.metodeSouvenir === "dikirim" ? `Dikirim via Ekspedisi (${formData.alamatPengiriman})` : "Diambil di Kantor VTU"}</p>
                   <p><strong>Status Bukti Pembayaran:</strong> {buktiTransferPreview ? "Terunggah (Menunggu Konfirmasi)" : "Belum Diunggah"}</p>
                 </div>
 
                 <div className="pt-4 flex flex-wrap justify-center gap-3">
                   <a
-                    href={`https://wa.me/${(process.env.NEXT_PUBLIC_ADMIN_WHATSAPP || "6281234567890").replace(/[^0-9]/g, "")}?text=${encodeURIComponent(`Assalamu'alaikum Admin, saya mendaftar ${listAlmarhum.length} Badal Umroh atas nama: ${listAlmarhum.map((a) => a.namaAlmarhum).join(", ")} (Pemohon: ${formData.namaPemohon}, WA: ${formData.nomorWhatsapp}${isJamaahVauza ? `, Paket: ${formData.namaPaketUmroh}` : ""}). Mohon konfirmasinya.`)}`}
+                    href={`https://wa.me/${(process.env.NEXT_PUBLIC_ADMIN_WHATSAPP || "6281234567890").replace(/[^0-9]/g, "")}?text=${encodeURIComponent(`Assalamu'alaikum Admin, saya mendaftar ${listAlmarhum.length} Badal Umroh atas nama: ${listAlmarhum.map((a) => a.namaAlmarhum).join(", ")} (Total Order: ${formatRupiah(listAlmarhum.length * HARGA_PER_BADAL)} - Sudah Termasuk Ongkir, Pemohon: ${formData.namaPemohon}, WA: ${formData.nomorWhatsapp}${isJamaahVauza ? `, Paket: ${formData.namaPaketUmroh}` : ""}). Mohon konfirmasinya.`)}`}
                     target="_blank"
                     rel="noreferrer"
                     className="inline-flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-xs rounded-lg transition-colors shadow-xs"
@@ -690,9 +701,12 @@ export default function BadalUmrohRegisterPage() {
                             <Truck className="h-4 w-4" />
                           </div>
                           <div>
-                            <p className="font-bold text-xs text-foreground">Dikirim melalui Pengiriman</p>
+                            <div className="flex items-center gap-1.5">
+                              <p className="font-bold text-xs text-foreground">Dikirim melalui Ekspedisi</p>
+                              <span className="text-[9px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-300 px-1.5 py-0.2 rounded">Bebas Ongkir</span>
+                            </div>
                             <p className="text-[11px] text-muted-foreground mt-0.5">
-                              Sertifikat & souvenir dikirimkan langsung ke alamat Anda.
+                              Sertifikat & souvenir dikirim ke alamat Anda (Sudah termasuk ongkir).
                             </p>
                           </div>
                         </button>
@@ -715,46 +729,86 @@ export default function BadalUmrohRegisterPage() {
                       )}
                     </div>
 
-                    {/* ── 5. Upload Bukti Transfer ── */}
-                    <div className="space-y-3">
-                      <span className="font-bold text-xs uppercase tracking-wider text-emerald-600 flex items-center gap-1.5">
-                        <FileCheck className="h-4 w-4 text-emerald-600" />
-                        5. Upload Bukti Transfer / Pembayaran
-                      </span>
-
-                      <div className="p-4 border rounded-lg bg-card space-y-3">
-                        {buktiTransferPreview ? (
-                          <div className="flex items-center gap-3 p-3 bg-emerald-50/60 border border-emerald-200 rounded-lg">
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img src={buktiTransferPreview} alt="Bukti Transfer" className="h-16 w-16 object-cover rounded-md border shadow-xs" />
-                            <div className="flex-1 truncate">
-                              <p className="font-semibold text-xs text-emerald-950 truncate">{buktiTransferFile?.name || "Bukti Transfer"}</p>
-                              <p className="text-[11px] text-emerald-700 font-medium mt-0.5">
-                                {(buktiTransferFile?.size ? (buktiTransferFile.size / 1024).toFixed(0) : "0")} KB — Siap diunggah
-                              </p>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={handleRemoveFile}
-                              className="p-1.5 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-md transition-colors font-bold text-xs"
-                              title="Hapus Bukti Transfer"
-                            >
-                              Hapus
-                            </button>
+                    {/* ── 5. Rincian Total Harga Order & Upload Bukti Transfer ── */}
+                    <div className="space-y-4">
+                      {/* Card Total Harga Order */}
+                      <div className="p-4 bg-gradient-to-br from-emerald-900 via-emerald-950 to-slate-950 text-white rounded-xl shadow-md border border-[#D4AF37]/40 space-y-3">
+                        <div className="flex items-center justify-between border-b border-emerald-800/80 pb-2.5">
+                          <div className="flex items-center gap-2">
+                            <CreditCard className="h-5 w-5 text-[#F5D061]" />
+                            <span className="font-bold text-xs uppercase tracking-wider text-[#F5D061]">
+                              Rincian Total Harga Order
+                            </span>
                           </div>
-                        ) : (
-                          <label className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-border hover:border-emerald-500 rounded-lg cursor-pointer bg-muted/20 hover:bg-muted/40 transition-all select-none">
-                            <Upload className="h-6 w-6 text-muted-foreground mb-2" />
-                            <span className="text-xs font-semibold text-foreground">Klik untuk Unggah Bukti Transfer</span>
-                            <span className="text-[11px] text-muted-foreground mt-0.5">Format: JPG, PNG, WEBP (Maksimal 5MB)</span>
-                            <input
-                              type="file"
-                              accept="image/*"
-                              onChange={handleFileChange}
-                              className="hidden"
-                            />
-                          </label>
-                        )}
+                          <span className="text-[10px] font-extrabold bg-[#D4AF37]/20 border border-[#D4AF37]/50 text-[#F5D061] px-2.5 py-0.5 rounded-full uppercase">
+                            {listAlmarhum.length} Badal Umroh
+                          </span>
+                        </div>
+
+                        <div className="space-y-2 text-xs text-emerald-100/90">
+                          <div className="flex justify-between items-center">
+                            <span>Biaya Per Badal Umroh:</span>
+                            <span className="font-semibold text-white">{formatRupiah(HARGA_PER_BADAL)}</span>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <span>Jumlah Badal Didaftarkan:</span>
+                            <span className="font-semibold text-white">{listAlmarhum.length} Nama Almarhum/ah</span>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <span>Biaya Pengiriman Souvenir / Ongkir:</span>
+                            <span className="font-semibold text-emerald-300">Rp 0 (Sudah Termasuk Ongkir ✓)</span>
+                          </div>
+                          <div className="flex justify-between items-center pt-2.5 border-t border-emerald-800/80 font-black text-sm">
+                            <span className="text-[#F5D061] uppercase tracking-wide">Total Pembayaran:</span>
+                            <span className="text-base text-[#F5D061] font-black tracking-tight">{formatRupiah(listAlmarhum.length * HARGA_PER_BADAL)}</span>
+                          </div>
+                          <p className="text-[10px] text-emerald-200/70 italic text-right pt-0.5">
+                            * Total harga di atas sudah bersih termasuk sertifikat, dokumentasi, souvenir & biaya ongkir.
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* ── Upload Bukti Transfer ── */}
+                      <div className="space-y-3">
+                        <span className="font-bold text-xs uppercase tracking-wider text-emerald-600 flex items-center gap-1.5">
+                          <FileCheck className="h-4 w-4 text-emerald-600" />
+                          5. Upload Bukti Transfer / Pembayaran
+                        </span>
+
+                        <div className="p-4 border rounded-lg bg-card space-y-3">
+                          {buktiTransferPreview ? (
+                            <div className="flex items-center gap-3 p-3 bg-emerald-50/60 border border-emerald-200 rounded-lg">
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img src={buktiTransferPreview} alt="Bukti Transfer" className="h-16 w-16 object-cover rounded-md border shadow-xs" />
+                              <div className="flex-1 truncate">
+                                <p className="font-semibold text-xs text-emerald-950 truncate">{buktiTransferFile?.name || "Bukti Transfer"}</p>
+                                <p className="text-[11px] text-emerald-700 font-medium mt-0.5">
+                                  {(buktiTransferFile?.size ? (buktiTransferFile.size / 1024).toFixed(0) : "0")} KB — Siap diunggah
+                                </p>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={handleRemoveFile}
+                                className="p-1.5 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-md transition-colors font-bold text-xs"
+                                title="Hapus Bukti Transfer"
+                              >
+                                Hapus
+                              </button>
+                            </div>
+                          ) : (
+                            <label className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-border hover:border-emerald-500 rounded-lg cursor-pointer bg-muted/20 hover:bg-muted/40 transition-all select-none">
+                              <Upload className="h-6 w-6 text-muted-foreground mb-2" />
+                              <span className="text-xs font-semibold text-foreground">Klik untuk Unggah Bukti Transfer</span>
+                              <span className="text-[11px] text-muted-foreground mt-0.5">Format: JPG, PNG, WEBP (Maksimal 5MB)</span>
+                              <input
+                                type="file"
+                                accept="image/*"
+                                onChange={handleFileChange}
+                                className="hidden"
+                              />
+                            </label>
+                          )}
+                        </div>
                       </div>
                     </div>
 
