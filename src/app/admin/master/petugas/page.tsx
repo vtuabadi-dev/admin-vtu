@@ -2,13 +2,13 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Card, CardHeader, CardTitle, CardContent } from "@/shared/components/ui/Card";
+import { Card, CardHeader, CardContent } from "@/shared/components/ui/Card";
 import { Button } from "@/shared/components/ui/Button";
 import { Input } from "@/shared/components/ui/Input";
 import { Modal } from "@/shared/components/ui/Modal";
 import { Table } from "@/shared/components/ui/Table";
 import { ErrorState } from "@/shared/components/ui/ErrorState";
-import { Users, Phone, Search, Plus, Pencil, Trash2, CheckCircle2, XCircle } from "lucide-react";
+import { Users, Phone, Search, Plus, Pencil, Trash2 } from "lucide-react";
 
 type Petugas = {
   id: string;
