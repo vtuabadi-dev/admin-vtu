@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, CheckCircle2, HeartHandshake, Send, User, Upload, Building2, Truck, FileCheck, Sparkles, UserCheck, ShieldCheck, Loader2, AlertCircle, BadgeCheck } from "lucide-react";
+import { ArrowLeft, CheckCircle2, HeartHandshake, Send, User, Upload, Building2, Truck, FileCheck, Sparkles, UserCheck, ShieldCheck, Loader2, AlertCircle, BadgeCheck, Trash2 } from "lucide-react";
 import { Button } from "@/shared/components/ui/Button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/components/ui/Card";
 import { Input } from "@/shared/components/ui/Input";
@@ -20,19 +20,47 @@ export default function BadalUmrohRegisterPage() {
   const [verifiedData, setVerifiedData] = useState<{ namaLengkap: string; nomorPaspor: string; paketName: string } | null>(null);
   const [verifyMessage, setVerifyMessage] = useState<string>("");
 
+  // State Multi-Badal (List Almarhum / Almarhumah)
+  const [listAlmarhum, setListAlmarhum] = useState<Array<{ id: string; namaAlmarhum: string; jenisKelamin: "L" | "P" }>>([
+    { id: "1", namaAlmarhum: "", jenisKelamin: "L" },
+  ]);
+
   // State Form Simplified
   const [formData, setFormData] = useState({
     namaPaketUmroh: "",
     namaPemohon: "",
     nomorWhatsapp: "",
-    namaAlmarhum: "",
-    jenisKelamin: "L", // "L" | "P"
     metodeSouvenir: "dikantor", // "dikantor" | "dikirim"
     alamatPengiriman: "",
   });
 
   const [buktiTransferFile, setBuktiTransferFile] = useState<File | null>(null);
   const [buktiTransferPreview, setBuktiTransferPreview] = useState<string>("");
+
+  // Handlers Multi-Badal
+  const handleAddAlmarhum = () => {
+    setListAlmarhum((prev) => [
+      ...prev,
+      { id: String(Date.now() + Math.random()), namaAlmarhum: "", jenisKelamin: "L" },
+    ]);
+  };
+
+  const handleRemoveAlmarhum = (id: string) => {
+    if (listAlmarhum.length <= 1) return;
+    setListAlmarhum((prev) => prev.filter((item) => item.id !== id));
+  };
+
+  const handleAlmarhumNameChange = (id: string, name: string) => {
+    setListAlmarhum((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, namaAlmarhum: name } : item))
+    );
+  };
+
+  const handleAlmarhumGenderChange = (id: string, gender: "L" | "P") => {
+    setListAlmarhum((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, jenisKelamin: gender } : item))
+    );
+  };
 
   // Reset verifikasi jika nama atau nomor paspor diubah
   const handleNamaPasporChange = (val: string) => {
@@ -166,6 +194,12 @@ export default function BadalUmrohRegisterPage() {
       }
     }
 
+    const invalidAlmarhum = listAlmarhum.some((a) => !a.namaAlmarhum.trim());
+    if (invalidAlmarhum) {
+      alert("Mohon lengkapi nama semua Almarhum/ah yang akan dibadalkan.");
+      return;
+    }
+
     if (formData.metodeSouvenir === "dikirim" && !formData.alamatPengiriman.trim()) {
       alert("Mohon lengkapi alamat pengiriman souvenir.");
       return;
@@ -181,8 +215,12 @@ export default function BadalUmrohRegisterPage() {
         nomorPasporJamaah: isJamaahVauza ? nomorPasporJamaah : null,
         namaPemohon: formData.namaPemohon,
         nomorWhatsapp: formData.nomorWhatsapp,
-        namaAlmarhum: formData.namaAlmarhum,
-        jenisKelamin: formData.jenisKelamin,
+        listAlmarhum: listAlmarhum.map((a) => ({
+          namaAlmarhum: a.namaAlmarhum.trim(),
+          jenisKelamin: a.jenisKelamin,
+        })),
+        namaAlmarhum: listAlmarhum[0]?.namaAlmarhum.trim() || "",
+        jenisKelamin: listAlmarhum[0]?.jenisKelamin || "L",
         metodeSouvenir: formData.metodeSouvenir,
         alamatPengiriman: formData.metodeSouvenir === "dikirim" ? formData.alamatPengiriman : null,
         buktiTransferUrl: buktiTransferPreview || null,
@@ -215,12 +253,11 @@ export default function BadalUmrohRegisterPage() {
     setVerifyMessage("");
     setNamaPasporJamaah("");
     setNomorPasporJamaah("");
+    setListAlmarhum([{ id: "1", namaAlmarhum: "", jenisKelamin: "L" }]);
     setFormData({
       namaPaketUmroh: "",
       namaPemohon: "",
       nomorWhatsapp: "",
-      namaAlmarhum: "",
-      jenisKelamin: "L",
       metodeSouvenir: "dikantor",
       alamatPengiriman: "",
     });
@@ -265,7 +302,7 @@ export default function BadalUmrohRegisterPage() {
                 </div>
                 <h3 className="text-lg font-bold text-foreground">Pendaftaran Badal Umroh Berhasil!</h3>
                 <p className="text-sm text-muted-foreground max-w-md mx-auto">
-                  Terima kasih Bpk/Ibu <span className="font-semibold text-foreground">{formData.namaPemohon}</span>. Permohonan Badal Umroh untuk <span className="font-semibold text-emerald-600">{formData.namaAlmarhum}</span> telah kami terima.
+                  Terima kasih Bpk/Ibu <span className="font-semibold text-foreground">{formData.namaPemohon}</span>. Permohonan <span className="font-bold text-emerald-600">{listAlmarhum.length} Badal Umroh</span> telah kami terima.
                 </p>
 
                 <div className="bg-muted/40 p-4 rounded-lg text-xs text-left max-w-md mx-auto space-y-2 border">
@@ -278,14 +315,21 @@ export default function BadalUmrohRegisterPage() {
                   )}
                   <p><strong>Nama Pemohon:</strong> {formData.namaPemohon}</p>
                   <p><strong>Nomor WhatsApp:</strong> {formData.nomorWhatsapp}</p>
-                  <p><strong>Nama Almarhum/ah:</strong> {formData.namaAlmarhum} ({formData.jenisKelamin === "L" ? "Laki-laki" : "Perempuan"})</p>
+                  <p><strong>Daftar Almarhum/ah ({listAlmarhum.length} Badal):</strong></p>
+                  <ul className="list-disc list-inside space-y-1 pl-1 text-emerald-950 font-medium">
+                    {listAlmarhum.map((a, idx) => (
+                      <li key={idx}>
+                        <strong className="font-bold">{a.namaAlmarhum}</strong> ({a.jenisKelamin === "L" ? "Laki-laki" : "Perempuan"})
+                      </li>
+                    ))}
+                  </ul>
                   <p><strong>Penyerahan Souvenir:</strong> {formData.metodeSouvenir === "dikirim" ? `Dikirim via Ekspedisi (${formData.alamatPengiriman})` : "Diambil di Kantor VTU"}</p>
                   <p><strong>Status Bukti Pembayaran:</strong> {buktiTransferPreview ? "Terunggah (Menunggu Konfirmasi)" : "Belum Diunggah"}</p>
                 </div>
 
                 <div className="pt-4 flex flex-wrap justify-center gap-3">
                   <a
-                    href={`https://wa.me/${(process.env.NEXT_PUBLIC_ADMIN_WHATSAPP || "6281234567890").replace(/[^0-9]/g, "")}?text=${encodeURIComponent(`Assalamu'alaikum Admin, saya mendaftar Badal Umroh atas nama Almarhum/ah: ${formData.namaAlmarhum} (Pemohon: ${formData.namaPemohon}, WA: ${formData.nomorWhatsapp}${isJamaahVauza ? `, Paket: ${formData.namaPaketUmroh}` : ""}). Mohon konfirmasinya.`)}`}
+                    href={`https://wa.me/${(process.env.NEXT_PUBLIC_ADMIN_WHATSAPP || "6281234567890").replace(/[^0-9]/g, "")}?text=${encodeURIComponent(`Assalamu'alaikum Admin, saya mendaftar ${listAlmarhum.length} Badal Umroh atas nama: ${listAlmarhum.map((a) => a.namaAlmarhum).join(", ")} (Pemohon: ${formData.namaPemohon}, WA: ${formData.nomorWhatsapp}${isJamaahVauza ? `, Paket: ${formData.namaPaketUmroh}` : ""}). Mohon konfirmasinya.`)}`}
                     target="_blank"
                     rel="noreferrer"
                     className="inline-flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-xs rounded-lg transition-colors shadow-xs"
@@ -512,57 +556,96 @@ export default function BadalUmrohRegisterPage() {
                       </div>
                     </div>
 
-                    {/* ── 3. Data Almarhum / Almarhumah ── */}
-                    <div className="space-y-3 pb-4 border-b">
-                      <span className="font-bold text-xs uppercase tracking-wider text-emerald-600 flex items-center gap-1.5">
-                        <HeartHandshake className="h-4 w-4 text-emerald-600" />
-                        3. Data Almarhum / Almarhumah
-                      </span>
+                    {/* ── 3. Data Almarhum / Almarhumah (Multi-Badal Support) ── */}
+                    <div className="space-y-4 pb-4 border-b">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-xs uppercase tracking-wider text-emerald-600 flex items-center gap-1.5">
+                          <HeartHandshake className="h-4 w-4 text-emerald-600" />
+                          3. Data Almarhum / Almarhumah
+                        </span>
+                        <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full">
+                          {listAlmarhum.length} Badal Terdaftar
+                        </span>
+                      </div>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <div className="space-y-1">
-                          <label className="font-semibold text-foreground block">
-                            Nama Almarhum / Almarhumah <span className="text-red-500">*</span>
-                          </label>
-                          <Input
-                            type="text"
-                            required
-                            value={formData.namaAlmarhum}
-                            onChange={(e) => setFormData((p) => ({ ...p, namaAlmarhum: e.target.value }))}
-                            placeholder="Fulan bin Fulan / Fulanah binti Fulan"
-                            className="text-xs h-10"
-                          />
-                        </div>
+                      <div className="space-y-3">
+                        {listAlmarhum.map((item, index) => (
+                          <div
+                            key={item.id}
+                            className="p-3.5 rounded-xl border border-emerald-200/80 bg-emerald-50/30 space-y-3 relative group transition-all"
+                          >
+                            <div className="flex items-center justify-between border-b border-emerald-200/50 pb-2">
+                              <span className="font-bold text-xs text-emerald-950 flex items-center gap-1.5">
+                                <Sparkles className="h-3.5 w-3.5 text-emerald-600" />
+                                Badal Umroh #{index + 1}
+                              </span>
+                              {listAlmarhum.length > 1 && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveAlmarhum(item.id)}
+                                  className="text-[11px] font-semibold text-red-600 hover:text-red-700 hover:bg-red-50 px-2 py-0.5 rounded transition-colors flex items-center gap-1"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" /> Hapus
+                                </button>
+                              )}
+                            </div>
 
-                        <div className="space-y-1">
-                          <label className="font-semibold text-foreground block">
-                            Jenis Kelamin Almarhum/ah <span className="text-red-500">*</span>
-                          </label>
-                          <div className="grid grid-cols-2 gap-2 pt-0.5">
-                            <button
-                              type="button"
-                              onClick={() => setFormData((p) => ({ ...p, jenisKelamin: "L" }))}
-                              className={`h-10 rounded-lg border text-xs font-semibold flex items-center justify-center gap-1.5 transition-all ${
-                                formData.jenisKelamin === "L"
-                                  ? "border-emerald-600 bg-emerald-50 text-emerald-950 ring-2 ring-emerald-600/30 font-bold"
-                                  : "border-border bg-card text-muted-foreground hover:bg-muted/40"
-                              }`}
-                            >
-                              <span>👨 Laki-laki</span>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setFormData((p) => ({ ...p, jenisKelamin: "P" }))}
-                              className={`h-10 rounded-lg border text-xs font-semibold flex items-center justify-center gap-1.5 transition-all ${
-                                formData.jenisKelamin === "P"
-                                  ? "border-emerald-600 bg-emerald-50 text-emerald-950 ring-2 ring-emerald-600/30 font-bold"
-                                  : "border-border bg-card text-muted-foreground hover:bg-muted/40"
-                              }`}
-                            >
-                              <span>👩 Perempuan</span>
-                            </button>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                              <div className="space-y-1">
+                                <label className="font-semibold text-foreground block">
+                                  Nama Almarhum / Almarhumah #{index + 1} <span className="text-red-500">*</span>
+                                </label>
+                                <Input
+                                  type="text"
+                                  required
+                                  value={item.namaAlmarhum}
+                                  onChange={(e) => handleAlmarhumNameChange(item.id, e.target.value)}
+                                  placeholder="Fulan bin Fulan / Fulanah binti Fulan"
+                                  className="text-xs h-10 bg-white"
+                                />
+                              </div>
+
+                              <div className="space-y-1">
+                                <label className="font-semibold text-foreground block">
+                                  Jenis Kelamin Almarhum/ah #{index + 1} <span className="text-red-500">*</span>
+                                </label>
+                                <div className="grid grid-cols-2 gap-2 pt-0.5">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleAlmarhumGenderChange(item.id, "L")}
+                                    className={`h-10 rounded-lg border text-xs font-semibold flex items-center justify-center gap-1.5 transition-all ${
+                                      item.jenisKelamin === "L"
+                                        ? "border-emerald-600 bg-emerald-50 text-emerald-950 ring-2 ring-emerald-600/30 font-bold"
+                                        : "border-border bg-white text-muted-foreground hover:bg-muted/40"
+                                    }`}
+                                  >
+                                    <span>👨 Laki-laki</span>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleAlmarhumGenderChange(item.id, "P")}
+                                    className={`h-10 rounded-lg border text-xs font-semibold flex items-center justify-center gap-1.5 transition-all ${
+                                      item.jenisKelamin === "P"
+                                        ? "border-emerald-600 bg-emerald-50 text-emerald-950 ring-2 ring-emerald-600/30 font-bold"
+                                        : "border-border bg-white text-muted-foreground hover:bg-muted/40"
+                                    }`}
+                                  >
+                                    <span>👩 Perempuan</span>
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
                           </div>
-                        </div>
+                        ))}
+
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={handleAddAlmarhum}
+                          className="w-full h-10 border-dashed border-emerald-600/60 text-emerald-700 hover:bg-emerald-50 text-xs font-semibold gap-1.5"
+                        >
+                          + Tambah Badal Almarhum/ah
+                        </Button>
                       </div>
                     </div>
 
