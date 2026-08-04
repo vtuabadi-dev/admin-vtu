@@ -162,7 +162,7 @@ export default function WakafQuranRegisterPage() {
                   <p><strong>Lokasi Penyaluran:</strong> {formData.lokasiWakaf}</p>
                   <p><strong>Total Pembayaran:</strong> <span className="font-bold text-sky-600">Rp {(formData.jumlahMushaf * hargaWakaf).toLocaleString("id-ID")}</span> ({formData.jumlahMushaf} x Rp {hargaWakaf.toLocaleString("id-ID")})</p>
                 </div>
-                <div className="pt-4 flex justify-center gap-3">
+                <div className="pt-4 flex flex-wrap justify-center gap-3">
                   <a
                     href={`https://wa.me/${(process.env.NEXT_PUBLIC_ADMIN_WHATSAPP || "6281234567890").replace(/[^0-9]/g, "")}?text=${encodeURIComponent(`Assalamu'alaikum Admin, saya ingin konfirmasi pendaftaran Wakaf Qur'an atas nama: ${formData.namaPeserta || formData.namaPewakaf} (${formData.jumlahMushaf} Mushaf). Total Tagihan: Rp ${(formData.jumlahMushaf * hargaWakaf).toLocaleString("id-ID")}`)}`}
                     target="_blank"
@@ -171,7 +171,13 @@ export default function WakafQuranRegisterPage() {
                   >
                     <Send className="h-3.5 w-3.5" /> Konfirmasi & Instruksi Transfer via WA
                   </a>
-                  <Button variant="outline" size="sm" onClick={() => setSubmitted(false)}>
+                  <Link
+                    href="/track/badal-wakaf"
+                    className="inline-flex items-center gap-2 px-4 py-2.5 bg-amber-500 hover:bg-amber-600 text-white font-medium text-xs rounded-lg transition-colors shadow-xs"
+                  >
+                    Cek Status Wakaf
+                  </Link>
+                  <Button variant="outline" size="sm" onClick={() => setSubmitted(false)} className="h-[36px]">
                     Daftar Lagi
                   </Button>
                 </div>
