@@ -9,7 +9,7 @@ export async function GET(request: NextRequest) {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
   
-  const perm = checkServerPermission(session, "master_data", "view");
+  const perm = checkServerPermission(session, "sistem", "view");
   if (!perm.allowed) return NextResponse.json({ success: false, message: perm.reason }, { status: 403 });
 
   const { searchParams } = new URL(request.url);
@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
   
-  const perm = checkServerPermission(session, "master_data", "edit");
+  const perm = checkServerPermission(session, "sistem", "edit");
   if (!perm.allowed) return NextResponse.json({ success: false, message: perm.reason }, { status: 403 });
 
   try {

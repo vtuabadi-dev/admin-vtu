@@ -9,7 +9,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
   const session = await auth();
   if (!session?.user) return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
   
-  const perm = checkServerPermission(session, "master_data", "edit");
+  const perm = checkServerPermission(session, "sistem", "edit");
   if (!perm.allowed) return NextResponse.json({ success: false, message: perm.reason }, { status: 403 });
 
   try {
@@ -37,7 +37,7 @@ export async function DELETE(_request: NextRequest, { params }: { params: { id: 
   const session = await auth();
   if (!session?.user) return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
   
-  const perm = checkServerPermission(session, "master_data", "delete");
+  const perm = checkServerPermission(session, "sistem", "delete");
   if (!perm.allowed) return NextResponse.json({ success: false, message: perm.reason }, { status: 403 });
 
   try {
