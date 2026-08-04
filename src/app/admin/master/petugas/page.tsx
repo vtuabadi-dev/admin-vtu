@@ -7,7 +7,7 @@ import { Input } from "@/shared/components/ui/Input";
 import { Modal } from "@/shared/components/ui/Modal";
 import { Table } from "@/shared/components/ui/Table";
 import { ErrorState } from "@/shared/components/ui/ErrorState";
-import { Users, Phone, Search, Plus, Pencil, Trash2 } from "lucide-react";
+import { Users, Phone, Search, Plus, Pencil, Trash2, Upload, Download, FileSpreadsheet } from "lucide-react";
 
 type Petugas = {
   id: string;
@@ -33,6 +33,11 @@ export default function MasterPetugasPage() {
   const [formIsActive, setFormIsActive] = useState(true);
   
   const [submitting, setSubmitting] = useState(false);
+
+  // Import Excel States
+  const [importModalOpen, setImportModalOpen] = useState(false);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importing, setImporting] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -125,6 +130,41 @@ export default function MasterPetugasPage() {
     }
   }
 
+  function handleDownloadTemplate() {
+    window.open("/api/master/petugas/template", "_blank");
+  }
+
+  async function handleImportSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!importFile) return alert("Pilih file Excel terlebih dahulu");
+
+    setImporting(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", importFile);
+      formData.append("defaultTipe", activeTab);
+
+      const res = await fetch("/api/master/petugas/import", {
+        method: "POST",
+        body: formData,
+      });
+
+      const json = await res.json();
+      if (res.ok && json.success) {
+        alert(json.message);
+        setImportModalOpen(false);
+        setImportFile(null);
+        fetchData();
+      } else {
+        alert(json.message || "Gagal mengimpor data Excel");
+      }
+    } catch (err: any) {
+      alert("Terjadi kesalahan sistem saat impor");
+    } finally {
+      setImporting(false);
+    }
+  }
+
   const columns = [
     {
       key: "nama",
@@ -184,9 +224,14 @@ export default function MasterPetugasPage() {
             Kelola daftar Tour Leader dan Muthowif untuk paket keberangkatan.
           </p>
         </div>
-        <Button onClick={() => handleOpenModal()} className="bg-sky-600 hover:bg-sky-700 text-white">
-          <Plus className="h-4 w-4 mr-2" /> Tambah {activeTab === "TOUR_LEADER" ? "Tour Leader" : "Muthowif"}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={() => setImportModalOpen(true)}>
+            <Upload className="h-4 w-4 mr-2" /> Import Excel
+          </Button>
+          <Button onClick={() => handleOpenModal()} className="bg-sky-600 hover:bg-sky-700 text-white">
+            <Plus className="h-4 w-4 mr-2" /> Tambah {activeTab === "TOUR_LEADER" ? "Tour Leader" : "Muthowif"}
+          </Button>
+        </div>
       </div>
 
       <Card>
@@ -278,6 +323,51 @@ export default function MasterPetugasPage() {
             <Button type="button" variant="outline" onClick={() => setModalOpen(false)}>Batal</Button>
             <Button type="submit" disabled={submitting}>
               {submitting ? "Menyimpan..." : "Simpan Petugas"}
+            </Button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Modal Import Excel */}
+      <Modal
+        open={importModalOpen}
+        onClose={() => setImportModalOpen(false)}
+        title={`Import Excel (${activeTab === "TOUR_LEADER" ? "Tour Leader" : "Muthowif"})`}
+      >
+        <form onSubmit={handleImportSubmit} className="space-y-4">
+          <div className="p-3 bg-sky-50 dark:bg-sky-950/40 rounded-lg border border-sky-200 dark:border-sky-800 text-xs space-y-2">
+            <p className="font-semibold text-sky-900 dark:text-sky-200 flex items-center gap-1.5">
+              <FileSpreadsheet className="h-4 w-4 text-sky-600" /> Format File Excel Standard
+            </p>
+            <p className="text-sky-700 dark:text-sky-300">
+              Gunakan format Excel standar untuk mengunggah banyak petugas sekaligus. Data kolom wajib: <strong>Nama Lengkap</strong>.
+            </p>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleDownloadTemplate}
+              className="mt-1 bg-white dark:bg-stone-900"
+            >
+              <Download className="h-3.5 w-3.5 mr-1 text-sky-600" /> Download Template Excel (.xlsx)
+            </Button>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold text-foreground">Pilih File Excel (.xlsx)</label>
+            <input
+              type="file"
+              accept=".xlsx, .xls"
+              onChange={(e) => setImportFile(e.target.files?.[0] || null)}
+              className="w-full text-xs file:mr-3 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-sky-50 file:text-sky-700 hover:file:bg-sky-100 cursor-pointer border rounded-md p-1"
+              required
+            />
+          </div>
+
+          <div className="flex justify-end gap-2 pt-4 border-t">
+            <Button type="button" variant="outline" onClick={() => setImportModalOpen(false)}>Batal</Button>
+            <Button type="submit" disabled={importing || !importFile} className="bg-sky-600 hover:bg-sky-700 text-white">
+              {importing ? "Mengimpor..." : "Proses Import"}
             </Button>
           </div>
         </form>
