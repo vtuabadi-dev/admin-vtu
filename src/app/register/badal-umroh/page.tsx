@@ -1,13 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { ArrowLeft, CheckCircle2, HeartHandshake, Send, User, Upload, Building2, Truck, FileCheck, Sparkles, UserCheck, ShieldCheck, Loader2, AlertCircle, BadgeCheck, Trash2, CreditCard } from "lucide-react";
 import { Button } from "@/shared/components/ui/Button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/components/ui/Card";
 import { Input } from "@/shared/components/ui/Input";
 
-const HARGA_PER_BADAL = 2500000; // Rp 2.500.000 per Badal Umroh
 
 const formatRupiah = (val: number) => {
   return new Intl.NumberFormat("id-ID", {
@@ -18,6 +17,19 @@ const formatRupiah = (val: number) => {
 };
 
 export default function BadalUmrohRegisterPage() {
+  const [hargaPerBadal, setHargaPerBadal] = useState<number>(2500000);
+
+  useEffect(() => {
+    fetch("/api/master/harga-layanan")
+      .then(res => res.json())
+      .then(json => {
+        if (json.success && json.data?.BADAL_UMROH) {
+          setHargaPerBadal(json.data.BADAL_UMROH);
+        }
+      })
+      .catch(console.error);
+  }, []);
+
   const [submitted, setSubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -333,14 +345,14 @@ export default function BadalUmrohRegisterPage() {
                       </li>
                     ))}
                   </ul>
-                  <p><strong>Total Harga Order:</strong> <span className="font-bold text-emerald-700">{formatRupiah(listAlmarhum.length * HARGA_PER_BADAL)}</span> ({listAlmarhum.length} x {formatRupiah(HARGA_PER_BADAL)} — Sudah Termasuk Ongkir ✓)</p>
+                  <p><strong>Total Harga Order:</strong> <span className="font-bold text-emerald-700">{formatRupiah(listAlmarhum.length * hargaPerBadal)}</span> ({listAlmarhum.length} x {formatRupiah(hargaPerBadal)} — Sudah Termasuk Ongkir ✓)</p>
                   <p><strong>Penyerahan Souvenir:</strong> {formData.metodeSouvenir === "dikirim" ? `Dikirim via Ekspedisi (${formData.alamatPengiriman})` : "Diambil di Kantor VTU"}</p>
                   <p><strong>Status Bukti Pembayaran:</strong> {buktiTransferPreview ? "Terunggah (Menunggu Konfirmasi)" : "Belum Diunggah"}</p>
                 </div>
 
                 <div className="pt-4 flex flex-wrap justify-center gap-3">
                   <a
-                    href={`https://wa.me/${(process.env.NEXT_PUBLIC_ADMIN_WHATSAPP || "6281234567890").replace(/[^0-9]/g, "")}?text=${encodeURIComponent(`Assalamu'alaikum Admin, saya mendaftar ${listAlmarhum.length} Badal Umroh atas nama: ${listAlmarhum.map((a) => a.namaAlmarhum).join(", ")} (Total Order: ${formatRupiah(listAlmarhum.length * HARGA_PER_BADAL)} - Sudah Termasuk Ongkir, Pemohon: ${formData.namaPemohon}, WA: ${formData.nomorWhatsapp}${isJamaahVauza ? `, Paket: ${formData.namaPaketUmroh}` : ""}). Mohon konfirmasinya.`)}`}
+                    href={`https://wa.me/${(process.env.NEXT_PUBLIC_ADMIN_WHATSAPP || "6281234567890").replace(/[^0-9]/g, "")}?text=${encodeURIComponent(`Assalamu'alaikum Admin, saya mendaftar ${listAlmarhum.length} Badal Umroh atas nama: ${listAlmarhum.map((a) => a.namaAlmarhum).join(", ")} (Total Order: ${formatRupiah(listAlmarhum.length * hargaPerBadal)} - Sudah Termasuk Ongkir, Pemohon: ${formData.namaPemohon}, WA: ${formData.nomorWhatsapp}${isJamaahVauza ? `, Paket: ${formData.namaPaketUmroh}` : ""}). Mohon konfirmasinya.`)}`}
                     target="_blank"
                     rel="noreferrer"
                     className="inline-flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-xs rounded-lg transition-colors shadow-xs"
@@ -748,7 +760,7 @@ export default function BadalUmrohRegisterPage() {
                         <div className="space-y-2 text-xs text-emerald-100/90">
                           <div className="flex justify-between items-center">
                             <span>Biaya Per Badal Umroh:</span>
-                            <span className="font-semibold text-white">{formatRupiah(HARGA_PER_BADAL)}</span>
+                            <span className="font-semibold text-white">{formatRupiah(hargaPerBadal)}</span>
                           </div>
                           <div className="flex justify-between items-center">
                             <span>Jumlah Badal Didaftarkan:</span>
@@ -760,7 +772,7 @@ export default function BadalUmrohRegisterPage() {
                           </div>
                           <div className="flex justify-between items-center pt-2.5 border-t border-emerald-800/80 font-black text-sm">
                             <span className="text-[#F5D061] uppercase tracking-wide">Total Pembayaran:</span>
-                            <span className="text-base text-[#F5D061] font-black tracking-tight">{formatRupiah(listAlmarhum.length * HARGA_PER_BADAL)}</span>
+                            <span className="text-base text-[#F5D061] font-black tracking-tight">{formatRupiah(listAlmarhum.length * hargaPerBadal)}</span>
                           </div>
                           <p className="text-[10px] text-emerald-200/70 italic text-right pt-0.5">
                             * Total harga di atas sudah bersih termasuk sertifikat, dokumentasi, souvenir & biaya ongkir.

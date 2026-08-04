@@ -66,6 +66,10 @@ const adminNav: NavSection[] = [
             label: "Konfigurasi Paket Umroh",
             href: "/admin/master-data/konfigurasi-paket-umroh",
           },
+          {
+            label: "Master Badal & Wakaf",
+            href: "/admin/master/badal-wakaf",
+          },
         ],
       },
     ],

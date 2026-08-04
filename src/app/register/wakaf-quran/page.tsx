@@ -11,6 +11,18 @@ export default function WakafQuranRegisterPage() {
   const [submitted, setSubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [paketOptions, setPaketOptions] = useState<any[]>([]);
+  const [hargaWakaf, setHargaWakaf] = useState<number>(350000);
+
+  useEffect(() => {
+    fetch("/api/master/harga-layanan")
+      .then(res => res.json())
+      .then(json => {
+        if (json.success && json.data?.WAKAF_QURAN) {
+          setHargaWakaf(json.data.WAKAF_QURAN);
+        }
+      })
+      .catch(console.error);
+  }, []);
 
   // State Pilihan Status Kejamaahan
   const [isJamaahVauza, setIsJamaahVauza] = useState<boolean>(true);
@@ -148,10 +160,11 @@ export default function WakafQuranRegisterPage() {
                   <p><strong>Jumlah Mushaf:</strong> {formData.jumlahMushaf} Mushaf</p>
                   <p><strong>Niat Atas Nama:</strong> {niatList.filter(Boolean).join(", ") || "-"}</p>
                   <p><strong>Lokasi Penyaluran:</strong> {formData.lokasiWakaf}</p>
+                  <p><strong>Total Pembayaran:</strong> <span className="font-bold text-sky-600">Rp {(formData.jumlahMushaf * hargaWakaf).toLocaleString("id-ID")}</span> ({formData.jumlahMushaf} x Rp {hargaWakaf.toLocaleString("id-ID")})</p>
                 </div>
                 <div className="pt-4 flex justify-center gap-3">
                   <a
-                    href={`https://wa.me/${(process.env.NEXT_PUBLIC_ADMIN_WHATSAPP || "6281234567890").replace(/[^0-9]/g, "")}?text=${encodeURIComponent(`Assalamu'alaikum Admin, saya ingin konfirmasi pendaftaran Wakaf Qur'an atas nama: ${formData.namaPeserta || formData.namaPewakaf} (${formData.jumlahMushaf} Mushaf)`)}`}
+                    href={`https://wa.me/${(process.env.NEXT_PUBLIC_ADMIN_WHATSAPP || "6281234567890").replace(/[^0-9]/g, "")}?text=${encodeURIComponent(`Assalamu'alaikum Admin, saya ingin konfirmasi pendaftaran Wakaf Qur'an atas nama: ${formData.namaPeserta || formData.namaPewakaf} (${formData.jumlahMushaf} Mushaf). Total Tagihan: Rp ${(formData.jumlahMushaf * hargaWakaf).toLocaleString("id-ID")}`)}`}
                     target="_blank"
                     rel="noreferrer"
                     className="inline-flex items-center gap-2 px-4 py-2.5 bg-sky-600 hover:bg-sky-700 text-white font-medium text-xs rounded-lg transition-colors"
