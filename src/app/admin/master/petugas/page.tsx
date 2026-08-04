@@ -226,7 +226,6 @@ export default function MasterPetugasPage() {
             columns={columns}
             data={data}
             keyField="id"
-            isLoading={loading}
           />
         </CardContent>
       </Card>
