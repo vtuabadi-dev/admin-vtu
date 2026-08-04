@@ -132,6 +132,15 @@ export const groupRepo = {
     return mapGroup(row);
   },
 
+  async update(id: string, data: any) {
+    const row = await prisma.registrationGroup.update({
+      where: { id },
+      data,
+      include: { anggota: true },
+    });
+    return mapGroup(row);
+  },
+
   async getPaymentSummary(groupId: string): Promise<GroupPaymentSummary | null> {
     const row = await prisma.registrationGroup.findUnique({
       where: { id: groupId },

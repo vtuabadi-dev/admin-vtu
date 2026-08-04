@@ -69,6 +69,15 @@ export const jamaahRepo = {
     return row ? mapJamaah(row) : null;
   },
 
+  async update(id: string, data: any) {
+    const row = await prisma.jamaah.update({
+      where: { id },
+      data,
+      include: { dokumen: true },
+    });
+    return mapJamaah(row);
+  },
+
   async findByRegistrationId(registrationId: string) {
     const row = await prisma.jamaah.findUnique({ where: { registrationId }, include: { dokumen: true } });
     return row ? mapJamaah(row) : null;
