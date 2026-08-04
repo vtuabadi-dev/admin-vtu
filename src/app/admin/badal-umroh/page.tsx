@@ -749,33 +749,7 @@ export default function AdminBadalUmrohPage() {
               </div>
             </div>
 
-            {/* Link Sertifikat */}
-            <div className="space-y-1.5">
-              <label className="font-semibold text-foreground flex items-center gap-1.5">
-                <FileText className="h-4 w-4 text-emerald-600" /> Link Sertifikat Badal (PDF / Gambar Drive)
-              </label>
-              <Input
-                type="url"
-                value={sertifikatUrl}
-                onChange={(e) => setSertifikatUrl(e.target.value)}
-                placeholder="https://drive.google.com/... atau link sertifikat"
-                className="text-xs h-10"
-              />
-            </div>
 
-            {/* Link Video Execution */}
-            <div className="space-y-1.5">
-              <label className="font-semibold text-foreground flex items-center gap-1.5">
-                <ExternalLink className="h-4 w-4 text-sky-600" /> Link Video Execution Dokumen (YouTube / Drive)
-              </label>
-              <Input
-                type="url"
-                value={videoUrl}
-                onChange={(e) => setVideoUrl(e.target.value)}
-                placeholder="https://youtube.com/watch?v=... atau link video"
-                className="text-xs h-10"
-              />
-            </div>
 
             {/* Catatan Tambahan */}
             <div className="space-y-1.5">
