@@ -224,7 +224,7 @@ export default function MasterPetugasPage() {
         <CardContent className="p-0">
           <Table
             columns={columns}
-            data={data as unknown as Record<string, unknown>[]}
+            data={data}
             keyField="id"
             isLoading={loading}
           />
