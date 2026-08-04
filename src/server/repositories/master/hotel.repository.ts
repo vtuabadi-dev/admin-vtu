@@ -5,7 +5,11 @@ export interface MasterHotel {
   code: string;
   name: string;
   cityId: string;
+  city?: { id: string; name: string; code: string } | null;
   starRating?: number | null;
+  jarakText?: string | null;
+  videoJarakUrl?: string | null;
+  videoJarakDriveId?: string | null;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -17,7 +21,11 @@ function mapMasterHotel(row: any): MasterHotel {
     code: row.code,
     name: row.name,
     cityId: row.cityId,
+    city: row.city ? { id: row.city.id, name: row.city.name, code: row.city.code } : undefined,
     starRating: row.starRating,
+    jarakText: row.jarakText,
+    videoJarakUrl: row.videoJarakUrl,
+    videoJarakDriveId: row.videoJarakDriveId,
     isActive: row.isActive,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
@@ -50,6 +58,7 @@ export const hotelRepo = {
         take: params?.limit ?? 100,
         skip: params?.offset ?? 0,
         orderBy,
+        include: { city: true },
       }),
       prisma.masterHotel.count({ where }),
     ]);
@@ -84,6 +93,9 @@ export const hotelRepo = {
         name: data.name,
         cityId: data.cityId,
         starRating: data.starRating,
+        jarakText: data.jarakText,
+        videoJarakUrl: data.videoJarakUrl,
+        videoJarakDriveId: data.videoJarakDriveId,
         isActive: data.isActive,
       },
     });
@@ -96,6 +108,9 @@ export const hotelRepo = {
     if (data.name !== undefined) updateData.name = data.name;
     if (data.cityId !== undefined) updateData.cityId = data.cityId;
     if (data.starRating !== undefined) updateData.starRating = data.starRating;
+    if (data.jarakText !== undefined) updateData.jarakText = data.jarakText;
+    if (data.videoJarakUrl !== undefined) updateData.videoJarakUrl = data.videoJarakUrl;
+    if (data.videoJarakDriveId !== undefined) updateData.videoJarakDriveId = data.videoJarakDriveId;
     if (data.isActive !== undefined) updateData.isActive = data.isActive;
 
     const row = await prisma.masterHotel.update({

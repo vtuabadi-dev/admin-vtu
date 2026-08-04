@@ -37,27 +37,27 @@ export function StatCard({
   className,
 }: StatCardProps) {
   return (
-    <div className={cn(statCardVariants({ variant }), className)}>
+    <div className={cn(statCardVariants({ variant }), "border border-[#D4AF37]/30 bg-white dark:bg-[#062118] rounded-xl p-4 shadow-sm hover:border-[#D4AF37]/60 transition-all flex items-start justify-between", className)}>
       <div className="space-y-1">
-        <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">
+        <p className="text-[11px] text-emerald-900 dark:text-emerald-200 font-bold uppercase tracking-wider">
           {label}
         </p>
-        <p className="text-2xl font-bold tracking-tight">{value}</p>
+        <p className="text-2xl font-black tracking-tight text-slate-900 dark:text-white">{value}</p>
         {trend && (
           <p
             className={cn(
-              "text-xs font-medium",
-              trend.positive ? "text-success" : "text-destructive"
+              "text-xs font-semibold flex items-center gap-1",
+              trend.positive ? "text-emerald-700 dark:text-emerald-300" : "text-destructive"
             )}
           >
-            {trend.positive ? "+" : "-"}
+            {trend.positive ? "▲ " : "▼ "}
             {trend.value}
           </p>
         )}
       </div>
       {Icon && (
-        <div className="rounded-md bg-muted p-2">
-          <Icon className="h-4 w-4 text-muted-foreground" />
+        <div className="rounded-xl bg-gradient-to-br from-[#041710] to-[#0A2E23] border border-[#D4AF37]/40 p-2.5 shadow-sm shrink-0">
+          <Icon className="h-4 w-4 text-[#F5D061]" />
         </div>
       )}
     </div>

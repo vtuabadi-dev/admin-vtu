@@ -76,10 +76,19 @@ export const ocrProviderRepo = {
   },
 
   async findActive(): Promise<OcrProviderRecord[]> {
-    const rows = await prisma.ocrProvider.findMany({
+    let rows = await prisma.ocrProvider.findMany({
       where: { isActive: true, healthStatus: { notIn: ["disabled", "error"] } },
       orderBy: { rotationOrder: "asc" },
     });
+    
+    // Fallback: If all active providers are marked disabled/error, attempt any provider with an API key
+    if (rows.length === 0) {
+      rows = await prisma.ocrProvider.findMany({
+        where: { apiKey: { not: "" } },
+        orderBy: { rotationOrder: "asc" },
+      });
+    }
+
     return rows.map(mapProvider);
   },
 
@@ -96,7 +105,7 @@ export const ocrProviderRepo = {
     const row = await prisma.ocrProvider.create({
       data: {
         label: input.label,
-        providerType: input.providerType,
+        providerType: (input.providerType === "google_ai_studio" ? "google_vision" : input.providerType) as any,
         apiKey: input.apiKey,
         apiUrl: input.apiUrl ?? null,
         apiHeaderName: input.apiHeaderName ?? null,
@@ -146,9 +155,28 @@ export const ocrProviderRepo = {
       }
     }
 
+    const nextIsActive = !current.isActive;
     const row = await prisma.ocrProvider.update({
       where: { id },
-      data: { isActive: !current.isActive },
+      data: {
+        isActive: nextIsActive,
+        ...(nextIsActive ? { healthStatus: "active", consecutiveErrors: 0, cooldownUntil: null } : {}),
+      },
+    });
+    return mapProvider(row);
+  },
+
+  async reactivate(id: string): Promise<OcrProviderRecord> {
+    const row = await prisma.ocrProvider.update({
+      where: { id },
+      data: {
+        isActive: true,
+        healthStatus: "active",
+        consecutiveErrors: 0,
+        cooldownUntil: null,
+        lastErrorAt: null,
+        lastErrorMsg: null,
+      },
     });
     return mapProvider(row);
   },
@@ -184,6 +212,18 @@ export const ocrProviderRepo = {
     },
   ): Promise<void> {
     await prisma.ocrProvider.update({ where: { id }, data: updates as any });
+  },
+
+  async resetAllCooldowns(): Promise<number> {
+    const result = await prisma.ocrProvider.updateMany({
+      where: { healthStatus: "cooldown" },
+      data: {
+        healthStatus: "active",
+        cooldownUntil: null,
+        consecutiveErrors: 0,
+      },
+    });
+    return result.count;
   },
 
   async recordSuccess(
@@ -255,7 +295,12 @@ export const ocrProviderRepo = {
     if (isNewDay) {
       await prisma.ocrProvider.update({
         where: { id },
-        data: { dailyUsage: 0 },
+        data: {
+          dailyUsage: 0,
+          consecutiveErrors: 0,
+          healthStatus: "active",
+          cooldownUntil: null,
+        },
       });
       return true;
     }
@@ -453,6 +498,13 @@ export const ocrProviderRepo = {
     return result.count;
   },
 
+  async resetAllDisabledProviders(): Promise<number> {
+    const result = await prisma.ocrProvider.updateMany({
+      data: { healthStatus: "active", isActive: true, cooldownUntil: null },
+    });
+    return result.count;
+  },
+
   // ── Seed / Migration ─────────────────────────────────
 
   async seedFromEnvKeys(): Promise<number> {
@@ -462,19 +514,19 @@ export const ocrProviderRepo = {
     const keys: { label: string; key: string }[] = [];
 
     // Primary key (comma-separated)
-    const mainKey = process.env.GOOGLE_VISION_API_KEY;
+    const mainKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_VISION_API_KEY;
     if (mainKey) {
       const parts = mainKey.split(",").map((k) => k.trim()).filter(Boolean);
       parts.forEach((key, i) => {
-        keys.push({ label: `Google Vision #${i + 1}`, key });
+        keys.push({ label: `Google AI Studio #${i + 1}`, key });
       });
     }
 
-    // Additional keys (GOOGLE_VISION_API_KEY_2 ... _20)
+    // Additional keys (GOOGLE_VISION_API_KEY_2 ... _20 or GEMINI_API_KEY_2 ... _20)
     for (let i = 2; i <= 20; i++) {
-      const extra = process.env[`GOOGLE_VISION_API_KEY_${i}`];
+      const extra = process.env[`GEMINI_API_KEY_${i}`] || process.env[`GOOGLE_VISION_API_KEY_${i}`];
       if (extra?.trim()) {
-        keys.push({ label: `Google Vision #${keys.length + 1}`, key: extra.trim() });
+        keys.push({ label: `Google AI Studio #${keys.length + 1}`, key: extra.trim() });
       }
     }
 

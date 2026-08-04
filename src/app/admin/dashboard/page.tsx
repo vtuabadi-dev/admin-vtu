@@ -499,41 +499,41 @@ export default function AdminDashboardPage() {
                     Aksi Cepat
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-1.5">
-                  <Link href="/admin/manifest">
-                    <Button variant="outline" size="sm" className="w-full justify-start text-sm h-8">
-                      <FileCheck className="mr-2 h-3.5 w-3.5" />
-                      Generate Manifest
+                <CardContent className="space-y-1.5 p-3 sm:p-4">
+                  <Link href="/admin/manifest" className="block">
+                    <Button variant="outline" size="sm" className="w-full justify-start text-xs h-8 px-2.5">
+                      <FileCheck className="mr-2 h-3.5 w-3.5 shrink-0" />
+                      <span className="truncate">Generate Manifest</span>
                     </Button>
                   </Link>
-                  <Link href="/admin/rooming">
-                    <Button variant="outline" size="sm" className="w-full justify-start text-sm h-8">
-                      <Plane className="mr-2 h-3.5 w-3.5" />
-                      Atur Rooming
+                  <Link href="/admin/rooming" className="block">
+                    <Button variant="outline" size="sm" className="w-full justify-start text-xs h-8 px-2.5">
+                      <Plane className="mr-2 h-3.5 w-3.5 shrink-0" />
+                      <span className="truncate">Atur Rooming</span>
                     </Button>
                   </Link>
-                  <Link href="/admin/pembayaran">
-                    <Button variant="outline" size="sm" className="w-full justify-start text-sm h-8">
-                      <CreditCard className="mr-2 h-3.5 w-3.5" />
-                      Monitoring Pembayaran
+                  <Link href="/admin/pembayaran" className="block">
+                    <Button variant="outline" size="sm" className="w-full justify-start text-xs h-8 px-2.5">
+                      <CreditCard className="mr-2 h-3.5 w-3.5 shrink-0" />
+                      <span className="truncate">Monitoring Pembayaran</span>
                     </Button>
                   </Link>
-                  <Link href="/admin/pengingat">
-                    <Button variant="outline" size="sm" className="w-full justify-start text-sm h-8">
-                      <AlertTriangle className="mr-2 h-3.5 w-3.5" />
-                      Kirim Pengingat
+                  <Link href="/admin/pengingat" className="block">
+                    <Button variant="outline" size="sm" className="w-full justify-start text-xs h-8 px-2.5">
+                      <AlertTriangle className="mr-2 h-3.5 w-3.5 shrink-0" />
+                      <span className="truncate">Kirim Pengingat</span>
                     </Button>
                   </Link>
-                  <Link href="/admin/bulk-operations">
-                    <Button variant="outline" size="sm" className="w-full justify-start text-sm h-8">
-                      <Layers className="mr-2 h-3.5 w-3.5" />
-                      Bulk Operations
+                  <Link href="/admin/bulk-operations" className="block">
+                    <Button variant="outline" size="sm" className="w-full justify-start text-xs h-8 px-2.5">
+                      <Layers className="mr-2 h-3.5 w-3.5 shrink-0" />
+                      <span className="truncate">Bulk Operations</span>
                     </Button>
                   </Link>
-                  <Link href="/admin/command-center">
-                    <Button variant="outline" size="sm" className="w-full justify-start text-sm h-8">
-                      <BarChart3 className="mr-2 h-3.5 w-3.5" />
-                      Command Center
+                  <Link href="/admin/command-center" className="block">
+                    <Button variant="outline" size="sm" className="w-full justify-start text-xs h-8 px-2.5">
+                      <BarChart3 className="mr-2 h-3.5 w-3.5 shrink-0" />
+                      <span className="truncate">Command Center</span>
                     </Button>
                   </Link>
                 </CardContent>

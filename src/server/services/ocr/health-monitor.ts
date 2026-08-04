@@ -7,7 +7,6 @@
 
 import {
   COOLDOWN_DURATIONS,
-  PERMANENT_DISABLE_CODES,
 } from "./types";
 import type { OcrProviderRecord } from "./types";
 
@@ -31,24 +30,24 @@ export function classifyError(
 ): HealthClassification {
   const code = error.statusCode;
 
-  // 401 / 403 → immediate DISABLED (auth failure, permanent)
-  if (code && PERMANENT_DISABLE_CODES.includes(String(code))) {
+  // 401 → immediate DISABLED (auth failure, invalid key)
+  if (code === 401) {
     return {
       newStatus: "disabled",
       cooldownUntil: null,
       shouldDisable: true,
-      reason: `Authentication failed (HTTP ${code}) — provider dinonaktifkan permanen. Periksa API key.`,
+      reason: `Authentication failed (HTTP 401) — provider dinonaktifkan. Periksa API key.`,
     };
   }
 
-  // 429 → COOLDOWN
-  if (code === 429) {
+  // 403 / 429 → COOLDOWN (Quota / Rate limited temporary)
+  if (code === 403 || code === 429) {
     const duration = COOLDOWN_DURATIONS["429"] || 60_000;
     return {
       newStatus: "cooldown",
       cooldownUntil: new Date(Date.now() + duration),
       shouldDisable: false,
-      reason: `Rate limited (HTTP 429) — cooldown ${duration / 1000}s`,
+      reason: `Rate limited / Quota exceeded (HTTP ${code}) — cooldown sementara ${duration / 1000}s.`,
     };
   }
 

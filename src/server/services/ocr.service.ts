@@ -3,8 +3,8 @@
 // Default provider: google-vision.
 // Menerima Buffer langsung — tidak membaca filesystem.
 //
-// Feature Flag: OCR_DB_DRIVEN=true  → gunakan OCR Gateway (DB-driven, adaptive)
-//               OCR_DB_DRIVEN unset → gunakan legacy env-var system
+// Feature Flag: OCR_DB_DRIVEN=false → gunakan legacy env-var system
+//               OCR_DB_DRIVEN unset/true  → gunakan OCR Gateway (DB-driven, adaptive)
 
 import type { DokumenJenis } from "@/shared/types";
 import type { OcrProvider, OcrResult, ImageMetaCheck } from "./ocr/provider";
@@ -80,8 +80,8 @@ async function getProvider(): Promise<OcrProvider> {
         break;
       }
 
-      const { createGoogleVisionProvider } = await import("./ocr/google-vision.provider");
-      _provider = createGoogleVisionProvider();
+      const { createGoogleAiStudioProvider } = await import("./ocr/google-ai-studio.provider");
+      _provider = createGoogleAiStudioProvider();
       break;
     }
 
@@ -92,8 +92,7 @@ async function getProvider(): Promise<OcrProvider> {
           "[OCR] Production memerlukan OCR_API_URL saat OCR_PROVIDER=external-api.\n" +
           "Set di environment variables Vercel:\n" +
           "  OCR_API_URL=<ocr-service-url>\n" +
-          "  OCR_API_KEY=<api-key>\n" +
-          "Atau ganti ke: OCR_PROVIDER=google-vision"
+          "  OCR_API_KEY=<api-key>"
         );
       }
       _provider = createExternalApiProvider();
@@ -111,8 +110,9 @@ async function getProvider(): Promise<OcrProvider> {
       break;
   }
 
-  await _provider.initialize?.();
-  return _provider;
+  const activeProvider = _provider ?? placeholderProvider;
+  await activeProvider.initialize?.();
+  return activeProvider;
 }
 
 export function setOcrProvider(provider: OcrProvider): void {
@@ -127,7 +127,7 @@ export async function processDocument(
   retryCount = 0
 ): Promise<OcrResult> {
   // ── DB-Driven OCR Gateway (adaptive, multi-provider) ──
-  if (process.env.OCR_DB_DRIVEN === "true") {
+  if (process.env.OCR_DB_DRIVEN !== "false") {
     const { process: gatewayProcess } = await import("./ocr/gateway");
     console.log("[OCR] Using DB-driven gateway mode");
     return gatewayProcess(imageBuffer, jenis, retryCount);
@@ -140,7 +140,7 @@ export async function processDocument(
 
 export function validateImageMetadata(buffer: Buffer): ImageMetaCheck {
   // ── DB-Driven: use gateway validator ──
-  if (process.env.OCR_DB_DRIVEN === "true") {
+  if (process.env.OCR_DB_DRIVEN !== "false") {
     // Dynamic import to avoid bundling gateway in legacy path
     const { validateImage } = require("./ocr/gateway") as typeof import("./ocr/gateway");
     return validateImage(buffer);

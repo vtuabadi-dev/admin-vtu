@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { PermissionGuard } from "@/shared/components/PermissionGuard";
+
 import { Tabs } from "@/shared/components/ui/Tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/components/ui/Card";
 import { Badge } from "@/shared/components/ui/Badge";
@@ -178,11 +178,11 @@ function ProviderFormModal({
   return (
     <Modal open={open} onClose={onClose} title={initial ? "Edit Provider" : "Tambah Provider"} size="lg">
       <div className="space-y-4">
-        <Input label="Label" value={form.label} onChange={(e) => setForm({ ...form, label: e.target.value })} placeholder="Google Vision #1" />
+        <Input label="Label" value={form.label} onChange={(e) => setForm({ ...form, label: e.target.value })} placeholder="Google AI Studio #1" />
         <Select
           label="Provider Type"
           options={[
-            { value: "google_vision", label: "Google Vision" },
+            { value: "google_vision", label: "Google AI Studio (Gemini)" },
             { value: "external_api", label: "External API" },
           ]}
           value={form.providerType}
@@ -273,6 +273,25 @@ function ProvidersTab() {
     }
   };
 
+  const handleReactivate = async (id: string, label: string) => {
+    try {
+      const res = await fetch(`/api/admin/ocr/providers/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "reactivate" }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert(`🎉 Provider ${label} berhasil diaktifkan kembali (status Active)!`);
+        fetchProviders();
+      } else {
+        alert("Gagal mengaktifkan kembali: " + data.message);
+      }
+    } catch (err) {
+      alert("Gagal mengaktifkan kembali: " + (err as Error).message);
+    }
+  };
+
   const handleTest = async (id: string) => {
     setTestingId(id);
     try {
@@ -300,15 +319,37 @@ function ProvidersTab() {
     }
   };
 
+  const handleResetAllCooldowns = async () => {
+    try {
+      const res = await fetch("/api/admin/ocr/reset-cooldowns", { method: "POST" });
+      const data = await res.json();
+      if (data.success) {
+        alert(`🎉 Berhasil mereset ${data.resetCount} provider dari status Cooldown ke Active!`);
+        fetchProviders();
+      } else {
+        alert("Gagal mereset cooldown: " + data.message);
+      }
+    } catch (err) {
+      alert("Gagal mereset cooldown: " + (err as Error).message);
+    }
+  };
+
   if (loading) return <p className="text-sm text-muted-foreground text-center py-8">Memuat provider...</p>;
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">{providers.length} provider terdaftar</p>
-        <Button onClick={() => { setEditing(null); setModalOpen(true); }} className="gap-1.5">
-          <Plus className="h-3.5 w-3.5" /> Tambah Provider
-        </Button>
+        <div className="flex items-center gap-2">
+          {providers.some(p => p.healthStatus === "cooldown") && (
+            <Button variant="outline" onClick={handleResetAllCooldowns} className="gap-1.5 border-amber-500/40 text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/30">
+              <Zap className="h-3.5 w-3.5 text-amber-500" /> Reset Semua Cooldown ({providers.filter(p => p.healthStatus === "cooldown").length})
+            </Button>
+          )}
+          <Button onClick={() => { setEditing(null); setModalOpen(true); }} className="gap-1.5">
+            <Plus className="h-3.5 w-3.5" /> Tambah Provider
+          </Button>
+        </div>
       </div>
 
       {providers.length === 0 ? (
@@ -337,7 +378,11 @@ function ProvidersTab() {
                 <tr key={p.id} className="border-t hover:bg-muted/30">
                   <td className="px-4 py-2.5 text-muted-foreground">{p.rotationOrder}</td>
                   <td className="px-4 py-2.5 font-medium">{p.label}</td>
-                  <td className="px-4 py-2.5 text-muted-foreground capitalize">{p.providerType.replace("_", " ")}</td>
+                  <td className="px-4 py-2.5 text-muted-foreground font-medium">
+                    {p.providerType === "google_vision" || (p.providerType as string) === "google_ai_studio"
+                      ? "Google AI Studio"
+                      : p.providerType.replace("_", " ")}
+                  </td>
                   <td className="px-4 py-2.5">{healthBadge(p.healthStatus)}</td>
                   <td className="px-4 py-2.5 text-right font-mono text-xs">
                     {p.dailyUsage}{p.dailyLimit ? ` / ${p.dailyLimit}` : ""}
@@ -350,17 +395,22 @@ function ProvidersTab() {
                   <td className="px-4 py-2.5 text-right font-mono text-xs">{formatMs(p.averageLatencyMs)}</td>
                   <td className="px-4 py-2.5">
                     <div className="flex items-center justify-center gap-1">
-                      <button onClick={() => handleTest(p.id)} disabled={testingId === p.id} className="p-1 hover:bg-muted rounded" title="Test Connection">
+                      <button onClick={() => handleTest(p.id)} disabled={testingId === p.id} className="p-1 hover:bg-muted rounded text-slate-400 hover:text-white" title="Test Connection">
                         {testingId === p.id ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <Activity className="h-3.5 w-3.5" />}
                       </button>
-                      <button onClick={() => { setEditing(p); setModalOpen(true); }} className="p-1 hover:bg-muted rounded" title="Edit">
+                      {p.healthStatus !== "active" && (
+                        <button onClick={() => handleReactivate(p.id, p.label)} className="p-1 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 rounded border border-emerald-500/30" title="Aktifkan Kembali Status (Reset Health Status ke Active)">
+                          <Zap className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+                      <button onClick={() => { setEditing(p); setModalOpen(true); }} className="p-1 hover:bg-muted rounded text-slate-400 hover:text-white" title="Edit">
                         <Edit3 className="h-3.5 w-3.5" />
                       </button>
                       <button onClick={() => handleToggle(p.id)} className="p-1 hover:bg-muted rounded" title={p.isActive ? "Nonaktifkan" : "Aktifkan"}>
-                        {p.isActive ? <PowerOff className="h-3.5 w-3.5 text-warning" /> : <Power className="h-3.5 w-3.5 text-success" />}
+                        {p.isActive ? <PowerOff className="h-3.5 w-3.5 text-amber-400" /> : <Power className="h-3.5 w-3.5 text-emerald-400" />}
                       </button>
-                      <button onClick={() => handleDelete(p.id)} className="p-1 hover:bg-muted rounded" title="Hapus">
-                        <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                      <button onClick={() => handleDelete(p.id)} className="p-1 hover:bg-muted rounded text-red-400 hover:text-red-300" title="Hapus">
+                        <Trash2 className="h-3.5 w-3.5" />
                       </button>
                     </div>
                   </td>
@@ -635,36 +685,34 @@ function CacheTab() {
 // MAIN PAGE
 // ============================================================
 
-export default function OcrSettingsPage() {
+export function OcrSettingsTab() {
   return (
-    <PermissionGuard module="ocr-settings">
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">OCR Settings</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Kelola provider OCR, monitoring, dan cache. Perubahan langsung berlaku tanpa deploy ulang.
-          </p>
-        </div>
-
-        <Tabs
-          tabs={[
-            { value: "providers", label: "Providers" },
-            { value: "statistics", label: "Statistics" },
-            { value: "logs", label: "Usage Log" },
-            { value: "cache", label: "Cache" },
-          ]}
-        >
-          {(activeTab) => {
-            switch (activeTab) {
-              case "providers": return <ProvidersTab />;
-              case "statistics": return <StatisticsTab />;
-              case "logs": return <UsageLogTab />;
-              case "cache": return <CacheTab />;
-              default: return null;
-            }
-          }}
-        </Tabs>
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-lg font-semibold">Integrasi API OCR</h2>
+        <p className="text-sm text-muted-foreground mt-1">
+          Kelola provider OCR, monitoring, dan cache. Perubahan langsung berlaku tanpa deploy ulang.
+        </p>
       </div>
-    </PermissionGuard>
+
+      <Tabs
+        tabs={[
+          { value: "providers", label: "Providers" },
+          { value: "statistics", label: "Statistics" },
+          { value: "logs", label: "Usage Log" },
+          { value: "cache", label: "Cache" },
+        ]}
+      >
+        {(activeTab) => {
+          switch (activeTab) {
+            case "providers": return <ProvidersTab />;
+            case "statistics": return <StatisticsTab />;
+            case "logs": return <UsageLogTab />;
+            case "cache": return <CacheTab />;
+            default: return null;
+          }
+        }}
+      </Tabs>
+    </div>
   );
 }

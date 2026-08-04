@@ -160,7 +160,7 @@ export default function ManifestDetailPage() {
             </div>
             <div>
               <span className="text-muted-foreground">Paket:</span>
-              <p className="font-medium">{keberangkatan?.paketUmroh?.namaPaket ?? "-"}</p>
+              <p className="font-medium">{keberangkatan?.namaPaket || keberangkatan?.paketUmroh?.namaPaket || "-"}</p>
             </div>
             <div>
               <span className="text-muted-foreground">Tanggal Berangkat:</span>

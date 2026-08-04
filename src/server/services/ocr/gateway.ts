@@ -89,27 +89,28 @@ export async function process(
   );
 
   if (eligible.length === 0) {
-    // Check if any are in cooldown
-    const cooldownProviders = providers.filter(
-      (p) => p.isActive && isInCooldown(p),
-    );
-    if (cooldownProviders.length > 0) {
-      const soonest = cooldownProviders.sort(
-        (a, b) => new Date(a.cooldownUntil!).getTime() - new Date(b.cooldownUntil!).getTime(),
-      )[0]!;
-      return {
-        success: false,
-        fields: [],
-        rawText: `All providers in cooldown. Next available: ${soonest.label} at ${soonest.cooldownUntil}`,
-        overallConfidence: 0,
-        processingTimeMs: Date.now() - startTime,
-        retryCount,
-      };
+    // Fallback: If all active providers are in cooldown, pick the one with oldest cooldown (least recently used)
+    const activeWithKey = providers.filter((p) => p.isActive && p.apiKey?.trim());
+    if (activeWithKey.length > 0) {
+      activeWithKey.sort((a, b) => {
+        const tA = a.cooldownUntil ? new Date(a.cooldownUntil).getTime() : 0;
+        const tB = b.cooldownUntil ? new Date(b.cooldownUntil).getTime() : 0;
+        return tA - tB;
+      });
+      eligible = activeWithKey;
     }
+  }
+
+  if (eligible.length === 0) {
+    // Ultimate Fallback: Try any provider with an API key regardless of active flag
+    eligible = providers.filter((p) => p.apiKey?.trim());
+  }
+
+  if (eligible.length === 0) {
     return {
       success: false,
       fields: [],
-      rawText: "No eligible OCR providers. Periksa status provider di Admin Panel.",
+      rawText: "Semua provider OCR belum memiliki Kunci API. Harap periksa menu Pengaturan -> Integrasi OCR.",
       overallConfidence: 0,
       processingTimeMs: Date.now() - startTime,
       retryCount,
@@ -117,7 +118,10 @@ export async function process(
   }
 
   // ── 5. Rotation: select current provider ────────────
-  const selection = selectProvider(eligible);
+  let selection = selectProvider(eligible);
+  if (!selection && eligible.length > 0) {
+    selection = { provider: eligible[0]!, isNewSlot: true };
+  }
   if (!selection) {
     return {
       success: false,
@@ -231,8 +235,20 @@ async function attemptWithProvider(
         });
       }
 
+      // Put provider in 45s post-success cooldown so NEXT extraction automatically rotates to next API key!
+      await ocrProviderRepo.updateHealth(currentProvider.id, {
+        healthStatus: "cooldown",
+        cooldownUntil: new Date(Date.now() + 45_000),
+      });
+
+      console.log(
+        `[OCR Gateway] SUCCESS | provider=${currentProvider.label} (id=${currentProvider.id}) | key=***${currentProvider.apiKey.slice(-6)} | Cooldown 45s set for rotation`
+      );
+
       result.processingTimeMs = Date.now() - startTime;
       result.retryCount = retryCount;
+      result.providerId = currentProvider.id;
+      result.apiKeyUsed = currentProvider.apiKey;
       return result;
 
     } catch (err: any) {

@@ -26,21 +26,24 @@ export interface RotationSelection {
 export function selectProvider(
   providers: OcrProviderRecord[],
 ): RotationSelection | null {
+  if (providers.length === 0) return null;
+
   const eligible = providers.filter(
     (p) => p.isActive && p.healthStatus === "active",
   );
 
-  if (eligible.length === 0) return null;
+  // If strict filtering produces no active providers, fallback to all passed providers
+  const candidates = eligible.length > 0 ? eligible : providers;
 
   // Find the first provider that hasn't reached its rotation count
-  const current = eligible.find((p) => p.requestCounter < p.rotationCount);
+  const current = candidates.find((p) => p.requestCounter < p.rotationCount);
 
   if (current) {
     return { provider: current, isNewSlot: current.requestCounter === 0 };
   }
 
   // All providers exhausted their rotation slots → reset and start over
-  return { provider: eligible[0]!, isNewSlot: true };
+  return { provider: candidates[0]!, isNewSlot: true };
 }
 
 /**

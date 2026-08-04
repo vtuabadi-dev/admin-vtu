@@ -94,6 +94,12 @@ export async function PATCH(
       return NextResponse.json({ success: true, data: updated });
     }
 
+    if (action === "reactivate" || action === "reset-health") {
+      const updated = await ocrProviderRepo.reactivate(params.id);
+      invalidateCache();
+      return NextResponse.json({ success: true, data: updated });
+    }
+
     return NextResponse.json({ success: false, message: `Unknown action: ${action}` }, { status: 400 });
   } catch (error) {
     return NextResponse.json({ success: false, message: (error as Error).message }, { status: 500 });

@@ -72,22 +72,22 @@ export function Shell({ children, role }: ShellProps) {
         )}
       >
         {/* Top navbar */}
-        <div className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-6">
+        <div className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b border-[#D4AF37]/30 bg-[#062118] text-white backdrop-blur supports-[backdrop-filter]:bg-[#062118]/95 px-6 shadow-md">
           <div className="flex-1" />
           <div className="flex items-center gap-3">
             <button
               type="button"
               onClick={() => setSearchOpen(true)}
-              className="flex h-9 w-9 items-center justify-center rounded-lg transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="flex h-9 w-9 items-center justify-center rounded-lg transition-colors hover:bg-[#0E4334] text-emerald-100 hover:text-[#F5D061] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]"
               aria-label="Cari"
               title="Cari (Ctrl+F atau /)"
             >
-              <Search className="h-5 w-5 text-foreground" />
+              <Search className="h-4 w-4" />
             </button>
 
             <NotificationBell />
 
-            <span className="text-xs text-muted-foreground">
+            <span className="text-xs text-emerald-200/90 font-medium">
               {new Date().toLocaleDateString("id-ID", {
                 weekday: "long",
                 year: "numeric",
@@ -97,10 +97,10 @@ export function Shell({ children, role }: ShellProps) {
             </span>
 
             {/* User info + logout */}
-            <div className="flex items-center gap-2 pl-2 border-l border-border">
+            <div className="flex items-center gap-2 pl-3 border-l border-[#D4AF37]/30">
               <div className="hidden sm:block text-right">
-                <p className="text-xs font-medium text-foreground leading-tight">{user?.name ?? "User"}</p>
-                <p className="text-[10px] text-muted-foreground leading-tight">{ROLE_LABELS[role] ?? role}</p>
+                <p className="text-xs font-bold text-white leading-tight">{user?.name ?? "User"}</p>
+                <p className="text-[10px] text-[#F5D061] font-semibold leading-tight">{ROLE_LABELS[role] ?? role}</p>
               </div>
               <button
                 type="button"
@@ -108,7 +108,7 @@ export function Shell({ children, role }: ShellProps) {
                   logout();
                   signOut({ callbackUrl: "/login" });
                 }}
-                className="flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold text-rose-300 hover:bg-rose-950/40 hover:text-rose-200 rounded-lg transition-colors border border-rose-500/30"
                 title="Keluar"
               >
                 <LogOut className="w-3.5 h-3.5" />
@@ -119,7 +119,7 @@ export function Shell({ children, role }: ShellProps) {
         </div>
 
         {/* Page content */}
-        <div className="p-6">{children}</div>
+        <div className="p-6 bg-arabic-pattern min-h-[calc(100vh-3.5rem)]">{children}</div>
       </main>
 
       {/* Overlays */}

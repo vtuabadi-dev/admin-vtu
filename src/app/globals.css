@@ -4,54 +4,54 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222 47% 11%;
+    --background: 43 30% 97%;
+    --foreground: 162 68% 10%;
     --card: 0 0% 100%;
-    --card-foreground: 222 47% 11%;
+    --card-foreground: 162 68% 10%;
     --popover: 0 0% 100%;
-    --popover-foreground: 222 47% 11%;
-    --primary: 212 96% 48%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 210 40% 96%;
-    --secondary-foreground: 222 47% 11%;
-    --muted: 210 40% 96%;
-    --muted-foreground: 215 16% 47%;
-    --accent: 210 40% 96%;
-    --accent-foreground: 222 47% 11%;
+    --popover-foreground: 162 68% 10%;
+    --primary: 162 68% 12%;
+    --primary-foreground: 46 80% 95%;
+    --secondary: 43 30% 94%;
+    --secondary-foreground: 162 68% 10%;
+    --muted: 160 20% 94%;
+    --muted-foreground: 162 30% 38%;
+    --accent: 43 40% 92%;
+    --accent-foreground: 162 68% 10%;
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
-    --border: 214 32% 91%;
-    --input: 214 32% 91%;
-    --ring: 212 96% 48%;
-    --radius: 0.5rem;
-    --success: 142 76% 36%;
+    --border: 43 30% 86%;
+    --input: 43 30% 86%;
+    --ring: 43 70% 50%;
+    --radius: 0.75rem;
+    --success: 142 76% 28%;
     --success-foreground: 0 0% 100%;
-    --warning: 38 92% 50%;
+    --warning: 38 92% 45%;
     --warning-foreground: 0 0% 100%;
     --info: 212 96% 48%;
     --info-foreground: 0 0% 100%;
   }
 
   .dark {
-    --background: 222 47% 6%;
-    --foreground: 210 40% 98%;
-    --card: 222 47% 9%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222 47% 9%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 212 96% 48%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 217 33% 17%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217 33% 17%;
-    --muted-foreground: 215 20% 65%;
-    --accent: 217 33% 17%;
-    --accent-foreground: 210 40% 98%;
+    --background: 162 70% 4%;
+    --foreground: 43 50% 95%;
+    --card: 162 65% 7%;
+    --card-foreground: 43 50% 95%;
+    --popover: 162 65% 7%;
+    --popover-foreground: 43 50% 95%;
+    --primary: 43 70% 50%;
+    --primary-foreground: 162 70% 4%;
+    --secondary: 162 50% 12%;
+    --secondary-foreground: 43 50% 95%;
+    --muted: 162 50% 12%;
+    --muted-foreground: 162 25% 65%;
+    --accent: 162 50% 14%;
+    --accent-foreground: 43 50% 95%;
     --destructive: 0 63% 31%;
     --destructive-foreground: 0 0% 100%;
-    --border: 217 33% 20%;
-    --input: 217 33% 20%;
-    --ring: 212 96% 48%;
+    --border: 162 40% 16%;
+    --input: 162 40% 16%;
+    --ring: 43 70% 50%;
     --success: 142 60% 30%;
     --success-foreground: 0 0% 100%;
     --warning: 38 85% 40%;
@@ -87,5 +87,36 @@
   .dense-table td,
   .dense-table th {
     @apply px-3 py-2;
+  }
+
+  /* ── POSTER THEME UTILITIES (Emerald & Luxury Gold) ── */
+  .text-gold-gradient {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-[#F5D061] via-[#D4AF37] to-[#B8860B];
+  }
+  .bg-gold-gradient {
+    @apply bg-gradient-to-r from-[#F5D061] via-[#D4AF37] to-[#B8860B] text-slate-950 font-bold shadow-md shadow-amber-900/20 hover:brightness-110 transition-all;
+  }
+  .border-gold-accent {
+    border-color: rgba(212, 175, 55, 0.4);
+  }
+  .border-gold-accent-glow {
+    border-color: rgba(245, 208, 97, 0.6);
+    box-shadow: 0 0 15px rgba(212, 175, 55, 0.15);
+  }
+  .poster-emerald-bg {
+    background: linear-gradient(135deg, #051A13 0%, #062118 40%, #0A2E23 70%, #0F3D2E 100%);
+  }
+  .poster-card {
+    background-color: #FAF6EE;
+    border: 1.5px solid rgba(212, 175, 55, 0.5);
+    border-radius: 1rem;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  }
+
+  /* ── ARABIC GEOMETRIC MOTIF BACKGROUND (Bone White + Gold Lattice) ── */
+  .bg-arabic-pattern {
+    background-color: #FAF6EE;
+    background-image: url("data:image/svg+xml,%3Csvg width='80' height='80' viewBox='0 0 80 80' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' stroke='%23D4AF37' stroke-width='0.8' stroke-opacity='0.09'%3E%3Cpath d='M40 0 L80 40 L40 80 L0 40 Z'/%3E%3Cpath d='M40 10 L70 40 L40 70 L10 40 Z'/%3E%3Crect x='20' y='20' width='40' height='40' transform='rotate(45 40 40)'/%3E%3Ccircle cx='40' cy='40' r='14'/%3E%3Cpath d='M0 0 L80 80 M80 0 L0 80' stroke-opacity='0.04'/%3E%3C/g%3E%3C/svg%3E");
+    background-size: 80px 80px;
   }
 }

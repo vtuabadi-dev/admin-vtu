@@ -151,6 +151,22 @@ export async function createPackageFolderHierarchy(
   };
 }
 
+export async function createHotelVideoFolderHierarchy(
+  cityName: string,
+  hotelName: string
+): Promise<string> {
+  if (!isGoogleDriveConfigured()) {
+    return process.env.GOOGLE_DRIVE_FOLDER_ID || "local-mock";
+  }
+
+  const videoHotelFolderId = await getOrCreateFolder("VIDEO HOTEL");
+  const normalizedCity = cityName.toUpperCase().includes("MADINAH") ? "MADINAH" : "MAKKAH";
+  const cityFolderId = await getOrCreateFolder(normalizedCity, videoHotelFolderId);
+  const hotelFolderId = await getOrCreateFolder(hotelName.trim(), cityFolderId);
+
+  return hotelFolderId;
+}
+
 export function createGoogleDriveAdapter(): StorageAdapter {
   const folderId = process.env.GOOGLE_DRIVE_FOLDER_ID!;
 

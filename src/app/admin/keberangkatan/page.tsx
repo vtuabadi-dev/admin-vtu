@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
-import { Plane, CalendarDays, Hotel, MapPin, Plus, Search, Trash2, Info, Copy, Check } from "lucide-react";
+import { Calendar, CalendarDays, Hotel, Search, Trash2, Info, Copy, Check, Pencil, FileText, UserCheck, UserPlus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import {
   Card,
@@ -28,12 +28,12 @@ export default function KeberangkatanListPage() {
   const [keberangkatan, setKeberangkatan] = useState<Keberangkatan[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
-  const [selectedMonth, setSelectedMonth] = useState<number | null>(
-    new Date().getMonth() + 1
-  );
+  const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [openInfoId, setOpenInfoId] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+
+
 
   const handleCopyId = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -102,7 +102,7 @@ export default function KeberangkatanListPage() {
       const q = searchQuery.toLowerCase().trim();
       result = result.filter(
         (k) =>
-          (k.paketUmroh?.namaPaket || "").toLowerCase().includes(q) ||
+          (k.namaPaket || k.paketUmroh?.namaPaket || "").toLowerCase().includes(q) ||
           k.kode.toLowerCase().includes(q) ||
           (k.maskapaiId && k.maskapaiId.toLowerCase().includes(q)) ||
           (k.hotelMekkahId && k.hotelMekkahId.toLowerCase().includes(q)) ||
@@ -138,10 +138,6 @@ export default function KeberangkatanListPage() {
             Kelola jadwal dan paket keberangkatan umroh
           </p>
         </div>
-        <Button onClick={() => router.push("/admin/keberangkatan/tambah")}>
-          <Plus className="mr-2 h-4 w-4" />
-          Tambah Keberangkatan
-        </Button>
       </div>
 
       {/* Search */}
@@ -242,7 +238,7 @@ export default function KeberangkatanListPage() {
               <CardHeader className="pb-3">
                 <div className="flex items-start justify-between">
                   <div>
-                    <CardTitle className="text-base">{k.paketUmroh?.namaPaket || "-"}</CardTitle>
+                    <CardTitle className="text-base">{k.namaPaket || k.paketUmroh?.namaPaket || "-"}</CardTitle>
                     <p className="text-xs text-muted-foreground mt-0.5 font-mono">
                       {k.kode}
                     </p>
@@ -345,33 +341,79 @@ export default function KeberangkatanListPage() {
                   </div>
                 </div>
 
-                {/* Maskapai */}
-                <div className="flex items-center gap-2 text-sm">
-                  <Plane className="h-4 w-4 text-muted-foreground shrink-0" />
-                  <div>
-                    <p className="text-xs text-muted-foreground">Maskapai</p>
-                    <p className="font-medium">
-                      {k.maskapaiId || "-"}{" "}
-                      <span className="text-muted-foreground font-normal">
-                        ({k.nomorPenerbangan})
-                      </span>
-                    </p>
-                  </div>
-                </div>
+                {/* Petugas Lapangan (Tour Leader & Muthowif) */}
+                {(() => {
+                  const meta = (k as any).driveFolderIds || {};
+                  const tl = meta.tourLeader?.nama || (k as any).tourLeader?.nama;
+                  const muth = meta.muthowif?.nama || (k as any).muthowif?.nama;
+                  return (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs bg-muted/20 border p-2.5 rounded-md">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <UserCheck className="h-3.5 w-3.5 text-primary shrink-0" />
+                        <span className="text-muted-foreground font-medium shrink-0">TL:</span>
+                        <span className={cn("font-semibold truncate", tl ? "text-foreground" : "text-muted-foreground/70 italic")}>
+                          {tl || "Belum ada"}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <UserPlus className="h-3.5 w-3.5 text-primary shrink-0" />
+                        <span className="text-muted-foreground font-medium shrink-0">Muthowif:</span>
+                        <span className={cn("font-semibold truncate", muth ? "text-foreground" : "text-muted-foreground/70 italic")}>
+                          {muth || "Belum ada"}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })()}
 
                 {/* Hotel */}
                 <div className="flex items-start gap-2 text-sm">
                   <Hotel className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs text-muted-foreground mb-1">
-                      Hotel
+                    <p className="text-xs text-muted-foreground mb-1 font-semibold">
+                      Komposisi Hotel (Mekkah & Madinah)
                     </p>
-                    <div className="flex flex-wrap gap-1">
-                        <span
-                          className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium"
-                        >
-                          {k.hotelMekkahId || "-"} &mdash; {k.hotelMadinahId || "-"}
-                        </span>
+                    <div className="flex flex-col gap-1.5">
+                      {(() => {
+                        let optionsList = k.hotelOptions;
+                        if (typeof optionsList === "string") {
+                          try { optionsList = JSON.parse(optionsList); } catch { optionsList = []; }
+                        }
+                        if (Array.isArray(optionsList) && optionsList.length > 0) {
+                          // Clean out garbage empty TBA cluster items if valid clusters exist
+                          const validOptions = optionsList.filter((opt: any) => {
+                            const hasMek = opt.hotelMekkah && opt.hotelMekkah !== "TBA";
+                            const hasMed = opt.hotelMadinah && opt.hotelMadinah !== "TBA";
+                            const hasPrice = Number(opt.hargaBase || 0) > 0;
+                            return hasMek || hasMed || hasPrice;
+                          });
+                          const listToRender = validOptions.length > 0 ? validOptions : optionsList;
+
+                          return listToRender.map((opt: any, idx: number) => (
+                            <div key={idx} className="flex flex-wrap items-center gap-1.5 text-xs bg-card border p-1.5 rounded-md shadow-xs">
+                              {opt.clusterName && opt.clusterName !== "Reguler" && (
+                                <span className="font-bold text-primary text-[10px] bg-primary/10 border border-primary/20 px-1.5 py-0.5 rounded uppercase">
+                                  {opt.clusterName}
+                                </span>
+                              )}
+                              <span className="font-semibold text-foreground">
+                                {opt.hotelMekkah || k.hotelMekkah || "TBA"} <span className="text-muted-foreground font-normal text-[11px]">(Mekkah)</span>
+                              </span>
+                              <span className="text-muted-foreground font-semibold">&mdash;</span>
+                              <span className="font-semibold text-foreground">
+                                {opt.hotelMadinah || k.hotelMadinah || "TBA"} <span className="text-muted-foreground font-normal text-[11px]">(Madinah)</span>
+                              </span>
+                            </div>
+                          ));
+                        }
+                        return (
+                          <div className="flex flex-wrap gap-1">
+                            <span className="inline-flex items-center rounded-md bg-muted/40 border px-2 py-1 text-xs font-medium">
+                              {k.hotelMekkah || "TBA"} &mdash; {k.hotelMadinah || "TBA"}
+                            </span>
+                          </div>
+                        );
+                      })()}
                     </div>
                   </div>
                 </div>
@@ -406,22 +448,32 @@ export default function KeberangkatanListPage() {
                     className="flex-1"
                     onClick={() => router.push(`/admin/keberangkatan/${k.id}`)}
                   >
-                    <MapPin className="mr-1.5 h-3.5 w-3.5" />
-                    Detail
+                    <Calendar className="mr-1.5 h-3.5 w-3.5 text-primary" />
+                    Itinerary
                   </Button>
                   <Button
                     variant="outline"
                     size="sm"
                     className="flex-1"
-                    onClick={() => router.push(`/admin/manifest`)}
+                    onClick={() => router.push(`/admin/manifest?paketId=${k.id}`)}
                   >
-                    <Plane className="mr-1.5 h-3.5 w-3.5" />
+                    <FileText className="mr-1.5 h-3.5 w-3.5" />
                     Manifest
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="shrink-0"
+                    title="Lengkapi & Edit Data Operasional Paket"
+                    onClick={() => router.push(`/admin/keberangkatan/${k.id}/edit`)}
+                  >
+                    <Pencil className="mr-1 h-3.5 w-3.5 text-muted-foreground" />
+                    Edit
                   </Button>
                   <Button
                     variant="destructive"
                     size="sm"
-                    className="shrink-0 px-2"
+                    className="shrink-0 px-2.5"
                     title="Hapus Paket"
                     onClick={() => handleDelete(k.id)}
                   >

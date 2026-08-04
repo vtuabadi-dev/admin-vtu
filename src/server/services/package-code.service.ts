@@ -76,6 +76,7 @@ export interface GeneratePackageNameParams {
   routeCode?: string;
   tanggalBerangkat: Date;
   maskapaiCode: string;
+  maskapaiName?: string;
 }
 
 export function generateNamaPaket(params: GeneratePackageNameParams): string {
@@ -102,9 +103,9 @@ export function generateNamaPaket(params: GeneratePackageNameParams): string {
   const year = params.tanggalBerangkat.getFullYear();
   const tglFormatted = `${day} ${month} ${year}`;
 
-  const mCode = (params.maskapaiCode || "SV").toUpperCase();
+  const maskapaiLabel = (params.maskapaiName || params.maskapaiCode || "SV").toUpperCase();
 
-  return `${prefix} ${durasi} ${sCode} ( ${rCode} ) - ${tglFormatted} (${mCode})`;
+  return `${prefix} ${durasi} ${sCode} ( ${rCode} ) - ${tglFormatted} (${maskapaiLabel})`;
 }
 
 export interface GenerateFolderNameParams {

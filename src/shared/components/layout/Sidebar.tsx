@@ -21,6 +21,7 @@ import {
   Activity,
   Wrench,
   ScrollText,
+  HeartHandshake,
   type LucideIcon,
 } from "lucide-react";
 import { useState, useEffect } from "react";
@@ -65,6 +66,10 @@ const adminNav: NavSection[] = [
             label: "Konfigurasi Paket Umroh",
             href: "/admin/master-data/konfigurasi-paket-umroh",
           },
+          {
+            label: "Master Badal & Wakaf",
+            href: "/admin/master/badal-wakaf",
+          },
         ],
       },
     ],
@@ -77,7 +82,22 @@ const adminNav: NavSection[] = [
         icon: Plane,
         children: [
           { label: "Generate Paket", href: "/admin/paket-umroh/generate" },
+          { label: "Info Hotel", href: "/admin/paket-umroh/info-hotel" },
           { label: "Paket Aktif", href: "/admin/keberangkatan" },
+        ],
+      },
+    ],
+  },
+  {
+    title: "BADAL & WAKAF",
+    items: [
+      {
+        label: "Badal Umroh & Wakaf",
+        icon: HeartHandshake,
+        children: [
+          { label: "Manajemen Badal Umroh", href: "/admin/badal-umroh" },
+          { label: "Manajemen Wakaf Qur'an", href: "/admin/wakaf-quran" },
+          { label: "Laporan Kolektif Per Paket", href: "/admin/laporan-paket" },
         ],
       },
     ],
@@ -107,7 +127,7 @@ const adminNav: NavSection[] = [
         children: [
           { label: "Monitoring Pembayaran", href: "/admin/pembayaran" },
           { label: "Jadwal Reminder", href: "/admin/pembayaran/reminder" },
-          { label: "Laporan Pembayaran", href: "/admin/pembayaran/laporan" },
+          { label: "Manajemen Invoice", href: "/admin/pembayaran/laporan" },
           { label: "Histori Pembayaran", href: "/admin/pembayaran/histori" },
           { label: "Peninjauan Pembayaran", href: "/admin/pembayaran/review" },
         ],
@@ -229,38 +249,37 @@ export function Sidebar({ role }: SidebarProps) {
   return (
     <aside
       className={cn(
-        "fixed left-0 top-0 z-40 h-screen border-r bg-card transition-all duration-200 flex flex-col",
+        "fixed left-0 top-0 z-40 h-screen border-r border-[#D4AF37]/30 bg-gradient-to-b from-[#041710] via-[#062118] to-[#0A2E23] text-white transition-all duration-200 flex flex-col shadow-2xl",
         collapsed ? "w-16" : "w-60"
       )}
     >
       {/* Logo */}
-      <div className="flex h-14 items-center border-b px-4">
+      <div className="flex h-14 items-center border-b border-[#D4AF37]/30 px-4">
         {!collapsed && (
-          <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary">
-              <Plane className="h-4 w-4 text-primary-foreground" />
+          <div className="flex items-center gap-2.5">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-tr from-[#F5D061] via-[#D4AF37] to-[#B8860B] text-slate-950 shadow-md">
+              <Plane className="h-4 w-4 text-slate-950" />
             </div>
-            <div className="text-sm font-semibold leading-tight">
-              <div>VTU</div>
-              <div className="text-[10px] text-muted-foreground font-normal">
-                Operational System
+            <div className="text-sm font-black leading-tight tracking-wide">
+              <div className="text-white">VTU <span className="text-[#F5D061] text-[10px] font-extrabold uppercase">Operasional</span></div>
+              <div className="text-[10px] text-emerald-200/70 font-medium">
+                Travel System
               </div>
             </div>
           </div>
         )}
         {collapsed && (
-          <div className="mx-auto flex h-8 w-8 items-center justify-center rounded-md bg-primary">
-            <Plane className="h-4 w-4 text-primary-foreground" />
+          <div className="mx-auto flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-tr from-[#F5D061] via-[#D4AF37] to-[#B8860B] text-slate-950 shadow-md">
+            <Plane className="h-4 w-4 text-slate-950" />
           </div>
         )}
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto py-3 px-2 space-y-5">
+      <nav className="flex-1 overflow-y-auto py-3 px-2 space-y-4">
         {sections.map((section) => (
           <div key={section.title}>
-            {/* Section title removed for a cleaner look */}
-            <ul className="space-y-0.5">
+            <ul className="space-y-1">
               {section.items.map((item) => {
                 const hasChildren = item.children !== undefined;
                 const active = isParentActive(item);
@@ -268,25 +287,27 @@ export function Sidebar({ role }: SidebarProps) {
 
                 if (hasChildren) {
                   return (
-                    <li key={item.label}>
+                    <li key={item.label} className="my-1">
                       <button
                         onClick={() => toggleGroup(item.label)}
                         className={cn(
-                          "w-full flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors text-left",
+                          "w-full flex items-center gap-2.5 rounded-2xl px-3 py-2.5 text-xs font-bold transition-all text-left border shadow-xs",
                           active && !collapsed
-                            ? "bg-primary/10 text-primary"
-                            : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                            ? "bg-[#0E4334] text-[#F5D061] border-[#D4AF37]/60 shadow-md"
+                            : "bg-[#062118]/60 text-emerald-100/90 hover:bg-[#0E4334]/80 hover:text-white border-[#D4AF37]/20",
                           collapsed && "justify-center px-2"
                         )}
                         title={collapsed ? item.label : undefined}
                       >
-                        <item.icon className="h-4 w-4 shrink-0" />
+                        <div className="flex h-7 w-7 items-center justify-center rounded-xl bg-[#D4AF37]/20 border border-[#D4AF37]/40 text-[#F5D061] shrink-0">
+                          <item.icon className="h-4 w-4" />
+                        </div>
                         {!collapsed && (
                           <>
-                            <span className="flex-1">{item.label}</span>
+                            <span className="flex-1 font-bold text-white tracking-wide">{item.label}</span>
                             <ChevronDown
                               className={cn(
-                                "h-3.5 w-3.5 shrink-0 transition-transform",
+                                "h-4 w-4 shrink-0 text-[#F5D061] transition-transform duration-200",
                                 isExpanded && "rotate-180"
                               )}
                             />
@@ -294,24 +315,31 @@ export function Sidebar({ role }: SidebarProps) {
                         )}
                       </button>
 
+                      {/* ── Sub-menu Box Container (Sage Green Box with Gold Border & Vertical Bar matching Image 7) ── */}
                       {!collapsed && isExpanded && (
-                        <ul className="mt-0.5 ml-4 space-y-0.5 border-l border-border pl-3">
-                          {item.children!.map((child) => (
-                            <li key={child.href}>
-                              <Link
-                                href={child.href}
-                                className={cn(
-                                  "block rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
-                                  isChildActive(child.href)
-                                    ? "bg-primary/10 text-primary"
-                                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                                )}
-                              >
-                                {child.label}
-                              </Link>
-                            </li>
-                          ))}
-                        </ul>
+                        <div className="mt-2.5 mb-1.5 relative rounded-2xl p-2 bg-[#0E4334] border-2 border-[#D4AF37]/50 shadow-2xl overflow-hidden">
+                          {/* Left Vertical Gold Indicator Bar */}
+                          <div className="absolute left-2.5 top-2.5 bottom-2.5 w-1 bg-gradient-to-b from-[#F5D061] via-[#D4AF37] to-[#B8860B] rounded-full" />
+                          
+                          <ul className="pl-3 space-y-1">
+                            {item.children!.map((child) => (
+                              <li key={child.href}>
+                                <Link
+                                  href={child.href}
+                                  className={cn(
+                                    "flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-bold transition-all",
+                                    isChildActive(child.href)
+                                      ? "bg-gradient-to-r from-[#F5D061] via-[#D4AF37] to-[#B8860B] text-slate-950 font-black shadow-md"
+                                      : "text-emerald-100 hover:bg-[#165340] hover:text-[#F5D061]"
+                                  )}
+                                >
+                                  <div className="h-1.5 w-1.5 rounded-full bg-[#F5D061] shrink-0" />
+                                  <span className="truncate">{child.label}</span>
+                                </Link>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
                       )}
                     </li>
                   );
@@ -322,10 +350,10 @@ export function Sidebar({ role }: SidebarProps) {
                     <Link
                       href={item.href!}
                       className={cn(
-                        "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                        "flex items-center gap-3 rounded-lg px-3 py-2 text-xs font-semibold transition-all",
                         active
-                          ? "bg-primary/10 text-primary"
-                          : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                          ? "bg-[#D4AF37]/20 text-[#F5D061] border-l-2 border-[#F5D061] font-bold shadow-xs"
+                          : "text-emerald-100/75 hover:bg-[#0E4334]/70 hover:text-white",
                         collapsed && "justify-center px-2"
                       )}
                       title={collapsed ? item.label : undefined}
@@ -342,24 +370,24 @@ export function Sidebar({ role }: SidebarProps) {
       </nav>
 
       {/* Footer */}
-      <div className="border-t p-2">
+      <div className="border-t border-[#D4AF37]/30 p-2.5 bg-[#041710]/50">
         {!collapsed && (
-          <div className="flex items-center gap-3 px-3 py-2">
+          <div className="flex items-center gap-2.5 px-2 py-1.5 mb-1">
             <div className={cn(
-              "flex h-8 w-8 items-center justify-center rounded-full text-xs font-medium",
-              superAdmin ? "bg-amber-100 text-amber-700" : "bg-muted"
+              "flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold shrink-0 border border-[#D4AF37]/40",
+              superAdmin ? "bg-[#D4AF37]/25 text-[#F5D061]" : "bg-emerald-900 text-emerald-100"
             )}>
               {avatarLetter}
             </div>
-            <div className="text-sm min-w-0">
-              <div className="font-medium truncate">{displayName}</div>
-              <div className="text-xs text-muted-foreground truncate">{displayEmail}</div>
+            <div className="text-xs min-w-0">
+              <div className="font-bold text-white truncate leading-tight">{displayName}</div>
+              <div className="text-[10px] text-emerald-200/70 truncate leading-tight">{displayEmail}</div>
             </div>
           </div>
         )}
         <button
           onClick={toggleSidebar}
-          className="flex w-full items-center justify-center rounded-md py-1.5 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+          className="flex w-full items-center justify-center rounded-lg py-1.5 text-emerald-200/80 hover:bg-[#0E4334] hover:text-white transition-colors"
         >
           {collapsed ? (
             <ChevronRight className="h-4 w-4" />

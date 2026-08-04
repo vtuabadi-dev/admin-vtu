@@ -29,3 +29,70 @@ export function formatDateShort(date: string | Date): string {
     day: "numeric",
   }).format(new Date(date));
 }
+
+export function formatNumberWithDots(val: string | number): string {
+  if (val === undefined || val === null || val === "") return "";
+  const clean = String(val).replace(/\D/g, "");
+  if (!clean) return "";
+  return clean.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+}
+
+export function formatDateDdMmmmTttt(dateStr: string): string {
+  if (!dateStr || !dateStr.includes("-")) return "";
+  const parts = dateStr.split("-");
+  if (parts.length < 3) return "";
+  const year = parts[0] ?? "";
+  const rawMonth = parts[1] ?? "";
+  const rawDay = parts[2] ?? "";
+  const monthIdx = parseInt(rawMonth, 10) - 1;
+  const day = rawDay.padStart(2, "0");
+  const MONTHS_ID = [
+    "Januari", "Februari", "Maret", "April", "Mei", "Juni",
+    "Juli", "Agustus", "September", "Oktober", "November", "Desember"
+  ];
+  if (isNaN(monthIdx) || monthIdx < 0 || monthIdx > 11) return dateStr;
+  return `${day}/${MONTHS_ID[monthIdx]}/${year}`;
+}
+
+export function normalizeToIsoDate(dateStr: string): string {
+  if (!dateStr) return "";
+  const clean = dateStr.trim();
+  
+  // Pattern 1: ISO YYYY-MM-DD or YYYY/MM/DD
+  if (/^\d{4}[\/\-]\d{1,2}[\/\-]\d{1,2}$/.test(clean)) {
+    const parts = clean.split(/[\/\-]/);
+    const y = parts[0] ?? "";
+    const m = (parts[1] ?? "").padStart(2, "0");
+    const d = (parts[2] ?? "").padStart(2, "0");
+    return `${y}-${m}-${d}`;
+  }
+
+  // Pattern 2: DD/MM/YYYY or DD-MM-YYYY
+  if (/^\d{1,2}[\/\-]\d{1,2}[\/\-]\d{4}$/.test(clean)) {
+    const parts = clean.split(/[\/\-]/);
+    const d = (parts[0] ?? "").padStart(2, "0");
+    const m = (parts[1] ?? "").padStart(2, "0");
+    const y = parts[2] ?? "";
+    return `${y}-${m}-${d}`;
+  }
+
+  // Pattern 3: DD (Kata Bulan) YYYY or DD/Kata Bulan/YYYY (e.g. 12 JULI 2026 or 12/Juli/2026)
+  const MONTH_MAP: Record<string, string> = {
+    JANUARI: "01", FEBRUARI: "02", MARET: "03", APRIL: "04", MEI: "05", JUNI: "06",
+    JULI: "07", AGUSTUS: "08", SEPTEMBER: "09", OKTOBER: "10", NOVEMBER: "11", DESEMBER: "12",
+    JAN: "01", FEB: "02", MAR: "03", APR: "04", JUN: "06", JUL: "07", AGS: "08", AGT: "08", SEP: "09", SEPT: "09", OKT: "10", NOV: "11", DES: "12"
+  };
+  const match = clean.match(/^(\d{1,2})[\/\-\s]+([A-Za-z]+)[\/\-\s]+(\d{4})$/);
+  if (match) {
+    const d = (match[1] ?? "").padStart(2, "0");
+    const mStr = (match[2] ?? "").toUpperCase();
+    const y = match[3] ?? "";
+    const m = MONTH_MAP[mStr];
+    if (d && m && y) {
+      return `${y}-${m}-${d}`;
+    }
+  }
+
+  return clean;
+}
+

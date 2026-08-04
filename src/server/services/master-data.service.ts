@@ -4,8 +4,13 @@ import { cityRepo } from "../repositories/master/city.repository";
 import { packageTypeRepo } from "../repositories/master/package-type.repository";
 import { hotelCityRepo } from "../repositories/master/hotel-city.repository";
 import { routeRepo } from "../repositories/master/route.repository";
+import { clusterRepo } from "../repositories/master/cluster.repository";
 
 export const masterDataService = {
+  // Clusters
+  async getClusters(params?: { isActive?: boolean; limit?: number; offset?: number; search?: string }) {
+    return clusterRepo.findAll(params);
+  },
   // Routes
   async getRoutes(params?: { isActive?: boolean; limit?: number; offset?: number; search?: string }) {
     return routeRepo.findAll(params);
@@ -67,7 +72,7 @@ export const masterDataService = {
   async getHotelById(id: string) {
     return hotelRepo.findById(id);
   },
-  async createHotel(data: { code: string; name: string; cityId: string; starRating?: number; isActive?: boolean }) {
+  async createHotel(data: { code: string; name: string; cityId: string; starRating?: number; jarakText?: string | null; videoJarakUrl?: string | null; videoJarakDriveId?: string | null; isActive?: boolean }) {
     const existingCode = await hotelRepo.findByCode(data.code);
     if (existingCode) throw new Error("DUPLICATE_CODE");
     const existingName = await hotelRepo.findByName(data.name);
@@ -75,10 +80,13 @@ export const masterDataService = {
     return hotelRepo.create({
       ...data,
       starRating: data.starRating ?? null,
+      jarakText: data.jarakText ?? null,
+      videoJarakUrl: data.videoJarakUrl ?? null,
+      videoJarakDriveId: data.videoJarakDriveId ?? null,
       isActive: data.isActive ?? true,
     });
   },
-  async updateHotel(id: string, data: { code?: string; name?: string; cityId?: string; starRating?: number; isActive?: boolean }) {
+  async updateHotel(id: string, data: { code?: string; name?: string; cityId?: string; starRating?: number; jarakText?: string | null; videoJarakUrl?: string | null; videoJarakDriveId?: string | null; isActive?: boolean }) {
     if (data.code) {
       const existing = await hotelRepo.findByCode(data.code);
       if (existing && existing.id !== id) throw new Error("DUPLICATE_CODE");

@@ -10,6 +10,9 @@ const createHotelSchema = z.object({
   name: z.string().min(1, "Name is required"),
   cityId: z.string().min(1, "City ID is required"),
   starRating: z.number().min(1).max(5).optional(),
+  jarakText: z.string().optional().nullable(),
+  videoJarakUrl: z.string().optional().nullable(),
+  videoJarakDriveId: z.string().optional().nullable(),
   isActive: z.boolean().optional(),
 });
 

@@ -82,13 +82,18 @@ export default function PembayaranMonitoringPage() {
 
   // Enrich summaries with paket info
   const enriched: EnrichedSummary[] = useMemo(() => {
-    return summaries.map((s) => {
-      const groupKbr = kbrList.find((k) =>
-        k.jamaahIds.some((jid) => s.anggota.some((a) => a.id === jid))
-      );
+    return summaries.map((s: any) => {
+      const groupKbr = kbrList.find((k: any) => {
+        if (!k) return false;
+        if (s.paketKeberangkatanId && k.id === s.paketKeberangkatanId) return true;
+        if (Array.isArray(k.jamaahIds) && Array.isArray(s.anggota)) {
+          return k.jamaahIds.some((jid: string) => s.anggota.some((a: any) => a.id === jid));
+        }
+        return false;
+      });
       return {
         ...s,
-        namaPaket: groupKbr?.paketUmroh?.namaPaket ?? "-",
+        namaPaket: groupKbr?.namaPaket || groupKbr?.paketUmroh?.namaPaket || "-",
         tanggalBerangkat: groupKbr?.tanggalBerangkat ?? "",
       };
     });
@@ -97,7 +102,9 @@ export default function PembayaranMonitoringPage() {
   // Paket filter options
   const paketOptions = useMemo(() => {
     const unique = new Map<string, string>();
-    for (const k of kbrList) unique.set(k.id, k.paketUmroh?.namaPaket || "-");
+    for (const k of kbrList) {
+      unique.set(k.id, k.namaPaket || k.paketUmroh?.namaPaket || "-");
+    }
     return [
       { value: "semua", label: "Semua Paket" },
       ...Array.from(unique.entries()).map(([id, nama]) => ({ value: id, label: nama })),
@@ -106,11 +113,16 @@ export default function PembayaranMonitoringPage() {
 
   // Filtered data
   const filtered = useMemo(() => {
-    return enriched.filter((s) => {
+    return enriched.filter((s: any) => {
       if (paketFilter !== "semua") {
-        const groupKbr = kbrList.find((k) =>
-          k.jamaahIds.some((jid) => s.anggota.some((a) => a.id === jid))
-        );
+        const groupKbr = kbrList.find((k: any) => {
+          if (!k) return false;
+          if (s.paketKeberangkatanId && k.id === s.paketKeberangkatanId) return true;
+          if (Array.isArray(k.jamaahIds) && Array.isArray(s.anggota)) {
+            return k.jamaahIds.some((jid: string) => s.anggota.some((a: any) => a.id === jid));
+          }
+          return false;
+        });
         if (groupKbr?.id !== paketFilter) return false;
       }
       if (statusFilter !== "semua" && s.status !== statusFilter) return false;

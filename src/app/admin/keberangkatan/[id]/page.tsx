@@ -110,6 +110,10 @@ export default function KeberangkatanDetailPage() {
   const [readinessScore, setReadinessScore] = useState<PackageReadinessScore | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Jamaah & Manifest state
+  const [jamaahList, setJamaahList] = useState<any[]>([]);
+  const [groupMap, setGroupMap] = useState<Map<string, string>>(new Map());
+
   // Dokumen tab state
   const [docRows, setDocRows] = useState<JamaahDocRow[]>([]);
   const [docFilter, setDocFilter] = useState<DocFilter>("semua");
@@ -119,30 +123,41 @@ export default function KeberangkatanDetailPage() {
     if (!id) return;
     async function load() {
       setLoading(true);
-      const [k, int, wrn, tl, fin, score, allJamaah, allGroups] = await Promise.all([
-        getKeberangkatanById(id),
-        getPackageIntelligence(id),
-        getAutoWarnings(id),
-        getOperationalTimeline(id),
-        getFinalizationResult(id),
-        getPackageReadinessScore(id),
-        getJamaahList(),
-        getGroupList(),
-      ]);
-      setKbr(k ?? null);
-      setIntel(int ?? null);
-      setWarnings(wrn);
-      setTimeline(tl ?? []);
-      setFinalization(fin ?? null);
-      setReadinessScore(score ?? null);
+      try {
+        const [k, int, wrn, tl, fin, score, allJamaah, allGroups] = await Promise.all([
+          getKeberangkatanById(id),
+          getPackageIntelligence(id).catch(() => null),
+          getAutoWarnings(id).catch(() => []),
+          getOperationalTimeline(id).catch(() => []),
+          getFinalizationResult(id).catch(() => null),
+          getPackageReadinessScore(id).catch(() => null),
+          getJamaahList().catch(() => []),
+          getGroupList().catch(() => []),
+        ]);
+        setKbr(k ?? null);
+        setIntel(int ?? null);
+        setWarnings(wrn || []);
+        setTimeline(tl ?? []);
+        setFinalization(fin ?? null);
+        setReadinessScore(score ?? null);
 
-      // Build doc rows from jamaah in this package
-      const pkgGroupIds = new Set(
-        allGroups.filter((g: any) => g.paketKeberangkatanId === id).map((g: any) => g.id)
-      );
-      const pkgJamaah = allJamaah.filter((j: any) => pkgGroupIds.has(j.groupId));
-      setDocRows(buildDocRows(pkgJamaah));
-      setLoading(false);
+        // Build doc rows & jamaah list for this package
+        const safeGroups = Array.isArray(allGroups) ? allGroups : [];
+        const safeJamaah = Array.isArray(allJamaah) ? allJamaah : [];
+        const pkgGroupIds = new Set(
+          safeGroups.filter((g: any) => g.paketKeberangkatanId === id).map((g: any) => g.id)
+        );
+        const gMap = new Map(safeGroups.map((g: any) => [g.id, g.namaGroup || g.kodeRegistrasi || "-"]));
+        setGroupMap(gMap);
+
+        const pkgJamaah = safeJamaah.filter((j: any) => pkgGroupIds.has(j.groupId) || j.paketKeberangkatanId === id);
+        setJamaahList(pkgJamaah);
+        setDocRows(buildDocRows(pkgJamaah));
+      } catch (err) {
+        console.error("Error loading keberangkatan detail:", err);
+      } finally {
+        setLoading(false);
+      }
     }
     load();
   }, [id]);
@@ -215,7 +230,7 @@ export default function KeberangkatanDetailPage() {
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
-            <h1 className="text-xl font-bold">{kbr.paketUmroh?.namaPaket || "-"}</h1>
+            <h1 className="text-xl font-bold">{kbr.namaPaket || kbr.paketUmroh?.namaPaket || "-"}</h1>
             <div className="flex items-center gap-2 mt-0.5">
               <span className="text-sm text-muted-foreground font-mono">{kbr.kode}</span>
               <span className="text-muted-foreground">·</span>
@@ -592,20 +607,133 @@ export default function KeberangkatanDetailPage() {
                 <Card>
                   <CardHeader className="pb-3">
                     <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
-                      Kombinasi Hotel
+                      Kombinasi Hotel (Mekkah & Madinah)
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    {!kbr.hotelMekkahId && !kbr.hotelMadinahId ? (
-                      <p className="text-sm text-muted-foreground py-2 text-center">Belum ada konfigurasi hotel</p>
-                    ) : (
-                      <div className="flex flex-wrap gap-2">
-                          <span
-                            className="inline-flex items-center rounded-full bg-muted px-3 py-1.5 text-sm font-medium"
-                          >
-                            <Building2 className="mr-1.5 h-3.5 w-3.5 text-muted-foreground" />
-                            {kbr.hotelMekkahId || "-"} — {kbr.hotelMadinahId || "-"}
+                    {(() => {
+                      let optionsList = kbr.hotelOptions;
+                      if (typeof optionsList === "string") {
+                        try { optionsList = JSON.parse(optionsList); } catch { optionsList = []; }
+                      }
+                      if (Array.isArray(optionsList) && optionsList.length > 0) {
+                        const validOptions = optionsList.filter((opt: any) => {
+                          const hasMek = opt.hotelMekkah && opt.hotelMekkah !== "TBA";
+                          const hasMed = opt.hotelMadinah && opt.hotelMadinah !== "TBA";
+                          const hasPrice = Number(opt.hargaBase || 0) > 0;
+                          return hasMek || hasMed || hasPrice;
+                        });
+                        const listToRender = validOptions.length > 0 ? validOptions : optionsList;
+
+                        return (
+                          <div className="flex flex-col gap-2">
+                            {listToRender.map((opt: any, idx: number) => (
+                              <div key={idx} className="flex flex-wrap items-center gap-2 p-2.5 rounded-lg border bg-card text-xs shadow-xs">
+                                {opt.clusterName && opt.clusterName !== "Reguler" && (
+                                  <span className="font-bold text-primary bg-primary/10 border border-primary/20 px-2 py-0.5 rounded text-[11px] uppercase">
+                                    {opt.clusterName}
+                                  </span>
+                                )}
+                                <span className="font-semibold text-foreground">
+                                  {opt.hotelMekkah || kbr.hotelMekkah || "TBA"} <span className="text-muted-foreground font-normal text-[11px]">(Mekkah)</span>
+                                </span>
+                                <span className="text-muted-foreground font-bold">&mdash;</span>
+                                <span className="font-semibold text-foreground">
+                                  {opt.hotelMadinah || kbr.hotelMadinah || "TBA"} <span className="text-muted-foreground font-normal text-[11px]">(Madinah)</span>
+                                </span>
+                                {opt.hargaBase > 0 && (
+                                  <span className="ml-auto text-muted-foreground font-mono text-[11px]">
+                                    Base: Rp {opt.hargaBase.toLocaleString("id-ID")}
+                                  </span>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        );
+                      }
+                      return (
+                        <div className="flex items-center gap-2 text-sm p-2.5 rounded-lg bg-muted/30 border">
+                          <Building2 className="h-4 w-4 text-muted-foreground shrink-0" />
+                          <span>
+                            {kbr.hotelMekkah || "TBA"} <span className="text-muted-foreground text-xs">(Mekkah)</span> &mdash; {kbr.hotelMadinah || "TBA"} <span className="text-muted-foreground text-xs">(Madinah)</span>
                           </span>
+                        </div>
+                      );
+                    })()}
+                  </CardContent>
+                </Card>
+
+                {/* Tabel Manifest Jamaah */}
+                <Card>
+                  <CardHeader className="pb-3 flex flex-row items-center justify-between">
+                    <div>
+                      <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
+                        Tabel Manifest Jamaah ({jamaahList.length} Jamaah)
+                      </CardTitle>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        Daftar jamaah terdaftar dalam paket keberangkatan ini
+                      </p>
+                    </div>
+                    <Button size="sm" variant="outline" onClick={() => router.push("/admin/manifest")}>
+                      <FileText className="mr-1.5 h-3.5 w-3.5" />
+                      Kelola Manifest Lengkap
+                    </Button>
+                  </CardHeader>
+                  <CardContent>
+                    {jamaahList.length === 0 ? (
+                      <div className="text-center py-8 border rounded-lg bg-muted/20">
+                        <Users className="mx-auto h-8 w-8 text-muted-foreground/60 mb-2" />
+                        <p className="text-sm font-medium text-foreground">Belum Ada Jamaah Terdaftar</p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Jamaah yang mendaftar ke paket ini akan otomatis muncul dalam tabel manifest di sini.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="overflow-x-auto border rounded-lg">
+                        <table className="w-full text-xs text-left">
+                          <thead className="bg-muted/50 text-muted-foreground font-semibold border-b">
+                            <tr>
+                              <th className="px-3 py-2.5 w-10 text-center">#</th>
+                              <th className="px-3 py-2.5">NAMA JAMAAH</th>
+                              <th className="px-3 py-2.5">NO. PESERTA</th>
+                              <th className="px-3 py-2.5">PASPOR</th>
+                              <th className="px-3 py-2.5">GROUP</th>
+                              <th className="px-3 py-2.5">HOTEL (MEKKAH / MADINAH)</th>
+                              <th className="px-3 py-2.5 text-center">STATUS DOKUMEN</th>
+                              <th className="px-3 py-2.5 text-center">STATUS BAYAR</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y">
+                            {jamaahList.map((j, index) => (
+                              <tr key={j.id} className="hover:bg-muted/30 transition-colors">
+                                <td className="px-3 py-2.5 text-center font-medium text-muted-foreground">{index + 1}</td>
+                                <td className="px-3 py-2.5 font-medium text-foreground">
+                                  {j.namaLengkap}
+                                  <div className="text-[10px] text-muted-foreground">
+                                    {j.jenisKelamin === "L" ? "Laki-laki" : "Perempuan"} · {j.tempatLahir || "-"}
+                                  </div>
+                                </td>
+                                <td className="px-3 py-2.5 font-mono text-muted-foreground">{j.nomorPeserta || "-"}</td>
+                                <td className="px-3 py-2.5 font-mono font-medium">{j.nomorPaspor || "-"}</td>
+                                <td className="px-3 py-2.5 text-muted-foreground">{groupMap.get(j.groupId) || "-"}</td>
+                                <td className="px-3 py-2.5">
+                                  <div className="text-[11px] font-medium text-foreground">
+                                    {j.hotelMekkah || kbr.hotelMekkah || "TBA"}
+                                  </div>
+                                  <div className="text-[10px] text-muted-foreground">
+                                    {j.hotelMadinah || kbr.hotelMadinah || "TBA"}
+                                  </div>
+                                </td>
+                                <td className="px-3 py-2.5 text-center">
+                                  <StatusBadge status={j.status === "lunas" ? "verified" : j.status === "dokumen_upload" ? "pending" : "draft"} />
+                                </td>
+                                <td className="px-3 py-2.5 text-center">
+                                  <StatusBadge status={j.status === "lunas" ? "lunas" : "cicilan"} />
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
                       </div>
                     )}
                   </CardContent>
@@ -831,7 +959,7 @@ export default function KeberangkatanDetailPage() {
                           {generateReminderText(
                             reminderTarget.jamaah,
                             reminderTarget.missingLabels,
-                            kbr.paketUmroh?.namaPaket || "-"
+                            kbr.namaPaket || kbr.paketUmroh?.namaPaket || "-"
                           )}
                         </pre>
                       </div>

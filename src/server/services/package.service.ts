@@ -47,11 +47,41 @@ export const packageService = {
     const firstDate = departureDates[0] || new Date();
     const year = firstDate.getFullYear();
 
-    // 2. If multi-date, create PaketGrup
-    let paketGrupId: string | undefined;
-    let kodeGrup: string | undefined;
+    // 2. If multi-date or splitting individual parent package, create/link PaketGrup
+    let paketGrupId: string | undefined = data.paketGrupId;
+    let kodeGrup: string | undefined = data.kodeGrup;
 
-    if (departureDates.length > 1) {
+    if (data.parentKeberangkatanId && !paketGrupId) {
+      const parentKeb = await prisma.keberangkatan.findUnique({
+        where: { id: data.parentKeberangkatanId },
+      });
+
+      if (parentKeb) {
+        const finalKodeGrup = data.kodeGrup || generateKodeGrup({
+          tahun: year,
+          durasiHari,
+          packageTypeCode: pCode,
+          startingPointCode: sCode,
+          maskapaiCode: mCode,
+          tanggalList: departureDates,
+        });
+        kodeGrup = finalKodeGrup;
+
+        const groupRecord = await prisma.paketGrup.create({
+          data: {
+            kodeGrup: finalKodeGrup,
+            namaPaket: parentKeb.namaPaket || `${pCode} ${sCode} Group`,
+          },
+        });
+        paketGrupId = groupRecord.id;
+
+        // Update parent to be part of this group
+        await prisma.keberangkatan.update({
+          where: { id: data.parentKeberangkatanId },
+          data: { paketGrupId },
+        });
+      }
+    } else if (!paketGrupId && departureDates.length > 1) {
       kodeGrup = generateKodeGrup({
         tahun: year,
         durasiHari,
@@ -68,6 +98,76 @@ export const packageService = {
         },
       });
       paketGrupId = groupRecord.id;
+    }
+
+    // Resolve hotel names (for single or cluster mode)
+    const hotelIdsToFetch = new Set<string>();
+    if (data.hotelMekkahId) hotelIdsToFetch.add(data.hotelMekkahId);
+    if (data.hotelMadinahId) hotelIdsToFetch.add(data.hotelMadinahId);
+    if (data.isAdaKlaster === "ya" && data.clusterConfigs) {
+      for (const cfg of Object.values(data.clusterConfigs as Record<string, any>)) {
+        if (cfg.hotelMekkahId) hotelIdsToFetch.add(cfg.hotelMekkahId);
+        if (cfg.hotelMadinahId) hotelIdsToFetch.add(cfg.hotelMadinahId);
+      }
+    }
+
+    const fetchedHotels = hotelIdsToFetch.size > 0
+      ? await prisma.masterHotel.findMany({ where: { id: { in: Array.from(hotelIdsToFetch) } } })
+      : [];
+    const hotelMap = new Map(fetchedHotels.map(h => [h.id, h.name]));
+
+    const resolveHotel = (idOrName?: string) => {
+      if (!idOrName || !idOrName.trim()) return "TBA";
+      return hotelMap.get(idOrName) || idOrName;
+    };
+
+    let finalHotelMekkah = resolveHotel(data.hotelMekkahId || data.hotelMekkah);
+    let finalHotelMadinah = resolveHotel(data.hotelMadinahId || data.hotelMadinah);
+    let hotelOptionsArray: any[] = [];
+
+    if (data.isAdaKlaster === "ya" && data.clusterConfigs) {
+      // Filter out empty garbage clusters (e.g. K1, K2, K3, K4 with no hotel and no price)
+      const validClusterEntries = Object.entries(data.clusterConfigs).filter(([, cfg]: [string, any]) => {
+        if (!cfg) return false;
+        const hMek = cfg.hotelMekkahId || cfg.hotelMekkah;
+        const hMed = cfg.hotelMadinahId || cfg.hotelMadinah;
+        const harga = Number(cfg.hargaBase || 0);
+        return (hMek && hMek.trim() !== "") || (hMed && hMed.trim() !== "") || harga > 0;
+      });
+
+      const clusterIds = validClusterEntries.map(([cId]) => cId);
+      const masterClusters = clusterIds.length > 0
+        ? await prisma.masterCluster.findMany({ where: { id: { in: clusterIds } } })
+        : [];
+      const clusterMap = new Map(masterClusters.map(c => [c.id, c.nama]));
+
+      hotelOptionsArray = validClusterEntries.map(([cId, cfg]: [string, any]) => {
+        const cName = clusterMap.get(cId) || cfg.clusterName || cId;
+        const hMek = resolveHotel(cfg.hotelMekkahId || cfg.hotelMekkah);
+        const hMed = resolveHotel(cfg.hotelMadinahId || cfg.hotelMadinah);
+        return {
+          clusterId: cId,
+          clusterName: cName,
+          hotelMekkah: hMek,
+          hotelMadinah: hMed,
+          hargaBase: Number(cfg.hargaBase || 0),
+          upgradeDouble: Number(cfg.upgradeDouble || 0),
+          upgradeTriple: Number(cfg.upgradeTriple || 0),
+        };
+      });
+
+      const mekkahNames = Array.from(new Set(hotelOptionsArray.map(o => o.hotelMekkah).filter(n => n && n !== "TBA")));
+      const madinahNames = Array.from(new Set(hotelOptionsArray.map(o => o.hotelMadinah).filter(n => n && n !== "TBA")));
+
+      if (mekkahNames.length > 0) finalHotelMekkah = mekkahNames.join(" / ");
+      if (madinahNames.length > 0) finalHotelMadinah = madinahNames.join(" / ");
+    } else {
+      hotelOptionsArray = [{
+        clusterName: "Reguler",
+        hotelMekkah: finalHotelMekkah,
+        hotelMadinah: finalHotelMadinah,
+        hargaBase: Number(data.hargaBase || data.hargaPaket || 0),
+      }];
     }
 
     // 3. Create Keberangkatan for each date
@@ -95,6 +195,7 @@ export const packageService = {
         routeCode: rCode,
         tanggalBerangkat: depDate,
         maskapaiCode: mCode,
+        maskapaiName: airline?.name || data.maskapai,
       });
 
       const folderName = generatePackageFolderName({
@@ -127,20 +228,37 @@ export const packageService = {
         maskapai: airline?.name || data.maskapai || "Saudia",
         maskapaiId: data.maskapaiId,
         nomorPenerbangan: data.nomorPenerbangan || "SV-816",
-        hotelMekkah: data.hotelMekkah || "TBA",
+        hotelMekkah: finalHotelMekkah,
         hotelMekkahId: data.hotelMekkahId,
-        hotelMadinah: data.hotelMadinah || "TBA",
+        hotelMadinah: finalHotelMadinah,
         hotelMadinahId: data.hotelMadinahId,
         startingPointId: data.startingPointId,
         packageTypeId: data.packageTypeId,
         kuota: parseInt(data.kapasitas || data.kuota || "45", 10),
         maxSeat: parseInt(data.kapasitas || data.maxSeat || "45", 10),
+        targetMaterialisasi: parseInt(data.targetMaterialisasi || data.targetMaterialis || "30", 10),
         terisi: 0,
         status: "scheduled",
         durationDays: durasiHari,
+        hotelOptions: hotelOptionsArray,
       } as any);
 
       createdList.push(created);
+    }
+
+    // 4. If pairedItems (parent seat adjustments) passed, update parent departure seat capacities!
+    if (Array.isArray(data.pairedItems) && data.pairedItems.length > 0) {
+      for (const pair of data.pairedItems) {
+        if (pair.parentId && typeof pair.parentSeat === "number") {
+          await prisma.keberangkatan.update({
+            where: { id: pair.parentId },
+            data: {
+              kuota: pair.parentSeat,
+              maxSeat: pair.parentSeat,
+            },
+          });
+        }
+      }
     }
 
     return departureDates.length === 1 ? createdList[0] : createdList;
@@ -148,6 +266,69 @@ export const packageService = {
 
   async update(id: string, data: any) {
     return keberangkatanRepo.update(id, data);
+  },
+
+  async updateWithAudit(id: string, data: any, user: { userId: string; userName: string; role: string }) {
+    const before = await keberangkatanRepo.findById(id);
+    const updated = await keberangkatanRepo.update(id, data);
+
+    const changes: string[] = [];
+    if (data.tanggalBerangkat) {
+      const newDep = new Date(data.tanggalBerangkat).toISOString().split("T")[0];
+      const oldDep = before?.tanggalBerangkat ? new Date(before.tanggalBerangkat).toISOString().split("T")[0] : "";
+      if (newDep !== oldDep) changes.push(`Tgl Berangkat (${oldDep} -> ${newDep})`);
+    }
+    if (data.tanggalPulang) {
+      const newRet = new Date(data.tanggalPulang).toISOString().split("T")[0];
+      const oldRet = before?.tanggalPulang ? new Date(before.tanggalPulang).toISOString().split("T")[0] : "";
+      if (newRet !== oldRet) changes.push(`Tgl Pulang (${oldRet} -> ${newRet})`);
+    }
+    if (data.nomorPenerbangan && before?.nomorPenerbangan !== data.nomorPenerbangan) {
+      changes.push(`Flight No (${before?.nomorPenerbangan} -> ${data.nomorPenerbangan})`);
+    }
+    if (data.flightDetails?.rutePenerbangan) {
+      changes.push(`Rute Flight (${data.flightDetails.rutePenerbangan})`);
+    }
+    if (data.tourLeader?.nama) {
+      changes.push(`TL: ${data.tourLeader.nama}`);
+    }
+    if (data.muthowif?.nama) {
+      changes.push(`Muthowif: ${data.muthowif.nama}`);
+    }
+    if (changes.length === 0) changes.push("Memperbarui detail operasional paket");
+
+    const detailMsg = `Perubahan paket #${before?.kode || id} oleh ${user.userName}: ${changes.join(", ")}`;
+
+    try {
+      await prisma.auditEntry.create({
+        data: {
+          userId: user.userId || "system",
+          userName: user.userName || "Admin Operasional",
+          role: (user.role as any) || "super_admin",
+          module: "keberangkatan",
+          action: "EDIT_KEBERANGKATAN",
+          detail: detailMsg,
+          entityId: id,
+          entityType: "Keberangkatan",
+          before: JSON.stringify(before),
+          after: JSON.stringify(updated),
+        },
+      });
+
+      await prisma.activityEvent.create({
+        data: {
+          keberangkatanId: id,
+          type: "info",
+          message: detailMsg,
+          module: "keberangkatan",
+          triggeredBy: user.userName,
+        },
+      });
+    } catch (auditErr) {
+      console.error("Failed to record audit log:", auditErr);
+    }
+
+    return updated;
   },
 
   async delete(id: string) {

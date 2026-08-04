@@ -7,7 +7,7 @@
 // ============================================================
 
 import { ocrProviderRepo } from "@/server/repositories/ocr-provider.repository";
-import { googleVisionAdapter } from "./adapters/google-vision.adapter";
+import { googleAiStudioAdapter } from "./adapters/google-ai-studio.adapter";
 import { externalApiAdapter } from "./adapters/external-api.adapter";
 import type { OcrAdapter, OcrAdapterConfig } from "./adapters/adapter.interface";
 import type { OcrProviderRecord } from "./types";
@@ -18,7 +18,8 @@ import { logger } from "@/server/lib/logger";
 const adapterRegistry = new Map<string, OcrAdapter>();
 
 // Register built-in adapters
-adapterRegistry.set("google_vision", googleVisionAdapter);
+adapterRegistry.set("google_ai_studio", googleAiStudioAdapter);
+adapterRegistry.set("google_vision", googleAiStudioAdapter);
 adapterRegistry.set("external_api", externalApiAdapter);
 
 /**
@@ -66,6 +67,11 @@ export async function loadProviders(): Promise<OcrProviderRecord[]> {
 
   try {
     _providersCache = await ocrProviderRepo.findActive();
+    if (!_providersCache || _providersCache.length === 0) {
+      // Auto-recovery: If all providers were disabled, reset health status to active
+      await ocrProviderRepo.resetAllDisabledProviders();
+      _providersCache = await ocrProviderRepo.findActive();
+    }
     _cacheTimestamp = now;
     logger.debug(`[OCR Registry] Loaded ${_providersCache.length} providers from DB`);
     return _providersCache;
