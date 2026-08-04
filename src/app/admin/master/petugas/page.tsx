@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
 import { Card, CardHeader, CardContent } from "@/shared/components/ui/Card";
 import { Button } from "@/shared/components/ui/Button";
 import { Input } from "@/shared/components/ui/Input";
@@ -19,7 +18,6 @@ type Petugas = {
 };
 
 export default function MasterPetugasPage() {
-  const router = useRouter();
   const [activeTab, setActiveTab] = useState<"TOUR_LEADER" | "MUTHOWIF">("TOUR_LEADER");
   
   const [data, setData] = useState<Petugas[]>([]);
