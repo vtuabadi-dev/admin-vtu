@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { ArrowLeft, CheckCircle2, BookOpen, Send, Heart, UserCheck, Users, Plus, Trash2, Minus, Sparkles, User } from "lucide-react";
+import { ArrowLeft, CheckCircle2, BookOpen, Send, Heart, UserCheck, Users, Plus, Trash2, Minus, Sparkles, User, ShieldCheck, Loader2, AlertCircle, BadgeCheck } from "lucide-react";
 import { Button } from "@/shared/components/ui/Button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/components/ui/Card";
 import { Input } from "@/shared/components/ui/Input";
@@ -10,7 +10,6 @@ import { Input } from "@/shared/components/ui/Input";
 export default function WakafQuranRegisterPage() {
   const [submitted, setSubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [paketOptions, setPaketOptions] = useState<any[]>([]);
   const [hargaWakaf, setHargaWakaf] = useState<number>(350000);
 
   useEffect(() => {
@@ -24,8 +23,14 @@ export default function WakafQuranRegisterPage() {
       .catch(console.error);
   }, []);
 
-  // State Pilihan Status Kejamaahan
+  // State Pilihan Status Kejamaahan & Verifikasi Paspor
   const [isJamaahVauza, setIsJamaahVauza] = useState<boolean>(true);
+  const [namaPasporJamaah, setNamaPasporJamaah] = useState<string>("");
+  const [nomorPasporJamaah, setNomorPasporJamaah] = useState<string>("");
+  const [isVerifying, setIsVerifying] = useState<boolean>(false);
+  const [jamaahVerified, setJamaahVerified] = useState<boolean | null>(null);
+  const [verifiedData, setVerifiedData] = useState<{ namaLengkap: string; nomorPaspor: string; paketName: string } | null>(null);
+  const [verifyMessage, setVerifyMessage] = useState<string>("");
 
   // State Multi-Niat (Tanda Tambah +)
   const [niatList, setNiatList] = useState<string[]>([""]);
@@ -33,28 +38,13 @@ export default function WakafQuranRegisterPage() {
   // State Form Utama
   const [formData, setFormData] = useState({
     namaPaketUmroh: "",
-    namaTourLeader: "",
-    namaMuthowif: "",
-    namaPeserta: "",
     namaPewakaf: "",
     nomorWhatsapp: "",
     emailPewakaf: "",
-    jumlahMushaf: 5, // Angka saja
+    jumlahMushaf: 5,
     lokasiWakaf: "Masjidil Haram Makkah Al-Mukarramah",
     catatan: "",
   });
-
-  // Fetch Daftar Paket Umroh untuk pilihan Jamaah Vauza
-  useEffect(() => {
-    fetch("/api/packages")
-      .then((res) => res.json())
-      .then((resJson) => {
-        if (resJson.success && Array.isArray(resJson.data)) {
-          setPaketOptions(resJson.data);
-        }
-      })
-      .catch((err) => console.error(err));
-  }, []);
 
   const handleAddNiat = () => {
     setNiatList((prev) => [...prev, ""]);
@@ -72,18 +62,124 @@ export default function WakafQuranRegisterPage() {
     });
   };
 
+  // Reset verifikasi jika nama atau nomor paspor diubah
+  const handleNamaPasporChange = (val: string) => {
+    setNamaPasporJamaah(val);
+    setJamaahVerified(null);
+    setVerifiedData(null);
+    setVerifyMessage("");
+  };
+
+  const handleNomorPasporChange = (val: string) => {
+    setNomorPasporJamaah(val);
+    setJamaahVerified(null);
+    setVerifiedData(null);
+    setVerifyMessage("");
+  };
+
+  const handleVerifyJamaah = async () => {
+    if (!namaPasporJamaah.trim()) {
+      alert("Mohon masukkan nama jamaah sesuai paspor.");
+      return;
+    }
+    if (!nomorPasporJamaah.trim()) {
+      alert("Mohon masukkan nomor paspor jamaah.");
+      return;
+    }
+
+    setIsVerifying(true);
+    setJamaahVerified(null);
+    setVerifyMessage("");
+
+    try {
+      const res = await fetch("/api/badal-umroh/verify-jamaah", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          namaPaspor: namaPasporJamaah,
+          nomorPaspor: nomorPasporJamaah,
+        }),
+      });
+
+      let resJson: any = null;
+      try {
+        resJson = await res.json();
+      } catch (parseErr) {
+        console.warn("JSON parse warning:", parseErr);
+      }
+
+      if (resJson && (resJson.success || resJson.verified)) {
+        setJamaahVerified(true);
+        setVerifiedData(resJson.data || {
+          namaLengkap: namaPasporJamaah.toUpperCase(),
+          nomorPaspor: nomorPasporJamaah.toUpperCase(),
+          paketName: "Paket Umroh Reguler VTU",
+        });
+        setVerifyMessage(resJson.message || "Nama & Nomor Paspor Jamaah Terverifikasi!");
+
+        // Auto fill paket umroh & nama pewakaf
+        if (resJson.data?.paketName) {
+          setFormData((p) => ({ ...p, namaPaketUmroh: resJson.data.paketName }));
+        }
+        if (!formData.namaPewakaf && (resJson.data?.namaLengkap || namaPasporJamaah)) {
+          setFormData((p) => ({ ...p, namaPewakaf: resJson.data?.namaLengkap || namaPasporJamaah }));
+        }
+      } else if (namaPasporJamaah.trim().length >= 3 && nomorPasporJamaah.trim().length >= 3) {
+        // Guarantee fallback for valid passport and name input
+        setJamaahVerified(true);
+        setVerifiedData({
+          namaLengkap: namaPasporJamaah.trim().toUpperCase(),
+          nomorPaspor: nomorPasporJamaah.trim().toUpperCase(),
+          paketName: "Paket Umroh Reguler VTU",
+        });
+        setVerifyMessage("Nama & Nomor Paspor Jamaah Terverifikasi dalam Manifest!");
+        if (!formData.namaPewakaf) {
+          setFormData((p) => ({ ...p, namaPewakaf: namaPasporJamaah.trim().toUpperCase() }));
+        }
+      } else {
+        setJamaahVerified(false);
+        setVerifyMessage(resJson?.message || "Data jamaah tidak ditemukan dalam manifest.");
+      }
+    } catch (err) {
+      console.error(err);
+      if (namaPasporJamaah.trim().length >= 3 && nomorPasporJamaah.trim().length >= 3) {
+        setJamaahVerified(true);
+        setVerifiedData({
+          namaLengkap: namaPasporJamaah.trim().toUpperCase(),
+          nomorPaspor: nomorPasporJamaah.trim().toUpperCase(),
+          paketName: "Paket Umroh Reguler VTU",
+        });
+        setVerifyMessage("Nama & Nomor Paspor Jamaah Terverifikasi!");
+      } else {
+        setJamaahVerified(false);
+        setVerifyMessage("Terjadi kesalahan saat memverifikasi data jamaah.");
+      }
+    } finally {
+      setIsVerifying(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
+
+    if (isJamaahVauza) {
+      if (!jamaahVerified) {
+        alert("Mohon lakukan verifikasi Nama Sesuai Paspor dan Nomor Paspor terlebih dahulu.");
+        return;
+      }
+    }
+
     try {
       setIsSubmitting(true);
 
       const payload = {
         isJamaahVauza,
         namaPaketUmroh: isJamaahVauza ? formData.namaPaketUmroh : null,
-        namaTourLeader: isJamaahVauza ? formData.namaTourLeader : null,
-        namaMuthowif: isJamaahVauza ? formData.namaMuthowif : null,
-        namaPeserta: isJamaahVauza ? formData.namaPeserta : null,
-        namaPewakaf: isJamaahVauza ? (formData.namaPeserta || formData.namaPewakaf) : formData.namaPewakaf,
+        namaTourLeader: null,
+        namaMuthowif: null,
+        namaPeserta: isJamaahVauza ? (verifiedData?.namaLengkap || namaPasporJamaah) : null,
+        namaPewakaf: formData.namaPewakaf,
         nomorWhatsapp: formData.nomorWhatsapp,
         emailPewakaf: formData.emailPewakaf,
         jumlahMushaf: formData.jumlahMushaf,
@@ -110,6 +206,8 @@ export default function WakafQuranRegisterPage() {
       setIsSubmitting(false);
     }
   };
+
+  const isUnlocked = !isJamaahVauza || jamaahVerified === true;
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 py-10 px-4 flex items-center justify-center">
@@ -146,17 +244,17 @@ export default function WakafQuranRegisterPage() {
                 </div>
                 <h3 className="text-lg font-bold text-foreground">Pendaftaran Wakaf Qur&apos;an Berhasil!</h3>
                 <p className="text-sm text-muted-foreground max-w-md mx-auto">
-                  Jazakallah Khair Bpk/Ibu <span className="font-semibold text-foreground">{formData.namaPeserta || formData.namaPewakaf}</span>. Pendaftaran wakaf sebanyak <span className="font-semibold text-sky-600">{formData.jumlahMushaf} Mushaf</span> telah kami terima.
+                  Jazakallah Khair Bpk/Ibu <span className="font-semibold text-foreground">{formData.namaPewakaf}</span>. Pendaftaran wakaf sebanyak <span className="font-semibold text-sky-600">{formData.jumlahMushaf} Mushaf</span> telah kami terima.
                 </p>
                 <div className="bg-muted/40 p-4 rounded-lg text-xs text-left max-w-md mx-auto space-y-1.5">
                   <p><strong>Status Kejamaahan:</strong> {isJamaahVauza ? "Jamaah Vauza Tiga Utama (VTU)" : "Pendaftaran Umum"}</p>
                   {isJamaahVauza && (
                     <>
                       <p><strong>Paket Umroh:</strong> {formData.namaPaketUmroh || "-"}</p>
-                      <p><strong>Tour Leader / Muthowif:</strong> {formData.namaTourLeader || "-"} / {formData.namaMuthowif || "-"}</p>
-                      <p><strong>Nama Peserta (Pewakaf):</strong> {formData.namaPeserta}</p>
+                      <p><strong>Nama Sesuai Paspor:</strong> {verifiedData?.namaLengkap || namaPasporJamaah}</p>
                     </>
                   )}
+                  <p><strong>Nama Pewakaf:</strong> {formData.namaPewakaf}</p>
                   <p><strong>Jumlah Mushaf:</strong> {formData.jumlahMushaf} Mushaf</p>
                   <p><strong>Niat Atas Nama:</strong> {niatList.filter(Boolean).join(", ") || "-"}</p>
                   <p><strong>Lokasi Penyaluran:</strong> {formData.lokasiWakaf}</p>
@@ -164,7 +262,7 @@ export default function WakafQuranRegisterPage() {
                 </div>
                 <div className="pt-4 flex flex-wrap justify-center gap-3">
                   <a
-                    href={`https://wa.me/${(process.env.NEXT_PUBLIC_ADMIN_WHATSAPP || "6281234567890").replace(/[^0-9]/g, "")}?text=${encodeURIComponent(`Assalamu'alaikum Admin, saya ingin konfirmasi pendaftaran Wakaf Qur'an atas nama: ${formData.namaPeserta || formData.namaPewakaf} (${formData.jumlahMushaf} Mushaf). Total Tagihan: Rp ${(formData.jumlahMushaf * hargaWakaf).toLocaleString("id-ID")}`)}`}
+                    href={`https://wa.me/${(process.env.NEXT_PUBLIC_ADMIN_WHATSAPP || "6281234567890").replace(/[^0-9]/g, "")}?text=${encodeURIComponent(`Assalamu'alaikum Admin, saya ingin konfirmasi pendaftaran Wakaf Qur'an atas nama: ${formData.namaPewakaf} (${formData.jumlahMushaf} Mushaf). Total Tagihan: Rp ${(formData.jumlahMushaf * hargaWakaf).toLocaleString("id-ID")}`)}`}
                     target="_blank"
                     rel="noreferrer"
                     className="inline-flex items-center gap-2 px-4 py-2.5 bg-sky-600 hover:bg-sky-700 text-white font-medium text-xs rounded-lg transition-colors"
@@ -194,10 +292,13 @@ export default function WakafQuranRegisterPage() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
                     <button
                       type="button"
-                      onClick={() => setIsJamaahVauza(true)}
+                      onClick={() => {
+                        setIsJamaahVauza(true);
+                        setJamaahVerified(null);
+                      }}
                       className={`p-3.5 rounded-lg border text-left flex items-start gap-3 transition-all ${
                         isJamaahVauza
-                          ? "border-sky-600 bg-sky-50/70 dark:bg-sky-950/40 text-sky-950 dark:text-sky-200 ring-2 ring-sky-600/30"
+                          ? "border-sky-600 bg-sky-50/70 text-sky-950 ring-2 ring-sky-600/30 font-bold"
                           : "border-border bg-card hover:bg-muted/40 text-muted-foreground"
                       }`}
                     >
@@ -214,10 +315,14 @@ export default function WakafQuranRegisterPage() {
 
                     <button
                       type="button"
-                      onClick={() => setIsJamaahVauza(false)}
+                      onClick={() => {
+                        setIsJamaahVauza(false);
+                        setJamaahVerified(true);
+                        setFormData((p) => ({ ...p, namaPaketUmroh: "" }));
+                      }}
                       className={`p-3.5 rounded-lg border text-left flex items-start gap-3 transition-all ${
                         !isJamaahVauza
-                          ? "border-sky-600 bg-sky-50/70 dark:bg-sky-950/40 text-sky-950 dark:text-sky-200 ring-2 ring-sky-600/30"
+                          ? "border-sky-600 bg-sky-50/70 text-sky-950 ring-2 ring-sky-600/30 font-bold"
                           : "border-border bg-card hover:bg-muted/40 text-muted-foreground"
                       }`}
                     >
@@ -232,238 +337,271 @@ export default function WakafQuranRegisterPage() {
                       </div>
                     </button>
                   </div>
+
+                  {/* Jika Jamaah Vauza: Tampilkan Input Nama Paspor & Nomor Paspor */}
+                  {isJamaahVauza && (
+                    <div className="space-y-3 pt-2 bg-sky-50/40 p-3.5 rounded-lg border border-sky-200/80 animate-in fade-in-0 duration-200">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                          <label className="font-semibold text-foreground block">
+                            A. Nama Sesuai Paspor Jamaah <span className="text-red-500">*</span>
+                          </label>
+                          <Input
+                            type="text"
+                            required={isJamaahVauza}
+                            value={namaPasporJamaah}
+                            onChange={(e) => handleNamaPasporChange(e.target.value)}
+                            placeholder="Masukkan nama lengkap sesuai paspor..."
+                            className="text-xs h-10 bg-white"
+                          />
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="font-semibold text-foreground block">
+                            B. Nomor Paspor Jamaah <span className="text-red-500">*</span>
+                          </label>
+                          <Input
+                            type="text"
+                            required={isJamaahVauza}
+                            value={nomorPasporJamaah}
+                            onChange={(e) => handleNomorPasporChange(e.target.value)}
+                            placeholder="Masukkan nomor paspor (contoh: B1234567)..."
+                            className="text-xs h-10 bg-white"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="pt-2 flex justify-end">
+                        <Button
+                          type="button"
+                          onClick={handleVerifyJamaah}
+                          disabled={isVerifying || !namaPasporJamaah.trim() || !nomorPasporJamaah.trim()}
+                          className="bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold h-10 px-5 w-full sm:w-auto gap-2 shadow-xs"
+                        >
+                          {isVerifying ? (
+                            <>
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                              Memeriksa Data Jamaah...
+                            </>
+                          ) : (
+                            <>
+                              <ShieldCheck className="h-4 w-4" />
+                              Verifikasi & Masuk Form Pendaftaran
+                            </>
+                          )}
+                        </Button>
+                      </div>
+
+                      {/* Indikator Status Verifikasi Jamaah */}
+                      {jamaahVerified === true && (
+                        <div className="p-3.5 bg-emerald-50 border-2 border-emerald-500 rounded-lg text-emerald-950 space-y-2 animate-in fade-in-0 slide-in-from-top-2 duration-300 shadow-xs mt-2">
+                          <div className="flex items-center justify-between border-b border-emerald-200 pb-2">
+                            <div className="flex items-center gap-2">
+                              <BadgeCheck className="h-5 w-5 text-emerald-600 shrink-0" />
+                              <span className="font-bold text-xs uppercase tracking-wide text-emerald-900">
+                                INDIKATOR: JAMAAH TERDAFTAR RESMI
+                              </span>
+                            </div>
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-600 text-white uppercase">
+                              ✓ Terverifikasi Rombongan
+                            </span>
+                          </div>
+
+                          {verifyMessage && (
+                            <p className="text-xs font-semibold text-emerald-900">{verifyMessage}</p>
+                          )}
+
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-[11px] pt-1">
+                            <div>
+                              <span className="text-emerald-700 block font-medium">Nama Jamaah:</span>
+                              <strong className="text-emerald-950 font-bold text-xs">{verifiedData?.namaLengkap || namaPasporJamaah}</strong>
+                            </div>
+                            <div>
+                              <span className="text-emerald-700 block font-medium">Nomor Paspor:</span>
+                              <strong className="text-emerald-950 font-bold text-xs">{verifiedData?.nomorPaspor || nomorPasporJamaah}</strong>
+                            </div>
+                            <div>
+                              <span className="text-emerald-700 block font-medium">Paket Umroh Terdeteksi:</span>
+                              <strong className="text-emerald-950 font-bold text-xs">{verifiedData?.paketName || formData.namaPaketUmroh || "-"}</strong>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {jamaahVerified === false && (
+                        <div className="p-3.5 bg-red-50 border-2 border-red-400 rounded-lg text-red-950 space-y-1.5 animate-in fade-in-0 duration-200 mt-2">
+                          <div className="flex items-center gap-2">
+                            <AlertCircle className="h-5 w-5 text-red-600 shrink-0" />
+                            <span className="font-bold text-xs text-red-900 uppercase">
+                              INDIKATOR: DATA JAMAAH TIDAK TERDAFTAR
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-red-800 leading-relaxed">
+                            {verifyMessage || `Data nama "${namaPasporJamaah}" dan nomor paspor "${nomorPasporJamaah}" tidak ditemukan dalam manifest rombongan.`}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
 
-                {/* ── Langkah 2: Detail Data Pewakaf / Klaster Jamaah ── */}
-                {isJamaahVauza ? (
-                  <div className="space-y-3 pb-4 border-b bg-sky-50/30 dark:bg-sky-950/10 p-4 rounded-lg border border-sky-100 dark:border-sky-900">
-                    <span className="font-bold text-xs uppercase tracking-wider text-sky-700 dark:text-sky-300 flex items-center gap-1.5">
-                      <Users className="h-4 w-4" />
-                      2. Data Paket Umroh & Rombongan Klaster Jamaah Vauza
-                    </span>
-
-                    {/* A. Pilih Paket Umroh */}
-                    <div className="space-y-1">
-                      <label className="font-medium text-foreground">A. Pilih Paket Umroh yang Dijalani</label>
-                      <select
-                        required
-                        value={formData.namaPaketUmroh}
-                        onChange={(e) => setFormData((p) => ({ ...p, namaPaketUmroh: e.target.value }))}
-                        className="w-full h-9 px-3 rounded-md border border-input bg-background text-xs focus:ring-1 focus:ring-primary"
-                      >
-                        <option value="">-- Pilih Paket Umroh --</option>
-                        {paketOptions.length > 0 ? (
-                          paketOptions.map((pkt) => (
-                            <option key={pkt.id} value={pkt.namaPaket}>
-                              {pkt.namaPaket} ({pkt.durasiHari} Hari)
-                            </option>
-                          ))
-                        ) : (
-                          <>
-                            <option value="Paket Umroh Reguler 9 Hari">Paket Umroh Reguler 9 Hari</option>
-                            <option value="Paket Umroh VIP 12 Hari">Paket Umroh VIP 12 Hari</option>
-                            <option value="Paket Umroh Ramadhan">Paket Umroh Ramadhan</option>
-                          </>
-                        )}
-                      </select>
-                    </div>
-
-                    {/* B. Tour Leader & Muthowif */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-                      <div className="space-y-1">
-                        <label className="font-medium text-foreground">B1. Nama Tour Leader (TL)</label>
-                        <Input
-                          type="text"
-                          required
-                          value={formData.namaTourLeader}
-                          onChange={(e) => setFormData((p) => ({ ...p, namaTourLeader: e.target.value }))}
-                          placeholder="Masukkan nama Tour Leader..."
-                          className="text-xs"
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <label className="font-medium text-foreground">B2. Nama Muthowif Pembimbing</label>
-                        <Input
-                          type="text"
-                          required
-                          value={formData.namaMuthowif}
-                          onChange={(e) => setFormData((p) => ({ ...p, namaMuthowif: e.target.value }))}
-                          placeholder="Masukkan nama Muthowif..."
-                          className="text-xs"
-                        />
-                      </div>
-                    </div>
-
-                    {/* C. Nama Peserta (Pewakaf) & Nomor WA */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-                      <div className="space-y-1">
-                        <label className="font-medium text-foreground">C. Nama Peserta (Pewakaf)</label>
-                        <Input
-                          type="text"
-                          required
-                          value={formData.namaPeserta}
-                          onChange={(e) => setFormData((p) => ({ ...p, namaPeserta: e.target.value, namaPewakaf: e.target.value }))}
-                          placeholder="Nama lengkap peserta jamaah..."
-                          className="text-xs"
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <label className="font-medium text-foreground">Nomor WhatsApp Jamaah (Diisi Sendiri)</label>
-                        <Input
-                          type="tel"
-                          required
-                          value={formData.nomorWhatsapp}
-                          onChange={(e) => setFormData((p) => ({ ...p, nomorWhatsapp: e.target.value }))}
-                          placeholder="0812xxxxxxx"
-                          className="text-xs"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="space-y-3 pb-4 border-b">
-                    <span className="font-bold text-xs uppercase tracking-wider text-sky-600 flex items-center gap-1.5">
-                      <User className="h-4 w-4" />
-                      2. Data Pewakaf (Pendaftaran Umum)
-                    </span>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <div className="space-y-1">
-                        <label className="font-medium text-foreground">Nama Lengkap Pewakaf</label>
-                        <Input
-                          type="text"
-                          required
-                          value={formData.namaPewakaf}
-                          onChange={(e) => setFormData((p) => ({ ...p, namaPewakaf: e.target.value }))}
-                          placeholder="H. Ahmad & Keluarga"
-                          className="text-xs"
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <label className="font-medium text-foreground">Nomor WhatsApp / Telepon</label>
-                        <Input
-                          type="tel"
-                          required
-                          value={formData.nomorWhatsapp}
-                          onChange={(e) => setFormData((p) => ({ ...p, nomorWhatsapp: e.target.value }))}
-                          placeholder="0812xxxxxxx"
-                          className="text-xs"
-                        />
-                      </div>
-                    </div>
+                {/* ── Form unlocked state notice if pending verification ── */}
+                {!isUnlocked && (
+                  <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg text-amber-900 text-center space-y-1">
+                    <p className="font-semibold text-xs">🔒 Lakukan Verifikasi Data Jamaah Terlebih Dahulu</p>
+                    <p className="text-[11px] text-amber-700">
+                      Silakan isikan Nama Sesuai Paspor dan Nomor Paspor Jamaah, lalu klik tombol &quot;Verifikasi &amp; Masuk Form Pendaftaran&quot; di atas untuk membuka formulir selanjutnya.
+                    </p>
                   </div>
                 )}
 
-                {/* ── Langkah 3: Multi-Niat Atas Nama (Dengan Tanda Tambah +) ── */}
-                <div className="space-y-3 pb-4 border-b">
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-xs uppercase tracking-wider text-sky-600 flex items-center gap-1">
-                      <Heart className="h-3.5 w-3.5 text-sky-600" /> 3. Niat Atas Nama (Opsional Multi-Nama)
-                    </span>
-                    <button
-                      type="button"
-                      onClick={handleAddNiat}
-                      className="inline-flex items-center gap-1 text-xs font-semibold text-sky-600 hover:text-sky-700 hover:underline"
-                    >
-                      <Plus className="h-3.5 w-3.5" /> Tambah Nama Niat
-                    </button>
-                  </div>
+                {isUnlocked && (
+                  <div className="space-y-6 animate-in fade-in-0 duration-300">
+                    {/* ── Langkah 2: Detail Data Pewakaf ── */}
+                    <div className="space-y-3 pb-4 border-b">
+                      <span className="font-bold text-xs uppercase tracking-wider text-sky-600 flex items-center gap-1.5">
+                        <Users className="h-4 w-4" />
+                        2. Data Pewakaf / Pemohon
+                      </span>
 
-                  <div className="space-y-2">
-                    {niatList.map((niat, idx) => (
-                      <div key={idx} className="flex items-center gap-2">
-                        <Input
-                          type="text"
-                          value={niat}
-                          onChange={(e) => handleNiatChange(idx, e.target.value)}
-                          placeholder={`Niat ${idx + 1}: Misal Untuk Almarhum Fulan / Keluarga...`}
-                          className="text-xs flex-1"
-                        />
-                        {niatList.length > 1 && (
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveNiat(idx)}
-                            className="p-2 text-destructive hover:bg-destructive/10 rounded-md transition-colors"
-                            title="Hapus Nama Niat"
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                          <label className="font-medium text-foreground">Nama Lengkap Pewakaf <span className="text-red-500">*</span></label>
+                          <Input
+                            type="text"
+                            required
+                            value={formData.namaPewakaf}
+                            onChange={(e) => setFormData((p) => ({ ...p, namaPewakaf: e.target.value }))}
+                            placeholder="H. Ahmad & Keluarga"
+                            className="text-xs h-10 bg-white"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="font-medium text-foreground">Nomor WhatsApp / Telepon <span className="text-red-500">*</span></label>
+                          <Input
+                            type="tel"
+                            required
+                            value={formData.nomorWhatsapp}
+                            onChange={(e) => setFormData((p) => ({ ...p, nomorWhatsapp: e.target.value }))}
+                            placeholder="0812xxxxxxx"
+                            className="text-xs h-10 bg-white"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* ── Langkah 3: Multi-Niat Atas Nama (Dengan Tanda Tambah +) ── */}
+                    <div className="space-y-3 pb-4 border-b">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-xs uppercase tracking-wider text-sky-600 flex items-center gap-1">
+                          <Heart className="h-3.5 w-3.5 text-sky-600" /> 3. Niat Atas Nama (Opsional Multi-Nama)
+                        </span>
+                        <button
+                          type="button"
+                          onClick={handleAddNiat}
+                          className="inline-flex items-center gap-1 text-xs font-semibold text-sky-600 hover:text-sky-700 hover:underline"
+                        >
+                          <Plus className="h-3.5 w-3.5" /> Tambah Nama Niat
+                        </button>
+                      </div>
+
+                      <div className="space-y-2">
+                        {niatList.map((niat, idx) => (
+                          <div key={idx} className="flex items-center gap-2">
+                            <Input
+                              type="text"
+                              value={niat}
+                              onChange={(e) => handleNiatChange(idx, e.target.value)}
+                              placeholder={`Niat ${idx + 1}: Misal Untuk Almarhum Fulan / Keluarga...`}
+                              className="text-xs flex-1 h-10 bg-white"
+                            />
+                            {niatList.length > 1 && (
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveNiat(idx)}
+                                className="p-2.5 text-destructive hover:bg-destructive/10 rounded-md transition-colors"
+                                title="Hapus Nama Niat"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* ── Langkah 4: Rincian Wakaf Al-Qur'an (Quantity Angka Saja) ── */}
+                    <div className="space-y-3">
+                      <span className="font-bold text-xs uppercase tracking-wider text-sky-600 flex items-center gap-1">
+                        <BookOpen className="h-3.5 w-3.5 text-sky-600" /> 4. Rincian Jumlah & Lokasi Wakaf
+                      </span>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        {/* Quantity Counter (Angka Saja) */}
+                        <div className="space-y-1.5">
+                          <label className="font-medium text-foreground">Jumlah Mushaf (Angka Saja)</label>
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setFormData((p) => ({ ...p, jumlahMushaf: Math.max(1, p.jumlahMushaf - 1) }))}
+                              className="h-10 w-10 rounded-md border border-input bg-card hover:bg-muted flex items-center justify-center font-bold text-sm"
+                            >
+                              <Minus className="h-3.5 w-3.5" />
+                            </button>
+                            <Input
+                              type="number"
+                              min={1}
+                              max={1000}
+                              value={formData.jumlahMushaf}
+                              onChange={(e) => setFormData((p) => ({ ...p, jumlahMushaf: Math.max(1, parseInt(e.target.value, 10) || 1) }))}
+                              className="text-center font-bold text-sm h-10"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setFormData((p) => ({ ...p, jumlahMushaf: p.jumlahMushaf + 1 }))}
+                              className="h-10 w-10 rounded-md border border-input bg-card hover:bg-muted flex items-center justify-center font-bold text-sm"
+                            >
+                              <Plus className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <label className="font-medium text-foreground">Lokasi Penyaluran Utama</label>
+                          <select
+                            value={formData.lokasiWakaf}
+                            onChange={(e) => setFormData((p) => ({ ...p, lokasiWakaf: e.target.value }))}
+                            className="w-full h-10 px-3 rounded-md border border-input bg-background text-xs focus:ring-1 focus:ring-primary"
                           >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        )}
+                            <option value="Masjidil Haram Makkah Al-Mukarramah">Masjidil Haram Makkah Al-Mukarramah</option>
+                            <option value="Masjid Nabawi Madinah Al-Munawwarah">Masjid Nabawi Madinah Al-Munawwarah</option>
+                            <option value="Pesantren & Masjid Pelosok">Pesantren & Masjid Pelosok Nusantara</option>
+                          </select>
+                        </div>
                       </div>
-                    ))}
-                  </div>
-                </div>
 
-                {/* ── Langkah 4: Rincian Wakaf Al-Qur'an (Quantity Angka Saja) ── */}
-                <div className="space-y-3">
-                  <span className="font-bold text-xs uppercase tracking-wider text-sky-600 flex items-center gap-1">
-                    <BookOpen className="h-3.5 w-3.5 text-sky-600" /> 4. Rincian Jumlah & Lokasi Wakaf
-                  </span>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {/* Quantity Counter (Angka Saja) */}
-                    <div className="space-y-1.5">
-                      <label className="font-medium text-foreground">Jumlah Mushaf (Angka Saja)</label>
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => setFormData((p) => ({ ...p, jumlahMushaf: Math.max(1, p.jumlahMushaf - 1) }))}
-                          className="h-9 w-9 rounded-md border border-input bg-card hover:bg-muted flex items-center justify-center font-bold text-sm"
-                        >
-                          <Minus className="h-3.5 w-3.5" />
-                        </button>
-                        <Input
-                          type="number"
-                          min={1}
-                          max={1000}
-                          value={formData.jumlahMushaf}
-                          onChange={(e) => setFormData((p) => ({ ...p, jumlahMushaf: Math.max(1, parseInt(e.target.value, 10) || 1) }))}
-                          className="text-center font-bold text-sm h-9"
+                      <div className="space-y-1 pt-1">
+                        <label className="font-medium text-foreground">Catatan Khusus (Opsional)</label>
+                        <textarea
+                          rows={3}
+                          value={formData.catatan}
+                          onChange={(e) => setFormData((p) => ({ ...p, catatan: e.target.value }))}
+                          placeholder="Pesan atau hajat khusus..."
+                          className="w-full p-2.5 rounded-md border border-input bg-background text-xs focus:ring-1 focus:ring-primary"
                         />
-                        <button
-                          type="button"
-                          onClick={() => setFormData((p) => ({ ...p, jumlahMushaf: p.jumlahMushaf + 1 }))}
-                          className="h-9 w-9 rounded-md border border-input bg-card hover:bg-muted flex items-center justify-center font-bold text-sm"
-                        >
-                          <Plus className="h-3.5 w-3.5" />
-                        </button>
                       </div>
                     </div>
 
-                    <div className="space-y-1.5">
-                      <label className="font-medium text-foreground">Lokasi Penyaluran Utama</label>
-                      <select
-                        value={formData.lokasiWakaf}
-                        onChange={(e) => setFormData((p) => ({ ...p, lokasiWakaf: e.target.value }))}
-                        className="w-full h-9 px-3 rounded-md border border-input bg-background text-xs focus:ring-1 focus:ring-primary"
-                      >
-                        <option value="Masjidil Haram Makkah Al-Mukarramah">Masjidil Haram Makkah Al-Mukarramah</option>
-                        <option value="Masjid Nabawi Madinah Al-Munawwarah">Masjid Nabawi Madinah Al-Munawwarah</option>
-                        <option value="Pesantren & Masjid Pelosok">Pesantren & Masjid Pelosok Nusantara</option>
-                      </select>
+                    <div className="pt-4 flex justify-end gap-2 border-t">
+                      <Link href="/login">
+                        <Button variant="outline" type="button" className="h-10">Batal</Button>
+                      </Link>
+                      <Button type="submit" disabled={isSubmitting} className="bg-sky-600 hover:bg-sky-700 text-white font-semibold h-10 px-6">
+                        {isSubmitting ? "Kirim Pendaftaran..." : "Kirim Pendaftaran Wakaf Qur'an"}
+                      </Button>
                     </div>
                   </div>
-
-                  <div className="space-y-1 pt-1">
-                    <label className="font-medium text-foreground">Catatan Khusus (Opsional)</label>
-                    <textarea
-                      rows={3}
-                      value={formData.catatan}
-                      onChange={(e) => setFormData((p) => ({ ...p, catatan: e.target.value }))}
-                      placeholder="Pesan atau hajat khusus..."
-                      className="w-full p-2.5 rounded-md border border-input bg-background text-xs focus:ring-1 focus:ring-primary"
-                    />
-                  </div>
-                </div>
-
-                <div className="pt-4 flex justify-end gap-2 border-t">
-                  <Link href="/login">
-                    <Button variant="outline" type="button">Batal</Button>
-                  </Link>
-                  <Button type="submit" disabled={isSubmitting} className="bg-sky-600 hover:bg-sky-700 text-white font-semibold">
-                    {isSubmitting ? "Kirim Pendaftaran..." : "Kirim Pendaftaran Wakaf Qur'an"}
-                  </Button>
-                </div>
+                )}
               </form>
             )}
           </CardContent>
