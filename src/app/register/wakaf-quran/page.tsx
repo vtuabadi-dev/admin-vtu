@@ -2,10 +2,18 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { ArrowLeft, CheckCircle2, BookOpen, Send, Heart, UserCheck, Users, Plus, Trash2, Minus, Sparkles, User, ShieldCheck, Loader2, AlertCircle, BadgeCheck } from "lucide-react";
+import { ArrowLeft, CheckCircle2, BookOpen, Send, Heart, UserCheck, Users, Plus, Trash2, Minus, Sparkles, User, ShieldCheck, Loader2, AlertCircle, BadgeCheck, CreditCard } from "lucide-react";
 import { Button } from "@/shared/components/ui/Button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/components/ui/Card";
 import { Input } from "@/shared/components/ui/Input";
+
+const formatRupiah = (val: number) => {
+  return new Intl.NumberFormat("id-ID", {
+    style: "currency",
+    currency: "IDR",
+    maximumFractionDigits: 0,
+  }).format(val);
+};
 
 export default function WakafQuranRegisterPage() {
   const [submitted, setSubmitted] = useState(false);
@@ -589,6 +597,41 @@ export default function WakafQuranRegisterPage() {
                           placeholder="Pesan atau hajat khusus..."
                           className="w-full p-2.5 rounded-md border border-input bg-background text-xs focus:ring-1 focus:ring-primary"
                         />
+                      </div>
+                    </div>
+
+                    {/* ── 5. Rincian Total Harga Order ── */}
+                    <div className="space-y-4 pt-2">
+                      <div className="p-4 bg-gradient-to-br from-sky-900 via-sky-950 to-slate-950 text-white rounded-xl shadow-md border border-[#D4AF37]/40 space-y-3">
+                        <div className="flex items-center justify-between border-b border-sky-800/80 pb-2.5">
+                          <div className="flex items-center gap-2">
+                            <CreditCard className="h-5 w-5 text-[#F5D061]" />
+                            <span className="font-bold text-xs uppercase tracking-wider text-[#F5D061]">
+                              Rincian Total Harga Order
+                            </span>
+                          </div>
+                          <span className="text-[10px] font-extrabold bg-[#D4AF37]/20 border border-[#D4AF37]/50 text-[#F5D061] px-2.5 py-0.5 rounded-full uppercase">
+                            {formData.jumlahMushaf} Mushaf
+                          </span>
+                        </div>
+
+                        <div className="space-y-2 text-xs text-sky-100/90">
+                          <div className="flex justify-between items-center">
+                            <span>Harga Per Mushaf:</span>
+                            <span className="font-semibold text-white">{formatRupiah(hargaWakaf)}</span>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <span>Jumlah Mushaf Didaftarkan:</span>
+                            <span className="font-semibold text-white">{formData.jumlahMushaf} Nama / Mushaf</span>
+                          </div>
+                          <div className="flex justify-between items-center pt-2.5 border-t border-sky-800/80 font-black text-sm">
+                            <span className="text-[#F5D061] uppercase tracking-wide">Total Pembayaran:</span>
+                            <span className="text-base text-[#F5D061] font-black tracking-tight">{formatRupiah(formData.jumlahMushaf * hargaWakaf)}</span>
+                          </div>
+                          <p className="text-[10px] text-sky-200/70 italic text-right pt-0.5">
+                            * Total harga di atas sudah bersih untuk program penyaluran wakaf di tanah suci.
+                          </p>
+                        </div>
                       </div>
                     </div>
 
