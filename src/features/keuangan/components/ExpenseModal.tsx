@@ -237,16 +237,7 @@ export const ExpenseModal: React.FC<ExpenseModalProps> = ({
             </div>
 
             <div>
-              <div className="flex items-center justify-between mb-1">
-                <label className="block font-bold text-slate-700">Kategori Pengeluaran</label>
-                <button
-                  type="button"
-                  onClick={() => setShowAddCatModal(true)}
-                  className="text-emerald-700 hover:text-emerald-800 hover:underline font-bold text-[11px] flex items-center gap-0.5"
-                >
-                  <Plus className="w-3.5 h-3.5 stroke-[2.5]" /> + Tambah Kategori
-                </button>
-              </div>
+              <label className="block font-bold text-slate-700 mb-1">Kategori Pengeluaran</label>
               <select
                 value={category}
                 onChange={(e) => {

@@ -30,7 +30,6 @@ interface DashboardViewProps {
   expenses: ExpenseRecord[];
   notifications: DeadlineNotification[];
   onOpenNewExpense: () => void;
-  onOpenNewGroup: () => void;
   onSelectGroup: (groupId: string) => void;
   onViewDeadlines: () => void;
 }
@@ -40,7 +39,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   expenses,
   notifications,
   onOpenNewExpense,
-  onOpenNewGroup,
   onSelectGroup,
   onViewDeadlines,
 }) => {
@@ -120,13 +118,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-lg text-xs shadow-md transition-all flex items-center gap-2"
             >
               <Receipt className="w-4 h-4" /> Catat Pembayaran Vendor
-            </button>
-            <button
-              onClick={onOpenNewGroup}
-              id="dash-add-group-btn"
-              className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-lg text-xs font-bold transition-all flex items-center gap-2"
-            >
-              <Users className="w-4 h-4 text-amber-400" /> + Tambah Grup Baru
             </button>
           </div>
         </div>

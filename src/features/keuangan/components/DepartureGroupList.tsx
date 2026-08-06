@@ -156,14 +156,6 @@ export const DepartureGroupList: React.FC<DepartureGroupListProps> = ({
             <option value="Berangkat">Sedang Berangkat</option>
             <option value="Selesai">Selesai</option>
           </select>
-
-          <button
-            onClick={() => openModal()}
-            id="groups-add-new-btn"
-            className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-lg text-xs shadow-md transition-all flex items-center gap-1.5"
-          >
-            <Plus className="w-4 h-4 stroke-[2.5]" /> + Tambah Grup Baru
-          </button>
         </div>
       </div>
 

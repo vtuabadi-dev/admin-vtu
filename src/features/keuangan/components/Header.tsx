@@ -18,7 +18,6 @@ interface HeaderProps {
   setActiveTab: (tab: 'dashboard' | 'groups' | 'expenses' | 'deadlines' | 'reports') => void;
   notifications: DeadlineNotification[];
   onOpenNewExpense: () => void;
-  onOpenNewGroup: () => void;
   onExportPDF: () => void;
   onExportExcel: () => void;
   onResetData: () => void;
@@ -29,7 +28,6 @@ export const Header: React.FC<HeaderProps> = ({
   setActiveTab,
   notifications,
   onOpenNewExpense,
-  onOpenNewGroup,
   onExportPDF,
   onExportExcel,
   onResetData,
@@ -191,16 +189,6 @@ export const Header: React.FC<HeaderProps> = ({
             title="Reset Data Sample Demo"
           >
             <RefreshCw className="w-4 h-4" />
-          </button>
-
-          {/* New Group Button */}
-          <button
-            onClick={onOpenNewGroup}
-            id="header-add-group-btn"
-            className="px-3 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5"
-          >
-            <Users className="w-3.5 h-3.5 text-amber-400" />
-            <span className="hidden md:inline">+ Grup Baru</span>
           </button>
 
           {/* New Expense Button */}

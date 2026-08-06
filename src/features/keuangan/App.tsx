@@ -177,7 +177,6 @@ export default function App() {
         setActiveTab={setActiveTab}
         notifications={notifications}
         onOpenNewExpense={() => handleOpenNewExpense()}
-        onOpenNewGroup={() => setIsGroupModalOpen(true)}
         onExportPDF={() => exportExpensesToPDF(expenses, groups)}
         onExportExcel={() => exportExpensesToExcel(expenses, groups)}
         onResetData={handleResetData}
@@ -197,7 +196,6 @@ export default function App() {
             expenses={expenses}
             notifications={notifications}
             onOpenNewExpense={() => handleOpenNewExpense()}
-            onOpenNewGroup={() => setIsGroupModalOpen(true)}
             onSelectGroup={handleSelectGroupFromDashboard}
             onViewDeadlines={() => setActiveTab('deadlines')}
           />
