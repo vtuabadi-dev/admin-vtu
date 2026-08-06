@@ -132,7 +132,7 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-900 text-slate-100 font-sans flex flex-col">
+    <div className="space-y-6 font-sans">
       {/* Header */}
       <Header
         activeTab={activeTab}
@@ -152,7 +152,7 @@ export default function App() {
       />
 
       {/* Main View Area */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <main className="space-y-6">
         {activeTab === 'dashboard' && (
           <DashboardView
             groups={groups}
@@ -236,7 +236,7 @@ export default function App() {
       />
 
       {/* Simple Footer */}
-      <footer className="bg-slate-950 border-t border-slate-800 py-4 text-center text-xs text-slate-400">
+      <footer className="py-4 text-center text-xs text-slate-500">
         <p>VTU Keuangan Travel Umroh &amp; Hajj © {new Date().getFullYear()} — System Keuangan &amp; Kuota Seat Jamaah</p>
       </footer>
     </div>
