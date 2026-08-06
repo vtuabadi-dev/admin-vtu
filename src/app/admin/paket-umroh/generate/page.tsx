@@ -1989,7 +1989,7 @@ export default function GeneratePaketPage() {
             Generate Paket Umroh
             {generateMode === "split" && (
               <span className="text-xs font-bold px-3 py-1 bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded-full">
-                ✂️ Mode Pecah Starting Point
+                ➕ Mode Tambah Starting Point
               </span>
             )}
           </h1>
@@ -2067,7 +2067,7 @@ export default function GeneratePaketPage() {
             </div>
             <div>
               <div className="font-bold text-sm text-foreground flex items-center gap-1.5">
-                ✂️ Pecah Starting Point Paket (Dual Starting Point)
+                ➕ Tambah Starting Point Paket (Dual Starting Point)
               </div>
               <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
                 Menghubungkan paket cabang (Starting Ke-2) dengan Paket Induk eksisting melalui Canvas Drag &amp; Drop.

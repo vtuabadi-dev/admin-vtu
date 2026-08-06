@@ -174,6 +174,7 @@ export default function AdminLaporanPaketPage() {
 
   const [laporanBadal, setLaporanBadal] = useState<any[]>([]);
   const [laporanWakaf, setLaporanWakaf] = useState<any[]>([]);
+  const [linkedPackageNames, setLinkedPackageNames] = useState<string[]>([]);
   const [loadingLaporan, setLoadingLaporan] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
 
@@ -199,7 +200,15 @@ export default function AdminLaporanPaketPage() {
 
   const generateWaTemplate = () => {
     let msg = `*LAPORAN KOLEKTIF BADAL UMROH & WAKAF QURAN*\n`;
-    msg += `*PAKET:* ${selectedPaket}\n\n`;
+    if (linkedPackageNames.length > 1) {
+      msg += `*PAKET GABUNGAN (PAKET INDUK & TAMBAH STARTING):*\n`;
+      linkedPackageNames.forEach((pName, idx) => {
+        msg += `${idx + 1}. ${pName} (${idx === 0 ? "Paket Induk" : "Paket Tambahan Starting"})\n`;
+      });
+      msg += `\n`;
+    } else {
+      msg += `*PAKET:* ${selectedPaket}\n\n`;
+    }
 
     if (laporanBadal.length > 0) {
       msg += `*Daftar Badal Umroh (${laporanBadal.length} Data)*\n`;
@@ -268,6 +277,7 @@ export default function AdminLaporanPaketPage() {
         if (resJson.success) {
           setLaporanBadal(resJson.data.badalList || []);
           setLaporanWakaf(resJson.data.wakafList || []);
+          setLinkedPackageNames(resJson.data.linkedPackageNames || []);
         }
       } catch (err) {
         console.error(err);
@@ -403,6 +413,37 @@ export default function AdminLaporanPaketPage() {
       {/* ── LAPORAN DATA ── */}
       {selectedPaket && !loadingLaporan && hasSearched && (
         <>
+          {/* Dual / Tambah Starting Point Notice Banner */}
+          {linkedPackageNames.length > 1 && (
+            <div className="bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 rounded-xl p-4 flex items-start gap-3 shadow-sm">
+              <div className="p-2 bg-amber-500 text-slate-950 rounded-lg font-bold shrink-0 mt-0.5">
+                <Layers className="h-5 w-5" />
+              </div>
+              <div className="space-y-1">
+                <h4 className="text-sm font-bold text-amber-900 dark:text-amber-300 flex items-center gap-2">
+                  Paket Tambah Starting Point — Laporan Konsolidasi Gabungan
+                </h4>
+                <p className="text-xs text-amber-800 dark:text-amber-400">
+                  Paket ini terhubung dengan Paket Tambahan Starting. Data Badal Umroh &amp; Wakaf Al-Qur&apos;an disatukan sebagai satu kesatuan laporan untuk Paket Induk &amp; Paket Tambahan Starting:
+                </p>
+                <div className="flex flex-wrap gap-2 pt-1">
+                  {linkedPackageNames.map((pkgName, idx) => (
+                    <span
+                      key={pkgName}
+                      className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-bold border ${
+                        pkgName === selectedPaket
+                          ? "bg-emerald-600 text-white border-emerald-700 shadow-sm"
+                          : "bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 border-amber-300 dark:border-amber-700"
+                      }`}
+                    >
+                      {idx === 0 ? "Paket Induk: " : "Paket Tambahan Starting: "} {pkgName}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Summary Cards */}
           <div className="grid grid-cols-2 gap-4">
             <Card className="p-4 flex items-center justify-between border-emerald-200 dark:border-emerald-900 bg-emerald-50 dark:bg-emerald-950/30">
@@ -447,7 +488,9 @@ export default function AdminLaporanPaketPage() {
               <span className="flex items-center gap-2">
                 <HeartHandshake className="h-4 w-4" />
                 DAFTAR NAMA ALMARHUM / ALMARHUMAH YANG DIBADALKAN
-                <span className="opacity-80 font-normal">— {selectedPaket}</span>
+                <span className="opacity-80 font-normal">
+                  — {linkedPackageNames.length > 1 ? linkedPackageNames.join(" & ") : selectedPaket}
+                </span>
               </span>
               <Badge variant="outline" className="text-white border-white/40">{laporanBadal.length} Data</Badge>
             </div>
@@ -505,7 +548,9 @@ export default function AdminLaporanPaketPage() {
               <span className="flex items-center gap-2">
                 <BookOpen className="h-4 w-4" />
                 DAFTAR KOLEKTIF NIAT WAKAF AL-QUR&apos;AN (TANPA NAMA PEWAKAF)
-                <span className="opacity-80 font-normal">— {selectedPaket}</span>
+                <span className="opacity-80 font-normal">
+                  — {linkedPackageNames.length > 1 ? linkedPackageNames.join(" & ") : selectedPaket}
+                </span>
               </span>
               <Badge variant="outline" className="text-white border-white/40">
                 {laporanWakaf.length} Catatan · {laporanWakaf.reduce((s: number, w: any) => s + (w.jumlahMushaf || 0), 0)} Mushaf
