@@ -8,13 +8,15 @@ export const loadStoredGroups = (): DepartureGroup[] => {
   try {
     const data = localStorage.getItem(GROUPS_STORAGE_KEY);
     if (!data) {
-      saveStoredGroups(INITIAL_GROUPS);
-      return INITIAL_GROUPS;
+      return [];
     }
-    return JSON.parse(data);
+    const parsed = JSON.parse(data);
+    if (Array.isArray(parsed)) {
+      return parsed.filter((g) => g && g.id && !g.id.startsWith('grp-00'));
+    }
+    return [];
   } catch (err) {
-    console.error('Failed to load groups from localStorage:', err);
-    return INITIAL_GROUPS;
+    return [];
   }
 };
 
@@ -30,13 +32,15 @@ export const loadStoredExpenses = (): ExpenseRecord[] => {
   try {
     const data = localStorage.getItem(EXPENSES_STORAGE_KEY);
     if (!data) {
-      saveStoredExpenses(INITIAL_EXPENSES);
-      return INITIAL_EXPENSES;
+      return [];
     }
-    return JSON.parse(data);
+    const parsed = JSON.parse(data);
+    if (Array.isArray(parsed)) {
+      return parsed.filter((e) => e && e.id && !e.id.startsWith('exp-00'));
+    }
+    return [];
   } catch (err) {
-    console.error('Failed to load expenses from localStorage:', err);
-    return INITIAL_EXPENSES;
+    return [];
   }
 };
 
