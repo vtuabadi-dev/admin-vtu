@@ -42,9 +42,9 @@ export const Header: React.FC<HeaderProps> = ({
   const urgentTotal = overdueCount + dueSoonCount;
 
   return (
-    <header className="bg-slate-900 text-white sticky top-0 z-40 shadow-xl border-b border-slate-800">
+    <header className="bg-[#062118] text-white rounded-2xl shadow-xl border border-[#D4AF37]/30 overflow-hidden mb-6">
       {/* Top Bar */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex flex-col md:flex-row items-center justify-between gap-4">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5 flex flex-col md:flex-row items-center justify-between gap-4">
         {/* Brand Logo & Name */}
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-lg bg-amber-500 text-slate-950 flex items-center justify-center font-black text-sm italic shadow-md shadow-amber-900/30 shrink-0">
@@ -217,14 +217,14 @@ export const Header: React.FC<HeaderProps> = ({
 
       {/* Main Navigation Tabs */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <nav className="flex items-center gap-1.5 overflow-x-auto scrollbar-none py-1.5 border-t border-slate-800 text-xs">
+        <nav className="flex items-center gap-1.5 overflow-x-auto scrollbar-none py-2 border-t border-[#D4AF37]/30 text-xs">
           <button
             onClick={() => setActiveTab('dashboard')}
             id="nav-tab-dashboard"
             className={`px-4 py-2 rounded-lg font-bold transition-all flex items-center gap-2 whitespace-nowrap ${
               activeTab === 'dashboard'
-                ? 'bg-amber-500/10 text-amber-400 border border-amber-500/30'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+                ? 'bg-[#0E4334] text-[#F5D061] border border-[#D4AF37]/40 shadow-sm'
+                : 'text-emerald-100/70 hover:text-white hover:bg-[#0E4334]/50'
             }`}
           >
             <LayoutDashboard className="w-4 h-4" />
@@ -236,8 +236,8 @@ export const Header: React.FC<HeaderProps> = ({
             id="nav-tab-groups"
             className={`px-4 py-2 rounded-lg font-bold transition-all flex items-center gap-2 whitespace-nowrap ${
               activeTab === 'groups'
-                ? 'bg-amber-500/10 text-amber-400 border border-amber-500/30'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+                ? 'bg-[#0E4334] text-[#F5D061] border border-[#D4AF37]/40 shadow-sm'
+                : 'text-emerald-100/70 hover:text-white hover:bg-[#0E4334]/50'
             }`}
           >
             <Users className="w-4 h-4" />
@@ -249,8 +249,8 @@ export const Header: React.FC<HeaderProps> = ({
             id="nav-tab-expenses"
             className={`px-4 py-2 rounded-lg font-bold transition-all flex items-center gap-2 whitespace-nowrap ${
               activeTab === 'expenses'
-                ? 'bg-amber-500/10 text-amber-400 border border-amber-500/30'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+                ? 'bg-[#0E4334] text-[#F5D061] border border-[#D4AF37]/40 shadow-sm'
+                : 'text-emerald-100/70 hover:text-white hover:bg-[#0E4334]/50'
             }`}
           >
             <Receipt className="w-4 h-4" />
@@ -262,14 +262,14 @@ export const Header: React.FC<HeaderProps> = ({
             id="nav-tab-deadlines"
             className={`px-4 py-2 rounded-lg font-bold transition-all flex items-center gap-2 whitespace-nowrap ${
               activeTab === 'deadlines'
-                ? 'bg-amber-500/10 text-amber-400 border border-amber-500/30'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+                ? 'bg-[#0E4334] text-[#F5D061] border border-[#D4AF37]/40 shadow-sm'
+                : 'text-emerald-100/70 hover:text-white hover:bg-[#0E4334]/50'
             }`}
           >
             <Clock className="w-4 h-4" />
             <span>Tenggat Waktu Vendor</span>
             {urgentTotal > 0 && (
-              <span className="bg-amber-500 text-slate-950 font-black px-1.5 py-0.2 rounded-full text-[10px]">
+              <span className="bg-[#F5D061] text-[#062118] font-black px-1.5 py-0.2 rounded-full text-[10px]">
                 {urgentTotal}
               </span>
             )}
@@ -280,8 +280,8 @@ export const Header: React.FC<HeaderProps> = ({
             id="nav-tab-reports"
             className={`px-4 py-2 rounded-lg font-bold transition-all flex items-center gap-2 whitespace-nowrap ${
               activeTab === 'reports'
-                ? 'bg-amber-500/10 text-amber-400 border border-amber-500/30'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+                ? 'bg-[#0E4334] text-[#F5D061] border border-[#D4AF37]/40 shadow-sm'
+                : 'text-emerald-100/70 hover:text-white hover:bg-[#0E4334]/50'
             }`}
           >
             <FileText className="w-4 h-4" />

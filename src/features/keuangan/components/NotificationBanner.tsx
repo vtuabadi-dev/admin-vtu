@@ -23,8 +23,8 @@ export const NotificationBanner: React.FC<NotificationBannerProps> = ({
   const dueSoon = urgentItems.filter((n) => n.status === 'DUE_SOON');
 
   return (
-    <div className="bg-amber-950/90 border-b border-amber-600/40 text-amber-100 py-3 px-4 sm:px-6 lg:px-8 shadow-md">
-      <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-3 text-xs">
+    <div className="bg-amber-950/90 border border-amber-600/40 text-amber-100 py-3.5 px-4 sm:px-6 rounded-2xl shadow-md mb-6">
+      <div className="flex flex-col md:flex-row items-center justify-between gap-3 text-xs">
         <div className="flex items-center gap-3">
           <div className="p-2 bg-amber-500/20 rounded-lg text-amber-400 shrink-0 border border-amber-500/40">
             {overdue.length > 0 ? (

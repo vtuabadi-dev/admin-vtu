@@ -99,12 +99,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   return (
     <div className="space-y-6">
       {/* Top Welcome Banner & Quick Action */}
-      <div className="bg-slate-900 p-6 rounded-xl border border-slate-800 shadow-sm text-white relative overflow-hidden">
+      <div className="bg-gradient-to-r from-[#062118] via-[#0E4334] to-[#062118] p-6 sm:p-8 rounded-2xl border border-[#D4AF37]/30 shadow-md text-white relative overflow-hidden">
         <div className="absolute right-0 top-0 bottom-0 w-1/3 opacity-10 pointer-events-none flex items-center justify-end pr-8">
-          <PlaneTakeoff className="w-64 h-64 text-amber-500" />
+          <PlaneTakeoff className="w-64 h-64 text-[#F5D061]" />
         </div>
         <div className="relative z-10 max-w-3xl space-y-2">
-          <div className="inline-flex items-center gap-2 px-3 py-1 bg-amber-500/10 border border-amber-500/30 rounded-full text-xs font-bold text-amber-400">
+          <div className="inline-flex items-center gap-2 px-3 py-1 bg-[#F5D061]/10 border border-[#D4AF37]/30 rounded-full text-xs font-bold text-[#F5D061]">
             <Sparkles className="w-3.5 h-3.5" /> VTU Finance Management
           </div>
           <h2 className="text-2xl sm:text-3xl font-bold tracking-tight">
