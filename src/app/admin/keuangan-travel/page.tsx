@@ -5,7 +5,7 @@ import KeuanganModule from '@/features/keuangan/App';
 
 export default function KeuanganTravelPage() {
   return (
-    <div className="w-full min-h-screen bg-slate-100">
+    <div className="-m-6 min-h-[calc(100vh-3.5rem)] bg-slate-900">
       <KeuanganModule />
     </div>
   );

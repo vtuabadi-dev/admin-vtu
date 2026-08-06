@@ -132,7 +132,7 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-100 text-slate-900 font-sans flex flex-col">
+    <div className="min-h-screen bg-slate-900 text-slate-100 font-sans flex flex-col">
       {/* Header */}
       <Header
         activeTab={activeTab}
@@ -236,8 +236,8 @@ export default function App() {
       />
 
       {/* Simple Footer */}
-      <footer className="bg-white border-t border-slate-200 py-4 text-center text-xs text-slate-500">
-        <p>SafarKeuangan Travel Umroh &amp; Hajj © {new Date().getFullYear()} — System Keuangan &amp; Kuota Seat Jamaah</p>
+      <footer className="bg-slate-950 border-t border-slate-800 py-4 text-center text-xs text-slate-400">
+        <p>VTU Keuangan Travel Umroh &amp; Hajj © {new Date().getFullYear()} — System Keuangan &amp; Kuota Seat Jamaah</p>
       </footer>
     </div>
   );
