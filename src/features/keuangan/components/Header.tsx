@@ -47,13 +47,13 @@ export const Header: React.FC<HeaderProps> = ({
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex flex-col md:flex-row items-center justify-between gap-4">
         {/* Brand Logo & Name */}
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-lg bg-amber-500 text-slate-950 flex items-center justify-center font-black text-lg italic shadow-md shadow-amber-900/30 shrink-0">
-            H
+          <div className="w-9 h-9 rounded-lg bg-amber-500 text-slate-950 flex items-center justify-center font-black text-sm italic shadow-md shadow-amber-900/30 shrink-0">
+            VTU
           </div>
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-lg font-bold tracking-tight text-white flex items-center gap-1.5">
-                HARAMAIN<span className="text-amber-500 font-semibold">FINANCE</span>
+                VTU<span className="text-amber-500 font-semibold">FINANCE</span>
               </h1>
               <span className="bg-slate-800 text-amber-400 text-[10px] font-bold px-2 py-0.5 rounded-md border border-slate-700">
                 Umroh &amp; Hajj

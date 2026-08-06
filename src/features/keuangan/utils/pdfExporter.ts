@@ -24,7 +24,7 @@ export const exportExpensesToPDF = (
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(16);
   doc.setTextColor(255, 255, 255);
-  doc.text('SAFAR TRAVEL UMROH & HAJJ', 14, 12);
+  doc.text('VTU TRAVEL UMROH & HAJJ', 14, 12);
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(10);
@@ -156,8 +156,8 @@ export const exportExpensesToPDF = (
     doc.text('_______________________', sigX1, finalY + 22);
     doc.text('_______________________', sigX2, finalY + 22);
 
-    doc.text('Finance / Kasir Safar Travel', sigX1, finalY + 27);
-    doc.text('Direktur Utama Safar Travel', sigX2, finalY + 27);
+    doc.text('Finance / Kasir VTU Travel', sigX1, finalY + 27);
+    doc.text('Direktur Utama VTU Travel', sigX2, finalY + 27);
   }
 
   doc.save(`Laporan_Pengeluaran_Umroh_${new Date().toISOString().slice(0, 10)}.pdf`);

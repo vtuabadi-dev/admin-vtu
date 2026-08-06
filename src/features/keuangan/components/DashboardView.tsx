@@ -105,7 +105,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
         <div className="relative z-10 max-w-3xl space-y-2">
           <div className="inline-flex items-center gap-2 px-3 py-1 bg-amber-500/10 border border-amber-500/30 rounded-full text-xs font-bold text-amber-400">
-            <Sparkles className="w-3.5 h-3.5" /> Haramain Finance Management
+            <Sparkles className="w-3.5 h-3.5" /> VTU Finance Management
           </div>
           <h2 className="text-2xl sm:text-3xl font-bold tracking-tight">
             Dashboard Keuangan Umroh &amp; Sisa Kursi

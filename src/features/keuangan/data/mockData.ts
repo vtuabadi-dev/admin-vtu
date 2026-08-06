@@ -7,7 +7,7 @@ const createSampleInvoiceSvg = (title: string, vendor: string, amount: string, i
     <rect x="20" y="20" width="560" height="760" rx="12" fill="#ffffff" stroke="#cbd5e1" stroke-width="2"/>
     <path d="M 20 20 L 580 20 L 580 100 L 20 100 Z" fill="#0f172a"/>
     <text x="50" y="65" font-size="24" font-weight="bold" fill="#f59e0b">INVOICE PEMBAYARAN VENDOR</text>
-    <text x="50" y="85" font-size="12" fill="#cbd5e1">HARAMAIN FINANCE — TRAVEL UMROH &amp; HAJJ</text>
+    <text x="50" y="85" font-size="12" fill="#cbd5e1">VTU FINANCE — TRAVEL UMROH &amp; HAJJ</text>
     
     <text x="50" y="140" font-size="14" font-weight="bold" fill="#334155">Nomor Invoice:</text>
     <text x="180" y="140" font-size="14" fill="#0f172a">${invoiceNo}</text>
@@ -72,7 +72,7 @@ const createSampleTransferProofSvg = (bank: string, refNo: string, amount: strin
     <line x1="85" y1="485" x2="515" y2="485" stroke="#1e293b" stroke-width="1"/>
     
     <text x="85" y="515" font-size="13" fill="#94a3b8">Pengirim:</text>
-    <text x="240" y="515" font-size="13" font-weight="bold" fill="#f8fafc">HARAMAIN FINANCE (REK OPERASIONAL)</text>
+    <text x="240" y="515" font-size="13" font-weight="bold" fill="#f8fafc">VTU FINANCE (REK OPERASIONAL)</text>
     
     <line x1="85" y1="535" x2="515" y2="535" stroke="#1e293b" stroke-width="1"/>
     
