@@ -126,9 +126,10 @@ const adminNav: NavSection[] = [
     title: "PEMBAYARAN",
     items: [
       {
-        label: "Pembayaran",
+        label: "Pembayaran & Keuangan",
         icon: CreditCard,
         children: [
+          { label: "Modul Keuangan Travel", href: "/admin/keuangan-travel" },
           { label: "Monitoring Pembayaran", href: "/admin/pembayaran" },
           { label: "Jadwal Reminder", href: "/admin/pembayaran/reminder" },
           { label: "Manajemen Invoice", href: "/admin/pembayaran/laporan" },
