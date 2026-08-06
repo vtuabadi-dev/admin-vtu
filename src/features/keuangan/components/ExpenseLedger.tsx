@@ -36,6 +36,7 @@ export const ExpenseLedger: React.FC<ExpenseLedgerProps> = ({
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [groupIdFilter, setGroupIdFilter] = useState(selectedGroupIdFilter);
+  const [monthFilter, setMonthFilter] = useState('ALL');
   const [categoryFilter, setCategoryFilter] = useState('ALL');
   const [statusFilter, setStatusFilter] = useState('ALL');
 
@@ -53,6 +54,19 @@ export const ExpenseLedger: React.FC<ExpenseLedgerProps> = ({
     if (groupIdFilter !== 'ALL') {
       if (groupIdFilter === 'GENERAL' && e.groupId) return false;
       if (groupIdFilter !== 'GENERAL' && e.groupId !== groupIdFilter) return false;
+    }
+
+    // Month Filter
+    if (monthFilter !== 'ALL') {
+      const transMonth = e.transactionDate ? e.transactionDate.slice(5, 7) : '';
+      let match = transMonth === monthFilter;
+      if (!match && e.groupId) {
+        const group = groups.find((g) => g.id === e.groupId);
+        if (group && group.departureDate) {
+          match = group.departureDate.slice(5, 7) === monthFilter;
+        }
+      }
+      if (!match) return false;
     }
 
     // Category Filter
@@ -90,7 +104,7 @@ export const ExpenseLedger: React.FC<ExpenseLedgerProps> = ({
         </div>
 
         {/* Filter Controls Row */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-2 border-t border-slate-100">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3 pt-2 border-t border-slate-100">
           {/* Search Field */}
           <div className="relative">
             <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
@@ -116,6 +130,27 @@ export const ExpenseLedger: React.FC<ExpenseLedgerProps> = ({
                 {g.name} ({g.code})
               </option>
             ))}
+          </select>
+
+          {/* Month Filter */}
+          <select
+            value={monthFilter}
+            onChange={(e) => setMonthFilter(e.target.value)}
+            className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+          >
+            <option value="ALL">Semua Bulan Transaksi</option>
+            <option value="01">Januari</option>
+            <option value="02">Februari</option>
+            <option value="03">Maret</option>
+            <option value="04">April</option>
+            <option value="05">Mei</option>
+            <option value="06">Juni</option>
+            <option value="07">Juli</option>
+            <option value="08">Agustus</option>
+            <option value="09">September</option>
+            <option value="10">Oktober</option>
+            <option value="11">November</option>
+            <option value="12">Desember</option>
           </select>
 
           {/* Category Filter */}

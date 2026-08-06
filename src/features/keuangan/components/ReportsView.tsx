@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { DepartureGroup, ExpenseRecord } from '../types';
 import { formatRupiah, formatTanggalIndo } from '../utils/formatters';
+import { loadStoredCategories } from '../utils/storage';
 
 interface ReportsViewProps {
   expenses: ExpenseRecord[];
@@ -20,6 +21,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
   onExportExcel,
 }) => {
   const [selectedGroupId, setSelectedGroupId] = useState<string>('ALL');
+  const [monthFilter, setMonthFilter] = useState<string>('ALL');
   const [categoryFilter, setCategoryFilter] = useState<string>('ALL');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
 
@@ -27,6 +29,17 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
 
   const filteredExpenses = expenses.filter((exp) => {
     if (selectedGroupId !== 'ALL' && exp.groupId !== selectedGroupId) return false;
+    if (monthFilter !== 'ALL') {
+      const transMonth = exp.transactionDate ? exp.transactionDate.slice(5, 7) : '';
+      let match = transMonth === monthFilter;
+      if (!match && exp.groupId) {
+        const group = groups.find((g) => g.id === exp.groupId);
+        if (group && group.departureDate) {
+          match = group.departureDate.slice(5, 7) === monthFilter;
+        }
+      }
+      if (!match) return false;
+    }
     if (categoryFilter !== 'ALL' && exp.category !== categoryFilter) return false;
     if (statusFilter !== 'ALL' && exp.paymentStatus !== statusFilter) return false;
     return true;
@@ -53,7 +66,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
         </div>
 
         {/* Filter Selection Controls */}
-        <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+        <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
           <div>
             <label className="block font-bold text-slate-700 mb-1">Grup Keberangkatan</label>
             <select
@@ -71,6 +84,29 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
           </div>
 
           <div>
+            <label className="block font-bold text-slate-700 mb-1">Bulan Transaksi</label>
+            <select
+              value={monthFilter}
+              onChange={(e) => setMonthFilter(e.target.value)}
+              className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl font-medium text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+            >
+              <option value="ALL">Semua Bulan</option>
+              <option value="01">Januari</option>
+              <option value="02">Februari</option>
+              <option value="03">Maret</option>
+              <option value="04">April</option>
+              <option value="05">Mei</option>
+              <option value="06">Juni</option>
+              <option value="07">Juli</option>
+              <option value="08">Agustus</option>
+              <option value="09">September</option>
+              <option value="10">Oktober</option>
+              <option value="11">November</option>
+              <option value="12">Desember</option>
+            </select>
+          </div>
+
+          <div>
             <label className="block font-bold text-slate-700 mb-1">Kategori Pengeluaran</label>
             <select
               value={categoryFilter}
@@ -78,16 +114,11 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
               className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl font-medium text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
             >
               <option value="ALL">Semua Kategori</option>
-              <option value="Tiket Penerbangan">Tiket Penerbangan</option>
-              <option value="Hotel Makkah">Hotel Makkah</option>
-              <option value="Hotel Madinah">Hotel Madinah</option>
-              <option value="Visa & Asuransi">Visa &amp; Asuransi</option>
-              <option value="Transport Bus & Train">Transport Bus &amp; Train</option>
-              <option value="Mutawwif & Handling">Mutawwif &amp; Handling</option>
-              <option value="Perlengkapan">Perlengkapan</option>
-              <option value="Catering & Konsumsi">Catering &amp; Konsumsi</option>
-              <option value="Operasional & Marketing">Operasional &amp; Marketing</option>
-              <option value="Reimbursement">Reimbursement</option>
+              {loadStoredCategories().map((cat) => (
+                <option key={cat} value={cat}>
+                  {cat}
+                </option>
+              ))}
             </select>
           </div>
 
