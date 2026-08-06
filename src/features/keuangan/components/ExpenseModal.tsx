@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Receipt,
   Upload,
@@ -6,9 +6,11 @@ import {
   Sparkles,
   Loader2,
   CheckCircle2,
+  Plus,
 } from 'lucide-react';
 import { DepartureGroup, ExpenseCategory, ExpenseRecord, PaymentStatus } from '../types';
 import { SAR_TO_IDR } from '../utils/formatters';
+import { loadStoredCategories, saveCustomCategory } from '../utils/storage';
 
 interface ExpenseModalProps {
   isOpen: boolean;
@@ -34,6 +36,13 @@ export const ExpenseModal: React.FC<ExpenseModalProps> = ({
   const [category, setCategory] = useState<ExpenseCategory>(
     expenseToEdit?.category || 'Hotel Makkah'
   );
+  const [categoriesList, setCategoriesList] = useState<string[]>([]);
+  const [showAddCatModal, setShowAddCatModal] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState('');
+
+  useEffect(() => {
+    setCategoriesList(loadStoredCategories());
+  }, []);
   const [vendorName, setVendorName] = useState(expenseToEdit?.vendorName || '');
   const [amount, setAmount] = useState<number>(expenseToEdit?.amount || 0);
   const [currencyMode, setCurrencyMode] = useState<'IDR' | 'SAR'>('IDR');
@@ -228,23 +237,35 @@ export const ExpenseModal: React.FC<ExpenseModalProps> = ({
             </div>
 
             <div>
-              <label className="block font-bold text-slate-700 mb-1">Kategori Pengeluaran</label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block font-bold text-slate-700">Kategori Pengeluaran</label>
+                <button
+                  type="button"
+                  onClick={() => setShowAddCatModal(true)}
+                  className="text-emerald-700 hover:text-emerald-800 hover:underline font-bold text-[11px] flex items-center gap-0.5"
+                >
+                  <Plus className="w-3.5 h-3.5 stroke-[2.5]" /> + Tambah Kategori
+                </button>
+              </div>
               <select
                 value={category}
-                onChange={(e) => setCategory(e.target.value as ExpenseCategory)}
+                onChange={(e) => {
+                  if (e.target.value === '__ADD_NEW__') {
+                    setShowAddCatModal(true);
+                  } else {
+                    setCategory(e.target.value);
+                  }
+                }}
                 className="w-full px-3 py-2 border border-slate-300 rounded-xl font-medium text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
               >
-                <option value="Tiket Penerbangan">Tiket Penerbangan (Airlines)</option>
-                <option value="Hotel Makkah">Hotel Makkah</option>
-                <option value="Hotel Madinah">Hotel Madinah</option>
-                <option value="Visa & Asuransi">Visa &amp; Asuransi Health</option>
-                <option value="Transport Bus & Train">Transport Bus &amp; Train</option>
-                <option value="Mutawwif & Handling">Mutawwif &amp; Handling</option>
-                <option value="Perlengkapan">Perlengkapan Jamaah</option>
-                <option value="Catering & Konsumsi">Catering &amp; Konsumsi</option>
-                <option value="Operasional & Marketing">Operasional &amp; Marketing</option>
-                <option value="Reimbursement">Reimbursement Staff</option>
-                <option value="Lain-lain">Lain-lain</option>
+                {categoriesList.map((cat) => (
+                  <option key={cat} value={cat}>
+                    {cat}
+                  </option>
+                ))}
+                <option value="__ADD_NEW__" className="font-bold text-emerald-700 bg-emerald-50">
+                  + Tambah Kategori Baru...
+                </option>
               </select>
             </div>
           </div>
@@ -565,6 +586,63 @@ export const ExpenseModal: React.FC<ExpenseModalProps> = ({
           </div>
         </form>
       </div>
+
+      {/* Sub-modal: Tambah Kategori Pengeluaran Baru */}
+      {showAddCatModal && (
+        <div className="fixed inset-0 z-[60] bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-5 shadow-2xl border border-slate-200 space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <h4 className="font-bold text-sm text-slate-900 flex items-center gap-1.5">
+                <Plus className="w-4 h-4 text-emerald-600" /> Tambah Kategori Pengeluaran Baru
+              </h4>
+              <button
+                type="button"
+                onClick={() => setShowAddCatModal(false)}
+                className="text-slate-400 hover:text-slate-600 p-1"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Nama Jenis Kategori</label>
+              <input
+                type="text"
+                value={newCategoryName}
+                onChange={(e) => setNewCategoryName(e.target.value)}
+                placeholder="Contoh: Sewa Guide Lokal / Airport Handling"
+                className="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs font-medium text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                autoFocus
+              />
+            </div>
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setShowAddCatModal(false)}
+                className="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg text-xs"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (!newCategoryName.trim()) {
+                    alert('Mohon isi nama kategori baru.');
+                    return;
+                  }
+                  const updated = saveCustomCategory(newCategoryName.trim());
+                  setCategoriesList(updated);
+                  setCategory(newCategoryName.trim());
+                  setNewCategoryName('');
+                  setShowAddCatModal(false);
+                }}
+                className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-lg text-xs shadow-sm"
+              >
+                Simpan &amp; Gunakan Kategori
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -1,17 +1,6 @@
 export type DepartureStatus = 'Direncanakan' | 'Aktif' | 'Berangkat' | 'Selesai' | 'Batal';
 
-export type ExpenseCategory =
-  | 'Tiket Penerbangan'
-  | 'Hotel Makkah'
-  | 'Hotel Madinah'
-  | 'Visa & Asuransi'
-  | 'Transport Bus & Train'
-  | 'Mutawwif & Handling'
-  | 'Perlengkapan'
-  | 'Catering & Konsumsi'
-  | 'Operasional & Marketing'
-  | 'Reimbursement'
-  | 'Lain-lain';
+export type ExpenseCategory = string;
 
 export type PaymentStatus = 'Lunas' | 'DP / Partial' | 'Belum Dibayar';
 

@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { DepartureGroup, ExpenseRecord } from '../types';
 import { formatRupiah, formatTanggalIndo } from '../utils/formatters';
+import { loadStoredCategories } from '../utils/storage';
 
 interface ExpenseLedgerProps {
   expenses: ExpenseRecord[];
@@ -124,17 +125,11 @@ export const ExpenseLedger: React.FC<ExpenseLedgerProps> = ({
             className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500"
           >
             <option value="ALL">Semua Kategori</option>
-            <option value="Tiket Penerbangan">Tiket Penerbangan</option>
-            <option value="Hotel Makkah">Hotel Makkah</option>
-            <option value="Hotel Madinah">Hotel Madinah</option>
-            <option value="Visa & Asuransi">Visa &amp; Asuransi</option>
-            <option value="Transport Bus & Train">Transport Bus &amp; Train</option>
-            <option value="Mutawwif & Handling">Mutawwif &amp; Handling</option>
-            <option value="Perlengkapan">Perlengkapan Jamaah</option>
-            <option value="Catering & Konsumsi">Catering &amp; Konsumsi</option>
-            <option value="Operasional & Marketing">Operasional &amp; Marketing</option>
-            <option value="Reimbursement">Reimbursement</option>
-            <option value="Lain-lain">Lain-lain</option>
+            {loadStoredCategories().map((cat) => (
+              <option key={cat} value={cat}>
+                {cat}
+              </option>
+            ))}
           </select>
 
           {/* Status Filter */}
