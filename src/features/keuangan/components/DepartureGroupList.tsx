@@ -139,7 +139,7 @@ export const DepartureGroupList: React.FC<DepartureGroupListProps> = ({
             <Users className="w-5 h-5 text-amber-500" /> Management Grup Keberangkatan Umroh
           </h2>
           <p className="text-xs text-slate-500">
-            Kelola grup jadwal keberangkatan, alokasi anggaran, dan pantau ketersediaan seat kursi jamaah.
+            Terhubung otomatis dengan referensi Paket Umroh Aktif. Kelola alokasi anggaran vendor dan pantau ketersediaan seat kursi jamaah.
           </p>
         </div>
 
