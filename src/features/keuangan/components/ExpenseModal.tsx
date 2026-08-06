@@ -27,8 +27,6 @@ export const ExpenseModal: React.FC<ExpenseModalProps> = ({
   defaultGroupId,
   onSaveExpense,
 }) => {
-  if (!isOpen) return null;
-
   const [title, setTitle] = useState(expenseToEdit?.title || '');
   const [groupId, setGroupId] = useState<string>(
     expenseToEdit?.groupId || defaultGroupId || ''
@@ -73,6 +71,8 @@ export const ExpenseModal: React.FC<ExpenseModalProps> = ({
   // AI Scanner state
   const [isScanningAI, setIsScanningAI] = useState(false);
   const [scanMessage, setScanMessage] = useState<string | null>(null);
+
+  if (!isOpen) return null;
 
   const handleSarChange = (valSar: number) => {
     setSarValue(valSar);
