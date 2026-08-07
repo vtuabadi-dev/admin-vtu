@@ -19,20 +19,32 @@ export async function GET(request: NextRequest) {
     let isDualStartingGroup = false;
 
     if (namaPaket && namaPaket !== "ALL") {
-      const matchKeb = await prisma.keberangkatan.findFirst({
-        where: {
-          OR: [
-            { namaPaket: namaPaket },
-            { kode: namaPaket },
-            { kodeIndividu: namaPaket },
-          ],
-        },
-        select: { id: true, paketGrupId: true, namaPaket: true, kode: true, kodeIndividu: true },
+      // First check if there is a PaketGrup with this name
+      const matchGrup = await prisma.paketGrup.findFirst({
+        where: { namaPaket: namaPaket },
+        select: { id: true },
       });
 
-      if (matchKeb?.paketGrupId) {
+      let matchKeb = null;
+      let targetGrupId = matchGrup?.id || null;
+
+      if (!targetGrupId) {
+        matchKeb = await prisma.keberangkatan.findFirst({
+          where: {
+            OR: [
+              { namaPaket: namaPaket },
+              { kode: namaPaket },
+              { kodeIndividu: namaPaket },
+            ],
+          },
+          select: { id: true, paketGrupId: true, namaPaket: true, kode: true, kodeIndividu: true },
+        });
+        targetGrupId = matchKeb?.paketGrupId || null;
+      }
+
+      if (targetGrupId) {
         const groupMembers = await prisma.keberangkatan.findMany({
-          where: { paketGrupId: matchKeb.paketGrupId },
+          where: { paketGrupId: targetGrupId },
           select: { namaPaket: true, kode: true, kodeIndividu: true },
         });
 

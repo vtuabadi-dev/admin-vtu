@@ -178,6 +178,15 @@ export default function AdminLaporanPaketPage() {
   const [loadingLaporan, setLoadingLaporan] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
 
+  // Manual linking states
+  const [refreshCounter, setRefreshCounter] = useState(0);
+  const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
+  const [selectedTargetPackage, setSelectedTargetPackage] = useState("");
+  const [linking, setLinking] = useState(false);
+  const [unlinking, setUnlinking] = useState(false);
+
+  const refetchLaporan = () => setRefreshCounter((c) => c + 1);
+
   // Data Master Harga
   const [hargaBadal, setHargaBadal] = useState<number>(0);
   const [hargaWakaf, setHargaWakaf] = useState<number>(0);
@@ -197,6 +206,57 @@ export default function AdminLaporanPaketPage() {
       })
       .catch(console.error);
   }, []);
+
+  const handleLinkPackage = async () => {
+    if (!selectedTargetPackage) return;
+    setLinking(true);
+    try {
+      const res = await fetch("/api/admin/laporan-paket/link", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sourceName: selectedPaket,
+          targetName: selectedTargetPackage,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setIsLinkModalOpen(false);
+        setSelectedTargetPackage("");
+        refetchLaporan();
+      } else {
+        alert(data.message || "Gagal menggabungkan paket");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Terjadi kesalahan saat menggabungkan paket");
+    } finally {
+      setLinking(false);
+    }
+  };
+
+  const handleUnlinkPackage = async (packageName: string) => {
+    if (!confirm(`Apakah Anda yakin ingin menghapus hubungan laporan untuk paket "${packageName}"?`)) {
+      return;
+    }
+    setUnlinking(true);
+    try {
+      const res = await fetch(`/api/admin/laporan-paket/link?name=${encodeURIComponent(packageName)}`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      if (data.success) {
+        refetchLaporan();
+      } else {
+        alert(data.message || "Gagal menghapus hubungan paket");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Terjadi kesalahan saat menghapus hubungan paket");
+    } finally {
+      setUnlinking(false);
+    }
+  };
 
   const generateWaTemplate = () => {
     let msg = `*LAPORAN KOLEKTIF BADAL UMROH & WAKAF QURAN*\n`;
@@ -286,7 +346,7 @@ export default function AdminLaporanPaketPage() {
       }
     };
     fetchLaporan();
-  }, [selectedPaket]);
+  }, [selectedPaket, refreshCounter]);
 
   const bulanLabel = BULAN_LIST.find((b) => b.value === selectedBulan)?.label ?? "";
 
@@ -414,33 +474,74 @@ export default function AdminLaporanPaketPage() {
       {selectedPaket && !loadingLaporan && hasSearched && (
         <>
           {/* Dual / Tambah Starting Point Notice Banner */}
-          {linkedPackageNames.length > 1 && (
+          {linkedPackageNames.length > 1 ? (
             <div className="bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 rounded-xl p-4 flex items-start gap-3 shadow-sm">
               <div className="p-2 bg-amber-500 text-slate-950 rounded-lg font-bold shrink-0 mt-0.5">
                 <Layers className="h-5 w-5" />
               </div>
-              <div className="space-y-1">
-                <h4 className="text-sm font-bold text-amber-900 dark:text-amber-300 flex items-center gap-2">
-                  Paket Tambah Starting Point — Laporan Konsolidasi Gabungan
-                </h4>
+              <div className="space-y-1 flex-1">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <h4 className="text-sm font-bold text-amber-900 dark:text-amber-300 flex items-center gap-2">
+                    Laporan Konsolidasi Gabungan
+                  </h4>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 text-xs bg-white text-slate-800 border-amber-300 hover:bg-amber-100 dark:bg-slate-900 dark:text-slate-100 dark:border-amber-800 dark:hover:bg-slate-800 gap-1"
+                    onClick={() => setIsLinkModalOpen(true)}
+                  >
+                    <Layers className="h-3 w-3" />
+                    Tambah Hubungan Paket
+                  </Button>
+                </div>
                 <p className="text-xs text-amber-800 dark:text-amber-400">
-                  Paket ini terhubung dengan Paket Tambahan Starting. Data Badal Umroh &amp; Wakaf Al-Qur&apos;an disatukan sebagai satu kesatuan laporan untuk Paket Induk &amp; Paket Tambahan Starting:
+                  Data Badal Umroh &amp; Wakaf Al-Qur&apos;an disatukan sebagai satu kesatuan laporan untuk paket-paket berikut:
                 </p>
                 <div className="flex flex-wrap gap-2 pt-1">
-                  {linkedPackageNames.map((pkgName, idx) => (
+                  {linkedPackageNames.map((pkgName) => (
                     <span
                       key={pkgName}
-                      className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-bold border ${
+                      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-bold border ${
                         pkgName === selectedPaket
                           ? "bg-emerald-600 text-white border-emerald-700 shadow-sm"
                           : "bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 border-amber-300 dark:border-amber-700"
                       }`}
                     >
-                      {idx === 0 ? "Paket Induk: " : "Paket Tambahan Starting: "} {pkgName}
+                      {pkgName}
+                      {pkgName !== selectedPaket && (
+                        <button
+                          type="button"
+                          onClick={() => handleUnlinkPackage(pkgName)}
+                          disabled={unlinking}
+                          className="hover:text-red-500 transition-colors disabled:opacity-50 ml-1"
+                          title="Hapus hubungan paket"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      )}
                     </span>
                   ))}
                 </div>
               </div>
+            </div>
+          ) : (
+            <div className="bg-muted/30 border border-border rounded-xl p-4 flex items-center justify-between flex-wrap gap-3 shadow-sm">
+              <div className="space-y-0.5">
+                <h4 className="text-sm font-bold text-foreground">
+                  Laporan Paket Standalone
+                </h4>
+                <p className="text-xs text-muted-foreground">
+                  Paket ini belum digabungkan dengan paket lain. Anda dapat menggabungkannya agar laporannya disatukan.
+                </p>
+              </div>
+              <Button
+                size="sm"
+                className="bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5"
+                onClick={() => setIsLinkModalOpen(true)}
+              >
+                <Layers className="h-3.5 w-3.5" />
+                Gabungkan dengan Paket Lain
+              </Button>
             </div>
           )}
 
@@ -621,6 +722,57 @@ export default function AdminLaporanPaketPage() {
             >
               <MessageCircle className="h-4 w-4" /> Buka WhatsApp Desktop/Web
             </a>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Modal Hubungkan Laporan Paket */}
+      <Modal
+        open={isLinkModalOpen}
+        onClose={() => {
+          setIsLinkModalOpen(false);
+          setSelectedTargetPackage("");
+        }}
+        title="Gabungkan Laporan Paket"
+        size="lg"
+      >
+        <div className="space-y-4 pt-2">
+          <p className="text-sm text-muted-foreground">
+            Pilih paket keberangkatan lain yang ingin digabungkan dengan paket <strong>{selectedPaket}</strong>. Setelah digabungkan, laporan niat badal &amp; wakaf untuk paket-paket ini akan disatukan seterusnya.
+          </p>
+          
+          <div className="space-y-2">
+            <label className="text-xs font-bold text-foreground block">
+              Pilih Paket Yang Akan Digabungkan
+            </label>
+            <SearchableCombobox
+              options={daftarPaket.filter(
+                (p) => p !== selectedPaket && !linkedPackageNames.includes(p)
+              )}
+              value={selectedTargetPackage}
+              onChange={setSelectedTargetPackage}
+              placeholder="Cari & pilih paket..."
+            />
+          </div>
+
+          <div className="flex items-center justify-end gap-3 pt-4 border-t border-border">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsLinkModalOpen(false);
+                setSelectedTargetPackage("");
+              }}
+              disabled={linking}
+            >
+              Batal
+            </Button>
+            <Button
+              onClick={handleLinkPackage}
+              disabled={linking || !selectedTargetPackage}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white"
+            >
+              {linking ? "Menghubungkan..." : "Gabungkan Laporan"}
+            </Button>
           </div>
         </div>
       </Modal>
