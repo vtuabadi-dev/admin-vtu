@@ -43,6 +43,11 @@ const BULAN_LIST = [
 const currentYear = new Date().getFullYear();
 const TAHUN_LIST = Array.from({ length: 5 }, (_, i) => String(currentYear - i));
 
+const DEFAULT_HEADER = `*LAPORAN KOLEKTIF BADAL UMROH & WAKAF QURAN*`;
+const DEFAULT_BADAL_FORMAT = `[no]. [nama] ([gender] - [hubungan])`;
+const DEFAULT_WAKAF_FORMAT = `[no]. [nama] ([jumlah] Mushaf) - [lokasi]`;
+const DEFAULT_FOOTER = `Demikian laporan kolektif paket ini.`;
+
 // ── Searchable Combobox ──
 function SearchableCombobox({
   options,
@@ -187,6 +192,13 @@ export default function AdminLaporanPaketPage() {
 
   const refetchLaporan = () => setRefreshCounter((c) => c + 1);
 
+  // WA Template configuration states
+  const [activeWaTab, setActiveWaTab] = useState<"preview" | "settings">("preview");
+  const [waHeader, setWaHeader] = useState(DEFAULT_HEADER);
+  const [waBadalFormat, setWaBadalFormat] = useState(DEFAULT_BADAL_FORMAT);
+  const [waWakafFormat, setWaWakafFormat] = useState(DEFAULT_WAKAF_FORMAT);
+  const [waFooter, setWaFooter] = useState(DEFAULT_FOOTER);
+
   // Data Master Harga
   const [hargaBadal, setHargaBadal] = useState<number>(0);
   const [hargaWakaf, setHargaWakaf] = useState<number>(0);
@@ -258,12 +270,52 @@ export default function AdminLaporanPaketPage() {
     }
   };
 
-  const generateWaTemplate = () => {
-    let msg = `*LAPORAN KOLEKTIF BADAL UMROH & WAKAF QURAN*\n`;
+  // Load WA template settings on modal open
+  useEffect(() => {
+    if (typeof window !== "undefined" && isTemplateModalOpen) {
+      setWaHeader(localStorage.getItem("wa_header") || DEFAULT_HEADER);
+      setWaBadalFormat(localStorage.getItem("wa_badal_format") || DEFAULT_BADAL_FORMAT);
+      setWaWakafFormat(localStorage.getItem("wa_wakaf_format") || DEFAULT_WAKAF_FORMAT);
+      setWaFooter(localStorage.getItem("wa_footer") || DEFAULT_FOOTER);
+      setActiveWaTab("preview");
+    }
+  }, [isTemplateModalOpen]);
+
+  const handleSaveSettings = () => {
+    localStorage.setItem("wa_header", waHeader);
+    localStorage.setItem("wa_badal_format", waBadalFormat);
+    localStorage.setItem("wa_wakaf_format", waWakafFormat);
+    localStorage.setItem("wa_footer", waFooter);
+    generateWaTemplate(waHeader, waBadalFormat, waWakafFormat, waFooter);
+    setActiveWaTab("preview");
+    alert("Pengaturan template berhasil disimpan dan diterapkan!");
+  };
+
+  const handleResetSettings = () => {
+    if (confirm("Apakah Anda yakin ingin mengembalikan pengaturan template ke bawaan (default)?")) {
+      setWaHeader(DEFAULT_HEADER);
+      setWaBadalFormat(DEFAULT_BADAL_FORMAT);
+      setWaWakafFormat(DEFAULT_WAKAF_FORMAT);
+      setWaFooter(DEFAULT_FOOTER);
+      localStorage.removeItem("wa_header");
+      localStorage.removeItem("wa_badal_format");
+      localStorage.removeItem("wa_wakaf_format");
+      localStorage.removeItem("wa_footer");
+      alert("Pengaturan template dikembalikan ke bawaan.");
+    }
+  };
+
+  const generateWaTemplate = (
+    header = typeof window !== "undefined" ? localStorage.getItem("wa_header") || DEFAULT_HEADER : DEFAULT_HEADER,
+    badalFormat = typeof window !== "undefined" ? localStorage.getItem("wa_badal_format") || DEFAULT_BADAL_FORMAT : DEFAULT_BADAL_FORMAT,
+    wakafFormat = typeof window !== "undefined" ? localStorage.getItem("wa_wakaf_format") || DEFAULT_WAKAF_FORMAT : DEFAULT_WAKAF_FORMAT,
+    footer = typeof window !== "undefined" ? localStorage.getItem("wa_footer") || DEFAULT_FOOTER : DEFAULT_FOOTER
+  ) => {
+    let msg = `${header}\n\n`;
     if (linkedPackageNames.length > 1) {
-      msg += `*PAKET GABUNGAN (PAKET INDUK & TAMBAH STARTING):*\n`;
+      msg += `*PAKET GABUNGAN:*\n`;
       linkedPackageNames.forEach((pName, idx) => {
-        msg += `${idx + 1}. ${pName} (${idx === 0 ? "Paket Induk" : "Paket Tambahan Starting"})\n`;
+        msg += `${idx + 1}. ${pName}\n`;
       });
       msg += `\n`;
     } else {
@@ -273,7 +325,14 @@ export default function AdminLaporanPaketPage() {
     if (laporanBadal.length > 0) {
       msg += `*Daftar Badal Umroh (${laporanBadal.length} Data)*\n`;
       laporanBadal.forEach((b, i) => {
-        msg += `${i + 1}. ${b.namaAlmarhum} (${b.jenisKelamin === "L" ? "L" : "P"} - ${b.hubungan})\n`;
+        let line = badalFormat
+          .replaceAll("[no]", String(i + 1))
+          .replaceAll("[nama]", b.namaAlmarhum || "")
+          .replaceAll("[gender]", b.jenisKelamin === "L" ? "L" : "P")
+          .replaceAll("[hubungan]", b.hubungan || "")
+          .replaceAll("[paket]", b.paketBadal || "")
+          .replaceAll("[petugas]", b.petugasBadal || "-");
+        msg += `${line}\n`;
       });
       msg += `\n`;
     }
@@ -282,12 +341,17 @@ export default function AdminLaporanPaketPage() {
       const totalMushaf = laporanWakaf.reduce((sum, w) => sum + (w.jumlahMushaf || 0), 0);
       msg += `*Daftar Wakaf Al-Quran (${totalMushaf} Mushaf)*\n`;
       laporanWakaf.forEach((w, i) => {
-        msg += `${i + 1}. ${w.niatAtasNama || "Hamba Allah"} (${w.jumlahMushaf} Mushaf) - ${w.lokasiWakaf}\n`;
+        let line = wakafFormat
+          .replaceAll("[no]", String(i + 1))
+          .replaceAll("[nama]", w.niatAtasNama || "Hamba Allah")
+          .replaceAll("[jumlah]", String(w.jumlahMushaf || 0))
+          .replaceAll("[lokasi]", w.lokasiWakaf || "");
+        msg += `${line}\n`;
       });
       msg += `\n`;
     }
 
-    msg += `Demikian laporan kolektif paket ini.`;
+    msg += footer;
     setWaTemplate(msg);
     setIsTemplateModalOpen(true);
   };
@@ -362,7 +426,7 @@ export default function AdminLaporanPaketPage() {
             </h1>
           </div>
           {selectedPaket && !loadingLaporan && hasSearched && (
-            <Button onClick={generateWaTemplate} className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2">
+            <Button onClick={() => generateWaTemplate()} className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2">
               <MessageCircle className="h-4 w-4" />
               Kirim / Salin Template WA
             </Button>
@@ -699,30 +763,147 @@ export default function AdminLaporanPaketPage() {
       {/* Modal WA Template */}
       <Modal open={isTemplateModalOpen} onClose={() => setIsTemplateModalOpen(false)} title="Konfigurasi Template WhatsApp" size="lg">
         <div className="space-y-4 pt-2">
-          <p className="text-sm text-muted-foreground">
-            Teks laporan ini dibuat secara otomatis. Anda dapat menyesuaikannya sebelum menyalin atau mengirimnya langsung via WhatsApp.
-          </p>
-          <textarea
-            className="w-full h-80 p-3 text-sm rounded-lg border border-input bg-background font-mono"
-            value={waTemplate}
-            onChange={(e) => setWaTemplate(e.target.value)}
-          />
-          <div className="flex items-center justify-end gap-3 pt-2">
-            <Button variant="outline" onClick={() => {
-              navigator.clipboard.writeText(waTemplate);
-              alert("Template berhasil disalin ke clipboard!");
-            }} className="gap-2">
-              <Copy className="h-4 w-4" /> Salin Teks
-            </Button>
-            <a
-              href={`https://wa.me/?text=${encodeURIComponent(waTemplate)}`}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-10 px-4 py-2 bg-emerald-600 text-white hover:bg-emerald-700 gap-2"
+          {/* Tab Header */}
+          <div className="flex border-b border-border">
+            <button
+              className={`px-4 py-2 text-sm font-bold border-b-2 transition-colors ${
+                activeWaTab === "preview"
+                  ? "border-emerald-600 text-emerald-600 font-semibold"
+                  : "border-transparent text-muted-foreground hover:text-foreground"
+              }`}
+              onClick={() => setActiveWaTab("preview")}
             >
-              <MessageCircle className="h-4 w-4" /> Buka WhatsApp Desktop/Web
-            </a>
+              Kirim &amp; Salin Teks
+            </button>
+            <button
+              className={`px-4 py-2 text-sm font-bold border-b-2 transition-colors ${
+                activeWaTab === "settings"
+                  ? "border-emerald-600 text-emerald-600 font-semibold"
+                  : "border-transparent text-muted-foreground hover:text-foreground"
+              }`}
+              onClick={() => setActiveWaTab("settings")}
+            >
+              Pengaturan Format
+            </button>
           </div>
+
+          {activeWaTab === "preview" ? (
+            <div className="space-y-4">
+              <p className="text-xs text-muted-foreground">
+                Teks laporan ini dibuat secara otomatis menggunakan pengaturan format Anda. Anda dapat menyesuaikannya secara langsung di bawah sebelum menyalin atau mengirim.
+              </p>
+              <textarea
+                className="w-full h-80 p-3 text-sm rounded-lg border border-input bg-background font-mono focus:ring-2 focus:ring-emerald-500 outline-none"
+                value={waTemplate}
+                onChange={(e) => setWaTemplate(e.target.value)}
+              />
+              <div className="flex items-center justify-end gap-3 pt-2">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    navigator.clipboard.writeText(waTemplate);
+                    alert("Template berhasil disalin ke clipboard!");
+                  }}
+                  className="gap-2"
+                >
+                  <Copy className="h-4 w-4" /> Salin Teks
+                </Button>
+                <a
+                  href={`https://wa.me/?text=${encodeURIComponent(waTemplate)}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-10 px-4 py-2 bg-emerald-600 text-white hover:bg-emerald-700 gap-2"
+                >
+                  <MessageCircle className="h-4 w-4" /> Buka WhatsApp Desktop/Web
+                </a>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 gap-4">
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-foreground block">
+                    Header Laporan
+                  </label>
+                  <textarea
+                    rows={2}
+                    className="w-full p-2.5 text-sm rounded-lg border border-input bg-background font-mono focus:ring-2 focus:ring-emerald-500 outline-none"
+                    value={waHeader}
+                    onChange={(e) => setWaHeader(e.target.value)}
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-foreground block">
+                    Format Baris Badal Umroh
+                  </label>
+                  <input
+                    type="text"
+                    className="w-full p-2.5 text-sm rounded-lg border border-input bg-background font-mono focus:ring-2 focus:ring-emerald-500 outline-none"
+                    value={waBadalFormat}
+                    onChange={(e) => setWaBadalFormat(e.target.value)}
+                  />
+                  <span className="text-[10px] text-muted-foreground block">
+                    Tag: <code className="bg-muted px-1 rounded">[no]</code> (nomor), <code className="bg-muted px-1 rounded">[nama]</code> (almarhum), <code className="bg-muted px-1 rounded">[gender]</code> (L/P), <code className="bg-muted px-1 rounded">[hubungan]</code>, <code className="bg-muted px-1 rounded">[paket]</code>, <code className="bg-muted px-1 rounded">[petugas]</code>
+                  </span>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-foreground block">
+                    Format Baris Wakaf Al-Quran
+                  </label>
+                  <input
+                    type="text"
+                    className="w-full p-2.5 text-sm rounded-lg border border-input bg-background font-mono focus:ring-2 focus:ring-emerald-500 outline-none"
+                    value={waWakafFormat}
+                    onChange={(e) => setWaWakafFormat(e.target.value)}
+                  />
+                  <span className="text-[10px] text-muted-foreground block">
+                    Tag: <code className="bg-muted px-1 rounded">[no]</code> (nomor), <code className="bg-muted px-1 rounded">[nama]</code> (atas nama), <code className="bg-muted px-1 rounded">[jumlah]</code>, <code className="bg-muted px-1 rounded">[lokasi]</code>
+                  </span>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-foreground block">
+                    Footer Laporan
+                  </label>
+                  <textarea
+                    rows={2}
+                    className="w-full p-2.5 text-sm rounded-lg border border-input bg-background font-mono focus:ring-2 focus:ring-emerald-500 outline-none"
+                    value={waFooter}
+                    onChange={(e) => setWaFooter(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between pt-4 border-t border-border">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleResetSettings}
+                  className="text-amber-600 border-amber-300 hover:bg-amber-50"
+                >
+                  Reset Default
+                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setActiveWaTab("preview")}
+                  >
+                    Batal
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={handleSaveSettings}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                  >
+                    Simpan &amp; Terapkan
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </Modal>
 
