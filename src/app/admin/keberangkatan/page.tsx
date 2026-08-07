@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
-import { Calendar, CalendarDays, Hotel, Search, Trash2, Info, Copy, Check, Pencil, FileText, UserCheck, UserPlus } from "lucide-react";
+import { Calendar, CalendarDays, Hotel, Search, Trash2, Info, Copy, Check, Pencil, FileText, UserCheck, UserPlus, FileSpreadsheet, Upload } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { Modal } from "@/shared/components/ui/Modal";
 import {
   Card,
   CardContent,
@@ -33,6 +34,15 @@ export default function KeberangkatanListPage() {
   const [openInfoId, setOpenInfoId] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
+  // Excel Import States
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importing, setImporting] = useState(false);
+  const [importResult, setImportResult] = useState<{
+    successCount: number;
+    errors: string[];
+  } | null>(null);
+
 
 
   const handleCopyId = async (id: string, e: React.MouseEvent) => {
@@ -52,6 +62,37 @@ export default function KeberangkatanListPage() {
       setError(err instanceof Error ? err : new Error("Database Connection Error"));
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleImportExcel = async () => {
+    if (!importFile) return alert("Pilih file Excel terlebih dahulu");
+    setImporting(true);
+    setImportResult(null);
+
+    const formData = new FormData();
+    formData.append("file", importFile);
+
+    try {
+      const res = await fetch("/api/admin/keberangkatan/import", {
+        method: "POST",
+        body: formData,
+      });
+      const json = await res.json();
+      if (json.success) {
+        setImportResult({
+          successCount: json.createdCount,
+          errors: json.errors || [],
+        });
+        load(); // Refresh the list
+      } else {
+        alert(json.message || "Gagal mengimpor data Excel");
+      }
+    } catch (err: any) {
+      console.error(err);
+      alert("Terjadi kesalahan saat mengimpor file");
+    } finally {
+      setImporting(false);
     }
   };
 
@@ -131,13 +172,24 @@ export default function KeberangkatanListPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Keberangkatan</h1>
           <p className="text-sm text-muted-foreground mt-1">
             Kelola jadwal dan paket keberangkatan umroh
           </p>
         </div>
+        <Button
+          onClick={() => {
+            setImportFile(null);
+            setImportResult(null);
+            setIsImportModalOpen(true);
+          }}
+          className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2"
+        >
+          <FileSpreadsheet className="h-4 w-4" />
+          Import Excel
+        </Button>
       </div>
 
       {/* Search */}
@@ -486,6 +538,95 @@ export default function KeberangkatanListPage() {
         })}
         </div>
       )}
+      {/* Modal Import Excel */}
+      <Modal
+        open={isImportModalOpen}
+        onClose={() => {
+          if (!importing) setIsImportModalOpen(false);
+        }}
+        title="Import Paket via Excel"
+        size="lg"
+      >
+        <div className="space-y-4 pt-2">
+          <p className="text-sm text-muted-foreground">
+            Unggah file Excel untuk membuat paket keberangkatan baru secara instan.
+          </p>
+
+          <div className="bg-muted/40 border rounded-lg p-3.5 flex items-center justify-between text-xs">
+            <span className="font-semibold text-foreground">Template Format Excel</span>
+            <a
+              href="/api/admin/keberangkatan/template"
+              className="inline-flex items-center justify-center font-bold text-emerald-600 dark:text-emerald-400 hover:underline gap-1"
+            >
+              Download Template (.xlsx)
+            </a>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-xs font-bold text-foreground block">
+              Pilih File Excel
+            </label>
+            <div className="flex items-center justify-center border-2 border-dashed border-border rounded-lg p-6 bg-muted/20 hover:bg-muted/40 transition-colors relative cursor-pointer">
+              <input
+                type="file"
+                accept=".xlsx"
+                onChange={(e) => setImportFile(e.target.files?.[0] || null)}
+                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                disabled={importing}
+              />
+              <div className="flex flex-col items-center justify-center text-center space-y-1.5 pointer-events-none">
+                <Upload className="h-8 w-8 text-muted-foreground" />
+                <p className="text-sm font-semibold text-foreground">
+                  {importFile ? importFile.name : "Pilih atau Seret File Excel (.xlsx)"}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Format file wajib sesuai template
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {importResult && (
+            <div className="space-y-2.5 p-3.5 bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900 rounded-lg">
+              <h4 className="text-sm font-bold text-emerald-800 dark:text-emerald-300">
+                Hasil Import:
+              </h4>
+              <p className="text-xs text-emerald-700 dark:text-emerald-400">
+                ✓ Berhasil mengimpor <strong>{importResult.successCount}</strong> paket keberangkatan.
+              </p>
+              {importResult.errors.length > 0 && (
+                <div className="space-y-1 mt-2">
+                  <p className="text-xs font-bold text-red-600 dark:text-red-400">
+                    Detail Kesalahan ({importResult.errors.length} Baris):
+                  </p>
+                  <div className="max-h-28 overflow-y-auto text-[10px] text-red-500 font-mono space-y-0.5 border border-red-100 dark:border-red-950 rounded p-2 bg-red-50/50 dark:bg-red-950/10">
+                    {importResult.errors.map((err, idx) => (
+                      <div key={idx}>{err}</div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="flex items-center justify-end gap-3 pt-4 border-t border-border">
+            <Button
+              variant="outline"
+              onClick={() => setIsImportModalOpen(false)}
+              disabled={importing}
+            >
+              Tutup
+            </Button>
+            <Button
+              onClick={handleImportExcel}
+              disabled={importing || !importFile}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white"
+            >
+              {importing ? "Mengimpor..." : "Mulai Import"}
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }
