@@ -220,6 +220,24 @@ export const keberangkatanRepo = {
       const allJamaahInPackage = keberangkatan.groups.flatMap((g) => g.anggota);
       const jamaahIds = allJamaahInPackage.map((a) => a.id);
 
+      // 1. Unlink package draft if published from this package
+      await tx.packageDraft.updateMany({
+        where: { publishedId: id },
+        data: { publishedId: null },
+      }).catch(() => {});
+
+      // 2. Hard delete activity events and auto deadlines
+      await tx.activityEvent.deleteMany({ where: { keberangkatanId: id } }).catch(() => {});
+      await tx.autoDeadline.deleteMany({ where: { keberangkatanId: id } }).catch(() => {});
+
+      // 3. Hard delete registration requests linked to this package
+      await tx.registrationRequest.deleteMany({ where: { paketId: id } }).catch(() => {});
+
+      // 4. Hard delete rooming and manifest structures for this package
+      await tx.rooming.deleteMany({ where: { keberangkatanId: id } }).catch(() => {});
+      await tx.manifest.deleteMany({ where: { keberangkatanId: id } }).catch(() => {});
+
+      // 5. Hard delete groups and jamaah records if any exist
       if (groupIds.length > 0) {
         // Break circular FK deadlock: reassign ketuaGroupId to a safe external Jamaah or temporary dummy Jamaah
         let safeJamaah = await tx.jamaah.findFirst({
@@ -316,9 +334,7 @@ export const keberangkatanRepo = {
         }
       }
 
-      await tx.rooming.deleteMany({ where: { keberangkatanId: id } });
-      await tx.manifest.deleteMany({ where: { keberangkatanId: id } });
-
+      // 6. Hard delete the Keberangkatan package itself
       await tx.keberangkatan.delete({
         where: { id },
       });
