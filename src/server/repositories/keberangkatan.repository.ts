@@ -194,9 +194,7 @@ export const keberangkatanRepo = {
       include: {
         groups: {
           include: {
-            anggota: {
-              where: { status: { not: "batal" } },
-            },
+            anggota: true,
           },
         },
       },
@@ -206,10 +204,10 @@ export const keberangkatanRepo = {
       throw new Error("Paket keberangkatan tidak ditemukan.");
     }
 
-    const activeJamaahCount = keberangkatan.groups.reduce(
-      (sum, group) => sum + group.anggota.length,
-      0
-    );
+    const activeJamaahCount = keberangkatan.groups.reduce((sum, group) => {
+      const activeInGroup = group.anggota.filter((a: any) => a.status !== "batal");
+      return sum + activeInGroup.length;
+    }, 0);
 
     if (activeJamaahCount > 0) {
       throw new Error(
@@ -219,34 +217,103 @@ export const keberangkatanRepo = {
 
     await prisma.$transaction(async (tx) => {
       const groupIds = keberangkatan.groups.map((g) => g.id);
+      const allJamaahInPackage = keberangkatan.groups.flatMap((g) => g.anggota);
+      const jamaahIds = allJamaahInPackage.map((a) => a.id);
 
       if (groupIds.length > 0) {
-        await tx.dokumenItem.deleteMany({
-          where: { jamaah: { groupId: { in: groupIds } } },
-        });
-        await tx.manifestRow.deleteMany({
-          where: { jamaah: { groupId: { in: groupIds } } },
-        });
-        await tx.penghuniKamar.deleteMany({
-          where: { jamaah: { groupId: { in: groupIds } } },
-        });
-        await tx.alokasiPembayaran.deleteMany({
-          where: { jamaah: { groupId: { in: groupIds } } },
-        });
-        await tx.jamaah.deleteMany({
-          where: { groupId: { in: groupIds } },
+        // Break circular FK deadlock: reassign ketuaGroupId to a safe external Jamaah or temporary dummy Jamaah
+        let safeJamaah = await tx.jamaah.findFirst({
+          where: { id: { notIn: jamaahIds } },
+          select: { id: true },
         });
 
+        let tempJamaahCreatedId: string | null = null;
+
+        if (!safeJamaah) {
+          const tempGroup = await tx.registrationGroup.findFirst({
+            where: { id: { notIn: groupIds } },
+          });
+
+          if (tempGroup) {
+            const temp = await tx.jamaah.create({
+              data: {
+                registrationId: `TEMP-${Date.now()}`,
+                groupId: tempGroup.id,
+                nomorPeserta: `TEMP-${Date.now()}`,
+                namaLengkap: "TEMP_CLEANUP",
+                namaAyah: "-",
+                jenisKelamin: "L" as any,
+                tempatLahir: "-",
+                tanggalLahir: new Date(),
+                nik: "0000000000000000",
+                nomorPaspor: "-",
+                masaBerlakuPaspor: new Date(),
+                nomorTelepon: "-",
+                email: "temp@clean.local",
+                alamat: "-",
+                provinsi: "-",
+                kota: "-",
+                kecamatan: "-",
+                kelurahan: "-",
+                hotelMekkah: "-",
+                hotelMadinah: "-",
+                status: "batal" as any,
+              },
+            });
+            safeJamaah = { id: temp.id };
+            tempJamaahCreatedId = temp.id;
+          }
+        }
+
+        if (safeJamaah) {
+          await tx.registrationGroup.updateMany({
+            where: { id: { in: groupIds } },
+            data: { ketuaGroupId: safeJamaah.id },
+          });
+        }
+
+        if (jamaahIds.length > 0) {
+          await tx.dokumenItem.deleteMany({
+            where: { jamaahId: { in: jamaahIds } },
+          });
+          await tx.manifestRow.deleteMany({
+            where: { jamaahId: { in: jamaahIds } },
+          });
+          await tx.penghuniKamar.deleteMany({
+            where: { jamaahId: { in: jamaahIds } },
+          });
+          await tx.alokasiPembayaran.deleteMany({
+            where: { jamaahId: { in: jamaahIds } },
+          });
+
+          await tx.jamaah.deleteMany({
+            where: { id: { in: jamaahIds } },
+          });
+        }
+
+        await tx.invoiceItem.deleteMany({
+          where: { invoice: { groupId: { in: groupIds } } },
+        });
         await tx.invoice.deleteMany({
           where: { groupId: { in: groupIds } },
         });
         await tx.pembayaran.deleteMany({
           where: { groupId: { in: groupIds } },
         });
+        await tx.invoiceSplitConfig.deleteMany({
+          where: { groupId: { in: groupIds } },
+        }).catch(() => {});
+        await tx.reminder.deleteMany({
+          where: { groupId: { in: groupIds } },
+        }).catch(() => {});
 
         await tx.registrationGroup.deleteMany({
           where: { id: { in: groupIds } },
         });
+
+        if (tempJamaahCreatedId) {
+          await tx.jamaah.delete({ where: { id: tempJamaahCreatedId } }).catch(() => {});
+        }
       }
 
       await tx.rooming.deleteMany({ where: { keberangkatanId: id } });

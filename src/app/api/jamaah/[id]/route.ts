@@ -71,8 +71,21 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
               data: { ketuaGroupId: newLeader.id },
             });
           } else {
+            const safeJamaah = await tx.jamaah.findFirst({
+              where: { id: { not: jamaah.id } },
+              select: { id: true },
+            });
+            if (safeJamaah) {
+              await tx.registrationGroup.update({
+                where: { id: jamaah.groupId },
+                data: { ketuaGroupId: safeJamaah.id },
+              });
+            }
+            await tx.invoiceItem.deleteMany({ where: { invoice: { groupId: jamaah.groupId } } });
             await tx.invoice.deleteMany({ where: { groupId: jamaah.groupId } });
             await tx.pembayaran.deleteMany({ where: { groupId: jamaah.groupId } });
+            await tx.invoiceSplitConfig.deleteMany({ where: { groupId: jamaah.groupId } }).catch(() => {});
+            await tx.reminder.deleteMany({ where: { groupId: jamaah.groupId } }).catch(() => {});
             await tx.registrationGroup.delete({ where: { id: jamaah.groupId } });
           }
         }
