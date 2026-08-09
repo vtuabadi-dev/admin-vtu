@@ -1493,7 +1493,7 @@ function ManifestPageContent() {
                 ⚠️ PERINGATAN: Tindakan ini permanen dan tidak dapat dibatalkan!
               </p>
               <div className="space-y-1.5">
-                <label className="font-semibold block">Ketik "HAPUS" untuk mengonfirmasi:</label>
+                <label className="font-semibold block">Ketik &quot;HAPUS&quot; untuk mengonfirmasi:</label>
                 <input
                   type="text"
                   placeholder="Ketik HAPUS"
