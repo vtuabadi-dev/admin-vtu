@@ -1,6 +1,7 @@
 "use server";
 
 import { prisma } from "@/server/db/client";
+import { packageService } from "@/server/services/package.service";
 
 
 // ==========================================
@@ -128,9 +129,7 @@ export async function getDokumenByJamaah(jamaahId: string) {
 }
 
 export async function deleteKeberangkatan(id: string) {
-  return await prisma.keberangkatan.delete({
-    where: { id },
-  }) as any;
+  return await packageService.delete(id);
 }
 
 export async function createKeberangkatan(data: any) {
