@@ -67,7 +67,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
   }
 }
 
-export async function DELETE(_request: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
   try {
     const session = await auth();
     if (!session?.user) return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
@@ -75,8 +75,15 @@ export async function DELETE(_request: NextRequest, { params }: { params: { id: 
     const perm = checkServerPermission(session, "sistem", "delete");
     if (!perm.allowed) return NextResponse.json({ success: false, message: perm.reason }, { status: 403 });
 
-    await masterDataService.deleteAirline(params.id);
-    return NextResponse.json({ success: true, message: "Deleted successfully" });
+    const mode = request.nextUrl.searchParams.get("mode");
+
+    if (mode === "hard") {
+      await masterDataService.deleteAirline(params.id);
+      return NextResponse.json({ success: true, message: "Deleted successfully" });
+    } else {
+      await masterDataService.updateAirline(params.id, { isActive: false });
+      return NextResponse.json({ success: true, message: "Deactivated successfully" });
+    }
   } catch (error) {
     return formatError(error);
   }

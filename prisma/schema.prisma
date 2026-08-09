@@ -327,7 +327,7 @@ model Keberangkatan {
   // Relations
   paketUmroh         PaketUmroh?        @relation(fields: [paketUmrohId], references: [id])
   paketGrup          PaketGrup?         @relation(fields: [paketGrupId], references: [id])
-  maskapaiMaster     MasterAirline?     @relation(fields: [maskapaiId], references: [id])
+  maskapaiMaster     MasterAirline?     @relation(fields: [maskapaiId], references: [id], onDelete: Cascade)
   hotelMekkahMaster  MasterHotel?       @relation("HotelMekkah", fields: [hotelMekkahId], references: [id])
   hotelMadinahMaster MasterHotel?       @relation("HotelMadinah", fields: [hotelMadinahId], references: [id])
   startingPoint      MasterCity?        @relation("StartingPoint", fields: [startingPointId], references: [id])
@@ -404,7 +404,7 @@ model RegistrationGroup {
   updatedAt            DateTime    @updatedAt
 
   // Relations
-  keberangkatan        Keberangkatan         @relation(fields: [paketKeberangkatanId], references: [id])
+  keberangkatan        Keberangkatan         @relation(fields: [paketKeberangkatanId], references: [id], onDelete: Cascade)
   anggota              Jamaah[] // jamaah with this groupId
   invoices             Invoice[]
   pembayaran           Pembayaran[]
@@ -493,7 +493,7 @@ model RegistrationRequest {
   createdAt       DateTime           @default(now())
   updatedAt       DateTime           @updatedAt
 
-  keberangkatan Keberangkatan        @relation(fields: [paketId], references: [id])
+  keberangkatan Keberangkatan        @relation(fields: [paketId], references: [id], onDelete: Cascade)
   members       RegistrationMember[]
   group         RegistrationGroup?   @relation(fields: [groupId], references: [id])
 
@@ -685,7 +685,7 @@ model Manifest {
   updatedAt       DateTime       @updatedAt
 
   // Relations
-  keberangkatan Keberangkatan @relation(fields: [keberangkatanId], references: [id])
+  keberangkatan Keberangkatan @relation(fields: [keberangkatanId], references: [id], onDelete: Cascade)
   rows          ManifestRow[]
 
   @@index([keberangkatanId])
@@ -733,7 +733,7 @@ model Rooming {
   updatedAt       DateTime      @updatedAt
 
   // Relations
-  keberangkatan Keberangkatan @relation(fields: [keberangkatanId], references: [id])
+  keberangkatan Keberangkatan @relation(fields: [keberangkatanId], references: [id], onDelete: Cascade)
   kamar         Kamar[]
 
   @@index([keberangkatanId])
@@ -863,7 +863,7 @@ model ActivityEvent {
   triggeredBy     String?
 
   // Relations
-  keberangkatan Keberangkatan @relation(fields: [keberangkatanId], references: [id])
+  keberangkatan Keberangkatan @relation(fields: [keberangkatanId], references: [id], onDelete: Cascade)
 
   @@index([keberangkatanId])
   @@index([timestamp])
@@ -884,7 +884,7 @@ model AutoDeadline {
   warningDays     Int
 
   // Relations
-  keberangkatan Keberangkatan @relation(fields: [keberangkatanId], references: [id])
+  keberangkatan Keberangkatan @relation(fields: [keberangkatanId], references: [id], onDelete: Cascade)
 
   @@index([keberangkatanId])
   @@index([deadlineDate])

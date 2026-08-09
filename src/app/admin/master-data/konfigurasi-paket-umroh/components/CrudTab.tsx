@@ -64,6 +64,10 @@ export function CrudTab<T extends { id: string; status?: string; [key: string]: 
   const [filterValue, setFilterValue] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(!!apiEndpoint);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
+  const [deleteMode, setDeleteMode] = useState<"soft" | "hard">("soft");
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
 
   const fetchData = async () => {
     if (!apiEndpoint) return;
@@ -104,28 +108,41 @@ export function CrudTab<T extends { id: string; status?: string; [key: string]: 
     setModalOpen(true);
   };
 
-  const handleDelete = async (id: string) => {
-    if (confirm(`Apakah Anda yakin ingin menonaktifkan/menghapus ${itemName} ini?`)) {
-      if (apiEndpoint) {
-        try {
-          setLoading(true);
-          const res = await fetch(`${apiEndpoint}/${id}`, {
-            method: "DELETE",
-          });
-          const resJson = await res.json();
-          if (resJson.success) {
-            await fetchData();
-          } else {
-            alert(`Error: ${resJson.message}`);
-          }
-        } catch (e) {
-          console.error("Failed to delete", e);
-        } finally {
-          setLoading(false);
+  const handleDeleteClick = (id: string) => {
+    setDeleteTargetId(id);
+    setDeleteMode("soft");
+    setDeleteConfirmText("");
+    setDeleteModalOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deleteTargetId) return;
+    if (deleteMode === "hard" && deleteConfirmText !== "HAPUS") {
+      alert("Teks konfirmasi salah. Silakan ketik HAPUS untuk mengonfirmasi.");
+      return;
+    }
+
+    if (apiEndpoint) {
+      try {
+        setLoading(true);
+        const res = await fetch(`${apiEndpoint}/${deleteTargetId}?mode=${deleteMode}`, {
+          method: "DELETE",
+        });
+        const resJson = await res.json();
+        if (resJson.success) {
+          setDeleteModalOpen(false);
+          await fetchData();
+        } else {
+          alert(`Error: ${resJson.message}`);
         }
-      } else {
-        setData((prev) => prev.filter((item) => item.id !== id));
+      } catch (e) {
+        console.error("Failed to delete", e);
+      } finally {
+        setLoading(false);
       }
+    } else {
+      setData((prev) => prev.filter((item) => item.id !== deleteTargetId));
+      setDeleteModalOpen(false);
     }
   };
 
@@ -336,7 +353,7 @@ export function CrudTab<T extends { id: string; status?: string; [key: string]: 
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => handleDelete(item.id)}
+                              onClick={() => handleDeleteClick(item.id)}
                               title="Hapus"
                               className="text-red-600 border-red-200 hover:bg-red-50 flex items-center gap-1"
                               disabled={loading}
@@ -420,6 +437,87 @@ export function CrudTab<T extends { id: string; status?: string; [key: string]: 
             </Button>
           </div>
         </form>
+      </Modal>
+
+      {/* Delete Choice Modal */}
+      <Modal
+        open={deleteModalOpen}
+        onClose={() => setDeleteModalOpen(false)}
+        title={`Hapus ${itemName}`}
+        description={`Silakan pilih metode penghapusan untuk data ${itemName} ini.`}
+      >
+        <div className="space-y-4 mt-2">
+          <div className="flex flex-col gap-3">
+            <label className="flex items-start gap-3 p-3 rounded-lg border border-border bg-muted/20 cursor-pointer hover:bg-muted/40 transition-colors">
+              <input
+                type="radio"
+                name="deleteMode"
+                value="soft"
+                checked={deleteMode === "soft"}
+                onChange={() => setDeleteMode("soft")}
+                className="mt-1"
+              />
+              <div className="flex flex-col">
+                <span className="text-sm font-semibold text-foreground">Nonaktifkan saja (Soft Delete - Direkomendasikan)</span>
+                <span className="text-xs text-muted-foreground mt-0.5">
+                  Sembunyikan data master dari pilihan baru, tetapi tetap pertahankan data transaksi historis. Sangat aman.
+                </span>
+              </div>
+            </label>
+
+            <label className="flex items-start gap-3 p-3 rounded-lg border border-red-100 bg-red-50/10 cursor-pointer hover:bg-red-50/20 transition-colors">
+              <input
+                type="radio"
+                name="deleteMode"
+                value="hard"
+                checked={deleteMode === "hard"}
+                onChange={() => setDeleteMode("hard")}
+                className="mt-1"
+              />
+              <div className="flex flex-col">
+                <span className="text-sm font-semibold text-red-600">Hapus Permanen (Hard Delete - Berbahaya)</span>
+                <span className="text-xs text-muted-foreground mt-0.5">
+                  Hapus data master beserta seluruh data transaksi (keberangkatan, manifest, registrasi jamaah, rooming) yang merujuk kepadanya.
+                </span>
+              </div>
+            </label>
+          </div>
+
+          {deleteMode === "hard" && (
+            <div className="p-3 rounded-md bg-red-50 border border-red-200 space-y-3">
+              <p className="text-xs text-red-800 font-medium leading-relaxed">
+                ⚠️ PERINGATAN: Tindakan ini akan menghapus semua paket keberangkatan, registrasi jamaah, manifest penerbangan, dan data pembayaran yang terkait secara permanen. Tindakan ini TIDAK dapat dibatalkan.
+              </p>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-semibold text-red-900">
+                  Ketik <span className="font-mono bg-red-100 px-1 py-0.5 rounded">HAPUS</span> untuk konfirmasi:
+                </label>
+                <Input
+                  type="text"
+                  value={deleteConfirmText}
+                  onChange={(e) => setDeleteConfirmText(e.target.value)}
+                  placeholder="Ketik HAPUS di sini..."
+                  className="bg-white border-red-300 text-red-900 focus-visible:ring-red-500"
+                />
+              </div>
+            </div>
+          )}
+
+          <div className="flex justify-end gap-2 pt-4 border-t">
+            <Button variant="outline" type="button" onClick={() => setDeleteModalOpen(false)} disabled={loading}>
+              Batal
+            </Button>
+            <Button
+              type="button"
+              variant={deleteMode === "hard" ? "destructive" : "default"}
+              onClick={handleConfirmDelete}
+              disabled={loading || (deleteMode === "hard" && deleteConfirmText !== "HAPUS")}
+              className={deleteMode === "hard" ? "bg-red-600 hover:bg-red-700 text-white" : ""}
+            >
+              {loading ? "Memproses..." : deleteMode === "hard" ? "Hapus Permanen" : "Nonaktifkan"}
+            </Button>
+          </div>
+        </div>
       </Modal>
     </div>
   );
