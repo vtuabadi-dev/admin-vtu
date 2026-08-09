@@ -26,12 +26,24 @@ function mapKeberangkatan(row: any): Keberangkatan {
     parsedHotelOptions = [];
   }
 
+  const activePaxCount = (row.groups as any[])?.reduce(
+    (sum: number, g: any) => sum + (g.anggota?.length || 0),
+    0
+  ) ?? row.terisi ?? 0;
+
+  if (row.id && row.terisi !== activePaxCount) {
+    prisma.keberangkatan.update({
+      where: { id: row.id },
+      data: { terisi: activePaxCount },
+    }).catch(() => {});
+  }
+
   return {
     id: row.id,
     kode: row.kodeIndividu || row.kode,
     paketUmrohId: row.paketUmrohId ?? "",
     status: row.status,
-    terisi: row.terisi,
+    terisi: activePaxCount,
     jamaahIds: (row.groups as any[])?.flatMap((g: any) => g.anggota?.map((a: any) => a.id) ?? []) ?? [],
     maxSeat: row.maxSeat ?? undefined,
     targetMaterialisasi: row.targetMaterialisasi ?? undefined,
@@ -60,7 +72,14 @@ const DEFAULT_INCLUDE = {
   maskapaiMaster: true,
   hotelMekkahMaster: true,
   hotelMadinahMaster: true,
-  groups: { include: { anggota: { select: { id: true } } } },
+  groups: {
+    include: {
+      anggota: {
+        where: { status: { not: "batal" as any } },
+        select: { id: true },
+      },
+    },
+  },
 };
 
 // ────────────────────────────────────────────────────────────
