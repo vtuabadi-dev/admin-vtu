@@ -6,17 +6,28 @@ const FILE_ID = "1CnqQc0FfQLM1m3eGmhiwuQ9dCApOEHOS";
 
 async function serveFallback() {
   try {
-    const fallbackPath = join(process.cwd(), "public", "images", "bg-makkah-madinah-canvas.jpg");
-    const fileBuffer = await fs.readFile(fallbackPath);
+    const pngPath = join(process.cwd(), "public", "images", "bg-makkah-madinah.png");
+    const fileBuffer = await fs.readFile(pngPath);
     return new Response(fileBuffer, {
       headers: {
-        "Content-Type": "image/jpeg",
+        "Content-Type": "image/png",
         "Cache-Control": "public, max-age=3600",
       },
     });
-  } catch (err) {
-    console.error("[Login Background API] Failed to read fallback file:", err);
-    return new Response("Background Image Not Found", { status: 404 });
+  } catch {
+    try {
+      const fallbackPath = join(process.cwd(), "public", "images", "bg-makkah-madinah-canvas.jpg");
+      const fileBuffer = await fs.readFile(fallbackPath);
+      return new Response(fileBuffer, {
+        headers: {
+          "Content-Type": "image/jpeg",
+          "Cache-Control": "public, max-age=3600",
+        },
+      });
+    } catch (err) {
+      console.error("[Login Background API] Failed to read fallback file:", err);
+      return new Response("Background Image Not Found", { status: 404 });
+    }
   }
 }
 
