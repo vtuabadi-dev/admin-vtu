@@ -215,130 +215,120 @@ export const keberangkatanRepo = {
       );
     }
 
-    await prisma.$transaction(async (tx) => {
-      const groupIds = keberangkatan.groups.map((g) => g.id);
-      const allJamaahInPackage = keberangkatan.groups.flatMap((g) => g.anggota);
-      const jamaahIds = allJamaahInPackage.map((a) => a.id);
+    await prisma.$transaction(
+      async (tx) => {
+        const groupIds = keberangkatan.groups.map((g) => g.id);
+        const allJamaahInPackage = keberangkatan.groups.flatMap((g) => g.anggota);
+        const jamaahIds = allJamaahInPackage.map((a) => a.id);
 
-      // 1. Unlink package draft if published from this package
-      await tx.packageDraft.updateMany({
-        where: { publishedId: id },
-        data: { publishedId: null },
-      }).catch(() => {});
+        // 1. Unlink package draft if published from this package
+        await tx.packageDraft.updateMany({
+          where: { publishedId: id },
+          data: { publishedId: null },
+        }).catch(() => {});
 
-      // 2. Hard delete activity events and auto deadlines
-      await tx.activityEvent.deleteMany({ where: { keberangkatanId: id } }).catch(() => {});
-      await tx.autoDeadline.deleteMany({ where: { keberangkatanId: id } }).catch(() => {});
+        // 2. Hard delete activity events, auto deadlines, registration requests, roomings, and manifests in parallel
+        await Promise.all([
+          tx.activityEvent.deleteMany({ where: { keberangkatanId: id } }).catch(() => {}),
+          tx.autoDeadline.deleteMany({ where: { keberangkatanId: id } }).catch(() => {}),
+          tx.registrationRequest.deleteMany({ where: { paketId: id } }).catch(() => {}),
+          tx.rooming.deleteMany({ where: { keberangkatanId: id } }).catch(() => {}),
+          tx.manifest.deleteMany({ where: { keberangkatanId: id } }).catch(() => {}),
+        ]);
 
-      // 3. Hard delete registration requests linked to this package
-      await tx.registrationRequest.deleteMany({ where: { paketId: id } }).catch(() => {});
-
-      // 4. Hard delete rooming and manifest structures for this package
-      await tx.rooming.deleteMany({ where: { keberangkatanId: id } }).catch(() => {});
-      await tx.manifest.deleteMany({ where: { keberangkatanId: id } }).catch(() => {});
-
-      // 5. Hard delete groups and jamaah records if any exist
-      if (groupIds.length > 0) {
-        // Break circular FK deadlock: reassign ketuaGroupId to a safe external Jamaah or temporary dummy Jamaah
-        let safeJamaah = await tx.jamaah.findFirst({
-          where: { id: { notIn: jamaahIds } },
-          select: { id: true },
-        });
-
-        let tempJamaahCreatedId: string | null = null;
-
-        if (!safeJamaah) {
-          const tempGroup = await tx.registrationGroup.findFirst({
-            where: { id: { notIn: groupIds } },
+        // 3. Hard delete groups and jamaah records if any exist
+        if (groupIds.length > 0) {
+          // Break circular FK deadlock: reassign ketuaGroupId to a safe external Jamaah or temporary dummy Jamaah
+          let safeJamaah = await tx.jamaah.findFirst({
+            where: { id: { notIn: jamaahIds } },
+            select: { id: true },
           });
 
-          if (tempGroup) {
-            const temp = await tx.jamaah.create({
-              data: {
-                registrationId: `TEMP-${Date.now()}`,
-                groupId: tempGroup.id,
-                nomorPeserta: `TEMP-${Date.now()}`,
-                namaLengkap: "TEMP_CLEANUP",
-                namaAyah: "-",
-                jenisKelamin: "L" as any,
-                tempatLahir: "-",
-                tanggalLahir: new Date(),
-                nik: "0000000000000000",
-                nomorPaspor: "-",
-                masaBerlakuPaspor: new Date(),
-                nomorTelepon: "-",
-                email: "temp@clean.local",
-                alamat: "-",
-                provinsi: "-",
-                kota: "-",
-                kecamatan: "-",
-                kelurahan: "-",
-                hotelMekkah: "-",
-                hotelMadinah: "-",
-                status: "batal" as any,
-              },
+          let tempJamaahCreatedId: string | null = null;
+
+          if (!safeJamaah) {
+            const tempGroup = await tx.registrationGroup.findFirst({
+              where: { id: { notIn: groupIds } },
             });
-            safeJamaah = { id: temp.id };
-            tempJamaahCreatedId = temp.id;
+
+            if (tempGroup) {
+              const temp = await tx.jamaah.create({
+                data: {
+                  registrationId: `TEMP-${Date.now()}`,
+                  groupId: tempGroup.id,
+                  nomorPeserta: `TEMP-${Date.now()}`,
+                  namaLengkap: "TEMP_CLEANUP",
+                  namaAyah: "-",
+                  jenisKelamin: "L" as any,
+                  tempatLahir: "-",
+                  tanggalLahir: new Date(),
+                  nik: "0000000000000000",
+                  nomorPaspor: "-",
+                  masaBerlakuPaspor: new Date(),
+                  nomorTelepon: "-",
+                  email: "temp@clean.local",
+                  alamat: "-",
+                  provinsi: "-",
+                  kota: "-",
+                  kecamatan: "-",
+                  kelurahan: "-",
+                  hotelMekkah: "-",
+                  hotelMadinah: "-",
+                  status: "batal" as any,
+                },
+              });
+              safeJamaah = { id: temp.id };
+              tempJamaahCreatedId = temp.id;
+            }
+          }
+
+          if (safeJamaah) {
+            await tx.registrationGroup.updateMany({
+              where: { id: { in: groupIds } },
+              data: { ketuaGroupId: safeJamaah.id },
+            });
+          }
+
+          if (jamaahIds.length > 0) {
+            await Promise.all([
+              tx.dokumenItem.deleteMany({ where: { jamaahId: { in: jamaahIds } } }),
+              tx.manifestRow.deleteMany({ where: { jamaahId: { in: jamaahIds } } }),
+              tx.penghuniKamar.deleteMany({ where: { jamaahId: { in: jamaahIds } } }),
+              tx.alokasiPembayaran.deleteMany({ where: { jamaahId: { in: jamaahIds } } }),
+            ]);
+
+            await tx.jamaah.deleteMany({
+              where: { id: { in: jamaahIds } },
+            });
+          }
+
+          await Promise.all([
+            tx.invoiceItem.deleteMany({ where: { invoice: { groupId: { in: groupIds } } } }),
+            tx.invoice.deleteMany({ where: { groupId: { in: groupIds } } }),
+            tx.pembayaran.deleteMany({ where: { groupId: { in: groupIds } } }),
+            tx.invoiceSplitConfig.deleteMany({ where: { groupId: { in: groupIds } } }).catch(() => {}),
+            tx.reminder.deleteMany({ where: { groupId: { in: groupIds } } }).catch(() => {}),
+          ]);
+
+          await tx.registrationGroup.deleteMany({
+            where: { id: { in: groupIds } },
+          });
+
+          if (tempJamaahCreatedId) {
+            await tx.jamaah.delete({ where: { id: tempJamaahCreatedId } }).catch(() => {});
           }
         }
 
-        if (safeJamaah) {
-          await tx.registrationGroup.updateMany({
-            where: { id: { in: groupIds } },
-            data: { ketuaGroupId: safeJamaah.id },
-          });
-        }
-
-        if (jamaahIds.length > 0) {
-          await tx.dokumenItem.deleteMany({
-            where: { jamaahId: { in: jamaahIds } },
-          });
-          await tx.manifestRow.deleteMany({
-            where: { jamaahId: { in: jamaahIds } },
-          });
-          await tx.penghuniKamar.deleteMany({
-            where: { jamaahId: { in: jamaahIds } },
-          });
-          await tx.alokasiPembayaran.deleteMany({
-            where: { jamaahId: { in: jamaahIds } },
-          });
-
-          await tx.jamaah.deleteMany({
-            where: { id: { in: jamaahIds } },
-          });
-        }
-
-        await tx.invoiceItem.deleteMany({
-          where: { invoice: { groupId: { in: groupIds } } },
+        // 4. Hard delete the Keberangkatan package itself
+        await tx.keberangkatan.delete({
+          where: { id },
         });
-        await tx.invoice.deleteMany({
-          where: { groupId: { in: groupIds } },
-        });
-        await tx.pembayaran.deleteMany({
-          where: { groupId: { in: groupIds } },
-        });
-        await tx.invoiceSplitConfig.deleteMany({
-          where: { groupId: { in: groupIds } },
-        }).catch(() => {});
-        await tx.reminder.deleteMany({
-          where: { groupId: { in: groupIds } },
-        }).catch(() => {});
-
-        await tx.registrationGroup.deleteMany({
-          where: { id: { in: groupIds } },
-        });
-
-        if (tempJamaahCreatedId) {
-          await tx.jamaah.delete({ where: { id: tempJamaahCreatedId } }).catch(() => {});
-        }
+      },
+      {
+        timeout: 30000,
+        maxWait: 10000,
       }
-
-      // 6. Hard delete the Keberangkatan package itself
-      await tx.keberangkatan.delete({
-        where: { id },
-      });
-    });
+    );
 
     return true;
   },
