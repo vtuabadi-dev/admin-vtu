@@ -143,6 +143,7 @@ function ManifestPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const urlPaketId = searchParams.get("paketId") || "";
+  const fromSource = searchParams.get("from") || "";
 
   const [manifests, setManifests] = useState<Manifest[]>([]);
   const [keberangkatanList, setKeberangkatanList] = useState<Keberangkatan[]>([]);
@@ -609,11 +610,15 @@ function ManifestPageContent() {
               size="sm"
               onClick={() => {
                 setSelectedKeberangkatan("");
-                router.push("/admin/manifest");
+                if (fromSource === "paket-aktif") {
+                  router.push("/admin/keberangkatan");
+                } else {
+                  router.push("/admin/manifest");
+                }
               }}
             >
               <ArrowLeft className="mr-1.5 h-4 w-4" />
-              Semua Manifest
+              {fromSource === "paket-aktif" ? "Paket Aktif" : "Semua Manifest"}
             </Button>
           )}
           <div>
