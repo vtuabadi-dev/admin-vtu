@@ -4,7 +4,7 @@ export default function LoginLayout({ children }: { children: React.ReactNode })
       {/* ── Background Makkah & Madinah Golden Canvas Artwork (Gambar No. 2) ── */}
       <div
         className="absolute inset-0 bg-cover bg-center bg-no-repeat opacity-90 mix-blend-multiply pointer-events-none scale-100 transition-transform duration-1000"
-        style={{ backgroundImage: `url('/images/bg-makkah-madinah-canvas.jpg')` }}
+        style={{ backgroundImage: `url('/api/assets/login-bg')` }}
       />
       
       {/* ── Ambient Warm Lighting & Soft Vignette Overlays ── */}
