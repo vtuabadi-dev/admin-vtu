@@ -125,10 +125,17 @@ export default function KeberangkatanListPage() {
   const handleDelete = async (id: string) => {
     if (confirm("Apakah Anda yakin ingin menghapus paket ini?")) {
       try {
-        await deleteKeberangkatan(id);
-        setKeberangkatan((prev) => prev.filter((k) => k.id !== id));
-      } catch (error) {
-        alert("Gagal menghapus paket: " + (error as Error).message);
+        const res = await deleteKeberangkatan(id);
+        if (res && res.success === false) {
+          alert(res.message);
+        } else {
+          setKeberangkatan((prev) => prev.filter((k) => k.id !== id));
+          useOperationalStore.getState().setKeberangkatanList(
+            useOperationalStore.getState().keberangkatanList.filter((k) => k.id !== id)
+          );
+        }
+      } catch (error: any) {
+        alert("Gagal menghapus paket: " + (error?.message || "Terjadi kesalahan sistem"));
       }
     }
   };

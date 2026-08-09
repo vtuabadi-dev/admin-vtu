@@ -1,9 +1,26 @@
-import { NextResponse } from "next/server";
 import { JWT } from "google-auth-library";
+import { join } from "path";
+import { promises as fs } from "fs";
 
 const FILE_ID = "1CnqQc0FfQLM1m3eGmhiwuQ9dCApOEHOS";
 
-export async function GET(request: Request) {
+async function serveFallback() {
+  try {
+    const fallbackPath = join(process.cwd(), "public", "images", "bg-makkah-madinah-canvas.jpg");
+    const fileBuffer = await fs.readFile(fallbackPath);
+    return new Response(fileBuffer, {
+      headers: {
+        "Content-Type": "image/jpeg",
+        "Cache-Control": "public, max-age=3600",
+      },
+    });
+  } catch (err) {
+    console.error("[Login Background API] Failed to read fallback file:", err);
+    return new Response("Background Image Not Found", { status: 404 });
+  }
+}
+
+export async function GET(_request: Request) {
   try {
     const jsonRaw = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
     let email: string | undefined;
@@ -19,8 +36,8 @@ export async function GET(request: Request) {
     }
 
     if (!email || !key) {
-      console.warn("[Login Background API] Google Service Account credentials not configured");
-      return NextResponse.redirect(new URL("/images/bg-makkah-madinah-canvas.jpg", request.url));
+      console.warn("[Login Background API] Google Service Account credentials not configured. Serving local fallback.");
+      return serveFallback();
     }
 
     const jwt = new JWT({
@@ -61,7 +78,7 @@ export async function GET(request: Request) {
       },
     });
   } catch (error: any) {
-    console.error("[Login Background API] Error fetching image:", error);
-    return NextResponse.redirect(new URL("/images/bg-makkah-madinah-canvas.jpg", request.url));
+    console.error("[Login Background API] Error fetching image, serving fallback:", error);
+    return serveFallback();
   }
 }

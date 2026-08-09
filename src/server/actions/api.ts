@@ -129,7 +129,12 @@ export async function getDokumenByJamaah(jamaahId: string) {
 }
 
 export async function deleteKeberangkatan(id: string) {
-  return await packageService.delete(id);
+  try {
+    await packageService.delete(id);
+    return { success: true, message: "Paket keberangkatan berhasil dihapus." };
+  } catch (err: any) {
+    return { success: false, message: err.message || "Gagal menghapus paket keberangkatan." };
+  }
 }
 
 export async function createKeberangkatan(data: any) {

@@ -172,18 +172,72 @@ export const keberangkatanRepo = {
   async delete(id: string) {
     const keberangkatan = await prisma.keberangkatan.findUnique({
       where: { id },
-      include: { _count: { select: { groups: true } } },
+      include: {
+        groups: {
+          include: {
+            anggota: {
+              where: { status: { not: "batal" } },
+            },
+          },
+        },
+      },
     });
-    
-    if (!keberangkatan) throw new Error("Keberangkatan not found");
-    if (keberangkatan._count.groups > 0) {
-      throw new Error("Cannot delete package: There are already groups registered to this package.");
+
+    if (!keberangkatan) {
+      throw new Error("Paket keberangkatan tidak ditemukan.");
     }
 
-    await prisma.keberangkatan.delete({
-      where: { id },
+    const activeJamaahCount = keberangkatan.groups.reduce(
+      (sum, group) => sum + group.anggota.length,
+      0
+    );
+
+    if (activeJamaahCount > 0) {
+      throw new Error(
+        `Tidak dapat menghapus paket: Masih terdapat ${activeJamaahCount} jamaah aktif terdaftar pada paket ini. Pindahkan atau batalkan jamaah terlebih dahulu.`
+      );
+    }
+
+    await prisma.$transaction(async (tx) => {
+      const groupIds = keberangkatan.groups.map((g) => g.id);
+
+      if (groupIds.length > 0) {
+        await tx.dokumenItem.deleteMany({
+          where: { jamaah: { groupId: { in: groupIds } } },
+        });
+        await tx.manifestRow.deleteMany({
+          where: { jamaah: { groupId: { in: groupIds } } },
+        });
+        await tx.penghuniKamar.deleteMany({
+          where: { jamaah: { groupId: { in: groupIds } } },
+        });
+        await tx.alokasiPembayaran.deleteMany({
+          where: { jamaah: { groupId: { in: groupIds } } },
+        });
+        await tx.jamaah.deleteMany({
+          where: { groupId: { in: groupIds } },
+        });
+
+        await tx.invoice.deleteMany({
+          where: { groupId: { in: groupIds } },
+        });
+        await tx.pembayaran.deleteMany({
+          where: { groupId: { in: groupIds } },
+        });
+
+        await tx.registrationGroup.deleteMany({
+          where: { id: { in: groupIds } },
+        });
+      }
+
+      await tx.rooming.deleteMany({ where: { keberangkatanId: id } });
+      await tx.manifest.deleteMany({ where: { keberangkatanId: id } });
+
+      await tx.keberangkatan.delete({
+        where: { id },
+      });
     });
-    
+
     return true;
   },
 
