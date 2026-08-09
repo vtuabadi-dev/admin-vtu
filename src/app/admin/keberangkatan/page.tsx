@@ -17,6 +17,7 @@ import { ErrorState } from "@/shared/components/ui/ErrorState";
 import { getKeberangkatanList, deleteKeberangkatan } from "@/server/actions/api";
 import type { Keberangkatan } from "@/shared/types";
 import { formatDate, cn } from "@/shared/lib/utils";
+import { useOperationalStore } from "@/stores/operational-store";
 
 const BULAN_LABEL: Record<number, string> = {
   1: "Januari", 2: "Februari", 3: "Maret", 4: "April",
@@ -25,9 +26,12 @@ const BULAN_LABEL: Record<number, string> = {
 };
 
 export default function KeberangkatanListPage() {
+  const storeIsLoaded = useOperationalStore((s) => s.isLoaded);
+  const storeKbrList = useOperationalStore((s) => s.keberangkatanList);
+
   const router = useRouter();
-  const [keberangkatan, setKeberangkatan] = useState<Keberangkatan[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [keberangkatan, setKeberangkatan] = useState<Keberangkatan[]>(storeKbrList);
+  const [loading, setLoading] = useState(!storeIsLoaded);
   const [error, setError] = useState<Error | null>(null);
   const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -97,8 +101,13 @@ export default function KeberangkatanListPage() {
   };
 
   useEffect(() => {
-    load();
-  }, []);
+    if (storeIsLoaded) {
+      setKeberangkatan(storeKbrList);
+      setLoading(false);
+    } else {
+      load();
+    }
+  }, [storeIsLoaded, storeKbrList]);
 
   // Tutup popover ID Paket saat klik di luar
   useEffect(() => {
