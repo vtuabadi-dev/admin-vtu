@@ -171,6 +171,8 @@ function ManifestPageContent() {
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [jamaahToDelete, setJamaahToDelete] = useState<Jamaah | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteMode, setDeleteMode] = useState<"soft" | "hard">("soft");
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
 
   const [moveModalOpen, setMoveModalOpen] = useState(false);
   const [groupToMove, setGroupToMove] = useState<any | null>(null);
@@ -553,7 +555,7 @@ function ManifestPageContent() {
     if (!jamaahToDelete) return;
     setIsDeleting(true);
     try {
-      const res = await fetch(`/api/jamaah/${jamaahToDelete.id}`, { method: "DELETE" });
+      const res = await fetch(`/api/jamaah/${jamaahToDelete.id}?mode=${deleteMode}`, { method: "DELETE" });
       const json = await res.json();
       if (res.ok && json.success) {
         setDeleteModalOpen(false);
@@ -1070,6 +1072,8 @@ function ManifestPageContent() {
                                     title="Hapus Jamaah"
                                     onClick={() => {
                                       setJamaahToDelete(j);
+                                      setDeleteMode("soft");
+                                      setDeleteConfirmText("");
                                       setDeleteModalOpen(true);
                                     }}
                                   >
@@ -1440,22 +1444,78 @@ function ManifestPageContent() {
         open={deleteModalOpen}
         onClose={() => !isDeleting && setDeleteModalOpen(false)}
         title="Hapus Jamaah"
-        description="Apakah Anda yakin ingin menghapus jamaah ini dari manifest paket?"
+        description="Pilih jenis penghapusan dan konfirmasikan tindakan Anda."
       >
         <div className="space-y-4">
-          <div className="bg-red-50 dark:bg-red-950/30 text-red-800 dark:text-red-200 p-4 rounded-md text-sm border border-red-200 dark:border-red-800/30">
+          <div className="bg-stone-50 dark:bg-stone-900/30 text-foreground p-4 rounded-md text-sm border border-stone-200 dark:border-stone-800/30">
             <p><strong>Nama:</strong> {jamaahToDelete ? getSingleSourceOfTruthName(jamaahToDelete) : "-"}</p>
             <p><strong>ID Register:</strong> {jamaahToDelete?.registrationId || "-"}</p>
-            <p className="mt-2 text-xs">
-              Tindakan ini akan membatalkan status keberangkatan jamaah (soft-delete).
-            </p>
           </div>
-          <div className="flex justify-end gap-2 pt-2">
+
+          {/* Delete Mode Options */}
+          <div className="space-y-3 pt-2">
+            <label className="text-xs font-bold text-foreground">Pilihan Penghapusan</label>
+            <div className="grid grid-cols-1 gap-2.5">
+              <label className="flex items-start gap-3 p-3 rounded-xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 cursor-pointer hover:bg-stone-50 transition">
+                <input
+                  type="radio"
+                  name="deleteMode"
+                  className="mt-1 h-4 w-4 text-emerald-600 focus:ring-emerald-500"
+                  checked={deleteMode === "soft"}
+                  onChange={() => setDeleteMode("soft")}
+                />
+                <div className="text-xs">
+                  <span className="font-bold text-foreground block">Soft Delete (Batal Berangkat)</span>
+                  <span className="text-muted-foreground">Membatalkan keberangkatan jamaah (status: batal), data record tetap tersimpan di database.</span>
+                </div>
+              </label>
+
+              <label className="flex items-start gap-3 p-3 rounded-xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 cursor-pointer hover:bg-stone-50 transition">
+                <input
+                  type="radio"
+                  name="deleteMode"
+                  className="mt-1 h-4 w-4 text-red-600 focus:ring-red-500"
+                  checked={deleteMode === "hard"}
+                  onChange={() => setDeleteMode("hard")}
+                />
+                <div className="text-xs">
+                  <span className="font-bold text-red-600 dark:text-red-400 block">Hard Delete (Hapus Permanen)</span>
+                  <span className="text-muted-foreground">Menghapus data jamaah, file dokumen, kamar, dan invoice terkait secara permanen dari database.</span>
+                </div>
+              </label>
+            </div>
+          </div>
+
+          {/* Hard Delete Warnings & Input */}
+          {deleteMode === "hard" && (
+            <div className="bg-red-50 dark:bg-red-950/30 text-red-800 dark:text-red-200 p-4 rounded-xl border border-red-200 dark:border-red-800/30 text-xs space-y-3 animate-in fade-in duration-200">
+              <p className="font-bold">
+                ⚠️ PERINGATAN: Tindakan ini permanen dan tidak dapat dibatalkan!
+              </p>
+              <div className="space-y-1.5">
+                <label className="font-semibold block">Ketik "HAPUS" untuk mengonfirmasi:</label>
+                <input
+                  type="text"
+                  placeholder="Ketik HAPUS"
+                  value={deleteConfirmText}
+                  onChange={(e) => setDeleteConfirmText(e.target.value)}
+                  className="h-9 w-full bg-white dark:bg-stone-950 border border-red-200 dark:border-red-800/50 rounded-lg px-3 text-xs text-foreground placeholder:text-muted-foreground/45 focus:outline-none focus:ring-2 focus:ring-red-500"
+                />
+              </div>
+            </div>
+          )}
+
+          <div className="flex justify-end gap-2 pt-2 border-t border-stone-100 dark:border-stone-800/50">
             <Button variant="outline" disabled={isDeleting} onClick={() => setDeleteModalOpen(false)}>
               Batal
             </Button>
-            <Button variant="destructive" disabled={isDeleting} onClick={handleDeleteJamaah}>
-              {isDeleting ? "Menghapus..." : "Ya, Hapus Jamaah"}
+            <Button
+              variant={deleteMode === "hard" ? "destructive" : "default"}
+              disabled={isDeleting || (deleteMode === "hard" && deleteConfirmText !== "HAPUS")}
+              className={deleteMode === "hard" ? "bg-red-600 hover:bg-red-700 text-white" : "bg-emerald-700 hover:bg-emerald-800 text-white"}
+              onClick={handleDeleteJamaah}
+            >
+              {isDeleting ? "Memproses..." : deleteMode === "hard" ? "Hapus Permanen" : "Batalkan Keberangkatan"}
             </Button>
           </div>
         </div>
