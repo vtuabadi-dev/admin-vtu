@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/server/auth";
+import { prisma } from "@/server/db";
 
 export async function GET() {
   try {
@@ -8,29 +9,57 @@ export async function GET() {
       return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
     }
 
+    // Fetch active master data from database
+    const [dbAirlines, dbHotels, dbClusters, dbCities] = await Promise.all([
+      prisma.masterAirline.findMany({ where: { isActive: true }, select: { name: true }, orderBy: { name: "asc" } }),
+      prisma.masterHotel.findMany({ where: { isActive: true }, select: { name: true, city: { select: { code: true, name: true } } }, orderBy: { name: "asc" } }),
+      prisma.masterCluster.findMany({ where: { isActive: true }, select: { nama: true }, orderBy: { nama: "asc" } }),
+      prisma.masterCity.findMany({ where: { isActive: true }, select: { name: true, code: true }, orderBy: { name: "asc" } }),
+    ]);
+
+    // Fallbacks if master data in database is empty
+    const fallbackAirlines = ["Saudia Airlines", "Lion Air", "Garuda Indonesia", "Etihad Airways", "Qatar Airways", "Oman Air", "Emirates", "Batik Air"];
+    const fallbackStartingPoints = ["Surabaya (SUB)", "Jakarta (CGK)", "Medan (KNO)", "Solo (SOC)", "Makassar (UPG)", "Kertajati (KJT)"];
+    const fallbackHotelsMekkah = ["Safwah Tower", "Pullman Zamzam", "Fairmont Makkah", "Clock Tower", "Swissotel Makkah", "Movenpick Makkah", "Anjum Hotel"];
+    const fallbackHotelsMadinah = ["Durrat Al Eiman", "Ansar Palace", "Oberoi Madinah", "Frontel Al Harithia", "Pullman Zamzam Madinah", "Grand Plaza Madinah"];
+    const fallbackClusters = ["Bronze", "Silver", "Gold", "Platinum", "Executive", "Reguler"];
+
+    const airlineList = dbAirlines.length > 0 ? dbAirlines.map(a => a.name) : fallbackAirlines;
+    const startingList = dbCities.length > 0 ? dbCities.map(c => `${c.name} (${c.code})`) : fallbackStartingPoints;
+    const clusterList = dbClusters.length > 0 ? dbClusters.map(c => c.nama) : fallbackClusters;
+
+    const mekkahDb = dbHotels.filter(h => h.city?.code === "MEK" || h.city?.name.toLowerCase().includes("mek")).map(h => h.name);
+    const madinahDb = dbHotels.filter(h => h.city?.code === "MED" || h.city?.name.toLowerCase().includes("mad")).map(h => h.name);
+
+    const mekkahList = mekkahDb.length > 0 ? mekkahDb : fallbackHotelsMekkah;
+    const madinahList = madinahDb.length > 0 ? madinahDb : fallbackHotelsMadinah;
+
     const ExcelJS = await import("exceljs");
     const workbook = new ExcelJS.Workbook();
+
+    // 1. Create Main Worksheet
     const sheet = workbook.addWorksheet("Template Keberangkatan");
 
     sheet.columns = [
-      // 1. Informasi Utama Paket (Kolom 1 - 8)
+      // 1. Informasi Utama Paket (Kolom 1 - 9)
       { header: "Kode Paket", key: "kode", width: 20 },
       { header: "Nama Paket", key: "namaPaket", width: 35 },
       { header: "Tanggal Berangkat (YYYY-MM-DD)", key: "tanggalBerangkat", width: 30 },
       { header: "Tanggal Pulang (YYYY-MM-DD)", key: "tanggalPulang", width: 30 },
-      { header: "Maskapai", key: "maskapai", width: 20 },
+      { header: "Maskapai", key: "maskapai", width: 22 },
+      { header: "Starting Point", key: "startingPoint", width: 22 },
       { header: "Nomor Penerbangan", key: "nomorPenerbangan", width: 20 },
       { header: "Kuota", key: "kuota", width: 12 },
       { header: "Target Materialisasi", key: "targetMaterialisasi", width: 20 },
 
-      // 2. Paket Tanpa Klaster / Reguler (Kolom 9 - 13)
+      // 2. Paket Tanpa Klaster / Reguler (Kolom 10 - 14)
       { header: "[Tanpa Klaster] Harga Base (Rp)", key: "regHargaBase", width: 25 },
       { header: "[Tanpa Klaster] Upgrade Double (Rp)", key: "regUpgradeDouble", width: 28 },
       { header: "[Tanpa Klaster] Upgrade Triple (Rp)", key: "regUpgradeTriple", width: 28 },
       { header: "[Tanpa Klaster] Hotel Mekkah", key: "regHotelMekkah", width: 25 },
       { header: "[Tanpa Klaster] Hotel Madinah", key: "regHotelMadinah", width: 25 },
 
-      // 3. Klaster 1 / Bronze (Kolom 14 - 19)
+      // 3. Klaster 1 / Bronze (Kolom 15 - 20)
       { header: "[K1] Nama Klaster", key: "k1Nama", width: 20 },
       { header: "[K1] Harga Base (Rp)", key: "k1HargaBase", width: 22 },
       { header: "[K1] Upgrade Double (Rp)", key: "k1UpgradeDouble", width: 25 },
@@ -38,7 +67,7 @@ export async function GET() {
       { header: "[K1] Hotel Mekkah", key: "k1HotelMekkah", width: 25 },
       { header: "[K1] Hotel Madinah", key: "k1HotelMadinah", width: 25 },
 
-      // 4. Klaster 2 / Silver (Kolom 20 - 25)
+      // 4. Klaster 2 / Silver (Kolom 21 - 26)
       { header: "[K2] Nama Klaster", key: "k2Nama", width: 20 },
       { header: "[K2] Harga Base (Rp)", key: "k2HargaBase", width: 22 },
       { header: "[K2] Upgrade Double (Rp)", key: "k2UpgradeDouble", width: 25 },
@@ -46,7 +75,7 @@ export async function GET() {
       { header: "[K2] Hotel Mekkah", key: "k2HotelMekkah", width: 25 },
       { header: "[K2] Hotel Madinah", key: "k2HotelMadinah", width: 25 },
 
-      // 5. Klaster 3 / Gold (Kolom 26 - 31)
+      // 5. Klaster 3 / Gold (Kolom 27 - 32)
       { header: "[K3] Nama Klaster", key: "k3Nama", width: 20 },
       { header: "[K3] Harga Base (Rp)", key: "k3HargaBase", width: 22 },
       { header: "[K3] Upgrade Double (Rp)", key: "k3UpgradeDouble", width: 25 },
@@ -61,7 +90,8 @@ export async function GET() {
       namaPaket: "PAKET REGULER 10 H - 01 Agt 2026 (SAUDIA AIRLINES)",
       tanggalBerangkat: "2026-08-01",
       tanggalPulang: "2026-08-10",
-      maskapai: "Saudia Airlines",
+      maskapai: airlineList[0] || "Saudia Airlines",
+      startingPoint: startingList[0] || "Surabaya (SUB)",
       nomorPenerbangan: "SV-816",
       kuota: 45,
       targetMaterialisasi: 30,
@@ -69,8 +99,8 @@ export async function GET() {
       regHargaBase: 25000000,
       regUpgradeDouble: 3500000,
       regUpgradeTriple: 2000000,
-      regHotelMekkah: "Safwah Tower",
-      regHotelMadinah: "Durrat Al Eiman",
+      regHotelMekkah: mekkahList[0] || "Safwah Tower",
+      regHotelMadinah: madinahList[0] || "Durrat Al Eiman",
     });
 
     // Sample Row 2: Paket 3-Klaster (Bronze, Silver, Gold)
@@ -79,50 +109,51 @@ export async function GET() {
       namaPaket: "PAKET VIP 3 KLASTER 10 H - 01 Sep 2026 (SAUDIA AIRLINES)",
       tanggalBerangkat: "2026-09-01",
       tanggalPulang: "2026-09-10",
-      maskapai: "Saudia Airlines",
+      maskapai: airlineList[0] || "Saudia Airlines",
+      startingPoint: startingList[0] || "Surabaya (SUB)",
       nomorPenerbangan: "SV-818",
       kuota: 45,
       targetMaterialisasi: 30,
 
-      k1Nama: "Bronze",
+      k1Nama: clusterList[0] || "Bronze",
       k1HargaBase: 25000000,
       k1UpgradeDouble: 3500000,
       k1UpgradeTriple: 2000000,
-      k1HotelMekkah: "Safwah Tower",
-      k1HotelMadinah: "Durrat Al Eiman",
+      k1HotelMekkah: mekkahList[0] || "Safwah Tower",
+      k1HotelMadinah: madinahList[0] || "Durrat Al Eiman",
 
-      k2Nama: "Silver",
+      k2Nama: clusterList[1] || "Silver",
       k2HargaBase: 28000000,
       k2UpgradeDouble: 4500000,
       k2UpgradeTriple: 2500000,
-      k2HotelMekkah: "Pullman Zamzam",
-      k2HotelMadinah: "Ansar Palace",
+      k2HotelMekkah: mekkahList[1] || mekkahList[0] || "Pullman Zamzam",
+      k2HotelMadinah: madinahList[1] || madinahList[0] || "Ansar Palace",
 
-      k3Nama: "Gold",
+      k3Nama: clusterList[2] || "Gold",
       k3HargaBase: 32000000,
       k3UpgradeDouble: 6000000,
       k3UpgradeTriple: 3500000,
-      k3HotelMekkah: "Fairmont Tower",
-      k3HotelMadinah: "Oberoi Madinah",
+      k3HotelMekkah: mekkahList[2] || mekkahList[0] || "Fairmont Tower",
+      k3HotelMadinah: madinahList[2] || madinahList[0] || "Oberoi Madinah",
     });
 
     // Header styling per section color
     const headerRow = sheet.getRow(1);
     headerRow.height = 28;
 
-    for (let col = 1; col <= 31; col++) {
+    for (let col = 1; col <= 32; col++) {
       const cell = headerRow.getCell(col);
       cell.font = { bold: true, color: { argb: "FFFFFFFF" }, size: 10 };
       cell.alignment = { vertical: "middle", horizontal: "center", wrapText: true };
 
-      let fgColor = "FF059669"; // Default Emerald (Informasi Utama A-H)
-      if (col >= 9 && col <= 13) {
+      let fgColor = "FF059669"; // Default Emerald (Informasi Utama A-I)
+      if (col >= 10 && col <= 14) {
         fgColor = "FF334155"; // Dark Slate Gray (Tanpa Klaster)
-      } else if (col >= 14 && col <= 19) {
+      } else if (col >= 15 && col <= 20) {
         fgColor = "FF92400E"; // Bronze Brown (Klaster 1)
-      } else if (col >= 20 && col <= 25) {
+      } else if (col >= 21 && col <= 26) {
         fgColor = "FF475569"; // Cool Silver Gray (Klaster 2)
-      } else if (col >= 26 && col <= 31) {
+      } else if (col >= 27 && col <= 32) {
         fgColor = "FFD97706"; // Amber Gold (Klaster 3)
       }
 
@@ -131,6 +162,62 @@ export async function GET() {
         pattern: "solid",
         fgColor: { argb: fgColor },
       };
+    }
+
+    // 2. Create Hidden Worksheet for Master Data Lookups
+    const lookupSheet = workbook.addWorksheet("MasterData");
+    lookupSheet.state = "hidden";
+
+    const maxLookupRows = Math.max(
+      airlineList.length,
+      startingList.length,
+      mekkahList.length,
+      madinahList.length,
+      clusterList.length
+    );
+
+    for (let i = 0; i < maxLookupRows; i++) {
+      lookupSheet.addRow([
+        airlineList[i] || "",
+        startingList[i] || "",
+        mekkahList[i] || "",
+        madinahList[i] || "",
+        clusterList[i] || "",
+      ]);
+    }
+
+    // Formulas for Data Validation ranges
+    const airlineRef = `MasterData!$A$1:$A$${airlineList.length}`;
+    const startingRef = `MasterData!$B$1:$B$${startingList.length}`;
+    const mekkahRef = `MasterData!$C$1:$C$${mekkahList.length}`;
+    const madinahRef = `MasterData!$D$1:$D$${madinahList.length}`;
+    const clusterRef = `MasterData!$E$1:$E$${clusterList.length}`;
+
+    // Apply Data Validation (Dropdown lists) for data rows 2 to 100
+    for (let r = 2; r <= 100; r++) {
+      // Maskapai (Col 5)
+      sheet.getCell(r, 5).dataValidation = { type: "list", allowBlank: true, formulae: [airlineRef] };
+      // Starting Point (Col 6)
+      sheet.getCell(r, 6).dataValidation = { type: "list", allowBlank: true, formulae: [startingRef] };
+
+      // [Tanpa Klaster] Hotel Mekkah (Col 13) & Hotel Madinah (Col 14)
+      sheet.getCell(r, 13).dataValidation = { type: "list", allowBlank: true, formulae: [mekkahRef] };
+      sheet.getCell(r, 14).dataValidation = { type: "list", allowBlank: true, formulae: [madinahRef] };
+
+      // [K1] Nama Klaster (Col 15), Hotel Mekkah (Col 19), Hotel Madinah (Col 20)
+      sheet.getCell(r, 15).dataValidation = { type: "list", allowBlank: true, formulae: [clusterRef] };
+      sheet.getCell(r, 19).dataValidation = { type: "list", allowBlank: true, formulae: [mekkahRef] };
+      sheet.getCell(r, 20).dataValidation = { type: "list", allowBlank: true, formulae: [madinahRef] };
+
+      // [K2] Nama Klaster (Col 21), Hotel Mekkah (Col 25), Hotel Madinah (Col 26)
+      sheet.getCell(r, 21).dataValidation = { type: "list", allowBlank: true, formulae: [clusterRef] };
+      sheet.getCell(r, 25).dataValidation = { type: "list", allowBlank: true, formulae: [mekkahRef] };
+      sheet.getCell(r, 26).dataValidation = { type: "list", allowBlank: true, formulae: [madinahRef] };
+
+      // [K3] Nama Klaster (Col 27), Hotel Mekkah (Col 31), Hotel Madinah (Col 32)
+      sheet.getCell(r, 27).dataValidation = { type: "list", allowBlank: true, formulae: [clusterRef] };
+      sheet.getCell(r, 31).dataValidation = { type: "list", allowBlank: true, formulae: [mekkahRef] };
+      sheet.getCell(r, 32).dataValidation = { type: "list", allowBlank: true, formulae: [madinahRef] };
     }
 
     const buffer = await workbook.xlsx.writeBuffer();
