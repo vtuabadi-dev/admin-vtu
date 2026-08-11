@@ -4,7 +4,7 @@ import { promises as fs } from "fs";
 
 const FILE_ID = "1CnqQc0FfQLM1m3eGmhiwuQ9dCApOEHOS";
 
-async function serveFallback() {
+async function serveFallback(request?: Request) {
   try {
     const pngPath = join(process.cwd(), "public", "images", "bg-makkah-madinah.png");
     const fileBuffer = await fs.readFile(pngPath);
@@ -25,13 +25,16 @@ async function serveFallback() {
         },
       });
     } catch (err) {
-      console.error("[Login Background API] Failed to read fallback file:", err);
-      return new Response("Background Image Not Found", { status: 404 });
+      console.warn("[Login Background API] Local filesystem read failed (serverless environment), redirecting to static asset /images/bg-makkah-madinah-canvas.jpg");
+      if (request?.url) {
+        return Response.redirect(new URL("/images/bg-makkah-madinah-canvas.jpg", request.url).toString(), 307);
+      }
+      return Response.redirect("/images/bg-makkah-madinah-canvas.jpg", 307);
     }
   }
 }
 
-export async function GET(_request: Request) {
+export async function GET(request: Request) {
   try {
     const jsonRaw = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
     let email: string | undefined;
@@ -48,7 +51,7 @@ export async function GET(_request: Request) {
 
     if (!email || !key) {
       console.warn("[Login Background API] Google Service Account credentials not configured. Serving local fallback.");
-      return serveFallback();
+      return serveFallback(request);
     }
 
     const jwt = new JWT({
@@ -90,6 +93,6 @@ export async function GET(_request: Request) {
     });
   } catch (error: any) {
     console.error("[Login Background API] Error fetching image, serving fallback:", error);
-    return serveFallback();
+    return serveFallback(request);
   }
 }
