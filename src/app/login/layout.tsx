@@ -4,7 +4,7 @@ export default function LoginLayout({ children }: { children: React.ReactNode })
       {/* ── Background Makkah & Madinah Golden Canvas Artwork (Full Original Clarity) ── */}
       <div
         className="absolute inset-0 bg-cover bg-center bg-no-repeat pointer-events-none"
-        style={{ backgroundImage: `url('/api/assets/login-bg')` }}
+        style={{ backgroundImage: `url('/images/bg-makkah-madinah-canvas.jpg')` }}
       />
       
       {/* ── Soft Contrast Overlay for Form Card Readability ── */}
