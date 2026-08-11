@@ -49,6 +49,7 @@ export default function RegisterPage() {
   const [namaPerwakilan, setNamaPerwakilan] = useState("");
   const [nomorTelepon, setNomorTelepon] = useState("");
   const [emailPerwakilan, setEmailPerwakilan] = useState("");
+  const [useRepAsJamaah1, setUseRepAsJamaah1] = useState(true);
 
   // Step 2: Terms (4 mandatory checkboxes) — fetched dynamically
   const [termsDoc, setTermsDoc] = useState<{ title: string; content: string; version: string } | null>(null);
@@ -142,6 +143,17 @@ export default function RegisterPage() {
       return prev.slice(0, paxCount);
     });
   }, [paxCount]);
+
+  // Auto-sync representative name to Jamaah #1 if toggle is active
+  useEffect(() => {
+    if (useRepAsJamaah1 && namaPerwakilan) {
+      setMembers((prev) => {
+        if (!prev || prev.length === 0) return prev;
+        if (prev[0]?.namaLengkap === namaPerwakilan) return prev;
+        return prev.map((m, i) => (i === 0 ? { ...m, namaLengkap: namaPerwakilan } : m));
+      });
+    }
+  }, [useRepAsJamaah1, namaPerwakilan]);
 
   const updateMember = (index: number, field: keyof MemberForm, value: string) => {
     setMembers((prev) =>
@@ -467,6 +479,34 @@ export default function RegisterPage() {
                 </div>
                 {errors.emailPerwakilan && <p className="text-xs text-red-500 mt-1">{errors.emailPerwakilan}</p>}
               </div>
+
+              {/* Toggle switch to use representative as Jamaah #1 */}
+              <div className="pt-3 border-t border-gray-100 flex items-center justify-between gap-4">
+                <div>
+                  <label htmlFor="toggle-rep-jamaah1-step1" className="text-sm font-medium text-gray-800 cursor-pointer">
+                    Daftarkan perwakilan sebagai Jamaah #1
+                  </label>
+                  <p className="text-xs text-gray-500">
+                    Otomatis memasukkan nama perwakilan ke dalam data anggota rombongan (Ketua Grup).
+                  </p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                  <input
+                    id="toggle-rep-jamaah1-step1"
+                    type="checkbox"
+                    checked={useRepAsJamaah1}
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      setUseRepAsJamaah1(checked);
+                      if (checked && namaPerwakilan) {
+                        updateMember(0, "namaLengkap", namaPerwakilan);
+                      }
+                    }}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                </label>
+              </div>
             </div>
           )}
 
@@ -629,22 +669,67 @@ export default function RegisterPage() {
               <h2 className="text-lg font-semibold text-gray-900">Data Jamaah</h2>
               <p className="text-sm text-gray-500">Isi data setiap anggota rombongan. Semua nama akan otomatis menjadi HURUF BESAR.</p>
 
+              {/* Banner switch to auto-fill Jamaah #1 from Representative */}
+              <div className="bg-blue-50/80 border border-blue-200/80 rounded-xl p-4 flex items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-lg bg-blue-600/10 text-blue-700 flex items-center justify-center shrink-0">
+                    <User className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-gray-900">
+                      Gunakan Data Perwakilan sebagai Jamaah #1
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      {namaPerwakilan
+                        ? `Nama perwakilan: "${namaPerwakilan}"`
+                        : "Otomatis mengisi nama perwakilan ke Jamaah #1 (Ketua Grup)"}
+                    </p>
+                  </div>
+                </div>
+
+                <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                  <input
+                    type="checkbox"
+                    checked={useRepAsJamaah1}
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      setUseRepAsJamaah1(checked);
+                      if (checked && namaPerwakilan) {
+                        updateMember(0, "namaLengkap", namaPerwakilan);
+                      }
+                    }}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                </label>
+              </div>
+
               {members.map((member, i) => (
                 <div key={i} className="border border-gray-200 rounded-lg p-4 space-y-3">
-                  <h3 className="text-sm font-semibold text-gray-700">
-                    Jamaah #{i + 1} {i === 0 && "(Ketua Grup)"}
-                  </h3>
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-semibold text-gray-700">
+                      Jamaah #{i + 1} {i === 0 && "(Ketua Grup)"}
+                    </h3>
+                    {i === 0 && useRepAsJamaah1 && (
+                      <span className="text-[11px] font-medium bg-blue-100 text-blue-700 px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                        <Check className="w-3 h-3" /> Sama dengan Perwakilan
+                      </span>
+                    )}
+                  </div>
 
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1">Nama Lengkap</label>
                     <input
                       type="text"
                       value={member.namaLengkap}
+                      disabled={i === 0 && useRepAsJamaah1}
                       onChange={(e) => updateMember(i, "namaLengkap", e.target.value.toUpperCase())}
                       className={cn(
-                        "w-full px-3 py-2 border rounded-lg text-sm uppercase",
-                        "focus:outline-none focus:ring-2 focus:ring-blue-500",
-                        errors[`member_${i}_nama`] ? "border-red-300" : "border-gray-300"
+                        "w-full px-3 py-2 border rounded-lg text-sm uppercase transition-colors",
+                        i === 0 && useRepAsJamaah1
+                          ? "bg-gray-100 text-gray-700 cursor-not-allowed border-gray-200 font-medium"
+                          : "focus:outline-none focus:ring-2 focus:ring-blue-500 border-gray-300",
+                        errors[`member_${i}_nama`] ? "border-red-300" : ""
                       )}
                       placeholder="NAMA LENGKAP"
                     />
