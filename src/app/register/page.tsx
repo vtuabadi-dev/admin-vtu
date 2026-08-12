@@ -274,7 +274,8 @@ export default function RegisterPage() {
   // Step 5: Package
   const [paketList, setPaketList] = useState<Keberangkatan[]>([]);
   const [selectedPaketId, setSelectedPaketId] = useState("");
-  const [roomUpgrade, setRoomUpgrade] = useState("");
+  const [selectedClusterIndex, setSelectedClusterIndex] = useState(0);
+  const [roomUpgrade, setRoomUpgrade] = useState("quad");
   const [hotelUpgrade, setHotelUpgrade] = useState("");
   const [loadingPaket, setLoadingPaket] = useState(false);
 
@@ -1123,114 +1124,292 @@ export default function RegisterPage() {
             </div>
           )}
 
-          {/* Step 5: Package */}
+          {/* Step 5: Package Selection */}
           {step === 5 && (
-            <div className="space-y-4">
-              <h2 className="text-lg font-semibold text-gray-900">Pilih Paket Keberangkatan</h2>
-              <p className="text-sm text-gray-500">Pilih paket umroh yang tersedia.</p>
+            <div className="space-y-6">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900">Pilih Paket Keberangkatan</h2>
+                <p className="text-sm text-gray-500">Pilih nama paket umroh dari daftar pilihan di bawah ini.</p>
+              </div>
 
               {loadingPaket ? (
                 <div className="flex items-center justify-center py-12">
-                  <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
+                  <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
                 </div>
               ) : paketList.length === 0 ? (
-                <p className="text-sm text-gray-400 text-center py-8">Belum ada paket keberangkatan tersedia.</p>
+                <div className="p-6 bg-gray-50 border border-gray-200 rounded-xl text-center">
+                  <p className="text-sm text-gray-500">Belum ada paket keberangkatan tersedia.</p>
+                </div>
               ) : (
-                <div className="space-y-3">
-                  {paketList.filter(p => p.status !== 'cancelled').map((paket) => (
-                    <button
-                      key={paket.id}
-                      type="button"
-                      onClick={() => setSelectedPaketId(paket.id)}
+                <div className="space-y-5">
+                  {/* Package Select Dropdown */}
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1.5">
+                      Nama Paket Keberangkatan
+                    </label>
+                    <select
+                      value={selectedPaketId}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setSelectedPaketId(val);
+                        setSelectedClusterIndex(0);
+                        if (errors.paket) {
+                          setErrors((prev) => ({ ...prev, paket: "" }));
+                        }
+                      }}
                       className={cn(
-                        "w-full text-left p-4 rounded-lg border-2 transition-colors",
-                        selectedPaketId === paket.id
-                          ? "border-blue-500 bg-blue-50"
-                          : "border-gray-200 hover:border-gray-300"
+                        "w-full px-4 py-3 border rounded-xl text-sm font-medium transition-colors bg-white shadow-sm",
+                        "focus:outline-none focus:ring-2 focus:ring-blue-500",
+                        errors.paket ? "border-red-400 bg-red-50/30" : "border-gray-300"
                       )}
                     >
-                      <div className="flex justify-between items-start gap-4">
-                        <div>
-                          <p className="font-semibold text-gray-900">{paket.namaPaket || paket.paketUmroh?.namaPaket || "-"}</p>
-                          <p className="text-sm text-gray-500">
-                            {new Date(paket.tanggalBerangkat).toLocaleDateString("id-ID", {
-                              day: "numeric", month: "long", year: "numeric",
-                            })}
-                            {" — "}
-                            {new Date(paket.tanggalPulang).toLocaleDateString("id-ID", {
-                              day: "numeric", month: "long", year: "numeric",
-                            })}
-                          </p>
-                          <p className="text-xs text-gray-400 mt-1">
-                            {paket.maskapai || paket.maskapaiId || "-"} • {paket.nomorPenerbangan || "-"}
-                          </p>
-                          <p className="text-xs text-gray-500 mt-0.5">
-                            Hotel: {paket.hotelMekkah || paket.hotelMekkahId || "TBA"} / {paket.hotelMadinah || paket.hotelMadinahId || "TBA"}
-                          </p>
+                      <option value="">-- Pilih Nama Paket Umroh --</option>
+                      {paketList
+                        .filter((p) => p.status !== "cancelled")
+                        .map((p) => {
+                          const name = p.namaPaket || p.paketUmroh?.namaPaket || p.kode;
+                          const depDateStr = new Date(p.tanggalBerangkat).toLocaleDateString("id-ID", {
+                            day: "numeric",
+                            month: "short",
+                            year: "numeric",
+                          });
+                          const sisa = (p.kuota || p.maxSeat || 45) - (p.terisi ?? 0);
+                          return (
+                            <option key={p.id} value={p.id}>
+                              {name} — Berangkat: {depDateStr} (Sisa Kuota: {sisa} PAX)
+                            </option>
+                          );
+                        })}
+                    </select>
+                    {errors.paket && <p className="text-xs text-red-500 mt-1">{errors.paket}</p>}
+                  </div>
+
+                  {/* Selected Package Details Card */}
+                  {selectedPaket && (() => {
+                    const clusters = Array.isArray(selectedPaket.hotelOptions) && selectedPaket.hotelOptions.length > 0
+                      ? selectedPaket.hotelOptions
+                      : null;
+                    const isMultiCluster = !!(clusters && clusters.length > 1);
+
+                    const activeCluster = isMultiCluster && clusters
+                      ? clusters[selectedClusterIndex] || clusters[0]
+                      : null;
+
+                    const basePrice = activeCluster
+                      ? Number(activeCluster.hargaBase || 0)
+                      : Number(selectedPaket.hargaPaket || selectedPaket.paketUmroh?.hargaBase || 0);
+
+                    const hotelMekkah = activeCluster?.hotelMekkah || selectedPaket.hotelMekkah || "TBA";
+                    const hotelMadinah = activeCluster?.hotelMadinah || selectedPaket.hotelMadinah || "TBA";
+
+                    const upgradeTriple = Number(activeCluster?.upgradeTriple || 1500000);
+                    const upgradeDouble = Number(activeCluster?.upgradeDouble || 2500000);
+
+                    const roomSurcharge = roomUpgrade === "triple" ? upgradeTriple : roomUpgrade === "double" ? upgradeDouble : 0;
+                    const pricePerPax = basePrice + roomSurcharge;
+                    const totalPriceGroup = pricePerPax * paxCount;
+
+                    return (
+                      <div className="border border-blue-100 rounded-2xl p-5 bg-gradient-to-br from-blue-50/40 via-white to-slate-50 shadow-sm space-y-6">
+                        {/* Header Info */}
+                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-gray-200/80 pb-4">
+                          <div>
+                            <span className="text-[11px] font-bold uppercase tracking-wider text-blue-600 bg-blue-100/80 px-2.5 py-0.5 rounded-md">
+                              Detail Paket Keberangkatan
+                            </span>
+                            <h3 className="text-base font-bold text-gray-900 mt-1">
+                              {selectedPaket.namaPaket || selectedPaket.paketUmroh?.namaPaket}
+                            </h3>
+                            <p className="text-xs text-gray-600 mt-1 flex items-center gap-2 flex-wrap">
+                              <span>✈️ {selectedPaket.maskapai || selectedPaket.maskapaiId || "Saudia Airlines"} • Flight {selectedPaket.nomorPenerbangan || "-"}</span>
+                              <span>•</span>
+                              <span>📅 {new Date(selectedPaket.tanggalBerangkat).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })} — {new Date(selectedPaket.tanggalPulang).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}</span>
+                            </p>
+                          </div>
+                          <div className="sm:text-right shrink-0">
+                            <span className="text-xs text-gray-500 block">Harga Base Paket</span>
+                            <span className="text-lg font-extrabold text-blue-600">
+                              Rp {basePrice.toLocaleString("id-ID")}
+                            </span>
+                            <span className="text-xs text-gray-400"> / orang</span>
+                          </div>
                         </div>
-                        <div className="text-right shrink-0">
-                          <p className="text-base font-bold text-blue-600">
-                            Rp {(paket.hargaPaket || paket.paketUmroh?.hargaBase || 0).toLocaleString("id-ID")}
-                          </p>
-                          <p className="text-xs text-gray-400">/orang</p>
-                          <p className="text-xs text-gray-500 mt-1 font-medium">
-                            Kuota: {paket.terisi ?? 0}/{paket.kuota || paket.maxSeat || 45}
-                          </p>
+
+                        {/* Multi-Cluster Selector (If Multi Cluster) */}
+                        {isMultiCluster && clusters && (
+                          <div className="space-y-3">
+                            <label className="block text-xs font-bold text-gray-800 uppercase tracking-wider">
+                              🏢 Pilih Klaster Hotel & Fasilitas
+                            </label>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                              {clusters.map((cl: any, idx: number) => {
+                                const isSelected = selectedClusterIndex === idx;
+                                const clPrice = Number(cl.hargaBase || 0);
+                                return (
+                                  <button
+                                    key={idx}
+                                    type="button"
+                                    onClick={() => {
+                                      setSelectedClusterIndex(idx);
+                                      if (cl.clusterName) setHotelUpgrade(cl.clusterName);
+                                    }}
+                                    className={cn(
+                                      "p-3.5 rounded-xl border-2 text-left transition-all relative flex flex-col justify-between gap-2",
+                                      isSelected
+                                        ? "border-blue-600 bg-blue-50/80 shadow-sm ring-1 ring-blue-500"
+                                        : "border-gray-200 bg-white hover:border-gray-300"
+                                    )}
+                                  >
+                                    <div className="flex items-center justify-between">
+                                      <span className="font-bold text-sm text-gray-900">
+                                        {cl.clusterName || `Klaster ${idx + 1}`}
+                                      </span>
+                                      {isSelected && <CheckCircle2 className="w-4 h-4 text-blue-600" />}
+                                    </div>
+                                    <div className="text-xs text-gray-600 space-y-0.5">
+                                      <p>🕋 Mekkah: <strong>{cl.hotelMekkah || "TBA"}</strong></p>
+                                      <p>🕌 Madinah: <strong>{cl.hotelMadinah || "TBA"}</strong></p>
+                                    </div>
+                                    <div className="text-xs font-semibold text-blue-700 pt-1 border-t border-gray-100">
+                                      Harga Base Klaster: Rp {clPrice.toLocaleString("id-ID")} / pax
+                                    </div>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Single Cluster Hotel Info (If Single Cluster) */}
+                        {!isMultiCluster && (
+                          <div className="bg-white border border-gray-200 rounded-xl p-3.5 flex flex-col sm:flex-row gap-4 sm:items-center justify-between text-xs shadow-2xs">
+                            <div className="flex items-center gap-2">
+                              <span className="font-semibold text-gray-700">🕋 Hotel Mekkah:</span>
+                              <span className="text-gray-900 font-bold">{hotelMekkah}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-semibold text-gray-700">🕌 Hotel Madinah:</span>
+                              <span className="text-gray-900 font-bold">{hotelMadinah}</span>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Room Upgrade Options */}
+                        <div className="space-y-3">
+                          <label className="block text-xs font-bold text-gray-800 uppercase tracking-wider">
+                            🛏️ Pilihan Upgrade Tipe Kamar
+                          </label>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+                            {/* QUAD */}
+                            <button
+                              type="button"
+                              onClick={() => setRoomUpgrade("quad")}
+                              className={cn(
+                                "p-3 rounded-xl border-2 text-left transition-all flex flex-col justify-between gap-1.5",
+                                roomUpgrade === "quad"
+                                  ? "border-blue-600 bg-blue-50/80 ring-1 ring-blue-500"
+                                  : "border-gray-200 bg-white hover:border-gray-300"
+                              )}
+                            >
+                              <div className="flex items-center justify-between">
+                                <span className="font-bold text-xs text-gray-900">QUAD (4 Pax)</span>
+                                {roomUpgrade === "quad" && <Check className="w-3.5 h-3.5 text-blue-600" />}
+                              </div>
+                              <p className="text-[11px] text-gray-500">4 orang per kamar</p>
+                              <p className="text-xs font-bold text-emerald-700 mt-1">Base (+ Rp 0)</p>
+                            </button>
+
+                            {/* TRIPLE */}
+                            <button
+                              type="button"
+                              onClick={() => setRoomUpgrade("triple")}
+                              className={cn(
+                                "p-3 rounded-xl border-2 text-left transition-all flex flex-col justify-between gap-1.5",
+                                roomUpgrade === "triple"
+                                  ? "border-blue-600 bg-blue-50/80 ring-1 ring-blue-500"
+                                  : "border-gray-200 bg-white hover:border-gray-300"
+                              )}
+                            >
+                              <div className="flex items-center justify-between">
+                                <span className="font-bold text-xs text-gray-900">TRIPLE (3 Pax)</span>
+                                {roomUpgrade === "triple" && <Check className="w-3.5 h-3.5 text-blue-600" />}
+                              </div>
+                              <p className="text-[11px] text-gray-500">3 orang per kamar</p>
+                              <p className="text-xs font-bold text-blue-700 mt-1">
+                                + Rp {upgradeTriple.toLocaleString("id-ID")} / pax
+                              </p>
+                            </button>
+
+                            {/* DOUBLE */}
+                            <button
+                              type="button"
+                              onClick={() => setRoomUpgrade("double")}
+                              className={cn(
+                                "p-3 rounded-xl border-2 text-left transition-all flex flex-col justify-between gap-1.5",
+                                roomUpgrade === "double"
+                                  ? "border-blue-600 bg-blue-50/80 ring-1 ring-blue-500"
+                                  : "border-gray-200 bg-white hover:border-gray-300"
+                              )}
+                            >
+                              <div className="flex items-center justify-between">
+                                <span className="font-bold text-xs text-gray-900">DOUBLE (2 Pax)</span>
+                                {roomUpgrade === "double" && <Check className="w-3.5 h-3.5 text-blue-600" />}
+                              </div>
+                              <p className="text-[11px] text-gray-500">2 orang per kamar</p>
+                              <p className="text-xs font-bold text-blue-700 mt-1">
+                                + Rp {upgradeDouble.toLocaleString("id-ID")} / pax
+                              </p>
+                            </button>
+
+                            {/* MIX */}
+                            <button
+                              type="button"
+                              onClick={() => setRoomUpgrade("mix")}
+                              className={cn(
+                                "p-3 rounded-xl border-2 text-left transition-all flex flex-col justify-between gap-1.5",
+                                roomUpgrade === "mix"
+                                  ? "border-blue-600 bg-blue-50/80 ring-1 ring-blue-500"
+                                  : "border-gray-200 bg-white hover:border-gray-300"
+                              )}
+                            >
+                              <div className="flex items-center justify-between">
+                                <span className="font-bold text-xs text-gray-900">MIX (Kamar Travel)</span>
+                                {roomUpgrade === "mix" && <Check className="w-3.5 h-3.5 text-blue-600" />}
+                              </div>
+                              <p className="text-[11px] text-gray-500">Diatur oleh travel</p>
+                              <p className="text-xs font-bold text-emerald-700 mt-1">Base (+ Rp 0)</p>
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Pricing Summary Breakdown */}
+                        <div className="bg-slate-900 text-white rounded-xl p-4 space-y-2 text-xs shadow-inner">
+                          <div className="flex justify-between items-center text-slate-300">
+                            <span>Harga Base Paket ({isMultiCluster ? activeCluster?.clusterName : "Reguler"}):</span>
+                            <span>Rp {basePrice.toLocaleString("id-ID")} / pax</span>
+                          </div>
+                          {roomSurcharge > 0 && (
+                            <div className="flex justify-between items-center text-amber-300 font-medium">
+                              <span>Upgrade Kamar ({roomUpgrade.toUpperCase()}):</span>
+                              <span>+ Rp {roomSurcharge.toLocaleString("id-ID")} / pax</span>
+                            </div>
+                          )}
+                          <div className="flex justify-between items-center text-slate-200 font-semibold pt-1 border-t border-slate-700">
+                            <span>Total per Pax:</span>
+                            <span>Rp {pricePerPax.toLocaleString("id-ID")} / pax</span>
+                          </div>
+                          <div className="flex justify-between items-center text-sm font-extrabold text-blue-400 pt-1.5 border-t border-slate-700">
+                            <span>Total Registrasi Rombongan ({paxCount} PAX):</span>
+                            <span className="text-base text-emerald-400">
+                              Rp {totalPriceGroup.toLocaleString("id-ID")}
+                            </span>
+                          </div>
                         </div>
                       </div>
-                    </button>
-                  ))}
+                    );
+                  })()}
                 </div>
               )}
-
-              {selectedPaketId && (
-                <div className="border-t pt-4 mt-4 space-y-3">
-                  <p className="text-sm font-medium text-gray-700">Preferensi Kamar</p>
-                  <p className="text-xs text-gray-500">Pilih tipe kamar yang diinginkan untuk rombongan Anda.</p>
-                  <div className="grid grid-cols-2 gap-3">
-                    {[
-                      { value: "mix", label: "MIX", desc: "Penempatan kamar akan diatur oleh pihak travel." },
-                      { value: "quad", label: "QUAD", desc: "4 orang per kamar (1 kamar berempat)." },
-                      { value: "triple", label: "TRIPLE", desc: "3 orang per kamar (1 kamar bertiga)." },
-                      { value: "double", label: "DOUBLE", desc: "2 orang per kamar (1 kamar berdua)." },
-                    ].map((opt) => (
-                      <button
-                        key={opt.value}
-                        type="button"
-                        onClick={() => setRoomUpgrade(roomUpgrade === opt.value ? "" : opt.value)}
-                        className={cn(
-                          "text-left p-3 rounded-lg border-2 transition-colors",
-                          roomUpgrade === opt.value
-                            ? "border-blue-500 bg-blue-50"
-                            : "border-gray-200 hover:border-gray-300"
-                        )}
-                      >
-                        <p className={cn(
-                          "text-sm font-semibold",
-                          roomUpgrade === opt.value ? "text-blue-700" : "text-gray-700"
-                        )}>
-                          {opt.label}
-                        </p>
-                        <p className="text-xs text-gray-500 mt-1">{opt.desc}</p>
-                      </button>
-                    ))}
-                  </div>
-                  <div className="border-t pt-3 mt-2">
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Hotel Upgrade (opsional)</label>
-                    <select
-                      value={hotelUpgrade}
-                      onChange={(e) => setHotelUpgrade(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                      <option value="">Standard</option>
-                      <option value="premium">Premium</option>
-                      <option value="vip">VIP</option>
-                    </select>
-                  </div>
-                </div>
-              )}
-
-              {errors.paket && <p className="text-xs text-red-500">{errors.paket}</p>}
             </div>
           )}
 
@@ -1378,21 +1557,53 @@ export default function RegisterPage() {
 
               {/* Package */}
               {selectedPaket && (() => {
-                const itemPrice = selectedPaket.hargaPaket || selectedPaket.paketUmroh?.hargaBase || 0;
-                const totalPrice = itemPrice * paxCount;
+                const clusters = Array.isArray(selectedPaket.hotelOptions) && selectedPaket.hotelOptions.length > 0
+                  ? selectedPaket.hotelOptions
+                  : null;
+                const isMultiCluster = !!(clusters && clusters.length > 1);
+                const activeCluster = isMultiCluster && clusters
+                  ? clusters[selectedClusterIndex] || clusters[0]
+                  : null;
+
+                const basePrice = activeCluster
+                  ? Number(activeCluster.hargaBase || 0)
+                  : Number(selectedPaket.hargaPaket || selectedPaket.paketUmroh?.hargaBase || 0);
+
+                const upgradeTriple = Number(activeCluster?.upgradeTriple || 1500000);
+                const upgradeDouble = Number(activeCluster?.upgradeDouble || 2500000);
+                const roomSurcharge = roomUpgrade === "triple" ? upgradeTriple : roomUpgrade === "double" ? upgradeDouble : 0;
+                const pricePerPax = basePrice + roomSurcharge;
+                const totalPriceGroup = pricePerPax * paxCount;
                 const packageName = selectedPaket.namaPaket || selectedPaket.paketUmroh?.namaPaket || "-";
+
                 return (
-                  <div className="border border-gray-200 rounded-lg p-4">
-                    <h3 className="text-sm font-semibold text-gray-700 mb-2">Paket Keberangkatan</h3>
-                    <p className="text-sm text-gray-900 font-medium">{packageName}</p>
-                    <p className="text-sm text-gray-500 mt-1">
-                      Rp {itemPrice.toLocaleString("id-ID")} × {paxCount} PAX ={" "}
-                      <span className="font-semibold text-blue-600">
-                        Rp {totalPrice.toLocaleString("id-ID")}
-                      </span>
+                  <div className="border border-gray-200 rounded-lg p-4 space-y-2">
+                    <h3 className="text-sm font-semibold text-gray-700">Paket Keberangkatan</h3>
+                    <p className="text-sm text-gray-900 font-bold">{packageName}</p>
+                    <p className="text-xs text-gray-500">
+                      ✈️ {selectedPaket.maskapai || selectedPaket.maskapaiId || "Saudia Airlines"} • Flight {selectedPaket.nomorPenerbangan || "-"}
                     </p>
-                    {roomUpgrade && <p className="text-xs text-gray-500 mt-1">Kamar: {roomUpgrade.toUpperCase()}{roomUpgrade === "mix" ? " (diatur travel)" : ""}</p>}
-                    {hotelUpgrade && <p className="text-xs text-gray-500">Hotel: {hotelUpgrade}</p>}
+                    {isMultiCluster && activeCluster && (
+                      <p className="text-xs font-semibold text-blue-700 bg-blue-50 px-2.5 py-1 rounded inline-block border border-blue-100">
+                        🏢 Klaster Hotel: {activeCluster.clusterName} (Mekkah: {activeCluster.hotelMekkah} | Madinah: {activeCluster.hotelMadinah})
+                      </p>
+                    )}
+                    <div className="text-xs text-gray-600 space-y-1 pt-1.5 border-t border-gray-100">
+                      <div className="flex justify-between">
+                        <span>Harga Base Paket:</span>
+                        <span>Rp {basePrice.toLocaleString("id-ID")} / pax</span>
+                      </div>
+                      {roomSurcharge > 0 && (
+                        <div className="flex justify-between text-amber-700 font-medium">
+                          <span>Upgrade Kamar ({roomUpgrade.toUpperCase()}):</span>
+                          <span>+ Rp {roomSurcharge.toLocaleString("id-ID")} / pax</span>
+                        </div>
+                      )}
+                      <div className="flex justify-between text-sm font-extrabold text-blue-600 pt-1 border-t border-gray-100">
+                        <span>Total Rombongan ({paxCount} PAX):</span>
+                        <span className="text-emerald-600">Rp {totalPriceGroup.toLocaleString("id-ID")}</span>
+                      </div>
+                    </div>
                   </div>
                 );
               })()}
