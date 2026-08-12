@@ -1168,15 +1168,9 @@ export default function RegisterPage() {
                         .filter((p) => p.status !== "cancelled")
                         .map((p) => {
                           const name = p.namaPaket || p.paketUmroh?.namaPaket || p.kode;
-                          const depDateStr = new Date(p.tanggalBerangkat).toLocaleDateString("id-ID", {
-                            day: "numeric",
-                            month: "short",
-                            year: "numeric",
-                          });
-                          const sisa = (p.kuota || p.maxSeat || 45) - (p.terisi ?? 0);
                           return (
                             <option key={p.id} value={p.id}>
-                              {name} — Berangkat: {depDateStr} (Sisa Kuota: {sisa} PAX)
+                              {name}
                             </option>
                           );
                         })}
