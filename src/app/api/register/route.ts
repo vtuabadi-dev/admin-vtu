@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, message: "Data perwakilan wajib diisi" }, { status: 400 });
     }
 
-    if (!body.termsAccepted || !(body as any).termsSyarat || !(body as any).termsPembayaran || !(body as any).termsPembatalan || !(body as any).termsData) {
+    if (!body.termsAccepted) {
       return NextResponse.json({ success: false, message: "Semua syarat & ketentuan harus disetujui" }, { status: 400 });
     }
 
