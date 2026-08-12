@@ -215,6 +215,7 @@ export async function POST(request: NextRequest) {
           kodeRegistrasi,
           pdfPath,
           pdfFilename,
+          driveFileId,
           registrationId: reg.id,
         },
       });
@@ -232,7 +233,7 @@ export async function POST(request: NextRequest) {
         role: "jamaah",
         module: "jamaah",
         action: "registration.artifacts",
-        detail: `PDF: ${pdfPath || "gagal"} | Email: ${emailStatus} | Ke: ${body.emailPerwakilan}`,
+        detail: `PDF: ${pdfPath || "gagal"} (ID: ${driveFileId || "local"}) | Email: ${emailStatus} | Ke: ${body.emailPerwakilan}`,
         entityId: reg.id,
         entityType: "RegistrationRequest",
       });
