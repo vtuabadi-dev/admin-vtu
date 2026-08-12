@@ -2,7 +2,7 @@ import fs from "fs/promises";
 import path from "path";
 import type { StorageAdapter } from "./adapter";
 
-const BASE_PATH = process.env.STORAGE_PATH || "./storage";
+const BASE_PATH = process.env.STORAGE_PATH || (process.env.VERCEL ? "/tmp/storage" : "./storage");
 
 function resolve(p: string): string {
   const resolved = path.resolve(path.join(BASE_PATH, p));
@@ -38,7 +38,15 @@ export function createLocalAdapter(): StorageAdapter {
     },
 
     async getUrl(p: string): Promise<string> {
-      return resolve(p);
+      try {
+        const fullPath = resolve(p);
+        const buffer = await fs.readFile(fullPath);
+        const ext = p.split(".").pop()?.toLowerCase() || "jpeg";
+        const mime = ext === "png" ? "image/png" : "image/jpeg";
+        return `data:${mime};base64,${buffer.toString("base64")}`;
+      } catch {
+        return resolve(p);
+      }
     },
 
     async list(prefix: string): Promise<{ path: string; size: number; modifiedAt: Date }[]> {
