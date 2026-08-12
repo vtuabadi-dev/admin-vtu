@@ -128,11 +128,13 @@ export async function POST(request: NextRequest) {
       // Non-critical
     }
 
-    // ── Generate PDF ────────────────────────────────────────
+    // ── Generate PDF & Save Copy to "FORMULIR PENDAFTARAN" ───
     let pdfPath = "";
+    let pdfFilename = "";
+    let pdfBuffer: Buffer | null = null;
     try {
       const { generateRegistrationPdf } = await import("@/server/services/registration-pdf.service");
-      const pdfBuffer = await generateRegistrationPdf({
+      pdfBuffer = await generateRegistrationPdf({
         registration: reg,
         packageInfo: (paket as any) ?? null,
         termsVersion: (body as any).termsVersion || "1.0",
@@ -140,47 +142,67 @@ export async function POST(request: NextRequest) {
         signedAt: reg.signedAt,
       });
 
+      // Filename format: [KODE_REGISTRASI]_[NAMA_PENDAFTAR].pdf
+      const namaClean = namaPerwakilan.replace(/[^A-Z0-9]/gi, "_").replace(/_+/g, "_");
+      pdfFilename = `${kodeRegistrasi}_${namaClean}.pdf`;
+      pdfPath = `FORMULIR PENDAFTARAN/${pdfFilename}`;
+
       const storage = getStorageAdapter();
-      pdfPath = `registrations/${kodeRegistrasi}/formulir-pendaftaran.pdf`;
+      // Upload copy to FORMULIR PENDAFTARAN folder
       await storage.upload(pdfPath, pdfBuffer, "application/pdf");
+      // Also upload to registrations/[kodeRegistrasi]/ for standard reference
+      await storage.upload(`registrations/${kodeRegistrasi}/${pdfFilename}`, pdfBuffer, "application/pdf").catch(() => {});
     } catch (err) {
       console.error("[register] PDF generation failed:", err);
       // Non-blocking — registration still succeeds
     }
 
-    // ── Send confirmation email ─────────────────────────────
+    // ── Send confirmation email with attached PDF ────────────
     let emailStatus = "not_sent";
     try {
       const { getNotificationProvider } = await import("@/server/services/notify");
       const notifier = getNotificationProvider();
+      const namaClean = namaPerwakilan.replace(/[^A-Z0-9]/gi, "_").replace(/_+/g, "_");
       await notifier.send({
         channel: "email",
         recipient: body.emailPerwakilan,
-        subject: "Konfirmasi Registrasi Jamaah — " + kodeRegistrasi,
+        subject: `Konfirmasi Registrasi Jamaah Umroh — ${kodeRegistrasi} (${namaPerwakilan})`,
         body: [
           `Yth. ${namaPerwakilan},`,
           "",
-          `Terima kasih telah melakukan pendaftaran melalui portal registrasi kami.`,
+          `Terima kasih telah melakukan pendaftaran melalui portal registrasi VTU Travel.`,
           "",
           `Berikut ringkasan pendaftaran Anda:`,
-          `  No. Registrasi: ${kodeRegistrasi}`,
-          `  Paket: ${paket?.namaPaket ?? "-"}`,
-          `  Jumlah Jamaah: ${body.paxCount} orang`,
-          `  Preferensi Kamar: ${body.roomUpgrade?.toUpperCase() ?? "MIX"}`,
+          `  • No. Registrasi : ${kodeRegistrasi}`,
+          `  • Nama PIC       : ${namaPerwakilan}`,
+          `  • Paket Umroh    : ${paket?.namaPaket ?? "-"}`,
+          `  • Jumlah Jamaah  : ${body.paxCount} PAX`,
+          `  • Preferensi Kamar: ${(body.roomUpgrade || "quad").toUpperCase()}`,
           "",
-          `Status pendaftaran Anda saat ini: BARU.`,
-          `Tim travel kami akan menghubungi Anda dalam 1-2 hari kerja untuk proses selanjutnya.`,
+          `Formulir & Surat Pernyataan Pendaftaran Anda terlampir dalam email ini dengan nama file:`,
+          `📄 ${pdfFilename || `${kodeRegistrasi}_${namaClean}.pdf`}`,
           "",
-          `Formulir registrasi terlampir dalam email ini untuk arsip Anda.`,
+          `Salinan dokumen ini juga telah berhasil tersimpan dalam folder arsip jamaah:`,
+          `📂 FORMULIR PENDAFTARAN/${pdfFilename || `${kodeRegistrasi}_${namaClean}.pdf`}`,
           "",
-          `Jika ada pertanyaan, silakan hubungi kami melalui WhatsApp.`,
+          `Tim operasional kami akan menghubungi Anda melalui WhatsApp (${body.nomorTelepon}) dalam 1-2 hari kerja untuk verifikasi berkas selanjutnya.`,
           "",
           `Hormat kami,`,
           `Tim VTU Operasional`,
         ].join("\n"),
+        attachments: pdfBuffer
+          ? [
+              {
+                filename: pdfFilename || `${kodeRegistrasi}_${namaClean}.pdf`,
+                content: pdfBuffer,
+                contentType: "application/pdf",
+              },
+            ]
+          : undefined,
         metadata: {
           kodeRegistrasi,
           pdfPath,
+          pdfFilename,
           registrationId: reg.id,
         },
       });
