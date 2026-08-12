@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/shared/lib/utils";
 import {
@@ -22,6 +22,8 @@ import {
   Minus,
   Plus,
   AlertTriangle,
+  ArrowDown,
+  CheckCircle2,
 } from "lucide-react";
 import type { JenisKelamin, Keberangkatan } from "@/shared/types";
 
@@ -51,13 +53,12 @@ export default function RegisterPage() {
   const [emailPerwakilan, setEmailPerwakilan] = useState("");
   const [useRepAsJamaah1, setUseRepAsJamaah1] = useState(true);
 
-  // Step 2: Terms (4 mandatory checkboxes) — fetched dynamically
+  // Step 2: Terms & Conditions (Single Checkbox with Scroll Enforcement)
+  const termsContainerRef = useRef<HTMLDivElement>(null);
   const [termsDoc, setTermsDoc] = useState<{ title: string; content: string; version: string } | null>(null);
   const [termsVersion, setTermsVersion] = useState("");
-  const [termsSyarat, setTermsSyarat] = useState(false);
-  const [termsPembayaran, setTermsPembayaran] = useState(false);
-  const [termsPembatalan, setTermsPembatalan] = useState(false);
-  const [termsData, setTermsData] = useState(false);
+  const [hasScrolledToBottom, setHasScrolledToBottom] = useState(false);
+  const [termsAccepted, setTermsAccepted] = useState(false);
   const [termsAcceptedAt, setTermsAcceptedAt] = useState<string | null>(null);
 
   // Step 3: PAX count
@@ -128,6 +129,26 @@ export default function RegisterPage() {
     loadTerms();
   }, []);
 
+  // Track scroll position to enable checkbox when scrolled to bottom
+  const handleTermsScroll = () => {
+    const container = termsContainerRef.current;
+    if (!container) return;
+    const isAtBottom = container.scrollTop + container.clientHeight >= container.scrollHeight - 30;
+    if (isAtBottom && !hasScrolledToBottom) {
+      setHasScrolledToBottom(true);
+    }
+  };
+
+  // If terms document fits without scrolling, enable checkbox automatically
+  useEffect(() => {
+    if (termsDoc && termsContainerRef.current) {
+      const container = termsContainerRef.current;
+      if (container.scrollHeight <= container.clientHeight + 25) {
+        setHasScrolledToBottom(true);
+      }
+    }
+  }, [termsDoc]);
+
   // Sync members when paxCount changes
   useEffect(() => {
     setMembers((prev) => {
@@ -173,8 +194,10 @@ export default function RegisterPage() {
     }
 
     if (s === 2) {
-      if (!termsSyarat || !termsPembayaran || !termsPembatalan || !termsData) {
-        errs.terms = "Anda harus menyetujui seluruh syarat & ketentuan";
+      if (!hasScrolledToBottom) {
+        errs.terms = "Harap membaca / menggulir Syarat & Ketentuan sampai bawah terlebih dahulu";
+      } else if (!termsAccepted) {
+        errs.terms = "Anda harus menyetujui Syarat & Ketentuan untuk melanjutkan";
       }
     }
 
@@ -199,7 +222,7 @@ export default function RegisterPage() {
 
     setErrors(errs);
     return Object.keys(errs).length === 0;
-  }, [namaPerwakilan, nomorTelepon, emailPerwakilan, termsSyarat, termsPembayaran, termsPembatalan, termsData, members, selectedPaketId, signaturePath, signatureFile]);
+  }, [namaPerwakilan, nomorTelepon, emailPerwakilan, hasScrolledToBottom, termsAccepted, members, selectedPaketId, signaturePath, signatureFile]);
 
   const nextStep = () => {
     if (validateStep(step)) {
@@ -279,11 +302,7 @@ export default function RegisterPage() {
           namaPerwakilan,
           nomorTelepon,
           emailPerwakilan,
-          termsAccepted: termsSyarat && termsPembayaran && termsPembatalan && termsData,
-          termsSyarat,
-          termsPembayaran,
-          termsPembatalan,
-          termsData,
+          termsAccepted,
           termsAcceptedAt,
           termsVersion,
           paxCount,
@@ -513,13 +532,16 @@ export default function RegisterPage() {
           {/* Step 2: Terms */}
           {step === 2 && (
             <div className="space-y-4">
-              <h2 className="text-lg font-semibold text-gray-900">Syarat & Ketentuan</h2>
+              <h2 className="text-lg font-semibold text-gray-900">Syarat & Ketentuan Umroh</h2>
               {termsDoc ? (
                 <>
                   <div
-                    className="border border-gray-200 rounded-lg p-4 h-64 overflow-y-auto text-sm text-gray-700 rich-text-content bg-white shadow-inner"
-                    dangerouslySetInnerHTML={{ __html: termsDoc.content }}
-                  />
+                    ref={termsContainerRef}
+                    onScroll={handleTermsScroll}
+                    className="border border-gray-200 rounded-lg p-4 h-64 overflow-y-auto text-sm text-gray-700 rich-text-content bg-white shadow-inner focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <div dangerouslySetInnerHTML={{ __html: termsDoc.content }} />
+                  </div>
                   <p className="text-xs text-gray-400 mt-1">
                     Versi {termsDoc.version || termsVersion} — {termsDoc.title}
                   </p>
@@ -530,53 +552,50 @@ export default function RegisterPage() {
                 </div>
               )}
 
-              <div className="space-y-3 pt-2">
-                <label className="flex items-start gap-3 cursor-pointer">
+              {/* Scroll Status Indicator Banner */}
+              {!hasScrolledToBottom ? (
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 flex items-center gap-2 text-amber-800 text-xs font-medium animate-pulse">
+                  <ArrowDown className="w-4 h-4 text-amber-600 shrink-0" />
+                  <span>Gulir teks Syarat & Ketentuan di atas hingga bagian paling bawah untuk mengaktifkan persetujuan.</span>
+                </div>
+              ) : (
+                <div className="bg-green-50 border border-green-200 rounded-xl p-3 flex items-center gap-2 text-green-800 text-xs font-medium">
+                  <CheckCircle2 className="w-4 h-4 text-green-600 shrink-0" />
+                  <span>Anda telah membaca seluruh Syarat & Ketentuan di atas.</span>
+                </div>
+              )}
+
+              {/* Single Checkbox */}
+              <div className="pt-2">
+                <label
+                  className={cn(
+                    "flex items-start gap-3 p-4 rounded-xl border transition-all cursor-pointer select-none",
+                    !hasScrolledToBottom
+                      ? "bg-gray-50 border-gray-200 opacity-60 cursor-not-allowed"
+                      : termsAccepted
+                      ? "bg-blue-50/90 border-blue-300 text-blue-950 shadow-sm"
+                      : "bg-white border-gray-300 hover:border-gray-400"
+                  )}
+                >
                   <input
                     type="checkbox"
-                    checked={termsSyarat}
-                    onChange={(e) => setTermsSyarat(e.target.checked)}
-                    className="mt-0.5 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    checked={termsAccepted}
+                    disabled={!hasScrolledToBottom}
+                    onChange={(e) => setTermsAccepted(e.target.checked)}
+                    className="mt-0.5 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 disabled:cursor-not-allowed shrink-0"
                   />
-                  <span className="text-sm text-gray-700">
-                    Saya telah membaca dan memahami syarat & ketentuan di atas.
-                  </span>
-                </label>
-                <label className="flex items-start gap-3 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={termsPembayaran}
-                    onChange={(e) => setTermsPembayaran(e.target.checked)}
-                    className="mt-0.5 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                  />
-                  <span className="text-sm text-gray-700">
-                    Saya memahami kebijakan pembayaran (DP 30%, jadwal pelunasan, dan metode pembayaran).
-                  </span>
-                </label>
-                <label className="flex items-start gap-3 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={termsPembatalan}
-                    onChange={(e) => setTermsPembatalan(e.target.checked)}
-                    className="mt-0.5 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                  />
-                  <span className="text-sm text-gray-700">
-                    Saya memahami kebijakan pembatalan dan refund yang berlaku.
-                  </span>
-                </label>
-                <label className="flex items-start gap-3 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={termsData}
-                    onChange={(e) => setTermsData(e.target.checked)}
-                    className="mt-0.5 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                  />
-                  <span className="text-sm text-gray-700">
-                    Saya menyetujui pengolahan data pribadi dan komunikasi WhatsApp dari pihak travel.
-                  </span>
+                  <div className="text-sm">
+                    <span className="font-semibold text-gray-900">
+                      Saya telah membaca, memahami, dan menyetujui seluruh Syarat & Ketentuan Umroh di atas.
+                    </span>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Persetujuan ini mencakup klausul pendaftaran, kebijakan pembayaran, pembatalan, dan pengolahan data pribadi.
+                    </p>
+                  </div>
                 </label>
               </div>
-              {errors.terms && <p className="text-xs text-red-500 mt-2">{errors.terms}</p>}
+
+              {errors.terms && <p className="text-xs text-red-500 mt-1">{errors.terms}</p>}
             </div>
           )}
 
@@ -972,19 +991,11 @@ export default function RegisterPage() {
               {/* Terms */}
               <div className="border border-gray-200 rounded-lg p-4">
                 <h3 className="text-sm font-semibold text-gray-700 mb-2">Syarat & Ketentuan</h3>
-                <div className="space-y-1 text-sm">
-                  <p className={termsSyarat ? "text-green-600" : "text-red-500"}>
-                    {termsSyarat ? "☑" : "☐"} Syarat & ketentuan
-                  </p>
-                  <p className={termsPembayaran ? "text-green-600" : "text-red-500"}>
-                    {termsPembayaran ? "☑" : "☐"} Kebijakan pembayaran
-                  </p>
-                  <p className={termsPembatalan ? "text-green-600" : "text-red-500"}>
-                    {termsPembatalan ? "☑" : "☐"} Kebijakan pembatalan
-                  </p>
-                  <p className={termsData ? "text-green-600" : "text-red-500"}>
-                    {termsData ? "☑" : "☐"} Pengolahan data & komunikasi
-                  </p>
+                <div className="flex items-center gap-2 text-sm text-green-700 font-medium">
+                  <CheckCircle2 className="w-4 h-4 text-green-600 shrink-0" />
+                  <span>
+                    Disetujui ({termsDoc?.title || "Syarat & Kondisi Umroh"} {termsDoc?.version ? `v${termsDoc.version}` : ""})
+                  </span>
                 </div>
               </div>
 
