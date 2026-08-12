@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/shared/lib/utils";
 import {
@@ -110,7 +110,9 @@ function CityCombobox({
   placeholder?: string;
 }) {
   const [isOpen, setIsOpen] = useState(false);
+  const [highlightedIndex, setHighlightedIndex] = useState(0);
   const wrapperRef = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
 
   // Close dropdown on click outside
   useEffect(() => {
@@ -124,11 +126,56 @@ function CityCombobox({
   }, []);
 
   // Filter cities live as user types
-  const filteredCities = (function getFiltered() {
+  const filteredCities = useMemo(() => {
     if (!value || value.trim() === "") return INDONESIAN_CITIES;
     const query = value.toLowerCase().trim();
     return INDONESIAN_CITIES.filter((c) => c.toLowerCase().includes(query));
-  })();
+  }, [value]);
+
+  // Reset highlighted index to 0 whenever value/filter changes
+  useEffect(() => {
+    setHighlightedIndex(0);
+  }, [value]);
+
+  // Keep highlighted item in view when scrolling via keyboard
+  useEffect(() => {
+    if (isOpen && listRef.current) {
+      const items = listRef.current.querySelectorAll("button");
+      if (items[highlightedIndex]) {
+        items[highlightedIndex].scrollIntoView({ block: "nearest" });
+      }
+    }
+  }, [highlightedIndex, isOpen]);
+
+  // Handle keyboard events (Enter key selects top/highlighted item)
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!isOpen) {
+      if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+        setIsOpen(true);
+        e.preventDefault();
+      }
+      return;
+    }
+
+    if (e.key === "Enter") {
+      e.preventDefault(); // Prevent form submit
+      if (filteredCities.length > 0) {
+        const targetCity = filteredCities[highlightedIndex] || filteredCities[0];
+        if (targetCity) {
+          onChange(targetCity.toUpperCase());
+        }
+      }
+      setIsOpen(false);
+    } else if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setHighlightedIndex((prev) => (prev < filteredCities.length - 1 ? prev + 1 : 0));
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setHighlightedIndex((prev) => (prev > 0 ? prev - 1 : filteredCities.length - 1));
+    } else if (e.key === "Escape") {
+      setIsOpen(false);
+    }
+  };
 
   return (
     <div ref={wrapperRef} className="relative w-full">
@@ -137,6 +184,7 @@ function CityCombobox({
           type="text"
           value={value}
           onFocus={() => setIsOpen(true)}
+          onKeyDown={handleKeyDown}
           onChange={(e) => {
             onChange(e.target.value.toUpperCase());
             if (!isOpen) setIsOpen(true);
@@ -150,30 +198,40 @@ function CityCombobox({
       </div>
 
       {isOpen && (
-        <div className="absolute z-50 left-0 right-0 mt-1 max-h-[252px] overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg divide-y divide-gray-100">
+        <div
+          ref={listRef}
+          className="absolute z-50 left-0 right-0 mt-1 max-h-[252px] overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg divide-y divide-gray-100"
+        >
           {filteredCities.length > 0 ? (
-            filteredCities.map((city) => (
-              <button
-                key={city}
-                type="button"
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  onChange(city.toUpperCase());
-                  setIsOpen(false);
-                }}
-                className={cn(
-                  "w-full text-left px-3.5 py-2 text-sm transition-colors hover:bg-blue-50 hover:text-blue-700 flex items-center justify-between",
-                  value.toUpperCase() === city.toUpperCase()
-                    ? "bg-blue-50 font-semibold text-blue-700"
-                    : "text-gray-700"
-                )}
-              >
-                <span>{city}</span>
-                {value.toUpperCase() === city.toUpperCase() && (
-                  <Check className="w-4 h-4 text-blue-600 shrink-0" />
-                )}
-              </button>
-            ))
+            filteredCities.map((city, idx) => {
+              const isSelected = value.toUpperCase() === city.toUpperCase();
+              const isHighlighted = idx === highlightedIndex;
+              return (
+                <button
+                  key={city}
+                  type="button"
+                  onMouseEnter={() => setHighlightedIndex(idx)}
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    onChange(city.toUpperCase());
+                    setIsOpen(false);
+                  }}
+                  className={cn(
+                    "w-full text-left px-3.5 py-2 text-sm transition-colors flex items-center justify-between",
+                    isHighlighted
+                      ? "bg-blue-100 font-semibold text-blue-900"
+                      : isSelected
+                      ? "bg-blue-50 font-semibold text-blue-700"
+                      : "text-gray-700 hover:bg-gray-50"
+                  )}
+                >
+                  <span>{city}</span>
+                  {isSelected && (
+                    <Check className="w-4 h-4 text-blue-600 shrink-0" />
+                  )}
+                </button>
+              );
+            })
           ) : (
             <div className="px-3.5 py-2.5 text-xs text-gray-400 italic">
               Kota &quot;{value}&quot; (Bisa digunakan / tekan Lanjut)
