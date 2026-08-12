@@ -6,6 +6,7 @@ import { cn } from "@/shared/lib/utils";
 import {
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   Check,
   User,
   Phone,
@@ -97,6 +98,91 @@ function calculateAge(birthDateStr?: string): { age: number; category: string; i
   else if (age < 12) category = "Anak";
 
   return { age, category, isLansia };
+}
+
+function CityCombobox({
+  value,
+  onChange,
+  placeholder = "Kota Tempat Lahir (contoh: SURABAYA)",
+}: {
+  value: string;
+  onChange: (val: string) => void;
+  placeholder?: string;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown on click outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  // Filter cities live as user types
+  const filteredCities = (function getFiltered() {
+    if (!value || value.trim() === "") return INDONESIAN_CITIES;
+    const query = value.toLowerCase().trim();
+    return INDONESIAN_CITIES.filter((c) => c.toLowerCase().includes(query));
+  })();
+
+  return (
+    <div ref={wrapperRef} className="relative w-full">
+      <div className="relative">
+        <input
+          type="text"
+          value={value}
+          onFocus={() => setIsOpen(true)}
+          onChange={(e) => {
+            onChange(e.target.value.toUpperCase());
+            if (!isOpen) setIsOpen(true);
+          }}
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm uppercase transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 pr-8 bg-white"
+          placeholder={placeholder}
+        />
+        <ChevronDown
+          className="w-4 h-4 text-gray-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none"
+        />
+      </div>
+
+      {isOpen && (
+        <div className="absolute z-50 left-0 right-0 mt-1 max-h-[252px] overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg divide-y divide-gray-100">
+          {filteredCities.length > 0 ? (
+            filteredCities.map((city) => (
+              <button
+                key={city}
+                type="button"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  onChange(city.toUpperCase());
+                  setIsOpen(false);
+                }}
+                className={cn(
+                  "w-full text-left px-3.5 py-2 text-sm transition-colors hover:bg-blue-50 hover:text-blue-700 flex items-center justify-between",
+                  value.toUpperCase() === city.toUpperCase()
+                    ? "bg-blue-50 font-semibold text-blue-700"
+                    : "text-gray-700"
+                )}
+              >
+                <span>{city}</span>
+                {value.toUpperCase() === city.toUpperCase() && (
+                  <Check className="w-4 h-4 text-blue-600 shrink-0" />
+                )}
+              </button>
+            ))
+          ) : (
+            <div className="px-3.5 py-2.5 text-xs text-gray-400 italic">
+              Kota &quot;{value}&quot; (Bisa digunakan / tekan Lanjut)
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
 }
 
 export default function RegisterPage() {
@@ -887,24 +973,14 @@ export default function RegisterPage() {
                     </div>
                   </div>
 
-                  {/* Datalist for Indonesian Cities Auto-complete */}
-                  <datalist id="indonesian-cities-list">
-                    {INDONESIAN_CITIES.map((city) => (
-                      <option key={city} value={city} />
-                    ))}
-                  </datalist>
-
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <div>
                       <label className="block text-xs font-medium text-gray-600 mb-1">
                         Tempat Lahir
                       </label>
-                      <input
-                        type="text"
-                        list="indonesian-cities-list"
+                      <CityCombobox
                         value={member.tempatLahir || ""}
-                        onChange={(e) => updateMember(i, "tempatLahir", e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm uppercase transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        onChange={(val) => updateMember(i, "tempatLahir", val)}
                         placeholder="Kota Tempat Lahir (contoh: SURABAYA)"
                       />
                     </div>
