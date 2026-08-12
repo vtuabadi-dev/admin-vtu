@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 
 // ── Types ──────────────────────────────────────────────────
-type DocType = "TERMS_CONDITIONS" | "PAYMENT_POLICY" | "CANCELLATION_POLICY" | "REFUND_POLICY";
+type DocType = "TERMS_CONDITIONS";
 
 interface OperationalDoc {
   id: string;
@@ -26,10 +26,7 @@ interface OperationalDoc {
 }
 
 const DOC_TYPE_CONFIG: Record<DocType, { label: string; icon: typeof FileText }> = {
-  TERMS_CONDITIONS: { label: "Syarat & Ketentuan Registrasi", icon: FileText },
-  PAYMENT_POLICY: { label: "Kebijakan Pembayaran", icon: FileText },
-  CANCELLATION_POLICY: { label: "Kebijakan Pembatalan", icon: FileText },
-  REFUND_POLICY: { label: "Kebijakan Refund", icon: FileText },
+  TERMS_CONDITIONS: { label: "Syarat dan Kondisi Umroh", icon: FileText },
 };
 
 // ── Component ──────────────────────────────────────────────
@@ -189,7 +186,7 @@ export default function AturanOperasionalPage() {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between pb-2">
           <CardTitle className="text-base">Daftar Versi — {typeConfig.label}</CardTitle>
-          <Button size="sm" onClick={() => { resetForm(); setShowCreate(true); }}>
+          <Button size="sm" onClick={() => { resetForm(); setFormTitle("Syarat dan Kondisi Umroh"); setShowCreate(true); }}>
             <Plus className="w-4 h-4 mr-1" /> Versi Baru
           </Button>
         </CardHeader>
@@ -276,7 +273,7 @@ export default function AturanOperasionalPage() {
                   value={formTitle}
                   onChange={(e) => setFormTitle(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Contoh: Syarat & Ketentuan Registrasi"
+                  placeholder="Contoh: Syarat dan Kondisi Umroh"
                 />
               </div>
               <div>
