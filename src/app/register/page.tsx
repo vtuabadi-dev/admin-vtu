@@ -160,6 +160,21 @@ export default function RegisterPage() {
     }
   };
 
+  // Wheel handler: when terms container reaches scroll boundary, propagate wheel scroll to main page window
+  const handleTermsWheel = (e: React.WheelEvent<HTMLDivElement>) => {
+    const container = termsContainerRef.current;
+    if (!container) return;
+
+    const isScrollingDown = e.deltaY > 0;
+    const isScrollingUp = e.deltaY < 0;
+    const isAtBottom = container.scrollTop + container.clientHeight >= container.scrollHeight - 5;
+    const isAtTop = container.scrollTop <= 0;
+
+    if ((isScrollingDown && isAtBottom) || (isScrollingUp && isAtTop)) {
+      window.scrollBy({ top: e.deltaY, behavior: "auto" });
+    }
+  };
+
   // If terms document fits without scrolling, enable checkbox automatically
   useEffect(() => {
     if (termsDoc && termsContainerRef.current) {
@@ -562,7 +577,8 @@ export default function RegisterPage() {
                   <div
                     ref={termsContainerRef}
                     onScroll={handleTermsScroll}
-                    className="border border-gray-200 rounded-lg p-5 h-[480px] overflow-y-auto text-sm text-gray-700 rich-text-content bg-white shadow-inner focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    onWheel={handleTermsWheel}
+                    className="border border-gray-200 rounded-lg p-5 h-[480px] overflow-y-auto text-sm text-gray-700 rich-text-content bg-white shadow-inner focus:outline-none focus:ring-2 focus:ring-blue-500 [overscroll-behavior-y:auto]"
                   >
                     <div dangerouslySetInnerHTML={{ __html: termsDoc.content }} />
                   </div>
