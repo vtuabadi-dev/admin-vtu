@@ -22,7 +22,6 @@ import {
   Minus,
   Plus,
   AlertTriangle,
-  ArrowDown,
   CheckCircle2,
 } from "lucide-react";
 import type { JenisKelamin, Keberangkatan } from "@/shared/types";
@@ -195,7 +194,7 @@ export default function RegisterPage() {
 
     if (s === 2) {
       if (!hasScrolledToBottom) {
-        errs.terms = "Harap membaca / menggulir Syarat & Ketentuan sampai bawah terlebih dahulu";
+        errs.terms = "Mohon membaca Syarat & Ketentuan sampai bagian akhir terlebih dahulu";
       } else if (!termsAccepted) {
         errs.terms = "Anda harus menyetujui Syarat & Ketentuan untuk melanjutkan";
       }
@@ -554,14 +553,14 @@ export default function RegisterPage() {
 
               {/* Scroll Status Indicator Banner */}
               {!hasScrolledToBottom ? (
-                <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 flex items-center gap-2 text-amber-800 text-xs font-medium animate-pulse">
-                  <ArrowDown className="w-4 h-4 text-amber-600 shrink-0" />
-                  <span>Gulir teks Syarat & Ketentuan di atas hingga bagian paling bawah untuk mengaktifkan persetujuan.</span>
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 flex items-center gap-2 text-amber-800 text-xs font-medium">
+                  <FileText className="w-4 h-4 text-amber-600 shrink-0" />
+                  <span>Mohon membaca seluruh isi Syarat & Ketentuan di atas hingga bagian akhir untuk mengaktifkan persetujuan.</span>
                 </div>
               ) : (
                 <div className="bg-green-50 border border-green-200 rounded-xl p-3 flex items-center gap-2 text-green-800 text-xs font-medium">
                   <CheckCircle2 className="w-4 h-4 text-green-600 shrink-0" />
-                  <span>Anda telah membaca seluruh Syarat & Ketentuan di atas.</span>
+                  <span>Terima kasih, Anda telah membaca seluruh Syarat & Ketentuan di atas.</span>
                 </div>
               )}
 
