@@ -537,7 +537,7 @@ export default function RegisterPage() {
                   <div
                     ref={termsContainerRef}
                     onScroll={handleTermsScroll}
-                    className="border border-gray-200 rounded-lg p-4 h-64 overflow-y-auto text-sm text-gray-700 rich-text-content bg-white shadow-inner focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="border border-gray-200 rounded-lg p-5 h-[480px] overflow-y-auto text-sm text-gray-700 rich-text-content bg-white shadow-inner focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
                     <div dangerouslySetInnerHTML={{ __html: termsDoc.content }} />
                   </div>
@@ -546,7 +546,7 @@ export default function RegisterPage() {
                   </p>
                 </>
               ) : (
-                <div className="border border-gray-200 rounded-lg p-4 h-64 overflow-y-auto flex items-center justify-center text-sm text-gray-400 italic">
+                <div className="border border-gray-200 rounded-lg p-5 h-[480px] overflow-y-auto flex items-center justify-center text-sm text-gray-400 italic">
                   Memuat Syarat & Ketentuan...
                 </div>
               )}
