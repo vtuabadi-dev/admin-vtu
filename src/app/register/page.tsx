@@ -41,7 +41,7 @@ interface MemberForm {
   hubungan: string;
 }
 
-function calculateAge(birthDateStr?: string): { age: number; category: string } | null {
+function calculateAge(birthDateStr?: string): { age: number; category: string; isLansia: boolean } | null {
   if (!birthDateStr) return null;
   const birthDate = new Date(birthDateStr);
   if (isNaN(birthDate.getTime())) return null;
@@ -53,12 +53,13 @@ function calculateAge(birthDateStr?: string): { age: number; category: string } 
   }
   if (age < 0) return null;
 
+  const isLansia = age >= 60;
   let category = "Dewasa";
-  if (age >= 60) category = "Lansia";
+  if (isLansia) category = "Lansia";
   else if (age < 2) category = "Bayi";
   else if (age < 12) category = "Anak";
 
-  return { age, category };
+  return { age, category, isLansia };
 }
 
 export default function RegisterPage() {
@@ -746,6 +747,30 @@ export default function RegisterPage() {
                 </label>
               </div>
 
+              {/* Group Lansia Alert Banner */}
+              {(() => {
+                const lansiaList = members.filter((m) => calculateAge(m.tanggalLahir)?.isLansia);
+                if (lansiaList.length === 0) return null;
+                return (
+                  <div className="bg-amber-50 border-2 border-amber-300 rounded-xl p-4 flex items-start gap-3 text-amber-950 shadow-sm">
+                    <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                    <div className="text-sm space-y-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-semibold text-amber-950">
+                          Terdeteksi {lansiaList.length} Jamaah Lansia (Usia ≥ 60 Tahun)
+                        </span>
+                        <span className="text-[11px] bg-amber-200 text-amber-900 font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+                          Wajib Berkas Tambahan
+                        </span>
+                      </div>
+                      <p className="text-xs text-amber-800 leading-relaxed">
+                        Sesuai ketentuan operasional, jamaah berusia 60 tahun ke atas wajib melengkapi <strong>Surat Pernyataan Keluarga Lansia</strong>. Berkas ini wajib dilampirkan pada saat penyerahan dokumen/pemberkasan.
+                      </p>
+                    </div>
+                  </div>
+                );
+              })()}
+
               {members.map((member, i) => (
                 <div key={i} className="border border-gray-200 rounded-lg p-4 space-y-3">
                   <div className="flex items-center justify-between">
@@ -827,10 +852,30 @@ export default function RegisterPage() {
                         const ageInfo = calculateAge(member.tanggalLahir);
                         if (!ageInfo) return null;
                         return (
-                          <div className="mt-1.5 flex items-center gap-1.5">
-                            <span className="text-[11px] font-semibold bg-emerald-100 text-emerald-800 px-2.5 py-0.5 rounded-full inline-flex items-center gap-1">
-                              🎂 Usia: {ageInfo.age} tahun ({ageInfo.category})
-                            </span>
+                          <div className="mt-2 space-y-1.5">
+                            <div className="flex items-center gap-1.5">
+                              <span
+                                className={cn(
+                                  "text-[11px] font-semibold px-2.5 py-0.5 rounded-full inline-flex items-center gap-1",
+                                  ageInfo.isLansia
+                                    ? "bg-amber-100 text-amber-900 border border-amber-300"
+                                    : "bg-emerald-100 text-emerald-800"
+                                )}
+                              >
+                                🎂 Usia: {ageInfo.age} tahun ({ageInfo.category})
+                              </span>
+                            </div>
+                            {ageInfo.isLansia && (
+                              <div className="bg-amber-50 border border-amber-200 rounded-lg p-2.5 flex items-start gap-2 text-xs text-amber-900">
+                                <FileText className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                                <div>
+                                  <span className="font-semibold text-amber-950">Berkas Mandatory Lansia:</span>
+                                  <p className="mt-0.5 text-amber-800">
+                                    Wajib melampirkan <strong>Surat Pernyataan Keluarga Lansia</strong> pada proses penyerahan dokumen.
+                                  </p>
+                                </div>
+                              </div>
+                            )}
                           </div>
                         );
                       })()}
@@ -1068,8 +1113,16 @@ export default function RegisterPage() {
                         <span className="text-gray-900 uppercase font-medium">{m.namaLengkap}</span>
                         <span className="text-gray-400">({m.jenisKelamin === "L" ? "Laki-laki" : "Perempuan"})</span>
                         {ageInfo ? (
-                          <span className="text-xs font-semibold bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded border border-emerald-200">
+                          <span
+                            className={cn(
+                              "text-xs font-semibold px-2.5 py-0.5 rounded border inline-flex items-center gap-1",
+                              ageInfo.isLansia
+                                ? "bg-amber-100 text-amber-900 border-amber-300"
+                                : "bg-emerald-50 text-emerald-700 border-emerald-200"
+                            )}
+                          >
                             🎂 Usia: {ageInfo.age} thn ({ageInfo.category})
+                            {ageInfo.isLansia && " — ⚠️ Wajib Surat Pernyataan Keluarga"}
                           </span>
                         ) : m.tanggalLahir ? (
                           <span className="text-xs text-gray-500">Tgl Lahir: {m.tanggalLahir}</span>
