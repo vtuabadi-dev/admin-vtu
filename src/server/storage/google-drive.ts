@@ -194,8 +194,9 @@ export function createGoogleDriveAdapter(): StorageAdapter {
     );
   }
 
-  function getFileName(path: string): string {
-    return path.replace(/[/\\]/g, "_");
+  function getFileName(filePath: string): string {
+    const parts = filePath.split(/[/\\]/);
+    return parts[parts.length - 1] || filePath;
   }
 
   return {
@@ -208,6 +209,7 @@ export function createGoogleDriveAdapter(): StorageAdapter {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: fileName,
+          mimeType: contentType,
           parents: [parentFolderId],
         }),
       });
