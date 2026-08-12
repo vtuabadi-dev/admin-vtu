@@ -72,7 +72,7 @@ export default function AturanOperasionalPage() {
           title: formTitle,
           version: formVersion,
           content: formContent,
-          status: "DRAFT",
+          status: "ACTIVE",
         }),
       });
       const data = await res.json();

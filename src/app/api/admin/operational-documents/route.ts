@@ -29,15 +29,20 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: false, message: "type, title, version, dan content wajib diisi" }, { status: 400 });
   }
 
+  const targetStatus = body.status ?? "ACTIVE";
   const doc = await operationalDocumentRepo.create({
     type: body.type,
     title: body.title,
     version: body.version,
     content: body.content,
-    status: body.status ?? "DRAFT",
-    effectiveDate: body.effectiveDate ? new Date(body.effectiveDate) : undefined,
+    status: targetStatus,
+    effectiveDate: body.effectiveDate ? new Date(body.effectiveDate) : new Date(),
     createdBy: session.user.id ?? undefined,
   });
+
+  if (targetStatus === "ACTIVE") {
+    await operationalDocumentRepo.activateVersion(doc.id, session.user.id ?? undefined);
+  }
 
   return NextResponse.json({ success: true, data: doc }, { status: 201 });
 }
