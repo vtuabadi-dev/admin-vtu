@@ -37,4 +37,4 @@ export function getStorageAdapter(): StorageAdapter {
 }
 
 // Export path helpers for convenience
-export { dokumenPath, dokumenThumbPath, exportFilePath, backupPath, tempUploadPath, signaturePath } from "@/services/storage/paths";
+export { dokumenPath, dokumenThumbPath, exportFilePath, backupPath, tempUploadPath, signaturePath, formulirPendaftaranPath } from "@/services/storage/paths";

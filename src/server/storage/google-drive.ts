@@ -104,6 +104,7 @@ export interface DriveFolderRegistry {
   dokumenLain: string;
   manifest: string;
   export: string;
+  formulirPendaftaran: string;
 }
 
 export async function createPackageFolderHierarchy(
@@ -121,6 +122,7 @@ export async function createPackageFolderHierarchy(
       dokumenLain: "local-mock",
       manifest: "local-mock",
       export: "local-mock",
+      formulirPendaftaran: "local-mock",
     };
   }
 
@@ -129,7 +131,7 @@ export async function createPackageFolderHierarchy(
   const monthId = await getOrCreateFolder(monthFolderName, yearId);
   const packageFolderId = await getOrCreateFolder(packageFolderName, monthId);
 
-  const [paspor, ktp, foto, pembayaran, dokumenLain, manifest, exportFolder] = await Promise.all([
+  const [paspor, ktp, foto, pembayaran, dokumenLain, manifest, exportFolder, formulirPendaftaran] = await Promise.all([
     getOrCreateFolder("PASPOR", packageFolderId),
     getOrCreateFolder("KTP", packageFolderId),
     getOrCreateFolder("FOTO", packageFolderId),
@@ -137,6 +139,7 @@ export async function createPackageFolderHierarchy(
     getOrCreateFolder("DOKUMEN LAIN", packageFolderId),
     getOrCreateFolder("MANIFEST", packageFolderId),
     getOrCreateFolder("EXPORT", packageFolderId),
+    getOrCreateFolder("FORMULIR PENDAFTARAN", packageFolderId),
   ]);
 
   return {
@@ -148,7 +151,21 @@ export async function createPackageFolderHierarchy(
     dokumenLain,
     manifest,
     export: exportFolder,
+    formulirPendaftaran,
   };
+}
+
+export async function getOrCreateFormulirPendaftaranDriveFolder(packageFolderId?: string): Promise<string | undefined> {
+  if (!isGoogleDriveConfigured()) return undefined;
+  try {
+    const parentId = packageFolderId || process.env.GOOGLE_DRIVE_FOLDER_ID;
+    if (!parentId) return undefined;
+    const folderId = await getOrCreateFolder("FORMULIR PENDAFTARAN", parentId);
+    return folderId;
+  } catch (err) {
+    console.error("[Google Drive] Failed to get or create FORMULIR PENDAFTARAN folder:", err);
+    return undefined;
+  }
 }
 
 export async function createHotelVideoFolderHierarchy(

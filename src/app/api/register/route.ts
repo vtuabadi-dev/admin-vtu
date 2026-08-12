@@ -128,10 +128,11 @@ export async function POST(request: NextRequest) {
       // Non-critical
     }
 
-    // ── Generate PDF & Save Copy to "FORMULIR PENDAFTARAN" ───
+    // ── Generate PDF & Save to Google Drive "FORMULIR PENDAFTARAN" ───
     let pdfPath = "";
     let pdfFilename = "";
     let pdfBuffer: Buffer | null = null;
+    let driveFileId = "";
     try {
       const { generateRegistrationPdf } = await import("@/server/services/registration-pdf.service");
       pdfBuffer = await generateRegistrationPdf({
@@ -148,12 +149,23 @@ export async function POST(request: NextRequest) {
       pdfPath = `FORMULIR PENDAFTARAN/${pdfFilename}`;
 
       const storage = getStorageAdapter();
-      // Upload copy to FORMULIR PENDAFTARAN folder
-      await storage.upload(pdfPath, pdfBuffer, "application/pdf");
-      // Also upload to registrations/[kodeRegistrasi]/ for standard reference
-      await storage.upload(`registrations/${kodeRegistrasi}/${pdfFilename}`, pdfBuffer, "application/pdf").catch(() => {});
+
+      // Resolve Google Drive "FORMULIR PENDAFTARAN" folder ID
+      let targetDriveFolderId: string | undefined = undefined;
+      try {
+        const { getOrCreateFormulirPendaftaranDriveFolder, isGoogleDriveConfigured } = await import("@/server/storage/google-drive");
+        if (isGoogleDriveConfigured()) {
+          const packageDriveId = (paket as any)?.driveFolderIds?.rootPackageFolderId || (paket as any)?.driveFolderIds?.formulirPendaftaran;
+          targetDriveFolderId = await getOrCreateFormulirPendaftaranDriveFolder(packageDriveId);
+        }
+      } catch (err) {
+        console.warn("[register] Google Drive folder resolution warning:", err);
+      }
+
+      // Upload PDF directly into Google Drive "FORMULIR PENDAFTARAN" folder
+      driveFileId = await storage.upload(pdfPath, pdfBuffer, "application/pdf", targetDriveFolderId);
     } catch (err) {
-      console.error("[register] PDF generation failed:", err);
+      console.error("[register] PDF generation or Google Drive upload failed:", err);
       // Non-blocking — registration still succeeds
     }
 
