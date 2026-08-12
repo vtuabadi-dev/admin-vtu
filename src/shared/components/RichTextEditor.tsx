@@ -9,9 +9,6 @@ import {
   List,
   ListOrdered,
   Link,
-  Heading1,
-  Heading2,
-  Heading3,
   AlignLeft,
   AlignCenter,
   AlignRight,
@@ -22,7 +19,6 @@ import {
   Redo,
   Eye,
   RemoveFormatting,
-  Quote,
   Minus,
 } from "lucide-react";
 
