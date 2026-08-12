@@ -74,7 +74,7 @@ async function apiFetch(url: string, options: RequestInit = {}): Promise<Respons
 
 export async function getOrCreateFolder(folderName: string, parentId?: string): Promise<string> {
   const rootId = parentId || process.env.GOOGLE_DRIVE_FOLDER_ID!;
-  const query = `'${rootId}' in parents and name = '${folderName.replace(/'/g, "\\'")}' and mimeType = 'application/vnd.google.apps.folder' and trashed = false`;
+  const query = `'${rootId}' in parents and name = '${folderName.replace(/'/g, "\\'")}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false`;
 
   const res = await apiFetch(`${DRIVE_API}/files?q=${encodeURIComponent(query)}&fields=files(id,name)`);
   const data = await res.json();
@@ -87,7 +87,7 @@ export async function getOrCreateFolder(folderName: string, parentId?: string): 
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       name: folderName,
-      mimeType: "application/vnd.google.apps.folder",
+      mimeType: "application/vnd.google-apps.folder",
       parents: [rootId],
     }),
   });
