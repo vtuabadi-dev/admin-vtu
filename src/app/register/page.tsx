@@ -517,7 +517,7 @@ export default function RegisterPage() {
               {termsDoc ? (
                 <>
                   <div
-                    className="border border-gray-200 rounded-lg p-4 h-64 overflow-y-auto text-sm text-gray-600 rich-text-content prose prose-sm max-w-none"
+                    className="border border-gray-200 rounded-lg p-4 h-64 overflow-y-auto text-sm text-gray-700 rich-text-content bg-white shadow-inner"
                     dangerouslySetInnerHTML={{ __html: termsDoc.content }}
                   />
                   <p className="text-xs text-gray-400 mt-1">
