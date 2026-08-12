@@ -34,9 +34,46 @@ const MAX_GROUP_SIZE = 100;
 const LARGE_GROUP_THRESHOLD = 30;
 const VERY_LARGE_GROUP_THRESHOLD = 60;
 
+const INDONESIAN_CITIES = [
+  "Banda Aceh", "Lhokseumawe", "Langsa", "Sabang", "Subulussalam",
+  "Medan", "Pematangsiantar", "Sibolga", "Tanjungbalai", "Binjai", "Tebing Tinggi", "Padangsidimpuan", "Gunungsitoli",
+  "Padang", "Bukittinggi", "Payakumbuh", "Solok", "Sawahlunto", "Padang Panjang", "Pariaman",
+  "Pekanbaru", "Dumai",
+  "Jambi", "Sungaipenuh",
+  "Palembang", "Prabumulih", "Pagar Alam", "Lubuklinggau",
+  "Bengkulu",
+  "Bandar Lampung", "Metro",
+  "Pangkalpinang",
+  "Batam", "Tanjungpinang",
+  "Jakarta Pusat", "Jakarta Utara", "Jakarta Barat", "Jakarta Selatan", "Jakarta Timur",
+  "Bandung", "Bogor", "Depok", "Bekasi", "Cimahi", "Cirebon", "Sukabumi", "Tasikmalaya", "Banjar",
+  "Semarang", "Surakarta", "Magelang", "Pekalongan", "Salatiga", "Tegal", "Kudus", "Jepara", "Pati", "Banyumas", "Cilacap", "Purwokerto", "Wonosobo", "Kebumen", "Boyolali", "Karanganyar", "Sukoharjo", "Sragen", "Klaten", "Grobogan",
+  "Yogyakarta", "Sleman", "Bantul", "Gunungkidul", "Kulon Progo",
+  "Surabaya", "Malang", "Madiun", "Kediri", "Blitar", "Probolinggo", "Pasuruan", "Mojokerto", "Batu", "Sidoarjo", "Gresik", "Jember", "Banyuwangi", "Tuban", "Lamongan", "Bojonegoro", "Ngawi", "Nganjuk", "Tulungagung", "Trenggalek", "Ponorogo", "Pacitan", "Sumenep", "Pamekasan", "Sampang", "Bangkalan",
+  "Serang", "Tangerang", "Cilegon", "Tangerang Selatan", "Pandeglang", "Lebak",
+  "Denpasar", "Singaraja", "Tabanan", "Gianyar", "Badung",
+  "Mataram", "Bima", "Sumbawa",
+  "Kupang", "Ende", "Maumere",
+  "Pontianak", "Singkawang",
+  "Palangkaraya",
+  "Banjarmasin", "Banjarbaru",
+  "Samarinda", "Balikpapan", "Bontang",
+  "Tanjung Selor", "Tarakan",
+  "Manado", "Bitung", "Tomohon", "Kotamobagu",
+  "Palu",
+  "Makassar", "Parepare", "Palopo",
+  "Kendari", "Baubau",
+  "Gorontalo",
+  "Mamuju",
+  "Ambon", "Tual",
+  "Ternate", "Tidore",
+  "Jayapura", "Sorong", "Merauke", "Manokwari"
+];
+
 interface MemberForm {
   namaLengkap: string;
   jenisKelamin: JenisKelamin;
+  tempatLahir: string;
   tanggalLahir: string;
   hubungan: string;
 }
@@ -87,7 +124,7 @@ export default function RegisterPage() {
 
   // Step 4: Members
   const [members, setMembers] = useState<MemberForm[]>([
-    { namaLengkap: "", jenisKelamin: "L", tanggalLahir: "", hubungan: "" },
+    { namaLengkap: "", jenisKelamin: "L", tempatLahir: "", tanggalLahir: "", hubungan: "" },
   ]);
 
   // Step 5: Package
@@ -193,6 +230,7 @@ export default function RegisterPage() {
         const added = Array.from({ length: paxCount - prev.length }, () => ({
           namaLengkap: "",
           jenisKelamin: "L" as JenisKelamin,
+          tempatLahir: "",
           tanggalLahir: "",
           hubungan: "",
         }));
@@ -849,7 +887,28 @@ export default function RegisterPage() {
                     </div>
                   </div>
 
+                  {/* Datalist for Indonesian Cities Auto-complete */}
+                  <datalist id="indonesian-cities-list">
+                    {INDONESIAN_CITIES.map((city) => (
+                      <option key={city} value={city} />
+                    ))}
+                  </datalist>
+
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">
+                        Tempat Lahir
+                      </label>
+                      <input
+                        type="text"
+                        list="indonesian-cities-list"
+                        value={member.tempatLahir || ""}
+                        onChange={(e) => updateMember(i, "tempatLahir", e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm uppercase transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="Kota Tempat Lahir (contoh: SURABAYA)"
+                      />
+                    </div>
+
                     <div>
                       <label className="block text-xs font-medium text-gray-600 mb-1">
                         Tanggal Lahir
@@ -899,19 +958,31 @@ export default function RegisterPage() {
                         <p className="text-xs text-red-500 mt-1">{errors[`member_${i}_tglLahir`]}</p>
                       )}
                     </div>
+                  </div>
 
-                    <div>
-                      <label className="block text-xs font-medium text-gray-600 mb-1">Hubungan (opsional)</label>
-                      <select
-                        value={member.hubungan}
-                        onChange={(e) => updateMember(i, "hubungan", e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      >
-                        <option value="">Pilih hubungan...</option>
-                        <option value="keluarga">Keluarga</option>
-                        <option value="teman">Teman</option>
-                      </select>
-                    </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                      {i === 0
+                        ? members.length > 1
+                          ? "Hubungan dengan Jamaah #2"
+                          : "Hubungan (opsional)"
+                        : `Hubungan dengan Jamaah #1 (${members[0]?.namaLengkap ? members[0].namaLengkap.toUpperCase() : "Ketua Grup"})`}
+                    </label>
+                    <select
+                      value={member.hubungan}
+                      onChange={(e) => updateMember(i, "hubungan", e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                    >
+                      <option value="">Pilih hubungan...</option>
+                      <option value="Suami">Suami</option>
+                      <option value="Istri">Istri</option>
+                      <option value="Ayah / Ibu">Ayah / Ibu</option>
+                      <option value="Anak">Anak</option>
+                      <option value="Kakak / Adik">Kakak / Adik</option>
+                      <option value="Keluarga / Mahram">Keluarga / Mahram</option>
+                      <option value="Teman / Rekan">Teman / Rekan</option>
+                      <option value="Lainnya">Lainnya</option>
+                    </select>
                   </div>
                 </div>
               ))}
@@ -1136,6 +1207,11 @@ export default function RegisterPage() {
                         </span>
                         <span className="text-gray-900 uppercase font-medium">{m.namaLengkap}</span>
                         <span className="text-gray-400">({m.jenisKelamin === "L" ? "Laki-laki" : "Perempuan"})</span>
+                        {m.tempatLahir && (
+                          <span className="text-xs text-gray-700 bg-gray-100 px-2 py-0.5 rounded border border-gray-200 uppercase">
+                            📍 {m.tempatLahir}
+                          </span>
+                        )}
                         {ageInfo ? (
                           <span
                             className={cn(
@@ -1151,7 +1227,15 @@ export default function RegisterPage() {
                         ) : m.tanggalLahir ? (
                           <span className="text-xs text-gray-500">Tgl Lahir: {m.tanggalLahir}</span>
                         ) : null}
-                        {m.hubungan && <span className="text-gray-400 text-xs">({m.hubungan})</span>}
+                        {m.hubungan && (
+                          <span className="text-xs font-medium text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-100">
+                            🔗 {i === 0
+                              ? members.length > 1
+                                ? `Hubungan dg Jamaah #2: ${m.hubungan}`
+                                : `Hubungan: ${m.hubungan}`
+                              : `Hubungan dg Jamaah #1 (${members[0]?.namaLengkap ? members[0].namaLengkap.toUpperCase() : "Ketua Grup"}): ${m.hubungan}`}
+                          </span>
+                        )}
                       </div>
                     );
                   })}

@@ -60,10 +60,9 @@ export async function generateRegistrationPdf(data: PdfData): Promise<Buffer> {
   const printer = new PdfPrinter(fonts);
   const roomLabel = reg.roomUpgrade ? (ROOM_LABELS[reg.roomUpgrade] ?? reg.roomUpgrade) : "Belum dipilih";
 
-  // Build member list
-  // Build member list with Tanggal Lahir & Usia
-  const memberRows = reg.members.map((m: { namaLengkap: string; jenisKelamin: string; tanggalLahir?: string; hubungan?: string }, i: number) => {
-    let ageText = "-";
+  // Build member list with Tempat, Tanggal Lahir & Usia
+  const memberRows = reg.members.map((m: { namaLengkap: string; jenisKelamin: string; tempatLahir?: string; tanggalLahir?: string; hubungan?: string }, i: number) => {
+    let birthInfo = "-";
     if (m.tanggalLahir) {
       const birthDate = new Date(m.tanggalLahir);
       if (!isNaN(birthDate.getTime())) {
@@ -71,14 +70,17 @@ export async function generateRegistrationPdf(data: PdfData): Promise<Buffer> {
         let age = today.getFullYear() - birthDate.getFullYear();
         const monthDiff = today.getMonth() - birthDate.getMonth();
         if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) age--;
-        ageText = `${m.tanggalLahir} (${age} thn${age >= 60 ? " — LANSIA" : ""})`;
+        const placeStr = m.tempatLahir ? `${m.tempatLahir.toUpperCase()}, ` : "";
+        birthInfo = `${placeStr}${m.tanggalLahir} (${age} thn${age >= 60 ? " — LANSIA" : ""})`;
       }
+    } else if (m.tempatLahir) {
+      birthInfo = m.tempatLahir.toUpperCase();
     }
     return [
       { text: String(i + 1), alignment: "center" as const },
       { text: m.namaLengkap.toUpperCase(), bold: i === 0 },
       { text: m.jenisKelamin === "L" ? "Laki-laki" : "Perempuan", alignment: "center" as const },
-      { text: ageText, alignment: "center" as const },
+      { text: birthInfo, alignment: "center" as const },
       { text: m.hubungan || "-", alignment: "center" as const },
     ];
   });
@@ -89,7 +91,7 @@ export async function generateRegistrationPdf(data: PdfData): Promise<Buffer> {
       { text: "No", style: "tableHeader", alignment: "center" },
       { text: "Nama Lengkap", style: "tableHeader" },
       { text: "Jenis Kelamin", style: "tableHeader", alignment: "center" },
-      { text: "Tgl Lahir / Usia", style: "tableHeader", alignment: "center" },
+      { text: "Tempat, Tgl Lahir / Usia", style: "tableHeader", alignment: "center" },
       { text: "Hubungan", style: "tableHeader", alignment: "center" },
     ],
     ...memberRows,

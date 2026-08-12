@@ -34,6 +34,7 @@ function mapMember(row: any): RegistrationMember {
     requestId: row.requestId,
     namaLengkap: row.namaLengkap,
     jenisKelamin: row.jenisKelamin,
+    tempatLahir: row.tempatLahir ?? undefined,
     tanggalLahir: row.tanggalLahir ?? undefined,
     hubungan: row.hubungan ?? undefined,
     urutan: row.urutan,
@@ -112,6 +113,7 @@ export const registrationRepo = {
           create: data.members.map((m: any) => ({
             namaLengkap: m.namaLengkap,
             jenisKelamin: m.jenisKelamin as any,
+            tempatLahir: m.tempatLahir ?? null,
             tanggalLahir: m.tanggalLahir ?? null,
             hubungan: m.hubungan ?? null,
             urutan: m.urutan,

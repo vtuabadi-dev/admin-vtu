@@ -838,6 +838,7 @@ export interface RegistrationMember {
   requestId: string;
   namaLengkap: string;
   jenisKelamin: JenisKelamin;
+  tempatLahir?: string;
   tanggalLahir?: string;
   hubungan?: string;
   urutan: number;
