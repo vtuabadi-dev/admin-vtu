@@ -126,7 +126,7 @@ export async function createPackageFolderHierarchy(
     };
   }
 
-  const rootIndukId = await getOrCreateFolder("KELENGKAPAN DATA JAMAAH");
+  const rootIndukId = await getOrCreateFolder("KELENGKAPAN DATA JAMAAH", process.env.GOOGLE_DRIVE_FOLDER_ID);
   const yearId = await getOrCreateFolder(String(year), rootIndukId);
   const monthId = await getOrCreateFolder(monthFolderName, yearId);
   const packageFolderId = await getOrCreateFolder(packageFolderName, monthId);
