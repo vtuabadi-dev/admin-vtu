@@ -92,6 +92,16 @@ export async function getOrCreateFolder(folderName: string, parentId?: string): 
     }),
   });
   const folder = await createRes.json();
+
+  // Grant open/write access so users with folder link can view and click into the folder
+  try {
+    await apiFetch(`${DRIVE_API}/files/${folder.id}/permissions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ role: "writer", type: "anyone" }),
+    });
+  } catch { /* non-blocking */ }
+
   return folder.id;
 }
 
