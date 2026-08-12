@@ -37,7 +37,28 @@ const VERY_LARGE_GROUP_THRESHOLD = 60;
 interface MemberForm {
   namaLengkap: string;
   jenisKelamin: JenisKelamin;
+  tanggalLahir: string;
   hubungan: string;
+}
+
+function calculateAge(birthDateStr?: string): { age: number; category: string } | null {
+  if (!birthDateStr) return null;
+  const birthDate = new Date(birthDateStr);
+  if (isNaN(birthDate.getTime())) return null;
+  const today = new Date();
+  let age = today.getFullYear() - birthDate.getFullYear();
+  const m = today.getMonth() - birthDate.getMonth();
+  if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+    age--;
+  }
+  if (age < 0) return null;
+
+  let category = "Dewasa";
+  if (age >= 60) category = "Lansia";
+  else if (age < 2) category = "Bayi";
+  else if (age < 12) category = "Anak";
+
+  return { age, category };
 }
 
 export default function RegisterPage() {
@@ -65,7 +86,7 @@ export default function RegisterPage() {
 
   // Step 4: Members
   const [members, setMembers] = useState<MemberForm[]>([
-    { namaLengkap: "", jenisKelamin: "L", hubungan: "" },
+    { namaLengkap: "", jenisKelamin: "L", tanggalLahir: "", hubungan: "" },
   ]);
 
   // Step 5: Package
@@ -156,6 +177,7 @@ export default function RegisterPage() {
         const added = Array.from({ length: paxCount - prev.length }, () => ({
           namaLengkap: "",
           jenisKelamin: "L" as JenisKelamin,
+          tanggalLahir: "",
           hubungan: "",
         }));
         return [...prev, ...added];
@@ -208,6 +230,7 @@ export default function RegisterPage() {
     if (s === 4) {
       members.forEach((m, i) => {
         if (!m.namaLengkap.trim()) errs[`member_${i}_nama`] = "Nama wajib diisi";
+        if (!m.tanggalLahir) errs[`member_${i}_tglLahir`] = "Tanggal lahir wajib diisi";
       });
     }
 
@@ -308,6 +331,7 @@ export default function RegisterPage() {
           members: members.map((m) => ({
             namaLengkap: m.namaLengkap,
             jenisKelamin: m.jenisKelamin,
+            tanggalLahir: m.tanggalLahir || undefined,
             hubungan: m.hubungan || undefined,
           })),
           paketId: selectedPaketId,
@@ -784,17 +808,49 @@ export default function RegisterPage() {
                     </div>
                   </div>
 
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Hubungan (opsional)</label>
-                    <select
-                      value={member.hubungan}
-                      onChange={(e) => updateMember(i, "hubungan", e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                      <option value="">Pilih hubungan...</option>
-                      <option value="keluarga">Keluarga</option>
-                      <option value="teman">Teman</option>
-                    </select>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">
+                        Tanggal Lahir
+                      </label>
+                      <input
+                        type="date"
+                        value={member.tanggalLahir || ""}
+                        onChange={(e) => updateMember(i, "tanggalLahir", e.target.value)}
+                        className={cn(
+                          "w-full px-3 py-2 border rounded-lg text-sm transition-colors",
+                          "focus:outline-none focus:ring-2 focus:ring-blue-500 border-gray-300",
+                          errors[`member_${i}_tglLahir`] ? "border-red-300" : ""
+                        )}
+                      />
+                      {member.tanggalLahir && (() => {
+                        const ageInfo = calculateAge(member.tanggalLahir);
+                        if (!ageInfo) return null;
+                        return (
+                          <div className="mt-1.5 flex items-center gap-1.5">
+                            <span className="text-[11px] font-semibold bg-emerald-100 text-emerald-800 px-2.5 py-0.5 rounded-full inline-flex items-center gap-1">
+                              🎂 Usia: {ageInfo.age} tahun ({ageInfo.category})
+                            </span>
+                          </div>
+                        );
+                      })()}
+                      {errors[`member_${i}_tglLahir`] && (
+                        <p className="text-xs text-red-500 mt-1">{errors[`member_${i}_tglLahir`]}</p>
+                      )}
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Hubungan (opsional)</label>
+                      <select
+                        value={member.hubungan}
+                        onChange={(e) => updateMember(i, "hubungan", e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="">Pilih hubungan...</option>
+                        <option value="keluarga">Keluarga</option>
+                        <option value="teman">Teman</option>
+                      </select>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -1002,16 +1058,26 @@ export default function RegisterPage() {
               <div className="border border-gray-200 rounded-lg p-4">
                 <h3 className="text-sm font-semibold text-gray-700 mb-2">Anggota ({paxCount} PAX)</h3>
                 <div className="space-y-2">
-                  {members.map((m, i) => (
-                    <div key={i} className="flex items-center gap-3 text-sm">
-                      <span className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center text-xs font-medium text-gray-600">
-                        {i + 1}
-                      </span>
-                      <span className="text-gray-900 uppercase font-medium">{m.namaLengkap}</span>
-                      <span className="text-gray-400">{m.jenisKelamin}</span>
-                      {m.hubungan && <span className="text-gray-400">({m.hubungan})</span>}
-                    </div>
-                  ))}
+                  {members.map((m, i) => {
+                    const ageInfo = calculateAge(m.tanggalLahir);
+                    return (
+                      <div key={i} className="flex items-center gap-3 text-sm flex-wrap border-b border-gray-100 pb-1.5 last:border-b-0 last:pb-0">
+                        <span className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center text-xs font-medium text-gray-600 shrink-0">
+                          {i + 1}
+                        </span>
+                        <span className="text-gray-900 uppercase font-medium">{m.namaLengkap}</span>
+                        <span className="text-gray-400">({m.jenisKelamin === "L" ? "Laki-laki" : "Perempuan"})</span>
+                        {ageInfo ? (
+                          <span className="text-xs font-semibold bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded border border-emerald-200">
+                            🎂 Usia: {ageInfo.age} thn ({ageInfo.category})
+                          </span>
+                        ) : m.tanggalLahir ? (
+                          <span className="text-xs text-gray-500">Tgl Lahir: {m.tanggalLahir}</span>
+                        ) : null}
+                        {m.hubungan && <span className="text-gray-400 text-xs">({m.hubungan})</span>}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
 

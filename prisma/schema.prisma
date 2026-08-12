@@ -507,8 +507,9 @@ model RegistrationMember {
   requestId    String
   namaLengkap  String
   jenisKelamin JenisKelamin
-  hubungan     String? // "keluarga" | "teman" | null
-  urutan       Int // 1..paxCount
+  tanggalLahir String?      // Format YYYY-MM-DD
+  hubungan     String?      // "keluarga" | "teman" | null
+  urutan       Int          // 1..paxCount
 
   request RegistrationRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
 

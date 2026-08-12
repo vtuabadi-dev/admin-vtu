@@ -34,6 +34,7 @@ function mapMember(row: any): RegistrationMember {
     requestId: row.requestId,
     namaLengkap: row.namaLengkap,
     jenisKelamin: row.jenisKelamin,
+    tanggalLahir: row.tanggalLahir ?? undefined,
     hubungan: row.hubungan ?? undefined,
     urutan: row.urutan,
   };
@@ -89,7 +90,7 @@ export const registrationRepo = {
     signedAt?: Date;
     leadStatus?: string;
     status: string;
-    members: { namaLengkap: string; jenisKelamin: string; hubungan?: string | undefined; urutan: number }[];
+    members: { namaLengkap: string; jenisKelamin: string; tanggalLahir?: string | undefined; hubungan?: string | undefined; urutan: number }[];
   }) {
     const row = await prisma.registrationRequest.create({
       data: {
@@ -111,6 +112,7 @@ export const registrationRepo = {
           create: data.members.map((m: any) => ({
             namaLengkap: m.namaLengkap,
             jenisKelamin: m.jenisKelamin as any,
+            tanggalLahir: m.tanggalLahir ?? null,
             hubungan: m.hubungan ?? null,
             urutan: m.urutan,
           })),
