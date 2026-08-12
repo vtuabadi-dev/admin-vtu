@@ -1484,27 +1484,36 @@ export default function RegisterPage() {
               {/* Official Document Paper Preview Container */}
               <div className="bg-white border-2 border-slate-300 rounded-2xl p-6 md:p-8 shadow-lg relative space-y-6 text-slate-800 font-sans max-w-3xl mx-auto">
                 {/* Official Letterhead (Kop Surat Travel) */}
-                <div className="border-b-2 border-slate-800 pb-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-xl bg-blue-600 flex items-center justify-center text-white font-extrabold text-xl shadow-md shrink-0">
-                      VTU
+                <div className="border-b-2 border-slate-800 pb-4 space-y-3">
+                  <img
+                    src="/templates/kop-surat/kop-surat.png"
+                    alt="Kop Surat Travel"
+                    className="w-full max-h-32 object-contain hidden"
+                    onLoad={(e) => { (e.target as HTMLElement).classList.remove("hidden"); }}
+                    onError={(e) => { (e.target as HTMLElement).style.display = "none"; }}
+                  />
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-12 rounded-xl bg-blue-600 flex items-center justify-center text-white font-extrabold text-xl shadow-md shrink-0">
+                        VTU
+                      </div>
+                      <div>
+                        <h1 className="text-lg font-extrabold text-slate-900 tracking-tight">
+                          VTU TRAVEL & OPERATIONAL SYSTEM
+                        </h1>
+                        <p className="text-xs text-slate-500">
+                          Izin PPIU No. 123/2026 • Layanan Perjalanan Ibadah Umroh Resmi • Surabaya, Indonesia
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <h1 className="text-lg font-extrabold text-slate-900 tracking-tight">
-                        VTU TRAVEL & OPERATIONAL SYSTEM
-                      </h1>
-                      <p className="text-xs text-slate-500">
-                        Izin PPIU No. 123/2026 • Layanan Perjalanan Ibadah Umroh Resmi • Surabaya, Indonesia
-                      </p>
+                    <div className="text-right sm:text-right shrink-0">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">
+                        FORMULIR PENDAFTARAN RESMI
+                      </span>
+                      <span className="text-xs font-mono font-bold text-blue-700 bg-blue-50 px-2.5 py-1 rounded border border-blue-200 inline-block mt-0.5 shadow-2xs">
+                        REG-2026-{Math.floor(1000 + Math.random() * 9000)}
+                      </span>
                     </div>
-                  </div>
-                  <div className="text-right sm:text-right shrink-0">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">
-                      FORMULIR PENDAFTARAN RESMI
-                    </span>
-                    <span className="text-xs font-mono font-bold text-blue-700 bg-blue-50 px-2.5 py-1 rounded border border-blue-200 inline-block mt-0.5 shadow-2xs">
-                      REG-2026-{Math.floor(1000 + Math.random() * 9000)}
-                    </span>
                   </div>
                 </div>
 
