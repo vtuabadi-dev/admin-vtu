@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { getStorageAdapter, signaturePath } from "@/server/storage";
+import { signaturePath } from "@/server/storage";
 import { checkRateLimit, rateLimitKey, getRateLimitConfig } from "@/server/lib/rate-limit";
 
 function validateImageMetadata(buffer: Buffer): { valid: boolean; issues: string[] } {
