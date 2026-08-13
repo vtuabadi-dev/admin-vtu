@@ -214,7 +214,7 @@ export function createGoogleDriveAdapter(): StorageAdapter {
       const fileName = getFileName(path);
       const parentFolderId = targetFolderId || folderId;
 
-      const metaRes = await apiFetch(`${DRIVE_API}/files`, {
+      const metaRes = await apiFetch(`${DRIVE_API}/files?supportsAllDrives=true`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -225,7 +225,7 @@ export function createGoogleDriveAdapter(): StorageAdapter {
       });
       const { id: fileId } = await metaRes.json();
 
-      await apiFetch(`${DRIVE_UPLOAD}/files/${fileId}?uploadType=media`, {
+      await apiFetch(`${DRIVE_UPLOAD}/files/${fileId}?uploadType=media&supportsAllDrives=true`, {
         method: "PATCH",
         headers: { "Content-Type": contentType },
         body: new Uint8Array(buffer),

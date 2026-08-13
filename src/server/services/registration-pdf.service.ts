@@ -33,8 +33,26 @@ const ROOM_LABELS: Record<string, string> = {
   double: "DOUBLE — 2 Orang / Kamar",
 };
 
+function getPrinterInstance(fonts: any): any {
+  let PdfPrinter: any;
+  try {
+    const p = require("pdfmake/src/printer");
+    PdfPrinter = p.default || p;
+  } catch {
+    const p = require("pdfmake");
+    PdfPrinter = p.PdfPrinter || p.default || p;
+  }
+  const printer = new PdfPrinter(fonts);
+  if (!printer.urlResolver) {
+    printer.urlResolver = {
+      resolve: (url: string) => Promise.resolve(url),
+      resolved: () => Promise.resolve(),
+    };
+  }
+  return printer;
+}
+
 export async function generateRegistrationPdf(data: PdfData): Promise<Buffer> {
-  const PdfPrinter = (await import("pdfmake")).default;
   const { registration: reg, packageInfo } = data;
 
   const fonts = {
@@ -52,13 +70,7 @@ export async function generateRegistrationPdf(data: PdfData): Promise<Buffer> {
     },
   };
 
-  const printer = new PdfPrinter(fonts);
-  if (!(printer as any).urlResolver) {
-    (printer as any).urlResolver = {
-      resolve: (url: string) => Promise.resolve(url),
-      resolved: () => Promise.resolve(),
-    };
-  }
+  const printer = getPrinterInstance(fonts);
 
   // 1. Load Kop Surat Header Image from bundled asset
   const kopSuratBase64 = KOP_SURAT_BASE64;
@@ -305,7 +317,7 @@ export async function generateRegistrationPdf(data: PdfData): Promise<Buffer> {
   };
 
   // Build PDF
-  const pdfDoc = printer.createPdfKitDocument(docDefinition);
+  const pdfDoc = await printer.createPdfKitDocument(docDefinition);
 
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];

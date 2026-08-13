@@ -153,20 +153,25 @@ export async function POST(request: NextRequest) {
       // Resolve Google Drive "FORMULIR PENDAFTARAN" folder ID
       let targetDriveFolderId: string | undefined = undefined;
       try {
-        const { getOrCreateFormulirPendaftaranDriveFolder, isGoogleDriveConfigured } = await import("@/server/storage/google-drive");
+        const { getOrCreateFolder, isGoogleDriveConfigured } = await import("@/server/storage/google-drive");
         if (isGoogleDriveConfigured()) {
-          const packageDriveId = (paket as any)?.driveFolderIds?.rootPackageFolderId || (paket as any)?.driveFolderIds?.formulirPendaftaran;
-          targetDriveFolderId = await getOrCreateFormulirPendaftaranDriveFolder(packageDriveId);
+          targetDriveFolderId = await getOrCreateFolder("FORMULIR PENDAFTARAN");
         }
       } catch (err) {
         console.warn("[register] Google Drive folder resolution warning:", err);
       }
 
-      // Upload PDF directly into Google Drive "FORMULIR PENDAFTARAN" folder
-      driveFileId = await storage.upload(pdfPath, pdfBuffer, "application/pdf", targetDriveFolderId);
+      // Upload PDF into Google Drive or fallback to local vault
+      try {
+        driveFileId = await storage.upload(pdfPath, pdfBuffer, "application/pdf", targetDriveFolderId);
+      } catch (uploadErr: any) {
+        console.warn("[register] Primary storage upload warning, saving to local vault:", uploadErr?.message || uploadErr);
+        const { createLocalAdapter } = await import("@/server/storage/local");
+        const localVault = createLocalAdapter();
+        driveFileId = await localVault.upload(pdfPath, pdfBuffer, "application/pdf");
+      }
     } catch (err) {
-      console.error("[register] PDF generation or Google Drive upload failed:", err);
-      // Non-blocking — registration still succeeds
+      console.error("[register] PDF generation error:", err);
     }
 
     // ── Send confirmation email with attached PDF ────────────
