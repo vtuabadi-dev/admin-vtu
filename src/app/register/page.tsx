@@ -1545,234 +1545,189 @@ export default function RegisterPage() {
               </div>
 
               {/* Official Document Paper Preview Container */}
-              <div className="bg-white border-2 border-slate-300 rounded-2xl p-6 md:p-8 shadow-lg relative space-y-6 text-slate-800 font-sans max-w-3xl mx-auto">
+              <div className="bg-white border-2 border-slate-300 rounded-2xl p-4 sm:p-6 md:p-8 shadow-lg relative space-y-6 text-slate-800 font-sans max-w-3xl mx-auto">
                 {/* Official Letterhead (Kop Surat Travel) */}
-                <div className="border-b-2 border-slate-800 pb-4 space-y-3">
+                <div className="border-b-2 border-slate-800 pb-2 mb-4">
                   <img
-                    src="/templates/kop-surat/kop-surat.png"
-                    alt="Kop Surat Travel"
-                    className="w-full max-h-32 object-contain hidden"
-                    onLoad={(e) => { (e.target as HTMLElement).classList.remove("hidden"); }}
-                    onError={(e) => { (e.target as HTMLElement).style.display = "none"; }}
+                    src="/templates/template-surat/kop_surat.jpeg"
+                    alt="Kop Surat Official VTU ABADI"
+                    className="w-full h-auto object-contain rounded-t-lg"
                   />
-                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 rounded-xl bg-blue-600 flex items-center justify-center text-white font-extrabold text-xl shadow-md shrink-0">
-                        VTU
-                      </div>
-                      <div>
-                        <h1 className="text-lg font-extrabold text-slate-900 tracking-tight">
-                          VTU TRAVEL & OPERATIONAL SYSTEM
-                        </h1>
-                        <p className="text-xs text-slate-500">
-                          Izin PPIU No. 123/2026 • Layanan Perjalanan Ibadah Umroh Resmi • Surabaya, Indonesia
-                        </p>
-                      </div>
-                    </div>
-                    <div className="text-right sm:text-right shrink-0">
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">
-                        FORMULIR PENDAFTARAN RESMI
-                      </span>
-                      <span className="text-xs font-mono font-bold text-blue-700 bg-blue-50 px-2.5 py-1 rounded border border-blue-200 inline-block mt-0.5 shadow-2xs">
-                        REG-2026-{Math.floor(1000 + Math.random() * 9000)}
-                      </span>
-                    </div>
-                  </div>
                 </div>
 
                 <div className="text-center space-y-1 py-1">
-                  <h2 className="text-base font-bold uppercase tracking-wide text-slate-900 underline decoration-slate-400 underline-offset-4">
-                    SURAT PERNYATAAN & FORMULIR PENDAFTARAN JAMAAH UMROH
+                  <h2 className="text-lg font-extrabold uppercase tracking-wide text-slate-900">
+                    FORMULIR PENDAFTARAN UMROH
                   </h2>
-                  <p className="text-xs text-slate-500">
-                    Tanggal Pendaftaran: {new Date().toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })}
-                  </p>
+                  <h3 className="text-base font-bold text-slate-700">VTU ABADI</h3>
                 </div>
 
-                {/* Section I: Data Perwakilan / PIC */}
+                {/* Section A: DATA PENDAFTAR */}
                 <div className="space-y-2">
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-blue-800 bg-blue-50 px-3 py-1.5 rounded-md border-l-4 border-blue-600">
-                    I. DATA PERWAKILAN (PIC ROMBONGAN)
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900 bg-slate-100 px-3 py-1.5 rounded-md border-l-4 border-slate-800">
+                    A. DATA PENDAFTAR
                   </h3>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1.5 text-xs px-2 pt-1">
                     <div className="flex">
-                      <span className="w-36 text-slate-500 font-medium shrink-0">Nama Lengkap PIC:</span>
+                      <span className="w-44 text-slate-500 font-medium shrink-0">ID / No. Registrasi Rombongan:</span>
+                      <span className="font-bold text-blue-700">GRP-2026-PREVIEW</span>
+                    </div>
+                    <div className="flex">
+                      <span className="w-44 text-slate-500 font-medium shrink-0">Nama Lengkap PIC:</span>
                       <span className="font-bold text-slate-900 uppercase">{namaPerwakilan || "-"}</span>
                     </div>
                     <div className="flex">
-                      <span className="w-36 text-slate-500 font-medium shrink-0">Nomor Telepon / HP:</span>
+                      <span className="w-44 text-slate-500 font-medium shrink-0">Nomor Telepon / WhatsApp:</span>
                       <span className="font-semibold text-slate-900">{nomorTelepon || "-"}</span>
                     </div>
                     <div className="flex">
-                      <span className="w-36 text-slate-500 font-medium shrink-0">Email Registrasi:</span>
+                      <span className="w-44 text-slate-500 font-medium shrink-0">Email:</span>
                       <span className="font-semibold text-slate-900">{emailPerwakilan || "-"}</span>
                     </div>
                     <div className="flex">
-                      <span className="w-36 text-slate-500 font-medium shrink-0">Jumlah Rombongan:</span>
-                      <span className="font-bold text-blue-700">{paxCount} PAX</span>
+                      <span className="w-44 text-slate-500 font-medium shrink-0">Tempat & Tanggal Lahir:</span>
+                      <span className="font-bold text-slate-900">
+                        {members[0]?.tempatLahir ? members[0].tempatLahir.toUpperCase() : "-"} / {members[0]?.tanggalLahir || "-"}
+                      </span>
                     </div>
                   </div>
                 </div>
 
-                {/* Section II: Data Anggota Jamaah Rombongan */}
+                {/* Section B: DATA ANGGOTA PENDAFTAR */}
                 <div className="space-y-2">
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-blue-800 bg-blue-50 px-3 py-1.5 rounded-md border-l-4 border-blue-600">
-                    II. DAFTAR ANGGOTA JAMAAH ROMBONGAN ({paxCount} PAX)
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900 bg-slate-100 px-3 py-1.5 rounded-md border-l-4 border-slate-800">
+                    B. DATA ANGGOTA PENDAFTAR
                   </h3>
+                  <p className="text-[11px] italic text-slate-500 px-2">
+                    Diisi apabila pendaftaran dilakukan untuk lebih dari satu jamaah.
+                  </p>
                   <div className="overflow-x-auto rounded-lg border border-slate-200">
                     <table className="w-full text-xs text-left border-collapse">
                       <thead>
                         <tr className="bg-slate-100 text-slate-700 font-bold border-b border-slate-200">
-                          <th className="p-2 border-r border-slate-200 w-8 text-center">No</th>
-                          <th className="p-2 border-r border-slate-200">Nama Lengkap Jamaah</th>
-                          <th className="p-2 border-r border-slate-200 w-12 text-center">L/P</th>
-                          <th className="p-2 border-r border-slate-200">Tempat & Tanggal Lahir</th>
-                          <th className="p-2 border-r border-slate-200">Usia & Kategori</th>
-                          <th className="p-2">Hubungan Rombongan</th>
+                          <th className="p-2 border-r border-slate-200 w-8 text-center">No.</th>
+                          <th className="p-2 border-r border-slate-200">Nama Anggota</th>
+                          <th className="p-2 border-r border-slate-200">Tempat Lahir</th>
+                          <th className="p-2 border-r border-slate-200 text-center">Tanggal Lahir</th>
+                          <th className="p-2 text-center">Hubungan</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-200">
-                        {members.map((m, i) => {
-                          const ageInfo = calculateAge(m.tanggalLahir);
-                          return (
-                            <tr key={i} className="hover:bg-slate-50">
-                              <td className="p-2 border-r border-slate-200 text-center font-bold text-slate-600">{i + 1}</td>
-                              <td className="p-2 border-r border-slate-200 font-bold text-slate-900 uppercase">{m.namaLengkap}</td>
-                              <td className="p-2 border-r border-slate-200 text-center font-semibold">{m.jenisKelamin}</td>
-                              <td className="p-2 border-r border-slate-200 text-slate-700">
-                                {m.tempatLahir ? m.tempatLahir.toUpperCase() : "-"}, {m.tanggalLahir || "-"}
-                              </td>
-                              <td className="p-2 border-r border-slate-200">
-                                {ageInfo ? (
-                                  <span className={cn(
-                                    "font-semibold px-1.5 py-0.5 rounded text-[11px] inline-block",
-                                    ageInfo.isLansia ? "bg-amber-100 text-amber-900 border border-amber-300" : "text-slate-800"
-                                  )}>
-                                    {ageInfo.age} Thn ({ageInfo.category})
-                                    {ageInfo.isLansia && " *Lansia"}
-                                  </span>
-                                ) : "-"}
-                              </td>
-                              <td className="p-2 text-slate-700 font-medium">
-                                {i === 0
-                                  ? members.length > 1 ? `Hubungan dg Jamaah #2: ${m.hubungan || "-"}` : `Ketua Rombongan`
-                                  : `Hubungan dg Jamaah #1 (${members[0]?.namaLengkap ? members[0].namaLengkap.toUpperCase() : "Ketua"}): ${m.hubungan || "-"}`}
-                              </td>
-                            </tr>
-                          );
-                        })}
+                        {members.map((m, i) => (
+                          <tr key={i} className="hover:bg-slate-50">
+                            <td className="p-2 border-r border-slate-200 text-center font-bold text-slate-600">{i + 1}</td>
+                            <td className="p-2 border-r border-slate-200 font-bold text-slate-900 uppercase">{m.namaLengkap}</td>
+                            <td className="p-2 border-r border-slate-200 text-slate-700">{m.tempatLahir ? m.tempatLahir.toUpperCase() : "-"}</td>
+                            <td className="p-2 border-r border-slate-200 text-center text-slate-700">{m.tanggalLahir || "-"}</td>
+                            <td className="p-2 text-center text-slate-700 font-medium">{m.hubungan || (i === 0 ? "Ketua Grup" : "-")}</td>
+                          </tr>
+                        ))}
                       </tbody>
                     </table>
                   </div>
                 </div>
 
-                {/* Section III: Detail Paket Keberangkatan */}
+                {/* Section C: PAKET & KLASTER PAKET UMROH */}
                 {selectedPaket && (() => {
-                  const clusters = Array.isArray(selectedPaket.hotelOptions) && selectedPaket.hotelOptions.length > 0
-                    ? selectedPaket.hotelOptions
-                    : null;
-                  const isMultiCluster = !!(clusters && clusters.length > 1);
-                  const activeCluster = isMultiCluster && clusters
-                    ? clusters[selectedClusterIndex] || clusters[0]
-                    : null;
-
-                  const basePrice = activeCluster
-                    ? Number(activeCluster.hargaBase || 0)
-                    : Number(selectedPaket.hargaPaket || selectedPaket.paketUmroh?.hargaBase || 0);
-
-                  const upgradeTriple = Number(activeCluster?.upgradeTriple || 1500000);
-                  const upgradeDouble = Number(activeCluster?.upgradeDouble || 2500000);
-                  const roomSurcharge = roomUpgrade === "triple" ? upgradeTriple : roomUpgrade === "double" ? upgradeDouble : 0;
-                  const pricePerPax = basePrice + roomSurcharge;
-                  const totalPriceGroup = pricePerPax * paxCount;
+                  const ROOM_NAMES: Record<string, string> = {
+                    mix: "MIX — Penempatan kamar diatur travel",
+                    quad: "QUAD — 4 Orang / Kamar",
+                    triple: "TRIPLE — 3 Orang / Kamar",
+                    double: "DOUBLE — 2 Orang / Kamar",
+                  };
 
                   return (
                     <div className="space-y-2">
-                      <h3 className="text-xs font-bold uppercase tracking-wider text-blue-800 bg-blue-50 px-3 py-1.5 rounded-md border-l-4 border-blue-600">
-                        III. DETAIL PAKET KEBERANGKATAN & AKOMODASI
+                      <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900 bg-slate-100 px-3 py-1.5 rounded-md border-l-4 border-slate-800">
+                        C. PAKET & KLASTER PAKET UMROH
                       </h3>
                       <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 space-y-2 text-xs">
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                           <div>
-                            <span className="text-slate-500">Nama Paket: </span>
+                            <span className="text-slate-500">Paket Umroh: </span>
                             <span className="font-bold text-slate-900">{selectedPaket.namaPaket || selectedPaket.paketUmroh?.namaPaket}</span>
                           </div>
                           <div>
-                            <span className="text-slate-500">Penerbangan: </span>
-                            <span className="font-semibold text-slate-900">{selectedPaket.maskapai || selectedPaket.maskapaiId || "Saudia Airlines"} ({selectedPaket.nomorPenerbangan || "-"})</span>
-                          </div>
-                          <div>
-                            <span className="text-slate-500">Jadwal Flight: </span>
-                            <span className="font-semibold text-slate-900">
-                              {new Date(selectedPaket.tanggalBerangkat).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })} — {new Date(selectedPaket.tanggalPulang).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}
-                            </span>
-                          </div>
-                          <div>
-                            <span className="text-slate-500">Tipe Kamar: </span>
-                            <span className="font-bold text-blue-700 uppercase">{roomUpgrade}</span>
+                            <span className="text-slate-500">Klaster Paket: </span>
+                            <span className="font-bold text-blue-700 uppercase">{ROOM_NAMES[roomUpgrade] || roomUpgrade}</span>
                           </div>
                         </div>
-                        {activeCluster ? (
-                          <div className="text-slate-700 bg-white p-2 rounded border border-slate-200">
-                            <strong>Klaster Hotel: {activeCluster.clusterName}</strong> (Mekkah: {activeCluster.hotelMekkah} | Madinah: {activeCluster.hotelMadinah})
-                          </div>
-                        ) : (
-                          <div className="text-slate-700 bg-white p-2 rounded border border-slate-200">
-                            <strong>Akomodasi Hotel:</strong> Mekkah: {selectedPaket.hotelMekkah || "TBA"} | Madinah: {selectedPaket.hotelMadinah || "TBA"}
-                          </div>
-                        )}
-                        <div className="flex justify-between items-center pt-2 border-t border-slate-200 font-bold text-slate-900">
-                          <span>Total Biaya Paket Rombongan ({paxCount} PAX):</span>
-                          <span className="text-sm text-emerald-700 font-extrabold">Rp {totalPriceGroup.toLocaleString("id-ID")}</span>
-                        </div>
+                        <p className="text-[11px] italic text-slate-500 pt-1">
+                          Informasi paket dan klaster paket yang dipilih menjadi bagian dari pendaftaran ini dan mengacu pada ketentuan paket yang berlaku.
+                        </p>
                       </div>
                     </div>
                   );
                 })()}
 
-                {/* Section IV: Pernyataan Hukum & Persetujuan Syarat & Ketentuan */}
-                <div className="space-y-2 border-t border-slate-200 pt-4">
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800">
-                    IV. PERNYATAAN PERSETUJUAN SYARAT & KETENTUAN TRAVEL
+                {/* Section D: SYARAT & KETENTUAN */}
+                <div className="space-y-2">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900 bg-slate-100 px-3 py-1.5 rounded-md border-l-4 border-slate-800">
+                    D. SYARAT & KETENTUAN
                   </h3>
-                  <div className="text-[11px] text-slate-600 leading-relaxed italic bg-slate-50 p-3.5 rounded-xl border border-slate-200 space-y-1">
-                    <p>
-                      &quot;Dengan ini saya selaku Perwakilan/PIC Rombongan bertindak untuk dan atas nama seluruh anggota jamaah yang tercantum dalam formulir ini, menyatakan bahwa seluruh data yang diisikan adalah benar, dan secara sadar <strong>MENYETUJUI SELURUH SYARAT & KETENTUAN REGISTRASI UMROH</strong> yang ditetapkan oleh pihak Travel ({termsDoc?.title || "Syarat & Kondisi Umroh"} v{termsDoc?.version || "1.0"}).&quot;
+                  <ol className="list-decimal list-inside text-xs text-slate-700 space-y-1 bg-slate-50 p-3 rounded-xl border border-slate-200">
+                    <li>Pendaftar adalah perwakilan resmi rombongan jamaah Umroh VTU ABADI.</li>
+                    <li>Seluruh data anggota jamaah yang diserahkan wajib sesuai dengan dokumen identitas resmi (KTP/Paspor).</li>
+                    <li>Minimal pendaftaran adalah 1 orang dan maksimal 100 orang per grup pendaftaran.</li>
+                    <li>Biaya paket belum termasuk biaya pembuatan paspor, vaksin, sertifikat mahram, dan kebutuhan pribadi.</li>
+                    <li>Pembayaran Down Payment (DP) minimal 30% wajib dilunasi dalam kurun waktu 14 hari kerja sejak registrasi.</li>
+                    <li>Pelunasan sisa biaya paket wajib diselesaikan selambat-lambatnya 30 hari sebelum jadwal keberangkatan.</li>
+                    <li>Pembatalan pendaftaran secara sepihak dikenakan biaya administrasi & pembatalan sesuai ketentuan operasional.</li>
+                    <li>Berkas fisik dokumen kelengkapan (Paspor aktif min. 7 bulan, Pas Foto, Sertifikat Vaksin, KTP, KK) wajib diserahkan.</li>
+                    <li>Tanda Tangan Digital pada formulir ini dinyatakan sah dan memiliki kekuatan hukum persetujuan yang mengikat.</li>
+                  </ol>
+                </div>
+
+                {/* Section E: PERSETUJUAN SYARAT & KETENTUAN */}
+                <div className="space-y-2">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900 bg-slate-100 px-3 py-1.5 rounded-md border-l-4 border-slate-800">
+                    E. PERSETUJUAN SYARAT & KETENTUAN
+                  </h3>
+                  <div className="text-xs text-slate-700 bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-2">
+                    <p className="italic text-slate-600">
+                      Dengan mengisi dan menandatangani formulir ini, saya menyatakan bahwa saya telah membaca, memahami, dan menyetujui Syarat & Ketentuan Umroh VTU ABADI yang berlaku.
                     </p>
-                    <p className="not-italic text-emerald-700 font-semibold flex items-center gap-1.5 pt-1">
-                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                      <span>Syarat & Ketentuan Telah Dibaca dan Disetujui secara Elektronik.</span>
-                    </p>
+                    <ul className="space-y-1 font-medium text-emerald-800 pt-1">
+                      <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-600" /> Saya telah membaca, memahami, dan menyetujui Syarat & Ketentuan Umroh VTU ABADI.</li>
+                      <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-600" /> Saya menyetujui paket dan klaster paket Umroh yang dipilih.</li>
+                      <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-600" /> Saya menyatakan bahwa data yang saya berikan dalam formulir ini adalah benar.</li>
+                      <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-600" /> Saya bersedia mengikuti seluruh ketentuan perjalanan Umroh yang berlaku.</li>
+                    </ul>
                   </div>
                 </div>
 
-                {/* Section V: Pengesahan & Tanda Tangan Digital */}
-                <div className="border-t border-slate-300 pt-6 flex flex-col sm:flex-row justify-between items-center sm:items-end gap-6">
-                  <div className="text-[11px] text-slate-500 space-y-1 text-center sm:text-left">
-                    <p className="font-bold text-slate-700">Catatan Sistem Security & Vault:</p>
-                    <p>• Dokumen ini sah dan ditandatangani secara digital oleh PIC.</p>
-                    <p>• Dokumen tersimpan aman pada Vault Operational VTU Travel.</p>
-                  </div>
-                  <div className="text-center w-60 space-y-1">
-                    <p className="text-xs text-slate-600">
-                      Surabaya, {new Date().toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })}
-                    </p>
-                    <p className="text-xs font-bold text-slate-800">Yang Menyatakan (PIC Rombongan),</p>
-                    <div className="h-24 flex items-center justify-center relative border border-dashed border-slate-300 rounded-xl bg-slate-50/80 my-1 p-1">
-                      {signaturePreview ? (
-                        <img
-                          src={signaturePreview}
-                          alt="Tanda Tangan PIC"
-                          className="max-h-20 max-w-full object-contain"
-                        />
-                      ) : (
-                        <span className="text-[10px] text-slate-400 italic">[Tanda Tangan Digital]</span>
-                      )}
+                {/* Section F: PERNYATAAN PERSETUJUAN (SIGNATURE BOX) */}
+                <div className="space-y-3 pt-2">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900 bg-slate-100 px-3 py-1.5 rounded-md border-l-4 border-slate-800">
+                    F. PERNYATAAN PERSETUJUAN
+                  </h3>
+                  <div className="grid grid-cols-2 gap-4 border border-slate-300 rounded-xl overflow-hidden text-xs">
+                    <div className="border-r border-slate-300">
+                      <div className="bg-slate-100 font-bold p-2 text-center border-b border-slate-300">PENDAFTAR</div>
+                      <div className="p-3 text-center space-y-2">
+                        <div className="h-20 flex items-center justify-center border border-dashed border-slate-300 rounded-lg bg-slate-50">
+                          {signaturePreview ? (
+                            <img src={signaturePreview} alt="Tanda Tangan Digital" className="max-h-16 max-w-full object-contain" />
+                          ) : (
+                            <span className="text-[10px] text-slate-400 italic">[Tanda Tangan Digital]</span>
+                          )}
+                        </div>
+                        <p className="font-bold uppercase text-slate-900">({namaPerwakilan || "NAMA PENDAFTAR"})</p>
+                      </div>
                     </div>
-                    <p className="text-xs font-extrabold uppercase text-slate-900 underline decoration-slate-400">
-                      ({namaPerwakilan || "NAMA PIC"})
-                    </p>
+                    <div>
+                      <div className="bg-slate-100 font-bold p-2 text-center border-b border-slate-300">PETUGAS</div>
+                      <div className="p-3 text-center space-y-2">
+                        <div className="h-20 flex items-center justify-center border border-dashed border-slate-300 rounded-lg bg-slate-50">
+                          <span className="text-[10px] text-slate-400 italic">[Stempel & Tanda Tangan]</span>
+                        </div>
+                        <p className="font-bold text-slate-900">( _______________________ )</p>
+                      </div>
+                    </div>
                   </div>
+                  <p className="text-[11px] italic text-center text-slate-500 pt-1">
+                    Catatan: Data paspor dan dokumen lainnya dapat dilengkapi pada tahap administrasi berikutnya.
+                  </p>
                 </div>
               </div>
 

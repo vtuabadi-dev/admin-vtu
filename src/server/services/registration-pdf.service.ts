@@ -4,10 +4,9 @@
 // matching official template sections A, B, C, D, E, F.
 // ============================================================
 
-import fs from "fs";
-import path from "path";
 import type { RegistrationRequest, Keberangkatan } from "@/shared/types";
 import { getStorageAdapter } from "@/server/storage";
+import { KOP_SURAT_BASE64 } from "@/server/assets/kop-surat";
 
 interface PdfData {
   registration: RegistrationRequest;
@@ -61,17 +60,8 @@ export async function generateRegistrationPdf(data: PdfData): Promise<Buffer> {
     };
   }
 
-  // 1. Load Kop Surat Header Image
-  let kopSuratBase64 = "";
-  try {
-    const kopPath = path.join(process.cwd(), "public", "templates", "template-surat", "kop_surat.jpeg");
-    if (fs.existsSync(kopPath)) {
-      const kopBuffer = fs.readFileSync(kopPath);
-      kopSuratBase64 = `data:image/jpeg;base64,${kopBuffer.toString("base64")}`;
-    }
-  } catch (err) {
-    console.warn("[registration-pdf] Failed to load kop_surat.jpeg:", err);
-  }
+  // 1. Load Kop Surat Header Image from bundled asset
+  const kopSuratBase64 = KOP_SURAT_BASE64;
 
   // 2. Load Digital Signature Image if available
   let signatureBase64 = "";
