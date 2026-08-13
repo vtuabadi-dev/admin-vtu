@@ -77,10 +77,22 @@ export async function generateRegistrationPdf(data: PdfData): Promise<Buffer> {
   let signatureBase64 = "";
   if (reg.signaturePath) {
     try {
-      const storage = getStorageAdapter();
-      const sigBuffer = await storage.download(reg.signaturePath);
-      if (sigBuffer && sigBuffer.length > 0) {
-        signatureBase64 = `data:image/jpeg;base64,${sigBuffer.toString("base64")}`;
+      if (reg.signaturePath.startsWith("data:image")) {
+        signatureBase64 = reg.signaturePath;
+      } else {
+        const { createLocalAdapter } = await import("@/server/storage/local");
+        const localAdapter = createLocalAdapter();
+        let sigBuffer: Buffer | null = null;
+        try {
+          sigBuffer = await localAdapter.download(reg.signaturePath);
+        } catch {
+          const storage = getStorageAdapter();
+          sigBuffer = await storage.download(reg.signaturePath).catch(() => null);
+        }
+
+        if (sigBuffer && sigBuffer.length > 0) {
+          signatureBase64 = `data:image/jpeg;base64,${sigBuffer.toString("base64")}`;
+        }
       }
     } catch (err) {
       console.warn("[registration-pdf] Failed to load signature image:", err);
