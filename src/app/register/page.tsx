@@ -24,10 +24,42 @@ import {
   Plus,
   AlertTriangle,
   CheckCircle2,
+  CreditCard,
+  Building2,
+  Copy,
+  ShieldCheck,
+  Sparkles,
 } from "lucide-react";
 import type { JenisKelamin, Keberangkatan } from "@/shared/types";
 
-type Step = 1 | 2 | 3 | 4 | 5 | 6 | 7;
+type Step = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
+
+const DRAFT_STORAGE_KEY = "vtu_registration_draft_v2";
+
+function loadDraftFromStorage() {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(DRAFT_STORAGE_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+function saveDraftToStorage(draft: any) {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(draft));
+  } catch {}
+}
+
+function clearDraftFromStorage() {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.removeItem(DRAFT_STORAGE_KEY);
+  } catch {}
+}
 
 // Konfigurasi jumlah jamaah — ubah di sini jika kebijakan berubah
 const MIN_GROUP_SIZE = 1;
@@ -311,6 +343,19 @@ export default function RegisterPage() {
   // Validation errors
   const [errors, setErrors] = useState<Record<string, string>>({});
 
+  // Step 8: Payment Proof State
+  const [paymentProofFile, setPaymentProofFile] = useState<File | null>(null);
+  const [paymentProofPreview, setPaymentProofPreview] = useState("");
+  const [isUploadingProof, setIsUploadingProof] = useState(false);
+  const [paymentProofSubmitted, setPaymentProofSubmitted] = useState(false);
+  const [paymentProofError, setPaymentProofError] = useState("");
+  const [copiedAccount, setCopiedAccount] = useState(false);
+  const [copiedRef, setCopiedRef] = useState(false);
+
+  // Draft auto-resume indicator
+  const [isRestoredDraft, setIsRestoredDraft] = useState(false);
+  const [hasInitializedDraft, setHasInitializedDraft] = useState(false);
+
   // Load packages on mount
   useEffect(() => {
     const loadPaket = async () => {
@@ -344,6 +389,105 @@ export default function RegisterPage() {
     };
     loadTerms();
   }, []);
+
+  // ── Auto-Resume: Load draft from localStorage on mount ──
+  useEffect(() => {
+    const draft = loadDraftFromStorage();
+    if (draft) {
+      try {
+        if (draft.step && draft.step >= 1 && draft.step <= 8) setStep(draft.step as Step);
+        if (draft.namaPerwakilan) setNamaPerwakilan(draft.namaPerwakilan);
+        if (draft.nomorTelepon) setNomorTelepon(draft.nomorTelepon);
+        if (draft.emailPerwakilan) setEmailPerwakilan(draft.emailPerwakilan);
+        if (typeof draft.useRepAsJamaah1 === "boolean") setUseRepAsJamaah1(draft.useRepAsJamaah1);
+        if (draft.paxCount) setPaxCount(draft.paxCount);
+        if (Array.isArray(draft.members) && draft.members.length > 0) setMembers(draft.members);
+        if (draft.selectedPaketId) setSelectedPaketId(draft.selectedPaketId);
+        if (typeof draft.selectedClusterIndex === "number") setSelectedClusterIndex(draft.selectedClusterIndex);
+        if (draft.roomUpgrade) setRoomUpgrade(draft.roomUpgrade);
+        if (draft.hotelUpgrade) setHotelUpgrade(draft.hotelUpgrade);
+        if (typeof draft.termsAccepted === "boolean") setTermsAccepted(draft.termsAccepted);
+        if (draft.termsAcceptedAt) setTermsAcceptedAt(draft.termsAcceptedAt);
+        if (draft.signaturePreview) setSignaturePreview(draft.signaturePreview);
+        if (draft.signaturePath) setSignaturePath(draft.signaturePath);
+        if (draft.signedAt) setSignedAt(draft.signedAt);
+        if (draft.submitResult) setSubmitResult(draft.submitResult);
+        setIsRestoredDraft(true);
+      } catch (err) {
+        console.warn("[register] Draft restore warning:", err);
+      }
+    }
+    setHasInitializedDraft(true);
+  }, []);
+
+  // ── Auto-Save: Save state changes to localStorage ──
+  useEffect(() => {
+    if (!hasInitializedDraft) return;
+    if (paymentProofSubmitted) {
+      clearDraftFromStorage();
+      return;
+    }
+
+    saveDraftToStorage({
+      step,
+      namaPerwakilan,
+      nomorTelepon,
+      emailPerwakilan,
+      useRepAsJamaah1,
+      paxCount,
+      members,
+      selectedPaketId,
+      selectedClusterIndex,
+      roomUpgrade,
+      hotelUpgrade,
+      termsAccepted,
+      termsAcceptedAt,
+      signaturePreview,
+      signaturePath,
+      signedAt,
+      submitResult,
+      updatedAt: new Date().toISOString(),
+    });
+  }, [
+    hasInitializedDraft,
+    step,
+    namaPerwakilan,
+    nomorTelepon,
+    emailPerwakilan,
+    useRepAsJamaah1,
+    paxCount,
+    members,
+    selectedPaketId,
+    selectedClusterIndex,
+    roomUpgrade,
+    hotelUpgrade,
+    termsAccepted,
+    termsAcceptedAt,
+    signaturePreview,
+    signaturePath,
+    signedAt,
+    submitResult,
+    paymentProofSubmitted,
+  ]);
+
+  // Clear draft & start fresh handler
+  const handleStartFresh = () => {
+    if (confirm("Apakah Anda yakin ingin menghapus draft ini dan mulai dari awal?")) {
+      clearDraftFromStorage();
+      setStep(1);
+      setNamaPerwakilan("");
+      setNomorTelepon("");
+      setEmailPerwakilan("");
+      setPaxCount(1);
+      setMembers([{ namaLengkap: "", jenisKelamin: "L", tempatLahir: "", tanggalLahir: "", hubungan: "" }]);
+      setSelectedPaketId("");
+      setTermsAccepted(false);
+      setSignaturePreview("");
+      setSignaturePath("");
+      setSubmitResult(null);
+      setIsRestoredDraft(false);
+    }
+  };
 
   // Track scroll position to enable checkbox when scrolled to bottom
   const handleTermsScroll = () => {
@@ -464,11 +608,52 @@ export default function RegisterPage() {
       if (step === 2 && !termsAcceptedAt) {
         setTermsAcceptedAt(new Date().toISOString());
       }
-      setStep((s) => Math.min(7, s + 1) as Step);
+      setStep((s) => Math.min(8, s + 1) as Step);
     }
   };
 
   const prevStep = () => setStep((s) => Math.max(1, s - 1) as Step);
+
+  // Handle payment proof upload & submission for Step 8
+  const handlePaymentProofSubmit = async () => {
+    if (!paymentProofFile && !paymentProofPreview) {
+      setPaymentProofError("Silakan pilih/unggah foto bukti transfer DP.");
+      return;
+    }
+    const kodeReg = submitResult?.kodeRegistrasi || (submitResult as any)?.data?.kodeRegistrasi;
+    if (!kodeReg) {
+      setPaymentProofError("Kode registrasi tidak ditemukan.");
+      return;
+    }
+
+    setIsUploadingProof(true);
+    setPaymentProofError("");
+
+    try {
+      const formData = new FormData();
+      formData.append("kodeRegistrasi", kodeReg);
+      if (paymentProofFile) {
+        formData.append("file", paymentProofFile);
+      }
+
+      const res = await fetch("/api/register/payment-proof", {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        setPaymentProofSubmitted(true);
+        clearDraftFromStorage();
+      } else {
+        setPaymentProofError(data.message || "Gagal mengunggah bukti transfer DP.");
+      }
+    } catch {
+      setPaymentProofError("Gagal mengunggah bukti transfer. Periksa koneksi internet Anda.");
+    } finally {
+      setIsUploadingProof(false);
+    }
+  };
 
   // Handle signature upload
   const handleSignatureChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -556,6 +741,9 @@ export default function RegisterPage() {
 
       const data = await res.json();
       setSubmitResult(data);
+      if (data.success) {
+        setStep(8);
+      }
     } catch {
       setSubmitResult({ success: false, message: "Terjadi kesalahan. Silakan coba lagi." });
     } finally {
@@ -572,41 +760,11 @@ export default function RegisterPage() {
     { key: 5, label: "Paket", icon: Package },
     { key: 6, label: "Tanda Tangan", icon: PenTool },
     { key: 7, label: "Review", icon: ClipboardCheck },
+    { key: 8, label: "Pembayaran DP", icon: CreditCard },
   ];
 
-  // Success screen
-  if (submitResult?.success) {
-    const kodeReg = submitResult.kodeRegistrasi || (submitResult as any).data?.kodeRegistrasi || "-";
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4 py-8">
-        <div className="w-full max-w-md bg-white rounded-2xl shadow-xl border border-gray-200 p-8 text-center">
-          <div className="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4 shadow-sm">
-            <Check className="w-8 h-8 text-green-600" />
-          </div>
-          <h1 className="text-xl font-bold text-gray-900 mb-2">Registrasi Berhasil!</h1>
-          <p className="text-gray-500 mb-4 text-sm">
-            Permohonan registrasi grup Anda telah diterima. Tim kami akan meninjau dan menghubungi Anda.
-          </p>
-          <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6">
-            <p className="text-xs text-blue-600 font-semibold uppercase tracking-wider mb-1">Kode Registrasi</p>
-            <p className="text-2xl font-extrabold text-blue-900 font-mono tracking-wider">{kodeReg}</p>
-          </div>
-          <p className="text-xs text-gray-500 mb-6">
-            Simpan kode registrasi Anda untuk referensi. Status dapat ditanyakan melalui WhatsApp.
-          </p>
-          <button
-            onClick={() => router.push("/login")}
-            className="w-full py-3 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 shadow-md transition-all"
-          >
-            Kembali ke Login
-          </button>
-        </div>
-      </div>
-    );
-  }
-
   // Error screen
-  if (submitResult && !submitResult.success) {
+  if (submitResult && !submitResult.success && step !== 8) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
         <div className="w-full max-w-md bg-white rounded-xl shadow-lg border border-gray-200 p-8 text-center">
@@ -631,10 +789,29 @@ export default function RegisterPage() {
   return (
     <div className="min-h-screen bg-gray-50 py-8 px-4">
       <div className="max-w-2xl mx-auto">
+        {/* Top Notice Banner if draft was restored */}
+        {isRestoredDraft && step < 8 && !paymentProofSubmitted && (
+          <div className="mb-4 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-xs text-amber-900 flex items-center justify-between shadow-sm">
+            <div className="flex items-center gap-2.5">
+              <Sparkles className="w-4 h-4 text-amber-600 shrink-0" />
+              <span>
+                <strong>Draft Pendaftaran Dipulihkan!</strong> Data isian Anda tersimpan otomatis. Anda melanjutkan dari <strong>Langkah {step} dari 8</strong>.
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={handleStartFresh}
+              className="text-amber-800 underline font-bold hover:text-amber-950 ml-4 shrink-0"
+            >
+              Mulai Dari Awal
+            </button>
+          </div>
+        )}
+
         {/* Header */}
         <div className="text-center mb-8">
           <h1 className="text-2xl font-bold text-gray-900">Registrasi Grup Umroh</h1>
-          <p className="text-sm text-gray-500 mt-1">Daftarkan rombongan Anda dalam 7 langkah</p>
+          <p className="text-sm text-gray-500 mt-1">Daftarkan rombongan Anda dalam 8 langkah mudah</p>
         </div>
 
         {/* Step indicator */}
@@ -1741,55 +1918,309 @@ export default function RegisterPage() {
             </div>
           )}
 
-          {/* Navigation buttons */}
-          <div className="flex justify-between mt-6 pt-4 border-t">
-            {step > 1 ? (
-              <button
-                type="button"
-                onClick={prevStep}
-                className="inline-flex items-center gap-1 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
-              >
-                <ChevronLeft className="w-4 h-4" />
-                Sebelumnya
-              </button>
-            ) : (
-              <div />
-            )}
+          {/* STEP 8: PEMBAYARAN & UPLOAD BUKTI TRANSFER DP */}
+          {step === 8 && (
+            <div className="space-y-6">
+              {paymentProofSubmitted ? (
+                /* Step 8 Completed Success Screen */
+                <div className="text-center py-6 px-4 space-y-4">
+                  <div className="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center shadow-sm">
+                    <Check className="w-8 h-8 text-green-600" />
+                  </div>
+                  <h2 className="text-2xl font-extrabold text-gray-900">Bukti Pembayaran DP Berhasil Diunggah! 🎉</h2>
+                  <p className="text-sm text-gray-600 max-w-md mx-auto">
+                    Terima kasih <strong>{namaPerwakilan}</strong>. Bukti transfer DP untuk kode registrasi{" "}
+                    <span className="font-mono font-bold text-blue-800">
+                      {submitResult?.kodeRegistrasi || (submitResult as any)?.data?.kodeRegistrasi || "-"}
+                    </span>{" "}
+                    telah berhasil dikirim dan akan diverifikasi oleh Tim Keuangan VTU ABADI dalam 1x24 jam.
+                  </p>
+                  <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 max-w-md mx-auto text-left text-xs space-y-1.5 text-blue-900">
+                    <p className="font-bold flex items-center gap-1.5"><ShieldCheck className="w-4 h-4 text-blue-600" /> Informasi Selanjutnya:</p>
+                    <p>• Salinan Formulir Pendaftaran & Tanda Terima telah dikirimkan ke email <strong>{emailPerwakilan}</strong>.</p>
+                    <p>• Tim Operasional kami akan menghubungi WhatsApp <strong>{nomorTelepon}</strong> untuk konfirmasi berkas fisik.</p>
+                  </div>
+                  <div className="pt-4 flex flex-col sm:flex-row gap-3 justify-center max-w-md mx-auto">
+                    <button
+                      type="button"
+                      onClick={() => router.push("/login")}
+                      className="w-full py-2.5 px-4 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 shadow-md transition-all"
+                    >
+                      Kembali ke Login
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                /* Step 8 Payment Proof Upload Form */
+                <div className="space-y-6">
+                  <div className="bg-slate-900 text-white rounded-2xl p-5 shadow-md">
+                    <div className="flex items-center gap-2 text-xs font-semibold text-blue-200 uppercase tracking-wider mb-1">
+                      <CreditCard className="w-4 h-4 text-amber-400" />
+                      Langkah 8 dari 8 — Pembayaran Down Payment (DP)
+                    </div>
+                    <h2 className="text-xl font-bold">Instruksi Pembayaran & Upload Bukti Transfer</h2>
+                    <p className="text-xs text-blue-100 mt-1">
+                      Silakan selesaikan pembayaran DP minimal 30% untuk mengamankan kuota pendaftaran rombongan Anda.
+                    </p>
+                  </div>
 
-            {step < 7 ? (
-              <button
-                id="btn_next_step"
-                type="button"
-                onClick={nextStep}
-                className="inline-flex items-center gap-1 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                Selanjutnya
-                <ChevronRight className="w-4 h-4" />
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={handleSubmit}
-                disabled={isSubmitting}
-                className={cn(
-                  "inline-flex items-center gap-2 px-6 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700",
-                  "disabled:opacity-50 disabled:cursor-not-allowed"
-                )}
-              >
-                {isSubmitting ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Mengirim...
-                  </>
-                ) : (
-                  <>
-                    <Check className="w-4 h-4" />
-                    Kirim Pendaftaran
-                  </>
-                )}
-              </button>
-            )}
-          </div>
+                  {/* Summary & Bank Details Grid */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Order Summary */}
+                    <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3">
+                      <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 border-b pb-2">
+                        Ringkasan Pendaftaran
+                      </h3>
+                      <div className="text-xs space-y-1.5">
+                        <div className="flex justify-between">
+                          <span className="text-gray-500">Kode Registrasi:</span>
+                          <span className="font-mono font-bold text-blue-900">
+                            {submitResult?.kodeRegistrasi || (submitResult as any)?.data?.kodeRegistrasi || "-"}
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-500">Nama PIC:</span>
+                          <span className="font-bold text-gray-800 uppercase">{namaPerwakilan}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-500">Jumlah Jamaah:</span>
+                          <span className="font-bold text-gray-800">{paxCount} PAX</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-500">Paket Umroh:</span>
+                          <span className="font-semibold text-gray-800">
+                            {selectedPaket?.namaPaket || selectedPaket?.paketUmroh?.namaPaket || "-"}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Calculated DP */}
+                      {selectedPaket && (() => {
+                        const price = (selectedPaket as any).hargaStartingFrom ?? (selectedPaket as any).hargaPaket ?? (selectedPaket as any).paketUmroh?.hargaQuad ?? 30000000;
+                        const totalEstimasi = price * paxCount;
+                        const minimalDp = Math.round(totalEstimasi * 0.3);
+                        return (
+                          <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 space-y-1">
+                            <div className="flex justify-between text-xs">
+                              <span className="text-amber-800">Estimasi Biaya ({paxCount} PAX):</span>
+                              <span className="font-semibold text-amber-900">Rp {totalEstimasi.toLocaleString("id-ID")}</span>
+                            </div>
+                            <div className="flex justify-between text-xs pt-1 border-t border-amber-200">
+                              <span className="font-bold text-amber-900">Nominal Minimal DP (30%):</span>
+                              <span className="font-extrabold text-blue-900 text-sm">
+                                Rp {minimalDp.toLocaleString("id-ID")}
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })()}
+                    </div>
+
+                    {/* Bank Transfer Info */}
+                    <div className="bg-white border-2 border-blue-200 rounded-xl p-4 shadow-sm space-y-3">
+                      <div className="flex items-center gap-2 border-b pb-2">
+                        <Building2 className="w-5 h-5 text-blue-600" />
+                        <div>
+                          <h3 className="text-xs font-bold text-gray-900 uppercase">Rekening Tujuan Pembayaran</h3>
+                          <p className="text-[10px] text-gray-500">Transfer Resmi PT VTU ABADI TRAVEL</p>
+                        </div>
+                      </div>
+
+                      <div className="space-y-2 text-xs">
+                        <div className="bg-blue-50 p-2.5 rounded-lg border border-blue-100">
+                          <p className="text-[10px] text-blue-600 font-semibold uppercase">Nama Bank</p>
+                          <p className="font-bold text-gray-900 text-sm">Bank Syariah Indonesia (BSI)</p>
+                        </div>
+
+                        <div className="bg-blue-50 p-2.5 rounded-lg border border-blue-100 flex items-center justify-between">
+                          <div>
+                            <p className="text-[10px] text-blue-600 font-semibold uppercase">Nomor Rekening</p>
+                            <p className="font-mono font-bold text-blue-900 text-base">7123 4567 89</p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              navigator.clipboard.writeText("7123456789");
+                              setCopiedAccount(true);
+                              setTimeout(() => setCopiedAccount(false), 2000);
+                            }}
+                            className="px-2.5 py-1 bg-white border border-blue-300 rounded text-[11px] font-semibold text-blue-700 hover:bg-blue-100 flex items-center gap-1"
+                          >
+                            {copiedAccount ? <Check className="w-3.5 h-3.5 text-green-600" /> : <Copy className="w-3.5 h-3.5" />}
+                            {copiedAccount ? "Tersalin" : "Salin"}
+                          </button>
+                        </div>
+
+                        <div className="bg-blue-50 p-2.5 rounded-lg border border-blue-100">
+                          <p className="text-[10px] text-blue-600 font-semibold uppercase">Atas Nama Rekening</p>
+                          <p className="font-bold text-gray-900">PT VTU ABADI TRAVEL</p>
+                        </div>
+
+                        <div className="bg-amber-50 p-2.5 rounded-lg border border-amber-200 flex items-center justify-between">
+                          <div>
+                            <p className="text-[10px] text-amber-700 font-semibold uppercase">Berita Transfer / Ref</p>
+                            <p className="font-mono font-bold text-amber-900">
+                              {submitResult?.kodeRegistrasi || (submitResult as any)?.data?.kodeRegistrasi || "-"}
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const refCode = submitResult?.kodeRegistrasi || (submitResult as any)?.data?.kodeRegistrasi || "";
+                              navigator.clipboard.writeText(refCode);
+                              setCopiedRef(true);
+                              setTimeout(() => setCopiedRef(false), 2000);
+                            }}
+                            className="px-2.5 py-1 bg-white border border-amber-300 rounded text-[11px] font-semibold text-amber-800 hover:bg-amber-100 flex items-center gap-1"
+                          >
+                            {copiedRef ? <Check className="w-3.5 h-3.5 text-green-600" /> : <Copy className="w-3.5 h-3.5" />}
+                            {copiedRef ? "Tersalin" : "Salin Ref"}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Upload File Box */}
+                  <div className="bg-slate-50 border border-slate-200 rounded-xl p-5 space-y-4">
+                    <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                      <Upload className="w-4 h-4 text-blue-600" />
+                      Upload Foto / File Bukti Transfer DP
+                    </h3>
+
+                    <div className="border-2 border-dashed border-blue-300 bg-white rounded-xl p-6 text-center space-y-3 hover:bg-blue-50/50 transition-colors">
+                      {paymentProofPreview ? (
+                        <div className="space-y-3">
+                          <img
+                            src={paymentProofPreview}
+                            alt="Bukti Transfer DP"
+                            className="max-h-48 max-w-full mx-auto rounded-lg shadow-sm border object-contain"
+                          />
+                          <p className="text-xs text-gray-500 font-medium">{paymentProofFile?.name}</p>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setPaymentProofFile(null);
+                              setPaymentProofPreview("");
+                            }}
+                            className="text-xs text-red-600 hover:underline font-semibold"
+                          >
+                            Ganti File Bukti Transfer
+                          </button>
+                        </div>
+                      ) : (
+                        <label className="cursor-pointer block space-y-2">
+                          <Upload className="w-10 h-10 text-blue-500 mx-auto" />
+                          <div>
+                            <p className="text-sm font-semibold text-gray-700">Pilih Foto atau File Bukti Transfer</p>
+                            <p className="text-xs text-gray-400">Format: JPG, JPEG, PNG, PDF (Maksimal 5 MB)</p>
+                          </div>
+                          <input
+                            type="file"
+                            accept="image/jpeg,image/png,image/jpg,application/pdf"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                setPaymentProofFile(file);
+                                if (file.type.startsWith("image/")) {
+                                  setPaymentProofPreview(URL.createObjectURL(file));
+                                } else {
+                                  setPaymentProofPreview("");
+                                }
+                              }
+                            }}
+                            className="hidden"
+                          />
+                        </label>
+                      )}
+                    </div>
+
+                    {paymentProofError && (
+                      <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700">
+                        {paymentProofError}
+                      </div>
+                    )}
+
+                    <div className="pt-2">
+                      <button
+                        type="button"
+                        onClick={handlePaymentProofSubmit}
+                        disabled={isUploadingProof}
+                        className={cn(
+                          "w-full py-3 bg-blue-600 text-white rounded-xl font-semibold text-sm hover:bg-blue-700 shadow-md transition-all flex items-center justify-center gap-2",
+                          "disabled:opacity-50 disabled:cursor-not-allowed"
+                        )}
+                      >
+                        {isUploadingProof ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            Mengunggah Bukti Pembayaran...
+                          </>
+                        ) : (
+                          <>
+                            <Check className="w-4 h-4" />
+                            Kirim Bukti Pembayaran DP
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Navigation buttons */}
+          {step < 8 && (
+            <div className="flex justify-between mt-6 pt-4 border-t">
+              {step > 1 ? (
+                <button
+                  type="button"
+                  onClick={prevStep}
+                  className="inline-flex items-center gap-1 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                  Sebelumnya
+                </button>
+              ) : (
+                <div />
+              )}
+
+              {step < 7 ? (
+                <button
+                  id="btn_next_step"
+                  type="button"
+                  onClick={nextStep}
+                  className="inline-flex items-center gap-1 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  Selanjutnya
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleSubmit}
+                  disabled={isSubmitting}
+                  className={cn(
+                    "inline-flex items-center gap-2 px-6 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700",
+                    "disabled:opacity-50 disabled:cursor-not-allowed"
+                  )}
+                >
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Mengirim Pendaftaran...
+                    </>
+                  ) : (
+                    <>
+                      <Check className="w-4 h-4" />
+                      Kirim Pendaftaran & Lanjut ke Pembayaran DP
+                    </>
+                  )}
+                </button>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Footer */}

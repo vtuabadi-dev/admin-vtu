@@ -324,19 +324,93 @@ export default function RegistrasiBaruPage() {
               </div>
             </div>
 
-            {/* Catatan admin */}
-            {detailTarget.catatanAdmin && (
-              <div>
-                <h4 className="text-sm font-semibold text-gray-700 mb-1">Catatan Admin</h4>
-                <p className="text-sm text-gray-600 bg-yellow-50 rounded-lg p-3">{detailTarget.catatanAdmin}</p>
-              </div>
-            )}
+            {/* Bukti Transfer DP Inspector */}
+            {(() => {
+              const notes = detailTarget.catatanAdmin || "";
+              const match = notes.match(/\[Bukti DP Uploaded[^\]]*\]:\s*(\S+)/);
+              const buktiUrl = match ? match[1] : null;
+
+              return (
+                <div className="space-y-3 pt-2 border-t">
+                  <h4 className="text-sm font-semibold text-gray-900 flex items-center justify-between">
+                    <span>Bukti Transfer DP Jamaah</span>
+                    {buktiUrl && (
+                      <span className="text-xs text-green-700 bg-green-50 px-2 py-0.5 rounded font-medium border border-green-200">
+                        Sudah Diunggah
+                      </span>
+                    )}
+                  </h4>
+
+                  {buktiUrl ? (
+                    <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 space-y-2">
+                      <div className="max-h-56 overflow-hidden rounded-lg border border-blue-200 bg-white flex items-center justify-center p-2">
+                        <img
+                          src={buktiUrl}
+                          alt="Bukti Transfer DP"
+                          className="max-h-52 object-contain rounded"
+                        />
+                      </div>
+                      <div className="flex justify-between items-center text-xs">
+                        <span className="text-blue-900 font-medium truncate max-w-[200px]">{buktiUrl}</span>
+                        <a
+                          href={buktiUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="px-2.5 py-1 bg-blue-600 text-white rounded font-medium hover:bg-blue-700 transition-colors"
+                        >
+                          Buka Gambar Full
+                        </a>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-xs text-yellow-800">
+                      Jamaah belum mengunggah foto bukti transfer DP.
+                    </div>
+                  )}
+
+                  {notes && (
+                    <div>
+                      <span className="text-xs text-gray-500 font-medium">Catatan Admin / Riwayat:</span>
+                      <p className="text-xs text-gray-600 bg-gray-50 rounded p-2 mt-1 whitespace-pre-line font-mono">{notes}</p>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
 
             {/* Signature */}
             <div>
-              <h4 className="text-sm font-semibold text-gray-700 mb-1">Tanda Tangan</h4>
-              <p className="text-xs text-gray-400 font-mono">{detailTarget.signaturePath}</p>
+              <h4 className="text-sm font-semibold text-gray-700 mb-1">Tanda Tangan Digital</h4>
+              <p className="text-xs text-gray-500 font-mono bg-gray-50 p-2 rounded">{detailTarget.signaturePath || "Tanda tangan tersedia"}</p>
             </div>
+
+            {/* Modal Approve / Reject Action Buttons */}
+            {detailTarget.status === "PENDING_REVIEW" && (
+              <div className="pt-4 border-t flex justify-end gap-2">
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => { setShowDetail(false); setRejectTarget(detailTarget); }}
+                  disabled={processingId === detailTarget.id}
+                >
+                  <XCircle className="w-4 h-4 mr-1" />
+                  Tolak
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={() => { setShowDetail(false); handleApprove(detailTarget.id); }}
+                  disabled={processingId === detailTarget.id}
+                  className="bg-green-600 hover:bg-green-700"
+                >
+                  {processingId === detailTarget.id ? (
+                    <Loader2 className="w-4 h-4 animate-spin mr-1" />
+                  ) : (
+                    <CheckCircle2 className="w-4 h-4 mr-1" />
+                  )}
+                  Setujui Pembayaran DP & Buat Invoice
+                </Button>
+              </div>
+            )}
           </div>
         )}
       </Modal>
