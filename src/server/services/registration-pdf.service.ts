@@ -135,6 +135,22 @@ export async function generateRegistrationPdf(data: PdfData): Promise<Buffer> {
     pageSize: "A4",
     pageMargins: [40, 30, 40, 40],
     defaultStyle: { font: "Helvetica", fontSize: 9.5, color: "#0f172a" },
+    background: function (_currentPage: number, pageSize: { width: number; height: number }) {
+      if (kopSuratBase64) {
+        return [
+          {
+            image: kopSuratBase64,
+            width: 380,
+            opacity: 0.12,
+            absolutePosition: {
+              x: (pageSize.width - 380) / 2,
+              y: 220,
+            },
+          },
+        ];
+      }
+      return [];
+    },
     styles: {
       docTitle: { fontSize: 13, bold: true, alignment: "center", margin: [0, 6, 0, 1] },
       docSubTitle: { fontSize: 11, bold: true, alignment: "center", margin: [0, 0, 0, 12] },
@@ -147,9 +163,9 @@ export async function generateRegistrationPdf(data: PdfData): Promise<Buffer> {
       footerNote: { fontSize: 8, italics: true, alignment: "center", color: "#64748b", margin: [0, 10, 0, 0] },
     },
     content: [
-      // ── KOP SURAT HEADER ─────────────────────────────────
+      // ── KOP SURAT HEADER (TOP BANNER ONLY) ────────────────
       ...(kopSuratBase64
-        ? [{ image: kopSuratBase64, width: 515, margin: [0, 0, 0, 10] }]
+        ? [{ image: kopSuratBase64, width: 515, fit: [515, 95] as [number, number], margin: [0, 0, 0, 6] }]
         : [{ text: "VTU ABADI TRAVEL", style: "docTitle", margin: [0, 0, 0, 10] }]),
 
       // ── FORM TITLE ───────────────────────────────────────
@@ -273,12 +289,9 @@ export async function generateRegistrationPdf(data: PdfData): Promise<Buffer> {
       },
       {
         table: {
-          widths: [240, 240],
+          widths: [260],
           body: [
-            [
-              { text: "PENDAFTAR", alignment: "center", bold: true, fontSize: 9.5, fillColor: "#f1f5f9" },
-              { text: "PETUGAS", alignment: "center", bold: true, fontSize: 9.5, fillColor: "#f1f5f9" },
-            ],
+            [{ text: "PENDAFTAR / KETUA ROMBONGAN", alignment: "center", bold: true, fontSize: 9.5, fillColor: "#f1f5f9" }],
             [
               {
                 stack: [
@@ -286,13 +299,6 @@ export async function generateRegistrationPdf(data: PdfData): Promise<Buffer> {
                     ? { image: signatureBase64, height: 45, alignment: "center" as const, margin: [0, 4, 0, 4] }
                     : { text: "\n\n", margin: [0, 15, 0, 15] },
                   { text: `( ${reg.namaPerwakilan.toUpperCase()} )`, alignment: "center" as const, bold: true, fontSize: 9 },
-                ],
-                margin: [0, 4, 0, 4],
-              },
-              {
-                stack: [
-                  { text: "\n\n", margin: [0, 15, 0, 15] },
-                  { text: "( _______________________ )", alignment: "center" as const, bold: true, fontSize: 9 },
                 ],
                 margin: [0, 4, 0, 4],
               },
@@ -305,7 +311,8 @@ export async function generateRegistrationPdf(data: PdfData): Promise<Buffer> {
           hLineColor: () => "#94a3b8",
           vLineColor: () => "#94a3b8",
         },
-        margin: [0, 0, 0, 6],
+        alignment: "center",
+        margin: [120, 0, 120, 6],
       },
 
       // ── FOOTER NOTE ──────────────────────────────────────

@@ -1723,22 +1723,35 @@ export default function RegisterPage() {
               </div>
 
               {/* Official Document Paper Preview Container */}
-              <div className="bg-white border-2 border-slate-300 rounded-2xl p-4 sm:p-6 md:p-8 shadow-lg relative space-y-6 text-slate-800 font-sans max-w-3xl mx-auto">
-                {/* Official Letterhead (Kop Surat Travel) */}
-                <div className="border-b-2 border-slate-800 pb-2 mb-4">
+              <div className="bg-white border-2 border-slate-300 rounded-2xl p-4 sm:p-6 md:p-8 shadow-lg relative space-y-6 text-slate-800 font-sans max-w-3xl mx-auto overflow-hidden">
+                
+                {/* Big V Logo Watermark Background behind text */}
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-[0.14] z-0 overflow-hidden pt-28">
                   <img
                     src="/templates/template-surat/kop_surat.jpeg"
-                    alt="Kop Surat Official VTU ABADI"
-                    className="w-full h-auto object-contain rounded-t-lg"
+                    alt="Watermark Logo Background"
+                    className="w-[85%] max-w-[480px] object-bottom scale-125"
                   />
                 </div>
 
-                <div className="text-center space-y-1 py-1">
-                  <h2 className="text-lg font-extrabold uppercase tracking-wide text-slate-900">
-                    FORMULIR PENDAFTARAN UMROH
-                  </h2>
-                  <h3 className="text-base font-bold text-slate-700">VTU ABADI</h3>
-                </div>
+                {/* Document Content Box (Above Background Watermark) */}
+                <div className="relative z-10 space-y-6">
+
+                  {/* Official Letterhead Header (Top Banner Only) */}
+                  <div className="border-b-2 border-slate-800 pb-2 mb-4 overflow-hidden rounded-t-lg h-[120px] sm:h-[145px] relative">
+                    <img
+                      src="/templates/template-surat/kop_surat.jpeg"
+                      alt="Kop Surat Official VTU ABADI"
+                      className="w-full object-cover object-top"
+                    />
+                  </div>
+
+                  <div className="text-center space-y-1 py-1">
+                    <h2 className="text-lg font-extrabold uppercase tracking-wide text-slate-900">
+                      FORMULIR PENDAFTARAN UMROH
+                    </h2>
+                    <h3 className="text-base font-bold text-slate-700">VTU ABADI</h3>
+                  </div>
 
                 {/* Section A: DATA PENDAFTAR */}
                 <div className="space-y-2">
@@ -1879,28 +1892,19 @@ export default function RegisterPage() {
                   <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900 bg-slate-100 px-3 py-1.5 rounded-md border-l-4 border-slate-800">
                     F. PERNYATAAN PERSETUJUAN
                   </h3>
-                  <div className="grid grid-cols-2 gap-4 border border-slate-300 rounded-xl overflow-hidden text-xs">
-                    <div className="border-r border-slate-300">
-                      <div className="bg-slate-100 font-bold p-2 text-center border-b border-slate-300">PENDAFTAR</div>
-                      <div className="p-3 text-center space-y-2">
-                        <div className="h-20 flex items-center justify-center border border-dashed border-slate-300 rounded-lg bg-slate-50">
-                          {signaturePreview ? (
-                            <img src={signaturePreview} alt="Tanda Tangan Digital" className="max-h-16 max-w-full object-contain" />
-                          ) : (
-                            <span className="text-[10px] text-slate-400 italic">[Tanda Tangan Digital]</span>
-                          )}
-                        </div>
-                        <p className="font-bold uppercase text-slate-900">({namaPerwakilan || "NAMA PENDAFTAR"})</p>
-                      </div>
+                  <div className="max-w-xs mx-auto border border-slate-300 rounded-xl overflow-hidden text-xs shadow-sm">
+                    <div className="bg-slate-100 font-bold p-2 text-center border-b border-slate-300 text-slate-800">
+                      PENDAFTAR / KETUA ROMBONGAN
                     </div>
-                    <div>
-                      <div className="bg-slate-100 font-bold p-2 text-center border-b border-slate-300">PETUGAS</div>
-                      <div className="p-3 text-center space-y-2">
-                        <div className="h-20 flex items-center justify-center border border-dashed border-slate-300 rounded-lg bg-slate-50">
-                          <span className="text-[10px] text-slate-400 italic">[Stempel & Tanda Tangan]</span>
-                        </div>
-                        <p className="font-bold text-slate-900">( _______________________ )</p>
+                    <div className="p-3 text-center space-y-2 bg-white">
+                      <div className="h-24 flex items-center justify-center border border-dashed border-slate-300 rounded-lg bg-slate-50">
+                        {signaturePreview ? (
+                          <img src={signaturePreview} alt="Tanda Tangan Digital" className="max-h-20 max-w-full object-contain" />
+                        ) : (
+                          <span className="text-[10px] text-slate-400 italic">[Tanda Tangan Digital]</span>
+                        )}
                       </div>
+                      <p className="font-bold uppercase text-slate-900 pt-1">({namaPerwakilan || "NAMA PENDAFTAR"})</p>
                     </div>
                   </div>
                   <p className="text-[11px] italic text-center text-slate-500 pt-1">
@@ -1908,15 +1912,9 @@ export default function RegisterPage() {
                   </p>
                 </div>
               </div>
-
-              {/* Submit Error */}
-              {submitResult && !submitResult.success && (
-                <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
-                  {submitResult.message}
-                </div>
-              )}
             </div>
-          )}
+          </div>
+        )}
 
           {/* STEP 8: PEMBAYARAN & UPLOAD BUKTI TRANSFER DP */}
           {step === 8 && (
