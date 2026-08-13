@@ -4,7 +4,7 @@ import { registrationRepo } from "@/server/repositories";
 import { notificationRepo } from "@/server/repositories";
 import { auditRepo } from "@/server/repositories";
 import { checkRateLimit, rateLimitKey, getRateLimitConfig } from "@/server/lib/rate-limit";
-import { getStorageAdapter, signaturePath } from "@/server/storage";
+import { signaturePath, getStorageAdapter } from "@/server/storage";
 import type { GroupRegistrationFormData } from "@/shared/types";
 
 const MAX_PAX = 100;
@@ -128,11 +128,13 @@ export async function POST(request: NextRequest) {
       // Non-critical
     }
 
-    // ── Generate PDF & Save to Google Drive "FORMULIR PENDAFTARAN" ───
+    // ── Generate PDF & Save to Local Server Vault ───────────
+    // NOTE: Google Drive upload is disabled — Service Accounts have 0 storage quota (HTTP 403).
+    // PDF is always saved to local server vault (/public/exports/formulir/) and attached to email.
     let pdfPath = "";
     let pdfFilename = "";
     let pdfBuffer: Buffer | null = null;
-    let driveFileId = "";
+    let localFilePath = "";
     try {
       const { generateRegistrationPdf } = await import("@/server/services/registration-pdf.service");
       pdfBuffer = await generateRegistrationPdf({
@@ -146,29 +148,17 @@ export async function POST(request: NextRequest) {
       // Filename format: [KODE_REGISTRASI]_[NAMA_PENDAFTAR].pdf
       const namaClean = namaPerwakilan.replace(/[^A-Z0-9]/gi, "_").replace(/_+/g, "_");
       pdfFilename = `${kodeRegistrasi}_${namaClean}.pdf`;
-      pdfPath = `FORMULIR PENDAFTARAN/${pdfFilename}`;
+      pdfPath = `formulir-pendaftaran/${pdfFilename}`;
 
-      const storage = getStorageAdapter();
-
-      // Resolve Google Drive "FORMULIR PENDAFTARAN" folder ID
-      let targetDriveFolderId: string | undefined = undefined;
+      // Always save to local vault — reliable, no external dependency
       try {
-        const { getOrCreateFolder, isGoogleDriveConfigured } = await import("@/server/storage/google-drive");
-        if (isGoogleDriveConfigured()) {
-          targetDriveFolderId = await getOrCreateFolder("FORMULIR PENDAFTARAN");
-        }
-      } catch (err) {
-        console.warn("[register] Google Drive folder resolution warning:", err);
-      }
-
-      // Upload PDF into Google Drive or fallback to local vault
-      try {
-        driveFileId = await storage.upload(pdfPath, pdfBuffer, "application/pdf", targetDriveFolderId);
-      } catch (uploadErr: any) {
-        console.warn("[register] Primary storage upload warning, saving to local vault:", uploadErr?.message || uploadErr);
         const { createLocalAdapter } = await import("@/server/storage/local");
         const localVault = createLocalAdapter();
-        driveFileId = await localVault.upload(pdfPath, pdfBuffer, "application/pdf");
+        localFilePath = await localVault.upload(pdfPath, pdfBuffer, "application/pdf");
+        console.log("[register] PDF saved to local vault:", localFilePath);
+      } catch (vaultErr: any) {
+        console.warn("[register] Local vault save failed:", vaultErr?.message || vaultErr);
+        // PDF bytes still in memory — will still be attached to email even if vault fails
       }
     } catch (err) {
       console.error("[register] PDF generation error:", err);
@@ -187,25 +177,30 @@ export async function POST(request: NextRequest) {
         body: [
           `Yth. ${namaPerwakilan},`,
           "",
-          `Terima kasih telah melakukan pendaftaran melalui portal registrasi VTU Travel.`,
+          `Assalamu'alaikum Warahmatullahi Wabarakatuh.`,
           "",
-          `Berikut ringkasan pendaftaran Anda:`,
-          `  • No. Registrasi : ${kodeRegistrasi}`,
-          `  • Nama PIC       : ${namaPerwakilan}`,
-          `  • Paket Umroh    : ${paket?.namaPaket ?? "-"}`,
-          `  • Jumlah Jamaah  : ${body.paxCount} PAX`,
-          `  • Preferensi Kamar: ${(body.roomUpgrade || "quad").toUpperCase()}`,
+          `Terima kasih telah mendaftar melalui portal registrasi VTU ABADI Travel.`,
+          `Pendaftaran Anda telah kami terima dengan detail sebagai berikut:`,
           "",
-          `Formulir & Surat Pernyataan Pendaftaran Anda terlampir dalam email ini dengan nama file:`,
-          `📄 ${pdfFilename || `${kodeRegistrasi}_${namaClean}.pdf`}`,
+          `  ✅ No. Registrasi   : ${kodeRegistrasi}`,
+          `  👤 Nama PIC         : ${namaPerwakilan}`,
+          `  📦 Paket Umroh      : ${paket?.namaPaket ?? "-"}`,
+          `  👥 Jumlah Jamaah    : ${body.paxCount} PAX`,
+          `  🛏️  Preferensi Kamar: ${(body.roomUpgrade || "quad").toUpperCase()}`,
+          `  📞 WhatsApp PIC     : ${body.nomorTelepon}`,
           "",
-          `Salinan dokumen ini juga telah berhasil tersimpan dalam folder arsip jamaah:`,
-          `📂 FORMULIR PENDAFTARAN/${pdfFilename || `${kodeRegistrasi}_${namaClean}.pdf`}`,
+          `📎 Formulir Pendaftaran Resmi terlampir dalam email ini (file PDF).`,
+          `   Simpan dokumen ini sebagai bukti pendaftaran Anda.`,
           "",
-          `Tim operasional kami akan menghubungi Anda melalui WhatsApp (${body.nomorTelepon}) dalam 1-2 hari kerja untuk verifikasi berkas selanjutnya.`,
+          `⏳ Selanjutnya:`,
+          `   Tim operasional kami akan menghubungi Anda via WhatsApp dalam 1-2 hari kerja`,
+          `   untuk konfirmasi pembayaran Down Payment (DP) dan verifikasi berkas.`,
+          "",
+          `Wassalamu'alaikum Warahmatullahi Wabarakatuh.`,
           "",
           `Hormat kami,`,
-          `Tim VTU Operasional`,
+          `Tim VTU ABADI Travel`,
+          `📧 info@vtuabadi.com | 📞 +62-xxx-xxxx-xxxx`,
         ].join("\n"),
         attachments: pdfBuffer
           ? [
@@ -220,7 +215,7 @@ export async function POST(request: NextRequest) {
           kodeRegistrasi,
           pdfPath,
           pdfFilename,
-          driveFileId,
+          localFilePath,
           registrationId: reg.id,
         },
       });
@@ -238,7 +233,7 @@ export async function POST(request: NextRequest) {
         role: "jamaah",
         module: "jamaah",
         action: "registration.artifacts",
-        detail: `PDF: ${pdfPath || "gagal"} (ID: ${driveFileId || "local"}) | Email: ${emailStatus} | Ke: ${body.emailPerwakilan}`,
+        detail: `PDF: ${pdfPath || "gagal"} (Vault: ${localFilePath || "not-saved"}) | Email: ${emailStatus} | Ke: ${body.emailPerwakilan}`,
         entityId: reg.id,
         entityType: "RegistrationRequest",
       });

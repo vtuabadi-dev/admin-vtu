@@ -225,11 +225,22 @@ export function createGoogleDriveAdapter(): StorageAdapter {
       });
       const { id: fileId } = await metaRes.json();
 
-      await apiFetch(`${DRIVE_UPLOAD}/files/${fileId}?uploadType=media&supportsAllDrives=true`, {
-        method: "PATCH",
-        headers: { "Content-Type": contentType },
-        body: new Uint8Array(buffer),
-      });
+      try {
+        const patchRes = await apiFetch(`${DRIVE_UPLOAD}/files/${fileId}?uploadType=media&supportsAllDrives=true`, {
+          method: "PATCH",
+          headers: { "Content-Type": contentType },
+          body: new Uint8Array(buffer),
+        });
+
+        if (!patchRes.ok) {
+          // Immediately delete 0-byte orphan metadata file to prevent corrupt files in Drive
+          await apiFetch(`${DRIVE_API}/files/${fileId}?supportsAllDrives=true`, { method: "DELETE" }).catch(() => {});
+          throw new Error(`[Google Drive Upload] Media patch failed HTTP ${patchRes.status}`);
+        }
+      } catch (patchErr) {
+        await apiFetch(`${DRIVE_API}/files/${fileId}?supportsAllDrives=true`, { method: "DELETE" }).catch(() => {});
+        throw patchErr;
+      }
 
       return fileId;
     },
