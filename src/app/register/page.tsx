@@ -1007,7 +1007,7 @@ export default function RegisterPage() {
                       onKeyDown={(e) => {
                         if (e.key === "Enter") {
                           e.preventDefault();
-                          const nextElem = document.getElementById(`member_${i}_tempatLahir`);
+                          const nextElem = document.getElementById(`member_${i}_gender_L`);
                           if (nextElem) nextElem.focus();
                         }
                       }}
@@ -1030,22 +1030,38 @@ export default function RegisterPage() {
                     <div className="flex gap-3">
                       <label className="flex items-center gap-2 cursor-pointer">
                         <input
+                          id={`member_${i}_gender_L`}
                           type="radio"
                           name={`gender_${i}`}
                           value="L"
                           checked={member.jenisKelamin === "L"}
                           onChange={() => updateMember(i, "jenisKelamin", "L")}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              const nextElem = document.getElementById(`member_${i}_tempatLahir`);
+                              if (nextElem) nextElem.focus();
+                            }
+                          }}
                           className="text-blue-600 focus:ring-blue-500"
                         />
                         <span className="text-sm">Laki-laki</span>
                       </label>
                       <label className="flex items-center gap-2 cursor-pointer">
                         <input
+                          id={`member_${i}_gender_P`}
                           type="radio"
                           name={`gender_${i}`}
                           value="P"
                           checked={member.jenisKelamin === "P"}
                           onChange={() => updateMember(i, "jenisKelamin", "P")}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              const nextElem = document.getElementById(`member_${i}_tempatLahir`);
+                              if (nextElem) nextElem.focus();
+                            }
+                          }}
                           className="text-blue-600 focus:ring-blue-500"
                         />
                         <span className="text-sm">Perempuan</span>
