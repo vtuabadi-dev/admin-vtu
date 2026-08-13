@@ -576,26 +576,27 @@ export default function RegisterPage() {
 
   // Success screen
   if (submitResult?.success) {
+    const kodeReg = submitResult.kodeRegistrasi || (submitResult as any).data?.kodeRegistrasi || "-";
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
-        <div className="w-full max-w-md bg-white rounded-xl shadow-lg border border-gray-200 p-8 text-center">
-          <div className="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4 py-8">
+        <div className="w-full max-w-md bg-white rounded-2xl shadow-xl border border-gray-200 p-8 text-center">
+          <div className="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4 shadow-sm">
             <Check className="w-8 h-8 text-green-600" />
           </div>
           <h1 className="text-xl font-bold text-gray-900 mb-2">Registrasi Berhasil!</h1>
-          <p className="text-gray-500 mb-4">
+          <p className="text-gray-500 mb-4 text-sm">
             Permohonan registrasi grup Anda telah diterima. Tim kami akan meninjau dan menghubungi Anda.
           </p>
-          <div className="bg-gray-50 rounded-lg p-4 mb-6">
-            <p className="text-sm text-gray-500">Kode Registrasi</p>
-            <p className="text-lg font-bold text-gray-900 font-mono">{submitResult.kodeRegistrasi}</p>
+          <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6">
+            <p className="text-xs text-blue-600 font-semibold uppercase tracking-wider mb-1">Kode Registrasi</p>
+            <p className="text-2xl font-extrabold text-blue-900 font-mono tracking-wider">{kodeReg}</p>
           </div>
-          <p className="text-sm text-gray-400 mb-6">
+          <p className="text-xs text-gray-500 mb-6">
             Simpan kode registrasi Anda untuk referensi. Status dapat ditanyakan melalui WhatsApp.
           </p>
           <button
             onClick={() => router.push("/login")}
-            className="w-full py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700"
+            className="w-full py-3 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 shadow-md transition-all"
           >
             Kembali ke Login
           </button>

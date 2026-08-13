@@ -261,6 +261,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
+      kodeRegistrasi: reg.kodeRegistrasi,
       data: {
         kodeRegistrasi: reg.kodeRegistrasi,
         status: reg.status,
