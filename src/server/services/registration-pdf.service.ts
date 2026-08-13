@@ -17,18 +17,6 @@ interface PdfData {
   signedAt?: Date | string;
 }
 
-function formatDate(isoOrDate: string | Date): string {
-  const d = typeof isoOrDate === "string" ? new Date(isoOrDate) : isoOrDate;
-  if (isNaN(d.getTime())) return "-";
-  return d.toLocaleDateString("id-ID", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
 function formatShortDate(isoOrDate: string | Date): string {
   const d = typeof isoOrDate === "string" ? new Date(isoOrDate) : isoOrDate;
   if (isNaN(d.getTime())) return "-";
@@ -47,8 +35,7 @@ const ROOM_LABELS: Record<string, string> = {
 };
 
 export async function generateRegistrationPdf(data: PdfData): Promise<Buffer> {
-  const PdfPrinter = (await import("pdfmake/src/printer")).default;
-  const URLResolver = (await import("pdfmake/src/URLResolver")).default;
+  const PdfPrinter = (await import("pdfmake")).default;
   const { registration: reg, packageInfo } = data;
 
   const fonts = {
@@ -66,11 +53,13 @@ export async function generateRegistrationPdf(data: PdfData): Promise<Buffer> {
     },
   };
 
-  const virtualfs = { existsSync: () => false, readFileSync: () => null };
-  const urlResolver = new URLResolver();
-  const localAccessPolicy = () => true;
-
-  const printer = new PdfPrinter(fonts, virtualfs, urlResolver, localAccessPolicy);
+  const printer = new PdfPrinter(fonts);
+  if (!(printer as any).urlResolver) {
+    (printer as any).urlResolver = {
+      resolve: (url: string) => Promise.resolve(url),
+      resolved: () => Promise.resolve(),
+    };
+  }
 
   // 1. Load Kop Surat Header Image
   let kopSuratBase64 = "";
@@ -314,7 +303,7 @@ export async function generateRegistrationPdf(data: PdfData): Promise<Buffer> {
   };
 
   // Build PDF
-  const pdfDoc = await printer.createPdfKitDocument(docDefinition, {});
+  const pdfDoc = printer.createPdfKitDocument(docDefinition);
 
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];
