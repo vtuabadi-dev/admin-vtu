@@ -104,10 +104,14 @@ function CityCombobox({
   value,
   onChange,
   placeholder = "Kota Tempat Lahir (contoh: SURABAYA)",
+  id,
+  onSelectNext,
 }: {
   value: string;
   onChange: (val: string) => void;
   placeholder?: string;
+  id?: string;
+  onSelectNext?: () => void;
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState(0);
@@ -153,6 +157,11 @@ function CityCombobox({
       if (e.key === "ArrowDown" || e.key === "ArrowUp") {
         setIsOpen(true);
         e.preventDefault();
+      } else if (e.key === "Enter") {
+        e.preventDefault();
+        if (onSelectNext) {
+          onSelectNext();
+        }
       }
       return;
     }
@@ -166,6 +175,9 @@ function CityCombobox({
         }
       }
       setIsOpen(false);
+      if (onSelectNext) {
+        setTimeout(() => onSelectNext(), 50);
+      }
     } else if (e.key === "ArrowDown") {
       e.preventDefault();
       setHighlightedIndex((prev) => (prev < filteredCities.length - 1 ? prev + 1 : 0));
@@ -181,6 +193,7 @@ function CityCombobox({
     <div ref={wrapperRef} className="relative w-full">
       <div className="relative">
         <input
+          id={id}
           type="text"
           value={value}
           onFocus={() => setIsOpen(true)}
@@ -986,10 +999,18 @@ export default function RegisterPage() {
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1">Nama Lengkap</label>
                     <input
+                      id={`member_${i}_nama`}
                       type="text"
                       value={member.namaLengkap}
                       disabled={i === 0 && useRepAsJamaah1}
                       onChange={(e) => updateMember(i, "namaLengkap", e.target.value.toUpperCase())}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          const nextElem = document.getElementById(`member_${i}_tempatLahir`);
+                          if (nextElem) nextElem.focus();
+                        }
+                      }}
                       className={cn(
                         "w-full px-3 py-2 border rounded-lg text-sm uppercase transition-colors",
                         i === 0 && useRepAsJamaah1
@@ -1038,8 +1059,13 @@ export default function RegisterPage() {
                         Tempat Lahir
                       </label>
                       <CityCombobox
+                        id={`member_${i}_tempatLahir`}
                         value={member.tempatLahir || ""}
                         onChange={(val) => updateMember(i, "tempatLahir", val)}
+                        onSelectNext={() => {
+                          const el = document.getElementById(`member_${i}_tglLahir`);
+                          if (el) el.focus();
+                        }}
                         placeholder="Kota Tempat Lahir (contoh: SURABAYA)"
                       />
                     </div>
@@ -1049,9 +1075,17 @@ export default function RegisterPage() {
                         Tanggal Lahir
                       </label>
                       <input
+                        id={`member_${i}_tglLahir`}
                         type="date"
                         value={member.tanggalLahir || ""}
                         onChange={(e) => updateMember(i, "tanggalLahir", e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            const nextElem = document.getElementById(`member_${i}_hubungan`);
+                            if (nextElem) nextElem.focus();
+                          }
+                        }}
                         className={cn(
                           "w-full px-3 py-2 border rounded-lg text-sm transition-colors",
                           "focus:outline-none focus:ring-2 focus:ring-blue-500 border-gray-300",
@@ -1104,8 +1138,21 @@ export default function RegisterPage() {
                         : `Hubungan dengan Jamaah #1 (${members[0]?.namaLengkap ? members[0].namaLengkap.toUpperCase() : "Ketua Grup"})`}
                     </label>
                     <select
+                      id={`member_${i}_hubungan`}
                       value={member.hubungan}
                       onChange={(e) => updateMember(i, "hubungan", e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          if (i < members.length - 1) {
+                            const nextMemberName = document.getElementById(`member_${i + 1}_nama`);
+                            if (nextMemberName) nextMemberName.focus();
+                          } else {
+                            const btnNext = document.getElementById("btn_next_step");
+                            if (btnNext) btnNext.focus();
+                          }
+                        }
+                      }}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
                     >
                       <option value="">Pilih hubungan...</option>
@@ -1739,9 +1786,10 @@ export default function RegisterPage() {
 
             {step < 7 ? (
               <button
+                id="btn_next_step"
                 type="button"
                 onClick={nextStep}
-                className="inline-flex items-center gap-1 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700"
+                className="inline-flex items-center gap-1 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 Selanjutnya
                 <ChevronRight className="w-4 h-4" />
