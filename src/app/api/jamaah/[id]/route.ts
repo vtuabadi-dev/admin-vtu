@@ -86,7 +86,7 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
         if (jamaah.groupId && jamaah.group) {
           if (otherMembers.length > 0) {
             // Re-assign group leader if deleted jamaah was leader
-            if (jamaah.group.ketuaGroupId === jamaah.id) {
+            if (jamaah.group.ketuaGroupId === jamaah.id && otherMembers[0]) {
               await tx.registrationGroup.update({
                 where: { id: jamaah.groupId },
                 data: { ketuaGroupId: otherMembers[0].id },
