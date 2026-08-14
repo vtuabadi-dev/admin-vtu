@@ -343,7 +343,7 @@ export default function RegisterPage() {
   // Validation errors
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  // Step 8: Payment Proof State
+  // Step 8: Payment Proof State & Custom DP Switch
   const [paymentProofFile, setPaymentProofFile] = useState<File | null>(null);
   const [paymentProofPreview, setPaymentProofPreview] = useState("");
   const [isUploadingProof, setIsUploadingProof] = useState(false);
@@ -351,6 +351,8 @@ export default function RegisterPage() {
   const [paymentProofError, setPaymentProofError] = useState("");
   const [copiedAccount, setCopiedAccount] = useState(false);
   const [copiedRef, setCopiedRef] = useState(false);
+  const [isCustomDp, setIsCustomDp] = useState(false);
+  const [customDpAmount, setCustomDpAmount] = useState("");
 
   // Draft auto-resume indicator
   const [isRestoredDraft, setIsRestoredDraft] = useState(false);
@@ -632,6 +634,13 @@ export default function RegisterPage() {
     try {
       const formData = new FormData();
       formData.append("kodeRegistrasi", kodeReg);
+
+      const defaultDpPerPax = 5000000;
+      const minimalDpStandard = defaultDpPerPax * paxCount;
+      const parsedCustomDp = parseInt(customDpAmount.replace(/\D/g, ""), 10) || 0;
+      const effectiveDp = isCustomDp && parsedCustomDp > 0 ? parsedCustomDp : minimalDpStandard;
+      formData.append("nominalDp", effectiveDp.toString());
+
       if (paymentProofFile) {
         formData.append("file", paymentProofFile);
       }
@@ -1992,21 +2001,76 @@ export default function RegisterPage() {
                         </div>
                       </div>
 
-                      {/* Calculated DP */}
+                      {/* Calculated DP (Standar 5 Juta x Pax + Custom DP Switch) */}
                       {selectedPaket && (() => {
                         const price = (selectedPaket as any).hargaStartingFrom ?? (selectedPaket as any).hargaPaket ?? (selectedPaket as any).paketUmroh?.hargaQuad ?? 30000000;
                         const totalEstimasi = price * paxCount;
-                        const minimalDp = Math.round(totalEstimasi * 0.3);
+                        const defaultDpPerPax = 5000000;
+                        const minimalDpStandard = defaultDpPerPax * paxCount;
+                        const parsedCustomDp = parseInt(customDpAmount.replace(/\D/g, ""), 10) || 0;
+                        const effectiveDp = isCustomDp && parsedCustomDp > 0 ? parsedCustomDp : minimalDpStandard;
+
                         return (
-                          <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 space-y-1">
+                          <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 space-y-2">
                             <div className="flex justify-between text-xs">
                               <span className="text-amber-800">Estimasi Biaya ({paxCount} PAX):</span>
                               <span className="font-semibold text-amber-900">Rp {totalEstimasi.toLocaleString("id-ID")}</span>
                             </div>
                             <div className="flex justify-between text-xs pt-1 border-t border-amber-200">
-                              <span className="font-bold text-amber-900">Nominal Minimal DP (30%):</span>
+                              <span className="font-bold text-amber-900">Nominal Minimal DP (Rp 5 Juta / Pax):</span>
                               <span className="font-extrabold text-blue-900 text-sm">
-                                Rp {minimalDp.toLocaleString("id-ID")}
+                                Rp {minimalDpStandard.toLocaleString("id-ID")}
+                              </span>
+                            </div>
+
+                            {/* Saklar / Toggle Switch for Custom DP */}
+                            <div className="pt-2 border-t border-amber-200 flex items-center justify-between">
+                              <label className="text-xs font-semibold text-gray-800 flex items-center gap-1.5 cursor-pointer select-none">
+                                <input
+                                  type="checkbox"
+                                  checked={isCustomDp}
+                                  onChange={(e) => {
+                                    setIsCustomDp(e.target.checked);
+                                    if (!e.target.checked) setCustomDpAmount("");
+                                  }}
+                                  className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 cursor-pointer"
+                                />
+                                <span>Bayar Nominal DP Lainnya (Custom)</span>
+                              </label>
+                              {isCustomDp && (
+                                <span className="text-[10px] bg-blue-100 text-blue-800 font-bold px-2 py-0.5 rounded-full">
+                                  Aktif
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Column Input for Custom DP */}
+                            {isCustomDp && (
+                              <div className="pt-1.5 space-y-1">
+                                <label className="block text-[11px] font-bold text-blue-900">
+                                  Masukkan Nominal DP Yang Dibayar (Rp):
+                                </label>
+                                <input
+                                  type="text"
+                                  inputMode="numeric"
+                                  value={customDpAmount ? `Rp ${parseInt(customDpAmount.replace(/\D/g, ""), 10).toLocaleString("id-ID")}` : ""}
+                                  onChange={(e) => {
+                                    const rawVal = e.target.value.replace(/\D/g, "");
+                                    setCustomDpAmount(rawVal);
+                                  }}
+                                  placeholder={`Misal: Rp ${(minimalDpStandard + 2000000).toLocaleString("id-ID")}`}
+                                  className="w-full h-9 px-3 text-xs font-bold font-mono bg-white border-2 border-blue-400 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-blue-950"
+                                />
+                              </div>
+                            )}
+
+                            {/* Total DP Effective Display */}
+                            <div className="flex justify-between text-xs pt-1.5 border-t border-amber-200">
+                              <span className="font-extrabold text-amber-950">
+                                {isCustomDp ? "Nominal DP Yang Dicatat:" : "Nominal DP Pembayaran:"}
+                              </span>
+                              <span className="font-extrabold text-blue-900 text-sm">
+                                Rp {effectiveDp.toLocaleString("id-ID")}
                               </span>
                             </div>
                           </div>
@@ -2025,34 +2089,56 @@ export default function RegisterPage() {
                       </div>
 
                       <div className="space-y-2 text-xs">
-                        <div className="bg-blue-50 p-2.5 rounded-lg border border-blue-100">
-                          <p className="text-[10px] text-blue-600 font-semibold uppercase">Nama Bank</p>
-                          <p className="font-bold text-gray-900 text-sm">Bank Syariah Indonesia (BSI)</p>
-                        </div>
+                        {(() => {
+                          let bankName = "Bank Syariah Indonesia (BSI)";
+                          let bankAccount = "7123 4567 89";
+                          let bankHolder = "PT VTU ABADI TRAVEL";
+                          if (typeof window !== "undefined") {
+                            const saved = localStorage.getItem("vtu_bank_config");
+                            if (saved) {
+                              try {
+                                const parsed = JSON.parse(saved);
+                                if (parsed.bankName) bankName = parsed.bankName;
+                                if (parsed.bankAccount) bankAccount = parsed.bankAccount;
+                                if (parsed.bankHolder) bankHolder = parsed.bankHolder;
+                              } catch (e) {}
+                            }
+                          }
+                          const rawAccountNum = bankAccount.replace(/\s+/g, "");
 
-                        <div className="bg-blue-50 p-2.5 rounded-lg border border-blue-100 flex items-center justify-between">
-                          <div>
-                            <p className="text-[10px] text-blue-600 font-semibold uppercase">Nomor Rekening</p>
-                            <p className="font-mono font-bold text-blue-900 text-base">7123 4567 89</p>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              navigator.clipboard.writeText("7123456789");
-                              setCopiedAccount(true);
-                              setTimeout(() => setCopiedAccount(false), 2000);
-                            }}
-                            className="px-2.5 py-1 bg-white border border-blue-300 rounded text-[11px] font-semibold text-blue-700 hover:bg-blue-100 flex items-center gap-1"
-                          >
-                            {copiedAccount ? <Check className="w-3.5 h-3.5 text-green-600" /> : <Copy className="w-3.5 h-3.5" />}
-                            {copiedAccount ? "Tersalin" : "Salin"}
-                          </button>
-                        </div>
+                          return (
+                            <>
+                              <div className="bg-blue-50 p-2.5 rounded-lg border border-blue-100">
+                                <p className="text-[10px] text-blue-600 font-semibold uppercase">Nama Bank</p>
+                                <p className="font-bold text-gray-900 text-sm">{bankName}</p>
+                              </div>
 
-                        <div className="bg-blue-50 p-2.5 rounded-lg border border-blue-100">
-                          <p className="text-[10px] text-blue-600 font-semibold uppercase">Atas Nama Rekening</p>
-                          <p className="font-bold text-gray-900">PT VTU ABADI TRAVEL</p>
-                        </div>
+                              <div className="bg-blue-50 p-2.5 rounded-lg border border-blue-100 flex items-center justify-between">
+                                <div>
+                                  <p className="text-[10px] text-blue-600 font-semibold uppercase">Nomor Rekening</p>
+                                  <p className="font-mono font-bold text-blue-900 text-base">{bankAccount}</p>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(rawAccountNum);
+                                    setCopiedAccount(true);
+                                    setTimeout(() => setCopiedAccount(false), 2000);
+                                  }}
+                                  className="px-2.5 py-1 bg-white border border-blue-300 rounded text-[11px] font-semibold text-blue-700 hover:bg-blue-100 flex items-center gap-1"
+                                >
+                                  {copiedAccount ? <Check className="w-3.5 h-3.5 text-green-600" /> : <Copy className="w-3.5 h-3.5" />}
+                                  {copiedAccount ? "Tersalin" : "Salin"}
+                                </button>
+                              </div>
+
+                              <div className="bg-blue-50 p-2.5 rounded-lg border border-blue-100">
+                                <p className="text-[10px] text-blue-600 font-semibold uppercase">Atas Nama Rekening</p>
+                                <p className="font-bold text-gray-900">{bankHolder}</p>
+                              </div>
+                            </>
+                          );
+                        })()}
 
                         <div className="bg-amber-50 p-2.5 rounded-lg border border-amber-200 flex items-center justify-between">
                           <div>

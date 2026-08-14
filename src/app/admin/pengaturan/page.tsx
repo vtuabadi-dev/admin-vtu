@@ -186,13 +186,73 @@ function NotifikasiSettings() {
 // ── Aturan Operasional ──
 function AturanOperasional() {
   const [saved, setSaved] = useState(false);
+  const [bankName, setBankName] = useState(() => {
+    if (typeof window !== "undefined") {
+      const savedConfig = localStorage.getItem("vtu_bank_config");
+      if (savedConfig) {
+        try { return JSON.parse(savedConfig).bankName || "Bank Syariah Indonesia (BSI)"; } catch (e) {}
+      }
+    }
+    return "Bank Syariah Indonesia (BSI)";
+  });
+
+  const [bankAccount, setBankAccount] = useState(() => {
+    if (typeof window !== "undefined") {
+      const savedConfig = localStorage.getItem("vtu_bank_config");
+      if (savedConfig) {
+        try { return JSON.parse(savedConfig).bankAccount || "7123 4567 89"; } catch (e) {}
+      }
+    }
+    return "7123 4567 89";
+  });
+
+  const [bankHolder, setBankHolder] = useState(() => {
+    if (typeof window !== "undefined") {
+      const savedConfig = localStorage.getItem("vtu_bank_config");
+      if (savedConfig) {
+        try { return JSON.parse(savedConfig).bankHolder || "PT VTU ABADI TRAVEL"; } catch (e) {}
+      }
+    }
+    return "PT VTU ABADI TRAVEL";
+  });
+
   const handleSave = () => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("vtu_bank_config", JSON.stringify({ bankName, bankAccount, bankHolder }));
+    }
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   };
 
   return (
     <div className="space-y-4">
+      <SettingSection title="Rekening Tujuan Pembayaran (DP & Pelunasan)" desc="Rekening bank resmi yang ditampilkan pada Step 8 Formulir Pendaftaran Online">
+        <SettingRow label="Nama Bank" desc="Nama bank tujuan transfer resmi (misal: BSI, Bank Mandiri, BCA)">
+          <input
+            className="h-9 w-64 rounded-md border border-input bg-background px-3 py-1 text-sm font-medium"
+            value={bankName}
+            onChange={(e) => setBankName(e.target.value)}
+            placeholder="Bank Syariah Indonesia (BSI)"
+          />
+        </SettingRow>
+        <SettingRow label="Nomor Rekening" desc="Nomor rekening perusahaan">
+          <input
+            className="h-9 w-64 rounded-md border border-input bg-background px-3 py-1 text-sm font-mono font-bold text-blue-900 dark:text-blue-300"
+            value={bankAccount}
+            onChange={(e) => setBankAccount(e.target.value)}
+            placeholder="7123 4567 89"
+          />
+        </SettingRow>
+        <SettingRow label="Atas Nama (A/N)" desc="Nama pemilik rekening sesuai buku tabungan">
+          <input
+            className="h-9 w-64 rounded-md border border-input bg-background px-3 py-1 text-sm font-medium"
+            value={bankHolder}
+            onChange={(e) => setBankHolder(e.target.value)}
+            placeholder="PT VTU ABADI TRAVEL"
+          />
+        </SettingRow>
+      </SettingSection>
+
       <SettingSection title="Aturan Pembayaran" desc="Konfigurasi skema pembayaran dan toleransi keterlambatan">
         <SettingRow label="DP Minimum" desc="Persentase DP dari total tagihan">
           <Select options={[

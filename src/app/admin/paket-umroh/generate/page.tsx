@@ -1433,9 +1433,9 @@ export default function GeneratePaketPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <label className="block text-sm font-medium mb-1">Kapasitas Seat (Maksimal Jamaah)</label>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+              <div className="flex flex-col justify-end h-full">
+                <label className="block text-sm font-medium mb-1 min-h-[2.5rem] flex items-end">Kapasitas Seat (Maksimal Jamaah)</label>
                 <Input 
                   id="field-kapasitas" 
                   type="number" 
@@ -1446,8 +1446,8 @@ export default function GeneratePaketPage() {
                   placeholder="Misal: 45" 
                 />
               </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Minimal Seat Materialisasi (Kuota Aman)</label>
+              <div className="flex flex-col justify-end h-full">
+                <label className="block text-sm font-medium mb-1 min-h-[2.5rem] flex items-end">Minimal Seat Materialisasi (Kuota Aman)</label>
                 <Input 
                   id="field-targetMaterialisasi" 
                   type="number" 
@@ -1458,8 +1458,8 @@ export default function GeneratePaketPage() {
                   placeholder="Misal: 30" 
                 />
               </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Termasuk Perlengkapan?</label>
+              <div className="flex flex-col justify-end h-full">
+                <label className="block text-sm font-medium mb-1 min-h-[2.5rem] flex items-end">Termasuk Perlengkapan?</label>
                 <div className="flex items-center gap-2 h-10">
                   <button
                     type="button"
@@ -1889,9 +1889,9 @@ export default function GeneratePaketPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1">
-            <div>
-              <label className="block text-xs font-semibold mb-1">Kapasitas Seat (Maksimal Jamaah)</label>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end pt-1">
+            <div className="flex flex-col justify-end h-full">
+              <label className="block text-xs font-semibold mb-1 min-h-[2.25rem] flex items-end">Kapasitas Seat (Maksimal Jamaah)</label>
               <Input 
                 type="number" 
                 name="kapasitas" 
@@ -1900,8 +1900,8 @@ export default function GeneratePaketPage() {
                 placeholder="45" 
               />
             </div>
-            <div>
-              <label className="block text-xs font-semibold mb-1">Minimal Seat Materialisasi (Kuota Aman)</label>
+            <div className="flex flex-col justify-end h-full">
+              <label className="block text-xs font-semibold mb-1 min-h-[2.25rem] flex items-end">Minimal Seat Materialisasi (Kuota Aman)</label>
               <Input 
                 type="number" 
                 name="targetMaterialisasi" 
@@ -1910,8 +1910,8 @@ export default function GeneratePaketPage() {
                 placeholder="30" 
               />
             </div>
-            <div>
-              <label className="block text-xs font-semibold mb-1">Termasuk Perlengkapan?</label>
+            <div className="flex flex-col justify-end h-full">
+              <label className="block text-xs font-semibold mb-1 min-h-[2.25rem] flex items-end">Termasuk Perlengkapan?</label>
               <div className="flex items-center gap-2 h-10">
                 <button
                   type="button"

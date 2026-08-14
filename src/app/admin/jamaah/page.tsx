@@ -18,24 +18,30 @@ import {
 } from "@/server/actions/api";
 import type { Jamaah, Invoice, RegistrationGroup } from "@/shared/types";
 
+import { useOperationalStore } from "@/stores/operational-store";
+
 export default function JamaahListPage() {
   const router = useRouter();
-  const [jamaahList, setJamaahList] = useState<Jamaah[]>([]);
-  const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const [groups, setGroups] = useState<RegistrationGroup[]>([]);
-  const [loading, setLoading] = useState(true);
+  const storeJamaah = useOperationalStore((s) => s.jamaahList);
+  const storeGroups = useOperationalStore((s) => s.groupList);
+  const storeInvoices = useOperationalStore((s) => s.invoices);
+
+  const [jamaahList, setJamaahList] = useState<Jamaah[]>(storeJamaah || []);
+  const [invoices, setInvoices] = useState<Invoice[]>(storeInvoices || []);
+  const [groups, setGroups] = useState<RegistrationGroup[]>(storeGroups || []);
+  const [loading, setLoading] = useState(!storeJamaah || storeJamaah.length === 0);
   const [error, setError] = useState<Error | null>(null);
   const [search, setSearch] = useState("");
   const [activeTab, setActiveTab] = useState("semua");
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (showLoading = false) => {
     try {
-      setLoading(true);
+      if (showLoading) setLoading(true);
       setError(null);
       const [j, inv, g] = await Promise.all([
-        getJamaahList(),
-        getInvoiceList(),
-        getGroupList(),
+        getJamaahList().catch(() => []),
+        getInvoiceList().catch(() => []),
+        getGroupList().catch(() => []),
       ]);
       setJamaahList(j);
       setInvoices(inv);
@@ -48,8 +54,18 @@ export default function JamaahListPage() {
   }, []);
 
   useEffect(() => {
-    load();
-  }, [load]);
+    // If store already pre-fetched data during SplashScreen login, use it instantly
+    if (storeJamaah && storeJamaah.length > 0) {
+      setJamaahList(storeJamaah);
+      setGroups(storeGroups);
+      setInvoices(storeInvoices);
+      setLoading(false);
+      // Background silent re-sync
+      load(false);
+    } else {
+      load(true);
+    }
+  }, [storeJamaah, storeGroups, storeInvoices, load]);
 
   // --- Helper: derive aggregate statuses ---
 

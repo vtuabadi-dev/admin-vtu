@@ -90,6 +90,39 @@ export async function POST(request: NextRequest) {
       },
     });
 
+    // Send email notification for DP Payment Proof submission
+    try {
+      if (reg.emailPerwakilan) {
+        const { getNotificationProvider } = await import("@/server/services/notify");
+        const notifier = getNotificationProvider();
+        await notifier.send({
+          channel: "email",
+          recipient: reg.emailPerwakilan,
+          subject: `Tanda Terima Upload Bukti Transfer DP — ${kodeRegistrasi} (${reg.namaPerwakilan})`,
+          body: [
+            `Yth. ${reg.namaPerwakilan},`,
+            "",
+            `Assalamu'alaikum Warahmatullahi Wabarakatuh.`,
+            "",
+            `Bukti pembayaran Down Payment (DP) untuk pendaftaran rombongan Anda telah BERHASIL kami terima.`,
+            "",
+            `  ✅ Kode Registrasi : ${kodeRegistrasi}`,
+            `  👤 Nama PIC         : ${reg.namaPerwakilan}`,
+            `  👥 Jumlah Jamaah    : ${reg.paxCount} PAX`,
+            `  📅 Tanggal Unggah   : ${new Date().toLocaleString("id-ID", { timeZone: "Asia/Jakarta" })} WIB`,
+            "",
+            `⏳ Status Saat Ini: MEMENUHI VERIFIKASI KEUANGAN (1x24 Jam)`,
+            `   Tim Keuangan VTU ABADI Travel akan melakukan pencocokan mutasi bank. Setelah disetujui, kwitansi resmi akan dikirimkan ke email ini.`,
+            "",
+            `Wassalamu'alaikum Warahmatullahi Wabarakatuh.`,
+            `PT VTU ABADI TRAVEL`,
+          ].join("\n"),
+        });
+      }
+    } catch (notifyErr) {
+      console.warn("[payment-proof] Notification dispatch warning:", notifyErr);
+    }
+
     return NextResponse.json({
       success: true,
       data: {
