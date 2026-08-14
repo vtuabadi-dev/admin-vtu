@@ -10,11 +10,12 @@ export async function GET() {
     }
 
     // Fetch active master data from database
-    const [dbAirlines, dbHotels, dbClusters, dbCities] = await Promise.all([
+    const [dbAirlines, dbHotels, dbClusters, dbCities, dbPerlengkapan] = await Promise.all([
       prisma.masterAirline.findMany({ where: { isActive: true }, select: { name: true }, orderBy: { name: "asc" } }),
       prisma.masterHotel.findMany({ where: { isActive: true }, select: { name: true, city: { select: { code: true, name: true } } }, orderBy: { name: "asc" } }),
       prisma.masterCluster.findMany({ where: { isActive: true }, select: { nama: true }, orderBy: { nama: "asc" } }),
       prisma.masterCity.findMany({ where: { isActive: true }, select: { name: true, code: true }, orderBy: { name: "asc" } }),
+      prisma.masterPerlengkapan.findMany({ where: { isActive: true }, select: { name: true }, orderBy: { name: "asc" } }),
     ]);
 
     // Fallbacks if master data in database is empty
@@ -23,10 +24,15 @@ export async function GET() {
     const fallbackHotelsMekkah = ["Safwah Tower", "Pullman Zamzam", "Fairmont Makkah", "Clock Tower", "Swissotel Makkah", "Movenpick Makkah", "Anjum Hotel"];
     const fallbackHotelsMadinah = ["Durrat Al Eiman", "Ansar Palace", "Oberoi Madinah", "Frontel Al Harithia", "Pullman Zamzam Madinah", "Grand Plaza Madinah"];
     const fallbackClusters = ["Bronze", "Silver", "Gold", "Platinum", "Executive", "Reguler"];
+    const fallbackPerlengkapan = ["Termasuk (Gratis)", "Belum / Tidak Termasuk", "Opsional (Bayar Terpisah)"];
 
     const airlineList = dbAirlines.length > 0 ? dbAirlines.map(a => a.name) : fallbackAirlines;
     const startingList = dbCities.length > 0 ? dbCities.map(c => `${c.name} (${c.code})`) : fallbackStartingPoints;
     const clusterList = dbClusters.length > 0 ? dbClusters.map(c => c.nama) : fallbackClusters;
+    const perlengkapanList = Array.from(new Set([
+      ...fallbackPerlengkapan,
+      ...dbPerlengkapan.map(p => p.name),
+    ]));
 
     const mekkahDb = dbHotels.filter(h => h.city?.code === "MEK" || h.city?.name.toLowerCase().includes("mek")).map(h => h.name);
     const madinahDb = dbHotels.filter(h => h.city?.code === "MED" || h.city?.name.toLowerCase().includes("mad")).map(h => h.name);
@@ -41,7 +47,7 @@ export async function GET() {
     const sheet = workbook.addWorksheet("Template Keberangkatan");
 
     sheet.columns = [
-      // 1. Informasi Utama Paket (Kolom 1 - 9)
+      // 1. Informasi Utama Paket (Kolom 1 - 10)
       { header: "Kode Paket", key: "kode", width: 20 },
       { header: "Nama Paket", key: "namaPaket", width: 35 },
       { header: "Tanggal Berangkat (YYYY-MM-DD)", key: "tanggalBerangkat", width: 30 },
@@ -51,15 +57,16 @@ export async function GET() {
       { header: "Nomor Penerbangan", key: "nomorPenerbangan", width: 20 },
       { header: "Kuota", key: "kuota", width: 12 },
       { header: "Target Materialisasi", key: "targetMaterialisasi", width: 20 },
+      { header: "Perlengkapan", key: "perlengkapan", width: 26 },
 
-      // 2. Paket Tanpa Klaster / Reguler (Kolom 10 - 14)
+      // 2. Paket Tanpa Klaster / Reguler (Kolom 11 - 15)
       { header: "[Tanpa Klaster] Harga Base (Rp)", key: "regHargaBase", width: 25 },
       { header: "[Tanpa Klaster] Upgrade Double (Rp)", key: "regUpgradeDouble", width: 28 },
       { header: "[Tanpa Klaster] Upgrade Triple (Rp)", key: "regUpgradeTriple", width: 28 },
       { header: "[Tanpa Klaster] Hotel Mekkah", key: "regHotelMekkah", width: 25 },
       { header: "[Tanpa Klaster] Hotel Madinah", key: "regHotelMadinah", width: 25 },
 
-      // 3. Klaster 1 / Bronze (Kolom 15 - 20)
+      // 3. Klaster 1 / Bronze (Kolom 16 - 21)
       { header: "[K1] Nama Klaster", key: "k1Nama", width: 20 },
       { header: "[K1] Harga Base (Rp)", key: "k1HargaBase", width: 22 },
       { header: "[K1] Upgrade Double (Rp)", key: "k1UpgradeDouble", width: 25 },
@@ -67,7 +74,7 @@ export async function GET() {
       { header: "[K1] Hotel Mekkah", key: "k1HotelMekkah", width: 25 },
       { header: "[K1] Hotel Madinah", key: "k1HotelMadinah", width: 25 },
 
-      // 4. Klaster 2 / Silver (Kolom 21 - 26)
+      // 4. Klaster 2 / Silver (Kolom 22 - 27)
       { header: "[K2] Nama Klaster", key: "k2Nama", width: 20 },
       { header: "[K2] Harga Base (Rp)", key: "k2HargaBase", width: 22 },
       { header: "[K2] Upgrade Double (Rp)", key: "k2UpgradeDouble", width: 25 },
@@ -75,7 +82,7 @@ export async function GET() {
       { header: "[K2] Hotel Mekkah", key: "k2HotelMekkah", width: 25 },
       { header: "[K2] Hotel Madinah", key: "k2HotelMadinah", width: 25 },
 
-      // 5. Klaster 3 / Gold (Kolom 27 - 32)
+      // 5. Klaster 3 / Gold (Kolom 28 - 33)
       { header: "[K3] Nama Klaster", key: "k3Nama", width: 20 },
       { header: "[K3] Harga Base (Rp)", key: "k3HargaBase", width: 22 },
       { header: "[K3] Upgrade Double (Rp)", key: "k3UpgradeDouble", width: 25 },
@@ -95,6 +102,7 @@ export async function GET() {
       nomorPenerbangan: "SV-816",
       kuota: 45,
       targetMaterialisasi: 30,
+      perlengkapan: perlengkapanList[0] || "Termasuk (Gratis)",
 
       regHargaBase: 25000000,
       regUpgradeDouble: 3500000,
@@ -114,6 +122,7 @@ export async function GET() {
       nomorPenerbangan: "SV-818",
       kuota: 45,
       targetMaterialisasi: 30,
+      perlengkapan: perlengkapanList[0] || "Termasuk (Gratis)",
 
       k1Nama: clusterList[0] || "Bronze",
       k1HargaBase: 25000000,
@@ -141,19 +150,19 @@ export async function GET() {
     const headerRow = sheet.getRow(1);
     headerRow.height = 28;
 
-    for (let col = 1; col <= 32; col++) {
+    for (let col = 1; col <= 33; col++) {
       const cell = headerRow.getCell(col);
       cell.font = { bold: true, color: { argb: "FFFFFFFF" }, size: 10 };
       cell.alignment = { vertical: "middle", horizontal: "center", wrapText: true };
 
-      let fgColor = "FF059669"; // Default Emerald (Informasi Utama A-I)
-      if (col >= 10 && col <= 14) {
+      let fgColor = "FF059669"; // Default Emerald (Informasi Utama 1-10)
+      if (col >= 11 && col <= 15) {
         fgColor = "FF334155"; // Dark Slate Gray (Tanpa Klaster)
-      } else if (col >= 15 && col <= 20) {
+      } else if (col >= 16 && col <= 21) {
         fgColor = "FF92400E"; // Bronze Brown (Klaster 1)
-      } else if (col >= 21 && col <= 26) {
+      } else if (col >= 22 && col <= 27) {
         fgColor = "FF475569"; // Cool Silver Gray (Klaster 2)
-      } else if (col >= 27 && col <= 32) {
+      } else if (col >= 28 && col <= 33) {
         fgColor = "FFD97706"; // Amber Gold (Klaster 3)
       }
 
@@ -173,7 +182,8 @@ export async function GET() {
       startingList.length,
       mekkahList.length,
       madinahList.length,
-      clusterList.length
+      clusterList.length,
+      perlengkapanList.length
     );
 
     for (let i = 0; i < maxLookupRows; i++) {
@@ -183,6 +193,7 @@ export async function GET() {
         mekkahList[i] || "",
         madinahList[i] || "",
         clusterList[i] || "",
+        perlengkapanList[i] || "",
       ]);
     }
 
@@ -192,6 +203,7 @@ export async function GET() {
     const mekkahRef = `MasterData!$C$1:$C$${mekkahList.length}`;
     const madinahRef = `MasterData!$D$1:$D$${madinahList.length}`;
     const clusterRef = `MasterData!$E$1:$E$${clusterList.length}`;
+    const perlengkapanRef = `MasterData!$F$1:$F$${perlengkapanList.length}`;
 
     // Apply Data Validation (Dropdown lists) for data rows 2 to 100
     for (let r = 2; r <= 100; r++) {
@@ -199,25 +211,27 @@ export async function GET() {
       sheet.getCell(r, 5).dataValidation = { type: "list", allowBlank: true, formulae: [airlineRef] };
       // Starting Point (Col 6)
       sheet.getCell(r, 6).dataValidation = { type: "list", allowBlank: true, formulae: [startingRef] };
+      // Perlengkapan (Col 10)
+      sheet.getCell(r, 10).dataValidation = { type: "list", allowBlank: true, formulae: [perlengkapanRef] };
 
-      // [Tanpa Klaster] Hotel Mekkah (Col 13) & Hotel Madinah (Col 14)
-      sheet.getCell(r, 13).dataValidation = { type: "list", allowBlank: true, formulae: [mekkahRef] };
-      sheet.getCell(r, 14).dataValidation = { type: "list", allowBlank: true, formulae: [madinahRef] };
+      // [Tanpa Klaster] Hotel Mekkah (Col 14) & Hotel Madinah (Col 15)
+      sheet.getCell(r, 14).dataValidation = { type: "list", allowBlank: true, formulae: [mekkahRef] };
+      sheet.getCell(r, 15).dataValidation = { type: "list", allowBlank: true, formulae: [madinahRef] };
 
-      // [K1] Nama Klaster (Col 15), Hotel Mekkah (Col 19), Hotel Madinah (Col 20)
-      sheet.getCell(r, 15).dataValidation = { type: "list", allowBlank: true, formulae: [clusterRef] };
-      sheet.getCell(r, 19).dataValidation = { type: "list", allowBlank: true, formulae: [mekkahRef] };
-      sheet.getCell(r, 20).dataValidation = { type: "list", allowBlank: true, formulae: [madinahRef] };
+      // [K1] Nama Klaster (Col 16), Hotel Mekkah (Col 20), Hotel Madinah (Col 21)
+      sheet.getCell(r, 16).dataValidation = { type: "list", allowBlank: true, formulae: [clusterRef] };
+      sheet.getCell(r, 20).dataValidation = { type: "list", allowBlank: true, formulae: [mekkahRef] };
+      sheet.getCell(r, 21).dataValidation = { type: "list", allowBlank: true, formulae: [madinahRef] };
 
-      // [K2] Nama Klaster (Col 21), Hotel Mekkah (Col 25), Hotel Madinah (Col 26)
-      sheet.getCell(r, 21).dataValidation = { type: "list", allowBlank: true, formulae: [clusterRef] };
-      sheet.getCell(r, 25).dataValidation = { type: "list", allowBlank: true, formulae: [mekkahRef] };
-      sheet.getCell(r, 26).dataValidation = { type: "list", allowBlank: true, formulae: [madinahRef] };
+      // [K2] Nama Klaster (Col 22), Hotel Mekkah (Col 26), Hotel Madinah (Col 27)
+      sheet.getCell(r, 22).dataValidation = { type: "list", allowBlank: true, formulae: [clusterRef] };
+      sheet.getCell(r, 26).dataValidation = { type: "list", allowBlank: true, formulae: [mekkahRef] };
+      sheet.getCell(r, 27).dataValidation = { type: "list", allowBlank: true, formulae: [madinahRef] };
 
-      // [K3] Nama Klaster (Col 27), Hotel Mekkah (Col 31), Hotel Madinah (Col 32)
-      sheet.getCell(r, 27).dataValidation = { type: "list", allowBlank: true, formulae: [clusterRef] };
-      sheet.getCell(r, 31).dataValidation = { type: "list", allowBlank: true, formulae: [mekkahRef] };
-      sheet.getCell(r, 32).dataValidation = { type: "list", allowBlank: true, formulae: [madinahRef] };
+      // [K3] Nama Klaster (Col 28), Hotel Mekkah (Col 32), Hotel Madinah (Col 33)
+      sheet.getCell(r, 28).dataValidation = { type: "list", allowBlank: true, formulae: [clusterRef] };
+      sheet.getCell(r, 32).dataValidation = { type: "list", allowBlank: true, formulae: [mekkahRef] };
+      sheet.getCell(r, 33).dataValidation = { type: "list", allowBlank: true, formulae: [madinahRef] };
     }
 
     const buffer = await workbook.xlsx.writeBuffer();

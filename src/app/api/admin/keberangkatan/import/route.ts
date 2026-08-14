@@ -81,7 +81,7 @@ export async function POST(request: NextRequest) {
 
       if (!rawKode || !rawNamaPaket) continue; // Skip empty/invalid rows
 
-      // Smart format detection (32-column new format vs legacy formats)
+      // Smart format detection (33-col new format vs 32-col format vs 11-col legacy format)
       const cell3Text = row.getCell(3).text?.trim();
       const isLegacyFormat = /^\d+$/.test(cell3Text?.replace(/[^0-9]/g, "") || "") && cell3Text.length > 5;
 
@@ -92,9 +92,11 @@ export async function POST(request: NextRequest) {
       let rawNomorPenerbangan: string;
       let rawKuota: number;
       let rawTargetMaterialisasi: number;
+      let rawPerlengkapan: string | undefined;
       let legacyHargaBase = 0;
       let legacyHotelMekkah = "";
       let legacyHotelMadinah = "";
+      let regColOffset = 0; // 0 for legacy & 32-col, 1 for 33-col format
 
       if (isLegacyFormat) {
         // Legacy 11-column format
@@ -108,7 +110,7 @@ export async function POST(request: NextRequest) {
         rawKuota = parseNum(row.getCell(10).text, 45);
         rawTargetMaterialisasi = parseNum(row.getCell(11).text, 30);
       } else {
-        // 32-column format with Starting Point
+        // 32-col / 33-col format with Starting Point
         rawTanggalBerangkat = row.getCell(3).text?.trim();
         rawTanggalPulang = row.getCell(4).text?.trim();
         rawMaskapai = row.getCell(5).text?.trim();
@@ -116,6 +118,18 @@ export async function POST(request: NextRequest) {
         rawNomorPenerbangan = row.getCell(7).text?.trim();
         rawKuota = parseNum(row.getCell(8).text, 45);
         rawTargetMaterialisasi = parseNum(row.getCell(9).text, 30);
+
+        // Detect if Col 10 is Perlengkapan (33-col format) or RegHargaBase (32-col format)
+        const cell10Text = row.getCell(10).text?.trim();
+        const cell11Text = row.getCell(11).text?.trim();
+        const cell10Num = parseNum(cell10Text);
+        const cell11Num = parseNum(cell11Text);
+
+        if (cell10Text && (cell10Num < 100000 || cell11Num > 100000)) {
+          // New 33-col format: Col 10 is Perlengkapan
+          rawPerlengkapan = cell10Text;
+          regColOffset = 1;
+        }
       }
 
       // Validate dates
@@ -140,9 +154,9 @@ export async function POST(request: NextRequest) {
       const hotelOptions: any[] = [];
       if (!isLegacyFormat) {
         const clusterCols = [
-          { nameCol: 15, priceCol: 16, doubleCol: 17, tripleCol: 18, mekkahCol: 19, madinahCol: 20, defaultName: "Bronze" },
-          { nameCol: 21, priceCol: 22, doubleCol: 23, tripleCol: 24, mekkahCol: 25, madinahCol: 26, defaultName: "Silver" },
-          { nameCol: 27, priceCol: 28, doubleCol: 29, tripleCol: 30, mekkahCol: 31, madinahCol: 32, defaultName: "Gold" },
+          { nameCol: 15 + regColOffset, priceCol: 16 + regColOffset, doubleCol: 17 + regColOffset, tripleCol: 18 + regColOffset, mekkahCol: 19 + regColOffset, madinahCol: 20 + regColOffset, defaultName: "Bronze" },
+          { nameCol: 21 + regColOffset, priceCol: 22 + regColOffset, doubleCol: 23 + regColOffset, tripleCol: 24 + regColOffset, mekkahCol: 25 + regColOffset, madinahCol: 26 + regColOffset, defaultName: "Silver" },
+          { nameCol: 27 + regColOffset, priceCol: 28 + regColOffset, doubleCol: 29 + regColOffset, tripleCol: 30 + regColOffset, mekkahCol: 31 + regColOffset, madinahCol: 32 + regColOffset, defaultName: "Gold" },
         ];
 
         for (const c of clusterCols) {
@@ -178,11 +192,11 @@ export async function POST(request: NextRequest) {
             hotelMadinah: legacyHotelMadinah || "TBA",
           });
         } else {
-          const regPrice = parseNum(row.getCell(10).text);
-          const regDouble = parseNum(row.getCell(11).text);
-          const regTriple = parseNum(row.getCell(12).text);
-          const regMekkah = row.getCell(13).text?.trim();
-          const regMadinah = row.getCell(14).text?.trim();
+          const regPrice = parseNum(row.getCell(10 + regColOffset).text);
+          const regDouble = parseNum(row.getCell(11 + regColOffset).text);
+          const regTriple = parseNum(row.getCell(12 + regColOffset).text);
+          const regMekkah = row.getCell(13 + regColOffset).text?.trim();
+          const regMadinah = row.getCell(14 + regColOffset).text?.trim();
 
           hotelOptions.push({
             clusterName: "Reguler",
@@ -204,6 +218,11 @@ export async function POST(request: NextRequest) {
       const summaryHotelMadinah = madinahNames.length > 0 ? madinahNames.join(" / ") : "TBA";
       const pricingMode = hotelOptions.length > 1 ? "TIER" : "SINGLE";
 
+      const includeList: string[] = [];
+      if (rawPerlengkapan) {
+        includeList.push(`Perlengkapan: ${rawPerlengkapan}`);
+      }
+
       try {
         await prisma.keberangkatan.create({
           data: {
@@ -220,6 +239,7 @@ export async function POST(request: NextRequest) {
             hotelMekkah: summaryHotelMekkah,
             hotelMadinah: summaryHotelMadinah,
             hotelOptions: hotelOptions,
+            include: includeList,
             pricingMode: pricingMode as any,
             kuota: rawKuota,
             maxSeat: rawKuota,
