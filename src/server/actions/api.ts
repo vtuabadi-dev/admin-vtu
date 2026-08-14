@@ -144,10 +144,82 @@ export async function createKeberangkatan(data: any) {
 }
 
 export async function getJamaahById(id: string) {
-  return await prisma.jamaah.findUnique({
-    where: { id },
-    include: { dokumen: true },
-  }) as any;
+  try {
+    const j = (await prisma.jamaah.findUnique({
+      where: { id },
+      include: { dokumen: true },
+    })) as any;
+
+    if (!j) return null;
+
+    let group = null;
+    let paket = null;
+    let invoices: any[] = [];
+    let pembayarans: any[] = [];
+
+    // Fetch related group & package
+    if (j.groupId) {
+      group = await prisma.registrationGroup.findUnique({ where: { id: j.groupId } }).catch(() => null);
+    }
+
+    // Fetch invoices for this jamaah or group
+    invoices = await prisma.invoice
+      .findMany({
+        where: {
+          OR: [{ jamaahId: j.id }, ...(j.groupId ? [{ groupId: j.groupId }] : [])],
+        },
+        orderBy: { createdAt: "desc" },
+      })
+      .catch(() => []);
+
+    // Fetch payments
+    pembayarans = invoices.length > 0
+      ? await prisma.pembayaran
+          .findMany({
+            where: { invoiceId: { in: invoices.map((i) => i.id) } },
+            orderBy: { createdAt: "desc" },
+          })
+          .catch(() => [])
+      : [];
+
+    // Fetch package details
+    const paketId = group?.paketKeberangkatanId;
+    if (paketId) {
+      paket = await prisma.keberangkatan
+        .findUnique({
+          where: { id: paketId },
+          include: {
+            paketUmroh: true,
+            maskapaiMaster: true,
+            hotelMekkahMaster: true,
+            hotelMadinahMaster: true,
+          },
+        })
+        .catch(() => null);
+    }
+
+    if (!paket) {
+      // Fallback: search default package
+      const list = await prisma.keberangkatan
+        .findMany({
+          take: 1,
+          include: { paketUmroh: true, maskapaiMaster: true, hotelMekkahMaster: true, hotelMadinahMaster: true },
+        })
+        .catch(() => []);
+      if (list.length > 0) paket = list[0];
+    }
+
+    return {
+      ...j,
+      group,
+      paket,
+      invoices,
+      pembayarans,
+    };
+  } catch (err) {
+    console.error("getJamaahById error:", err);
+    return null;
+  }
 }
 
 export async function getJamaahReadiness(_id: string) {
