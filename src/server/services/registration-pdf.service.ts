@@ -6,6 +6,7 @@
 
 import type { RegistrationRequest, Keberangkatan } from "@/shared/types";
 import { getStorageAdapter } from "@/server/storage";
+import { KOP_SURAT_BASE64 } from "@/server/assets/kop-surat";
 
 interface PdfData {
   registration: RegistrationRequest;
@@ -75,15 +76,31 @@ export async function generateRegistrationPdf(data: PdfData): Promise<Buffer> {
       const GRAY = "#64748b";
       const LIGHT_GRAY = "#e2e8f0";
 
-      // ── HEADER ─────────────────────────────────────────────────────────────
-      doc.rect(40, 40, PAGE_W, 56).fill(ACC_COLOR);
-      doc.fillColor("#ffffff").fontSize(16).font("Helvetica-Bold")
-        .text("VTU ABADI TRAVEL", 50, 48, { align: "center", width: PAGE_W - 20 });
-      doc.fontSize(9).font("Helvetica")
-        .text("Formulir Pendaftaran Jamaah Umroh | Travel Umroh Terpercaya", 50, 68, { align: "center", width: PAGE_W - 20 });
-      doc.moveTo(40, 96).lineTo(40 + PAGE_W, 96).lineWidth(1.5).strokeColor(ACC_COLOR).stroke();
+      // ── HEADER (Kop Surat Image Asset) ───────────────────────────────────
+      let hasKopSurat = false;
+      if (KOP_SURAT_BASE64) {
+        try {
+          const base64Data = KOP_SURAT_BASE64.replace(/^data:image\/\w+;base64,/, "");
+          const kopBuffer = Buffer.from(base64Data, "base64");
+          if (kopBuffer.length > 0) {
+            doc.image(kopBuffer, 40, 30, { width: PAGE_W });
+            hasKopSurat = true;
+          }
+        } catch (e) {
+          console.warn("[registration-pdf] Failed to draw kop surat image:", e);
+        }
+      }
 
-      let y = 110;
+      let y = 125;
+      if (!hasKopSurat) {
+        doc.rect(40, 40, PAGE_W, 56).fill(ACC_COLOR);
+        doc.fillColor("#ffffff").fontSize(16).font("Helvetica-Bold")
+          .text("VTU ABADI TRAVEL", 50, 48, { align: "center", width: PAGE_W - 20 });
+        doc.fontSize(9).font("Helvetica")
+          .text("Formulir Pendaftaran Jamaah Umroh | Travel Umroh Terpercaya", 50, 68, { align: "center", width: PAGE_W - 20 });
+        doc.moveTo(40, 96).lineTo(40 + PAGE_W, 96).lineWidth(1.5).strokeColor(ACC_COLOR).stroke();
+        y = 110;
+      }
 
       // ── TITLE BLOCK ─────────────────────────────────────────────────────────
       doc.fillColor(PRI_COLOR).fontSize(13).font("Helvetica-Bold")
