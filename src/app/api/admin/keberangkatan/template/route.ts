@@ -26,7 +26,7 @@ export async function GET() {
     const fallbackHotelsMadinah = ["Durrat Al Eiman", "Ansar Palace", "Oberoi Madinah", "Frontel Al Harithia", "Pullman Zamzam Madinah", "Grand Plaza Madinah"];
     const fallbackClusters = ["Bronze", "Silver", "Gold", "Platinum", "Executive", "Reguler"];
     const fallbackPerlengkapan = ["Termasuk (Gratis)", "Belum / Tidak Termasuk", "Opsional (Bayar Terpisah)"];
-    const fallbackRoutes = ["JED-MED (Jeddah In - Madinah Out)", "MED-JED (Madinah In - Jeddah Out)", "JED-JED (Jeddah In - Jeddah Out)", "MED-MED (Madinah In - Madinah Out)"];
+    const fallbackRoutes = ["JED-MED", "MED-JED", "JED-JED", "MED-MED", "JED.TH-M", "JED.TH-J", "TD.D-J", "TD.C-J", "TD.C-M", "MED-J", "UD.D-J", "UD.D-M", "JED.D-J", "JED.C-M"];
 
     const airlineList = dbAirlines.length > 0 ? dbAirlines.map(a => a.name) : fallbackAirlines;
     const startingList = dbCities.length > 0 ? dbCities.map(c => `${c.name} (${c.code})`) : fallbackStartingPoints;
@@ -36,8 +36,7 @@ export async function GET() {
       ...dbPerlengkapan.map(p => p.name),
     ]));
     const routeList = Array.from(new Set([
-      ...fallbackRoutes,
-      ...dbRoutes.map(r => `${r.kode} (${r.ruteIn} In - ${r.ruteOut} Out)`),
+      ...(dbRoutes.length > 0 ? dbRoutes.map(r => r.kode) : fallbackRoutes),
     ]));
 
     const mekkahDb = dbHotels.filter(h => h.city?.code === "MEK" || h.city?.name.toLowerCase().includes("mek")).map(h => h.name);
