@@ -1332,12 +1332,11 @@ export default function RegisterPage() {
                     </div>
                   </div>
 
+                  {members.length > 1 && (
                   <div>
                     <label className="block text-xs font-medium text-gray-700 mb-1">
                       {i === 0
-                        ? members.length > 1
-                          ? "Hubungan dengan Jamaah #2"
-                          : "Hubungan (opsional)"
+                        ? `Hubungan dengan Jamaah #2`
                         : `Hubungan dengan Jamaah #1 (${members[0]?.namaLengkap ? members[0].namaLengkap.toUpperCase() : "Ketua Grup"})`}
                     </label>
                     <select
@@ -1369,6 +1368,7 @@ export default function RegisterPage() {
                       <option value="Lainnya">Lainnya</option>
                     </select>
                   </div>
+                  )}
                 </div>
               ))}
             </div>
