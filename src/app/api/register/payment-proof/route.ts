@@ -90,43 +90,48 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // Send email notification for DP Payment Proof submission with attached PDF
+    // ── Generate PDF Formulir Pendaftaran ──────────────────────────────────────
+    let pdfBuf: Buffer | null = null;
+    const pdfFileName = `${kodeRegistrasi}_${reg.namaPerwakilan.replace(/[^A-Z0-9]/gi, "_")}.pdf`;
+    try {
+      const { generateRegistrationPdf } = await import("@/server/services/registration-pdf.service");
+      const { registrationRepo } = await import("@/server/repositories");
+      const fullReg = await registrationRepo.findByKode(kodeRegistrasi);
+      if (fullReg) {
+        pdfBuf = await generateRegistrationPdf({
+          registration: fullReg,
+          packageInfo: null,
+          termsVersion: "1.0",
+          termsAcceptedAt: fullReg.termsAcceptedAt ?? fullReg.createdAt,
+        });
+        console.log(`[payment-proof] PDF formulir berhasil digenerate: ${pdfFileName}, size: ${pdfBuf.length} bytes`);
+      } else {
+        console.warn(`[payment-proof] Registration ${kodeRegistrasi} tidak ditemukan di repo — skip PDF generation`);
+      }
+    } catch (pdfErr) {
+      console.warn("[payment-proof] PDF generation warning:", pdfErr);
+    }
+
+    // ── Simpan PDF ke Google Drive (Folder: FORMULIR PENDAFTARAN) ─────────────
+    if (pdfBuf) {
+      try {
+        const { isGoogleDriveConfigured, getOrCreateFolder } = await import("@/server/storage/google-drive");
+        if (isGoogleDriveConfigured()) {
+          const driveStorage = getStorageAdapter();
+          const formulirFolderId = await getOrCreateFolder("FORMULIR PENDAFTARAN");
+          await driveStorage.upload(pdfFileName, pdfBuf, "application/pdf", formulirFolderId);
+          console.log(`[payment-proof] PDF formulir berhasil disimpan ke Google Drive folder FORMULIR PENDAFTARAN: ${pdfFileName}`);
+        } else {
+          console.warn("[payment-proof] Google Drive tidak dikonfigurasi — skip Drive upload");
+        }
+      } catch (driveErr) {
+        console.warn("[payment-proof] Gagal menyimpan PDF ke Google Drive (non-blocking):", driveErr);
+      }
+    }
+
+    // ── Send email notification ──────────────────────────────────────────────────
     try {
       if (reg.emailPerwakilan) {
-        let pdfBuf: Buffer | null = null;
-        let pdfFileName = `${kodeRegistrasi}_${reg.namaPerwakilan.replace(/[^A-Z0-9]/gi, "_")}.pdf`;
-        try {
-          const { generateRegistrationPdf } = await import("@/server/services/registration-pdf.service");
-          const { registrationRepo } = await import("@/server/repositories");
-          const fullReg = await registrationRepo.findByKode(kodeRegistrasi);
-          if (fullReg) {
-            pdfBuf = await generateRegistrationPdf({
-              registration: fullReg,
-              packageInfo: null,
-              termsVersion: "1.0",
-              termsAcceptedAt: fullReg.termsAcceptedAt ?? fullReg.createdAt,
-            });
-          }
-
-          // ── Simpan PDF ke Google Drive (Folder: FORMULIR PENDAFTARAN) ───────
-          if (pdfBuf) {
-            try {
-              const { isGoogleDriveConfigured, getOrCreateFolder } = await import("@/server/storage/google-drive");
-              if (isGoogleDriveConfigured()) {
-                const storage = getStorageAdapter();
-                const formulirFolderId = await getOrCreateFolder("FORMULIR PENDAFTARAN");
-                const drivePdfName = `${pdfFileName}`;
-                await storage.upload(drivePdfName, pdfBuf, "application/pdf", formulirFolderId);
-                console.log(`[payment-proof] PDF formulir berhasil disimpan ke Google Drive: ${drivePdfName}`);
-              }
-            } catch (driveErr) {
-              console.warn("[payment-proof] Gagal menyimpan PDF ke Google Drive (non-blocking):", driveErr);
-            }
-          }
-        } catch (pdfErr) {
-          console.warn("[payment-proof] PDF generation warning for email:", pdfErr);
-        }
-
         const { getNotificationProvider } = await import("@/server/services/notify");
         const notifier = getNotificationProvider();
         await notifier.send({
