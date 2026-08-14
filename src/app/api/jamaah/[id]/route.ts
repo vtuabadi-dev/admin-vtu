@@ -45,58 +45,69 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
   const mode = searchParams.get("mode") || "soft";
 
   try {
-    const jamaah = await prisma.jamaah.findUnique({
+    let jamaah = await prisma.jamaah.findUnique({
       where: { id: params.id },
       include: { group: true },
     });
 
+    // Fallback check if ID belongs to RegistrationMember
     if (!jamaah) {
-      return NextResponse.json({ success: false, message: "Jamaah not found" }, { status: 404 });
+      const member = await prisma.registrationMember.findUnique({
+        where: { id: params.id },
+      });
+      if (member) {
+        await prisma.registrationMember.delete({ where: { id: member.id } });
+        return NextResponse.json({ success: true, message: "Pendaftar berhasil dihapus" });
+      }
+      return NextResponse.json({ success: false, message: "Data jamaah tidak ditemukan" }, { status: 404 });
     }
 
     const wasActive = jamaah.status !== "batal";
-    const paketId = jamaah.group.paketKeberangkatanId;
+    const paketId = jamaah.group?.paketKeberangkatanId;
 
     if (mode === "hard") {
-      const otherMembers = await prisma.jamaah.findMany({
-        where: { groupId: jamaah.groupId, id: { not: jamaah.id } },
-      });
+      const otherMembers = jamaah.groupId
+        ? await prisma.jamaah.findMany({
+            where: { groupId: jamaah.groupId, id: { not: jamaah.id } },
+          })
+        : [];
 
       await prisma.$transaction(async (tx) => {
-        if (jamaah.group.ketuaGroupId === jamaah.id) {
+        // 1. Delete all child references belonging to this jamaah
+        await tx.dokumenItem.deleteMany({ where: { jamaahId: jamaah.id } }).catch(() => {});
+        await tx.manifestRow.deleteMany({ where: { jamaahId: jamaah.id } }).catch(() => {});
+        await tx.penghuniKamar.deleteMany({ where: { jamaahId: jamaah.id } }).catch(() => {});
+        await tx.alokasiPembayaran.deleteMany({ where: { jamaahId: jamaah.id } }).catch(() => {});
+
+        // 2. Delete the jamaah record FIRST (frees FK reference to registrationGroup)
+        await tx.jamaah.delete({ where: { id: jamaah.id } });
+
+        // 3. Handle RegistrationGroup update or cleanup AFTER jamaah is deleted
+        if (jamaah.groupId && jamaah.group) {
           if (otherMembers.length > 0) {
-            const newLeader = otherMembers[0]!;
-            await tx.registrationGroup.update({
-              where: { id: jamaah.groupId },
-              data: { ketuaGroupId: newLeader.id },
-            });
-          } else {
-            const safeJamaah = await tx.jamaah.findFirst({
-              where: { id: { not: jamaah.id } },
-              select: { id: true },
-            });
-            if (safeJamaah) {
+            // Re-assign group leader if deleted jamaah was leader
+            if (jamaah.group.ketuaGroupId === jamaah.id) {
               await tx.registrationGroup.update({
                 where: { id: jamaah.groupId },
-                data: { ketuaGroupId: safeJamaah.id },
+                data: { ketuaGroupId: otherMembers[0].id },
               });
             }
-            await tx.invoiceItem.deleteMany({ where: { invoice: { groupId: jamaah.groupId } } });
-            await tx.invoice.deleteMany({ where: { groupId: jamaah.groupId } });
-            await tx.pembayaran.deleteMany({ where: { groupId: jamaah.groupId } });
+            await tx.registrationGroup.update({
+              where: { id: jamaah.groupId },
+              data: { jumlahAnggota: { decrement: 1 } },
+            });
+          } else {
+            // No other members left in group -> clean up billing & delete empty group
+            await tx.invoiceItem.deleteMany({ where: { invoice: { groupId: jamaah.groupId } } }).catch(() => {});
+            await tx.invoice.deleteMany({ where: { groupId: jamaah.groupId } }).catch(() => {});
+            await tx.pembayaran.deleteMany({ where: { groupId: jamaah.groupId } }).catch(() => {});
             await tx.invoiceSplitConfig.deleteMany({ where: { groupId: jamaah.groupId } }).catch(() => {});
             await tx.reminder.deleteMany({ where: { groupId: jamaah.groupId } }).catch(() => {});
-            await tx.registrationGroup.delete({ where: { id: jamaah.groupId } });
+            await tx.registrationGroup.delete({ where: { id: jamaah.groupId } }).catch(() => {});
           }
         }
 
-        await tx.dokumenItem.deleteMany({ where: { jamaahId: jamaah.id } });
-        await tx.manifestRow.deleteMany({ where: { jamaahId: jamaah.id } });
-        await tx.penghuniKamar.deleteMany({ where: { jamaahId: jamaah.id } });
-        await tx.alokasiPembayaran.deleteMany({ where: { jamaahId: jamaah.id } });
-
-        await tx.jamaah.delete({ where: { id: jamaah.id } });
-
+        // 4. Decrement package capacity if active
         if (wasActive && paketId) {
           const kbr = await tx.keberangkatan.findUnique({ where: { id: paketId } });
           if (kbr && kbr.terisi > 0) {
@@ -106,16 +117,9 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
             });
           }
         }
-
-        if (otherMembers.length > 0) {
-          await tx.registrationGroup.update({
-            where: { id: jamaah.groupId },
-            data: { jumlahAnggota: { decrement: 1 } },
-          });
-        }
       });
 
-      return NextResponse.json({ success: true, message: "Jamaah hard-deleted successfully" });
+      return NextResponse.json({ success: true, message: "Jamaah berhasil dihapus permanen" });
     } else {
       await prisma.$transaction(async (tx) => {
         await tx.jamaah.update({
@@ -134,7 +138,7 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
         }
       });
 
-      return NextResponse.json({ success: true, message: "Jamaah soft-deleted successfully" });
+      return NextResponse.json({ success: true, message: "Jamaah berhasil dibatalkan (soft delete)" });
     }
   } catch (error) {
     console.error("[DELETE /api/jamaah/[id]] Error:", error);
