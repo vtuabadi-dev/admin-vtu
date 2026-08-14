@@ -13,33 +13,63 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const namaPaket = searchParams.get("namaPaket");
 
-    // Resolve all package names in group if package belongs to a combined PaketGrup
+    // Resolve all package names in group if package belongs to a combined PaketGrup (Dual Starting Point)
     let targetPackageNames: string[] | null = null;
+    let linkedPackageNames: string[] = [];
+    let isDualStartingGroup = false;
+
     if (namaPaket && namaPaket !== "ALL") {
-      const matchKeb = await prisma.keberangkatan.findFirst({
-        where: {
-          OR: [
-            { namaPaket: namaPaket },
-            { kode: namaPaket },
-            { kodeIndividu: namaPaket },
-          ],
-        },
-        select: { paketGrupId: true },
+      // First check if there is a PaketGrup with this name
+      const matchGrup = await prisma.paketGrup.findFirst({
+        where: { namaPaket: namaPaket },
+        select: { id: true },
       });
 
-      if (matchKeb?.paketGrupId) {
+      let matchKeb = null;
+      let targetGrupId = matchGrup?.id || null;
+
+      if (!targetGrupId) {
+        matchKeb = await prisma.keberangkatan.findFirst({
+          where: {
+            OR: [
+              { namaPaket: namaPaket },
+              { kode: namaPaket },
+              { kodeIndividu: namaPaket },
+            ],
+          },
+          select: { id: true, paketGrupId: true, namaPaket: true, kode: true, kodeIndividu: true },
+        });
+        targetGrupId = matchKeb?.paketGrupId || null;
+      }
+
+      if (targetGrupId) {
         const groupMembers = await prisma.keberangkatan.findMany({
-          where: { paketGrupId: matchKeb.paketGrupId },
+          where: { paketGrupId: targetGrupId },
           select: { namaPaket: true, kode: true, kodeIndividu: true },
         });
 
-        targetPackageNames = Array.from(
-          new Set(
-            groupMembers.flatMap((g) => [g.namaPaket, g.kode, g.kodeIndividu]).filter(Boolean) as string[]
-          )
-        );
+        const namesSet = new Set<string>();
+        const uniqueTitles: string[] = [];
+
+        groupMembers.forEach((g) => {
+          if (g.namaPaket) {
+            namesSet.add(g.namaPaket);
+            if (!uniqueTitles.includes(g.namaPaket)) {
+              uniqueTitles.push(g.namaPaket);
+            }
+          }
+          if (g.kode) namesSet.add(g.kode);
+          if (g.kodeIndividu) namesSet.add(g.kodeIndividu);
+        });
+
+        targetPackageNames = Array.from(namesSet);
+        linkedPackageNames = uniqueTitles;
+        if (linkedPackageNames.length > 1) {
+          isDualStartingGroup = true;
+        }
       } else {
         targetPackageNames = [namaPaket];
+        linkedPackageNames = [namaPaket];
       }
     }
 
@@ -95,6 +125,8 @@ export async function GET(request: NextRequest) {
       data: {
         badalList,
         wakafList,
+        linkedPackageNames,
+        isDualStartingGroup,
       },
     });
   } catch (error: any) {

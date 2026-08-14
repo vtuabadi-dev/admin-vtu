@@ -85,7 +85,11 @@ export default function AdminBadalUmrohPage() {
       });
       const resJson = await res.json();
       if (resJson.success) {
-        fetchList();
+        setList((prev) =>
+          prev.map((item) =>
+            item.id === id ? { ...item, petugasBadal: newPetugas } : item
+          )
+        );
       } else {
         alert(`Gagal memperbarui pelaksana badal: ${resJson.message}`);
       }
@@ -160,7 +164,21 @@ export default function AdminBadalUmrohPage() {
       const resJson = await res.json();
       if (resJson.success) {
         setEditItem(null);
-        fetchList();
+        setList((prev) =>
+          prev.map((item) =>
+            item.id === editItem.id
+              ? {
+                  ...item,
+                  status: editStatus,
+                  paymentStatus: editPaymentStatus,
+                  petugasBadal,
+                  sertifikatUrl,
+                  videoUrl,
+                  catatan: catatanText,
+                }
+              : item
+          )
+        );
       } else {
         alert(`Gagal: ${resJson.message}`);
       }
@@ -182,7 +200,11 @@ export default function AdminBadalUmrohPage() {
       });
       const resJson = await res.json();
       if (resJson.success) {
-        fetchList();
+        setList((prev) =>
+          prev.map((item) =>
+            item.id === id ? { ...item, paymentStatus: "Lunas" } : item
+          )
+        );
       } else {
         alert(`Gagal: ${resJson.message}`);
       }
@@ -200,7 +222,7 @@ export default function AdminBadalUmrohPage() {
       const res = await fetch(`/api/badal-umroh/${id}`, { method: "DELETE" });
       const resJson = await res.json();
       if (resJson.success) {
-        fetchList();
+        setList((prev) => prev.filter((item) => item.id !== id));
       } else {
         alert(`Gagal menghapus: ${resJson.message}`);
       }

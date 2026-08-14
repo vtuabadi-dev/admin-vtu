@@ -23,6 +23,7 @@ import {
   ChevronUp,
   Package,
 } from "lucide-react";
+import { useOperationalStore } from "@/stores/operational-store";
 import type {
   DashboardStats,
   OperationalAlert,
@@ -35,16 +36,26 @@ import { getScoreVariant } from "@/shared/lib/readiness-score";
 import Link from "next/link";
 
 export default function AdminDashboardPage() {
-  const [stats, setStats] = useState<DashboardStats | null>(null);
-  const [alerts, setAlerts] = useState<OperationalAlert[]>([]);
-  const [kbrList, setKbrList] = useState<Keberangkatan[]>([]);
-  const [scores, setScores] = useState<Record<string, PackageReadinessScore>>({});
-  const [intelMap, setIntelMap] = useState<Record<string, any>>({});
-  const [loading, setLoading] = useState(true);
+  const storeIsLoaded = useOperationalStore((s) => s.isLoaded);
+  const storeStats = useOperationalStore((s) => s.stats);
+  const storeAlerts = useOperationalStore((s) => s.alerts);
+  const storeKbrList = useOperationalStore((s) => s.keberangkatanList);
+  const storeInvoices = useOperationalStore((s) => s.invoices);
+  const storePendingReviewCount = useOperationalStore((s) => s.pendingReviewCount);
+  const storePendingDocReviewCount = useOperationalStore((s) => s.pendingDocReviewCount);
+  const storeScores = useOperationalStore((s) => s.scores);
+  const storeIntelMap = useOperationalStore((s) => s.intelMap);
+
+  const [stats, setStats] = useState<DashboardStats | null>(storeStats);
+  const [alerts, setAlerts] = useState<OperationalAlert[]>(storeAlerts);
+  const [kbrList, setKbrList] = useState<Keberangkatan[]>(storeKbrList);
+  const [scores, setScores] = useState<Record<string, PackageReadinessScore>>(storeScores);
+  const [intelMap, setIntelMap] = useState<Record<string, any>>(storeIntelMap);
+  const [loading, setLoading] = useState(!storeIsLoaded);
   const [error, setError] = useState<Error | null>(null);
   const [mobileAlertsOpen, setMobileAlertsOpen] = useState(false);
-  const [pendingReviewCount, setPendingReviewCount] = useState(0);
-  const [pendingDocReviewCount, setPendingDocReviewCount] = useState(0);
+  const [pendingReviewCount, setPendingReviewCount] = useState(storePendingReviewCount);
+  const [pendingDocReviewCount, setPendingDocReviewCount] = useState(storePendingDocReviewCount);
   const [overdueAmount, setOverdueAmount] = useState(0);
 
   // ── Package filter ──────────────────────────────────────────────
@@ -92,11 +103,39 @@ export default function AdminDashboardPage() {
   }, []);
 
   useEffect(() => {
-    load();
-  }, [load]);
+    if (storeIsLoaded) {
+      setStats(storeStats);
+      setAlerts(storeAlerts);
+      setKbrList(storeKbrList);
+      setScores(storeScores);
+      setIntelMap(storeIntelMap);
+      setPendingReviewCount(storePendingReviewCount);
+      setPendingDocReviewCount(storePendingDocReviewCount);
+
+      const overdue = storeInvoices
+        .filter((inv: any) => inv.status === "overdue")
+        .reduce((sum: number, inv: any) => sum + (inv.sisaTagihan ?? 0), 0);
+      setOverdueAmount(overdue);
+      setLoading(false);
+    } else {
+      load();
+    }
+  }, [
+    load,
+    storeIsLoaded,
+    storeStats,
+    storeAlerts,
+    storeKbrList,
+    storeScores,
+    storeIntelMap,
+    storePendingReviewCount,
+    storePendingDocReviewCount,
+    storeInvoices,
+  ]);
 
   // ── Load per-package readiness after kbrList loads ──────────────
   useEffect(() => {
+    if (storeIsLoaded) return; // Skip if loaded by global store to prevent N+1 fetches!
     if (kbrList.length === 0) return;
     async function loadScores() {
       const scoreMap: Record<string, PackageReadinessScore> = {};
@@ -123,7 +162,7 @@ export default function AdminDashboardPage() {
       setIntelMap(intelAcc);
     }
     loadScores();
-  }, [kbrList]);
+  }, [kbrList, storeIsLoaded]);
 
   // ── Load package-specific data when filter changes ──────────────
   const loadPackageData = useCallback(async (kbrId: string) => {

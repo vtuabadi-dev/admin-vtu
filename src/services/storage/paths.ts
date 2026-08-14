@@ -45,6 +45,10 @@ export function signaturePath(registrationId: string): string {
   return `dokumen/signatures/${registrationId}_ttd.jpg`;
 }
 
+export function formulirPendaftaranPath(fileName: string): string {
+  return `FORMULIR PENDAFTARAN/${fileName}`;
+}
+
 // ── Payment proof paths ──────────────────────────────────────────
 
 export function paymentProofPath(jamaahId: string, ext: string): string {

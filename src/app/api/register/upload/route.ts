@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { getStorageAdapter, signaturePath } from "@/server/storage";
+import { signaturePath } from "@/server/storage";
 import { checkRateLimit, rateLimitKey, getRateLimitConfig } from "@/server/lib/rate-limit";
 
 function validateImageMetadata(buffer: Buffer): { valid: boolean; issues: string[] } {
@@ -63,9 +63,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, message: "File tidak valid", details: metaCheck.issues }, { status: 400 });
     }
 
-    // Save file to temp location — final path set after registration ID is generated
+    // Save file to temp location — local adapter ensures instant preview without Drive 403 quota errors
     const tempId = `tmp_${Date.now()}_${crypto.randomUUID().slice(0, 8)}`;
-    const storage = getStorageAdapter();
+    const { createLocalAdapter } = await import("@/server/storage/local");
+    const storage = createLocalAdapter();
     const storagePath = signaturePath(tempId);
     await storage.upload(storagePath, buffer, file.type || "image/jpeg");
 

@@ -74,7 +74,7 @@ async function apiFetch(url: string, options: RequestInit = {}): Promise<Respons
 
 export async function getOrCreateFolder(folderName: string, parentId?: string): Promise<string> {
   const rootId = parentId || process.env.GOOGLE_DRIVE_FOLDER_ID!;
-  const query = `'${rootId}' in parents and name = '${folderName.replace(/'/g, "\\'")}' and mimeType = 'application/vnd.google.apps.folder' and trashed = false`;
+  const query = `'${rootId}' in parents and name = '${folderName.replace(/'/g, "\\'")}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false`;
 
   const res = await apiFetch(`${DRIVE_API}/files?q=${encodeURIComponent(query)}&fields=files(id,name)`);
   const data = await res.json();
@@ -87,11 +87,21 @@ export async function getOrCreateFolder(folderName: string, parentId?: string): 
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       name: folderName,
-      mimeType: "application/vnd.google.apps.folder",
+      mimeType: "application/vnd.google-apps.folder",
       parents: [rootId],
     }),
   });
   const folder = await createRes.json();
+
+  // Grant open/write access so users with folder link can view and click into the folder
+  try {
+    await apiFetch(`${DRIVE_API}/files/${folder.id}/permissions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ role: "writer", type: "anyone" }),
+    });
+  } catch { /* non-blocking */ }
+
   return folder.id;
 }
 
@@ -104,6 +114,7 @@ export interface DriveFolderRegistry {
   dokumenLain: string;
   manifest: string;
   export: string;
+  formulirPendaftaran: string;
 }
 
 export async function createPackageFolderHierarchy(
@@ -121,15 +132,16 @@ export async function createPackageFolderHierarchy(
       dokumenLain: "local-mock",
       manifest: "local-mock",
       export: "local-mock",
+      formulirPendaftaran: "local-mock",
     };
   }
 
-  const rootIndukId = await getOrCreateFolder("KELENGKAPAN DATA JAMAAH");
+  const rootIndukId = await getOrCreateFolder("KELENGKAPAN DATA JAMAAH", process.env.GOOGLE_DRIVE_FOLDER_ID);
   const yearId = await getOrCreateFolder(String(year), rootIndukId);
   const monthId = await getOrCreateFolder(monthFolderName, yearId);
   const packageFolderId = await getOrCreateFolder(packageFolderName, monthId);
 
-  const [paspor, ktp, foto, pembayaran, dokumenLain, manifest, exportFolder] = await Promise.all([
+  const [paspor, ktp, foto, pembayaran, dokumenLain, manifest, exportFolder, formulirPendaftaran] = await Promise.all([
     getOrCreateFolder("PASPOR", packageFolderId),
     getOrCreateFolder("KTP", packageFolderId),
     getOrCreateFolder("FOTO", packageFolderId),
@@ -137,6 +149,7 @@ export async function createPackageFolderHierarchy(
     getOrCreateFolder("DOKUMEN LAIN", packageFolderId),
     getOrCreateFolder("MANIFEST", packageFolderId),
     getOrCreateFolder("EXPORT", packageFolderId),
+    getOrCreateFolder("FORMULIR PENDAFTARAN", packageFolderId),
   ]);
 
   return {
@@ -148,7 +161,21 @@ export async function createPackageFolderHierarchy(
     dokumenLain,
     manifest,
     export: exportFolder,
+    formulirPendaftaran,
   };
+}
+
+export async function getOrCreateFormulirPendaftaranDriveFolder(packageFolderId?: string): Promise<string | undefined> {
+  if (!isGoogleDriveConfigured()) return undefined;
+  try {
+    const parentId = packageFolderId || process.env.GOOGLE_DRIVE_FOLDER_ID;
+    if (!parentId) return undefined;
+    const folderId = await getOrCreateFolder("FORMULIR PENDAFTARAN", parentId);
+    return folderId;
+  } catch (err) {
+    console.error("[Google Drive] Failed to get or create FORMULIR PENDAFTARAN folder:", err);
+    return undefined;
+  }
 }
 
 export async function createHotelVideoFolderHierarchy(
@@ -177,8 +204,9 @@ export function createGoogleDriveAdapter(): StorageAdapter {
     );
   }
 
-  function getFileName(path: string): string {
-    return path.replace(/[/\\]/g, "_");
+  function getFileName(filePath: string): string {
+    const parts = filePath.split(/[/\\]/);
+    return parts[parts.length - 1] || filePath;
   }
 
   return {
@@ -186,21 +214,33 @@ export function createGoogleDriveAdapter(): StorageAdapter {
       const fileName = getFileName(path);
       const parentFolderId = targetFolderId || folderId;
 
-      const metaRes = await apiFetch(`${DRIVE_API}/files`, {
+      const metaRes = await apiFetch(`${DRIVE_API}/files?supportsAllDrives=true`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: fileName,
+          mimeType: contentType,
           parents: [parentFolderId],
         }),
       });
       const { id: fileId } = await metaRes.json();
 
-      await apiFetch(`${DRIVE_UPLOAD}/files/${fileId}?uploadType=media`, {
-        method: "PATCH",
-        headers: { "Content-Type": contentType },
-        body: new Uint8Array(buffer),
-      });
+      try {
+        const patchRes = await apiFetch(`${DRIVE_UPLOAD}/files/${fileId}?uploadType=media&supportsAllDrives=true`, {
+          method: "PATCH",
+          headers: { "Content-Type": contentType },
+          body: new Uint8Array(buffer),
+        });
+
+        if (!patchRes.ok) {
+          // Immediately delete 0-byte orphan metadata file to prevent corrupt files in Drive
+          await apiFetch(`${DRIVE_API}/files/${fileId}?supportsAllDrives=true`, { method: "DELETE" }).catch(() => {});
+          throw new Error(`[Google Drive Upload] Media patch failed HTTP ${patchRes.status}`);
+        }
+      } catch (patchErr) {
+        await apiFetch(`${DRIVE_API}/files/${fileId}?supportsAllDrives=true`, { method: "DELETE" }).catch(() => {});
+        throw patchErr;
+      }
 
       return fileId;
     },

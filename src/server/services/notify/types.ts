@@ -3,6 +3,13 @@
 
 export type NotificationChannel = "email" | "whatsapp" | "telegram" | "in_app";
 
+export interface NotificationAttachment {
+  filename: string;
+  content?: Buffer | string;
+  path?: string;
+  contentType?: string;
+}
+
 export interface NotificationMessage {
   channel: NotificationChannel;
   recipient: string; // email address, phone number, or user ID
@@ -10,6 +17,7 @@ export interface NotificationMessage {
   body: string;
   templateId?: string;
   templateVars?: Record<string, string>;
+  attachments?: NotificationAttachment[];
   metadata?: Record<string, string>;
 }
 

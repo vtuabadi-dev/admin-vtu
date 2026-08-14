@@ -54,11 +54,18 @@ export const operationalDocumentRepo = {
   },
 
   async findActiveByType(type: string) {
-    const row = await (prisma as any).operationalDocument.findFirst({
+    const activeRow = await (prisma as any).operationalDocument.findFirst({
       where: { type, status: "ACTIVE" },
       orderBy: { effectiveDate: "desc" },
     });
-    return row ? mapRow(row) : null;
+    if (activeRow) return mapRow(activeRow);
+
+    // Fallback: if no ACTIVE status doc exists, return the latest doc for this type
+    const latestRow = await (prisma as any).operationalDocument.findFirst({
+      where: { type },
+      orderBy: { createdAt: "desc" },
+    });
+    return latestRow ? mapRow(latestRow) : null;
   },
 
   async create(data: {

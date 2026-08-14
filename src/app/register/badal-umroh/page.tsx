@@ -359,7 +359,13 @@ export default function BadalUmrohRegisterPage() {
                   >
                     <Send className="h-3.5 w-3.5" /> Konfirmasi via WhatsApp
                   </a>
-                  <Button variant="outline" size="sm" onClick={resetForm}>
+                  <Link
+                    href="/track/badal-wakaf"
+                    className="inline-flex items-center gap-2 px-4 py-2.5 bg-amber-500 hover:bg-amber-600 text-white font-medium text-xs rounded-lg transition-colors shadow-xs"
+                  >
+                    Cek Status Badal
+                  </Link>
+                  <Button variant="outline" size="sm" onClick={resetForm} className="h-[36px]">
                     Daftar Lagi
                   </Button>
                 </div>

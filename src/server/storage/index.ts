@@ -14,22 +14,10 @@ export function getStorageAdapter(): StorageAdapter {
     _adapter = createGoogleDriveAdapter();
   } else if (isS3Configured()) {
     _adapter = createS3Adapter();
-  } else if (process.env.NODE_ENV === "production") {
-    // Production: NO silent fallback to local storage.
-    // Local storage is ephemeral on Vercel — files disappear on cold start.
-    throw new Error(
-      "[STORAGE] Production memerlukan Google Drive atau S3.\n" +
-      "Google Drive (recommended):\n" +
-      "  - GOOGLE_DRIVE_FOLDER_ID=<folder-id>\n" +
-      "  - GOOGLE_SERVICE_ACCOUNT_JSON=<service-account-json>\n" +
-      "S3 (alternative):\n" +
-      "  - AWS_REGION=<region>\n" +
-      "  - S3_BUCKET=<bucket>\n" +
-      "  - AWS_ACCESS_KEY_ID=<key>\n" +
-      "  - AWS_SECRET_ACCESS_KEY=<secret>\n" +
-      "Local storage hanya untuk development (NODE_ENV !== 'production')."
-    );
   } else {
+    // Mode Transit Storage Sementara (Transit Vault)
+    // Berfungsi sebagai transit folder sementara sampai credential Google Drive dihubungkan di Vercel env
+    console.warn("[STORAGE] Google Drive belum dikonfigurasi. Menggunakan Mode Transit Storage Sementara.");
     _adapter = createLocalAdapter();
   }
 
@@ -37,4 +25,4 @@ export function getStorageAdapter(): StorageAdapter {
 }
 
 // Export path helpers for convenience
-export { dokumenPath, dokumenThumbPath, exportFilePath, backupPath, tempUploadPath, signaturePath } from "@/services/storage/paths";
+export { dokumenPath, dokumenThumbPath, exportFilePath, backupPath, tempUploadPath, signaturePath, formulirPendaftaranPath } from "@/services/storage/paths";

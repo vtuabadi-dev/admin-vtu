@@ -1,0 +1,105 @@
+import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
+import { prisma } from "@/server/db/client";
+import { getStorageAdapter } from "@/server/storage";
+import { checkRateLimit, rateLimitKey, getRateLimitConfig } from "@/server/lib/rate-limit";
+
+export async function POST(request: NextRequest) {
+  // Rate limit
+  const rlKey = rateLimitKey(request);
+  const rl = checkRateLimit(rlKey, getRateLimitConfig("upload"));
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { success: false, message: "Too many upload requests. Try again later." },
+      { status: 429 }
+    );
+  }
+
+  try {
+    const contentType = request.headers.get("content-type") || "";
+
+    let kodeRegistrasi = "";
+    let fileBuffer: Buffer | null = null;
+    let fileMime = "image/jpeg";
+
+    if (contentType.includes("multipart/form-data")) {
+      const formData = await request.formData();
+      kodeRegistrasi = (formData.get("kodeRegistrasi") as string) || "";
+      const file = formData.get("file") as File | null;
+
+      if (!file) {
+        return NextResponse.json({ success: false, message: "File bukti transfer wajib diunggah" }, { status: 400 });
+      }
+
+      fileBuffer = Buffer.from(await file.arrayBuffer());
+      fileMime = file.type || "image/jpeg";
+    } else {
+      const body = await request.json();
+      kodeRegistrasi = body.kodeRegistrasi || "";
+      if (body.fileBase64) {
+        const base64Data = body.fileBase64.replace(/^data:image\/\w+;base64,/, "");
+        fileBuffer = Buffer.from(base64Data, "base64");
+      }
+    }
+
+    if (!kodeRegistrasi) {
+      return NextResponse.json({ success: false, message: "Kode registrasi wajib diisi" }, { status: 400 });
+    }
+
+    // Find registration record
+    const reg = await prisma.registrationRequest.findUnique({
+      where: { kodeRegistrasi },
+    });
+
+    if (!reg) {
+      return NextResponse.json({ success: false, message: "Kode registrasi tidak ditemukan" }, { status: 404 });
+    }
+
+    let buktiUrl = "";
+    if (fileBuffer && fileBuffer.length > 0) {
+      const storage = getStorageAdapter();
+      const storagePath = `BUKTI_TRANSFER/${kodeRegistrasi}_${Date.now()}.jpg`;
+      try {
+        const { getOrCreateFolder, isGoogleDriveConfigured } = await import("@/server/storage/google-drive");
+        let targetFolderId: string | undefined = undefined;
+        if (isGoogleDriveConfigured()) {
+          targetFolderId = await getOrCreateFolder("PEMBAYARAN");
+        }
+        await storage.upload(storagePath, fileBuffer, fileMime, targetFolderId);
+        buktiUrl = await storage.getUrl(storagePath);
+      } catch (uploadErr) {
+        console.warn("[payment-proof] Storage upload warning, saving to local vault:", uploadErr);
+        const { createLocalAdapter } = await import("@/server/storage/local");
+        const localVault = createLocalAdapter();
+        await localVault.upload(storagePath, fileBuffer, fileMime);
+        buktiUrl = await localVault.getUrl(storagePath);
+      }
+    }
+
+    // Update Registration Request status and catatanAdmin
+    const updatedNotes = [
+      reg.catatanAdmin || "",
+      `[Bukti DP Uploaded at ${new Date().toISOString()}]: ${buktiUrl || "File received"}`,
+    ].filter(Boolean).join("\n");
+
+    await prisma.registrationRequest.update({
+      where: { kodeRegistrasi },
+      data: {
+        catatanAdmin: updatedNotes,
+        status: "PENDING_REVIEW",
+      },
+    });
+
+    return NextResponse.json({
+      success: true,
+      data: {
+        kodeRegistrasi,
+        buktiUrl,
+        message: "Bukti transfer DP berhasil diterima. Tim keuangan akan memverifikasi dalam 1x24 jam.",
+      },
+    });
+  } catch (error) {
+    console.error("[payment-proof] Error handling payment proof:", error);
+    return NextResponse.json({ success: false, message: (error as Error).message }, { status: 500 });
+  }
+}

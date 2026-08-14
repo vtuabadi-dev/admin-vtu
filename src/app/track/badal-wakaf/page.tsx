@@ -362,11 +362,19 @@ export default function TrackBadalWakafPage() {
                             </div>
 
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                              <div>
-                                <p className="text-muted-foreground">Status Kejamaahan:</p>
-                                <p className="font-semibold text-foreground">
-                                  {item.isJamaahVauza ? `Jamaah Vauza (${item.namaPaketUmroh || "Umroh"})` : "Pendaftaran Umum"}
-                                </p>
+                              <div className="space-y-3">
+                                <div>
+                                  <p className="text-muted-foreground">Status Kejamaahan:</p>
+                                  <p className="font-semibold text-foreground">
+                                    {item.isJamaahVauza ? `Jamaah Vauza (${item.namaPaketUmroh || "Umroh"})` : "Pendaftaran Umum"}
+                                  </p>
+                                </div>
+                                <div>
+                                  <p className="text-muted-foreground">Petugas Pelaksana:</p>
+                                  <p className="font-semibold text-emerald-700 dark:text-emerald-400">
+                                    {item.petugasBadal || "Menunggu Penugasan"}
+                                  </p>
+                                </div>
                               </div>
                               <div>
                                 <p className="text-muted-foreground">Catatan & Penyerahan Souvenir:</p>

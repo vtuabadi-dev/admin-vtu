@@ -838,6 +838,8 @@ export interface RegistrationMember {
   requestId: string;
   namaLengkap: string;
   jenisKelamin: JenisKelamin;
+  tempatLahir?: string;
+  tanggalLahir?: string;
   hubungan?: string;
   urutan: number;
 }
@@ -851,6 +853,7 @@ export interface GroupRegistrationFormData {
   members: {
     namaLengkap: string;
     jenisKelamin: JenisKelamin;
+    tanggalLahir?: string;
     hubungan?: string;
   }[];
   paketId: string;

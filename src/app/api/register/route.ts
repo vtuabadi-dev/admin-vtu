@@ -4,7 +4,7 @@ import { registrationRepo } from "@/server/repositories";
 import { notificationRepo } from "@/server/repositories";
 import { auditRepo } from "@/server/repositories";
 import { checkRateLimit, rateLimitKey, getRateLimitConfig } from "@/server/lib/rate-limit";
-import { getStorageAdapter, signaturePath } from "@/server/storage";
+import { signaturePath, getStorageAdapter } from "@/server/storage";
 import type { GroupRegistrationFormData } from "@/shared/types";
 
 const MAX_PAX = 100;
@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, message: "Data perwakilan wajib diisi" }, { status: 400 });
     }
 
-    if (!body.termsAccepted || !(body as any).termsSyarat || !(body as any).termsPembayaran || !(body as any).termsPembatalan || !(body as any).termsData) {
+    if (!body.termsAccepted) {
       return NextResponse.json({ success: false, message: "Semua syarat & ketentuan harus disetujui" }, { status: 400 });
     }
 
@@ -85,6 +85,7 @@ export async function POST(request: NextRequest) {
     const members = body.members.map((m, i) => ({
       namaLengkap: m.namaLengkap.toUpperCase().trim(),
       jenisKelamin: m.jenisKelamin,
+      tanggalLahir: m.tanggalLahir || undefined,
       hubungan: m.hubungan ?? null,
       urutan: i + 1,
     }));
@@ -127,11 +128,16 @@ export async function POST(request: NextRequest) {
       // Non-critical
     }
 
-    // ── Generate PDF ────────────────────────────────────────
+    // ── Generate PDF & Save to Local Server Vault ───────────
+    // NOTE: Google Drive upload is disabled — Service Accounts have 0 storage quota (HTTP 403).
+    // PDF is always saved to local server vault (/public/exports/formulir/) and attached to email.
     let pdfPath = "";
+    let pdfFilename = "";
+    let pdfBuffer: Buffer | null = null;
+    let localFilePath = "";
     try {
       const { generateRegistrationPdf } = await import("@/server/services/registration-pdf.service");
-      const pdfBuffer = await generateRegistrationPdf({
+      pdfBuffer = await generateRegistrationPdf({
         registration: reg,
         packageInfo: (paket as any) ?? null,
         termsVersion: (body as any).termsVersion || "1.0",
@@ -139,47 +145,77 @@ export async function POST(request: NextRequest) {
         signedAt: reg.signedAt,
       });
 
-      const storage = getStorageAdapter();
-      pdfPath = `registrations/${kodeRegistrasi}/formulir-pendaftaran.pdf`;
-      await storage.upload(pdfPath, pdfBuffer, "application/pdf");
+      // Filename format: [KODE_REGISTRASI]_[NAMA_PENDAFTAR].pdf
+      const namaClean = namaPerwakilan.replace(/[^A-Z0-9]/gi, "_").replace(/_+/g, "_");
+      pdfFilename = `${kodeRegistrasi}_${namaClean}.pdf`;
+      pdfPath = `formulir-pendaftaran/${pdfFilename}`;
+
+      // Always save to local vault — reliable, no external dependency
+      try {
+        const { createLocalAdapter } = await import("@/server/storage/local");
+        const localVault = createLocalAdapter();
+        localFilePath = await localVault.upload(pdfPath, pdfBuffer, "application/pdf");
+        console.log("[register] PDF saved to local vault:", localFilePath);
+      } catch (vaultErr: any) {
+        console.warn("[register] Local vault save failed:", vaultErr?.message || vaultErr);
+        // PDF bytes still in memory — will still be attached to email even if vault fails
+      }
     } catch (err) {
-      console.error("[register] PDF generation failed:", err);
-      // Non-blocking — registration still succeeds
+      console.error("[register] PDF generation error:", err);
     }
 
-    // ── Send confirmation email ─────────────────────────────
+    // ── Send confirmation email with attached PDF ────────────
     let emailStatus = "not_sent";
     try {
       const { getNotificationProvider } = await import("@/server/services/notify");
       const notifier = getNotificationProvider();
+      const namaClean = namaPerwakilan.replace(/[^A-Z0-9]/gi, "_").replace(/_+/g, "_");
       await notifier.send({
         channel: "email",
         recipient: body.emailPerwakilan,
-        subject: "Konfirmasi Registrasi Jamaah — " + kodeRegistrasi,
+        subject: `Konfirmasi Registrasi Jamaah Umroh — ${kodeRegistrasi} (${namaPerwakilan})`,
         body: [
           `Yth. ${namaPerwakilan},`,
           "",
-          `Terima kasih telah melakukan pendaftaran melalui portal registrasi kami.`,
+          `Assalamu'alaikum Warahmatullahi Wabarakatuh.`,
           "",
-          `Berikut ringkasan pendaftaran Anda:`,
-          `  No. Registrasi: ${kodeRegistrasi}`,
-          `  Paket: ${paket?.namaPaket ?? "-"}`,
-          `  Jumlah Jamaah: ${body.paxCount} orang`,
-          `  Preferensi Kamar: ${body.roomUpgrade?.toUpperCase() ?? "MIX"}`,
+          `Terima kasih telah mendaftar melalui portal registrasi VTU ABADI Travel.`,
+          `Pendaftaran Anda telah kami terima dengan detail sebagai berikut:`,
           "",
-          `Status pendaftaran Anda saat ini: BARU.`,
-          `Tim travel kami akan menghubungi Anda dalam 1-2 hari kerja untuk proses selanjutnya.`,
+          `  ✅ No. Registrasi   : ${kodeRegistrasi}`,
+          `  👤 Nama PIC         : ${namaPerwakilan}`,
+          `  📦 Paket Umroh      : ${paket?.namaPaket ?? "-"}`,
+          `  👥 Jumlah Jamaah    : ${body.paxCount} PAX`,
+          `  🛏️  Preferensi Kamar: ${(body.roomUpgrade || "quad").toUpperCase()}`,
+          `  📞 WhatsApp PIC     : ${body.nomorTelepon}`,
           "",
-          `Formulir registrasi terlampir dalam email ini untuk arsip Anda.`,
+          `📎 Formulir Pendaftaran Resmi terlampir dalam email ini (file PDF).`,
+          `   Simpan dokumen ini sebagai bukti pendaftaran Anda.`,
           "",
-          `Jika ada pertanyaan, silakan hubungi kami melalui WhatsApp.`,
+          `⏳ Selanjutnya:`,
+          `   Tim operasional kami akan menghubungi Anda via WhatsApp dalam 1-2 hari kerja`,
+          `   untuk konfirmasi pembayaran Down Payment (DP) dan verifikasi berkas.`,
+          "",
+          `Wassalamu'alaikum Warahmatullahi Wabarakatuh.`,
           "",
           `Hormat kami,`,
-          `Tim VTU Operasional`,
+          `Tim VTU ABADI Travel`,
+          `📧 info@vtuabadi.com | 📞 +62-xxx-xxxx-xxxx`,
         ].join("\n"),
+        attachments: pdfBuffer
+          ? [
+              {
+                filename: pdfFilename || `${kodeRegistrasi}_${namaClean}.pdf`,
+                content: pdfBuffer,
+                contentType: "application/pdf",
+              },
+            ]
+          : undefined,
         metadata: {
           kodeRegistrasi,
           pdfPath,
+          pdfFilename,
+          localFilePath,
           registrationId: reg.id,
         },
       });
@@ -197,7 +233,7 @@ export async function POST(request: NextRequest) {
         role: "jamaah",
         module: "jamaah",
         action: "registration.artifacts",
-        detail: `PDF: ${pdfPath || "gagal"} | Email: ${emailStatus} | Ke: ${body.emailPerwakilan}`,
+        detail: `PDF: ${pdfPath || "gagal"} (Vault: ${localFilePath || "not-saved"}) | Email: ${emailStatus} | Ke: ${body.emailPerwakilan}`,
         entityId: reg.id,
         entityType: "RegistrationRequest",
       });
@@ -225,6 +261,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
+      kodeRegistrasi: reg.kodeRegistrasi,
       data: {
         kodeRegistrasi: reg.kodeRegistrasi,
         status: reg.status,

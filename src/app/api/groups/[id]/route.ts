@@ -18,3 +18,18 @@ export async function GET(_request: NextRequest, { params }: { params: { id: str
     return NextResponse.json({ success: false, message: (error as Error).message }, { status: 500 });
   }
 }
+
+export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
+  const session = await auth();
+  if (!session?.user) return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
+  const perm = checkServerPermission(session, "jamaah", "edit");
+  if (!perm.allowed) return NextResponse.json({ success: false, message: perm.reason }, { status: 403 });
+
+  try {
+    const body = await request.json();
+    const group = await groupRepo.update(params.id, body);
+    return NextResponse.json({ success: true, data: group });
+  } catch (error) {
+    return NextResponse.json({ success: false, message: (error as Error).message }, { status: 500 });
+  }
+}

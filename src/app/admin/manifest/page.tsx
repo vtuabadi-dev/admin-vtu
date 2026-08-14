@@ -20,6 +20,8 @@ import {
   FileSpreadsheet,
   Upload,
   CheckCircle2,
+  Trash2,
+  ArrowRightLeft,
 } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/shared/components/ui/Card";
 import { Button } from "@/shared/components/ui/Button";
@@ -141,6 +143,7 @@ function ManifestPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const urlPaketId = searchParams.get("paketId") || "";
+  const fromSource = searchParams.get("from") || "";
 
   const [manifests, setManifests] = useState<Manifest[]>([]);
   const [keberangkatanList, setKeberangkatanList] = useState<Keberangkatan[]>([]);
@@ -163,6 +166,18 @@ function ManifestPageContent() {
   const [excelPreviewRows, setExcelPreviewRows] = useState<any[]>([]);
   const [parsingExcel, setParsingExcel] = useState(false);
   const [submittingImport, setSubmittingImport] = useState(false);
+
+  // Actions Modal State
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [jamaahToDelete, setJamaahToDelete] = useState<Jamaah | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteMode, setDeleteMode] = useState<"soft" | "hard">("soft");
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
+
+  const [moveModalOpen, setMoveModalOpen] = useState(false);
+  const [groupToMove, setGroupToMove] = useState<any | null>(null);
+  const [targetPaketId, setTargetPaketId] = useState<string>("");
+  const [isMoving, setIsMoving] = useState(false);
 
   // Sync state if URL search param changes
   useEffect(() => {
@@ -222,7 +237,7 @@ function ManifestPageContent() {
     );
 
     return allJamaah.filter(
-      (j) => jamaahIds.has(j.id) || packageGroupIds.has(j.groupId)
+      (j) => (jamaahIds.has(j.id) || packageGroupIds.has(j.groupId)) && j.status !== "batal"
     );
   }, [activePackage, allJamaah, groups]);
 
@@ -536,6 +551,53 @@ function ManifestPageContent() {
     }
   }
 
+  async function handleDeleteJamaah() {
+    if (!jamaahToDelete) return;
+    setIsDeleting(true);
+    try {
+      const res = await fetch(`/api/jamaah/${jamaahToDelete.id}?mode=${deleteMode}`, { method: "DELETE" });
+      const json = await res.json();
+      if (res.ok && json.success) {
+        setDeleteModalOpen(false);
+        setJamaahToDelete(null);
+        await loadAllData();
+      } else {
+        alert(json.message || "Gagal menghapus jamaah");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Terjadi kesalahan sistem");
+    } finally {
+      setIsDeleting(false);
+    }
+  }
+
+  async function handleMoveGroup() {
+    if (!groupToMove || !targetPaketId) return;
+    setIsMoving(true);
+    try {
+      const res = await fetch(`/api/groups/${groupToMove.groupId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ paketKeberangkatanId: targetPaketId }),
+      });
+      const json = await res.json();
+      if (res.ok && json.success) {
+        setMoveModalOpen(false);
+        setGroupToMove(null);
+        setTargetPaketId("");
+        await loadAllData();
+      } else {
+        alert(json.message || "Gagal memindahkan grup jamaah");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Terjadi kesalahan sistem");
+    } finally {
+      setIsMoving(false);
+    }
+  }
+
   // Counter variable for global sequential NO JAMAAH
   let globalNoJamaahCounter = 1;
 
@@ -550,11 +612,15 @@ function ManifestPageContent() {
               size="sm"
               onClick={() => {
                 setSelectedKeberangkatan("");
-                router.push("/admin/manifest");
+                if (fromSource === "paket-aktif") {
+                  router.push("/admin/keberangkatan");
+                } else {
+                  router.push("/admin/manifest");
+                }
               }}
             >
               <ArrowLeft className="mr-1.5 h-4 w-4" />
-              Semua Manifest
+              {fromSource === "paket-aktif" ? "Paket Aktif" : "Semua Manifest"}
             </Button>
           )}
           <div>
@@ -795,8 +861,11 @@ function ManifestPageContent() {
                       <th className="px-3 py-3 font-bold uppercase tracking-wider text-[10px] text-stone-700 dark:text-stone-300 border-r border-stone-200/70 dark:border-stone-800/70 w-28">
                         PROVINSI (*)
                       </th>
-                      <th className="px-3 py-3 font-bold uppercase tracking-wider text-[10px] text-stone-700 dark:text-stone-300 min-w-[200px]">
+                      <th className="px-3 py-3 font-bold uppercase tracking-wider text-[10px] text-stone-700 dark:text-stone-300 min-w-[200px] border-r border-stone-200/70 dark:border-stone-800/70">
                         ALAMAT
+                      </th>
+                      <th className="px-3 py-3 font-bold uppercase tracking-wider text-[10px] text-stone-700 dark:text-stone-300 w-24 text-center sticky right-0 bg-stone-100/90 dark:bg-stone-900/90 shadow-[-4px_0_6px_-4px_rgba(0,0,0,0.1)]">
+                        AKSI
                       </th>
                     </tr>
                   </thead>
@@ -971,12 +1040,46 @@ function ManifestPageContent() {
                                 {provinsiDisplay}
                               </td>
 
-                              {/* ALAMAT */}
                               <td
-                                className="px-3 py-2.5 text-stone-600 dark:text-stone-400 max-w-[240px] truncate"
+                                className="px-3 py-2.5 text-stone-600 dark:text-stone-400 max-w-[240px] truncate border-r border-stone-200/50 dark:border-stone-800/50"
                                 title={j.alamat}
                               >
                                 {j.alamat || "-"}
+                              </td>
+
+                              {/* AKSI */}
+                              <td className="px-3 py-2.5 text-center sticky right-0 bg-white/90 dark:bg-card/90 backdrop-blur-sm shadow-[-4px_0_6px_-4px_rgba(0,0,0,0.05)] border-l border-stone-200/50 dark:border-stone-800/50">
+                                <div className="flex items-center justify-center gap-2">
+                                  {isFirstInGroup && (
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      className="h-7 px-2 text-[10px] border-stone-200/60 dark:border-stone-800/60 hover:bg-sky-50 hover:text-sky-600"
+                                      title="Pindah Paket"
+                                      onClick={() => {
+                                        setGroupToMove(group);
+                                        setTargetPaketId("");
+                                        setMoveModalOpen(true);
+                                      }}
+                                    >
+                                      <ArrowRightLeft className="h-3 w-3" />
+                                    </Button>
+                                  )}
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-7 px-2 text-[10px] border-stone-200/60 dark:border-stone-800/60 hover:bg-red-50 hover:text-red-600"
+                                    title="Hapus Jamaah"
+                                    onClick={() => {
+                                      setJamaahToDelete(j);
+                                      setDeleteMode("soft");
+                                      setDeleteConfirmText("");
+                                      setDeleteModalOpen(true);
+                                    }}
+                                  >
+                                    <Trash2 className="h-3 w-3" />
+                                  </Button>
+                                </div>
                               </td>
                             </tr>
                           );
@@ -1331,6 +1434,123 @@ function ManifestPageContent() {
               onClick={doGenerate}
             >
               Generate Sekarang
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Delete Jamaah Modal */}
+      <Modal
+        open={deleteModalOpen}
+        onClose={() => !isDeleting && setDeleteModalOpen(false)}
+        title="Hapus Jamaah"
+        description="Pilih jenis penghapusan dan konfirmasikan tindakan Anda."
+      >
+        <div className="space-y-4">
+          <div className="bg-stone-50 dark:bg-stone-900/30 text-foreground p-4 rounded-md text-sm border border-stone-200 dark:border-stone-800/30">
+            <p><strong>Nama:</strong> {jamaahToDelete ? getSingleSourceOfTruthName(jamaahToDelete) : "-"}</p>
+            <p><strong>ID Register:</strong> {jamaahToDelete?.registrationId || "-"}</p>
+          </div>
+
+          {/* Delete Mode Options */}
+          <div className="space-y-3 pt-2">
+            <label className="text-xs font-bold text-foreground">Pilihan Penghapusan</label>
+            <div className="grid grid-cols-1 gap-2.5">
+              <label className="flex items-start gap-3 p-3 rounded-xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 cursor-pointer hover:bg-stone-50 transition">
+                <input
+                  type="radio"
+                  name="deleteMode"
+                  className="mt-1 h-4 w-4 text-emerald-600 focus:ring-emerald-500"
+                  checked={deleteMode === "soft"}
+                  onChange={() => setDeleteMode("soft")}
+                />
+                <div className="text-xs">
+                  <span className="font-bold text-foreground block">Soft Delete (Batal Berangkat)</span>
+                  <span className="text-muted-foreground">Membatalkan keberangkatan jamaah (status: batal), data record tetap tersimpan di database.</span>
+                </div>
+              </label>
+
+              <label className="flex items-start gap-3 p-3 rounded-xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 cursor-pointer hover:bg-stone-50 transition">
+                <input
+                  type="radio"
+                  name="deleteMode"
+                  className="mt-1 h-4 w-4 text-red-600 focus:ring-red-500"
+                  checked={deleteMode === "hard"}
+                  onChange={() => setDeleteMode("hard")}
+                />
+                <div className="text-xs">
+                  <span className="font-bold text-red-600 dark:text-red-400 block">Hard Delete (Hapus Permanen)</span>
+                  <span className="text-muted-foreground">Menghapus data jamaah, file dokumen, kamar, dan invoice terkait secara permanen dari database.</span>
+                </div>
+              </label>
+            </div>
+          </div>
+
+          {/* Hard Delete Warnings & Input */}
+          {deleteMode === "hard" && (
+            <div className="bg-red-50 dark:bg-red-950/30 text-red-800 dark:text-red-200 p-4 rounded-xl border border-red-200 dark:border-red-800/30 text-xs space-y-3 animate-in fade-in duration-200">
+              <p className="font-bold">
+                ⚠️ PERINGATAN: Tindakan ini permanen dan tidak dapat dibatalkan!
+              </p>
+              <div className="space-y-1.5">
+                <label className="font-semibold block">Ketik &quot;HAPUS&quot; untuk mengonfirmasi:</label>
+                <input
+                  type="text"
+                  placeholder="Ketik HAPUS"
+                  value={deleteConfirmText}
+                  onChange={(e) => setDeleteConfirmText(e.target.value)}
+                  className="h-9 w-full bg-white dark:bg-stone-950 border border-red-200 dark:border-red-800/50 rounded-lg px-3 text-xs text-foreground placeholder:text-muted-foreground/45 focus:outline-none focus:ring-2 focus:ring-red-500"
+                />
+              </div>
+            </div>
+          )}
+
+          <div className="flex justify-end gap-2 pt-2 border-t border-stone-100 dark:border-stone-800/50">
+            <Button variant="outline" disabled={isDeleting} onClick={() => setDeleteModalOpen(false)}>
+              Batal
+            </Button>
+            <Button
+              variant={deleteMode === "hard" ? "destructive" : "default"}
+              disabled={isDeleting || (deleteMode === "hard" && deleteConfirmText !== "HAPUS")}
+              className={deleteMode === "hard" ? "bg-red-600 hover:bg-red-700 text-white" : "bg-emerald-700 hover:bg-emerald-800 text-white"}
+              onClick={handleDeleteJamaah}
+            >
+              {isDeleting ? "Memproses..." : deleteMode === "hard" ? "Hapus Permanen" : "Batalkan Keberangkatan"}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Move Group Modal */}
+      <Modal
+        open={moveModalOpen}
+        onClose={() => !isMoving && setMoveModalOpen(false)}
+        title="Pindah Paket (Rombongan)"
+        description="Pindahkan seluruh anggota rombongan/keluarga ke paket keberangkatan lain."
+      >
+        <div className="space-y-4">
+          <div className="bg-sky-50 dark:bg-sky-950/30 text-sky-800 dark:text-sky-200 p-4 rounded-md text-sm border border-sky-200 dark:border-sky-800/30">
+            <p><strong>Rombongan:</strong> {groupToMove ? formatGroupMergeLabel(groupToMove.groupObj, groupToMove.members) : "-"}</p>
+            <p><strong>Jumlah Anggota:</strong> {groupToMove?.members?.length || 0} Pax</p>
+          </div>
+          <Select
+            label="Pilih Paket Tujuan"
+            options={keberangkatanList
+              .filter(k => k.id !== activePackage?.id && k.status === "scheduled")
+              .map((k) => ({
+                value: k.id,
+                label: `${k.kode} — ${k.namaPaket || "-"} (${formatDateShort(k.tanggalBerangkat)})`,
+              }))}
+            placeholder="-- Pilih Paket Tujuan --"
+            value={targetPaketId}
+            onChange={(e) => setTargetPaketId(e.target.value)}
+          />
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" disabled={isMoving} onClick={() => setMoveModalOpen(false)}>
+              Batal
+            </Button>
+            <Button disabled={!targetPaketId || isMoving} onClick={handleMoveGroup}>
+              {isMoving ? "Memindahkan..." : "Pindahkan Rombongan"}
             </Button>
           </div>
         </div>
