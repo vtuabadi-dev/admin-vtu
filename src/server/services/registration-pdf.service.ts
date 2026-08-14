@@ -1,12 +1,11 @@
 // ============================================================
 // REGISTRATION PDF SERVICE
-// Generate official registration form PDF using VTU Kop Surat
-// matching official template sections A, B, C, D, E, F.
+// Generate official registration form PDF using PDFKit directly
+// Pure Node.js — guaranteed to work on Vercel Serverless
 // ============================================================
 
 import type { RegistrationRequest, Keberangkatan } from "@/shared/types";
 import { getStorageAdapter } from "@/server/storage";
-import { KOP_SURAT_BASE64 } from "@/server/assets/kop-surat";
 
 interface PdfData {
   registration: RegistrationRequest;
@@ -33,73 +32,25 @@ const ROOM_LABELS: Record<string, string> = {
   double: "DOUBLE — 2 Orang / Kamar",
 };
 
-function getPrinterInstance(fonts: any): any {
-  let PdfPrinter: any;
-  try {
-    const p = require("pdfmake/src/printer");
-    PdfPrinter = p.default || p;
-  } catch {
-    const p = require("pdfmake");
-    PdfPrinter = p.PdfPrinter || p.default || p;
-  }
-  const printer = new PdfPrinter(fonts);
-  if (!printer.urlResolver) {
-    printer.urlResolver = {
-      resolve: (url: string) => Promise.resolve(url),
-      resolved: () => Promise.resolve(),
-    };
-  }
-  return printer;
-}
-
 export async function generateRegistrationPdf(data: PdfData): Promise<Buffer> {
   const { registration: reg, packageInfo } = data;
 
-  const fonts = {
-    Roboto: {
-      normal: "Helvetica",
-      bold: "Helvetica-Bold",
-      italics: "Helvetica-Oblique",
-      bolditalics: "Helvetica-BoldOblique",
-    },
-    Helvetica: {
-      normal: "Helvetica",
-      bold: "Helvetica-Bold",
-      italics: "Helvetica-Oblique",
-      bolditalics: "Helvetica-BoldOblique",
-    },
-    Courier: {
-      normal: "Courier",
-      bold: "Courier-Bold",
-      italics: "Courier-Oblique",
-      bolditalics: "Courier-BoldOblique",
-    },
-  };
-
-  const printer = getPrinterInstance(fonts);
-
-  // 1. Load Kop Surat Header Image from bundled asset
-  const kopSuratBase64 = KOP_SURAT_BASE64;
-
-  // 2. Load Digital Signature Image if available
-  let signatureBase64 = "";
+  // Load signature image if available
+  let signatureBuffer: Buffer | null = null;
   if (reg.signaturePath) {
     try {
       if (reg.signaturePath.startsWith("data:image")) {
-        signatureBase64 = reg.signaturePath;
+        // base64 inline — extract raw buffer
+        const base64Data = reg.signaturePath.split(",")[1];
+        if (base64Data) signatureBuffer = Buffer.from(base64Data, "base64");
       } else {
         const { createLocalAdapter } = await import("@/server/storage/local");
         const localAdapter = createLocalAdapter();
-        let sigBuffer: Buffer | null = null;
         try {
-          sigBuffer = await localAdapter.download(reg.signaturePath);
+          signatureBuffer = await localAdapter.download(reg.signaturePath);
         } catch {
           const storage = getStorageAdapter();
-          sigBuffer = await storage.download(reg.signaturePath).catch(() => null);
-        }
-
-        if (sigBuffer && sigBuffer.length > 0) {
-          signatureBase64 = `data:image/jpeg;base64,${sigBuffer.toString("base64")}`;
+          signatureBuffer = await storage.download(reg.signaturePath).catch(() => null);
         }
       }
     } catch (err) {
@@ -107,269 +58,176 @@ export async function generateRegistrationPdf(data: PdfData): Promise<Buffer> {
     }
   }
 
-  // 3. Build Section B Member Table Rows (Dynamic member count)
-  const memberRows = reg.members.map((m, i) => {
-    let tglStr = "-";
-    if (m.tanggalLahir) {
-      tglStr = formatShortDate(m.tanggalLahir);
-    }
-    return [
-      { text: String(i + 1), alignment: "center" as const, fontSize: 9 },
-      { text: m.namaLengkap.toUpperCase(), bold: true, fontSize: 9 },
-      { text: m.tempatLahir ? m.tempatLahir.toUpperCase() : "-", fontSize: 9 },
-      { text: tglStr, alignment: "center" as const, fontSize: 9 },
-      { text: m.hubungan || (i === 0 ? "Ketua Grup" : "-"), alignment: "center" as const, fontSize: 9 },
-    ];
-  });
+  // Use PDFKit directly — pure Node.js, no font files needed for built-in fonts
+  const PDFDocument = (await import("pdfkit")).default;
 
-  const memberTableBody = [
-    [
-      { text: "No.", style: "tableHeader", alignment: "center" },
-      { text: "Nama Anggota", style: "tableHeader" },
-      { text: "Tempat Lahir", style: "tableHeader" },
-      { text: "Tanggal Lahir", style: "tableHeader", alignment: "center" },
-      { text: "Hubungan", style: "tableHeader", alignment: "center" },
-    ],
-    ...memberRows,
-  ];
-
-  const roomText = reg.roomUpgrade ? (ROOM_LABELS[reg.roomUpgrade] ?? reg.roomUpgrade.toUpperCase()) : "QUAD (Standar)";
-  const picBirthPlace = reg.members[0]?.tempatLahir ? reg.members[0].tempatLahir.toUpperCase() : "-";
-  const picBirthDate = reg.members[0]?.tanggalLahir ? formatShortDate(reg.members[0].tanggalLahir) : "-";
-
-  const docDefinition: any = {
-    pageSize: "A4",
-    pageMargins: [40, 30, 40, 40],
-    defaultStyle: { font: "Helvetica", fontSize: 9.5, color: "#0f172a" },
-    background: function (_currentPage: number, pageSize: { width: number; height: number }) {
-      if (kopSuratBase64) {
-        return [
-          {
-            image: kopSuratBase64,
-            width: 380,
-            opacity: 0.12,
-            absolutePosition: {
-              x: (pageSize.width - 380) / 2,
-              y: 220,
-            },
-          },
-        ];
-      }
-      return [];
-    },
-    styles: {
-      docTitle: { fontSize: 13, bold: true, alignment: "center", margin: [0, 6, 0, 1] },
-      docSubTitle: { fontSize: 11, bold: true, alignment: "center", margin: [0, 0, 0, 12] },
-      sectionHeader: { fontSize: 10, bold: true, color: "#0f172a", margin: [0, 10, 0, 4] },
-      tableHeader: { fontSize: 9, bold: true, color: "#0f172a", fillColor: "#e2e8f0" },
-      subCaption: { fontSize: 8.5, italics: true, color: "#475569", margin: [0, 0, 0, 4] },
-      labelText: { fontSize: 9, color: "#334155" },
-      valueText: { fontSize: 9.5, bold: true, color: "#0f172a" },
-      termsItem: { fontSize: 8.5, color: "#334155", margin: [0, 1, 0, 1] },
-      footerNote: { fontSize: 8, italics: true, alignment: "center", color: "#64748b", margin: [0, 10, 0, 0] },
-    },
-    content: [
-      // ── KOP SURAT HEADER (TOP BANNER ONLY) ────────────────
-      ...(kopSuratBase64
-        ? [{ image: kopSuratBase64, width: 515, fit: [515, 95] as [number, number], margin: [0, 0, 0, 6] }]
-        : [{ text: "VTU ABADI TRAVEL", style: "docTitle", margin: [0, 0, 0, 10] }]),
-
-      // ── FORM TITLE ───────────────────────────────────────
-      { text: "FORMULIR PENDAFTARAN UMROH", style: "docTitle" },
-      { text: "VTU ABADI", style: "docSubTitle" },
-
-      // ── A. DATA PENDAFTAR ────────────────────────────────
-      { text: "A. DATA PENDAFTAR", style: "sectionHeader" },
-      {
-        table: {
-          widths: [140, 5, "*"],
-          body: [
-            [{ text: "ID / No. Registrasi Rombongan", style: "labelText" }, ":", { text: reg.kodeRegistrasi, style: "valueText" }],
-            [{ text: "Nama Lengkap PIC", style: "labelText" }, ":", { text: reg.namaPerwakilan.toUpperCase(), style: "valueText" }],
-            [{ text: "Nomor Telepon / WhatsApp", style: "labelText" }, ":", { text: reg.nomorTelepon, style: "valueText" }],
-            [{ text: "Email", style: "labelText" }, ":", { text: reg.emailPerwakilan, style: "valueText" }],
-            [
-              { text: "Tempat & Tanggal Lahir", style: "labelText" },
-              ":",
-              { text: `${picBirthPlace}  /  ${picBirthDate}`, style: "valueText" },
-            ],
-          ],
-        },
-        layout: "noBorders",
-        margin: [0, 0, 0, 6],
-      },
-
-      // ── B. DATA ANGGOTA PENDAFTAR ────────────────────────
-      { text: "B. DATA ANGGOTA PENDAFTAR", style: "sectionHeader" },
-      { text: "Diisi apabila pendaftaran dilakukan untuk lebih dari satu jamaah.", style: "subCaption" },
-      {
-        table: {
-          headerRows: 1,
-          widths: [25, "*", 110, 95, 80],
-          body: memberTableBody,
-        },
-        layout: {
-          hLineWidth: () => 0.5,
-          vLineWidth: () => 0.5,
-          hLineColor: () => "#94a3b8",
-          vLineColor: () => "#94a3b8",
-          paddingLeft: () => 5,
-          paddingRight: () => 5,
-          paddingTop: () => 3,
-          paddingBottom: () => 3,
-        },
-        margin: [0, 0, 0, 8],
-      },
-
-      // ── C. PAKET & KLASTER PAKET UMROH ───────────────────
-      { text: "C. PAKET & KLASTER PAKET UMROH", style: "sectionHeader" },
-      {
-        table: {
-          widths: [140, 5, "*"],
-          body: [
-            [{ text: "Paket Umroh", style: "labelText" }, ":", { text: packageInfo?.namaPaket || packageInfo?.kode || "Paket Regular Umroh", style: "valueText" }],
-            [{ text: "Klaster Paket", style: "labelText" }, ":", { text: roomText, style: "valueText" }],
-          ],
-        },
-        layout: "noBorders",
-        margin: [0, 0, 0, 2],
-      },
-      {
-        text: "Informasi paket dan klaster paket yang dipilih menjadi bagian dari pendaftaran ini dan mengacu pada ketentuan paket yang berlaku.",
-        style: "subCaption",
-        margin: [0, 2, 0, 8],
-      },
-
-      // ── D. SYARAT & KETENTUAN (OPERASIONAL RULES) ───────
-      { text: "D. SYARAT & KETENTUAN", style: "sectionHeader" },
-      {
-        ol: [
-          "Pendaftar adalah perwakilan resmi rombongan jamaah Umroh VTU ABADI.",
-          "Seluruh data anggota jamaah yang diserahkan wajib sesuai dengan dokumen identitas resmi (KTP/Paspor).",
-          "Minimal pendaftaran adalah 1 orang dan maksimal 100 orang per grup pendaftaran.",
-          "Biaya paket belum termasuk biaya pembuatan paspor, vaksin, sertifikat mahram, dan kebutuhan pribadi jamaah.",
-          "Pembayaran Down Payment (DP) minimal 30% wajib dilunasi dalam kurun waktu 14 hari kerja sejak registrasi.",
-          "Pelunasan sisa biaya paket wajib diselesaikan selambat-lambatnya 30 hari sebelum jadwal keberangkatan.",
-          "Pembatalan pendaftaran secara sepihak dikenakan biaya administrasi & pembatalan sesuai ketentuan operasional.",
-          "Berkas fisik dokumen kelengkapan (Paspor aktif min. 7 bulan, Pas Foto, Sertifikat Vaksin, KTP, KK) wajib diserahkan pada tahap pemberkasan.",
-          "Tanda Tangan Digital pada formulir ini dinyatakan sah dan memiliki kekuatan hukum persetujuan yang mengikat.",
-        ],
-        style: "termsItem",
-        margin: [10, 0, 0, 8],
-      },
-
-      // ── E. PERSETUJUAN SYARAT & KETENTUAN ─────────────────
-      { text: "E. PERSETUJUAN SYARAT & KETENTUAN", style: "sectionHeader" },
-      {
-        text: "Dengan mengisi dan menandatangani formulir ini, saya menyatakan bahwa saya telah membaca, memahami, dan menyetujui Syarat & Ketentuan Umroh VTU ABADI yang berlaku.",
-        style: "subCaption",
-        margin: [0, 0, 0, 4],
-      },
-      {
-        ul: [
-          "[x]  Saya telah membaca, memahami, dan menyetujui Syarat & Ketentuan Umroh VTU ABADI.",
-          "[x]  Saya menyetujui paket dan klaster paket Umroh yang dipilih.",
-          "[x]  Saya menyatakan bahwa data yang saya berikan dalam formulir ini adalah benar.",
-          "[x]  Saya bersedia mengikuti seluruh ketentuan perjalanan Umroh yang berlaku.",
-        ],
-        style: "termsItem",
-        margin: [10, 0, 0, 10],
-      },
-
-      // ── F. PERNYATAAN PERSETUJUAN (SIGNATURE BOX) ─────────
-      { text: "F. PERNYATAAN PERSETUJUAN", style: "sectionHeader" },
-      {
-        table: {
-          widths: [140, 5, "*"],
-          body: [
-            [{ text: "Nama Pendaftar", style: "labelText" }, ":", { text: reg.namaPerwakilan.toUpperCase(), style: "valueText" }],
-            [
-              { text: "Tanggal Persetujuan", style: "labelText" },
-              ":",
-              { text: formatShortDate(data.termsAcceptedAt || reg.createdAt), style: "valueText" },
-            ],
-          ],
-        },
-        layout: "noBorders",
-        margin: [0, 0, 0, 8],
-      },
-      {
-        table: {
-          widths: [260],
-          body: [
-            [{ text: "PENDAFTAR / KETUA ROMBONGAN", alignment: "center", bold: true, fontSize: 9.5, fillColor: "#f1f5f9" }],
-            [
-              {
-                stack: [
-                  signatureBase64
-                    ? { image: signatureBase64, height: 45, alignment: "center" as const, margin: [0, 4, 0, 4] }
-                    : { text: "\n\n", margin: [0, 15, 0, 15] },
-                  { text: `( ${reg.namaPerwakilan.toUpperCase()} )`, alignment: "center" as const, bold: true, fontSize: 9 },
-                ],
-                margin: [0, 4, 0, 4],
-              },
-            ],
-          ],
-        },
-        layout: {
-          hLineWidth: () => 0.5,
-          vLineWidth: () => 0.5,
-          hLineColor: () => "#94a3b8",
-          vLineColor: () => "#94a3b8",
-        },
-        alignment: "center",
-        margin: [120, 0, 120, 6],
-      },
-
-      // ── FOOTER NOTE ──────────────────────────────────────
-      {
-        text: "Catatan: Data paspor dan dokumen lainnya dapat dilengkapi pada tahap administrasi berikutnya.",
-        style: "footerNote",
-      },
-    ],
-  };
-
-  try {
-    // Build PDF using pdfmake
-    const pdfDoc = await printer.createPdfKitDocument(docDefinition);
-
-    return await new Promise((resolve, reject) => {
+  return new Promise((resolve, reject) => {
+    try {
+      const doc = new PDFDocument({ size: "A4", margin: 40, bufferPages: true });
       const chunks: Buffer[] = [];
-      pdfDoc.on("data", (chunk: Buffer) => chunks.push(chunk));
-      pdfDoc.on("end", () => resolve(Buffer.concat(chunks)));
-      pdfDoc.on("error", reject);
-      pdfDoc.end();
-    });
-  } catch (pdfMakeErr) {
-    console.warn("[registration-pdf] pdfmake failed, falling back to jsPDF:", pdfMakeErr);
-    return generateJsPdfFallback(data);
-  }
+      doc.on("data", (chunk: Buffer) => chunks.push(chunk));
+      doc.on("end", () => resolve(Buffer.concat(chunks)));
+      doc.on("error", reject);
+
+      const PAGE_W = 515; // usable width at margin=40
+      const PRI_COLOR = "#0f172a";
+      const ACC_COLOR = "#1e40af";
+      const GRAY = "#64748b";
+      const LIGHT_GRAY = "#e2e8f0";
+
+      // ── HEADER ─────────────────────────────────────────────────────────────
+      doc.rect(40, 40, PAGE_W, 56).fill(ACC_COLOR);
+      doc.fillColor("#ffffff").fontSize(16).font("Helvetica-Bold")
+        .text("VTU ABADI TRAVEL", 50, 48, { align: "center", width: PAGE_W - 20 });
+      doc.fontSize(9).font("Helvetica")
+        .text("Formulir Pendaftaran Jamaah Umroh | Travel Umroh Terpercaya", 50, 68, { align: "center", width: PAGE_W - 20 });
+      doc.moveTo(40, 96).lineTo(40 + PAGE_W, 96).lineWidth(1.5).strokeColor(ACC_COLOR).stroke();
+
+      let y = 110;
+
+      // ── TITLE BLOCK ─────────────────────────────────────────────────────────
+      doc.fillColor(PRI_COLOR).fontSize(13).font("Helvetica-Bold")
+        .text("FORMULIR PENDAFTARAN JAMAAH UMROH", 40, y, { align: "center", width: PAGE_W });
+      y += 18;
+      doc.fontSize(10).font("Helvetica")
+        .text(`No. Registrasi: ${reg.kodeRegistrasi}`, 40, y, { align: "center", width: PAGE_W });
+      y += 20;
+
+      // ── SECTION A — DATA PENDAFTARAN ───────────────────────────────────────
+      y = drawSectionHeader(doc, y, PAGE_W, ACC_COLOR, "A", "DATA PENDAFTARAN");
+      const paketName = packageInfo?.namaPaket ?? "-";
+      const dateKeberangkatan = packageInfo?.tanggalBerangkat
+        ? formatShortDate(packageInfo.tanggalBerangkat as string | Date)
+        : "-";
+      const roomText = reg.roomUpgrade ? (ROOM_LABELS[reg.roomUpgrade] ?? reg.roomUpgrade.toUpperCase()) : "QUAD (Standar)";
+
+      y = drawInfoRow(doc, y, PAGE_W, LIGHT_GRAY, PRI_COLOR, GRAY, "Tanggal Pendaftaran", formatShortDate(reg.createdAt));
+      y = drawInfoRow(doc, y, PAGE_W, "#ffffff", PRI_COLOR, GRAY, "Kode Registrasi", reg.kodeRegistrasi);
+      y = drawInfoRow(doc, y, PAGE_W, LIGHT_GRAY, PRI_COLOR, GRAY, "Paket Umroh", paketName);
+      y = drawInfoRow(doc, y, PAGE_W, "#ffffff", PRI_COLOR, GRAY, "Tanggal Keberangkatan", dateKeberangkatan);
+      y = drawInfoRow(doc, y, PAGE_W, LIGHT_GRAY, PRI_COLOR, GRAY, "Preferensi Kamar", roomText);
+      y = drawInfoRow(doc, y, PAGE_W, "#ffffff", PRI_COLOR, GRAY, "Jumlah Pax", `${reg.paxCount} Jamaah`);
+      y += 10;
+
+      // ── SECTION B — DATA PERWAKILAN ────────────────────────────────────────
+      y = drawSectionHeader(doc, y, PAGE_W, ACC_COLOR, "B", "DATA PERWAKILAN");
+      const picMember = reg.members?.[0];
+      y = drawInfoRow(doc, y, PAGE_W, LIGHT_GRAY, PRI_COLOR, GRAY, "Nama Perwakilan", reg.namaPerwakilan);
+      y = drawInfoRow(doc, y, PAGE_W, "#ffffff", PRI_COLOR, GRAY, "No. Telepon / WA", reg.nomorTelepon);
+      y = drawInfoRow(doc, y, PAGE_W, LIGHT_GRAY, PRI_COLOR, GRAY, "Email Perwakilan", reg.emailPerwakilan);
+      y = drawInfoRow(doc, y, PAGE_W, "#ffffff", PRI_COLOR, GRAY, "Tempat Lahir", picMember?.tempatLahir ?? "-");
+      y = drawInfoRow(doc, y, PAGE_W, LIGHT_GRAY, PRI_COLOR, GRAY, "Tanggal Lahir", picMember?.tanggalLahir ? formatShortDate(picMember.tanggalLahir) : "-");
+      y += 10;
+
+      // ── SECTION C — DAFTAR ANGGOTA ──────────────────────────────────────────
+      y = drawSectionHeader(doc, y, PAGE_W, ACC_COLOR, "C", "DAFTAR ANGGOTA ROMBONGAN");
+
+      // Table header
+      doc.rect(40, y, PAGE_W, 18).fill(LIGHT_GRAY);
+      doc.fillColor(PRI_COLOR).fontSize(8).font("Helvetica-Bold");
+      doc.text("No.", 44, y + 5, { width: 25 });
+      doc.text("Nama Lengkap", 72, y + 5, { width: 180 });
+      doc.text("Tempat Lahir", 255, y + 5, { width: 110 });
+      doc.text("Tgl Lahir", 368, y + 5, { width: 90 });
+      doc.text("Hub.", 460, y + 5, { width: 55 });
+      y += 18;
+
+      const members = reg.members ?? [];
+      members.forEach((m, i) => {
+        const rowBg = i % 2 === 0 ? "#ffffff" : "#f8fafc";
+        doc.rect(40, y, PAGE_W, 16).fill(rowBg);
+        doc.fillColor(PRI_COLOR).fontSize(8).font("Helvetica");
+        doc.text(String(i + 1), 44, y + 4, { width: 25 });
+        doc.text(m.namaLengkap.toUpperCase(), 72, y + 4, { width: 180 });
+        doc.text(m.tempatLahir?.toUpperCase() ?? "-", 255, y + 4, { width: 110 });
+        doc.text(m.tanggalLahir ? formatShortDate(m.tanggalLahir) : "-", 368, y + 4, { width: 90 });
+        doc.text(m.hubungan ?? (i === 0 ? "Ketua Grup" : "-"), 460, y + 4, { width: 55 });
+        y += 16;
+      });
+
+      // Table border
+      doc.rect(40, y - (members.length * 16) - 18, PAGE_W, members.length * 16 + 18)
+        .lineWidth(0.5).strokeColor("#94a3b8").stroke();
+      y += 10;
+
+      // ── SECTION D — SYARAT & KETENTUAN ──────────────────────────────────────
+      y = drawSectionHeader(doc, y, PAGE_W, ACC_COLOR, "D", "PERSETUJUAN SYARAT & KETENTUAN");
+      const acceptedAt = data.termsAcceptedAt ? formatShortDate(data.termsAcceptedAt) : "-";
+      y = drawInfoRow(doc, y, PAGE_W, LIGHT_GRAY, PRI_COLOR, GRAY, "Syarat & Ketentuan Diterima", "Ya — Pendaftar telah menyetujui S&K VTU ABADI Travel");
+      y = drawInfoRow(doc, y, PAGE_W, "#ffffff", PRI_COLOR, GRAY, "Versi Syarat & Ketentuan", `v${data.termsVersion}`);
+      y = drawInfoRow(doc, y, PAGE_W, LIGHT_GRAY, PRI_COLOR, GRAY, "Tanggal Persetujuan", acceptedAt);
+      y += 14;
+
+      // ── SECTION E — TANDA TANGAN DIGITAL ───────────────────────────────────
+      y = drawSectionHeader(doc, y, PAGE_W, ACC_COLOR, "E", "TANDA TANGAN DIGITAL");
+      doc.fillColor(GRAY).fontSize(8.5).font("Helvetica-Oblique")
+        .text("Pendaftar telah menandatangani formulir ini secara digital melalui portal registrasi VTU ABADI Travel.", 40, y, { width: PAGE_W });
+      y += 14;
+
+      // Signature block
+      const sigBoxX = (PAGE_W - 200) / 2 + 40;
+      doc.rect(sigBoxX, y, 200, 70).lineWidth(0.5).strokeColor("#94a3b8").stroke();
+      if (signatureBuffer) {
+        try {
+          doc.image(signatureBuffer, sigBoxX + 10, y + 5, { fit: [180, 55] });
+        } catch {
+          // skip if image fails
+        }
+      }
+      doc.fillColor(PRI_COLOR).fontSize(8).font("Helvetica-Bold")
+        .text(`( ${reg.namaPerwakilan.toUpperCase()} )`, sigBoxX, y + 74, { width: 200, align: "center" });
+      y += 90;
+
+      // ── FOOTER ─────────────────────────────────────────────────────────────
+      doc.fillColor(GRAY).fontSize(7.5).font("Helvetica-Oblique")
+        .text(
+          "Catatan: Data paspor dan dokumen lainnya dapat dilengkapi pada tahap administrasi berikutnya. Dokumen ini sah sebagai bukti pendaftaran resmi VTU ABADI Travel.",
+          40, y, { width: PAGE_W, align: "center" }
+        );
+
+      // Bottom divider line
+      y += 16;
+      doc.moveTo(40, y).lineTo(40 + PAGE_W, y).lineWidth(2).strokeColor(ACC_COLOR).stroke();
+
+      doc.end();
+    } catch (err) {
+      reject(err);
+    }
+  });
 }
 
-async function generateJsPdfFallback(data: PdfData): Promise<Buffer> {
-  const { jsPDF } = await import("jspdf");
-  const doc = new jsPDF();
-  const reg = data.registration;
+// ── Helper: Section Header ──────────────────────────────────────────────────
+function drawSectionHeader(
+  doc: any,
+  y: number,
+  pageW: number,
+  color: string,
+  letter: string,
+  title: string
+): number {
+  doc.rect(40, y, pageW, 20).fill(color);
+  doc.fillColor("#ffffff").fontSize(9).font("Helvetica-Bold")
+    .text(`${letter}.  ${title}`, 50, y + 5, { width: pageW - 20 });
+  return y + 26;
+}
 
-  doc.setFontSize(16);
-  doc.text("VTU ABADI TRAVEL — FORMULIR REGISTRASI", 15, 20);
-  doc.setFontSize(11);
-  doc.text(`Kode Registrasi : ${reg.kodeRegistrasi}`, 15, 32);
-  doc.text(`Nama PIC        : ${reg.namaPerwakilan}`, 15, 40);
-  doc.text(`Jumlah Jamaah   : ${reg.paxCount} PAX`, 15, 48);
-  doc.text(`Email PIC       : ${reg.emailPerwakilan}`, 15, 56);
-  doc.text(`No. Telepon/WA  : ${reg.nomorTelepon}`, 15, 64);
-  doc.text(`Tanggal         : ${formatShortDate(reg.createdAt)}`, 15, 72);
-
-  doc.setFontSize(13);
-  doc.text("DAFTAR ANGGOTA ROMBONGAN:", 15, 86);
-  doc.setFontSize(10);
-  let y = 96;
-  (reg.members || []).forEach((m, idx) => {
-    doc.text(`${idx + 1}. ${m.namaLengkap.toUpperCase()} (${m.jenisKelamin}) — Lahir: ${m.tanggalLahir || "-"}`, 15, y);
-    y += 8;
-  });
-
-  const pdfArrayBuffer = doc.output("arraybuffer");
-  return Buffer.from(pdfArrayBuffer);
+// ── Helper: Info Row ────────────────────────────────────────────────────────
+function drawInfoRow(
+  doc: any,
+  y: number,
+  pageW: number,
+  rowBg: string,
+  labelColor: string,
+  valueColor: string,
+  label: string,
+  value: string
+): number {
+  doc.rect(40, y, pageW, 16).fill(rowBg);
+  doc.fillColor(labelColor).fontSize(8.5).font("Helvetica-Bold")
+    .text(label, 50, y + 4, { width: 160 });
+  doc.fillColor("#64748b").fontSize(8.5).font("Helvetica")
+    .text(":", 210, y + 4, { width: 15 });
+  doc.fillColor(valueColor).fontSize(8.5).font("Helvetica")
+    .text(value, 222, y + 4, { width: pageW - 190 });
+  return y + 16;
 }
