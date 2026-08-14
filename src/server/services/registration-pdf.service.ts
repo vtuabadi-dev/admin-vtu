@@ -329,14 +329,47 @@ export async function generateRegistrationPdf(data: PdfData): Promise<Buffer> {
     ],
   };
 
-  // Build PDF
-  const pdfDoc = await printer.createPdfKitDocument(docDefinition);
+  try {
+    // Build PDF using pdfmake
+    const pdfDoc = await printer.createPdfKitDocument(docDefinition);
 
-  return new Promise((resolve, reject) => {
-    const chunks: Buffer[] = [];
-    pdfDoc.on("data", (chunk: Buffer) => chunks.push(chunk));
-    pdfDoc.on("end", () => resolve(Buffer.concat(chunks)));
-    pdfDoc.on("error", reject);
-    pdfDoc.end();
+    return await new Promise((resolve, reject) => {
+      const chunks: Buffer[] = [];
+      pdfDoc.on("data", (chunk: Buffer) => chunks.push(chunk));
+      pdfDoc.on("end", () => resolve(Buffer.concat(chunks)));
+      pdfDoc.on("error", reject);
+      pdfDoc.end();
+    });
+  } catch (pdfMakeErr) {
+    console.warn("[registration-pdf] pdfmake failed, falling back to jsPDF:", pdfMakeErr);
+    return generateJsPdfFallback(data);
+  }
+}
+
+async function generateJsPdfFallback(data: PdfData): Promise<Buffer> {
+  const { jsPDF } = await import("jspdf");
+  const doc = new jsPDF();
+  const reg = data.registration;
+
+  doc.setFontSize(16);
+  doc.text("VTU ABADI TRAVEL — FORMULIR REGISTRASI", 15, 20);
+  doc.setFontSize(11);
+  doc.text(`Kode Registrasi : ${reg.kodeRegistrasi}`, 15, 32);
+  doc.text(`Nama PIC        : ${reg.namaPerwakilan}`, 15, 40);
+  doc.text(`Jumlah Jamaah   : ${reg.paxCount} PAX`, 15, 48);
+  doc.text(`Email PIC       : ${reg.emailPerwakilan}`, 15, 56);
+  doc.text(`No. Telepon/WA  : ${reg.nomorTelepon}`, 15, 64);
+  doc.text(`Tanggal         : ${formatShortDate(reg.createdAt)}`, 15, 72);
+
+  doc.setFontSize(13);
+  doc.text("DAFTAR ANGGOTA ROMBONGAN:", 15, 86);
+  doc.setFontSize(10);
+  let y = 96;
+  (reg.members || []).forEach((m, idx) => {
+    doc.text(`${idx + 1}. ${m.namaLengkap.toUpperCase()} (${m.jenisKelamin}) — Lahir: ${m.tanggalLahir || "-"}`, 15, y);
+    y += 8;
   });
+
+  const pdfArrayBuffer = doc.output("arraybuffer");
+  return Buffer.from(pdfArrayBuffer);
 }

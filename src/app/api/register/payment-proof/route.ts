@@ -90,9 +90,27 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // Send email notification for DP Payment Proof submission
+    // Send email notification for DP Payment Proof submission with attached PDF
     try {
       if (reg.emailPerwakilan) {
+        let pdfBuf: Buffer | null = null;
+        let pdfFileName = `${kodeRegistrasi}_${reg.namaPerwakilan.replace(/[^A-Z0-9]/gi, "_")}.pdf`;
+        try {
+          const { generateRegistrationPdf } = await import("@/server/services/registration-pdf.service");
+          const { registrationRepo } = await import("@/server/repositories");
+          const fullReg = await registrationRepo.findByKode(kodeRegistrasi);
+          if (fullReg) {
+            pdfBuf = await generateRegistrationPdf({
+              registration: fullReg,
+              packageInfo: null,
+              termsVersion: "1.0",
+              termsAcceptedAt: fullReg.termsAcceptedAt ?? fullReg.createdAt,
+            });
+          }
+        } catch (pdfErr) {
+          console.warn("[payment-proof] PDF generation warning for email:", pdfErr);
+        }
+
         const { getNotificationProvider } = await import("@/server/services/notify");
         const notifier = getNotificationProvider();
         await notifier.send({
@@ -111,12 +129,23 @@ export async function POST(request: NextRequest) {
             `  👥 Jumlah Jamaah    : ${reg.paxCount} PAX`,
             `  📅 Tanggal Unggah   : ${new Date().toLocaleString("id-ID", { timeZone: "Asia/Jakarta" })} WIB`,
             "",
+            `📎 Formulir Pendaftaran Resmi terlampir dalam email ini (file PDF).`,
+            "",
             `⏳ Status Saat Ini: MEMENUHI VERIFIKASI KEUANGAN (1x24 Jam)`,
             `   Tim Keuangan VTU ABADI Travel akan melakukan pencocokan mutasi bank. Setelah disetujui, kwitansi resmi akan dikirimkan ke email ini.`,
             "",
             `Wassalamu'alaikum Warahmatullahi Wabarakatuh.`,
             `PT VTU ABADI TRAVEL`,
           ].join("\n"),
+          attachments: pdfBuf
+            ? [
+                {
+                  filename: pdfFileName,
+                  content: pdfBuf,
+                  contentType: "application/pdf",
+                },
+              ]
+            : undefined,
         });
       }
     } catch (notifyErr) {
