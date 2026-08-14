@@ -4,12 +4,17 @@ import type {
   OperationalAlert,
   Keberangkatan,
   PackageReadinessScore,
+  Jamaah,
+  RegistrationGroup,
 } from "@/shared/types";
+import { getJamaahList, getGroupList } from "@/server/actions/api";
 
 interface OperationalStore {
   stats: DashboardStats | null;
   alerts: OperationalAlert[];
   keberangkatanList: Keberangkatan[];
+  jamaahList: Jamaah[];
+  groupList: RegistrationGroup[];
   invoices: any[];
   pendingReviewCount: number;
   pendingDocReviewCount: number;
@@ -20,6 +25,8 @@ interface OperationalStore {
   setStats: (stats: DashboardStats) => void;
   setAlerts: (alerts: OperationalAlert[]) => void;
   setKeberangkatanList: (list: Keberangkatan[]) => void;
+  setJamaahList: (list: Jamaah[]) => void;
+  setGroupList: (list: RegistrationGroup[]) => void;
   setInvoices: (list: any[]) => void;
   setPendingReviewCount: (count: number) => void;
   setPendingDocReviewCount: (count: number) => void;
@@ -33,6 +40,8 @@ export const useOperationalStore = create<OperationalStore>((set) => ({
   stats: null,
   alerts: [],
   keberangkatanList: [],
+  jamaahList: [],
+  groupList: [],
   invoices: [],
   pendingReviewCount: 0,
   pendingDocReviewCount: 0,
@@ -43,6 +52,8 @@ export const useOperationalStore = create<OperationalStore>((set) => ({
   setStats: (stats) => set({ stats }),
   setAlerts: (alerts) => set({ alerts }),
   setKeberangkatanList: (keberangkatanList) => set({ keberangkatanList }),
+  setJamaahList: (jamaahList) => set({ jamaahList }),
+  setGroupList: (groupList) => set({ groupList }),
   setInvoices: (invoices) => set({ invoices }),
   setPendingReviewCount: (pendingReviewCount) => set({ pendingReviewCount }),
   setPendingDocReviewCount: (pendingDocReviewCount) => set({ pendingDocReviewCount }),
@@ -52,13 +63,24 @@ export const useOperationalStore = create<OperationalStore>((set) => ({
 
   loadAllData: async () => {
     try {
-      const [statsRes, alertsRes, kbrRes, payReviewRes, docReviewRes, invRes] = await Promise.all([
-        fetch("/api/dashboard/stats"),
-        fetch("/api/dashboard/alerts"),
-        fetch("/api/keberangkatan"),
-        fetch("/api/pembayaran/review"),
-        fetch("/api/dokumen/review"),
-        fetch("/api/invoices"),
+      const [
+        statsRes,
+        alertsRes,
+        kbrRes,
+        payReviewRes,
+        docReviewRes,
+        invRes,
+        jamaahRes,
+        groupRes,
+      ] = await Promise.all([
+        fetch("/api/dashboard/stats").catch(() => ({ ok: false })),
+        fetch("/api/dashboard/alerts").catch(() => ({ ok: false })),
+        fetch("/api/keberangkatan").catch(() => ({ ok: false })),
+        fetch("/api/pembayaran/review").catch(() => ({ ok: false })),
+        fetch("/api/dokumen/review").catch(() => ({ ok: false })),
+        fetch("/api/invoices").catch(() => ({ ok: false })),
+        getJamaahList().catch(() => []),
+        getGroupList().catch(() => []),
       ]);
 
       let stats: DashboardStats | null = null;
@@ -67,19 +89,21 @@ export const useOperationalStore = create<OperationalStore>((set) => ({
       let pendingReviewCount = 0;
       let pendingDocReviewCount = 0;
       let invoices: any[] = [];
+      let jamaahList: Jamaah[] = Array.isArray(jamaahRes) ? jamaahRes : [];
+      let groupList: RegistrationGroup[] = Array.isArray(groupRes) ? groupRes : [];
       const scores: Record<string, PackageReadinessScore> = {};
       const intelMap: Record<string, any> = {};
 
-      if (statsRes.ok) {
-        const j = await statsRes.json();
+      if ((statsRes as any).ok) {
+        const j = await (statsRes as Response).json();
         stats = j.data ?? j;
       }
-      if (alertsRes.ok) {
-        const j = await alertsRes.json();
+      if ((alertsRes as any).ok) {
+        const j = await (alertsRes as Response).json();
         alerts = j.data ?? [];
       }
-      if (kbrRes.ok) {
-        const j = await kbrRes.json();
+      if ((kbrRes as any).ok) {
+        const j = await (kbrRes as Response).json();
         keberangkatanList = j.data ?? [];
 
         // Pre-fetch scores and intel maps for all packages in parallel
@@ -104,16 +128,16 @@ export const useOperationalStore = create<OperationalStore>((set) => ({
           })
         );
       }
-      if (payReviewRes.ok) {
-        const j = await payReviewRes.json();
+      if ((payReviewRes as any).ok) {
+        const j = await (payReviewRes as Response).json();
         pendingReviewCount = (j.data ?? []).length;
       }
-      if (docReviewRes.ok) {
-        const j = await docReviewRes.json();
+      if ((docReviewRes as any).ok) {
+        const j = await (docReviewRes as Response).json();
         pendingDocReviewCount = (j.data ?? []).length;
       }
-      if (invRes.ok) {
-        const j = await invRes.json();
+      if ((invRes as any).ok) {
+        const j = await (invRes as Response).json();
         invoices = j.data ?? [];
       }
 
@@ -121,6 +145,8 @@ export const useOperationalStore = create<OperationalStore>((set) => ({
         stats,
         alerts,
         keberangkatanList,
+        jamaahList,
+        groupList,
         pendingReviewCount,
         pendingDocReviewCount,
         invoices,
@@ -130,7 +156,6 @@ export const useOperationalStore = create<OperationalStore>((set) => ({
       });
     } catch (error) {
       console.error("[useOperationalStore] Failed to pre-fetch global data:", error);
-      throw error;
     }
   },
 }));
