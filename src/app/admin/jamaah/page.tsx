@@ -290,9 +290,6 @@ export default function JamaahListPage() {
                   },
                 ]}
                 data={filteredList as any}
-                onRowClick={(row: any) =>
-                  router.push(`/admin/jamaah/${row.id}`)
-                }
                 emptyMessage="Tidak ada jamaah ditemukan"
               />
             </CardContent>

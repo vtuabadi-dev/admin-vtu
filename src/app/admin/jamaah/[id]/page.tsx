@@ -242,15 +242,15 @@ export default function JamaahDetailPage() {
     );
   }
 
-  const jamaah: Jamaah = jamaahFull;
-  const paket = jamaahFull.paket;
-  const invoices: any[] = jamaahFull.invoices || [];
-  const pembayarans: any[] = jamaahFull.pembayarans || [];
-  const dokumenList: DokumenItem[] = jamaahFull.dokumen || [];
+  const jamaah: Jamaah = jamaahFull || {};
+  const paket = jamaahFull?.paket ?? null;
+  const invoices: any[] = Array.isArray(jamaahFull?.invoices) ? jamaahFull.invoices : [];
+  const pembayarans: any[] = Array.isArray(jamaahFull?.pembayarans) ? jamaahFull.pembayarans : [];
+  const dokumenList: DokumenItem[] = Array.isArray(jamaahFull?.dokumen) ? jamaahFull.dokumen : [];
 
-  // Calculate billing summary
-  const totalTagihan = invoices.reduce((acc, inv) => acc + (inv.totalAmount || inv.nominal || 0), 0) || 30000000;
-  const totalDibayar = pembayarans.reduce((acc, p) => acc + (p.jumlah || p.nominal || 0), 0) || (invoices.some((i) => i.status === "paid") ? totalTagihan : invoices.some((i) => i.status === "partial") ? 5000000 : 0);
+  // Calculate billing summary safely
+  const totalTagihan = invoices.reduce((acc, inv) => acc + (inv?.totalAmount || inv?.nominal || 0), 0) || 30000000;
+  const totalDibayar = pembayarans.reduce((acc, p) => acc + (p?.jumlah || p?.nominal || 0), 0) || (invoices.some((i) => i?.status === "paid") ? totalTagihan : invoices.some((i) => i?.status === "partial") ? 5000000 : 0);
   const sisaTagihan = Math.max(0, totalTagihan - totalDibayar);
   const statusPembayaran = sisaTagihan === 0 && totalTagihan > 0 ? "LUNAS" : totalDibayar > 0 ? "CICILAN" : "DRAFT";
 
@@ -516,7 +516,7 @@ export default function JamaahDetailPage() {
             <CardContent className="p-5">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                 {DOKUMEN_SPECS.map((spec) => {
-                  const doc = dokumenList.find((d) => d.jenis === spec.jenis);
+                  const doc = (dokumenList || []).find((d) => d && d.jenis === spec.jenis);
                   const isUploaded = !!doc;
                   const isVerified = doc && (doc.status === "lengkap" || doc.status === "verified");
 
