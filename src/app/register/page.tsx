@@ -2025,34 +2025,56 @@ export default function RegisterPage() {
                       </div>
 
                       <div className="space-y-2 text-xs">
-                        <div className="bg-blue-50 p-2.5 rounded-lg border border-blue-100">
-                          <p className="text-[10px] text-blue-600 font-semibold uppercase">Nama Bank</p>
-                          <p className="font-bold text-gray-900 text-sm">Bank Syariah Indonesia (BSI)</p>
-                        </div>
+                        {(() => {
+                          let bankName = "Bank Syariah Indonesia (BSI)";
+                          let bankAccount = "7123 4567 89";
+                          let bankHolder = "PT VTU ABADI TRAVEL";
+                          if (typeof window !== "undefined") {
+                            const saved = localStorage.getItem("vtu_bank_config");
+                            if (saved) {
+                              try {
+                                const parsed = JSON.parse(saved);
+                                if (parsed.bankName) bankName = parsed.bankName;
+                                if (parsed.bankAccount) bankAccount = parsed.bankAccount;
+                                if (parsed.bankHolder) bankHolder = parsed.bankHolder;
+                              } catch (e) {}
+                            }
+                          }
+                          const rawAccountNum = bankAccount.replace(/\s+/g, "");
 
-                        <div className="bg-blue-50 p-2.5 rounded-lg border border-blue-100 flex items-center justify-between">
-                          <div>
-                            <p className="text-[10px] text-blue-600 font-semibold uppercase">Nomor Rekening</p>
-                            <p className="font-mono font-bold text-blue-900 text-base">7123 4567 89</p>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              navigator.clipboard.writeText("7123456789");
-                              setCopiedAccount(true);
-                              setTimeout(() => setCopiedAccount(false), 2000);
-                            }}
-                            className="px-2.5 py-1 bg-white border border-blue-300 rounded text-[11px] font-semibold text-blue-700 hover:bg-blue-100 flex items-center gap-1"
-                          >
-                            {copiedAccount ? <Check className="w-3.5 h-3.5 text-green-600" /> : <Copy className="w-3.5 h-3.5" />}
-                            {copiedAccount ? "Tersalin" : "Salin"}
-                          </button>
-                        </div>
+                          return (
+                            <>
+                              <div className="bg-blue-50 p-2.5 rounded-lg border border-blue-100">
+                                <p className="text-[10px] text-blue-600 font-semibold uppercase">Nama Bank</p>
+                                <p className="font-bold text-gray-900 text-sm">{bankName}</p>
+                              </div>
 
-                        <div className="bg-blue-50 p-2.5 rounded-lg border border-blue-100">
-                          <p className="text-[10px] text-blue-600 font-semibold uppercase">Atas Nama Rekening</p>
-                          <p className="font-bold text-gray-900">PT VTU ABADI TRAVEL</p>
-                        </div>
+                              <div className="bg-blue-50 p-2.5 rounded-lg border border-blue-100 flex items-center justify-between">
+                                <div>
+                                  <p className="text-[10px] text-blue-600 font-semibold uppercase">Nomor Rekening</p>
+                                  <p className="font-mono font-bold text-blue-900 text-base">{bankAccount}</p>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(rawAccountNum);
+                                    setCopiedAccount(true);
+                                    setTimeout(() => setCopiedAccount(false), 2000);
+                                  }}
+                                  className="px-2.5 py-1 bg-white border border-blue-300 rounded text-[11px] font-semibold text-blue-700 hover:bg-blue-100 flex items-center gap-1"
+                                >
+                                  {copiedAccount ? <Check className="w-3.5 h-3.5 text-green-600" /> : <Copy className="w-3.5 h-3.5" />}
+                                  {copiedAccount ? "Tersalin" : "Salin"}
+                                </button>
+                              </div>
+
+                              <div className="bg-blue-50 p-2.5 rounded-lg border border-blue-100">
+                                <p className="text-[10px] text-blue-600 font-semibold uppercase">Atas Nama Rekening</p>
+                                <p className="font-bold text-gray-900">{bankHolder}</p>
+                              </div>
+                            </>
+                          );
+                        })()}
 
                         <div className="bg-amber-50 p-2.5 rounded-lg border border-amber-200 flex items-center justify-between">
                           <div>
