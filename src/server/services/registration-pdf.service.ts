@@ -68,6 +68,12 @@ export async function generateRegistrationPdf(data: PdfData): Promise<Buffer> {
       italics: "Helvetica-Oblique",
       bolditalics: "Helvetica-BoldOblique",
     },
+    Courier: {
+      normal: "Courier",
+      bold: "Courier-Bold",
+      italics: "Courier-Oblique",
+      bolditalics: "Courier-BoldOblique",
+    },
   };
 
   const printer = getPrinterInstance(fonts);
