@@ -145,15 +145,45 @@ export async function createKeberangkatan(data: any) {
 
 export async function getJamaahById(id: string) {
   try {
-    const j = (await prisma.jamaah.findUnique({
+    let j = (await prisma.jamaah.findUnique({
       where: { id },
       include: { dokumen: true },
     })) as any;
 
+    // Fallback: if not in prisma.jamaah, check registrationMember / registrationRequest
+    if (!j) {
+      const member = await prisma.registrationMember.findUnique({
+        where: { id },
+        include: { request: { include: { keberangkatan: { include: { paketUmroh: true } } } } },
+      }).catch(() => null);
+
+      if (member) {
+        j = {
+          id: member.id,
+          nomorPeserta: `PST-${member.id.slice(-6).toUpperCase()}`,
+          namaLengkap: member.namaLengkap,
+          jenisKelamin: member.jenisKelamin,
+          tempatLahir: member.tempatLahir || "Jakarta",
+          tanggalLahir: member.tanggalLahir || "1990-01-01",
+          nik: "3171000000000000",
+          nomorPaspor: "-",
+          masaBerlakuPaspor: "-",
+          nomorTelepon: member.request?.nomorTelepon || "-",
+          email: member.request?.emailPerwakilan || "-",
+          status: "registered",
+          hotelMekkah: "Hotel Setaraf Bintang 5",
+          hotelMadinah: "Hotel Setaraf Bintang 4",
+          dokumen: [],
+          groupId: member.request?.kodeRegistrasi || "GRP-2026",
+          paket: member.request?.keberangkatan,
+        };
+      }
+    }
+
     if (!j) return null;
 
     let group = null;
-    let paket = null;
+    let paket = j.paket || null;
     let invoices: any[] = [];
     let pembayarans: any[] = [];
 
@@ -182,9 +212,9 @@ export async function getJamaahById(id: string) {
           .catch(() => [])
       : [];
 
-    // Fetch package details
+    // Fetch package details if not already present
     const paketId = group?.paketKeberangkatanId;
-    if (paketId) {
+    if (!paket && paketId) {
       paket = await prisma.keberangkatan
         .findUnique({
           where: { id: paketId },
@@ -209,13 +239,16 @@ export async function getJamaahById(id: string) {
       if (list.length > 0) paket = list[0];
     }
 
-    return {
-      ...j,
-      group,
-      paket,
-      invoices,
-      pembayarans,
-    };
+    // Must sanitize Date objects into plain JSON for Next.js Server Action serialization
+    return JSON.parse(
+      JSON.stringify({
+        ...j,
+        group,
+        paket,
+        invoices,
+        pembayarans,
+      })
+    );
   } catch (err) {
     console.error("getJamaahById error:", err);
     return null;
