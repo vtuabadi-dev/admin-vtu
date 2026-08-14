@@ -117,3 +117,76 @@ export function createResendProvider(apiKey?: string): NotificationProvider {
     },
   };
 }
+
+// Nodemailer (Gmail / SMTP) provider — sends real emails via SMTP using Gmail App Password or custom SMTP
+export function createNodemailerProvider(): NotificationProvider {
+  const user = process.env.SMTP_USER || process.env.GMAIL_USER;
+  const pass = process.env.SMTP_PASS || process.env.GMAIL_APP_PASSWORD;
+  const host = process.env.SMTP_HOST || "smtp.gmail.com";
+  const port = Number(process.env.SMTP_PORT || "465");
+  const secure = process.env.SMTP_SECURE !== "false";
+
+  return {
+    name: "nodemailer",
+    channels: ["email"] as NotificationChannel[],
+
+    async send(message: NotificationMessage): Promise<NotificationResult> {
+      if (!user || !pass) {
+        console.warn("[notify:nodemailer] SMTP credentials (GMAIL_USER / GMAIL_APP_PASSWORD) missing — fallback to mock provider");
+        return createMockProvider().send(message);
+      }
+
+      try {
+        const nodemailer = await import("nodemailer");
+        const transporter = nodemailer.createTransport({
+          host,
+          port,
+          secure,
+          auth: { user, pass },
+        });
+
+        const fromAddress = process.env.SMTP_FROM || process.env.GMAIL_FROM || `VTU ABADI Travel <${user}>`;
+
+        const mailOptions: any = {
+          from: fromAddress,
+          to: message.recipient,
+          subject: message.subject ?? "Konfirmasi Registrasi Jamaah Umroh",
+          text: message.body,
+        };
+
+        if (message.attachments && message.attachments.length > 0) {
+          mailOptions.attachments = message.attachments.map((att) => ({
+            filename: att.filename,
+            content: att.content,
+            contentType: att.contentType,
+          }));
+        }
+
+        const info = await transporter.sendMail(mailOptions);
+        console.log(`[notify:nodemailer] Email sent successfully to ${message.recipient}: ${info.messageId}`);
+
+        return {
+          success: true,
+          messageId: info.messageId || `smtp-${Date.now()}`,
+          channel: "email",
+          sentAt: new Date().toISOString(),
+          retryable: false,
+        };
+      } catch (err: any) {
+        console.error("[notify:nodemailer] SMTP send failed:", err?.message || err);
+        return {
+          success: false,
+          error: err?.message || "SMTP dispatch failed",
+          channel: "email",
+          sentAt: new Date().toISOString(),
+          retryable: true,
+        };
+      }
+    },
+
+    async healthCheck() {
+      return { ok: !!(user && pass), detail: user && pass ? `Nodemailer configured for ${user}` : "SMTP credentials missing" };
+    },
+  };
+}
+
