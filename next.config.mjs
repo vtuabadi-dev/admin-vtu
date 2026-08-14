@@ -14,7 +14,7 @@ const nextConfig = {
   productionBrowserSourceMaps: false,
 
   experimental: {
-    serverComponentsExternalPackages: ["@prisma/client", "pdfmake"],
+    serverComponentsExternalPackages: ["@prisma/client", "pdfmake", "pdfkit"],
   },
 };
 
