@@ -93,10 +93,11 @@ export async function POST(request: NextRequest) {
       let rawKuota: number;
       let rawTargetMaterialisasi: number;
       let rawPerlengkapan: string | undefined;
+      let rawRute: string | undefined;
       let legacyHargaBase = 0;
       let legacyHotelMekkah = "";
       let legacyHotelMadinah = "";
-      let regColOffset = 0; // 0 for legacy & 32-col, 1 for 33-col format
+      let regColOffset = 0; // 0 for legacy/32-col, 1 for 33-col, 2 for 34-col format
 
       if (isLegacyFormat) {
         // Legacy 11-column format
@@ -110,7 +111,7 @@ export async function POST(request: NextRequest) {
         rawKuota = parseNum(row.getCell(10).text, 45);
         rawTargetMaterialisasi = parseNum(row.getCell(11).text, 30);
       } else {
-        // 32-col / 33-col format with Starting Point
+        // Modern format with Starting Point
         rawTanggalBerangkat = row.getCell(3).text?.trim();
         rawTanggalPulang = row.getCell(4).text?.trim();
         rawMaskapai = row.getCell(5).text?.trim();
@@ -119,16 +120,25 @@ export async function POST(request: NextRequest) {
         rawKuota = parseNum(row.getCell(8).text, 45);
         rawTargetMaterialisasi = parseNum(row.getCell(9).text, 30);
 
-        // Detect if Col 10 is Perlengkapan (33-col format) or RegHargaBase (32-col format)
+        // Detect Col 10 (Perlengkapan) & Col 11 (Rute In-Out) vs RegHargaBase
         const cell10Text = row.getCell(10).text?.trim();
         const cell11Text = row.getCell(11).text?.trim();
+        const cell12Text = row.getCell(12).text?.trim();
+
         const cell10Num = parseNum(cell10Text);
         const cell11Num = parseNum(cell11Text);
+        const cell12Num = parseNum(cell12Text);
 
-        if (cell10Text && (cell10Num < 100000 || cell11Num > 100000)) {
-          // New 33-col format: Col 10 is Perlengkapan
+        if (cell10Text && (cell10Num < 100000 || cell12Num > 100000)) {
+          // Col 10 is Perlengkapan
           rawPerlengkapan = cell10Text;
           regColOffset = 1;
+
+          if (cell11Text && (cell11Num < 100000 || cell12Num > 100000)) {
+            // Col 11 is Rute In-Out (34-col format)
+            rawRute = cell11Text;
+            regColOffset = 2;
+          }
         }
       }
 
@@ -221,6 +231,9 @@ export async function POST(request: NextRequest) {
       const includeList: string[] = [];
       if (rawPerlengkapan) {
         includeList.push(`Perlengkapan: ${rawPerlengkapan}`);
+      }
+      if (rawRute) {
+        includeList.push(`Rute In-Out: ${rawRute}`);
       }
 
       try {
