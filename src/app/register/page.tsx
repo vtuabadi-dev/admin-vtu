@@ -2001,11 +2001,20 @@ export default function RegisterPage() {
                         </div>
                       </div>
 
-                      {/* Calculated DP (Standar 5 Juta x Pax + Custom DP Switch) */}
+                      {/* Calculated DP (Standar Per Pax Config + Custom DP Switch) */}
                       {selectedPaket && (() => {
                         const price = (selectedPaket as any).hargaStartingFrom ?? (selectedPaket as any).hargaPaket ?? (selectedPaket as any).paketUmroh?.hargaQuad ?? 30000000;
                         const totalEstimasi = price * paxCount;
-                        const defaultDpPerPax = 5000000;
+                        let defaultDpPerPax = 5000000;
+                        if (typeof window !== "undefined") {
+                          const saved = localStorage.getItem("vtu_bank_config");
+                          if (saved) {
+                            try {
+                              const parsed = JSON.parse(saved);
+                              if (parsed.minDpPerPax) defaultDpPerPax = parseInt(parsed.minDpPerPax, 10) || 5000000;
+                            } catch (e) {}
+                          }
+                        }
                         const minimalDpStandard = defaultDpPerPax * paxCount;
                         const parsedCustomDp = parseInt(customDpAmount.replace(/\D/g, ""), 10) || 0;
                         const effectiveDp = isCustomDp && parsedCustomDp > 0 ? parsedCustomDp : minimalDpStandard;
@@ -2017,7 +2026,7 @@ export default function RegisterPage() {
                               <span className="font-semibold text-amber-900">Rp {totalEstimasi.toLocaleString("id-ID")}</span>
                             </div>
                             <div className="flex justify-between text-xs pt-1 border-t border-amber-200">
-                              <span className="font-bold text-amber-900">Nominal Minimal DP (Rp 5 Juta / Pax):</span>
+                              <span className="font-bold text-amber-900">Nominal Minimal DP (Rp {(defaultDpPerPax / 1000000).toLocaleString("id-ID")} Juta / Pax):</span>
                               <span className="font-extrabold text-blue-900 text-sm">
                                 Rp {minimalDpStandard.toLocaleString("id-ID")}
                               </span>

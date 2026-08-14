@@ -216,9 +216,19 @@ function AturanOperasional() {
     return "PT VTU ABADI TRAVEL";
   });
 
+  const [minDpPerPax, setMinDpPerPax] = useState(() => {
+    if (typeof window !== "undefined") {
+      const savedConfig = localStorage.getItem("vtu_bank_config");
+      if (savedConfig) {
+        try { return JSON.parse(savedConfig).minDpPerPax || "5000000"; } catch (e) {}
+      }
+    }
+    return "5000000";
+  });
+
   const handleSave = () => {
     if (typeof window !== "undefined") {
-      localStorage.setItem("vtu_bank_config", JSON.stringify({ bankName, bankAccount, bankHolder }));
+      localStorage.setItem("vtu_bank_config", JSON.stringify({ bankName, bankAccount, bankHolder, minDpPerPax }));
     }
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
@@ -254,12 +264,17 @@ function AturanOperasional() {
       </SettingSection>
 
       <SettingSection title="Aturan Pembayaran" desc="Konfigurasi skema pembayaran dan toleransi keterlambatan">
-        <SettingRow label="DP Minimum" desc="Persentase DP dari total tagihan">
-          <Select options={[
-            { value: "10", label: "10%" }, { value: "20", label: "20%" },
-            { value: "25", label: "25%" }, { value: "30", label: "30%" },
-            { value: "50", label: "50%" },
-          ]} defaultValue="25" />
+        <SettingRow label="DP Minimum Per Pax" desc="Nominal DP minimum yang ditagihkan per jamaah (Pax)">
+          <Select
+            value={minDpPerPax}
+            onChange={(val) => setMinDpPerPax(val)}
+            options={[
+              { value: "3000000", label: "Rp 3.000.000 / Pax" },
+              { value: "5000000", label: "Rp 5.000.000 / Pax (Standar)" },
+              { value: "7500000", label: "Rp 7.500.000 / Pax" },
+              { value: "10000000", label: "Rp 10.000.000 / Pax" },
+            ]}
+          />
         </SettingRow>
         <SettingRow label="Maksimal Tahap Cicilan" desc="Jumlah tahap cicilan yang diizinkan setelah DP">
           <Select options={[
