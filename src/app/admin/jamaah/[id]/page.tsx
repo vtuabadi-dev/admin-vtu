@@ -200,23 +200,29 @@ export default function JamaahDetailPage() {
   useEffect(() => {
     if (!id) return;
     async function load() {
-      setLoading(true);
-      const j = await getJamaahById(id);
-      if (!j) {
+      try {
+        setLoading(true);
+        const j = await getJamaahById(id);
+        if (!j) {
+          setJamaahFull(null);
+          setLoading(false);
+          return;
+        }
+        setJamaahFull(j);
+        const [r, p, ds] = await Promise.all([
+          getJamaahReadiness(id).catch(() => null),
+          getJamaahProgress(id).catch(() => null),
+          getDerivedStatus(id).catch(() => "draft"),
+        ]);
+        setReadiness(r ?? null);
+        setProgress(p ?? null);
+        setDerivedStatus(ds ?? null);
+      } catch (err) {
+        console.error("JamaahDetailPage load error:", err);
         setJamaahFull(null);
+      } finally {
         setLoading(false);
-        return;
       }
-      setJamaahFull(j);
-      const [r, p, ds] = await Promise.all([
-        getJamaahReadiness(id),
-        getJamaahProgress(id),
-        getDerivedStatus(id),
-      ]);
-      setReadiness(r ?? null);
-      setProgress(p ?? null);
-      setDerivedStatus(ds ?? null);
-      setLoading(false);
     }
     load();
   }, [id]);
