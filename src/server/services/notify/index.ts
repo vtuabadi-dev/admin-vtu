@@ -1,16 +1,23 @@
 import type { NotificationProvider, NotificationMessage, NotificationResult } from "./types";
-import { createMockProvider, createConsoleProvider, createResendProvider } from "./providers";
+import { createMockProvider, createConsoleProvider, createResendProvider, createNodemailerProvider } from "./providers";
 
 let _provider: NotificationProvider | null = null;
 
 export function getNotificationProvider(): NotificationProvider {
   if (_provider) return _provider;
 
-  if (process.env.RESEND_API_KEY) {
+  if (process.env.GMAIL_USER || process.env.SMTP_USER) {
+    _provider = createNodemailerProvider();
+  } else if (process.env.RESEND_API_KEY) {
     _provider = createResendProvider();
   } else {
-    const configured = process.env.NOTIFICATION_PROVIDER ?? "resend";
+    const configured = process.env.NOTIFICATION_PROVIDER ?? "nodemailer";
     switch (configured) {
+      case "nodemailer":
+      case "smtp":
+      case "gmail":
+        _provider = createNodemailerProvider();
+        break;
       case "console":
         _provider = createConsoleProvider();
         break;
