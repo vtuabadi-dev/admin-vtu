@@ -107,6 +107,22 @@ export async function POST(request: NextRequest) {
               termsAcceptedAt: fullReg.termsAcceptedAt ?? fullReg.createdAt,
             });
           }
+
+          // ── Simpan PDF ke Google Drive (Folder: FORMULIR PENDAFTARAN) ───────
+          if (pdfBuf) {
+            try {
+              const { isGoogleDriveConfigured, getOrCreateFolder } = await import("@/server/storage/google-drive");
+              if (isGoogleDriveConfigured()) {
+                const storage = getStorageAdapter();
+                const formulirFolderId = await getOrCreateFolder("FORMULIR PENDAFTARAN");
+                const drivePdfName = `${pdfFileName}`;
+                await storage.upload(drivePdfName, pdfBuf, "application/pdf", formulirFolderId);
+                console.log(`[payment-proof] PDF formulir berhasil disimpan ke Google Drive: ${drivePdfName}`);
+              }
+            } catch (driveErr) {
+              console.warn("[payment-proof] Gagal menyimpan PDF ke Google Drive (non-blocking):", driveErr);
+            }
+          }
         } catch (pdfErr) {
           console.warn("[payment-proof] PDF generation warning for email:", pdfErr);
         }
