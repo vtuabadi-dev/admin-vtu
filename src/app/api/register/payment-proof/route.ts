@@ -91,7 +91,7 @@ export async function POST(request: NextRequest) {
     });
 
     // ── Generate PDF Formulir Pendaftaran ──────────────────────────────────────
-    console.log(`[payment-proof][v3] Mulai generate PDF + Drive upload untuk ${kodeRegistrasi}`);
+    console.log(`[payment-proof][v4] Mulai generate PDF + Drive upload untuk ${kodeRegistrasi}`);
     let pdfBuf: Buffer | null = null;
     const pdfFileName = `${kodeRegistrasi}_${reg.namaPerwakilan.replace(/[^A-Z0-9]/gi, "_")}.pdf`;
     try {
