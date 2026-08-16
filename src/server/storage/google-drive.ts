@@ -32,7 +32,8 @@ async function getAccessToken(): Promise<string> {
         "Pastikan JSON key berasal dari Google Cloud Console → Service Accounts → Keys."
       );
     }
-    jwt = new JWT({ email: creds.client_email, key: creds.private_key, scopes });
+    const subject = process.env.GOOGLE_IMPERSONATE_USER || undefined;
+    jwt = new JWT({ email: creds.client_email, key: creds.private_key, scopes, subject });
   } else {
     const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
     const key = process.env.GOOGLE_PRIVATE_KEY;
@@ -44,10 +45,12 @@ async function getAccessToken(): Promise<string> {
         "  B) GOOGLE_SERVICE_ACCOUNT_EMAIL + GOOGLE_PRIVATE_KEY"
       );
     }
+    const subject = process.env.GOOGLE_IMPERSONATE_USER || undefined;
     jwt = new JWT({
       email,
       key: key.replace(/\\n/g, "\n"),
       scopes,
+      subject,
     });
   }
 
@@ -243,6 +246,15 @@ export function createGoogleDriveAdapter(): StorageAdapter {
 
       if (!res.ok) {
         const text = await res.text().catch(() => "");
+        if (text.includes("storage quota") || text.includes("Service Accounts do not have storage quota")) {
+          throw new Error(
+            "[Google Drive 403 Storage Quota Exceeded]\n" +
+            "Google Service Account tidak memiliki storage quota pribadi untuk upload file ke Personal Google Drive.\n" +
+            "SOLUSI:\n" +
+            "1. Gunakan 'Shared Drive' (Drive Bersama) di Google Workspace & tambahkan Service Account email sebagai anggota (Content Manager).\n" +
+            "2. ATAU tambahkan env variable GOOGLE_IMPERSONATE_USER=<email_admin_workspace> jika menggunakan Domain-Wide Delegation."
+          );
+        }
         throw new Error(`[Google Drive Upload] Multipart upload failed HTTP ${res.status}: ${text.slice(0, 500)}`);
       }
 
