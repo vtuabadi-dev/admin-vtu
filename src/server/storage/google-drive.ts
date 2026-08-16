@@ -12,7 +12,7 @@ export function isGoogleDriveConfigured(): boolean {
 
 async function getAccessToken(): Promise<string> {
   const { JWT } = await import("google-auth-library");
-  const scopes = ["https://www.googleapis.com/auth/drive.file"];
+  const scopes = ["https://www.googleapis.com/auth/drive", "https://www.googleapis.com/auth/drive.file"];
   let jwt: InstanceType<typeof JWT>;
 
   const jsonRaw = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
@@ -76,13 +76,15 @@ export async function getOrCreateFolder(folderName: string, parentId?: string): 
   const rootId = parentId || process.env.GOOGLE_DRIVE_FOLDER_ID!;
   const query = `'${rootId}' in parents and name = '${folderName.replace(/'/g, "\\'")}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false`;
 
-  const res = await apiFetch(`${DRIVE_API}/files?q=${encodeURIComponent(query)}&fields=files(id,name)`);
+  const res = await apiFetch(
+    `${DRIVE_API}/files?q=${encodeURIComponent(query)}&fields=files(id,name)&supportsAllDrives=true&includeItemsFromAllDrives=true`
+  );
   const data = await res.json();
   if (data.files && data.files.length > 0) {
     return data.files[0].id;
   }
 
-  const createRes = await apiFetch(`${DRIVE_API}/files`, {
+  const createRes = await apiFetch(`${DRIVE_API}/files?supportsAllDrives=true`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -95,7 +97,7 @@ export async function getOrCreateFolder(folderName: string, parentId?: string): 
 
   // Grant open/write access so users with folder link can view and click into the folder
   try {
-    await apiFetch(`${DRIVE_API}/files/${folder.id}/permissions`, {
+    await apiFetch(`${DRIVE_API}/files/${folder.id}/permissions?supportsAllDrives=true`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ role: "writer", type: "anyone" }),
