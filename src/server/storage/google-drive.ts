@@ -216,35 +216,38 @@ export function createGoogleDriveAdapter(): StorageAdapter {
       const fileName = getFileName(path);
       const parentFolderId = targetFolderId || folderId;
 
-      const metaRes = await apiFetch(`${DRIVE_API}/files?supportsAllDrives=true`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: fileName,
-          mimeType: contentType,
-          parents: [parentFolderId],
-        }),
+      const boundary = "----------VTU_DRIVE_MULTIPART_BOUNDARY_" + Date.now().toString(36);
+      const metadata = JSON.stringify({
+        name: fileName,
+        mimeType: contentType,
+        parents: [parentFolderId],
       });
-      const { id: fileId } = await metaRes.json();
 
-      try {
-        const patchRes = await apiFetch(`${DRIVE_UPLOAD}/files/${fileId}?uploadType=media&supportsAllDrives=true`, {
-          method: "PATCH",
-          headers: { "Content-Type": contentType },
-          body: new Uint8Array(buffer),
-        });
+      const header = `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${metadata}\r\n--${boundary}\r\nContent-Type: ${contentType}\r\n\r\n`;
+      const footer = `\r\n--${boundary}--`;
 
-        if (!patchRes.ok) {
-          // Immediately delete 0-byte orphan metadata file to prevent corrupt files in Drive
-          await apiFetch(`${DRIVE_API}/files/${fileId}?supportsAllDrives=true`, { method: "DELETE" }).catch(() => {});
-          throw new Error(`[Google Drive Upload] Media patch failed HTTP ${patchRes.status}`);
-        }
-      } catch (patchErr) {
-        await apiFetch(`${DRIVE_API}/files/${fileId}?supportsAllDrives=true`, { method: "DELETE" }).catch(() => {});
-        throw patchErr;
+      const headerBuf = Buffer.from(header, "utf-8");
+      const footerBuf = Buffer.from(footer, "utf-8");
+      const multipartBody = Buffer.concat([headerBuf, buffer, footerBuf]);
+
+      const token = await getAccessToken();
+      const res = await fetch(`${DRIVE_UPLOAD}/files?uploadType=multipart&supportsAllDrives=true`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": `multipart/related; boundary=${boundary}`,
+          "Content-Length": String(multipartBody.length),
+        },
+        body: multipartBody,
+      });
+
+      if (!res.ok) {
+        const text = await res.text().catch(() => "");
+        throw new Error(`[Google Drive Upload] Multipart upload failed HTTP ${res.status}: ${text.slice(0, 500)}`);
       }
 
-      return fileId;
+      const file = await res.json();
+      return file.id;
     },
 
     async download(fileId: string): Promise<Buffer> {
