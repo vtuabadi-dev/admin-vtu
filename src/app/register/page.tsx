@@ -325,12 +325,28 @@ export default function RegisterPage() {
   const [loadingPaket, setLoadingPaket] = useState(false);
 
   // Step 6: Signature
+  const [signatureMode, setSignatureMode] = useState<"draw" | "upload">("draw");
   const [signatureFile, setSignatureFile] = useState<File | null>(null);
   const [signaturePreview, setSignaturePreview] = useState("");
   const [signaturePath, setSignaturePath] = useState("");
   const [signedAt, setSignedAt] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState("");
+
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const [isDrawing, setIsDrawing] = useState(false);
+  const [hasDrawnOnCanvas, setHasDrawnOnCanvas] = useState(false);
+
+  const activeSignatureSrc = useMemo(() => {
+    if (signaturePreview) return signaturePreview;
+    if (signaturePath) {
+      if (signaturePath.startsWith("data:") || signaturePath.startsWith("http")) {
+        return signaturePath;
+      }
+      return `/api/storage/download?path=${encodeURIComponent(signaturePath)}`;
+    }
+    return "";
+  }, [signaturePreview, signaturePath]);
 
   // Step 7: Submit
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -664,7 +680,7 @@ export default function RegisterPage() {
     }
   };
 
-  // Handle signature upload
+  // Handle signature upload file
   const handleSignatureChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -682,7 +698,13 @@ export default function RegisterPage() {
     }
 
     setSignatureFile(file);
-    setSignaturePreview(URL.createObjectURL(file));
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === "string") {
+        setSignaturePreview(reader.result);
+      }
+    };
+    reader.readAsDataURL(file);
 
     // Upload immediately
     setUploading(true);
@@ -708,6 +730,104 @@ export default function RegisterPage() {
     } finally {
       setUploading(false);
     }
+  };
+
+  // Canvas Drawing Handlers
+  const startDrawingCanvas = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    const rect = canvas.getBoundingClientRect();
+    let clientX = 0;
+    let clientY = 0;
+    if ("touches" in e && e.touches && e.touches[0]) {
+      clientX = e.touches[0].clientX;
+      clientY = e.touches[0].clientY;
+    } else if ("clientX" in e) {
+      clientX = (e as React.MouseEvent<HTMLCanvasElement>).clientX;
+      clientY = (e as React.MouseEvent<HTMLCanvasElement>).clientY;
+    }
+
+    ctx.strokeStyle = "#0f172a";
+    ctx.lineWidth = 2.5;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.beginPath();
+    ctx.moveTo(clientX - rect.left, clientY - rect.top);
+    setIsDrawing(true);
+    setHasDrawnOnCanvas(true);
+  };
+
+  const drawCanvas = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    if (!isDrawing) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    const rect = canvas.getBoundingClientRect();
+    let clientX = 0;
+    let clientY = 0;
+    if ("touches" in e && e.touches && e.touches[0]) {
+      clientX = e.touches[0].clientX;
+      clientY = e.touches[0].clientY;
+    } else if ("clientX" in e) {
+      clientX = (e as React.MouseEvent<HTMLCanvasElement>).clientX;
+      clientY = (e as React.MouseEvent<HTMLCanvasElement>).clientY;
+    }
+
+    ctx.lineTo(clientX - rect.left, clientY - rect.top);
+    ctx.stroke();
+  };
+
+  const stopDrawingCanvas = () => {
+    setIsDrawing(false);
+  };
+
+  const clearCanvasSignature = () => {
+    const canvas = canvasRef.current;
+    if (canvas) {
+      const ctx = canvas.getContext("2d");
+      if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
+    }
+    setHasDrawnOnCanvas(false);
+    clearSignature();
+  };
+
+  const saveCanvasSignature = async () => {
+    const canvas = canvasRef.current;
+    if (!canvas || !hasDrawnOnCanvas) return;
+
+    const previewUrl = canvas.toDataURL("image/png");
+    setSignaturePreview(previewUrl);
+
+    canvas.toBlob(async (blob) => {
+      if (!blob) return;
+      const file = new File([blob], "ttd_digital.png", { type: "image/png" });
+      setSignatureFile(file);
+
+      setUploading(true);
+      try {
+        const formData = new FormData();
+        formData.append("file", file);
+
+        const res = await fetch("/api/register/upload", { method: "POST", body: formData });
+        const data = await res.json();
+
+        if (data.success) {
+          setSignaturePath(data.data.storagePath);
+          setSignedAt(new Date().toISOString());
+        } else {
+          setUploadError(data.message ?? "Upload tanda tangan gagal");
+        }
+      } catch {
+        setUploadError("Upload gagal. Periksa koneksi internet Anda.");
+      } finally {
+        setUploading(false);
+      }
+    }, "image/png");
   };
 
   const clearSignature = () => {
@@ -1665,41 +1785,139 @@ export default function RegisterPage() {
           {/* Step 6: Signature */}
           {step === 6 && (
             <div className="space-y-4">
-              <h2 className="text-lg font-semibold text-gray-900">Tanda Tangan Digital</h2>
-              <p className="text-sm text-gray-500">
-                Unggah foto tanda tangan PIC pada kertas putih. Format PNG, JPG, atau JPEG. Maksimal 100 KB.
-              </p>
+              <div>
+                <h2 className="text-lg font-black text-slate-950">Tanda Tangan Digital</h2>
+                <p className="text-sm font-semibold text-slate-800">
+                  Goreskan tanda tangan langsung di layar ponsel/laptop Anda, atau unggah foto tanda tangan PIC pada kertas putih.
+                </p>
+              </div>
 
-              <div
-                className={cn(
-                  "border-2 border-dashed rounded-lg p-6 text-center",
-                  signaturePreview ? "border-green-300 bg-green-50" : "border-gray-300 hover:border-gray-400",
-                  uploadError && "border-red-300 bg-red-50"
-                )}
-              >
-                {signaturePreview ? (
-                  <div className="space-y-3">
+              {/* Mode Selector Tabs */}
+              <div className="flex gap-2 p-1 bg-white/30 backdrop-blur-md rounded-xl border border-white/60 max-w-sm">
+                <button
+                  type="button"
+                  onClick={() => setSignatureMode("draw")}
+                  className={cn(
+                    "flex-1 py-2 px-3 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5",
+                    signatureMode === "draw"
+                      ? "bg-emerald-800 text-white shadow-sm"
+                      : "text-slate-700 hover:bg-white/40"
+                  )}
+                >
+                  <PenTool className="w-3.5 h-3.5" />
+                  Gambar Tulis Langsung
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSignatureMode("upload")}
+                  className={cn(
+                    "flex-1 py-2 px-3 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5",
+                    signatureMode === "upload"
+                      ? "bg-emerald-800 text-white shadow-sm"
+                      : "text-slate-700 hover:bg-white/40"
+                  )}
+                >
+                  <Upload className="w-3.5 h-3.5" />
+                  Unggah File Foto
+                </button>
+              </div>
+
+              {/* Signature Display Container */}
+              <div className="bg-white/30 backdrop-blur-md border-t border-l border-white/90 border-b border-r border-slate-900/20 rounded-2xl p-6 shadow-[inset_1px_1px_2px_rgba(255,255,255,0.9),0_10px_25px_-5px_rgba(0,0,0,0.15)] text-center">
+                {activeSignatureSrc ? (
+                  <div className="space-y-3 max-w-xs mx-auto bg-white p-4 rounded-xl border border-slate-200 shadow-md">
+                    <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Pratinjau Tanda Tangan Digital</p>
                     <img
-                      src={signaturePreview}
-                      alt="Tanda tangan"
-                      className="max-h-40 mx-auto rounded border border-gray-200"
+                      src={activeSignatureSrc}
+                      alt="Tanda Tangan Digital"
+                      className="max-h-36 max-w-full mx-auto object-contain"
+                      onError={(e) => {
+                        if (signaturePath && !signaturePath.startsWith("data:")) {
+                          (e.target as HTMLImageElement).src = `/api/storage/download?path=${encodeURIComponent(signaturePath)}`;
+                        }
+                      }}
                     />
-                    <p className="text-sm text-green-600 font-medium">Tanda tangan terunggah</p>
+                    <div className="pt-2 flex items-center justify-center gap-1.5 text-xs text-emerald-700 font-bold">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                      Tanda Tangan Terverifikasi & Tersimpan
+                    </div>
                     <button
                       type="button"
-                      onClick={clearSignature}
-                      className="text-sm text-red-500 hover:text-red-700"
+                      onClick={() => {
+                        clearCanvasSignature();
+                        clearSignature();
+                      }}
+                      className="text-xs text-red-600 hover:underline font-bold pt-1 block mx-auto"
                     >
-                      Hapus & unggah ulang
+                      Hapus & Tanda Tangan Ulang
                     </button>
                   </div>
+                ) : signatureMode === "draw" ? (
+                  /* Canvas Drawing Pad */
+                  <div className="space-y-3 max-w-md mx-auto">
+                    <p className="text-xs font-bold text-slate-700">
+                      Gunakan Jari / Mouse / Stylus untuk membuat Tanda Tangan di bawah ini:
+                    </p>
+                    <div className="bg-white rounded-xl border-2 border-dashed border-slate-400 p-1 shadow-inner relative touch-none">
+                      <canvas
+                        ref={canvasRef}
+                        width={400}
+                        height={180}
+                        onMouseDown={startDrawingCanvas}
+                        onMouseMove={drawCanvas}
+                        onMouseUp={stopDrawingCanvas}
+                        onMouseLeave={stopDrawingCanvas}
+                        onTouchStart={startDrawingCanvas}
+                        onTouchMove={drawCanvas}
+                        onTouchEnd={stopDrawingCanvas}
+                        className="w-full h-44 bg-white rounded-lg cursor-crosshair block"
+                      />
+                      {!hasDrawnOnCanvas && (
+                        <span className="absolute inset-0 flex items-center justify-center pointer-events-none text-slate-400 text-xs italic">
+                          (Coret/Tanda tangan di area ini)
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="flex items-center justify-center gap-3 pt-1">
+                      <button
+                        type="button"
+                        onClick={clearCanvasSignature}
+                        className="px-4 py-2 bg-slate-200 text-slate-800 rounded-lg text-xs font-bold hover:bg-slate-300 transition-colors"
+                      >
+                        Bersihkan Canvas
+                      </button>
+                      <button
+                        type="button"
+                        onClick={saveCanvasSignature}
+                        disabled={!hasDrawnOnCanvas || uploading}
+                        className={cn(
+                          "px-5 py-2 bg-emerald-800 text-white rounded-lg text-xs font-bold hover:bg-emerald-900 shadow-md transition-all flex items-center gap-1.5",
+                          "disabled:opacity-50 disabled:cursor-not-allowed"
+                        )}
+                      >
+                        {uploading ? (
+                          <>
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            Menyimpan...
+                          </>
+                        ) : (
+                          <>
+                            <Check className="w-3.5 h-3.5" />
+                            Simpan Tanda Tangan Ini
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
                 ) : (
-                  <div className="space-y-3">
-                    <Upload className="w-8 h-8 text-gray-400 mx-auto" />
+                  /* Image File Upload Mode */
+                  <div className="space-y-3 max-w-sm mx-auto">
+                    <Upload className="w-10 h-10 text-slate-500 mx-auto" />
                     <div>
-                      <label className="cursor-pointer inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">
+                      <label className="cursor-pointer inline-flex items-center gap-2 px-5 py-2.5 bg-emerald-800 text-white rounded-xl text-xs font-bold hover:bg-emerald-900 shadow-md transition-all">
                         <Upload className="w-4 h-4" />
-                        Pilih File Gambar
+                        Pilih Foto Tanda Tangan (PNG/JPG)
                         <input
                           type="file"
                           accept="image/png,image/jpeg,image/jpg"
@@ -1708,21 +1926,21 @@ export default function RegisterPage() {
                         />
                       </label>
                     </div>
-                    <p className="text-xs text-gray-400">atau drag & drop file di sini</p>
+                    <p className="text-xs font-semibold text-slate-600">Maksimal file 100 KB dengan foto pada kertas putih polos</p>
                   </div>
                 )}
 
                 {uploading && (
-                  <div className="flex items-center justify-center gap-2 mt-3">
-                    <Loader2 className="w-4 h-4 animate-spin text-blue-500" />
-                    <span className="text-sm text-blue-600">Mengunggah...</span>
+                  <div className="flex items-center justify-center gap-2 mt-4 text-xs font-bold text-emerald-800">
+                    <Loader2 className="w-4 h-4 animate-spin text-emerald-700" />
+                    Mengunggah & Menyimpan Tanda Tangan...
                   </div>
                 )}
 
-                {uploadError && <p className="text-sm text-red-500 mt-3">{uploadError}</p>}
+                {uploadError && <p className="text-xs font-bold text-red-600 mt-3">{uploadError}</p>}
               </div>
 
-              {errors.signature && <p className="text-xs text-red-500">{errors.signature}</p>}
+              {errors.signature && <p className="text-xs text-red-600 font-extrabold">{errors.signature}</p>}
             </div>
           )}
 
@@ -1730,8 +1948,8 @@ export default function RegisterPage() {
           {step === 7 && (
             <div className="space-y-6">
               <div>
-                <h2 className="text-lg font-semibold text-gray-900">Review & Pratinjau Dokumen Pendaftaran</h2>
-                <p className="text-sm text-gray-500">
+                <h2 className="text-lg font-bold text-slate-950">Review & Pratinjau Dokumen Pendaftaran</h2>
+                <p className="text-sm font-semibold text-slate-800">
                   Berikut adalah pratinjau lembar Formulir & Surat Pernyataan Pendaftaran resmi yang memuat data rombongan dan tanda tangan elektronik perwakilan.
                 </p>
               </div>
@@ -1849,17 +2067,26 @@ export default function RegisterPage() {
                       <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 space-y-2 text-xs">
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                           <div>
-                            <span className="text-slate-500">Paket Umroh: </span>
-                            <span className="font-bold text-slate-900">{selectedPaket.namaPaket || selectedPaket.paketUmroh?.namaPaket}</span>
+                            <span className="text-slate-500 font-medium">Nama Paket:</span>{" "}
+                            <span className="font-bold text-slate-900">
+                              {selectedPaket.namaPaket || (selectedPaket as any).paketUmroh?.namaPaket || "-"}
+                            </span>
                           </div>
                           <div>
-                            <span className="text-slate-500">Klaster Paket: </span>
-                            <span className="font-bold text-blue-700 uppercase">{ROOM_NAMES[roomUpgrade] || roomUpgrade}</span>
+                            <span className="text-slate-500 font-medium">Tipe / Klaster:</span>{" "}
+                            <span className="font-bold text-blue-700">
+                              {(selectedPaket as any).clusters?.[selectedClusterIndex]?.clusterName || "Standar Paket"}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-slate-500 font-medium">Preferensi Kamar:</span>{" "}
+                            <span className="font-semibold text-slate-900">{ROOM_NAMES[roomUpgrade] || roomUpgrade}</span>
+                          </div>
+                          <div>
+                            <span className="text-slate-500 font-medium">Jumlah Rombongan:</span>{" "}
+                            <span className="font-bold text-emerald-700">{paxCount} PAX</span>
                           </div>
                         </div>
-                        <p className="text-[11px] italic text-slate-500 pt-1">
-                          Informasi paket dan klaster paket yang dipilih menjadi bagian dari pendaftaran ini dan mengacu pada ketentuan paket yang berlaku.
-                        </p>
                       </div>
                     </div>
                   );
@@ -1868,35 +2095,16 @@ export default function RegisterPage() {
                 {/* Section D: SYARAT & KETENTUAN */}
                 <div className="space-y-2">
                   <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900 bg-slate-100 px-3 py-1.5 rounded-md border-l-4 border-slate-800">
-                    D. SYARAT & KETENTUAN
+                    D. PERSETUJUAN SYARAT & KETENTUAN
                   </h3>
-                  <ol className="list-decimal list-inside text-xs text-slate-700 space-y-1 bg-slate-50 p-3 rounded-xl border border-slate-200">
-                    <li>Pendaftar adalah perwakilan resmi rombongan jamaah Umroh VTU ABADI.</li>
-                    <li>Seluruh data anggota jamaah yang diserahkan wajib sesuai dengan dokumen identitas resmi (KTP/Paspor).</li>
-                    <li>Minimal pendaftaran adalah 1 orang dan maksimal 100 orang per grup pendaftaran.</li>
-                    <li>Biaya paket belum termasuk biaya pembuatan paspor, vaksin, sertifikat mahram, dan kebutuhan pribadi.</li>
-                    <li>Pembayaran Down Payment (DP) minimal 30% wajib dilunasi dalam kurun waktu 14 hari kerja sejak registrasi.</li>
-                    <li>Pelunasan sisa biaya paket wajib diselesaikan selambat-lambatnya 30 hari sebelum jadwal keberangkatan.</li>
-                    <li>Pembatalan pendaftaran secara sepihak dikenakan biaya administrasi & pembatalan sesuai ketentuan operasional.</li>
-                    <li>Berkas fisik dokumen kelengkapan (Paspor aktif min. 7 bulan, Pas Foto, Sertifikat Vaksin, KTP, KK) wajib diserahkan.</li>
-                    <li>Tanda Tangan Digital pada formulir ini dinyatakan sah dan memiliki kekuatan hukum persetujuan yang mengikat.</li>
-                  </ol>
-                </div>
-
-                {/* Section E: PERSETUJUAN SYARAT & KETENTUAN */}
-                <div className="space-y-2">
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900 bg-slate-100 px-3 py-1.5 rounded-md border-l-4 border-slate-800">
-                    E. PERSETUJUAN SYARAT & KETENTUAN
-                  </h3>
-                  <div className="text-xs text-slate-700 bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-2">
-                    <p className="italic text-slate-600">
-                      Dengan mengisi dan menandatangani formulir ini, saya menyatakan bahwa saya telah membaca, memahami, dan menyetujui Syarat & Ketentuan Umroh VTU ABADI yang berlaku.
+                  <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 text-xs space-y-1.5 text-slate-700">
+                    <p className="font-semibold text-slate-900">
+                      Dengan mengisi dan menandatangani formulir ini, pendaftar menyatakan bahwa:
                     </p>
-                    <ul className="space-y-1 font-medium text-emerald-800 pt-1">
-                      <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-600" /> Saya telah membaca, memahami, dan menyetujui Syarat & Ketentuan Umroh VTU ABADI.</li>
-                      <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-600" /> Saya menyetujui paket dan klaster paket Umroh yang dipilih.</li>
-                      <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-600" /> Saya menyatakan bahwa data yang saya berikan dalam formulir ini adalah benar.</li>
-                      <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-600" /> Saya bersedia mengikuti seluruh ketentuan perjalanan Umroh yang berlaku.</li>
+                    <ul className="list-disc pl-5 space-y-1 text-[11px]">
+                      <li>Saya telah membaca, memahami, dan menyetujui seluruh Syarat & Ketentuan Pendaftaran Umroh VTU ABADI.</li>
+                      <li>Saya menjamin keabsahan dan kebenaran seluruh data jamaah yang disampaikan dalam pendaftaran ini.</li>
+                      <li>Saya bersedia menyelesaikan kewajiban pembayaran Down Payment (DP) & Pelunasan tepat waktu.</li>
                     </ul>
                   </div>
                 </div>
@@ -1912,8 +2120,17 @@ export default function RegisterPage() {
                     </div>
                     <div className="p-3 text-center space-y-2 bg-white">
                       <div className="h-24 flex items-center justify-center border border-dashed border-slate-300 rounded-lg bg-slate-50">
-                        {signaturePreview ? (
-                          <img src={signaturePreview} alt="Tanda Tangan Digital" className="max-h-20 max-w-full object-contain" />
+                        {activeSignatureSrc ? (
+                          <img
+                            src={activeSignatureSrc}
+                            alt="Tanda Tangan Digital"
+                            className="max-h-20 max-w-full object-contain mx-auto"
+                            onError={(e) => {
+                              if (signaturePath && !signaturePath.startsWith("data:")) {
+                                (e.target as HTMLImageElement).src = `/api/storage/download?path=${encodeURIComponent(signaturePath)}`;
+                              }
+                            }}
+                          />
                         ) : (
                           <span className="text-[10px] text-slate-400 italic">[Tanda Tangan Digital]</span>
                         )}
