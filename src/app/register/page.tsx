@@ -796,8 +796,7 @@ export default function RegisterPage() {
   const selectedPaket = paketList.find((p) => p.id === selectedPaketId);
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8 px-4">
-      <div className="max-w-2xl mx-auto">
+    <div className="w-full max-w-4xl mx-auto">
         {/* Top Notice Banner if draft was restored */}
         {isRestoredDraft && step < 8 && !paymentProofSubmitted && (
           <div className="mb-4 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-xs text-amber-900 flex items-center justify-between shadow-sm">
@@ -868,60 +867,60 @@ export default function RegisterPage() {
               <p className="text-sm text-gray-500">Masukkan data perwakilan yang akan menjadi kontak utama grup.</p>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Nama Perwakilan</label>
+                <label className="block text-sm font-medium text-slate-800 mb-1">Nama Perwakilan</label>
                 <div className="relative">
-                  <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                   <input
                     type="text"
                     value={namaPerwakilan}
                     onChange={(e) => setNamaPerwakilan(e.target.value.toUpperCase())}
                     className={cn(
-                      "w-full pl-10 pr-3 py-2.5 border rounded-lg text-sm uppercase",
-                      "focus:outline-none focus:ring-2 focus:ring-blue-500",
-                      errors.namaPerwakilan ? "border-red-300" : "border-gray-300"
+                      "w-full pl-10 pr-3.5 py-2.5 bg-white/70 backdrop-blur-sm border rounded-xl text-sm uppercase transition-all shadow-sm",
+                      "focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600",
+                      errors.namaPerwakilan ? "border-red-400 bg-red-50/50" : "border-slate-300/80"
                     )}
                     placeholder="NAMA LENGKAP"
                   />
                 </div>
-                {errors.namaPerwakilan && <p className="text-xs text-red-500 mt-1">{errors.namaPerwakilan}</p>}
+                {errors.namaPerwakilan && <p className="text-xs text-red-500 mt-1 font-medium">{errors.namaPerwakilan}</p>}
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Nomor Telepon (WhatsApp)</label>
+                <label className="block text-sm font-medium text-slate-800 mb-1">Nomor Telepon (WhatsApp)</label>
                 <div className="relative">
-                  <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <Phone className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                   <input
                     type="tel"
                     value={nomorTelepon}
                     onChange={(e) => setNomorTelepon(e.target.value)}
                     className={cn(
-                      "w-full pl-10 pr-3 py-2.5 border rounded-lg text-sm",
-                      "focus:outline-none focus:ring-2 focus:ring-blue-500",
-                      errors.nomorTelepon ? "border-red-300" : "border-gray-300"
+                      "w-full pl-10 pr-3.5 py-2.5 bg-white/70 backdrop-blur-sm border rounded-xl text-sm transition-all shadow-sm",
+                      "focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600",
+                      errors.nomorTelepon ? "border-red-400 bg-red-50/50" : "border-slate-300/80"
                     )}
                     placeholder="0812-3456-7890"
                   />
                 </div>
-                {errors.nomorTelepon && <p className="text-xs text-red-500 mt-1">{errors.nomorTelepon}</p>}
+                {errors.nomorTelepon && <p className="text-xs text-red-500 mt-1 font-medium">{errors.nomorTelepon}</p>}
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                <label className="block text-sm font-medium text-slate-800 mb-1">Email</label>
                 <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                   <input
                     type="email"
                     value={emailPerwakilan}
                     onChange={(e) => setEmailPerwakilan(e.target.value)}
                     className={cn(
-                      "w-full pl-10 pr-3 py-2.5 border rounded-lg text-sm",
-                      "focus:outline-none focus:ring-2 focus:ring-blue-500",
-                      errors.emailPerwakilan ? "border-red-300" : "border-gray-300"
+                      "w-full pl-10 pr-3.5 py-2.5 bg-white/70 backdrop-blur-sm border rounded-xl text-sm transition-all shadow-sm",
+                      "focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600",
+                      errors.emailPerwakilan ? "border-red-400 bg-red-50/50" : "border-slate-300/80"
                     )}
                     placeholder="perwakilan@email.com"
                   />
                 </div>
-                {errors.emailPerwakilan && <p className="text-xs text-red-500 mt-1">{errors.emailPerwakilan}</p>}
+                {errors.emailPerwakilan && <p className="text-xs text-red-500 mt-1 font-medium">{errors.emailPerwakilan}</p>}
               </div>
 
               {/* Toggle switch to use representative as Jamaah #1 */}
@@ -2320,11 +2319,10 @@ export default function RegisterPage() {
         </div>
 
         {/* Footer */}
-        <p className="text-center text-xs text-gray-400 mt-6">
+        <p className="text-center text-xs font-medium text-slate-700 mt-6 bg-white/60 backdrop-blur-sm py-2 px-4 rounded-full inline-block mx-auto">
           Sudah punya akun?{" "}
-          <a href="/login" className="text-blue-600 hover:underline">Login di sini</a>
+          <a href="/login" className="text-emerald-700 font-bold hover:underline">Login di sini</a>
         </p>
       </div>
-    </div>
   );
 }
