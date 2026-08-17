@@ -818,30 +818,33 @@ export default function RegisterPage() {
         )}
 
         {/* Header */}
-        <div className="text-center mb-8">
-          <h1 className="text-2xl font-bold text-gray-900">Registrasi Grup Umroh</h1>
-          <p className="text-sm text-gray-500 mt-1">Daftarkan rombongan Anda dalam 8 langkah mudah</p>
+        <div className="text-center mb-6 bg-white/80 backdrop-blur-md border border-white/60 p-6 rounded-3xl shadow-xl">
+          <div className="inline-flex items-center justify-center h-12 w-12 rounded-2xl bg-gradient-to-tr from-emerald-800 to-teal-700 text-white shadow-md shadow-emerald-900/20 mb-2">
+            <Building2 className="h-6 w-6" />
+          </div>
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">Registrasi Grup Umroh</h1>
+          <p className="text-sm font-medium text-slate-600 mt-1">Daftarkan rombongan Anda dalam 8 langkah mudah & cepat</p>
         </div>
 
         {/* Step indicator */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 mb-6">
+        <div className="bg-white/80 backdrop-blur-md rounded-2xl shadow-xl border border-white/50 p-4 mb-6">
           <div className="flex items-center justify-between">
             {steps.map((s, i) => (
               <div key={s.key} className="flex items-center">
                 <div
                   className={cn(
                     "flex flex-col items-center",
-                    step === s.key && "text-blue-600",
-                    step > s.key && "text-green-600",
-                    step < s.key && "text-gray-400"
+                    step === s.key && "text-emerald-700 font-bold",
+                    step > s.key && "text-emerald-600 font-semibold",
+                    step < s.key && "text-slate-400"
                   )}
                 >
                   <div
                     className={cn(
-                      "w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold",
-                      step === s.key && "bg-blue-100 text-blue-600",
-                      step > s.key && "bg-green-100 text-green-600",
-                      step < s.key && "bg-gray-100 text-gray-400"
+                      "w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all duration-200 shadow-sm",
+                      step === s.key && "bg-gradient-to-tr from-emerald-700 to-teal-600 text-white shadow-emerald-900/20 ring-4 ring-emerald-500/20 scale-110",
+                      step > s.key && "bg-emerald-100 text-emerald-700 border border-emerald-300",
+                      step < s.key && "bg-white/60 text-slate-400 border border-slate-200"
                     )}
                   >
                     {step > s.key ? <Check className="w-4 h-4" /> : s.key}
@@ -849,7 +852,7 @@ export default function RegisterPage() {
                   <span className="text-[10px] mt-1 hidden sm:block">{s.label}</span>
                 </div>
                 {i < steps.length - 1 && (
-                  <div className={cn("w-6 h-0.5 mx-1", step > s.key ? "bg-green-300" : "bg-gray-200")} />
+                  <div className={cn("w-6 h-0.5 mx-1 transition-all duration-300", step > s.key ? "bg-emerald-400" : "bg-slate-200/80")} />
                 )}
               </div>
             ))}
@@ -857,7 +860,7 @@ export default function RegisterPage() {
         </div>
 
         {/* Step content */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <div className="bg-white/85 backdrop-blur-lg rounded-3xl shadow-2xl border border-white/60 p-6 sm:p-8">
           {/* Step 1: Representative */}
           {step === 1 && (
             <div className="space-y-4">
