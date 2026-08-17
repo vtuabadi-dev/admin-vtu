@@ -1004,7 +1004,7 @@ export default function RegisterPage() {
             <div>
               <label className="block text-sm font-extrabold text-slate-950 mb-1 drop-shadow-[0_1px_1px_rgba(255,255,255,0.9)]">Nama Perwakilan</label>
               <div className="relative group">
-                <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-slate-950 group-focus-within:text-emerald-950 font-extrabold stroke-[2.5] transition-colors" />
+                <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-700/60 stroke-[1.75] transition-all duration-200 group-focus-within:text-emerald-950 group-focus-within:stroke-[2.5] group-focus-within:scale-110 group-hover:text-slate-900" />
                 <input
                   type="text"
                   value={namaPerwakilan}
@@ -1024,7 +1024,7 @@ export default function RegisterPage() {
             <div>
               <label className="block text-sm font-extrabold text-slate-950 mb-1 drop-shadow-[0_1px_1px_rgba(255,255,255,0.9)]">Nomor Telepon (WhatsApp)</label>
               <div className="relative group">
-                <Phone className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-slate-950 group-focus-within:text-emerald-950 font-extrabold stroke-[2.5] transition-colors" />
+                <Phone className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-700/60 stroke-[1.75] transition-all duration-200 group-focus-within:text-emerald-950 group-focus-within:stroke-[2.5] group-focus-within:scale-110 group-hover:text-slate-900" />
                 <input
                   type="tel"
                   value={nomorTelepon}
@@ -1044,7 +1044,7 @@ export default function RegisterPage() {
             <div>
               <label className="block text-sm font-extrabold text-slate-950 mb-1 drop-shadow-[0_1px_1px_rgba(255,255,255,0.9)]">Email</label>
               <div className="relative group">
-                <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-slate-950 group-focus-within:text-emerald-950 font-extrabold stroke-[2.5] transition-colors" />
+                <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-700/60 stroke-[1.75] transition-all duration-200 group-focus-within:text-emerald-950 group-focus-within:stroke-[2.5] group-focus-within:scale-110 group-hover:text-slate-900" />
                 <input
                   type="email"
                   value={emailPerwakilan}

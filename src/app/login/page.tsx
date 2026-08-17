@@ -114,7 +114,7 @@ export default function LoginPage() {
                 Email
               </label>
               <div className="relative group">
-                <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-emerald-950 group-focus-within:text-emerald-800 font-extrabold stroke-[2.5] pointer-events-none transition-colors" />
+                <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-emerald-700/60 stroke-[1.75] transition-all duration-200 group-focus-within:text-emerald-950 group-focus-within:stroke-[2.5] group-focus-within:scale-110 group-hover:text-emerald-900 pointer-events-none" />
                 <input
                   id="email"
                   type="email"
@@ -135,7 +135,7 @@ export default function LoginPage() {
                 Password
               </label>
               <div className="relative group">
-                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-emerald-950 group-focus-within:text-emerald-800 font-extrabold stroke-[2.5] pointer-events-none transition-colors" />
+                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-emerald-700/60 stroke-[1.75] transition-all duration-200 group-focus-within:text-emerald-950 group-focus-within:stroke-[2.5] group-focus-within:scale-110 group-hover:text-emerald-900 pointer-events-none" />
                 <input
                   id="password"
                   type={showPassword ? "text" : "password"}
