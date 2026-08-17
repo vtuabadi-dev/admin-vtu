@@ -1972,7 +1972,16 @@ export default function RegisterPage() {
             {/* Official Document Paper Preview Container */}
             <div className="bg-white border-2 border-slate-300 rounded-2xl p-3 sm:p-5 md:p-6 shadow-lg relative text-slate-800 font-sans max-w-3xl mx-auto overflow-hidden">
 
-              {/* Document Content Box */}
+              {/* Green V Logo Watermark Background behind document content */}
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-[0.20] z-0 overflow-hidden pt-16">
+                <img
+                  src="/templates/template-surat/watermark_logo.png"
+                  alt="Watermark Logo VTU ABADI"
+                  className="w-[65%] max-w-[360px] object-contain"
+                />
+              </div>
+
+              {/* Document Content Box (Above Watermark) */}
               <div className="relative z-10 space-y-4">
 
                 {/* Official Letterhead Header (100% Proportionate, Compact) */}
