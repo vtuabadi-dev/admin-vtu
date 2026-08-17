@@ -288,6 +288,8 @@ function CityCombobox({
   );
 }
 
+import IntroVideoLoader from "@/shared/components/IntroVideoLoader";
+
 export default function RegisterPage() {
   const router = useRouter();
 
@@ -923,6 +925,9 @@ export default function RegisterPage() {
 
   return (
     <div className="w-full max-w-4xl mx-auto">
+      {/* Background Intro Video Loader */}
+      <IntroVideoLoader />
+
       {/* Top Notice Banner if draft was restored */}
       {isRestoredDraft && step < 8 && !paymentProofSubmitted && (
         <div className="mb-4 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-xs text-amber-900 flex items-center justify-between shadow-sm">
