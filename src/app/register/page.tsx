@@ -1970,13 +1970,13 @@ export default function RegisterPage() {
             </div>
 
             {/* Official Document Paper Preview Container */}
-            <div className="bg-white border-2 border-slate-300 rounded-2xl p-4 sm:p-6 md:p-8 shadow-lg relative space-y-6 text-slate-800 font-sans max-w-3xl mx-auto overflow-hidden">
+            <div className="bg-white border-2 border-slate-300 rounded-2xl p-3 sm:p-5 md:p-6 shadow-lg relative text-slate-800 font-sans max-w-3xl mx-auto overflow-hidden">
 
               {/* Document Content Box */}
-              <div className="relative z-10 space-y-6">
+              <div className="relative z-10 space-y-4">
 
-                {/* Official Letterhead Header (100% Proportionate, No Cutoff) */}
-                <div className="border-b-2 border-slate-800 pb-2 mb-4 overflow-hidden rounded-t-lg relative">
+                {/* Official Letterhead Header (100% Proportionate, Compact) */}
+                <div className="border-b-2 border-slate-800 pb-1 mb-1.5 overflow-hidden rounded-t-lg relative">
                   <img
                     src="/templates/template-surat/kop_surat.jpeg"
                     alt="Kop Surat Official VTU ABADI"
@@ -1984,11 +1984,11 @@ export default function RegisterPage() {
                   />
                 </div>
 
-                <div className="text-center space-y-1 py-1">
-                  <h2 className="text-lg font-extrabold uppercase tracking-wide text-slate-900">
+                <div className="text-center space-y-0.5 py-0">
+                  <h2 className="text-base sm:text-lg font-extrabold uppercase tracking-wide text-slate-900">
                     FORMULIR PENDAFTARAN UMROH
                   </h2>
-                  <h3 className="text-base font-bold text-slate-700">VTU ABADI</h3>
+                  <h3 className="text-xs sm:text-sm font-bold text-slate-700">VTU ABADI</h3>
                 </div>
 
                 {/* Section A: DATA PENDAFTAR */}
