@@ -45,13 +45,17 @@ export async function generateRegistrationPdf(data: PdfData): Promise<Buffer> {
         const base64Data = reg.signaturePath.split(",")[1];
         if (base64Data) signatureBuffer = Buffer.from(base64Data, "base64");
       } else {
-        const { createLocalAdapter } = await import("@/server/storage/local");
-        const localAdapter = createLocalAdapter();
         try {
-          signatureBuffer = await localAdapter.download(reg.signaturePath);
-        } catch {
           const storage = getStorageAdapter();
-          signatureBuffer = await storage.download(reg.signaturePath).catch(() => null);
+          signatureBuffer = await storage.download(reg.signaturePath);
+        } catch {
+          try {
+            const { createLocalAdapter } = await import("@/server/storage/local");
+            const localAdapter = createLocalAdapter();
+            signatureBuffer = await localAdapter.download(reg.signaturePath);
+          } catch {
+            signatureBuffer = null;
+          }
         }
       }
     } catch (err) {
