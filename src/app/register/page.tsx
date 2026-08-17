@@ -1006,7 +1006,7 @@ export default function RegisterPage() {
                     "focus:bg-white/85 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-600",
                     errors.namaPerwakilan ? "border-red-500 bg-red-50/70" : ""
                   )}
-                  placeholder="Contoh: Muhammad Zamroni"
+                  placeholder="Contoh: Nama Pendaftar"
                 />
               </div>
               {errors.namaPerwakilan && <p className="text-xs text-red-600 mt-1 font-extrabold">{errors.namaPerwakilan}</p>}
@@ -1336,7 +1336,7 @@ export default function RegisterPage() {
                         : "focus:outline-none focus:ring-2 focus:ring-blue-500 border-gray-300 font-bold text-gray-900",
                       errors[`member_${i}_nama`] ? "border-red-300" : ""
                     )}
-                    placeholder="Contoh: Muhammad Zamroni"
+                    placeholder="Contoh: Nama Pendaftar"
                   />
                   {errors[`member_${i}_nama`] && (
                     <p className="text-xs text-red-500 mt-1">{errors[`member_${i}_nama`]}</p>
