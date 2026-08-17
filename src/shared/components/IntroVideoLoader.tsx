@@ -96,13 +96,13 @@ export default function IntroVideoLoader({
       }`}
     >
       {/* Pure Fullscreen Intro Video Player */}
-      <div className="absolute inset-0 z-0 bg-slate-950">
+      <div className="absolute inset-0 z-0 bg-slate-950 flex items-center justify-center">
         <video
           ref={videoRef}
-          src={videoSrc}
           autoPlay
           muted={isMuted}
           playsInline
+          preload="auto"
           controls={false}
           onCanPlay={() => {
             if (videoRef.current) {
@@ -111,12 +111,14 @@ export default function IntroVideoLoader({
             }
           }}
           onEnded={handleFinish}
-          onError={() => {
-            console.warn("[IntroVideoLoader] Video element error, finishing intro");
+          onError={(e) => {
+            console.warn("[IntroVideoLoader] Video element error, finishing intro:", e);
             handleFinish();
           }}
           className="w-full h-full object-cover object-center"
-        />
+        >
+          <source src={videoSrc} type="video/mp4" />
+        </video>
       </div>
 
       {/* Top Header Bar */}

@@ -93,8 +93,8 @@ export async function middleware(req: NextRequest) {
     );
   }
 
-  // Allow public paths and static assets
-  if (isPublic(pathname) || pathname.match(/\.(ico|png|svg|jpg|jpeg)$/)) {
+  // Allow public paths and static assets (images, videos, documents)
+  if (isPublic(pathname) || pathname.match(/\.(ico|png|svg|jpg|jpeg|gif|webp|mp4|webm|ogg|mp3|wav|pdf)$/i)) {
     return addSecurityHeaders(NextResponse.next());
   }
 
