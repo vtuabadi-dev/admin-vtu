@@ -817,16 +817,16 @@ export default function RegisterPage() {
         )}
 
         {/* Header */}
-        <div className="text-center mb-6 bg-white/20 backdrop-blur-md border border-white/60 p-6 rounded-3xl shadow-[0_8px_32px_0_rgba(0,0,0,0.08)]">
-          <div className="inline-flex items-center justify-center h-12 w-12 rounded-2xl bg-gradient-to-tr from-emerald-800 to-teal-700 text-white shadow-md shadow-emerald-900/20 mb-2">
+        <div className="text-center mb-6 bg-gradient-to-b from-white/35 to-white/15 backdrop-blur-md p-6 rounded-3xl border-t border-l border-white/90 border-b border-r border-slate-900/20 shadow-[inset_1px_1px_2px_rgba(255,255,255,0.9),inset_-1px_-1px_3px_rgba(0,0,0,0.1),0_15px_35px_-10px_rgba(0,0,0,0.2)]">
+          <div className="inline-flex items-center justify-center h-12 w-12 rounded-2xl bg-gradient-to-tr from-emerald-800 to-teal-700 text-white shadow-md shadow-emerald-900/30 mb-2">
             <Building2 className="h-6 w-6" />
           </div>
-          <h1 className="text-2xl sm:text-3xl font-black text-slate-950 tracking-tight drop-shadow-sm">Registrasi Grup Umroh</h1>
-          <p className="text-sm font-bold text-slate-800 mt-1">Daftarkan rombongan Anda dalam 8 langkah mudah & cepat</p>
+          <h1 className="text-2xl sm:text-3xl font-black text-slate-950 tracking-tight drop-shadow-[0_1px_2px_rgba(255,255,255,0.8)]">Registrasi Grup Umroh</h1>
+          <p className="text-sm font-bold text-slate-800 mt-1 drop-shadow-[0_1px_1px_rgba(255,255,255,0.8)]">Daftarkan rombongan Anda dalam 8 langkah mudah & cepat</p>
         </div>
 
         {/* Step indicator */}
-        <div className="bg-white/20 backdrop-blur-md rounded-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.08)] border border-white/60 p-4 mb-6">
+        <div className="bg-gradient-to-b from-white/35 to-white/15 backdrop-blur-md p-4 rounded-2xl border-t border-l border-white/90 border-b border-r border-slate-900/20 shadow-[inset_1px_1px_2px_rgba(255,255,255,0.9),inset_-1px_-1px_3px_rgba(0,0,0,0.1),0_15px_35px_-10px_rgba(0,0,0,0.2)] mb-6">
           <div className="flex items-center justify-between">
             {steps.map((s, i) => (
               <div key={s.key} className="flex items-center">
@@ -841,17 +841,17 @@ export default function RegisterPage() {
                   <div
                     className={cn(
                       "w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all duration-200 shadow-sm",
-                      step === s.key && "bg-gradient-to-tr from-emerald-800 to-teal-600 text-white shadow-emerald-900/30 ring-4 ring-emerald-500/30 scale-110",
-                      step > s.key && "bg-emerald-100/90 text-emerald-900 border border-emerald-300",
-                      step < s.key && "bg-white/40 text-slate-600 border border-white/60"
+                      step === s.key && "bg-gradient-to-tr from-emerald-800 to-teal-600 text-white shadow-emerald-900/40 ring-4 ring-emerald-500/30 scale-110 border-t border-l border-white/80",
+                      step > s.key && "bg-emerald-100/90 text-emerald-900 border border-emerald-400 shadow-inner",
+                      step < s.key && "bg-white/40 text-slate-600 border border-white/70 shadow-[inset_0_1px_2px_rgba(0,0,0,0.1)]"
                     )}
                   >
                     {step > s.key ? <Check className="w-4 h-4" /> : s.key}
                   </div>
-                  <span className="text-[10px] mt-1 font-bold hidden sm:block">{s.label}</span>
+                  <span className="text-[10px] mt-1 font-bold hidden sm:block drop-shadow-[0_1px_1px_rgba(255,255,255,0.8)]">{s.label}</span>
                 </div>
                 {i < steps.length - 1 && (
-                  <div className={cn("w-6 h-0.5 mx-1 transition-all duration-300", step > s.key ? "bg-emerald-500" : "bg-slate-400/60")} />
+                  <div className={cn("w-6 h-0.5 mx-1 transition-all duration-300 shadow-sm", step > s.key ? "bg-emerald-500" : "bg-slate-400/50")} />
                 )}
               </div>
             ))}
@@ -859,15 +859,15 @@ export default function RegisterPage() {
         </div>
 
         {/* Step content */}
-        <div className="bg-white/25 backdrop-blur-md rounded-3xl shadow-[0_12px_40px_0_rgba(0,0,0,0.1)] border border-white/60 p-6 sm:p-8">
+        <div className="bg-gradient-to-b from-white/35 to-white/15 backdrop-blur-md p-6 sm:p-8 rounded-3xl border-t border-l border-white/90 border-b border-r border-slate-900/20 shadow-[inset_1.5px_1.5px_3px_rgba(255,255,255,0.9),inset_-1.5px_-1.5px_4px_rgba(0,0,0,0.12),0_20px_50px_-15px_rgba(0,0,0,0.25)]">
           {/* Step 1: Representative */}
           {step === 1 && (
             <div className="space-y-4">
-              <h2 className="text-lg font-black text-slate-950">Data Perwakilan Grup</h2>
+              <h2 className="text-lg font-black text-slate-950 drop-shadow-[0_1px_1px_rgba(255,255,255,0.8)]">Data Perwakilan Grup</h2>
               <p className="text-sm font-semibold text-slate-800">Masukkan data perwakilan yang akan menjadi kontak utama grup.</p>
 
               <div>
-                <label className="block text-sm font-extrabold text-slate-950 mb-1">Nama Perwakilan</label>
+                <label className="block text-sm font-extrabold text-slate-950 mb-1 drop-shadow-[0_1px_1px_rgba(255,255,255,0.8)]">Nama Perwakilan</label>
                 <div className="relative">
                   <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-600" />
                   <input
@@ -875,9 +875,10 @@ export default function RegisterPage() {
                     value={namaPerwakilan}
                     onChange={(e) => setNamaPerwakilan(e.target.value.toUpperCase())}
                     className={cn(
-                      "w-full pl-10 pr-3.5 py-2.5 bg-white/35 backdrop-blur-sm border rounded-xl text-sm uppercase transition-all shadow-sm font-bold text-slate-950 placeholder:text-slate-500",
-                      "focus:bg-white/80 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-600",
-                      errors.namaPerwakilan ? "border-red-500 bg-red-50/70" : "border-white/70"
+                      "w-full pl-10 pr-3.5 py-2.5 bg-white/25 backdrop-blur-sm rounded-xl text-sm uppercase transition-all font-bold text-slate-950 placeholder:text-slate-500",
+                      "border-t border-l border-slate-900/15 border-b border-r border-white/80 shadow-[inset_0_2px_4px_rgba(0,0,0,0.1)]",
+                      "focus:bg-white/85 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-600",
+                      errors.namaPerwakilan ? "border-red-500 bg-red-50/70" : ""
                     )}
                     placeholder="NAMA LENGKAP"
                   />
@@ -886,7 +887,7 @@ export default function RegisterPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-extrabold text-slate-950 mb-1">Nomor Telepon (WhatsApp)</label>
+                <label className="block text-sm font-extrabold text-slate-950 mb-1 drop-shadow-[0_1px_1px_rgba(255,255,255,0.8)]">Nomor Telepon (WhatsApp)</label>
                 <div className="relative">
                   <Phone className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-600" />
                   <input
@@ -894,9 +895,10 @@ export default function RegisterPage() {
                     value={nomorTelepon}
                     onChange={(e) => setNomorTelepon(e.target.value)}
                     className={cn(
-                      "w-full pl-10 pr-3.5 py-2.5 bg-white/35 backdrop-blur-sm border rounded-xl text-sm transition-all shadow-sm font-bold text-slate-950 placeholder:text-slate-500",
-                      "focus:bg-white/80 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-600",
-                      errors.nomorTelepon ? "border-red-500 bg-red-50/70" : "border-white/70"
+                      "w-full pl-10 pr-3.5 py-2.5 bg-white/25 backdrop-blur-sm rounded-xl text-sm transition-all font-bold text-slate-950 placeholder:text-slate-500",
+                      "border-t border-l border-slate-900/15 border-b border-r border-white/80 shadow-[inset_0_2px_4px_rgba(0,0,0,0.1)]",
+                      "focus:bg-white/85 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-600",
+                      errors.nomorTelepon ? "border-red-500 bg-red-50/70" : ""
                     )}
                     placeholder="0812-3456-7890"
                   />
@@ -905,7 +907,7 @@ export default function RegisterPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-extrabold text-slate-950 mb-1">Email</label>
+                <label className="block text-sm font-extrabold text-slate-950 mb-1 drop-shadow-[0_1px_1px_rgba(255,255,255,0.8)]">Email</label>
                 <div className="relative">
                   <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-600" />
                   <input
@@ -913,9 +915,10 @@ export default function RegisterPage() {
                     value={emailPerwakilan}
                     onChange={(e) => setEmailPerwakilan(e.target.value)}
                     className={cn(
-                      "w-full pl-10 pr-3.5 py-2.5 bg-white/35 backdrop-blur-sm border rounded-xl text-sm transition-all shadow-sm font-bold text-slate-950 placeholder:text-slate-500",
-                      "focus:bg-white/80 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-600",
-                      errors.emailPerwakilan ? "border-red-500 bg-red-50/70" : "border-white/70"
+                      "w-full pl-10 pr-3.5 py-2.5 bg-white/25 backdrop-blur-sm rounded-xl text-sm transition-all font-bold text-slate-950 placeholder:text-slate-500",
+                      "border-t border-l border-slate-900/15 border-b border-r border-white/80 shadow-[inset_0_2px_4px_rgba(0,0,0,0.1)]",
+                      "focus:bg-white/85 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-600",
+                      errors.emailPerwakilan ? "border-red-500 bg-red-50/70" : ""
                     )}
                     placeholder="perwakilan@email.com"
                   />
