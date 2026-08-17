@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { Volume2, VolumeX, SkipForward } from "lucide-react";
 
 interface IntroVideoLoaderProps {
@@ -14,6 +15,7 @@ export default function IntroVideoLoader({
   forceShow = false,
   videoSrc = "/intro-web.mp4",
 }: IntroVideoLoaderProps) {
+  const router = useRouter();
   const [isVisible, setIsVisible] = useState(false);
   const [isFadingOut, setIsFadingOut] = useState(false);
   const [isMuted, setIsMuted] = useState(true);
@@ -32,6 +34,36 @@ export default function IntroVideoLoader({
     }
   }, [forceShow, onComplete]);
 
+  // Attempt autoplay programmatically when visible
+  useEffect(() => {
+    if (!isVisible) return;
+
+    const video = videoRef.current;
+    if (video) {
+      video.muted = isMuted;
+      video.defaultMuted = true;
+      const playPromise = video.play();
+      if (playPromise !== undefined) {
+        playPromise
+          .catch((err) => {
+            console.warn("[IntroVideoLoader] Initial play blocked, trying muted force play:", err);
+            video.muted = true;
+            setIsMuted(true);
+            video
+              .play()
+              .catch((e) => console.warn("[IntroVideoLoader] Muted play error:", e));
+          });
+      }
+    }
+
+    // Safety timeout: if video stuck or fails after 12s, automatically transition to login
+    const safetyTimer = setTimeout(() => {
+      handleFinish();
+    }, 12000);
+
+    return () => clearTimeout(safetyTimer);
+  }, [isVisible]);
+
   const handleFinish = () => {
     if (isFadingOut) return;
     setIsFadingOut(true);
@@ -40,7 +72,11 @@ export default function IntroVideoLoader({
     }
     setTimeout(() => {
       setIsVisible(false);
-      if (onComplete) onComplete();
+      if (onComplete) {
+        onComplete();
+      } else if (typeof window !== "undefined" && window.location.pathname !== "/login") {
+        router.push("/login");
+      }
     }, 700);
   };
 
@@ -60,14 +96,25 @@ export default function IntroVideoLoader({
       }`}
     >
       {/* Pure Fullscreen Intro Video Player */}
-      <div className="absolute inset-0 z-0">
+      <div className="absolute inset-0 z-0 bg-slate-950">
         <video
           ref={videoRef}
           src={videoSrc}
           autoPlay
           muted={isMuted}
           playsInline
+          controls={false}
+          onCanPlay={() => {
+            if (videoRef.current) {
+              videoRef.current.muted = isMuted;
+              videoRef.current.play().catch(() => {});
+            }
+          }}
           onEnded={handleFinish}
+          onError={() => {
+            console.warn("[IntroVideoLoader] Video element error, finishing intro");
+            handleFinish();
+          }}
           className="w-full h-full object-cover object-center"
         />
       </div>
@@ -79,7 +126,7 @@ export default function IntroVideoLoader({
           <button
             type="button"
             onClick={toggleMute}
-            className="p-2.5 bg-black/40 hover:bg-black/60 text-white rounded-full border border-white/20 backdrop-blur-md shadow-lg transition-all"
+            className="p-2.5 bg-black/50 hover:bg-black/80 text-white rounded-full border border-white/25 backdrop-blur-md shadow-lg transition-all"
             title={isMuted ? "Nyalakan Suara Video" : "Matikan Suara"}
           >
             {isMuted ? <VolumeX className="w-4 h-4 text-slate-300" /> : <Volume2 className="w-4 h-4 text-emerald-400" />}
@@ -89,7 +136,7 @@ export default function IntroVideoLoader({
           <button
             type="button"
             onClick={handleFinish}
-            className="px-4 py-2 bg-black/40 hover:bg-black/60 text-white rounded-full text-xs font-extrabold backdrop-blur-md border border-white/20 shadow-xl transition-all flex items-center gap-1.5"
+            className="px-4 py-2 bg-black/50 hover:bg-black/80 text-white rounded-full text-xs font-extrabold backdrop-blur-md border border-white/25 shadow-xl transition-all flex items-center gap-1.5"
           >
             <span>Lewati Intro</span>
             <SkipForward className="w-3.5 h-3.5" />
@@ -97,7 +144,7 @@ export default function IntroVideoLoader({
         </div>
       </div>
 
-      {/* Spacer to push video clean */}
+      {/* Spacer */}
       <div className="relative z-10 p-4 pointer-events-none" />
     </div>
   );
