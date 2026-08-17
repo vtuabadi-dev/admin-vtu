@@ -13,7 +13,7 @@ interface IntroVideoLoaderProps {
 export default function IntroVideoLoader({
   onComplete,
   forceShow = false,
-  videoSrc = process.env.NEXT_PUBLIC_INTRO_VIDEO_URL || "https://drive.google.com/uc?export=download&id=1wHjgA3FfqZ2cnlzIuXpm7s6n9iGc_Gii",
+  videoSrc = process.env.NEXT_PUBLIC_INTRO_VIDEO_URL || "https://drive.google.com/uc?export=download&id=1jOMszvMajCWR0iVJku6hnAGKqwHWFec_",
 }: IntroVideoLoaderProps) {
   const router = useRouter();
   const [isVisible, setIsVisible] = useState(false);
