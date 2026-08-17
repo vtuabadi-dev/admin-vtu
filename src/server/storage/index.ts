@@ -5,23 +5,15 @@ import type { StorageAdapter } from "./adapter";
 
 export type { StorageAdapter } from "./adapter";
 
-let _adapter: StorageAdapter | null = null;
-
 export function getStorageAdapter(): StorageAdapter {
-  if (_adapter) return _adapter;
-
   if (isGoogleDriveConfigured()) {
-    _adapter = createGoogleDriveAdapter();
-  } else if (isS3Configured()) {
-    _adapter = createS3Adapter();
-  } else {
-    // Mode Transit Storage Sementara (Transit Vault)
-    // Berfungsi sebagai transit folder sementara sampai credential Google Drive dihubungkan di Vercel env
-    console.warn("[STORAGE] Google Drive belum dikonfigurasi. Menggunakan Mode Transit Storage Sementara.");
-    _adapter = createLocalAdapter();
+    return createGoogleDriveAdapter();
   }
-
-  return _adapter;
+  if (isS3Configured()) {
+    return createS3Adapter();
+  }
+  console.warn("[STORAGE] Google Drive belum dikonfigurasi. Menggunakan Mode Transit Storage Sementara.");
+  return createLocalAdapter();
 }
 
 // Export path helpers for convenience
