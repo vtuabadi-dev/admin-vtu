@@ -1963,24 +1963,15 @@ export default function RegisterPage() {
             {/* Official Document Paper Preview Container */}
             <div className="bg-white border-2 border-slate-300 rounded-2xl p-4 sm:p-6 md:p-8 shadow-lg relative space-y-6 text-slate-800 font-sans max-w-3xl mx-auto overflow-hidden">
 
-              {/* Big V Logo Watermark Background behind text */}
-              <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-[0.14] z-0 overflow-hidden pt-28">
-                <img
-                  src="/templates/template-surat/kop_surat.jpeg"
-                  alt="Watermark Logo Background"
-                  className="w-[85%] max-w-[480px] object-bottom scale-125"
-                />
-              </div>
-
-              {/* Document Content Box (Above Background Watermark) */}
+              {/* Document Content Box */}
               <div className="relative z-10 space-y-6">
 
-                {/* Official Letterhead Header (Top Banner Only) */}
-                <div className="border-b-2 border-slate-800 pb-2 mb-4 overflow-hidden rounded-t-lg h-[120px] sm:h-[145px] relative">
+                {/* Official Letterhead Header (100% Proportionate, No Cutoff) */}
+                <div className="border-b-2 border-slate-800 pb-2 mb-4 overflow-hidden rounded-t-lg relative">
                   <img
                     src="/templates/template-surat/kop_surat.jpeg"
                     alt="Kop Surat Official VTU ABADI"
-                    className="w-full object-cover object-top"
+                    className="w-full h-auto object-contain block"
                   />
                 </div>
 
