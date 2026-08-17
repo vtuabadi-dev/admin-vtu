@@ -817,25 +817,25 @@ export default function RegisterPage() {
         )}
 
         {/* Header */}
-        <div className="text-center mb-6 bg-white/45 backdrop-blur-xl border border-white/70 p-6 rounded-3xl shadow-[0_8px_32px_0_rgba(0,0,0,0.12)]">
+        <div className="text-center mb-6 bg-white/20 backdrop-blur-md border border-white/60 p-6 rounded-3xl shadow-[0_8px_32px_0_rgba(0,0,0,0.08)]">
           <div className="inline-flex items-center justify-center h-12 w-12 rounded-2xl bg-gradient-to-tr from-emerald-800 to-teal-700 text-white shadow-md shadow-emerald-900/20 mb-2">
             <Building2 className="h-6 w-6" />
           </div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-950 tracking-tight drop-shadow-sm">Registrasi Grup Umroh</h1>
-          <p className="text-sm font-semibold text-slate-800 mt-1">Daftarkan rombongan Anda dalam 8 langkah mudah & cepat</p>
+          <h1 className="text-2xl sm:text-3xl font-black text-slate-950 tracking-tight drop-shadow-sm">Registrasi Grup Umroh</h1>
+          <p className="text-sm font-bold text-slate-800 mt-1">Daftarkan rombongan Anda dalam 8 langkah mudah & cepat</p>
         </div>
 
         {/* Step indicator */}
-        <div className="bg-white/45 backdrop-blur-xl rounded-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.12)] border border-white/70 p-4 mb-6">
+        <div className="bg-white/20 backdrop-blur-md rounded-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.08)] border border-white/60 p-4 mb-6">
           <div className="flex items-center justify-between">
             {steps.map((s, i) => (
               <div key={s.key} className="flex items-center">
                 <div
                   className={cn(
                     "flex flex-col items-center",
-                    step === s.key && "text-emerald-900 font-bold",
-                    step > s.key && "text-emerald-800 font-semibold",
-                    step < s.key && "text-slate-500"
+                    step === s.key && "text-emerald-950 font-extrabold",
+                    step > s.key && "text-emerald-900 font-bold",
+                    step < s.key && "text-slate-600 font-medium"
                   )}
                 >
                   <div
@@ -843,15 +843,15 @@ export default function RegisterPage() {
                       "w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all duration-200 shadow-sm",
                       step === s.key && "bg-gradient-to-tr from-emerald-800 to-teal-600 text-white shadow-emerald-900/30 ring-4 ring-emerald-500/30 scale-110",
                       step > s.key && "bg-emerald-100/90 text-emerald-900 border border-emerald-300",
-                      step < s.key && "bg-white/50 text-slate-500 border border-white/60"
+                      step < s.key && "bg-white/40 text-slate-600 border border-white/60"
                     )}
                   >
                     {step > s.key ? <Check className="w-4 h-4" /> : s.key}
                   </div>
-                  <span className="text-[10px] mt-1 font-semibold hidden sm:block">{s.label}</span>
+                  <span className="text-[10px] mt-1 font-bold hidden sm:block">{s.label}</span>
                 </div>
                 {i < steps.length - 1 && (
-                  <div className={cn("w-6 h-0.5 mx-1 transition-all duration-300", step > s.key ? "bg-emerald-500" : "bg-slate-300/70")} />
+                  <div className={cn("w-6 h-0.5 mx-1 transition-all duration-300", step > s.key ? "bg-emerald-500" : "bg-slate-400/60")} />
                 )}
               </div>
             ))}
@@ -859,68 +859,68 @@ export default function RegisterPage() {
         </div>
 
         {/* Step content */}
-        <div className="bg-white/50 backdrop-blur-xl rounded-3xl shadow-[0_12px_40px_0_rgba(0,0,0,0.15)] border border-white/70 p-6 sm:p-8">
+        <div className="bg-white/25 backdrop-blur-md rounded-3xl shadow-[0_12px_40px_0_rgba(0,0,0,0.1)] border border-white/60 p-6 sm:p-8">
           {/* Step 1: Representative */}
           {step === 1 && (
             <div className="space-y-4">
-              <h2 className="text-lg font-bold text-slate-950">Data Perwakilan Grup</h2>
-              <p className="text-sm font-medium text-slate-700">Masukkan data perwakilan yang akan menjadi kontak utama grup.</p>
+              <h2 className="text-lg font-black text-slate-950">Data Perwakilan Grup</h2>
+              <p className="text-sm font-semibold text-slate-800">Masukkan data perwakilan yang akan menjadi kontak utama grup.</p>
 
               <div>
-                <label className="block text-sm font-bold text-slate-900 mb-1">Nama Perwakilan</label>
+                <label className="block text-sm font-extrabold text-slate-950 mb-1">Nama Perwakilan</label>
                 <div className="relative">
-                  <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                  <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-600" />
                   <input
                     type="text"
                     value={namaPerwakilan}
                     onChange={(e) => setNamaPerwakilan(e.target.value.toUpperCase())}
                     className={cn(
-                      "w-full pl-10 pr-3.5 py-2.5 bg-white/50 backdrop-blur-md border rounded-xl text-sm uppercase transition-all shadow-sm font-medium text-slate-950 placeholder:text-slate-400",
-                      "focus:bg-white/90 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-600",
-                      errors.namaPerwakilan ? "border-red-500/80 bg-red-50/60" : "border-white/80"
+                      "w-full pl-10 pr-3.5 py-2.5 bg-white/35 backdrop-blur-sm border rounded-xl text-sm uppercase transition-all shadow-sm font-bold text-slate-950 placeholder:text-slate-500",
+                      "focus:bg-white/80 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-600",
+                      errors.namaPerwakilan ? "border-red-500 bg-red-50/70" : "border-white/70"
                     )}
                     placeholder="NAMA LENGKAP"
                   />
                 </div>
-                {errors.namaPerwakilan && <p className="text-xs text-red-600 mt-1 font-bold">{errors.namaPerwakilan}</p>}
+                {errors.namaPerwakilan && <p className="text-xs text-red-600 mt-1 font-extrabold">{errors.namaPerwakilan}</p>}
               </div>
 
               <div>
-                <label className="block text-sm font-bold text-slate-900 mb-1">Nomor Telepon (WhatsApp)</label>
+                <label className="block text-sm font-extrabold text-slate-950 mb-1">Nomor Telepon (WhatsApp)</label>
                 <div className="relative">
-                  <Phone className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                  <Phone className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-600" />
                   <input
                     type="tel"
                     value={nomorTelepon}
                     onChange={(e) => setNomorTelepon(e.target.value)}
                     className={cn(
-                      "w-full pl-10 pr-3.5 py-2.5 bg-white/50 backdrop-blur-md border rounded-xl text-sm transition-all shadow-sm font-medium text-slate-950 placeholder:text-slate-400",
-                      "focus:bg-white/90 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-600",
-                      errors.nomorTelepon ? "border-red-500/80 bg-red-50/60" : "border-white/80"
+                      "w-full pl-10 pr-3.5 py-2.5 bg-white/35 backdrop-blur-sm border rounded-xl text-sm transition-all shadow-sm font-bold text-slate-950 placeholder:text-slate-500",
+                      "focus:bg-white/80 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-600",
+                      errors.nomorTelepon ? "border-red-500 bg-red-50/70" : "border-white/70"
                     )}
                     placeholder="0812-3456-7890"
                   />
                 </div>
-                {errors.nomorTelepon && <p className="text-xs text-red-600 mt-1 font-bold">{errors.nomorTelepon}</p>}
+                {errors.nomorTelepon && <p className="text-xs text-red-600 mt-1 font-extrabold">{errors.nomorTelepon}</p>}
               </div>
 
               <div>
-                <label className="block text-sm font-bold text-slate-900 mb-1">Email</label>
+                <label className="block text-sm font-extrabold text-slate-950 mb-1">Email</label>
                 <div className="relative">
-                  <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                  <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-600" />
                   <input
                     type="email"
                     value={emailPerwakilan}
                     onChange={(e) => setEmailPerwakilan(e.target.value)}
                     className={cn(
-                      "w-full pl-10 pr-3.5 py-2.5 bg-white/50 backdrop-blur-md border rounded-xl text-sm transition-all shadow-sm font-medium text-slate-950 placeholder:text-slate-400",
-                      "focus:bg-white/90 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-600",
-                      errors.emailPerwakilan ? "border-red-500/80 bg-red-50/60" : "border-white/80"
+                      "w-full pl-10 pr-3.5 py-2.5 bg-white/35 backdrop-blur-sm border rounded-xl text-sm transition-all shadow-sm font-bold text-slate-950 placeholder:text-slate-500",
+                      "focus:bg-white/80 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-600",
+                      errors.emailPerwakilan ? "border-red-500 bg-red-50/70" : "border-white/70"
                     )}
                     placeholder="perwakilan@email.com"
                   />
                 </div>
-                {errors.emailPerwakilan && <p className="text-xs text-red-600 mt-1 font-bold">{errors.emailPerwakilan}</p>}
+                {errors.emailPerwakilan && <p className="text-xs text-red-600 mt-1 font-extrabold">{errors.emailPerwakilan}</p>}
               </div>
 
               {/* Toggle switch to use representative as Jamaah #1 */}
