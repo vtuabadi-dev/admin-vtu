@@ -4,7 +4,7 @@ import { registrationRepo } from "@/server/repositories";
 import { notificationRepo } from "@/server/repositories";
 import { auditRepo } from "@/server/repositories";
 import { checkRateLimit, rateLimitKey, getRateLimitConfig } from "@/server/lib/rate-limit";
-import { signaturePath, getStorageAdapter } from "@/server/storage";
+import { signaturePath } from "@/server/storage";
 import type { GroupRegistrationFormData } from "@/shared/types";
 
 const MAX_PAX = 100;
@@ -70,14 +70,26 @@ export async function POST(request: NextRequest) {
     let finalSignaturePath = body.signaturePath;
     try {
       if (body.signaturePath.includes("tmp_")) {
+        const { getStorageAdapter } = await import("@/server/storage");
+        const { isGoogleDriveConfigured, getOrCreateFolder } = await import("@/server/storage/google-drive");
         const storage = getStorageAdapter();
         const newPath = signaturePath(kodeRegistrasi);
         const buffer = await storage.download(body.signaturePath);
-        finalSignaturePath = await storage.upload(newPath, buffer, "image/jpeg");
+
+        let signatureFolderId: string | undefined = undefined;
+        if (isGoogleDriveConfigured()) {
+          try {
+            signatureFolderId = await getOrCreateFolder("TANDA TANGAN");
+          } catch (err) {
+            console.warn("[register] Folder TANDA TANGAN error:", err);
+          }
+        }
+
+        finalSignaturePath = await storage.upload(newPath, buffer, "image/jpeg", signatureFolderId);
         await storage.delete(body.signaturePath).catch(() => {});
       }
-    } catch {
-      // If storage move fails, keep the original path
+    } catch (moveErr) {
+      console.warn("[register] Signature move notice:", moveErr);
     }
 
     // UPPERCASE all nama fields
