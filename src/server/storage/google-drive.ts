@@ -5,12 +5,28 @@ const DRIVE_UPLOAD = "https://www.googleapis.com/upload/drive/v3";
 
 export function isGoogleDriveConfigured(): boolean {
   const hasFolderId = !!process.env.GOOGLE_DRIVE_FOLDER_ID;
+  const hasOauth = !!(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET && process.env.GOOGLE_REFRESH_TOKEN);
   const hasJson = !!process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
   const hasEmailKey = !!(process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL && process.env.GOOGLE_PRIVATE_KEY);
-  return !!(hasFolderId && (hasJson || hasEmailKey));
+  return !!(hasFolderId && (hasOauth || hasJson || hasEmailKey));
 }
 
 async function getAccessToken(): Promise<string> {
+  // Option A (User OAuth2 Refresh Token - Cara 2): Uses human user 200GB quota
+  const clientId = process.env.GOOGLE_CLIENT_ID;
+  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+  const refreshToken = process.env.GOOGLE_REFRESH_TOKEN;
+
+  if (clientId && clientSecret && refreshToken) {
+    const { OAuth2Client } = await import("google-auth-library");
+    const oauth2Client = new OAuth2Client(clientId, clientSecret);
+    oauth2Client.setCredentials({ refresh_token: refreshToken });
+    const res = await oauth2Client.getAccessToken();
+    if (!res.token) throw new Error("Failed to obtain OAuth2 user access token for Google Drive");
+    return res.token;
+  }
+
+  // Option B (Service Account): Uses service account JWT
   const { JWT } = await import("google-auth-library");
   const scopes = ["https://www.googleapis.com/auth/drive", "https://www.googleapis.com/auth/drive.file"];
   let jwt: InstanceType<typeof JWT>;
@@ -41,8 +57,9 @@ async function getAccessToken(): Promise<string> {
       throw new Error(
         "[Google Drive] Google Drive dikonfigurasi tetapi credential tidak lengkap.\n" +
         "Gunakan salah satu:\n" +
-        "  A) GOOGLE_SERVICE_ACCOUNT_JSON=<paste full JSON>\n" +
-        "  B) GOOGLE_SERVICE_ACCOUNT_EMAIL + GOOGLE_PRIVATE_KEY"
+        "  A) GOOGLE_CLIENT_ID + GOOGLE_CLIENT_SECRET + GOOGLE_REFRESH_TOKEN\n" +
+        "  B) GOOGLE_SERVICE_ACCOUNT_JSON=<paste full JSON>\n" +
+        "  C) GOOGLE_SERVICE_ACCOUNT_EMAIL + GOOGLE_PRIVATE_KEY"
       );
     }
     const subject = process.env.GOOGLE_IMPERSONATE_USER || undefined;
@@ -297,4 +314,17 @@ export function createGoogleDriveAdapter(): StorageAdapter {
       }));
     },
   };
+}
+
+export async function renameDriveFile(fileId: string, newName: string): Promise<boolean> {
+  const token = await getAccessToken();
+  const res = await fetch(`${DRIVE_API}/files/${fileId}?supportsAllDrives=true`, {
+    method: "PATCH",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ name: newName }),
+  });
+  return res.ok;
 }
