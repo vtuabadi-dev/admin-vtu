@@ -113,7 +113,7 @@ export async function POST(request: NextRequest) {
       console.warn("[payment-proof] PDF generation warning:", pdfErr);
     }
 
-    // ── Simpan PDF ke Google Drive (Folder: FORMULIR PENDAFTARAN) ─────────────
+    // ── Simpan PDF ke Storage (Drive / Transit Vault) ─────────────────────────
     if (pdfBuf) {
       try {
         const { isGoogleDriveConfigured, getOrCreateFolder } = await import("@/server/storage/google-drive");
@@ -122,11 +122,17 @@ export async function POST(request: NextRequest) {
           const formulirFolderId = await getOrCreateFolder("FORMULIR PENDAFTARAN");
           await driveStorage.upload(pdfFileName, pdfBuf, "application/pdf", formulirFolderId);
           console.log(`[payment-proof] PDF formulir berhasil disimpan ke Google Drive folder FORMULIR PENDAFTARAN: ${pdfFileName}`);
-        } else {
-          console.warn("[payment-proof] Google Drive tidak dikonfigurasi — skip Drive upload");
         }
       } catch (driveErr) {
-        console.warn("[payment-proof] Gagal menyimpan PDF ke Google Drive (non-blocking):", driveErr);
+        console.warn("[payment-proof] Google Drive storage notice (Transit Vault mode active):", (driveErr as Error).message);
+        try {
+          const { createLocalAdapter } = await import("@/server/storage/local");
+          const localVault = createLocalAdapter();
+          await localVault.upload(`FORMULIR_PENDAFTARAN/${pdfFileName}`, pdfBuf, "application/pdf");
+          console.log(`[payment-proof] PDF formulir berhasil disimpan ke Transit Vault Local Storage: ${pdfFileName}`);
+        } catch (vaultErr) {
+          console.warn("[payment-proof] Vault upload warning:", vaultErr);
+        }
       }
     }
 
