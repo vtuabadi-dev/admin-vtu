@@ -158,7 +158,20 @@ export async function POST(request: NextRequest) {
         console.log("[register] PDF saved to local vault:", localFilePath);
       } catch (vaultErr: any) {
         console.warn("[register] Local vault save failed:", vaultErr?.message || vaultErr);
-        // PDF bytes still in memory — will still be attached to email even if vault fails
+      }
+
+      // Save to Google Drive if configured
+      try {
+        const { isGoogleDriveConfigured, getOrCreateFolder } = await import("@/server/storage/google-drive");
+        if (isGoogleDriveConfigured()) {
+          const { getStorageAdapter } = await import("@/server/storage");
+          const driveStorage = getStorageAdapter();
+          const formulirFolderId = await getOrCreateFolder("FORMULIR PENDAFTARAN");
+          await driveStorage.upload(pdfFilename, pdfBuffer, "application/pdf", formulirFolderId);
+          console.log("[register] PDF formulir berhasil disimpan ke Google Drive folder FORMULIR PENDAFTARAN:", pdfFilename);
+        }
+      } catch (driveErr: any) {
+        console.warn("[register] Google Drive upload notice:", driveErr?.message || driveErr);
       }
     } catch (err) {
       console.error("[register] PDF generation error:", err);
