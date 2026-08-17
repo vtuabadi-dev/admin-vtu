@@ -82,10 +82,11 @@ export async function generateRegistrationPdf(data: PdfData): Promise<Buffer> {
 
       // ── HEADER (Kop Surat Image Asset) ───────────────────────────────────
       let hasKopSurat = false;
+      let kopBuffer: Buffer | null = null;
       if (KOP_SURAT_BASE64) {
         try {
           const base64Data = KOP_SURAT_BASE64.replace(/^data:image\/\w+;base64,/, "");
-          const kopBuffer = Buffer.from(base64Data, "base64");
+          kopBuffer = Buffer.from(base64Data, "base64");
           if (kopBuffer.length > 0) {
             doc.image(kopBuffer, 40, 20, { width: PAGE_W });
             hasKopSurat = true;
@@ -206,6 +207,64 @@ export async function generateRegistrationPdf(data: PdfData): Promise<Buffer> {
       // Bottom divider line
       y += 16;
       doc.moveTo(40, y).lineTo(40 + PAGE_W, y).lineWidth(1.5).strokeColor(ACC_COLOR).stroke();
+
+      // ── PAGE 2 — SYARAT & KETENTUAN PENUH ────────────────────────────────
+      doc.addPage({ size: [612, 936], margin: 40 });
+
+      let y2 = 40;
+      // Header Kop Surat on Page 2
+      if (hasKopSurat && kopBuffer) {
+        try {
+          doc.image(kopBuffer, 40, 20, { width: PAGE_W });
+          y2 += 85;
+        } catch {
+          y2 += 10;
+        }
+      }
+
+      y2 = drawSectionHeader(doc, y2, PAGE_W, ACC_COLOR, "F", "SYARAT & KETENTUAN LENGKAP PENDAFTARAN");
+
+      doc.fillColor(GRAY).fontSize(8).font("Helvetica-Oblique")
+        .text("Dokumen ini merupakan bagian hukum resmi yang tidak terpisahkan dari Formulir Pendaftaran VTU ABADI Travel.", 40, y2, { width: PAGE_W });
+      y2 += 16;
+
+      const termsList = [
+        { label: "1. PASPOR & MASA BERLAKU:", body: "Calon jamaah wajib memiliki paspor yang masih berlaku minimal 12 bulan sejak tanggal jadwal keberangkatan yang telah ditentukan." },
+        { label: "2. KELENGKAPAN DOKUMEN:", body: "Calon jamaah wajib melengkapi seluruh dokumen persyaratan administrasi (KTP, KK, Akta Kelahiran/Buku Nikah, Pas Foto latar putih 80% wajah, dan Buku Vaksin Meningitis/COVID-19) paling lambat 30 hari sebelum tanggal keberangkatan." },
+        { label: "3. KETENTUAN PEMBAYARAN:", body: "Pembayaran Down Payment (DP) mengikat pendaftaran. Pelunasan biaya sisa wajib diselesaikan paling lambat 45 hari sebelum tanggal jadwal keberangkatan resmi." },
+        { label: "4. KEBIJAKAN PEMBATALAN:", body: "Pembatalan oleh pihak jamaah dikenakan pemotongan biaya administrasi, non-refundable deposit maskapai, dan hotel sesuai regulasi maskapai & hotel Arab Saudi." },
+        { label: "5. KEABSAHAN DATA HUKUM:", body: "Calon jamaah menjamin bahwa seluruh data dan informasi yang diisikan dalam portal registrasi adalah sah, benar, dan dapat dipertanggungjawabkan secara hukum." },
+        { label: "6. HAK PEMBATALAN TRAVEL:", body: "Pihak VTU ABADI Travel berhak membatalkan pendaftaran secara sepihak apabila ditemukan data yang tidak sesuai atau dokumen yang tidak memenuhi kriteria permohonan visa umroh/haji." },
+        { label: "7. PERUBAHAN JADWAL & FLIGHT:", body: "Calon jamaah memahami dan menyetujui bahwa jadwal penerbangan, penginapan hotel, dan visa dapat berubah sewaktu-waktu menyesuaikan regulasi Pemerintah Arab Saudi, Kementerian Agama RI, dan maskapai penerbangan." },
+        { label: "8. FORCE MAJEURE:", body: "Kejadian di luar kendali pihak travel (bencana alam, wabah penyakit, larangan terbang dari pemerintah) akan diselesaikan berdasarkan azas musyawarah dan regulasi asosiasi penyelenggara umroh/haji." },
+      ];
+
+      for (const term of termsList) {
+        doc.fillColor(PRI_COLOR).fontSize(8.5).font("Helvetica-Bold")
+          .text(term.label, 45, y2, { width: PAGE_W - 10 });
+        y2 += 13;
+        doc.fillColor(GRAY).fontSize(8.5).font("Helvetica")
+          .text(term.body, 55, y2, { width: PAGE_W - 20, align: "justify" });
+        y2 += doc.heightOfString(term.body, { width: PAGE_W - 20, align: "justify" }) + 8;
+        doc.moveTo(45, y2).lineTo(40 + PAGE_W, y2).lineWidth(0.3).strokeColor("#e2e8f0").stroke();
+        y2 += 6;
+      }
+
+      // Legal acknowledgment signature box at bottom of Page 2
+      y2 += 10;
+      doc.fillColor(GRAY).fontSize(8).font("Helvetica-Oblique")
+        .text("Pernyataan Menyetujui Syarat & Ketentuan di atas:", 40, y2, { width: PAGE_W, align: "center" });
+      y2 += 14;
+
+      const sigBoxX2 = (PAGE_W - 200) / 2 + 40;
+      doc.rect(sigBoxX2, y2, 200, 50).lineWidth(0.6).strokeColor(ACC_COLOR).stroke();
+      if (signatureBuffer) {
+        try {
+          doc.image(signatureBuffer, sigBoxX2 + 10, y2 + 4, { fit: [180, 42] });
+        } catch {}
+      }
+      doc.fillColor(PRI_COLOR).fontSize(8).font("Helvetica-Bold")
+        .text(`( ${reg.namaPerwakilan.toUpperCase()} )`, sigBoxX2, y2 + 54, { width: 200, align: "center" });
 
       doc.end();
     } catch (err) {
