@@ -63,12 +63,23 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, message: "File tidak valid", details: metaCheck.issues }, { status: 400 });
     }
 
-    // Save file to temp location — local adapter ensures instant preview without Drive 403 quota errors
+    // Save file to storage — uses Google Drive if configured, local vault fallback
     const tempId = `tmp_${Date.now()}_${crypto.randomUUID().slice(0, 8)}`;
-    const { createLocalAdapter } = await import("@/server/storage/local");
-    const storage = createLocalAdapter();
+    const { getStorageAdapter } = await import("@/server/storage");
+    const { isGoogleDriveConfigured, getOrCreateFolder } = await import("@/server/storage/google-drive");
+    const storage = getStorageAdapter();
     const storagePath = signaturePath(tempId);
-    await storage.upload(storagePath, buffer, file.type || "image/jpeg");
+
+    let targetFolderId: string | undefined = undefined;
+    if (isGoogleDriveConfigured()) {
+      try {
+        targetFolderId = await getOrCreateFolder("TANDA TANGAN");
+      } catch (folderErr) {
+        console.warn("[upload] Folder TANDA TANGAN creation warning:", folderErr);
+      }
+    }
+
+    await storage.upload(storagePath, buffer, file.type || "image/jpeg", targetFolderId);
 
     return NextResponse.json({
       success: true,
