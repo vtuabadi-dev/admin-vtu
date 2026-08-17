@@ -113,8 +113,8 @@ export default function LoginPage() {
               <label htmlFor="email" className="text-xs font-semibold text-emerald-900">
                 Email
               </label>
-              <div className="relative">
-                <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-emerald-600/70 pointer-events-none" />
+              <div className="relative group">
+                <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-emerald-950 group-focus-within:text-emerald-800 font-extrabold stroke-[2.5] pointer-events-none transition-colors" />
                 <input
                   id="email"
                   type="email"
@@ -124,7 +124,7 @@ export default function LoginPage() {
                   autoComplete="email"
                   required
                   disabled={isSubmitting}
-                  className="h-11 w-full bg-emerald-50/50 border border-emerald-200/80 rounded-xl pl-10 pr-3 text-sm text-emerald-950 placeholder:text-emerald-700/40 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:bg-white disabled:opacity-50 transition-all duration-200"
+                  className="h-11 w-full bg-emerald-50/50 border border-emerald-200/80 rounded-xl pl-10 pr-3 text-sm font-bold text-emerald-950 placeholder:text-emerald-700/40 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:bg-white disabled:opacity-50 transition-all duration-200"
                 />
               </div>
             </div>
@@ -134,8 +134,8 @@ export default function LoginPage() {
               <label htmlFor="password" className="text-xs font-semibold text-emerald-900">
                 Password
               </label>
-              <div className="relative">
-                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-emerald-600/70 pointer-events-none" />
+              <div className="relative group">
+                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-emerald-950 group-focus-within:text-emerald-800 font-extrabold stroke-[2.5] pointer-events-none transition-colors" />
                 <input
                   id="password"
                   type={showPassword ? "text" : "password"}
@@ -145,7 +145,7 @@ export default function LoginPage() {
                   autoComplete="current-password"
                   required
                   disabled={isSubmitting}
-                  className="h-11 w-full bg-emerald-50/50 border border-emerald-200/80 rounded-xl pl-10 pr-10 text-sm text-emerald-950 placeholder:text-emerald-700/40 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:bg-white disabled:opacity-50 transition-all duration-200"
+                  className="h-11 w-full bg-emerald-50/50 border border-emerald-200/80 rounded-xl pl-10 pr-10 text-sm font-bold text-emerald-950 placeholder:text-emerald-700/40 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:bg-white disabled:opacity-50 transition-all duration-200"
                 />
                 <button
                   type="button"

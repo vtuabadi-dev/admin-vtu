@@ -952,32 +952,41 @@ export default function RegisterPage() {
       </div>
 
       {/* Step indicator */}
-      <div className="bg-gradient-to-b from-white/20 to-white/05 backdrop-blur-[4px] p-4 rounded-2xl border-t border-l border-white/90 border-b border-r border-slate-900/25 shadow-[inset_1px_1px_2px_rgba(255,255,255,0.9),inset_-1px_-1px_3px_rgba(0,0,0,0.1),0_15px_35px_-10px_rgba(0,0,0,0.2)] mb-6">
-        <div className="flex items-center justify-between">
+      <div className="bg-gradient-to-b from-white/20 to-white/05 backdrop-blur-[4px] p-4 sm:p-5 rounded-2xl border-t border-l border-white/90 border-b border-r border-slate-900/25 shadow-[inset_1px_1px_2px_rgba(255,255,255,0.9),inset_-1px_-1px_3px_rgba(0,0,0,0.1),0_15px_35px_-10px_rgba(0,0,0,0.2)] mb-6 overflow-x-auto">
+        <div className="flex items-start justify-between min-w-[320px] px-1 sm:px-3">
           {steps.map((s, i) => (
-            <div key={s.key} className="flex items-center">
-              <div
-                className={cn(
-                  "flex flex-col items-center",
-                  step === s.key && "text-emerald-950 font-extrabold",
-                  step > s.key && "text-emerald-900 font-bold",
-                  step < s.key && "text-slate-600 font-medium"
-                )}
-              >
+            <div key={s.key} className="flex-1 flex items-start">
+              <div className="flex flex-col items-center shrink-0">
                 <div
                   className={cn(
-                    "w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all duration-200 shadow-sm",
-                    step === s.key && "bg-gradient-to-tr from-emerald-800 to-teal-600 text-white shadow-emerald-900/40 ring-4 ring-emerald-500/30 scale-110 border-t border-l border-white/80",
-                    step > s.key && "bg-emerald-100/90 text-emerald-900 border border-emerald-400 shadow-inner",
-                    step < s.key && "bg-white/30 text-slate-600 border border-white/70 shadow-[inset_0_1px_2px_rgba(0,0,0,0.1)]"
+                    "w-9 h-9 rounded-full flex items-center justify-center text-xs font-extrabold transition-all duration-200 shadow-sm",
+                    step === s.key && "bg-gradient-to-tr from-emerald-800 to-teal-600 text-white shadow-md shadow-emerald-900/30 ring-4 ring-emerald-500/30 scale-110 border border-white/80",
+                    step > s.key && "bg-emerald-800 text-white border border-emerald-600 shadow-sm",
+                    step < s.key && "bg-white/60 text-slate-700 border border-white/90 shadow-sm"
                   )}
                 >
-                  {step > s.key ? <Check className="w-4 h-4" /> : s.key}
+                  {step > s.key ? <Check className="w-4.5 h-4.5 text-white stroke-[2.5]" /> : s.key}
                 </div>
-                <span className="text-[10px] mt-1 font-bold hidden sm:block drop-shadow-[0_1px_1px_rgba(255,255,255,0.9)]">{s.label}</span>
+                <span
+                  className={cn(
+                    "text-[10.5px] mt-2 font-bold hidden sm:block text-center whitespace-nowrap drop-shadow-[0_1px_1px_rgba(255,255,255,0.9)]",
+                    step === s.key && "text-emerald-950 font-black",
+                    step > s.key && "text-emerald-900 font-bold",
+                    step < s.key && "text-slate-600 font-semibold"
+                  )}
+                >
+                  {s.label}
+                </span>
               </div>
               {i < steps.length - 1 && (
-                <div className={cn("w-6 h-0.5 mx-1 transition-all duration-300 shadow-sm", step > s.key ? "bg-emerald-500" : "bg-slate-400/50")} />
+                <div className="flex-1 flex items-center h-9 mx-1 sm:mx-2">
+                  <div
+                    className={cn(
+                      "w-full h-1 rounded-full transition-all duration-300 shadow-inner",
+                      step > s.key ? "bg-emerald-600" : "bg-slate-400/60"
+                    )}
+                  />
+                </div>
               )}
             </div>
           ))}
@@ -994,8 +1003,8 @@ export default function RegisterPage() {
 
             <div>
               <label className="block text-sm font-extrabold text-slate-950 mb-1 drop-shadow-[0_1px_1px_rgba(255,255,255,0.9)]">Nama Perwakilan</label>
-              <div className="relative">
-                <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-700" />
+              <div className="relative group">
+                <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-slate-950 group-focus-within:text-emerald-950 font-extrabold stroke-[2.5] transition-colors" />
                 <input
                   type="text"
                   value={namaPerwakilan}
@@ -1003,7 +1012,7 @@ export default function RegisterPage() {
                   className={cn(
                     "w-full pl-10 pr-3.5 py-2.5 bg-white/15 backdrop-blur-sm rounded-xl text-sm uppercase transition-all font-bold text-slate-950 placeholder:text-slate-700/40 placeholder:font-normal placeholder:normal-case",
                     "border-t border-l border-slate-900/20 border-b border-r border-white/90 shadow-[inset_0_2px_4px_rgba(0,0,0,0.12)]",
-                    "focus:bg-white/85 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-600",
+                    "focus:bg-white/90 focus:outline-none focus:ring-2 focus:ring-emerald-600/50 focus:border-emerald-700",
                     errors.namaPerwakilan ? "border-red-500 bg-red-50/70" : ""
                   )}
                   placeholder="Contoh: Nama Pendaftar"
@@ -1014,8 +1023,8 @@ export default function RegisterPage() {
 
             <div>
               <label className="block text-sm font-extrabold text-slate-950 mb-1 drop-shadow-[0_1px_1px_rgba(255,255,255,0.9)]">Nomor Telepon (WhatsApp)</label>
-              <div className="relative">
-                <Phone className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-700" />
+              <div className="relative group">
+                <Phone className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-slate-950 group-focus-within:text-emerald-950 font-extrabold stroke-[2.5] transition-colors" />
                 <input
                   type="tel"
                   value={nomorTelepon}
@@ -1023,7 +1032,7 @@ export default function RegisterPage() {
                   className={cn(
                     "w-full pl-10 pr-3.5 py-2.5 bg-white/15 backdrop-blur-sm rounded-xl text-sm transition-all font-bold text-slate-950 placeholder:text-slate-700/40 placeholder:font-normal",
                     "border-t border-l border-slate-900/20 border-b border-r border-white/90 shadow-[inset_0_2px_4px_rgba(0,0,0,0.12)]",
-                    "focus:bg-white/85 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-600",
+                    "focus:bg-white/90 focus:outline-none focus:ring-2 focus:ring-emerald-600/50 focus:border-emerald-700",
                     errors.nomorTelepon ? "border-red-500 bg-red-50/70" : ""
                   )}
                   placeholder="Contoh: 081234567890"
@@ -1034,8 +1043,8 @@ export default function RegisterPage() {
 
             <div>
               <label className="block text-sm font-extrabold text-slate-950 mb-1 drop-shadow-[0_1px_1px_rgba(255,255,255,0.9)]">Email</label>
-              <div className="relative">
-                <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-700" />
+              <div className="relative group">
+                <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-slate-950 group-focus-within:text-emerald-950 font-extrabold stroke-[2.5] transition-colors" />
                 <input
                   type="email"
                   value={emailPerwakilan}
@@ -1043,7 +1052,7 @@ export default function RegisterPage() {
                   className={cn(
                     "w-full pl-10 pr-3.5 py-2.5 bg-white/15 backdrop-blur-sm rounded-xl text-sm transition-all font-bold text-slate-950 placeholder:text-slate-700/40 placeholder:font-normal",
                     "border-t border-l border-slate-900/20 border-b border-r border-white/90 shadow-[inset_0_2px_4px_rgba(0,0,0,0.12)]",
-                    "focus:bg-white/85 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-600",
+                    "focus:bg-white/90 focus:outline-none focus:ring-2 focus:ring-emerald-600/50 focus:border-emerald-700",
                     errors.emailPerwakilan ? "border-red-500 bg-red-50/70" : ""
                   )}
                   placeholder="Contoh: nama@gmail.com"
