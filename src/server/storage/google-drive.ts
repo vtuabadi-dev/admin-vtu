@@ -258,6 +258,7 @@ export function createGoogleDriveAdapter(): StorageAdapter {
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": contentType,
+          "Content-Length": String(buffer.length),
         },
         body: new Uint8Array(buffer),
       });
