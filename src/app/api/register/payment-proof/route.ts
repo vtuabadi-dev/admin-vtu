@@ -169,16 +169,8 @@ export async function POST(request: NextRequest) {
           await driveStorage.upload(pdfFileName, pdfBuf, "application/pdf", targetFolderId);
           console.log(`[payment-proof] PDF formulir berhasil disimpan ke Google Drive folder: ${targetFolderId}`);
         }
-      } catch (driveErr) {
-        console.warn("[payment-proof] Google Drive storage notice (Transit Vault mode active):", (driveErr as Error).message);
-        try {
-          const { createLocalAdapter } = await import("@/server/storage/local");
-          const localVault = createLocalAdapter();
-          await localVault.upload(`FORMULIR_PENDAFTARAN/${pdfFileName}`, pdfBuf, "application/pdf");
-          console.log(`[payment-proof] PDF formulir berhasil disimpan ke Transit Vault Local Storage: ${pdfFileName}`);
-        } catch (vaultErr) {
-          console.warn("[payment-proof] Vault upload warning:", vaultErr);
-        }
+      } catch (driveErr: any) {
+        console.error("[payment-proof] Cloud Vault Storage FAILED:", driveErr?.message || driveErr);
       }
     }
 
