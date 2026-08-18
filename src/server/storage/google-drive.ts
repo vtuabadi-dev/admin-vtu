@@ -238,48 +238,53 @@ export function createGoogleDriveAdapter(): StorageAdapter {
       const fileName = getFileName(path);
       const parentFolderId = targetFolderId || folderId;
 
-      const boundary = "----------VTU_DRIVE_MULTIPART_BOUNDARY_" + Date.now().toString(36);
-      const metadata = JSON.stringify({
-        name: fileName,
-        mimeType: contentType,
-        parents: [parentFolderId],
-      });
-
-      const header = `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${metadata}\r\n--${boundary}\r\nContent-Type: ${contentType}\r\n\r\n`;
-      const footer = `\r\n--${boundary}--`;
-
-      const headerBuf = Buffer.from(header, "utf-8");
-      const footerBuf = Buffer.from(footer, "utf-8");
-      const blob = new Blob([headerBuf as any, buffer as any, footerBuf as any]);
-
-      const token = await getAccessToken();
-      const res = await fetch(`${DRIVE_UPLOAD}/files?uploadType=multipart&supportsAllDrives=true`, {
+      // Step 1: Create file metadata entry in the target parent folder
+      const metaRes = await apiFetch(`${DRIVE_API}/files?supportsAllDrives=true`, {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: fileName,
+          mimeType: contentType,
+          parents: [parentFolderId],
+        }),
+      });
+      const metaData = await metaRes.json();
+      const fileId = metaData.id;
+
+      // Step 2: Upload binary content to the created file entry via simple media upload
+      const token = await getAccessToken();
+      const uploadRes = await fetch(`${DRIVE_UPLOAD}/files/${fileId}?uploadType=media&supportsAllDrives=true`, {
+        method: "PATCH",
         headers: {
           Authorization: `Bearer ${token}`,
-          "Content-Type": `multipart/related; boundary=${boundary}`,
+          "Content-Type": contentType,
         },
-        body: blob,
+        body: new Uint8Array(buffer),
       });
 
-      if (!res.ok) {
-        const text = await res.text().catch(() => "");
-        console.error(`[Google Drive Upload Fail] HTTP ${res.status} for file "${fileName}" in folder "${parentFolderId}":`, text);
+      if (!uploadRes.ok) {
+        const text = await uploadRes.text().catch(() => "");
+        console.error(`[Google Drive Media Upload Fail] HTTP ${uploadRes.status} for file "${fileName}" (ID: ${fileId}):`, text);
         if (text.includes("storage quota") || text.includes("Service Accounts do not have storage quota")) {
           throw new Error(
             "[Google Drive 403 Storage Quota Exceeded]\n" +
-            "Google Service Account tidak memiliki storage quota pribadi untuk upload file ke Personal Google Drive.\n" +
-            "SOLUSI:\n" +
-            "1. Gunakan 'Shared Drive' (Drive Bersama) di Google Workspace & tambahkan Service Account email sebagai anggota (Content Manager).\n" +
-            "2. ATAU tambahkan env variable GOOGLE_IMPERSONATE_USER=<email_admin_workspace> jika menggunakan Domain-Wide Delegation."
+            "Google Service Account tidak memiliki storage quota pribadi untuk upload file ke Personal Google Drive."
           );
         }
-        throw new Error(`[Google Drive Upload] Multipart upload failed HTTP ${res.status}: ${text.slice(0, 500)}`);
+        throw new Error(`[Google Drive Upload] Media upload failed HTTP ${uploadRes.status}: ${text.slice(0, 500)}`);
       }
 
-      const file = await res.json();
-      console.log(`[Google Drive Upload Success] File "${fileName}" (ID: ${file.id}) successfully saved to folder ID "${parentFolderId}"`);
-      return file.id;
+      // Grant view/edit permission on the file entry
+      try {
+        await apiFetch(`${DRIVE_API}/files/${fileId}/permissions?supportsAllDrives=true`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ role: "writer", type: "anyone" }),
+        });
+      } catch { /* non-blocking */ }
+
+      console.log(`[Google Drive Upload Success] File "${fileName}" (ID: ${fileId}) successfully saved to folder ID "${parentFolderId}"`);
+      return fileId;
     },
 
     async download(fileId: string): Promise<Buffer> {
