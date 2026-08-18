@@ -5,7 +5,7 @@ import { checkRateLimit, rateLimitKey, getRateLimitConfig } from "@/server/lib/r
 
 function validateImageMetadata(buffer: Buffer): { valid: boolean; issues: string[] } {
   const issues: string[] = [];
-  if (buffer.length < 10240) issues.push("File size too small (< 10KB)");
+  if (buffer.length < 500) issues.push("File size too small (< 500 B)");
   if (buffer.length > 10 * 1024 * 1024) issues.push("File size terlalu besar (> 10MB)");
   const isJpeg = buffer[0] === 0xFF && buffer[1] === 0xD8 && buffer[2] === 0xFF;
   const isPng = buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4E && buffer[3] === 0x47;

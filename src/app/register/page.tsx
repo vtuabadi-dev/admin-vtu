@@ -620,7 +620,13 @@ export default function RegisterPage() {
     return Object.keys(errs).length === 0;
   }, [namaPerwakilan, nomorTelepon, emailPerwakilan, hasScrolledToBottom, termsAccepted, members, selectedPaketId, signaturePath, signatureFile]);
 
-  const nextStep = () => {
+  const nextStep = async () => {
+    // If on Step 6 (Signature step) with canvas drawn but not yet saved, auto-save before proceeding!
+    if (step === 6 && signatureMode === "draw" && hasDrawnOnCanvas && !signaturePath) {
+      const saved = await saveCanvasSignature();
+      if (!saved) return;
+    }
+
     if (validateStep(step)) {
       // Record terms acceptance timestamp when leaving step 2
       if (step === 2 && !termsAcceptedAt) {
@@ -802,38 +808,46 @@ export default function RegisterPage() {
     clearSignature();
   };
 
-  const saveCanvasSignature = async () => {
+  const saveCanvasSignature = async (): Promise<boolean> => {
     const canvas = canvasRef.current;
-    if (!canvas || !hasDrawnOnCanvas) return;
+    if (!canvas || !hasDrawnOnCanvas) return false;
 
     const previewUrl = canvas.toDataURL("image/png");
     setSignaturePreview(previewUrl);
 
-    canvas.toBlob(async (blob) => {
-      if (!blob) return;
-      const file = new File([blob], "ttd_digital.png", { type: "image/png" });
-      setSignatureFile(file);
-
-      setUploading(true);
-      try {
-        const formData = new FormData();
-        formData.append("file", file);
-
-        const res = await fetch("/api/register/upload", { method: "POST", body: formData });
-        const data = await res.json();
-
-        if (data.success) {
-          setSignaturePath(data.data.storagePath);
-          setSignedAt(new Date().toISOString());
-        } else {
-          setUploadError(data.message ?? "Upload tanda tangan gagal");
+    return new Promise<boolean>((resolve) => {
+      canvas.toBlob(async (blob) => {
+        if (!blob) {
+          resolve(false);
+          return;
         }
-      } catch {
-        setUploadError("Upload gagal. Periksa koneksi internet Anda.");
-      } finally {
-        setUploading(false);
-      }
-    }, "image/png");
+        const file = new File([blob], "ttd_digital.png", { type: "image/png" });
+        setSignatureFile(file);
+
+        setUploading(true);
+        try {
+          const formData = new FormData();
+          formData.append("file", file);
+
+          const res = await fetch("/api/register/upload", { method: "POST", body: formData });
+          const data = await res.json();
+
+          if (data.success) {
+            setSignaturePath(data.data.storagePath);
+            setSignedAt(new Date().toISOString());
+            resolve(true);
+          } else {
+            setUploadError(data.message ?? "Upload tanda tangan gagal");
+            resolve(false);
+          }
+        } catch {
+          setUploadError("Upload gagal. Periksa koneksi internet Anda.");
+          resolve(false);
+        } finally {
+          setUploading(false);
+        }
+      }, "image/png");
+    });
   };
 
   const clearSignature = () => {
