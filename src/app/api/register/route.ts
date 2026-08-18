@@ -79,9 +79,19 @@ export async function POST(request: NextRequest) {
         let signatureFolderId: string | undefined = undefined;
         if (isGoogleDriveConfigured()) {
           try {
-            signatureFolderId = await getOrCreateFolder("TANDA TANGAN");
+            const { createPackageFolderHierarchy } = await import("@/server/storage/google-drive");
+            const depDate = paket?.tanggalBerangkat ? new Date(paket.tanggalBerangkat) : new Date();
+            const year = depDate.getFullYear();
+            const monthNum = String(depDate.getMonth() + 1).padStart(2, "0");
+            const monthNames = ["JANUARI", "FEBRUARI", "MARET", "APRIL", "MEI", "JUNI", "JULI", "AGUSTUS", "SEPTEMBER", "OKTOBER", "NOVEMBER", "DESEMBER"];
+            const monthName = `${monthNum} - ${monthNames[depDate.getMonth()]} ${year}`;
+            const packageName = (paket?.namaPaket || "PAKET REGULER").toUpperCase().trim();
+
+            const folderRegistry = await createPackageFolderHierarchy(year, monthName, packageName);
+            signatureFolderId = folderRegistry.tandaTangan;
           } catch (err) {
             console.warn("[register] Folder TANDA TANGAN error:", err);
+            signatureFolderId = await getOrCreateFolder("TANDA TANGAN");
           }
         }
 
