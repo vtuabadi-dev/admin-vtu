@@ -133,6 +133,7 @@ export interface DriveFolderRegistry {
   ktp: string;
   foto: string;
   pembayaran: string;
+  tandaTangan: string;
   dokumenLain: string;
   manifest: string;
   export: string;
@@ -151,6 +152,7 @@ export async function createPackageFolderHierarchy(
       ktp: "local-mock",
       foto: "local-mock",
       pembayaran: "local-mock",
+      tandaTangan: "local-mock",
       dokumenLain: "local-mock",
       manifest: "local-mock",
       export: "local-mock",
@@ -163,16 +165,15 @@ export async function createPackageFolderHierarchy(
   const monthId = await getOrCreateFolder(monthFolderName, yearId);
   const packageFolderId = await getOrCreateFolder(packageFolderName, monthId);
 
-  const [paspor, ktp, foto, pembayaran, dokumenLain, manifest, exportFolder, formulirPendaftaran] = await Promise.all([
-    getOrCreateFolder("PASPOR", packageFolderId),
-    getOrCreateFolder("KTP", packageFolderId),
-    getOrCreateFolder("FOTO", packageFolderId),
-    getOrCreateFolder("PEMBAYARAN", packageFolderId),
-    getOrCreateFolder("DOKUMEN LAIN", packageFolderId),
-    getOrCreateFolder("MANIFEST", packageFolderId),
-    getOrCreateFolder("EXPORT", packageFolderId),
-    getOrCreateFolder("FORMULIR PENDAFTARAN", packageFolderId),
-  ]);
+  const paspor = await getOrCreateFolder("PASPOR", packageFolderId);
+  const ktp = await getOrCreateFolder("KTP", packageFolderId);
+  const foto = await getOrCreateFolder("FOTO", packageFolderId);
+  const pembayaran = await getOrCreateFolder("PEMBAYARAN", packageFolderId);
+  const tandaTangan = await getOrCreateFolder("TANDA TANGAN", packageFolderId);
+  const dokumenLain = await getOrCreateFolder("DOKUMEN LAIN", packageFolderId);
+  const manifest = await getOrCreateFolder("MANIFEST", packageFolderId);
+  const exportFolder = await getOrCreateFolder("EXPORT", packageFolderId);
+  const formulirPendaftaran = await getOrCreateFolder("FORMULIR PENDAFTARAN", packageFolderId);
 
   return {
     rootPackageFolderId: packageFolderId,
@@ -180,6 +181,7 @@ export async function createPackageFolderHierarchy(
     ktp,
     foto,
     pembayaran,
+    tandaTangan,
     dokumenLain,
     manifest,
     export: exportFolder,
@@ -258,7 +260,7 @@ export function createGoogleDriveAdapter(): StorageAdapter {
           "Content-Type": `multipart/related; boundary=${boundary}`,
           "Content-Length": String(multipartBody.length),
         },
-        body: multipartBody,
+        body: new Uint8Array(multipartBody),
       });
 
       if (!res.ok) {
