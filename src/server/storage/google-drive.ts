@@ -6,74 +6,35 @@ const DRIVE_UPLOAD = "https://www.googleapis.com/upload/drive/v3";
 export function isGoogleDriveConfigured(): boolean {
   const hasFolderId = !!process.env.GOOGLE_DRIVE_FOLDER_ID;
   const hasOauth = !!(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET && process.env.GOOGLE_REFRESH_TOKEN);
-  const hasJson = !!process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
-  const hasEmailKey = !!(process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL && process.env.GOOGLE_PRIVATE_KEY);
-  return !!(hasFolderId && (hasOauth || hasJson || hasEmailKey));
+  return !!(hasFolderId && hasOauth);
 }
 
 async function getAccessToken(): Promise<string> {
-  // Option A (User OAuth2 Refresh Token - Cara 2): Uses human user 200GB quota
   const clientId = process.env.GOOGLE_CLIENT_ID;
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
   const refreshToken = process.env.GOOGLE_REFRESH_TOKEN;
 
-  if (clientId && clientSecret && refreshToken) {
+  if (!clientId || !clientSecret || !refreshToken) {
+    throw new Error(
+      "[Google Drive OAuth Error] Environment variables GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, dan GOOGLE_REFRESH_TOKEN wajib dikonfigurasi di Vercel.\n" +
+      "Cloud Vault secara eksklusif menggunakan OAuth 2.0 User identity untuk menyimpan berkas di Google Drive pribadi."
+    );
+  }
+
+  try {
     const { OAuth2Client } = await import("google-auth-library");
     const oauth2Client = new OAuth2Client(clientId, clientSecret);
     oauth2Client.setCredentials({ refresh_token: refreshToken });
     const res = await oauth2Client.getAccessToken();
-    if (!res.token) throw new Error("Failed to obtain OAuth2 user access token for Google Drive");
+    if (!res.token) throw new Error("Google Drive OAuth2 client did not return an access token");
     return res.token;
+  } catch (err: any) {
+    console.error("[Google Drive OAuth Error: Invalid Grant / Token Revoked]", err?.message || err);
+    throw new Error(
+      `[Google Drive OAuth Authorization Failure] Gagal mendapatkan Access Token: ${err?.message || err}. ` +
+      "Refresh Token kemungkinan telah direvoke atau invalid. Lakukan re-authorization di Google Cloud / OAuth Playground untuk memperbarui GOOGLE_REFRESH_TOKEN di Vercel Environment Variables."
+    );
   }
-
-  // Option B (Service Account): Uses service account JWT
-  const { JWT } = await import("google-auth-library");
-  const scopes = ["https://www.googleapis.com/auth/drive", "https://www.googleapis.com/auth/drive.file"];
-  let jwt: InstanceType<typeof JWT>;
-
-  const jsonRaw = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
-  if (jsonRaw) {
-    let creds: { client_email?: string; private_key?: string };
-    try {
-      creds = JSON.parse(jsonRaw);
-    } catch {
-      throw new Error(
-        "[Google Drive] GOOGLE_SERVICE_ACCOUNT_JSON bukan JSON yang valid. " +
-        "Pastikan seluruh JSON service account di-paste dengan benar (satu baris atau multi-baris)."
-      );
-    }
-    if (!creds.client_email || !creds.private_key) {
-      throw new Error(
-        "[Google Drive] GOOGLE_SERVICE_ACCOUNT_JSON tidak mengandung client_email atau private_key. " +
-        "Pastikan JSON key berasal dari Google Cloud Console → Service Accounts → Keys."
-      );
-    }
-    const subject = process.env.GOOGLE_IMPERSONATE_USER || undefined;
-    jwt = new JWT({ email: creds.client_email, key: creds.private_key, scopes, subject });
-  } else {
-    const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
-    const key = process.env.GOOGLE_PRIVATE_KEY;
-    if (!email || !key) {
-      throw new Error(
-        "[Google Drive] Google Drive dikonfigurasi tetapi credential tidak lengkap.\n" +
-        "Gunakan salah satu:\n" +
-        "  A) GOOGLE_CLIENT_ID + GOOGLE_CLIENT_SECRET + GOOGLE_REFRESH_TOKEN\n" +
-        "  B) GOOGLE_SERVICE_ACCOUNT_JSON=<paste full JSON>\n" +
-        "  C) GOOGLE_SERVICE_ACCOUNT_EMAIL + GOOGLE_PRIVATE_KEY"
-      );
-    }
-    const subject = process.env.GOOGLE_IMPERSONATE_USER || undefined;
-    jwt = new JWT({
-      email,
-      key: key.replace(/\\n/g, "\n"),
-      scopes,
-      subject,
-    });
-  }
-
-  const tokens = await jwt.getAccessToken();
-  if (!tokens.token) throw new Error("Failed to obtain Google Drive access token");
-  return tokens.token;
 }
 
 async function apiFetch(url: string, options: RequestInit = {}): Promise<Response> {
@@ -90,6 +51,20 @@ async function apiFetch(url: string, options: RequestInit = {}): Promise<Respons
     throw new Error(`Google Drive API error ${res.status}: ${text.slice(0, 500)}`);
   }
   return res;
+}
+
+export async function checkStorageQuotaDiagnostics(): Promise<{ totalBytes?: number; usedBytes?: number; userEmail?: string; error?: string }> {
+  try {
+    const res = await apiFetch(`${DRIVE_API}/about?fields=storageQuota,user`);
+    const data = await res.json();
+    return {
+      totalBytes: parseInt(data.storageQuota?.limit || "0", 10),
+      usedBytes: parseInt(data.storageQuota?.usage || "0", 10),
+      userEmail: data.user?.emailAddress,
+    };
+  } catch (err: any) {
+    return { error: err?.message || "Failed to fetch storage diagnostics" };
+  }
 }
 
 export async function getOrCreateFolder(folderName: string, parentId?: string): Promise<string> {
@@ -275,6 +250,17 @@ export function createGoogleDriveAdapter(): StorageAdapter {
         throw new Error(`[Google Drive Upload] Media upload failed HTTP ${uploadRes.status}: ${text.slice(0, 500)}`);
       }
 
+      // Step 3: Post-upload byte verification — assert size > 0 bytes
+      const checkRes = await apiFetch(`${DRIVE_API}/files/${fileId}?fields=id,name,size&supportsAllDrives=true`);
+      const fileMeta = await checkRes.json();
+      const byteSize = parseInt(fileMeta.size || "0", 10);
+
+      if (byteSize === 0) {
+        throw new Error(
+          `[Cloud Vault Storage Verification FAILED] File "${fileName}" (ID: ${fileId}) was saved as 0 bytes in Google Drive. Media upload was incomplete.`
+        );
+      }
+
       // Grant view/edit permission on the file entry
       try {
         await apiFetch(`${DRIVE_API}/files/${fileId}/permissions?supportsAllDrives=true`, {
@@ -284,7 +270,7 @@ export function createGoogleDriveAdapter(): StorageAdapter {
         });
       } catch { /* non-blocking */ }
 
-      console.log(`[Google Drive Upload Success] File "${fileName}" (ID: ${fileId}) successfully saved to folder ID "${parentFolderId}"`);
+      console.log(`[Google Drive Upload Success] File "${fileName}" (ID: ${fileId}, Size: ${byteSize} bytes) successfully saved to folder ID "${parentFolderId}"`);
       return fileId;
     },
 
