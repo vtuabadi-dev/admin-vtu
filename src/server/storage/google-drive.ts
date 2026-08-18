@@ -250,7 +250,7 @@ export function createGoogleDriveAdapter(): StorageAdapter {
 
       const headerBuf = Buffer.from(header, "utf-8");
       const footerBuf = Buffer.from(footer, "utf-8");
-      const multipartBody = Buffer.concat([headerBuf, buffer, footerBuf]);
+      const blob = new Blob([headerBuf as any, buffer as any, footerBuf as any]);
 
       const token = await getAccessToken();
       const res = await fetch(`${DRIVE_UPLOAD}/files?uploadType=multipart&supportsAllDrives=true`, {
@@ -258,13 +258,13 @@ export function createGoogleDriveAdapter(): StorageAdapter {
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": `multipart/related; boundary=${boundary}`,
-          "Content-Length": String(multipartBody.length),
         },
-        body: new Uint8Array(multipartBody),
+        body: blob,
       });
 
       if (!res.ok) {
         const text = await res.text().catch(() => "");
+        console.error(`[Google Drive Upload Fail] HTTP ${res.status} for file "${fileName}" in folder "${parentFolderId}":`, text);
         if (text.includes("storage quota") || text.includes("Service Accounts do not have storage quota")) {
           throw new Error(
             "[Google Drive 403 Storage Quota Exceeded]\n" +
@@ -278,6 +278,7 @@ export function createGoogleDriveAdapter(): StorageAdapter {
       }
 
       const file = await res.json();
+      console.log(`[Google Drive Upload Success] File "${fileName}" (ID: ${file.id}) successfully saved to folder ID "${parentFolderId}"`);
       return file.id;
     },
 
