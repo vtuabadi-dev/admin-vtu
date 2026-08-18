@@ -60,10 +60,31 @@ export async function POST(request: NextRequest) {
       const storage = getStorageAdapter();
       const storagePath = `BUKTI_TRANSFER/${kodeRegistrasi}_${Date.now()}.jpg`;
       try {
-        const { getOrCreateFolder, isGoogleDriveConfigured } = await import("@/server/storage/google-drive");
+        const { getOrCreateFolder, isGoogleDriveConfigured, createPackageFolderHierarchy } = await import("@/server/storage/google-drive");
         let targetFolderId: string | undefined = undefined;
         if (isGoogleDriveConfigured()) {
-          targetFolderId = await getOrCreateFolder("PEMBAYARAN");
+          if (reg?.paketId) {
+            try {
+              const paketInfo = await prisma.keberangkatan.findUnique({ where: { id: reg.paketId } });
+              if (paketInfo) {
+                const depDate = paketInfo.tanggalBerangkat ? new Date(paketInfo.tanggalBerangkat) : new Date();
+                const year = depDate.getFullYear();
+                const monthNum = String(depDate.getMonth() + 1).padStart(2, "0");
+                const monthNames = ["JANUARI", "FEBRUARI", "MARET", "APRIL", "MEI", "JUNI", "JULI", "AGUSTUS", "SEPTEMBER", "OKTOBER", "NOVEMBER", "DESEMBER"];
+                const monthName = `${monthNum} - ${monthNames[depDate.getMonth()]} ${year}`;
+                const packageName = (paketInfo.namaPaket || "PAKET REGULER").toUpperCase().trim();
+
+                const folderRegistry = await createPackageFolderHierarchy(year, monthName, packageName);
+                targetFolderId = folderRegistry.pembayaran;
+              }
+            } catch (hErr) {
+              console.warn("[payment-proof] Package folder hierarchy warning:", hErr);
+            }
+          }
+
+          if (!targetFolderId) {
+            targetFolderId = await getOrCreateFolder("PEMBAYARAN");
+          }
         }
         await storage.upload(storagePath, fileBuffer, fileMime, targetFolderId);
         buktiUrl = await storage.getUrl(storagePath);
@@ -94,16 +115,17 @@ export async function POST(request: NextRequest) {
     console.log(`[payment-proof][v4] Mulai generate PDF + Drive upload untuk ${kodeRegistrasi}`);
     let pdfBuf: Buffer | null = null;
     const pdfFileName = `${kodeRegistrasi}_${reg.namaPerwakilan.replace(/[^A-Z0-9]/gi, "_")}.pdf`;
+    let fullRegRecord: any = null;
     try {
       const { generateRegistrationPdf } = await import("@/server/services/registration-pdf.service");
       const { registrationRepo } = await import("@/server/repositories");
-      const fullReg = await registrationRepo.findByKode(kodeRegistrasi);
-      if (fullReg) {
+      fullRegRecord = await registrationRepo.findByKode(kodeRegistrasi);
+      if (fullRegRecord) {
         pdfBuf = await generateRegistrationPdf({
-          registration: fullReg,
+          registration: fullRegRecord,
           packageInfo: null,
           termsVersion: "1.0",
-          termsAcceptedAt: fullReg.termsAcceptedAt ?? fullReg.createdAt,
+          termsAcceptedAt: fullRegRecord.termsAcceptedAt ?? fullRegRecord.createdAt,
         });
         console.log(`[payment-proof] PDF formulir berhasil digenerate: ${pdfFileName}, size: ${pdfBuf.length} bytes`);
       } else {
@@ -116,12 +138,36 @@ export async function POST(request: NextRequest) {
     // ── Simpan PDF ke Storage (Drive / Transit Vault) ─────────────────────────
     if (pdfBuf) {
       try {
-        const { isGoogleDriveConfigured, getOrCreateFolder } = await import("@/server/storage/google-drive");
+        const { isGoogleDriveConfigured, getOrCreateFolder, createPackageFolderHierarchy } = await import("@/server/storage/google-drive");
         if (isGoogleDriveConfigured()) {
           const driveStorage = getStorageAdapter();
-          const formulirFolderId = await getOrCreateFolder("FORMULIR PENDAFTARAN");
-          await driveStorage.upload(pdfFileName, pdfBuf, "application/pdf", formulirFolderId);
-          console.log(`[payment-proof] PDF formulir berhasil disimpan ke Google Drive folder FORMULIR PENDAFTARAN: ${pdfFileName}`);
+          let targetFolderId: string | undefined = undefined;
+
+          if (reg?.paketId) {
+            try {
+              const paketInfo = await prisma.keberangkatan.findUnique({ where: { id: reg.paketId } });
+              if (paketInfo) {
+                const depDate = paketInfo.tanggalBerangkat ? new Date(paketInfo.tanggalBerangkat) : new Date();
+                const year = depDate.getFullYear();
+                const monthNum = String(depDate.getMonth() + 1).padStart(2, "0");
+                const monthNames = ["JANUARI", "FEBRUARI", "MARET", "APRIL", "MEI", "JUNI", "JULI", "AGUSTUS", "SEPTEMBER", "OKTOBER", "NOVEMBER", "DESEMBER"];
+                const monthName = `${monthNum} - ${monthNames[depDate.getMonth()]} ${year}`;
+                const packageName = (paketInfo.namaPaket || "PAKET REGULER").toUpperCase().trim();
+
+                const folderRegistry = await createPackageFolderHierarchy(year, monthName, packageName);
+                targetFolderId = folderRegistry.formulirPendaftaran;
+              }
+            } catch (hErr) {
+              console.warn("[payment-proof] Package folder hierarchy warning:", hErr);
+            }
+          }
+
+          if (!targetFolderId) {
+            targetFolderId = await getOrCreateFolder("FORMULIR PENDAFTARAN");
+          }
+
+          await driveStorage.upload(pdfFileName, pdfBuf, "application/pdf", targetFolderId);
+          console.log(`[payment-proof] PDF formulir berhasil disimpan ke Google Drive folder: ${targetFolderId}`);
         }
       } catch (driveErr) {
         console.warn("[payment-proof] Google Drive storage notice (Transit Vault mode active):", (driveErr as Error).message);
