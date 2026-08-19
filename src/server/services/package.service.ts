@@ -67,12 +67,18 @@ export const packageService = {
         });
         kodeGrup = finalKodeGrup;
 
-        const groupRecord = await prisma.paketGrup.create({
-          data: {
-            kodeGrup: finalKodeGrup,
-            namaPaket: parentKeb.namaPaket || `${pCode} ${sCode} Group`,
-          },
+        let groupRecord = await prisma.paketGrup.findUnique({
+          where: { kodeGrup: finalKodeGrup },
         });
+
+        if (!groupRecord) {
+          groupRecord = await prisma.paketGrup.create({
+            data: {
+              kodeGrup: finalKodeGrup,
+              namaPaket: parentKeb.namaPaket || `${pCode} ${sCode} Group`,
+            },
+          });
+        }
         paketGrupId = groupRecord.id;
 
         // Update parent to be part of this group
@@ -91,12 +97,18 @@ export const packageService = {
         tanggalList: departureDates,
       });
 
-      const groupRecord = await prisma.paketGrup.create({
-        data: {
-          kodeGrup,
-          namaPaket: data.namaPaket || `${pCode} ${sCode} Group`,
-        },
+      let groupRecord = await prisma.paketGrup.findUnique({
+        where: { kodeGrup },
       });
+
+      if (!groupRecord) {
+        groupRecord = await prisma.paketGrup.create({
+          data: {
+            kodeGrup,
+            namaPaket: data.namaPaket || `${pCode} ${sCode} Group`,
+          },
+        });
+      }
       paketGrupId = groupRecord.id;
     }
 
@@ -178,7 +190,7 @@ export const packageService = {
       const retDate = new Date(depDate);
       retDate.setDate(retDate.getDate() + durasiHari - 1);
 
-      const kodeIndividu = generateKodeIndividu({
+      const baseKodeIndividu = generateKodeIndividu({
         tahun: depYear,
         durasiHari,
         packageTypeCode: pCode,
@@ -186,6 +198,27 @@ export const packageService = {
         maskapaiCode: mCode,
         tanggalBerangkat: depDate,
       });
+
+      let kodeIndividu = baseKodeIndividu;
+      const existingKeb = await prisma.keberangkatan.findFirst({
+        where: { OR: [{ kode: kodeIndividu }, { kodeIndividu: kodeIndividu }] },
+      });
+      if (existingKeb) {
+        let counter = 2;
+        while (
+          await prisma.keberangkatan.findFirst({
+            where: {
+              OR: [
+                { kode: `${baseKodeIndividu}_V${counter}` },
+                { kodeIndividu: `${baseKodeIndividu}_V${counter}` },
+              ],
+            },
+          })
+        ) {
+          counter++;
+        }
+        kodeIndividu = `${baseKodeIndividu}_V${counter}`;
+      }
 
       const formattedNamaPaket = generateNamaPaket({
         packageTypeCode: pCode,

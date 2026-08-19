@@ -61,11 +61,11 @@ export function generateKodeGrup(params: GenerateGroupCodeParams): string {
   const mCode = (params.maskapaiCode || "AIR").toUpperCase();
 
   const sortedDates = [...params.tanggalList].sort((a, b) => a.getTime() - b.getTime());
-  const uniqueMonths = Array.from(
-    new Set(sortedDates.map((d) => MONTH_ENG[d.getMonth()]))
+  const dateStamps = sortedDates.map(
+    (d) => `${MONTH_ENG[d.getMonth()]}${String(d.getDate()).padStart(2, "0")}`
   );
 
-  return `#${params.tahun}_${params.durasiHari}H_${identifier}_${mCode}_${uniqueMonths.join("_")}`;
+  return `#${params.tahun}_${params.durasiHari}H_${identifier}_${mCode}_GRP_${dateStamps.join("_")}`;
 }
 
 export interface GeneratePackageNameParams {
