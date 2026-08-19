@@ -12,7 +12,7 @@ import {
   generatePackageFolderName,
   getMonthFolderName,
 } from "./package-code.service";
-import { createPackageFolderHierarchy } from "../storage/google-drive";
+import { createPackageFolderHierarchy, validateFolderRegistry } from "../storage/google-drive";
 
 export const packageService = {
   async findAll(params?: { status?: string; limit?: number; offset?: number }) {
@@ -208,12 +208,13 @@ export const packageService = {
 
       const monthFolder = getMonthFolderName(depDate);
 
-      // Create Google Drive folder hierarchy for this package
-      let driveFolderIds: any = null;
-      try {
-        driveFolderIds = await createPackageFolderHierarchy(depYear, monthFolder, folderName);
-      } catch (e) {
-        console.error("[PackageService] Failed to create GDrive folder hierarchy:", e);
+      // Create & validate Google Drive folder hierarchy for this package BEFORE DB creation
+      const driveFolderIds = await createPackageFolderHierarchy(depYear, monthFolder, folderName);
+
+      if (!validateFolderRegistry(driveFolderIds)) {
+        throw new Error(
+          `[PackageService Error] Gagal mem-provisioning folder Google Drive untuk paket "${formattedNamaPaket}". Kategori folder tidak lengkap.`
+        );
       }
 
       const created = await keberangkatanRepo.create({
@@ -242,19 +243,6 @@ export const packageService = {
         durationDays: durasiHari,
         hotelOptions: hotelOptionsArray,
       } as any);
-
-      // Fallback Provisioning if initial hierarchy creation returned null or local-mock
-      if (!driveFolderIds || driveFolderIds.rootPackageFolderId === "local-mock") {
-        try {
-          const { provisionPackageStorage } = await import("@/server/storage/google-drive");
-          const freshRegistry = await provisionPackageStorage(created.id);
-          if (freshRegistry) {
-            (created as any).driveFolderIds = freshRegistry;
-          }
-        } catch (provErr) {
-          console.error(`[PackageService] Fallback provisioning error for package ${created.id}:`, provErr);
-        }
-      }
 
       createdList.push(created);
     }

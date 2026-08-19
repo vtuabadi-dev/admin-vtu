@@ -115,24 +115,38 @@ export interface DriveFolderRegistry {
   formulirPendaftaran: string;
 }
 
+export function validateFolderRegistry(registry: any): registry is DriveFolderRegistry {
+  if (!registry || typeof registry !== "object") return false;
+  const requiredKeys: (keyof DriveFolderRegistry)[] = [
+    "rootPackageFolderId",
+    "paspor",
+    "ktp",
+    "foto",
+    "pembayaran",
+    "tandaTangan",
+    "dokumenLain",
+    "manifest",
+    "export",
+    "formulirPendaftaran",
+  ];
+  for (const key of requiredKeys) {
+    const val = registry[key];
+    if (!val || typeof val !== "string" || val.trim() === "" || val === "local-mock") {
+      return false;
+    }
+  }
+  return true;
+}
+
 export async function createPackageFolderHierarchy(
   year: number,
   monthFolderName: string,
   packageFolderName: string
 ): Promise<DriveFolderRegistry> {
   if (!isGoogleDriveConfigured()) {
-    return {
-      rootPackageFolderId: "local-mock",
-      paspor: "local-mock",
-      ktp: "local-mock",
-      foto: "local-mock",
-      pembayaran: "local-mock",
-      tandaTangan: "local-mock",
-      dokumenLain: "local-mock",
-      manifest: "local-mock",
-      export: "local-mock",
-      formulirPendaftaran: "local-mock",
-    };
+    throw new Error(
+      "[Cloud Vault Error] Google Drive belum dikonfigurasi. Variabel GOOGLE_DRIVE_FOLDER_ID, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, dan GOOGLE_REFRESH_TOKEN wajib dikonfigurasi."
+    );
   }
 
   const rootIndukId =
@@ -164,7 +178,7 @@ export async function createPackageFolderHierarchy(
     getOrCreateFolder("FORMULIR PENDAFTARAN", packageFolderId),
   ]);
 
-  return {
+  const registry: DriveFolderRegistry = {
     rootPackageFolderId: packageFolderId,
     paspor,
     ktp,
@@ -176,6 +190,14 @@ export async function createPackageFolderHierarchy(
     export: exportFolder,
     formulirPendaftaran,
   };
+
+  if (!validateFolderRegistry(registry)) {
+    throw new Error(
+      `[Cloud Vault Error] Pembuatan hierarki folder Google Drive untuk "${packageFolderName}" mengembalikan registry yang tidak lengkap atau mengandung nilai mock.`
+    );
+  }
+
+  return registry;
 }
 
 export async function provisionPackageStorage(packageId: string): Promise<DriveFolderRegistry | undefined> {
@@ -183,6 +205,12 @@ export async function provisionPackageStorage(packageId: string): Promise<DriveF
   const { prisma } = await import("@/server/db/client");
   const paket = await prisma.keberangkatan.findUnique({ where: { id: packageId } });
   if (!paket) return undefined;
+
+  // Reuse existing valid folder registry if available
+  const existingMeta = (paket.driveFolderIds as any) || {};
+  if (validateFolderRegistry(existingMeta)) {
+    return existingMeta;
+  }
 
   const depDate = paket.tanggalBerangkat ? new Date(paket.tanggalBerangkat) : new Date();
   const year = depDate.getFullYear();
@@ -273,6 +301,12 @@ export function createGoogleDriveAdapter(): StorageAdapter {
     async upload(path: string, buffer: Buffer, contentType: string, targetFolderId?: string): Promise<string> {
       const fileName = getFileName(path);
       const parentFolderId = targetFolderId || folderId;
+
+      if (!parentFolderId || parentFolderId === "local-mock" || parentFolderId.trim() === "") {
+        throw new Error(
+          `[Cloud Vault Storage Configuration Error] targetFolderId tidak valid ("${parentFolderId}") untuk mengunggah file "${fileName}".`
+        );
+      }
 
       // Step 1: Create file metadata entry in the target parent folder
       const metaRes = await apiFetch(`${DRIVE_API}/files?supportsAllDrives=true`, {
