@@ -109,6 +109,7 @@ interface MemberForm {
   tempatLahir: string;
   tanggalLahir: string;
   hubungan: string;
+  tipeKamar?: string;
 }
 
 function calculateAge(birthDateStr?: string): { age: number; category: string; isLansia: boolean } | null {
@@ -321,6 +322,7 @@ export default function RegisterPage() {
   const [selectedPaketId, setSelectedPaketId] = useState("");
   const [selectedClusterIndex, setSelectedClusterIndex] = useState(0);
   const [roomUpgrade, setRoomUpgrade] = useState("quad");
+  const [isCustomRoomAssignment, setIsCustomRoomAssignment] = useState(false);
   const [hotelUpgrade, setHotelUpgrade] = useState("");
   const [loadingPaket, setLoadingPaket] = useState(false);
 
@@ -1727,18 +1729,6 @@ export default function RegisterPage() {
                           return ageInfo?.category === "Bayi" || (ageInfo?.age !== undefined && ageInfo.age < 2);
                         });
 
-                        const roomSurcharge =
-                          roomUpgrade === "triple"
-                            ? upgradeTriple
-                            : roomUpgrade === "double"
-                            ? upgradeDouble
-                            : roomUpgrade === "combo_double_triple"
-                            ? Math.round((2 * upgradeDouble + 3 * upgradeTriple) / (paxCount || 5))
-                            : 0;
-
-                        const pricePerPax = basePrice + roomSurcharge;
-                        const totalPriceGroup = pricePerPax * paxCount;
-
                         const visibleCardCount = (showQuad ? 1 : 0) + (showTriple ? 1 : 0) + (showDouble ? 1 : 0) + 1;
                         const gridColsClass =
                           visibleCardCount === 1
@@ -1858,7 +1848,7 @@ export default function RegisterPage() {
                               </div>
                             </div>
 
-                            {/* Multi-Room Options for 5+ Pax */}
+                             {/* Multi-Room Options for 5+ Pax */}
                             {paxCount >= 5 && (
                               <div className="p-4 bg-gradient-to-r from-blue-50/80 via-slate-50 to-indigo-50/60 border border-blue-200 rounded-xl space-y-3 shadow-2xs">
                                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
@@ -1876,7 +1866,17 @@ export default function RegisterPage() {
                                   {/* Combo Double + Triple */}
                                   <button
                                     type="button"
-                                    onClick={() => setRoomUpgrade("combo_double_triple")}
+                                    onClick={() => {
+                                      setRoomUpgrade("combo_double_triple");
+                                      setIsCustomRoomAssignment(true);
+                                      // Preset: First 2 members Double, next 3 members Triple
+                                      setMembers((prev) =>
+                                        prev.map((m, idx) => ({
+                                          ...m,
+                                          tipeKamar: idx < 2 ? "double" : idx < 5 ? "triple" : "mix",
+                                        }))
+                                      );
+                                    }}
                                     className={cn(
                                       "p-3 rounded-xl border-2 text-left transition-all flex flex-col justify-between gap-1.5",
                                       roomUpgrade === "combo_double_triple"
@@ -1888,14 +1888,24 @@ export default function RegisterPage() {
                                       <span className="font-bold text-xs text-gray-900">Upgrade Double + Triple</span>
                                       {roomUpgrade === "combo_double_triple" && <Check className="w-3.5 h-3.5 text-blue-600" />}
                                     </div>
-                                    <p className="text-[11px] text-gray-500">Kombinasi Kamar Double & Triple</p>
+                                    <p className="text-[11px] text-gray-500">2 Pax Double + 3 Pax Triple</p>
                                     <p className="text-xs font-bold text-blue-700 mt-1">Kombinasi Upgrade</p>
                                   </button>
 
                                   {/* Combo Quad + Mix */}
                                   <button
                                     type="button"
-                                    onClick={() => setRoomUpgrade("combo_quad_mix")}
+                                    onClick={() => {
+                                      setRoomUpgrade("combo_quad_mix");
+                                      setIsCustomRoomAssignment(true);
+                                      // Preset: First 4 members Quad, rest Mix
+                                      setMembers((prev) =>
+                                        prev.map((m, idx) => ({
+                                          ...m,
+                                          tipeKamar: idx < 4 ? "quad" : "mix",
+                                        }))
+                                      );
+                                    }}
                                     className={cn(
                                       "p-3 rounded-xl border-2 text-left transition-all flex flex-col justify-between gap-1.5",
                                       roomUpgrade === "combo_quad_mix"
@@ -1907,14 +1917,17 @@ export default function RegisterPage() {
                                       <span className="font-bold text-xs text-gray-900">Quad Family & Mix</span>
                                       {roomUpgrade === "combo_quad_mix" && <Check className="w-3.5 h-3.5 text-blue-600" />}
                                     </div>
-                                    <p className="text-[11px] text-gray-500">1 Kamar Quad + Sisa Kamar Mix</p>
+                                    <p className="text-[11px] text-gray-500">4 Pax Quad + Sisa Mix Travel</p>
                                     <p className="text-xs font-bold text-emerald-700 mt-1">Base (+ Rp 0)</p>
                                   </button>
 
                                   {/* QUINF (Quad + Infant) */}
                                   <button
                                     type="button"
-                                    onClick={() => setRoomUpgrade("quinf")}
+                                    onClick={() => {
+                                      setRoomUpgrade("quinf");
+                                      setIsCustomRoomAssignment(false);
+                                    }}
                                     className={cn(
                                       "p-3 rounded-xl border-2 text-left transition-all flex flex-col justify-between gap-1.5 relative overflow-hidden",
                                       roomUpgrade === "quinf"
@@ -1938,29 +1951,174 @@ export default function RegisterPage() {
                               </div>
                             )}
 
-                            {/* Pricing Summary Breakdown */}
-                            <div className="bg-slate-900 text-white rounded-xl p-4 space-y-2 text-xs shadow-inner">
-                              <div className="flex justify-between items-center text-slate-300">
-                                <span>Harga Base Paket ({isMultiCluster ? activeCluster?.clusterName : "Reguler"}):</span>
-                                <span>Rp {basePrice.toLocaleString("id-ID")} / pax</span>
-                              </div>
-                              {roomSurcharge > 0 && (
-                                <div className="flex justify-between items-center text-amber-300 font-medium">
-                                  <span>Upgrade Kamar ({roomUpgrade.toUpperCase().replace(/_/g, " ")}):</span>
-                                  <span>+ Rp {roomSurcharge.toLocaleString("id-ID")} / pax</span>
+                            {/* Individual Member Room Placement Selector (For Multi-Member Groups) */}
+                            {paxCount >= 2 && (
+                              <div className="bg-white border border-blue-200/90 rounded-xl p-4 space-y-3 shadow-xs">
+                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-gray-100 pb-2.5">
+                                  <div>
+                                    <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+                                      <span>👤 Penentuan Tipe Kamar Per Jamaah ({members.length} Anggota)</span>
+                                    </h4>
+                                    <p className="text-[11px] text-slate-500">
+                                      Tentukan tipe kamar spesifik untuk masing-masing jamaah dalam rombongan.
+                                    </p>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => setIsCustomRoomAssignment(!isCustomRoomAssignment)}
+                                    className="text-[11px] font-bold text-blue-600 hover:text-blue-800 underline self-start sm:self-center shrink-0"
+                                  >
+                                    {isCustomRoomAssignment ? "Ganti ke Mode Seragam" : "Atur Spesifik Per Jamaah"}
+                                  </button>
                                 </div>
-                              )}
-                              <div className="flex justify-between items-center text-slate-200 font-semibold pt-1 border-t border-slate-700">
-                                <span>Total per Pax:</span>
-                                <span>Rp {pricePerPax.toLocaleString("id-ID")} / pax</span>
+
+                                {isCustomRoomAssignment && (
+                                  <div className="space-y-3 pt-1">
+                                    <div className="flex items-center justify-between gap-2 text-[11px]">
+                                      <span className="font-semibold text-slate-700">Preset Cepat Kombinasi:</span>
+                                      <div className="flex gap-2 flex-wrap">
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            setMembers((prev) =>
+                                              prev.map((m, idx) => ({
+                                                ...m,
+                                                tipeKamar: idx < 2 ? "double" : "mix",
+                                              }))
+                                            );
+                                          }}
+                                          className="px-2 py-0.5 bg-blue-50 border border-blue-200 text-blue-800 rounded font-semibold text-[10px] hover:bg-blue-100"
+                                        >
+                                          1 Double + Sisa Mix
+                                        </button>
+                                        {paxCount >= 5 && (
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              setMembers((prev) =>
+                                                prev.map((m, idx) => ({
+                                                  ...m,
+                                                  tipeKamar: idx < 2 ? "double" : idx < 5 ? "triple" : "mix",
+                                                }))
+                                              );
+                                            }}
+                                            className="px-2 py-0.5 bg-indigo-50 border border-indigo-200 text-indigo-800 rounded font-semibold text-[10px] hover:bg-indigo-100"
+                                          >
+                                            1 Double + 1 Triple + Sisa Mix
+                                          </button>
+                                        )}
+                                      </div>
+                                    </div>
+
+                                    <div className="divide-y divide-gray-100 border border-gray-200 rounded-lg overflow-hidden bg-slate-50/50">
+                                      {members.map((m, idx) => {
+                                        const currentRoom = m.tipeKamar || roomUpgrade || "mix";
+                                        const mAge = calculateAge(m.tanggalLahir);
+                                        return (
+                                          <div
+                                            key={idx}
+                                            className="p-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2 hover:bg-white transition-colors"
+                                          >
+                                            <div className="flex items-center gap-2">
+                                              <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-800 font-bold text-[10px] flex items-center justify-center shrink-0">
+                                                {idx + 1}
+                                              </span>
+                                              <div>
+                                                <span className="text-xs font-bold text-slate-900">
+                                                  {m.namaLengkap ? m.namaLengkap.toUpperCase() : `Jamaah #${idx + 1}`}
+                                                </span>
+                                                {mAge && (
+                                                  <span className="ml-1.5 text-[10px] font-semibold text-slate-500">
+                                                    ({mAge.category})
+                                                  </span>
+                                                )}
+                                                {idx === 0 && (
+                                                  <span className="ml-1.5 text-[9px] font-extrabold uppercase bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">
+                                                    PIC
+                                                  </span>
+                                                )}
+                                              </div>
+                                            </div>
+
+                                            <div className="flex items-center gap-2">
+                                              <select
+                                                value={currentRoom}
+                                                onChange={(e) => {
+                                                  const val = e.target.value;
+                                                  setMembers((prev) =>
+                                                    prev.map((item, i) => (i === idx ? { ...item, tipeKamar: val } : item))
+                                                  );
+                                                }}
+                                                className="px-2.5 py-1.5 border border-gray-300 rounded-lg text-xs font-semibold text-slate-800 bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                                              >
+                                                <option value="mix">MIX (Kamar Travel - Base +Rp0)</option>
+                                                <option value="quad">QUAD (4 Pax - Base +Rp0)</option>
+                                                <option value="triple">
+                                                  TRIPLE (3 Pax - +Rp {upgradeTriple.toLocaleString("id-ID")})
+                                                </option>
+                                                <option value="double">
+                                                  DOUBLE (2 Pax - +Rp {upgradeDouble.toLocaleString("id-ID")})
+                                                </option>
+                                              </select>
+                                            </div>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  </div>
+                                )}
                               </div>
-                              <div className="flex justify-between items-center text-sm font-extrabold text-blue-400 pt-1.5 border-t border-slate-700">
-                                <span>Total Registrasi Rombongan ({paxCount} PAX):</span>
-                                <span className="text-base text-emerald-400">
-                                  Rp {totalPriceGroup.toLocaleString("id-ID")}
-                                </span>
-                              </div>
-                            </div>
+                            )}
+
+                            {/* Pricing Summary Breakdown */}
+                            {(() => {
+                              let totalSurcharge = 0;
+                              if (isCustomRoomAssignment) {
+                                members.forEach((m) => {
+                                  const room = m.tipeKamar || roomUpgrade || "mix";
+                                  if (room === "double") totalSurcharge += upgradeDouble;
+                                  else if (room === "triple") totalSurcharge += upgradeTriple;
+                                });
+                              } else {
+                                const perPaxSurcharge =
+                                  roomUpgrade === "triple"
+                                    ? upgradeTriple
+                                    : roomUpgrade === "double"
+                                    ? upgradeDouble
+                                    : roomUpgrade === "combo_double_triple"
+                                    ? Math.round((2 * upgradeDouble + 3 * upgradeTriple) / (paxCount || 5))
+                                    : 0;
+                                totalSurcharge = perPaxSurcharge * paxCount;
+                              }
+
+                              const totalGroup = basePrice * paxCount + totalSurcharge;
+                              const averagePerPax = Math.round(totalGroup / (paxCount || 1));
+
+                              return (
+                                <div className="bg-slate-900 text-white rounded-xl p-4 space-y-2 text-xs shadow-inner">
+                                  <div className="flex justify-between items-center text-slate-300">
+                                    <span>Harga Base Paket ({isMultiCluster ? activeCluster?.clusterName : "Reguler"}):</span>
+                                    <span>Rp {basePrice.toLocaleString("id-ID")} / pax</span>
+                                  </div>
+                                  {totalSurcharge > 0 && (
+                                    <div className="flex justify-between items-center text-amber-300 font-medium">
+                                      <span>Total Upgrade Kamar Rombongan:</span>
+                                      <span>+ Rp {totalSurcharge.toLocaleString("id-ID")}</span>
+                                    </div>
+                                  )}
+                                  <div className="flex justify-between items-center text-slate-200 font-semibold pt-1 border-t border-slate-700">
+                                    <span>Rata-Rata Total per Pax:</span>
+                                    <span>Rp {averagePerPax.toLocaleString("id-ID")} / pax</span>
+                                  </div>
+                                  <div className="flex justify-between items-center text-sm font-extrabold text-blue-400 pt-1.5 border-t border-slate-700">
+                                    <span>Total Registrasi Rombongan ({paxCount} PAX):</span>
+                                    <span className="text-base text-emerald-400">
+                                      Rp {totalGroup.toLocaleString("id-ID")}
+                                    </span>
+                                  </div>
+                                </div>
+                              );
+                            })()}
                           </div>
                         );
                       })()}
