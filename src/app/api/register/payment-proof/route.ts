@@ -138,7 +138,7 @@ export async function POST(request: NextRequest) {
     // ── Simpan PDF ke Storage (Drive / Transit Vault) ─────────────────────────
     if (pdfBuf) {
       try {
-        const { isGoogleDriveConfigured } = await import("@/server/storage/google-drive");
+        const { isGoogleDriveConfigured, provisionPackageStorage, getOrCreateFormulirPendaftaranDriveFolder } = await import("@/server/storage/google-drive");
         if (isGoogleDriveConfigured()) {
           const driveStorage = getStorageAdapter();
           let targetFolderId: string | undefined = undefined;
@@ -147,13 +147,23 @@ export async function POST(request: NextRequest) {
             const paketInfo = await prisma.keberangkatan.findUnique({ where: { id: reg.paketId } });
             const driveFolders = (paketInfo?.driveFolderIds as Record<string, string> | null) || null;
             targetFolderId = driveFolders?.formulirPendaftaran || driveFolders?.pembayaran;
+
+            if (!targetFolderId) {
+              console.log(`[payment-proof] Package "${reg.paketId}" lacks pre-provisioned folder ID in DB. Running fallback provisioning...`);
+              const registry = await provisionPackageStorage(reg.paketId);
+              targetFolderId = registry?.formulirPendaftaran || registry?.pembayaran;
+            }
+          }
+
+          if (!targetFolderId) {
+            targetFolderId = await getOrCreateFormulirPendaftaranDriveFolder(process.env.GOOGLE_DRIVE_FOLDER_ID);
           }
 
           if (targetFolderId) {
             await driveStorage.upload(pdfFileName, pdfBuf, "application/pdf", targetFolderId);
             console.log(`[payment-proof] PDF formulir berhasil disimpan ke Cloud Vault: ${pdfFileName} (Folder ID: ${targetFolderId})`);
           } else {
-            console.warn(`[payment-proof] Storage Notice: STORAGE_NOT_PROVISIONED. Package ID "${reg?.paketId}" lacks pre-provisioned folder ID in DB.`);
+            console.warn(`[payment-proof] Storage Notice: STORAGE_NOT_PROVISIONED. Package ID "${reg?.paketId}" lacks folder ID.`);
           }
         }
       } catch (driveErr: any) {

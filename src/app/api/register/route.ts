@@ -182,21 +182,32 @@ export async function POST(request: NextRequest) {
         console.warn("[register] Local vault save failed:", vaultErr?.message || vaultErr);
       }
 
-      // Save to Google Drive Cloud Vault V2 (Reads pre-provisioned Folder ID from DB - 0ms hierarchy lookup)
+      // Save to Google Drive Cloud Vault V2 (Reads pre-provisioned Folder ID from DB - with auto-provision fallback)
       try {
-        const { isGoogleDriveConfigured } = await import("@/server/storage/google-drive");
+        const { isGoogleDriveConfigured, provisionPackageStorage, getOrCreateFormulirPendaftaranDriveFolder } = await import("@/server/storage/google-drive");
         if (isGoogleDriveConfigured()) {
           const { getStorageAdapter } = await import("@/server/storage");
           const driveStorage = getStorageAdapter();
 
           const driveFolders = (paket?.driveFolderIds as Record<string, string> | null) || null;
-          const targetFolderId = driveFolders?.formulirPendaftaran;
+          let targetFolderId = driveFolders?.formulirPendaftaran;
+
+          if (!targetFolderId) {
+            console.log(`[register] Package "${paket?.namaPaket || body.paketId}" lacks pre-provisioned formulirPendaftaran folder ID in DB. Running fallback provisioning...`);
+            if (paket?.id) {
+              const registry = await provisionPackageStorage(paket.id);
+              targetFolderId = registry?.formulirPendaftaran;
+            }
+            if (!targetFolderId) {
+              targetFolderId = await getOrCreateFormulirPendaftaranDriveFolder(driveFolders?.rootPackageFolderId || process.env.GOOGLE_DRIVE_FOLDER_ID);
+            }
+          }
 
           if (targetFolderId) {
             await driveStorage.upload(pdfFilename, pdfBuffer, "application/pdf", targetFolderId);
             console.log(`[register] PDF formulir berhasil disimpan ke Cloud Vault: ${pdfFilename} (Folder ID: ${targetFolderId})`);
           } else {
-            console.warn(`[register] Storage Notice: STORAGE_NOT_PROVISIONED. Package "${paket?.namaPaket || body.paketId}" lacks pre-provisioned formulirPendaftaran folder ID in DB.`);
+            console.warn(`[register] Storage Notice: STORAGE_NOT_PROVISIONED. Package "${paket?.namaPaket || body.paketId}" lacks folder ID.`);
           }
         } else {
           console.warn("[register] Google Drive belum dikonfigurasi di Vercel env (GOOGLE_DRIVE_FOLDER_ID, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REFRESH_TOKEN)");
