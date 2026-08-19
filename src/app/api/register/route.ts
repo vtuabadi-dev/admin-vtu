@@ -192,18 +192,21 @@ export async function POST(request: NextRequest) {
           const driveFolders = (paket?.driveFolderIds as Record<string, string> | null) || null;
           let targetFolderId = driveFolders?.formulirPendaftaran;
 
-          if (!targetFolderId) {
-            console.log(`[register] Package "${paket?.namaPaket || body.paketId}" lacks pre-provisioned formulirPendaftaran folder ID in DB. Running fallback provisioning...`);
+          if (!targetFolderId || targetFolderId === "local-mock") {
+            console.log(`[register] Package "${paket?.namaPaket || body.paketId}" lacks valid pre-provisioned formulirPendaftaran folder ID in DB. Running fallback provisioning...`);
             if (paket?.id) {
               const registry = await provisionPackageStorage(paket.id);
               targetFolderId = registry?.formulirPendaftaran;
             }
-            if (!targetFolderId) {
-              targetFolderId = await getOrCreateFormulirPendaftaranDriveFolder(driveFolders?.rootPackageFolderId || process.env.GOOGLE_DRIVE_FOLDER_ID);
+            if (!targetFolderId || targetFolderId === "local-mock") {
+              const rootParent = driveFolders?.rootPackageFolderId && driveFolders.rootPackageFolderId !== "local-mock"
+                ? driveFolders.rootPackageFolderId
+                : undefined;
+              targetFolderId = await getOrCreateFormulirPendaftaranDriveFolder(rootParent);
             }
           }
 
-          if (targetFolderId) {
+          if (targetFolderId && targetFolderId !== "local-mock") {
             await driveStorage.upload(pdfFilename, pdfBuffer, "application/pdf", targetFolderId);
             console.log(`[register] PDF formulir berhasil disimpan ke Cloud Vault: ${pdfFilename} (Folder ID: ${targetFolderId})`);
           } else {
