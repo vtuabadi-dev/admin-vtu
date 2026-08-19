@@ -1440,7 +1440,15 @@ export default function RegisterPage() {
                         if (e.key === "Enter") {
                           e.preventDefault();
                           const nextElem = document.getElementById(`member_${i}_hubungan`);
-                          if (nextElem) nextElem.focus();
+                          if (nextElem) {
+                            nextElem.focus();
+                          } else if (i < members.length - 1) {
+                            const nextMemberName = document.getElementById(`member_${i + 1}_nama`);
+                            if (nextMemberName) nextMemberName.focus();
+                          } else {
+                            const btnNext = document.getElementById("btn_next_step");
+                            if (btnNext) btnNext.focus();
+                          }
                         }
                       }}
                       className={cn(
