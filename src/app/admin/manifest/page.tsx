@@ -34,6 +34,7 @@ import { ErrorState } from "@/shared/components/ui/ErrorState";
 import { formatDateShort, formatDate } from "@/shared/lib/utils";
 import { getHotelCombinations, generateHotelLabel } from "@/shared/lib/hotel-utils";
 import type { Manifest, ManifestRow, Keberangkatan, Jamaah, HotelCombinationSummary, RegistrationGroup } from "@/shared/types";
+import { useOperationalStore } from "@/stores/operational-store";
 
 // ── Helper Utilities ─────────────────────────────────────────
 
@@ -179,6 +180,13 @@ function ManifestPageContent() {
   const [targetPaketId, setTargetPaketId] = useState<string>("");
   const [isMoving, setIsMoving] = useState(false);
 
+  // Multi-Select & Bulk Delete State
+  const [selectedJamaahIds, setSelectedJamaahIds] = useState<string[]>([]);
+  const [bulkDeleteModalOpen, setBulkDeleteModalOpen] = useState(false);
+  const [bulkDeleteMode, setBulkDeleteMode] = useState<"soft" | "hard">("soft");
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false);
+  const [bulkDeleteConfirmText, setBulkDeleteConfirmText] = useState("");
+
   // Sync state if URL search param changes
   useEffect(() => {
     if (urlPaketId) {
@@ -272,6 +280,74 @@ function ManifestPageContent() {
       };
     });
   }, [filteredActiveJamaah, groups]);
+
+  // Reset selection when package or search query changes
+  useEffect(() => {
+    setSelectedJamaahIds([]);
+  }, [selectedKeberangkatan, searchQuery, filterStatus]);
+
+  const isAllSelected = useMemo(() => {
+    if (filteredActiveJamaah.length === 0) return false;
+    return filteredActiveJamaah.every((j: any) => selectedJamaahIds.includes(j.id));
+  }, [filteredActiveJamaah, selectedJamaahIds]);
+
+  const toggleSelectAll = () => {
+    if (isAllSelected) {
+      setSelectedJamaahIds([]);
+    } else {
+      setSelectedJamaahIds(filteredActiveJamaah.map((j: any) => j.id));
+    }
+  };
+
+  const toggleSelectRow = useCallback((id: string) => {
+    // Find the rombongan group containing this jamaahId
+    const targetGroup = groupedJamaahList.find((group) =>
+      group.members.some((m: any) => m.id === id)
+    );
+
+    const groupMemberIds = targetGroup
+      ? targetGroup.members.map((m: any) => m.id)
+      : [id];
+
+    setSelectedJamaahIds((prev) => {
+      const isGroupSelected = groupMemberIds.every((memberId) => prev.includes(memberId));
+      if (isGroupSelected) {
+        // Deselect all members of this rombongan group
+        return prev.filter((memberId) => !groupMemberIds.includes(memberId));
+      } else {
+        // Select all members of this rombongan group
+        const newSet = new Set([...prev, ...groupMemberIds]);
+        return Array.from(newSet);
+      }
+    });
+  }, [groupedJamaahList]);
+
+  async function handleBulkDeleteJamaah() {
+    if (selectedJamaahIds.length === 0) return;
+    setIsBulkDeleting(true);
+    try {
+      const res = await fetch("/api/jamaah/bulk-delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: selectedJamaahIds, mode: bulkDeleteMode }),
+      });
+      const json = await res.json();
+      if (res.ok && json.success) {
+        setBulkDeleteModalOpen(false);
+        setSelectedJamaahIds([]);
+        useOperationalStore.getState().setIsLoaded(false);
+        await loadAllData();
+        router.refresh();
+      } else {
+        alert(json.message || "Gagal menghapus jamaah terpilih");
+      }
+    } catch (err) {
+      console.error("[handleBulkDeleteJamaah] Error:", err);
+      alert("Terjadi kesalahan sistem saat menghapus jamaah sekaligus");
+    } finally {
+      setIsBulkDeleting(false);
+    }
+  }
 
   function handleGenerate() {
     setFormKeberangkatan(selectedKeberangkatan || "");
@@ -793,11 +869,55 @@ function ManifestPageContent() {
               </div>
             </div>
 
+            {/* Floating Bulk Action Bar */}
+            {selectedJamaahIds.length > 0 && (
+              <div className="flex items-center justify-between p-3.5 bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-700/60 rounded-xl shadow-sm animate-in fade-in-0 duration-200">
+                <div className="flex items-center gap-2.5 text-amber-900 dark:text-amber-200 text-xs font-bold">
+                  <span className="bg-amber-600 text-white rounded-full min-w-[22px] h-5 px-1.5 flex items-center justify-center text-[11px] font-extrabold shadow-xs">
+                    {selectedJamaahIds.length}
+                  </span>
+                  <span>Jamaah Terpilih (Termasuk Seluruh Anggota Rombongan)</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 text-xs text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-white"
+                    onClick={() => setSelectedJamaahIds([])}
+                  >
+                    Batal Pilih
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    className="h-8 text-xs font-bold bg-red-600 hover:bg-red-700 text-white flex items-center gap-1.5 shadow-sm"
+                    onClick={() => {
+                      setBulkDeleteMode("soft");
+                      setBulkDeleteConfirmText("");
+                      setBulkDeleteModalOpen(true);
+                    }}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    Hapus {selectedJamaahIds.length} Jamaah Terpilih
+                  </Button>
+                </div>
+              </div>
+            )}
+
             <div className="rounded-xl border border-stone-200 dark:border-stone-800 bg-card shadow-sm overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full border-collapse text-left text-xs font-medium">
                   <thead className="bg-stone-100/90 dark:bg-stone-900/90 border-b border-stone-200 dark:border-stone-800 sticky top-0 z-10 backdrop-blur-xs">
                     <tr>
+                      <th className="px-2 py-3 font-bold uppercase tracking-wider text-[10px] text-stone-700 dark:text-stone-300 border-r border-stone-200/70 dark:border-stone-800/70 w-10 text-center sticky left-0 bg-stone-100/90 dark:bg-stone-900/90 z-20">
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4 rounded border-stone-300 text-amber-600 focus:ring-amber-500 cursor-pointer"
+                          checked={isAllSelected}
+                          onChange={toggleSelectAll}
+                          title={isAllSelected ? "Batal Pilih Semua" : "Pilih Semua Jamaah"}
+                        />
+                      </th>
                       <th className="px-3 py-3 font-bold uppercase tracking-wider text-[10px] text-stone-700 dark:text-stone-300 border-r border-stone-200/70 dark:border-stone-800/70 min-w-[200px]">
                         KELUARGA / ROMBONGAN
                       </th>
@@ -917,18 +1037,42 @@ function ManifestPageContent() {
                           const kotaDisplay = j.kota || "JAKARTA SELATAN";
                           const provinsiDisplay = j.provinsi && j.provinsi !== "-" ? j.provinsi : deriveProvinsi(j.provinsi, j.kota);
 
+                          const isGroupFullySelected = group.members.every((m: any) => selectedJamaahIds.includes(m.id));
+
                           return (
                             <tr
                               key={j.id}
-                              className="hover:bg-amber-50/40 dark:hover:bg-amber-950/20 transition-colors"
+                              className={`hover:bg-amber-50/40 dark:hover:bg-amber-950/20 transition-colors ${
+                                selectedJamaahIds.includes(j.id) ? "bg-amber-50/60 dark:bg-amber-950/30 font-semibold" : ""
+                              }`}
                             >
+                              {/* CHECKBOX COL */}
+                              <td className="px-2 py-2.5 text-center border-r border-stone-200/50 dark:border-stone-800/50 sticky left-0 bg-white/90 dark:bg-card/90 z-10">
+                                <input
+                                  type="checkbox"
+                                  className="h-4 w-4 rounded border-stone-300 text-amber-600 focus:ring-amber-500 cursor-pointer"
+                                  checked={selectedJamaahIds.includes(j.id)}
+                                  onChange={() => toggleSelectRow(j.id)}
+                                  title="Mencentang jamaah ini akan memilih seluruh anggota rombongan"
+                                />
+                              </td>
+
                               {/* MERGED CELL: KELUARGA/ROMBONGAN */}
                               {isFirstInGroup && (
                                 <td
                                   rowSpan={totalInGroup}
                                   className="p-3 text-center align-middle font-bold text-[11px] bg-amber-50/80 dark:bg-amber-950/30 text-amber-950 dark:text-amber-200 border-r-2 border-r-amber-400 dark:border-r-amber-700 border-b border-stone-200 dark:border-stone-800 shadow-xs"
                                 >
-                                  {groupMergeText}
+                                  <div className="flex flex-col items-center justify-center gap-1.5">
+                                    <input
+                                      type="checkbox"
+                                      className="h-4 w-4 rounded border-stone-300 text-amber-600 focus:ring-amber-500 cursor-pointer"
+                                      checked={isGroupFullySelected}
+                                      onChange={() => toggleSelectRow(j.id)}
+                                      title="Pilih/Batal Pilih Seluruh Rombongan Ini"
+                                    />
+                                    <span>{groupMergeText}</span>
+                                  </div>
                                 </td>
                               )}
 
@@ -1516,6 +1660,92 @@ function ManifestPageContent() {
               onClick={handleDeleteJamaah}
             >
               {isDeleting ? "Memproses..." : deleteMode === "hard" ? "Hapus Permanen" : "Batalkan Keberangkatan"}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Bulk Delete Jamaah Modal */}
+      <Modal
+        open={bulkDeleteModalOpen}
+        onClose={() => !isBulkDeleting && setBulkDeleteModalOpen(false)}
+        title={`Hapus ${selectedJamaahIds.length} Jamaah Terpilih`}
+        description="Pilih jenis penghapusan masal dan konfirmasikan tindakan Anda."
+      >
+        <div className="space-y-4">
+          <div className="bg-amber-50 dark:bg-amber-950/30 text-amber-900 dark:text-amber-200 p-4 rounded-xl text-xs border border-amber-200 dark:border-amber-800/30 space-y-1">
+            <p className="font-bold text-sm">
+              ⚠️ Anda akan menghapus/membatalkan {selectedJamaahIds.length} data jamaah sekaligus.
+            </p>
+            <p className="text-muted-foreground text-[11px]">
+              Setiap rombongan yang dicentang akan dihapus seluruh anggotanya secara bersamaan. Kuota terisi paket akan otomatis diperbarui.
+            </p>
+          </div>
+
+          {/* Delete Mode Options */}
+          <div className="space-y-3 pt-2">
+            <label className="text-xs font-bold text-foreground">Pilihan Jenis Penghapusan</label>
+            <div className="grid grid-cols-1 gap-2.5">
+              <label className="flex items-start gap-3 p-3 rounded-xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 cursor-pointer hover:bg-stone-50 transition">
+                <input
+                  type="radio"
+                  name="bulkDeleteMode"
+                  className="mt-1 h-4 w-4 text-emerald-600 focus:ring-emerald-500"
+                  checked={bulkDeleteMode === "soft"}
+                  onChange={() => setBulkDeleteMode("soft")}
+                />
+                <div className="text-xs">
+                  <span className="font-bold text-foreground block">Soft Delete (Batal Berangkat)</span>
+                  <span className="text-muted-foreground">Membatalkan keberangkatan {selectedJamaahIds.length} jamaah (status: batal). Data tetap tersimpan di database.</span>
+                </div>
+              </label>
+
+              <label className="flex items-start gap-3 p-3 rounded-xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 cursor-pointer hover:bg-stone-50 transition">
+                <input
+                  type="radio"
+                  name="bulkDeleteMode"
+                  className="mt-1 h-4 w-4 text-red-600 focus:ring-red-500"
+                  checked={bulkDeleteMode === "hard"}
+                  onChange={() => setBulkDeleteMode("hard")}
+                />
+                <div className="text-xs">
+                  <span className="font-bold text-red-600 dark:text-red-400 block">Hard Delete (Hapus Permanen)</span>
+                  <span className="text-muted-foreground">Menghapus data {selectedJamaahIds.length} jamaah, file dokumen, kamar, dan tagihan invoice terkait secara permanen dari database.</span>
+                </div>
+              </label>
+            </div>
+          </div>
+
+          {/* Hard Delete Warnings & Input */}
+          {bulkDeleteMode === "hard" && (
+            <div className="bg-red-50 dark:bg-red-950/30 text-red-800 dark:text-red-200 p-4 rounded-xl border border-red-200 dark:border-red-800/30 text-xs space-y-3 animate-in fade-in duration-200">
+              <p className="font-bold">
+                ⚠️ PERINGATAN: Penghapusan permanen {selectedJamaahIds.length} jamaah tidak dapat dibatalkan!
+              </p>
+              <div className="space-y-1.5">
+                <label className="font-semibold block">Ketik &quot;HAPUS&quot; untuk mengonfirmasi:</label>
+                <input
+                  type="text"
+                  placeholder="Ketik HAPUS"
+                  value={bulkDeleteConfirmText}
+                  onChange={(e) => setBulkDeleteConfirmText(e.target.value)}
+                  className="h-9 w-full bg-white dark:bg-stone-950 border border-red-200 dark:border-red-800/50 rounded-lg px-3 text-xs text-foreground placeholder:text-muted-foreground/45 focus:outline-none focus:ring-2 focus:ring-red-500"
+                />
+              </div>
+            </div>
+          )}
+
+          <div className="flex justify-end gap-2 pt-2 border-t border-stone-100 dark:border-stone-800/50">
+            <Button variant="outline" disabled={isBulkDeleting} onClick={() => setBulkDeleteModalOpen(false)}>
+              Batal
+            </Button>
+            <Button
+              variant={bulkDeleteMode === "hard" ? "destructive" : "default"}
+              disabled={isBulkDeleting || (bulkDeleteMode === "hard" && bulkDeleteConfirmText !== "HAPUS")}
+              className={bulkDeleteMode === "hard" ? "bg-red-600 hover:bg-red-700 text-white" : "bg-emerald-700 hover:bg-emerald-800 text-white"}
+              onClick={handleBulkDeleteJamaah}
+            >
+              {isBulkDeleting ? "Memproses..." : bulkDeleteMode === "hard" ? `Hapus Permanen (${selectedJamaahIds.length})` : `Batalkan Keberangkatan (${selectedJamaahIds.length})`}
             </Button>
           </div>
         </div>
