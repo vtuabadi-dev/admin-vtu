@@ -57,9 +57,11 @@ export default function KeberangkatanListPage() {
     setTimeout(() => setCopiedId(null), 1800);
   };
 
-  const load = async () => {
+  const load = async (showSpinner = false) => {
     try {
-      setLoading(true);
+      if (showSpinner || keberangkatan.length === 0) {
+        setLoading(true);
+      }
       setError(null);
       const data = await getKeberangkatanList();
       setKeberangkatan(data);
@@ -79,7 +81,7 @@ export default function KeberangkatanListPage() {
       const json = await res.json();
       if (json.success) {
         alert("Berhasil membuat seluruh struktur folder Google Drive!");
-        load();
+        load(false);
       } else {
         alert(json.message || "Gagal membuat folder Google Drive");
       }
@@ -109,7 +111,7 @@ export default function KeberangkatanListPage() {
           successCount: json.createdCount,
           errors: json.errors || [],
         });
-        load(); // Refresh the list
+        load(false); // Refresh the list
       } else {
         alert(json.message || "Gagal mengimpor data Excel");
       }
@@ -122,12 +124,14 @@ export default function KeberangkatanListPage() {
   };
 
   useEffect(() => {
-    if (storeIsLoaded) {
+    if (storeIsLoaded && storeKbrList.length > 0) {
       setKeberangkatan(storeKbrList);
       setLoading(false);
+      // Background silent revalidation
+      load(false);
+    } else {
+      load(true);
     }
-    // Always trigger fresh server load to ensure newly generated packages appear instantly
-    load();
 
     // Auto-provision any unprovisioned packages (e.g. September packages) in the background
     fetch("/api/keberangkatan/provision-all", { method: "POST" })
@@ -135,7 +139,7 @@ export default function KeberangkatanListPage() {
       .then((json) => {
         if (json.success && json.data?.provisioned > 0) {
           console.log(`[Cloud Vault Auto-Sync] Provisioned ${json.data.provisioned} missing package folders.`);
-          load();
+          load(false);
         }
       })
       .catch((err) => console.error("[Cloud Vault Auto-Sync Error]", err));
@@ -181,30 +185,66 @@ export default function KeberangkatanListPage() {
   }, [keberangkatan]);
 
   const filteredKeberangkatan = useMemo(() => {
-    let result = keberangkatan;
+    let result = [...keberangkatan];
+
     if (selectedMonth !== null) {
       result = result.filter(
         (k) => new Date(k.tanggalBerangkat).getMonth() + 1 === selectedMonth
       );
     }
+
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase().trim();
-      result = result.filter(
-        (k) =>
-          (k.namaPaket || k.paketUmroh?.namaPaket || "").toLowerCase().includes(q) ||
-          k.kode.toLowerCase().includes(q) ||
-          (k.maskapaiId && k.maskapaiId.toLowerCase().includes(q)) ||
-          (k.hotelMekkahId && k.hotelMekkahId.toLowerCase().includes(q)) ||
-          (k.hotelMadinahId && k.hotelMadinahId.toLowerCase().includes(q))
-      );
+      result = result.filter((k) => {
+        const nama = (k.namaPaket || k.paketUmroh?.namaPaket || "").toLowerCase();
+        const kode = (k.kode || "").toLowerCase();
+        const maskapai = (k.maskapai || "").toLowerCase();
+        const mekkah = (k.hotelMekkah || "").toLowerCase();
+        const madinah = (k.hotelMadinah || "").toLowerCase();
+        return (
+          nama.includes(q) ||
+          kode.includes(q) ||
+          maskapai.includes(q) ||
+          mekkah.includes(q) ||
+          madinah.includes(q)
+        );
+      });
     }
     return result;
   }, [keberangkatan, selectedMonth, searchQuery]);
 
-  if (loading) {
+  if (loading && keberangkatan.length === 0) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <p className="text-muted-foreground">Memuat data keberangkatan...</p>
+      <div className="space-y-6 animate-pulse p-1">
+        <div className="flex items-center justify-between flex-wrap gap-4">
+          <div className="space-y-2">
+            <div className="h-7 w-48 bg-muted/60 rounded-md" />
+            <div className="h-4 w-72 bg-muted/40 rounded-md" />
+          </div>
+          <div className="h-10 w-36 bg-emerald-600/30 rounded-lg" />
+        </div>
+        <div className="h-10 w-full max-w-md bg-muted/40 rounded-lg" />
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="h-24 bg-card border rounded-xl p-4 space-y-2">
+              <div className="h-3 w-28 bg-muted/60 rounded" />
+              <div className="h-7 w-16 bg-muted/80 rounded" />
+            </div>
+          ))}
+        </div>
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+          {[1, 2].map((i) => (
+            <div key={i} className="h-72 bg-card border rounded-xl p-5 space-y-4">
+              <div className="flex justify-between items-start">
+                <div className="h-6 w-3/4 bg-muted/60 rounded" />
+                <div className="h-5 w-16 bg-muted/40 rounded-full" />
+              </div>
+              <div className="h-12 bg-muted/30 rounded-lg" />
+              <div className="h-12 bg-muted/30 rounded-lg" />
+              <div className="h-10 bg-muted/40 rounded-lg mt-auto" />
+            </div>
+          ))}
+        </div>
       </div>
     );
   }
