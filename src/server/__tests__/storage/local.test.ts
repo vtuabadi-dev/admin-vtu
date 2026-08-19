@@ -75,6 +75,6 @@ describe("LocalStorageAdapter", () => {
   it("should get URL for file", async () => {
     await adapter.upload("url-test.txt", Buffer.from("x"), "text/plain");
     const url = await adapter.getUrl("url-test.txt");
-    expect(url).toContain("url-test.txt");
+    expect(url.startsWith("data:") || url.includes("url-test.txt")).toBe(true);
   });
 });

@@ -1,5 +1,6 @@
 import { prisma } from "@/server/db/client";
 import type { Keberangkatan } from "@/shared/types";
+import { purgePackageStorageFolder } from "@/server/storage/google-drive";
 
 function mapKeberangkatan(row: any): Keberangkatan {
   const maskapaiName = row.maskapaiMaster?.name || (row.maskapai && !row.maskapai.startsWith("cm") ? row.maskapai : undefined) || "Saudia";
@@ -329,6 +330,15 @@ export const keberangkatanRepo = {
         maxWait: 10000,
       }
     );
+
+    // 5. Hard purge cloud storage folder for this departure package if provisioned
+    if (keberangkatan.driveFolderIds) {
+      try {
+        await purgePackageStorageFolder(keberangkatan.driveFolderIds);
+      } catch (storageErr) {
+        console.error(`[Package Delete Storage Purge Error] Failed to purge storage folder for package ${id}:`, storageErr);
+      }
+    }
 
     return true;
   },

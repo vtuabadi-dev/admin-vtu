@@ -454,3 +454,47 @@ export async function renameDriveFile(fileId: string, newName: string): Promise<
   });
   return res.ok;
 }
+
+export async function purgePackageStorageFolder(folderMetaOrId: any): Promise<boolean> {
+  if (!folderMetaOrId) return false;
+
+  let rootFolderId: string | undefined;
+  if (typeof folderMetaOrId === "string") {
+    rootFolderId = folderMetaOrId;
+  } else if (typeof folderMetaOrId === "object") {
+    rootFolderId = folderMetaOrId.rootPackageFolderId || folderMetaOrId.rootFolderId;
+  }
+
+  if (!rootFolderId || rootFolderId === "local-mock") {
+    console.log("[Cloud Vault Purge] No valid root package folder ID found for deletion.");
+    return false;
+  }
+
+  if (!isGoogleDriveConfigured()) {
+    console.warn(`[Cloud Vault Purge] Google Drive is not configured. Skipping remote folder purge for folder ID "${rootFolderId}".`);
+    return false;
+  }
+
+  try {
+    const token = await getAccessToken();
+    const res = await fetch(`${DRIVE_API}/files/${rootFolderId}?supportsAllDrives=true`, {
+      method: "DELETE",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (res.ok || res.status === 404) {
+      console.log(`[Cloud Vault Purge SUCCESS] Root package folder ID "${rootFolderId}" and all subfolders/files deleted from Google Drive.`);
+      return true;
+    } else {
+      const errText = await res.text().catch(() => "");
+      console.error(`[Cloud Vault Purge ERROR] Failed to delete root package folder ID "${rootFolderId}": Status ${res.status} - ${errText}`);
+      return false;
+    }
+  } catch (err) {
+    console.error(`[Cloud Vault Purge EXCEPTION] Failed to purge package folder ID "${rootFolderId}":`, err);
+    return false;
+  }
+}
+

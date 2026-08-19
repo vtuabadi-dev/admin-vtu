@@ -255,7 +255,7 @@ export const packageService = {
         kodeIndividu,
         paketGrupId,
         driveFolderIds,
-        namaPaket: data.namaPaket || formattedNamaPaket,
+        namaPaket: departureDates.length > 1 ? formattedNamaPaket : (data.namaPaket || formattedNamaPaket),
         hargaPaket: parseInt(data.hargaBase || data.hargaPaket || "0", 10),
         tanggalBerangkat: depDate.toISOString(),
         tanggalPulang: retDate.toISOString(),
