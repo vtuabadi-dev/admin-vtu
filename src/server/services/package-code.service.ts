@@ -13,10 +13,9 @@ const MONTH_IND_TITLE = [
   "Jul", "Agt", "Sep", "Okt", "Nov", "Des"
 ];
 
-const MONTH_IND_FULL = [
-  "01-JANUARI", "02-FEBRUARI", "03-MARET", "04-APRIL",
-  "05-MEI", "06-JUNI", "07-JULI", "08-AGUSTUS",
-  "09-SEPTEMBER", "10-OKTOBER", "11-NOVEMBER", "12-DESEMBER"
+const MONTH_IND_FULL_NAMES = [
+  "JANUARI", "FEBRUARI", "MARET", "APRIL", "MEI", "JUNI",
+  "JULI", "AGUSTUS", "SEPTEMBER", "OKTOBER", "NOVEMBER", "DESEMBER"
 ];
 
 export function buildPackageIdentifier(packageTypeCode: string, startingPointCode: string): string {
@@ -127,5 +126,8 @@ export function generatePackageFolderName(params: GenerateFolderNameParams): str
 }
 
 export function getMonthFolderName(date: Date): string {
-  return MONTH_IND_FULL[date.getMonth()] || "01-JANUARI";
+  const mNum = String(date.getMonth() + 1).padStart(2, "0");
+  const mName = MONTH_IND_FULL_NAMES[date.getMonth()] || "JANUARI";
+  const year = date.getFullYear();
+  return `${mNum} - ${mName} ${year}`;
 }

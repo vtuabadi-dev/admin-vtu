@@ -150,6 +150,30 @@ export function validateFolderRegistry(registry: any): registry is DriveFolderRe
   return true;
 }
 
+export async function getOrCreateMonthFolder(monthFolderName: string, yearId: string): Promise<string> {
+  const query = `'${yearId}' in parents and mimeType = 'application/vnd.google-apps.folder' and trashed = false`;
+  const res = await apiFetch(
+    `${DRIVE_API}/files?q=${encodeURIComponent(query)}&fields=files(id,name)&supportsAllDrives=true&includeItemsFromAllDrives=true`
+  );
+  const data = await res.json();
+  const existingFiles: Array<{ id: string; name: string }> = data.files || [];
+
+  const mPrefix = monthFolderName.slice(0, 2);
+  const parts = monthFolderName.split("-");
+  const monthNameRaw = ((parts[1] || "").trim().split(" ")[0] || "").toUpperCase();
+
+  const matched = existingFiles.find((f) => {
+    const fn = f.name.toUpperCase().trim();
+    return fn.startsWith(mPrefix) || (monthNameRaw && monthNameRaw.length > 2 && fn.includes(monthNameRaw));
+  });
+
+  if (matched) {
+    return matched.id;
+  }
+
+  return getOrCreateFolder(monthFolderName, yearId);
+}
+
 export async function createPackageFolderHierarchy(
   year: number,
   monthFolderName: string,
@@ -165,7 +189,7 @@ export async function createPackageFolderHierarchy(
     process.env.GOOGLE_DRIVE_KELENGKAPAN_JAMAAH_FOLDER_ID ||
     "19e3zObFKihQG1rjPyb_NxoJQGagDVZfs";
   const yearId = await getOrCreateFolder(String(year), rootIndukId);
-  const monthId = await getOrCreateFolder(monthFolderName, yearId);
+  const monthId = await getOrCreateMonthFolder(monthFolderName, yearId);
   const packageFolderId = await getOrCreateFolder(packageFolderName, monthId);
 
   const [
