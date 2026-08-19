@@ -148,18 +148,18 @@ export async function POST(request: NextRequest) {
             const driveFolders = (paketInfo?.driveFolderIds as Record<string, string> | null) || null;
             targetFolderId = driveFolders?.formulirPendaftaran || driveFolders?.pembayaran;
 
-            if (!targetFolderId) {
-              console.log(`[payment-proof] Package "${reg.paketId}" lacks pre-provisioned folder ID in DB. Running fallback provisioning...`);
+            if (!targetFolderId || targetFolderId === "local-mock") {
+              console.log(`[payment-proof] Package "${reg.paketId}" lacks valid folder ID in DB. Running fallback provisioning...`);
               const registry = await provisionPackageStorage(reg.paketId);
               targetFolderId = registry?.formulirPendaftaran || registry?.pembayaran;
             }
           }
 
-          if (!targetFolderId) {
-            targetFolderId = await getOrCreateFormulirPendaftaranDriveFolder(process.env.GOOGLE_DRIVE_FOLDER_ID);
+          if (!targetFolderId || targetFolderId === "local-mock") {
+            targetFolderId = await getOrCreateFormulirPendaftaranDriveFolder();
           }
 
-          if (targetFolderId) {
+          if (targetFolderId && targetFolderId !== "local-mock") {
             await driveStorage.upload(pdfFileName, pdfBuf, "application/pdf", targetFolderId);
             console.log(`[payment-proof] PDF formulir berhasil disimpan ke Cloud Vault: ${pdfFileName} (Folder ID: ${targetFolderId})`);
           } else {
