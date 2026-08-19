@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
   ArrowLeft,
@@ -15,11 +15,13 @@ import {
   Save,
   CheckCircle2,
   Clipboard,
+  ExternalLink,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/components/ui/Card";
 import { Button } from "@/shared/components/ui/Button";
 import { Input } from "@/shared/components/ui/Input";
 import { ErrorState } from "@/shared/components/ui/ErrorState";
+import { SearchableSelect } from "@/shared/components/ui/SearchableSelect";
 import { getKeberangkatanById } from "@/server/actions/api";
 import type { Keberangkatan } from "@/shared/types";
 
@@ -58,6 +60,48 @@ export default function EditKeberangkatanPage() {
   const [tourLeaderKontak, setTourLeaderKontak] = useState("");
   const [muthowifNama, setMuthowifNama] = useState("");
   const [muthowifKontak, setMuthowifKontak] = useState("");
+
+  // Master Petugas State
+  const [masterPetugas, setMasterPetugas] = useState<Array<{ id: string; nama: string; tipe: string; noHp?: string | null }>>([]);
+
+  useEffect(() => {
+    async function fetchPetugas() {
+      try {
+        const res = await fetch("/api/master/petugas");
+        if (res.ok) {
+          const json = await res.json();
+          if (json.success && Array.isArray(json.data)) {
+            setMasterPetugas(json.data);
+          }
+        }
+      } catch (err) {
+        console.warn("[EditKeberangkatan] Gagal memuat Master Petugas:", err);
+      }
+    }
+    fetchPetugas();
+  }, []);
+
+  const tlOptions = useMemo(() => {
+    return masterPetugas
+      .filter((p) => p.tipe === "TOUR_LEADER" || !p.tipe)
+      .map((p) => ({
+        value: p.nama,
+        label: p.nama,
+        sublabel: p.noHp ? `No. HP: ${p.noHp}` : "Tanpa Kontak",
+        noHp: p.noHp || "",
+      }));
+  }, [masterPetugas]);
+
+  const muthOptions = useMemo(() => {
+    return masterPetugas
+      .filter((p) => p.tipe === "MUTHOWIF" || !p.tipe)
+      .map((p) => ({
+        value: p.nama,
+        label: p.nama,
+        sublabel: p.noHp ? `No. HP: ${p.noHp}` : "Tanpa Kontak",
+        noHp: p.noHp || "",
+      }));
+  }, [masterPetugas]);
 
   // Flight Segments State
   const [flightSegments, setFlightSegments] = useState<FlightSegment[]>([]);
@@ -605,30 +649,64 @@ export default function EditKeberangkatanPage() {
 
       {/* Section 3: Petugas Lapangan (Tour Leader & Muthowif) */}
       <Card className="border shadow-sm">
-        <CardHeader className="pb-3 border-b bg-muted/20">
+        <CardHeader className="pb-3 border-b bg-muted/20 flex flex-row items-center justify-between">
           <CardTitle className="text-base font-bold flex items-center gap-2 text-primary">
             <UserCheck className="h-4 w-4" />
             Petugas Lapangan (Tour Leader & Muthowif)
           </CardTitle>
+          <a
+            href="/admin/master/petugas"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs text-primary hover:underline font-semibold flex items-center gap-1"
+          >
+            + Kelola Master Petugas <ExternalLink className="h-3 w-3" />
+          </a>
         </CardHeader>
         <CardContent className="p-5 space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* Tour Leader Column */}
             <div className="p-3.5 rounded-lg border bg-muted/20 space-y-3">
-              <span className="text-xs font-bold text-foreground flex items-center gap-1.5">
-                <UserCheck className="h-3.5 w-3.5 text-primary" /> Tour Leader (TL)
-              </span>
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                  <UserCheck className="h-3.5 w-3.5 text-primary" /> Tour Leader (TL)
+                </span>
+                <span className="text-[10px] text-primary bg-primary/10 px-1.5 py-0.5 rounded font-medium">
+                  {tlOptions.length} Petugas Terdaftar
+                </span>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-muted-foreground mb-1">
+                  Pilih dari Master Petugas (Tour Leader)
+                </label>
+                <SearchableSelect
+                  options={tlOptions}
+                  value={tourLeaderNama}
+                  onChange={(val) => {
+                    setTourLeaderNama(val);
+                    const selected = tlOptions.find((o) => o.value === val);
+                    if (selected?.noHp) setTourLeaderKontak(selected.noHp);
+                  }}
+                  placeholder="-- Cari / Pilih Tour Leader --"
+                  searchPlaceholder="Ketik nama Tour Leader..."
+                  size="sm"
+                />
+              </div>
+
               <div>
                 <label className="block text-xs font-medium text-muted-foreground mb-1">
-                  Nama Lengkap Tour Leader
+                  Nama Lengkap Tour Leader (Bisa Ketik Custom)
                 </label>
                 <Input
                   type="text"
                   placeholder="Misal: Ustadz Ahmad"
                   value={tourLeaderNama}
                   onChange={(e) => setTourLeaderNama(e.target.value)}
-                  className="text-xs"
+                  className="text-xs bg-background"
                 />
               </div>
+
               <div>
                 <label className="block text-xs font-medium text-muted-foreground mb-1">
                   No. HP / WhatsApp Tour Leader
@@ -638,27 +716,53 @@ export default function EditKeberangkatanPage() {
                   placeholder="Misal: 08123456789"
                   value={tourLeaderKontak}
                   onChange={(e) => setTourLeaderKontak(e.target.value)}
-                  className="text-xs font-mono"
+                  className="text-xs font-mono bg-background"
                 />
               </div>
             </div>
 
+            {/* Muthowif Column */}
             <div className="p-3.5 rounded-lg border bg-muted/20 space-y-3">
-              <span className="text-xs font-bold text-foreground flex items-center gap-1.5">
-                <UserPlus className="h-3.5 w-3.5 text-primary" /> Muthowif
-              </span>
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                  <UserPlus className="h-3.5 w-3.5 text-primary" /> Muthowif
+                </span>
+                <span className="text-[10px] text-sky-700 bg-sky-600/10 px-1.5 py-0.5 rounded font-medium">
+                  {muthOptions.length} Petugas Terdaftar
+                </span>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-muted-foreground mb-1">
+                  Pilih dari Master Petugas (Muthowif)
+                </label>
+                <SearchableSelect
+                  options={muthOptions}
+                  value={muthowifNama}
+                  onChange={(val) => {
+                    setMuthowifNama(val);
+                    const selected = muthOptions.find((o) => o.value === val);
+                    if (selected?.noHp) setMuthowifKontak(selected.noHp);
+                  }}
+                  placeholder="-- Cari / Pilih Muthowif --"
+                  searchPlaceholder="Ketik nama Muthowif..."
+                  size="sm"
+                />
+              </div>
+
               <div>
                 <label className="block text-xs font-medium text-muted-foreground mb-1">
-                  Nama Lengkap Muthowif
+                  Nama Lengkap Muthowif (Bisa Ketik Custom)
                 </label>
                 <Input
                   type="text"
                   placeholder="Misal: Syekh Abdullah"
                   value={muthowifNama}
                   onChange={(e) => setMuthowifNama(e.target.value)}
-                  className="text-xs"
+                  className="text-xs bg-background"
                 />
               </div>
+
               <div>
                 <label className="block text-xs font-medium text-muted-foreground mb-1">
                   No. HP / WhatsApp Muthowif
@@ -668,7 +772,7 @@ export default function EditKeberangkatanPage() {
                   placeholder="Misal: +966 50 123 4567"
                   value={muthowifKontak}
                   onChange={(e) => setMuthowifKontak(e.target.value)}
-                  className="text-xs font-mono"
+                  className="text-xs font-mono bg-background"
                 />
               </div>
             </div>
