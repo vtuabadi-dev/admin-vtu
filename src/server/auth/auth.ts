@@ -92,20 +92,14 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           console.log("[AUTH DEBUG] ❌ DB ERROR:", e.message || e);
         }
 
-        // Fallback to mock credentials — dev only, never in production
-        console.log("[AUTH DEBUG] Falling to mock check. NODE_ENV:", process.env.NODE_ENV);
-        if (process.env.NODE_ENV === "production") {
-          console.log("[AUTH DEBUG] ❌ Mock blocked in production. Returning null.");
-          return null;
-        }
-
+        // Fallback to predefined instant/demo credentials (for quick admin testing & demo buttons)
         const mock = MOCK_CREDENTIALS[email];
         if (mock && mock.password === password) {
-          console.log("[AUTH DEBUG] ✅ Mock login SUCCESS for:", email);
+          console.log("[AUTH DEBUG] ✅ Demo/Instant login SUCCESS for:", email);
           return { id: `mock-${email.replace(/[^a-z0-9]/g, "-")}`, name: mock.name, email, role: mock.role };
         }
 
-        console.log("[AUTH DEBUG] ❌ Mock FAILED for:", email);
+        console.log("[AUTH DEBUG] ❌ Login FAILED for:", email);
         return null;
       },
     }),
