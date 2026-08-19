@@ -12,7 +12,7 @@ import {
   generatePackageFolderName,
   getMonthFolderName,
 } from "./package-code.service";
-import { createPackageFolderHierarchy } from "../storage/google-drive";
+import { createPackageFolderHierarchy, validateFolderRegistry } from "../storage/google-drive";
 
 export const packageService = {
   async findAll(params?: { status?: string; limit?: number; offset?: number }) {
@@ -67,12 +67,18 @@ export const packageService = {
         });
         kodeGrup = finalKodeGrup;
 
-        const groupRecord = await prisma.paketGrup.create({
-          data: {
-            kodeGrup: finalKodeGrup,
-            namaPaket: parentKeb.namaPaket || `${pCode} ${sCode} Group`,
-          },
+        let groupRecord = await prisma.paketGrup.findUnique({
+          where: { kodeGrup: finalKodeGrup },
         });
+
+        if (!groupRecord) {
+          groupRecord = await prisma.paketGrup.create({
+            data: {
+              kodeGrup: finalKodeGrup,
+              namaPaket: parentKeb.namaPaket || `${pCode} ${sCode} Group`,
+            },
+          });
+        }
         paketGrupId = groupRecord.id;
 
         // Update parent to be part of this group
@@ -91,12 +97,18 @@ export const packageService = {
         tanggalList: departureDates,
       });
 
-      const groupRecord = await prisma.paketGrup.create({
-        data: {
-          kodeGrup,
-          namaPaket: data.namaPaket || `${pCode} ${sCode} Group`,
-        },
+      let groupRecord = await prisma.paketGrup.findUnique({
+        where: { kodeGrup },
       });
+
+      if (!groupRecord) {
+        groupRecord = await prisma.paketGrup.create({
+          data: {
+            kodeGrup,
+            namaPaket: data.namaPaket || `${pCode} ${sCode} Group`,
+          },
+        });
+      }
       paketGrupId = groupRecord.id;
     }
 
@@ -178,7 +190,7 @@ export const packageService = {
       const retDate = new Date(depDate);
       retDate.setDate(retDate.getDate() + durasiHari - 1);
 
-      const kodeIndividu = generateKodeIndividu({
+      const baseKodeIndividu = generateKodeIndividu({
         tahun: depYear,
         durasiHari,
         packageTypeCode: pCode,
@@ -186,6 +198,27 @@ export const packageService = {
         maskapaiCode: mCode,
         tanggalBerangkat: depDate,
       });
+
+      let kodeIndividu = baseKodeIndividu;
+      const existingKeb = await prisma.keberangkatan.findFirst({
+        where: { OR: [{ kode: kodeIndividu }, { kodeIndividu: kodeIndividu }] },
+      });
+      if (existingKeb) {
+        let counter = 2;
+        while (
+          await prisma.keberangkatan.findFirst({
+            where: {
+              OR: [
+                { kode: `${baseKodeIndividu}_V${counter}` },
+                { kodeIndividu: `${baseKodeIndividu}_V${counter}` },
+              ],
+            },
+          })
+        ) {
+          counter++;
+        }
+        kodeIndividu = `${baseKodeIndividu}_V${counter}`;
+      }
 
       const formattedNamaPaket = generateNamaPaket({
         packageTypeCode: pCode,
@@ -208,12 +241,13 @@ export const packageService = {
 
       const monthFolder = getMonthFolderName(depDate);
 
-      // Create Google Drive folder hierarchy for this package
-      let driveFolderIds: any = null;
-      try {
-        driveFolderIds = await createPackageFolderHierarchy(depYear, monthFolder, folderName);
-      } catch (e) {
-        console.error("[PackageService] Failed to create GDrive folder hierarchy:", e);
+      // Create & validate Google Drive folder hierarchy for this package BEFORE DB creation
+      const driveFolderIds = await createPackageFolderHierarchy(depYear, monthFolder, folderName);
+
+      if (!validateFolderRegistry(driveFolderIds)) {
+        throw new Error(
+          `[PackageService Error] Gagal mem-provisioning folder Google Drive untuk paket "${formattedNamaPaket}". Kategori folder tidak lengkap.`
+        );
       }
 
       const created = await keberangkatanRepo.create({
@@ -242,19 +276,6 @@ export const packageService = {
         durationDays: durasiHari,
         hotelOptions: hotelOptionsArray,
       } as any);
-
-      // Fallback Provisioning if initial hierarchy creation returned null or local-mock
-      if (!driveFolderIds || driveFolderIds.rootPackageFolderId === "local-mock") {
-        try {
-          const { provisionPackageStorage } = await import("@/server/storage/google-drive");
-          const freshRegistry = await provisionPackageStorage(created.id);
-          if (freshRegistry) {
-            (created as any).driveFolderIds = freshRegistry;
-          }
-        } catch (provErr) {
-          console.error(`[PackageService] Fallback provisioning error for package ${created.id}:`, provErr);
-        }
-      }
 
       createdList.push(created);
     }
