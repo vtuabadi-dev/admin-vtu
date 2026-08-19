@@ -115,11 +115,46 @@ export interface GenerateFolderNameParams {
   maskapaiCode: string;
 }
 
+export function resolvePackageFolderTypeCode(packageTypeCode: string): string {
+  if (!packageTypeCode) return "REG";
+  const raw = packageTypeCode.toUpperCase().trim();
+
+  if (raw === "REG" || raw === "REGULER" || raw === "PAKET REGULER") {
+    return "REG";
+  }
+
+  if (raw.includes("TURKI") || raw.includes("TURKEY") || raw.includes("TURKISH") || raw === "TUR") {
+    return "TUR";
+  }
+  if (raw.includes("DUBAI") || raw === "DUB") {
+    return "DUB";
+  }
+  if (raw.includes("EUROP") || raw.includes("EROPA") || raw === "EUR") {
+    return "EUR";
+  }
+  if (raw.includes("AQSA") || raw.includes("PALESTINE") || raw === "AQS") {
+    return "AQS";
+  }
+  if (raw.includes("MESIR") || raw.includes("EGYPT") || raw.includes("CAIRO") || raw === "CAI") {
+    return "CAI";
+  }
+  if (raw.includes("TAIF") || raw === "TAI") {
+    return "TAI";
+  }
+
+  const cleaned = raw.replace(/^PLUS\s+/i, "").replace(/^PAKET\s+/i, "").trim();
+  if (cleaned.length >= 3) {
+    return cleaned.slice(0, 3).toUpperCase();
+  }
+
+  return raw.slice(0, 3).toUpperCase();
+}
+
 export function generatePackageFolderName(params: GenerateFolderNameParams): string {
   const sCode = (params.startingPointCode || "JKT").toUpperCase();
   const dateNum = String(params.tanggalBerangkat.getDate()).padStart(2, "0");
   const monthInd = MONTH_IND_SHORT[params.tanggalBerangkat.getMonth()];
-  const pCode = (params.packageTypeCode || "REG").toUpperCase();
+  const pCode = resolvePackageFolderTypeCode(params.packageTypeCode);
   const mCode = (params.maskapaiCode || "SV").toUpperCase();
 
   return `${sCode} - ${dateNum} ${monthInd} ${params.durasiHari} H ${pCode} (${mCode})`;
