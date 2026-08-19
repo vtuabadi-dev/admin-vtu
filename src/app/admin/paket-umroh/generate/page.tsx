@@ -56,6 +56,8 @@ export default function GeneratePaketPage() {
   // OCR state — multi-file drag-and-drop
   const [flyerFiles, setFlyerFiles] = useState<File[]>([]);
   const [flyerPreviews, setFlyerPreviews] = useState<string[]>([]);
+  const [activeFlyerIndex, setActiveFlyerIndex] = useState<number | null>(null);
+  const [flyerZoom, setFlyerZoom] = useState<number>(100);
   const [isDragging, setIsDragging] = useState(false);
   const [caption, setCaption] = useState("");
   const [uploading, setUploading] = useState(false);
@@ -83,6 +85,10 @@ export default function GeneratePaketPage() {
     const arr = Array.from(incoming).filter(f =>
       f.type.startsWith("image/")
     );
+    if (arr.length > 0) {
+      setActiveFlyerIndex(0);
+      setFlyerZoom(100);
+    }
     setFlyerFiles(prev => {
       const combined = [...prev, ...arr].slice(0, MAX_FILES);
       // Build previews for new files
@@ -2484,9 +2490,18 @@ export default function GeneratePaketPage() {
                       {flyerFiles.map((file, idx) => (
                         <div
                           key={idx}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setActiveFlyerIndex(idx);
+                            setFlyerZoom(100);
+                          }}
                           className={cn(
-                            "relative group aspect-square rounded-lg overflow-hidden border shadow-sm transition-all",
-                            idx === 0 ? "ring-2 ring-emerald-500 border-emerald-500" : "border-border"
+                            "relative group aspect-square rounded-lg overflow-hidden border shadow-sm transition-all cursor-pointer",
+                            activeFlyerIndex === idx
+                              ? "ring-2 ring-blue-600 border-blue-600 scale-[1.02]"
+                              : idx === 0
+                              ? "ring-2 ring-emerald-500 border-emerald-500"
+                              : "border-border hover:border-blue-400"
                           )}
                         >
                           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -2497,13 +2512,20 @@ export default function GeneratePaketPage() {
                           />
                           {/* Hover overlay */}
                           <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1 p-1">
+                            <span className="text-white text-[10px] font-bold bg-blue-600/80 px-1.5 py-0.5 rounded">🔍 Perbesar</span>
                             <span className="text-white text-[10px] font-medium text-center line-clamp-2 leading-tight">{file.name}</span>
                             <span className="text-white/70 text-[10px]">{(file.size / 1024).toFixed(0)} KB</span>
                           </div>
                           {/* Remove button */}
                           <button
                             type="button"
-                            onClick={(e) => { e.stopPropagation(); removeFile(idx); }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              removeFile(idx);
+                              if (activeFlyerIndex === idx) {
+                                setActiveFlyerIndex(flyerFiles.length > 1 ? 0 : null);
+                              }
+                            }}
                             className="absolute top-1 right-1 z-10 h-5 w-5 rounded-full bg-red-500 hover:bg-red-600 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow"
                           >
                             <X className="h-3 w-3" />
@@ -2540,11 +2562,17 @@ export default function GeneratePaketPage() {
                     <div className="flex items-center justify-between pt-1 border-t border-border">
                       <p className="text-xs text-muted-foreground flex items-center gap-1.5">
                         <span className="font-semibold text-foreground">{flyerFiles.length}</span> foto dipilih
-                        <span className="text-[11px] text-emerald-700 dark:text-emerald-400 font-semibold">(Foto #1 = Flyer Utama)</span>
+                        <span className="text-[11px] text-emerald-700 dark:text-emerald-400 font-semibold">(Klik gambar untuk memperbesar)</span>
                       </p>
                       <button
                         type="button"
-                        onClick={(e) => { e.stopPropagation(); flyerPreviews.forEach(URL.revokeObjectURL); setFlyerFiles([]); setFlyerPreviews([]); }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          flyerPreviews.forEach(URL.revokeObjectURL);
+                          setFlyerFiles([]);
+                          setFlyerPreviews([]);
+                          setActiveFlyerIndex(null);
+                        }}
                         className="text-xs text-red-500 hover:text-red-600 font-medium flex items-center gap-1"
                       >
                         <X className="h-3 w-3" /> Hapus Semua
@@ -2553,6 +2581,103 @@ export default function GeneratePaketPage() {
                   </div>
                 )}
               </div>
+
+              {/* ── Enlarged Flyer Inspector Card (Side-by-Side Verification) ── */}
+              {activeFlyerIndex !== null && flyerPreviews[activeFlyerIndex] && (
+                <div className="border border-blue-200 rounded-xl bg-slate-900 text-white overflow-hidden shadow-md space-y-0">
+                  {/* Header Controls Bar */}
+                  <div className="p-3 bg-slate-800 border-b border-slate-700 flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 truncate">
+                      <span className="text-[11px] font-bold uppercase bg-blue-600 text-white px-2 py-0.5 rounded shrink-0">
+                        🔍 Flyer #{activeFlyerIndex + 1} {activeFlyerIndex === 0 && "(Utama)"}
+                      </span>
+                      <span className="text-xs font-semibold text-slate-200 truncate max-w-[140px]" title={flyerFiles[activeFlyerIndex]?.name}>
+                        {flyerFiles[activeFlyerIndex]?.name}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      {/* Zoom Controls */}
+                      <button
+                        type="button"
+                        onClick={() => setFlyerZoom((z) => Math.max(z - 25, 50))}
+                        className="px-2 py-1 bg-slate-700 hover:bg-slate-600 rounded text-xs font-bold text-slate-200"
+                        title="Zoom Out (-)"
+                      >
+                        🔍-
+                      </button>
+                      <span className="text-[11px] font-mono font-bold text-blue-400 min-w-[38px] text-center">
+                        {flyerZoom}%
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setFlyerZoom((z) => Math.min(z + 25, 300))}
+                        className="px-2 py-1 bg-slate-700 hover:bg-slate-600 rounded text-xs font-bold text-slate-200"
+                        title="Zoom In (+)"
+                      >
+                        🔍+
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setFlyerZoom(100)}
+                        className="px-2 py-1 bg-slate-700 hover:bg-slate-600 rounded text-[11px] font-semibold text-slate-300"
+                        title="Reset Zoom 100%"
+                      >
+                        100%
+                      </button>
+
+                      {/* Prev / Next */}
+                      <button
+                        type="button"
+                        disabled={activeFlyerIndex === 0}
+                        onClick={() => { setFlyerZoom(100); setActiveFlyerIndex((idx) => Math.max(0, (idx ?? 0) - 1)); }}
+                        className="p-1 bg-slate-700 hover:bg-slate-600 disabled:opacity-40 rounded text-slate-200"
+                        title="Flyer Sebelumnya"
+                      >
+                        ◀
+                      </button>
+                      <button
+                        type="button"
+                        disabled={activeFlyerIndex === flyerFiles.length - 1}
+                        onClick={() => { setFlyerZoom(100); setActiveFlyerIndex((idx) => Math.min(flyerFiles.length - 1, (idx ?? 0) + 1)); }}
+                        className="p-1 bg-slate-700 hover:bg-slate-600 disabled:opacity-40 rounded text-slate-200"
+                        title="Flyer Selanjutnya"
+                      >
+                        ▶
+                      </button>
+
+                      {/* Close Button */}
+                      <button
+                        type="button"
+                        onClick={() => setActiveFlyerIndex(null)}
+                        className="p-1 bg-red-600 hover:bg-red-700 rounded text-white font-bold text-xs ml-1"
+                        title="Tutup Pratinjau Membesar"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Scrollable/Zoomable Image Display Box */}
+                  <div className="p-3 max-h-[480px] overflow-auto flex items-start justify-center bg-slate-950/90 scrollbar-thin">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={flyerPreviews[activeFlyerIndex]}
+                      alt={flyerFiles[activeFlyerIndex]?.name || "Flyer Preview"}
+                      style={{ width: `${flyerZoom}%`, maxWidth: "none" }}
+                      className="rounded shadow-lg object-contain transition-all duration-150"
+                    />
+                  </div>
+
+                  {/* Footer Navigation Bar */}
+                  <div className="p-2 bg-slate-900 border-t border-slate-800 flex items-center justify-between text-[11px] text-slate-400">
+                    <span>Gunakan tombol zoom 🔍+ / 🔍- untuk membaca teks kecil di flyer</span>
+                    <span className="font-semibold text-blue-300">
+                      Flyer {activeFlyerIndex + 1} dari {flyerFiles.length}
+                    </span>
+                  </div>
+                </div>
+              )}
 
               {/* Caption */}
               <div className="space-y-1">
