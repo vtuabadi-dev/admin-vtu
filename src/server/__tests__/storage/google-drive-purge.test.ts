@@ -21,4 +21,10 @@ describe("purgePackageStorageFolder", () => {
     const result = await purgePackageStorageFolder(meta);
     expect(typeof result).toBe("boolean");
   });
+
+  it("should extract rootPackageFolderId from JSON string correctly", async () => {
+    const metaStr = JSON.stringify({ rootPackageFolderId: "folder-67890" });
+    const result = await purgePackageStorageFolder(metaStr);
+    expect(typeof result).toBe("boolean");
+  });
 });

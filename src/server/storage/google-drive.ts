@@ -459,10 +459,23 @@ export async function purgePackageStorageFolder(folderMetaOrId: any): Promise<bo
   if (!folderMetaOrId) return false;
 
   let rootFolderId: string | undefined;
-  if (typeof folderMetaOrId === "string") {
-    rootFolderId = folderMetaOrId;
-  } else if (typeof folderMetaOrId === "object") {
-    rootFolderId = folderMetaOrId.rootPackageFolderId || folderMetaOrId.rootFolderId;
+  let meta = folderMetaOrId;
+
+  if (typeof meta === "string") {
+    const trimmed = meta.trim();
+    if (trimmed.startsWith("{")) {
+      try {
+        meta = JSON.parse(trimmed);
+      } catch {
+        /* ignore JSON parse error */
+      }
+    }
+  }
+
+  if (typeof meta === "string") {
+    rootFolderId = meta;
+  } else if (meta && typeof meta === "object") {
+    rootFolderId = meta.rootPackageFolderId || meta.rootFolderId;
   }
 
   if (!rootFolderId || rootFolderId === "local-mock") {
