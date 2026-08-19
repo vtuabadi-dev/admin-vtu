@@ -37,6 +37,7 @@ export default function KeberangkatanListPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [openInfoId, setOpenInfoId] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [provisioningId, setProvisioningId] = useState<string | null>(null);
 
   // Excel Import States
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
@@ -68,6 +69,24 @@ export default function KeberangkatanListPage() {
       setError(err instanceof Error ? err : new Error("Database Connection Error"));
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleProvisionSingle = async (id: string) => {
+    setProvisioningId(id);
+    try {
+      const res = await fetch(`/api/keberangkatan/${id}/provision`, { method: "POST" });
+      const json = await res.json();
+      if (json.success) {
+        alert("Berhasil membuat seluruh struktur folder Google Drive!");
+        load();
+      } else {
+        alert(json.message || "Gagal membuat folder Google Drive");
+      }
+    } catch (err: any) {
+      alert("Terjadi kesalahan: " + (err?.message || "Gagal menghubungi server"));
+    } finally {
+      setProvisioningId(null);
     }
   };
 
@@ -109,6 +128,17 @@ export default function KeberangkatanListPage() {
     }
     // Always trigger fresh server load to ensure newly generated packages appear instantly
     load();
+
+    // Auto-provision any unprovisioned packages (e.g. September packages) in the background
+    fetch("/api/keberangkatan/provision-all", { method: "POST" })
+      .then((res) => res.json())
+      .then((json) => {
+        if (json.success && json.data?.provisioned > 0) {
+          console.log(`[Cloud Vault Auto-Sync] Provisioned ${json.data.provisioned} missing package folders.`);
+          load();
+        }
+      })
+      .catch((err) => console.error("[Cloud Vault Auto-Sync Error]", err));
   }, []);
 
   // Tutup popover ID Paket saat klik di luar
@@ -385,6 +415,40 @@ export default function KeberangkatanListPage() {
                       {persen}
                     </span>
                     <StatusBadge status={k.status} />
+
+                    {/* Google Drive Folder Status & Direct Link */}
+                    {(() => {
+                      const meta = (k as any).driveFolderIds;
+                      const hasFolder = meta && meta.rootPackageFolderId && meta.rootPackageFolderId !== "local-mock";
+                      if (hasFolder) {
+                        return (
+                          <a
+                            href={`https://drive.google.com/drive/folders/${meta.rootPackageFolderId}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/20 border border-emerald-500/30 transition-colors"
+                            title="Buka Folder Google Drive Paket"
+                          >
+                            <span>📁 Drive</span> ↗
+                          </a>
+                        );
+                      }
+                      return (
+                        <button
+                          type="button"
+                          onClick={() => handleProvisionSingle(k.id)}
+                          disabled={provisioningId === k.id}
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/10 text-amber-700 hover:bg-amber-500/20 border border-amber-500/30 transition-colors disabled:opacity-50"
+                          title="Buat Seluruh Folder Google Drive Paket Ini"
+                        >
+                          {provisioningId === k.id ? (
+                            <span>⏳ Membuat...</span>
+                          ) : (
+                            <span>⚡ Buat Drive</span>
+                          )}
+                        </button>
+                      );
+                    })()}
                   </div>
                 </div>
               </CardHeader>

@@ -243,6 +243,19 @@ export const packageService = {
         hotelOptions: hotelOptionsArray,
       } as any);
 
+      // Fallback Provisioning if initial hierarchy creation returned null or local-mock
+      if (!driveFolderIds || driveFolderIds.rootPackageFolderId === "local-mock") {
+        try {
+          const { provisionPackageStorage } = await import("@/server/storage/google-drive");
+          const freshRegistry = await provisionPackageStorage(created.id);
+          if (freshRegistry) {
+            (created as any).driveFolderIds = freshRegistry;
+          }
+        } catch (provErr) {
+          console.error(`[PackageService] Fallback provisioning error for package ${created.id}:`, provErr);
+        }
+      }
+
       createdList.push(created);
     }
 
