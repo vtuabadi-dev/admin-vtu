@@ -67,12 +67,17 @@ export async function POST(request: NextRequest) {
             try {
               const paketInfo = await prisma.keberangkatan.findUnique({ where: { id: reg.paketId } });
               if (paketInfo) {
+                const { generatePackageFolderName, getMonthFolderName } = await import("@/server/services/package-code.service");
                 const depDate = paketInfo.tanggalBerangkat ? new Date(paketInfo.tanggalBerangkat) : new Date();
                 const year = depDate.getFullYear();
-                const monthNum = String(depDate.getMonth() + 1).padStart(2, "0");
-                const monthNames = ["JANUARI", "FEBRUARI", "MARET", "APRIL", "MEI", "JUNI", "JULI", "AGUSTUS", "SEPTEMBER", "OKTOBER", "NOVEMBER", "DESEMBER"];
-                const monthName = `${monthNum} - ${monthNames[depDate.getMonth()]} ${year}`;
-                const packageName = (paketInfo.namaPaket || "PAKET REGULER").toUpperCase().trim();
+                const monthName = getMonthFolderName(depDate);
+                const packageName = generatePackageFolderName({
+                  startingPointCode: paketInfo.startingPointId || "JKT",
+                  tanggalBerangkat: depDate,
+                  durasiHari: paketInfo.durationDays || 12,
+                  packageTypeCode: paketInfo.packageTypeId || "REG",
+                  maskapaiCode: paketInfo.maskapai || "SV",
+                });
 
                 const folderRegistry = await createPackageFolderHierarchy(year, monthName, packageName);
                 targetFolderId = folderRegistry.pembayaran;

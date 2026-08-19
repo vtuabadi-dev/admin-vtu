@@ -80,12 +80,17 @@ export async function POST(request: NextRequest) {
         if (isGoogleDriveConfigured()) {
           try {
             const { createPackageFolderHierarchy } = await import("@/server/storage/google-drive");
+            const { generatePackageFolderName, getMonthFolderName } = await import("@/server/services/package-code.service");
             const depDate = paket?.tanggalBerangkat ? new Date(paket.tanggalBerangkat) : new Date();
             const year = depDate.getFullYear();
-            const monthNum = String(depDate.getMonth() + 1).padStart(2, "0");
-            const monthNames = ["JANUARI", "FEBRUARI", "MARET", "APRIL", "MEI", "JUNI", "JULI", "AGUSTUS", "SEPTEMBER", "OKTOBER", "NOVEMBER", "DESEMBER"];
-            const monthName = `${monthNum} - ${monthNames[depDate.getMonth()]} ${year}`;
-            const packageName = (paket?.namaPaket || "PAKET REGULER").toUpperCase().trim();
+            const monthName = getMonthFolderName(depDate);
+            const packageName = generatePackageFolderName({
+              startingPointCode: paket?.startingPointId || "JKT",
+              tanggalBerangkat: depDate,
+              durasiHari: paket?.durationDays || 12,
+              packageTypeCode: paket?.packageTypeId || "REG",
+              maskapaiCode: paket?.maskapai || "SV",
+            });
 
             const folderRegistry = await createPackageFolderHierarchy(year, monthName, packageName);
             signatureFolderId = folderRegistry.tandaTangan;
