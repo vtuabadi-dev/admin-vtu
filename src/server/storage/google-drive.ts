@@ -140,15 +140,27 @@ export async function createPackageFolderHierarchy(
   const monthId = await getOrCreateFolder(monthFolderName, yearId);
   const packageFolderId = await getOrCreateFolder(packageFolderName, monthId);
 
-  const paspor = await getOrCreateFolder("PASPOR", packageFolderId);
-  const ktp = await getOrCreateFolder("KTP", packageFolderId);
-  const foto = await getOrCreateFolder("FOTO", packageFolderId);
-  const pembayaran = await getOrCreateFolder("PEMBAYARAN", packageFolderId);
-  const tandaTangan = await getOrCreateFolder("TANDA TANGAN", packageFolderId);
-  const dokumenLain = await getOrCreateFolder("DOKUMEN LAIN", packageFolderId);
-  const manifest = await getOrCreateFolder("MANIFEST", packageFolderId);
-  const exportFolder = await getOrCreateFolder("EXPORT", packageFolderId);
-  const formulirPendaftaran = await getOrCreateFolder("FORMULIR PENDAFTARAN", packageFolderId);
+  const [
+    paspor,
+    ktp,
+    foto,
+    pembayaran,
+    tandaTangan,
+    dokumenLain,
+    manifest,
+    exportFolder,
+    formulirPendaftaran,
+  ] = await Promise.all([
+    getOrCreateFolder("PASPOR", packageFolderId),
+    getOrCreateFolder("KTP", packageFolderId),
+    getOrCreateFolder("FOTO", packageFolderId),
+    getOrCreateFolder("PEMBAYARAN", packageFolderId),
+    getOrCreateFolder("TANDA TANGAN", packageFolderId),
+    getOrCreateFolder("DOKUMEN LAIN", packageFolderId),
+    getOrCreateFolder("MANIFEST", packageFolderId),
+    getOrCreateFolder("EXPORT", packageFolderId),
+    getOrCreateFolder("FORMULIR PENDAFTARAN", packageFolderId),
+  ]);
 
   return {
     rootPackageFolderId: packageFolderId,
@@ -187,6 +199,28 @@ export async function provisionPackageStorage(packageId: string): Promise<DriveF
 
   console.log(`[Cloud Vault Provisioning COMPLETE] Package: "${packageName}" (ID: ${packageId}) - Folder IDs saved to DB.`);
   return folderRegistry;
+}
+
+export async function provisionAllUnprovisionedPackages(): Promise<{ total: number; provisioned: number }> {
+  if (!isGoogleDriveConfigured()) return { total: 0, provisioned: 0 };
+  const { prisma } = await import("@/server/db/client");
+  const allPackages = await prisma.keberangkatan.findMany({ select: { id: true, driveFolderIds: true } });
+  const unprovisioned = allPackages.filter((p) => {
+    if (!p.driveFolderIds) return true;
+    const meta = p.driveFolderIds as any;
+    return !meta.rootPackageFolderId || meta.rootPackageFolderId === "local-mock";
+  });
+
+  let provisionedCount = 0;
+  for (const paket of unprovisioned) {
+    try {
+      await provisionPackageStorage(paket.id);
+      provisionedCount++;
+    } catch (e) {
+      console.error(`[Cloud Vault] Failed auto-provisioning package ID ${paket.id}:`, e);
+    }
+  }
+  return { total: unprovisioned.length, provisioned: provisionedCount };
 }
 
 export async function getOrCreateFormulirPendaftaranDriveFolder(packageFolderId?: string): Promise<string | undefined> {
