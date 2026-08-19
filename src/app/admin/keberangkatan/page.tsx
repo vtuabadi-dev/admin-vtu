@@ -62,6 +62,8 @@ export default function KeberangkatanListPage() {
       setError(null);
       const data = await getKeberangkatanList();
       setKeberangkatan(data);
+      useOperationalStore.getState().setKeberangkatanList(data);
+      useOperationalStore.getState().setIsLoaded(true);
     } catch (err: any) {
       setError(err instanceof Error ? err : new Error("Database Connection Error"));
     } finally {
@@ -104,10 +106,10 @@ export default function KeberangkatanListPage() {
     if (storeIsLoaded) {
       setKeberangkatan(storeKbrList);
       setLoading(false);
-    } else {
-      load();
     }
-  }, [storeIsLoaded, storeKbrList]);
+    // Always trigger fresh server load to ensure newly generated packages appear instantly
+    load();
+  }, []);
 
   // Tutup popover ID Paket saat klik di luar
   useEffect(() => {
