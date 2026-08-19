@@ -560,6 +560,25 @@ export default function RegisterPage() {
     });
   }, [paxCount]);
 
+  // Auto-validate and filter available roomUpgrade selection based on paxCount
+  useEffect(() => {
+    if (paxCount === 1) {
+      if (roomUpgrade !== "mix") setRoomUpgrade("mix");
+    } else if (paxCount === 2) {
+      if (roomUpgrade === "quad" || roomUpgrade === "triple" || roomUpgrade.startsWith("combo") || roomUpgrade === "quinf") {
+        setRoomUpgrade("double");
+      }
+    } else if (paxCount === 3) {
+      if (roomUpgrade === "quad" || roomUpgrade.startsWith("combo") || roomUpgrade === "quinf") {
+        setRoomUpgrade("triple");
+      }
+    } else if (paxCount === 4) {
+      if (roomUpgrade.startsWith("combo") || roomUpgrade === "quinf") {
+        setRoomUpgrade("quad");
+      }
+    }
+  }, [paxCount, roomUpgrade]);
+
   // Auto-sync representative name to Jamaah #1 if toggle is active
   useEffect(() => {
     if (useRepAsJamaah1 && namaPerwakilan) {
@@ -1611,10 +1630,6 @@ export default function RegisterPage() {
                   const upgradeTriple = Number(activeCluster?.upgradeTriple || 1500000);
                   const upgradeDouble = Number(activeCluster?.upgradeDouble || 2500000);
 
-                  const roomSurcharge = roomUpgrade === "triple" ? upgradeTriple : roomUpgrade === "double" ? upgradeDouble : 0;
-                  const pricePerPax = basePrice + roomSurcharge;
-                  const totalPriceGroup = pricePerPax * paxCount;
-
                   return (
                     <div className="border border-blue-100 rounded-2xl p-5 bg-gradient-to-br from-blue-50/40 via-white to-slate-50 shadow-sm space-y-6">
                       {/* Header Info */}
@@ -1700,117 +1715,255 @@ export default function RegisterPage() {
                         </div>
                       )}
 
-                      {/* Room Upgrade Options */}
-                      <div className="space-y-3">
-                        <label className="block text-xs font-bold text-gray-800 uppercase tracking-wider">
-                          🛏️ Pilihan Upgrade Tipe Kamar
-                        </label>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
-                          {/* QUAD */}
-                          <button
-                            type="button"
-                            onClick={() => setRoomUpgrade("quad")}
-                            className={cn(
-                              "p-3 rounded-xl border-2 text-left transition-all flex flex-col justify-between gap-1.5",
-                              roomUpgrade === "quad"
-                                ? "border-blue-600 bg-blue-50/80 ring-1 ring-blue-500"
-                                : "border-gray-200 bg-white hover:border-gray-300"
-                            )}
-                          >
-                            <div className="flex items-center justify-between">
-                              <span className="font-bold text-xs text-gray-900">QUAD (4 Pax)</span>
-                              {roomUpgrade === "quad" && <Check className="w-3.5 h-3.5 text-blue-600" />}
-                            </div>
-                            <p className="text-[11px] text-gray-500">4 orang per kamar</p>
-                            <p className="text-xs font-bold text-emerald-700 mt-1">Base (+ Rp 0)</p>
-                          </button>
+                      {/* Room Upgrade Options - Dynamically Filtered by paxCount */}
+                      {(() => {
+                        const showQuad = paxCount >= 4;
+                        const showTriple = paxCount >= 3;
+                        const showDouble = paxCount >= 2;
+                        const showMix = true; // Always available
 
-                          {/* TRIPLE */}
-                          <button
-                            type="button"
-                            onClick={() => setRoomUpgrade("triple")}
-                            className={cn(
-                              "p-3 rounded-xl border-2 text-left transition-all flex flex-col justify-between gap-1.5",
-                              roomUpgrade === "triple"
-                                ? "border-blue-600 bg-blue-50/80 ring-1 ring-blue-500"
-                                : "border-gray-200 bg-white hover:border-gray-300"
-                            )}
-                          >
-                            <div className="flex items-center justify-between">
-                              <span className="font-bold text-xs text-gray-900">TRIPLE (3 Pax)</span>
-                              {roomUpgrade === "triple" && <Check className="w-3.5 h-3.5 text-blue-600" />}
-                            </div>
-                            <p className="text-[11px] text-gray-500">3 orang per kamar</p>
-                            <p className="text-xs font-bold text-blue-700 mt-1">
-                              + Rp {upgradeTriple.toLocaleString("id-ID")} / pax
-                            </p>
-                          </button>
+                        const hasInfant = members.some((m) => {
+                          const ageInfo = calculateAge(m.tanggalLahir);
+                          return ageInfo?.category === "Bayi" || (ageInfo?.age !== undefined && ageInfo.age < 2);
+                        });
 
-                          {/* DOUBLE */}
-                          <button
-                            type="button"
-                            onClick={() => setRoomUpgrade("double")}
-                            className={cn(
-                              "p-3 rounded-xl border-2 text-left transition-all flex flex-col justify-between gap-1.5",
-                              roomUpgrade === "double"
-                                ? "border-blue-600 bg-blue-50/80 ring-1 ring-blue-500"
-                                : "border-gray-200 bg-white hover:border-gray-300"
-                            )}
-                          >
-                            <div className="flex items-center justify-between">
-                              <span className="font-bold text-xs text-gray-900">DOUBLE (2 Pax)</span>
-                              {roomUpgrade === "double" && <Check className="w-3.5 h-3.5 text-blue-600" />}
-                            </div>
-                            <p className="text-[11px] text-gray-500">2 orang per kamar</p>
-                            <p className="text-xs font-bold text-blue-700 mt-1">
-                              + Rp {upgradeDouble.toLocaleString("id-ID")} / pax
-                            </p>
-                          </button>
+                        const roomSurcharge =
+                          roomUpgrade === "triple"
+                            ? upgradeTriple
+                            : roomUpgrade === "double"
+                            ? upgradeDouble
+                            : roomUpgrade === "combo_double_triple"
+                            ? Math.round((2 * upgradeDouble + 3 * upgradeTriple) / (paxCount || 5))
+                            : 0;
 
-                          {/* MIX */}
-                          <button
-                            type="button"
-                            onClick={() => setRoomUpgrade("mix")}
-                            className={cn(
-                              "p-3 rounded-xl border-2 text-left transition-all flex flex-col justify-between gap-1.5",
-                              roomUpgrade === "mix"
-                                ? "border-blue-600 bg-blue-50/80 ring-1 ring-blue-500"
-                                : "border-gray-200 bg-white hover:border-gray-300"
-                            )}
-                          >
-                            <div className="flex items-center justify-between">
-                              <span className="font-bold text-xs text-gray-900">MIX (Kamar Travel)</span>
-                              {roomUpgrade === "mix" && <Check className="w-3.5 h-3.5 text-blue-600" />}
-                            </div>
-                            <p className="text-[11px] text-gray-500">Diatur oleh travel</p>
-                            <p className="text-xs font-bold text-emerald-700 mt-1">Base (+ Rp 0)</p>
-                          </button>
-                        </div>
-                      </div>
+                        const pricePerPax = basePrice + roomSurcharge;
+                        const totalPriceGroup = pricePerPax * paxCount;
 
-                      {/* Pricing Summary Breakdown */}
-                      <div className="bg-slate-900 text-white rounded-xl p-4 space-y-2 text-xs shadow-inner">
-                        <div className="flex justify-between items-center text-slate-300">
-                          <span>Harga Base Paket ({isMultiCluster ? activeCluster?.clusterName : "Reguler"}):</span>
-                          <span>Rp {basePrice.toLocaleString("id-ID")} / pax</span>
-                        </div>
-                        {roomSurcharge > 0 && (
-                          <div className="flex justify-between items-center text-amber-300 font-medium">
-                            <span>Upgrade Kamar ({roomUpgrade.toUpperCase()}):</span>
-                            <span>+ Rp {roomSurcharge.toLocaleString("id-ID")} / pax</span>
+                        const visibleCardCount = (showQuad ? 1 : 0) + (showTriple ? 1 : 0) + (showDouble ? 1 : 0) + 1;
+                        const gridColsClass =
+                          visibleCardCount === 1
+                            ? "grid-cols-1 max-w-sm mx-auto"
+                            : visibleCardCount === 2
+                            ? "grid-cols-1 sm:grid-cols-2"
+                            : visibleCardCount === 3
+                            ? "grid-cols-1 sm:grid-cols-3"
+                            : "grid-cols-1 sm:grid-cols-2 md:grid-cols-4";
+
+                        return (
+                          <div className="space-y-4">
+                            <div className="space-y-3">
+                              <div className="flex justify-between items-center">
+                                <label className="block text-xs font-bold text-gray-800 uppercase tracking-wider">
+                                  🛏️ Pilihan Upgrade Tipe Kamar ({paxCount} Jamaah)
+                                </label>
+                                <span className="text-[11px] text-gray-500 font-medium">
+                                  {paxCount === 1
+                                    ? "Tipe Kamar Tunggal: MIX (Travel)"
+                                    : paxCount === 2
+                                    ? "Opsi 2 Jamaah: Double / Mix"
+                                    : paxCount === 3
+                                    ? "Opsi 3 Jamaah: Triple / Double / Mix"
+                                    : "Opsi 4+ Jamaah: Semua Tipe Kamar"}
+                                </span>
+                              </div>
+
+                              <div className={cn("grid gap-3", gridColsClass)}>
+                                {/* QUAD */}
+                                {showQuad && (
+                                  <button
+                                    type="button"
+                                    onClick={() => setRoomUpgrade("quad")}
+                                    className={cn(
+                                      "p-3 rounded-xl border-2 text-left transition-all flex flex-col justify-between gap-1.5",
+                                      roomUpgrade === "quad"
+                                        ? "border-blue-600 bg-blue-50/80 ring-1 ring-blue-500 shadow-sm"
+                                        : "border-gray-200 bg-white hover:border-gray-300"
+                                    )}
+                                  >
+                                    <div className="flex items-center justify-between">
+                                      <span className="font-bold text-xs text-gray-900">QUAD (4 Pax)</span>
+                                      {roomUpgrade === "quad" && <Check className="w-3.5 h-3.5 text-blue-600" />}
+                                    </div>
+                                    <p className="text-[11px] text-gray-500">4 orang per kamar</p>
+                                    <p className="text-xs font-bold text-emerald-700 mt-1">Base (+ Rp 0)</p>
+                                  </button>
+                                )}
+
+                                {/* TRIPLE */}
+                                {showTriple && (
+                                  <button
+                                    type="button"
+                                    onClick={() => setRoomUpgrade("triple")}
+                                    className={cn(
+                                      "p-3 rounded-xl border-2 text-left transition-all flex flex-col justify-between gap-1.5",
+                                      roomUpgrade === "triple"
+                                        ? "border-blue-600 bg-blue-50/80 ring-1 ring-blue-500 shadow-sm"
+                                        : "border-gray-200 bg-white hover:border-gray-300"
+                                    )}
+                                  >
+                                    <div className="flex items-center justify-between">
+                                      <span className="font-bold text-xs text-gray-900">TRIPLE (3 Pax)</span>
+                                      {roomUpgrade === "triple" && <Check className="w-3.5 h-3.5 text-blue-600" />}
+                                    </div>
+                                    <p className="text-[11px] text-gray-500">3 orang per kamar</p>
+                                    <p className="text-xs font-bold text-blue-700 mt-1">
+                                      + Rp {upgradeTriple.toLocaleString("id-ID")} / pax
+                                    </p>
+                                  </button>
+                                )}
+
+                                {/* DOUBLE */}
+                                {showDouble && (
+                                  <button
+                                    type="button"
+                                    onClick={() => setRoomUpgrade("double")}
+                                    className={cn(
+                                      "p-3 rounded-xl border-2 text-left transition-all flex flex-col justify-between gap-1.5",
+                                      roomUpgrade === "double"
+                                        ? "border-blue-600 bg-blue-50/80 ring-1 ring-blue-500 shadow-sm"
+                                        : "border-gray-200 bg-white hover:border-gray-300"
+                                    )}
+                                  >
+                                    <div className="flex items-center justify-between">
+                                      <span className="font-bold text-xs text-gray-900">DOUBLE (2 Pax)</span>
+                                      {roomUpgrade === "double" && <Check className="w-3.5 h-3.5 text-blue-600" />}
+                                    </div>
+                                    <p className="text-[11px] text-gray-500">2 orang per kamar</p>
+                                    <p className="text-xs font-bold text-blue-700 mt-1">
+                                      + Rp {upgradeDouble.toLocaleString("id-ID")} / pax
+                                    </p>
+                                  </button>
+                                )}
+
+                                {/* MIX */}
+                                {showMix && (
+                                  <button
+                                    type="button"
+                                    onClick={() => setRoomUpgrade("mix")}
+                                    className={cn(
+                                      "p-3 rounded-xl border-2 text-left transition-all flex flex-col justify-between gap-1.5",
+                                      roomUpgrade === "mix"
+                                        ? "border-blue-600 bg-blue-50/80 ring-1 ring-blue-500 shadow-sm"
+                                        : "border-gray-200 bg-white hover:border-gray-300"
+                                    )}
+                                  >
+                                    <div className="flex items-center justify-between">
+                                      <span className="font-bold text-xs text-gray-900">MIX (Kamar Travel)</span>
+                                      {roomUpgrade === "mix" && <Check className="w-3.5 h-3.5 text-blue-600" />}
+                                    </div>
+                                    <p className="text-[11px] text-gray-500">Diatur oleh travel</p>
+                                    <p className="text-xs font-bold text-emerald-700 mt-1">Base (+ Rp 0)</p>
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Multi-Room Options for 5+ Pax */}
+                            {paxCount >= 5 && (
+                              <div className="p-4 bg-gradient-to-r from-blue-50/80 via-slate-50 to-indigo-50/60 border border-blue-200 rounded-xl space-y-3 shadow-2xs">
+                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
+                                  <label className="block text-xs font-bold text-gray-800 uppercase tracking-wider flex items-center gap-1.5">
+                                    <span>🧩 Opsi Kombinasi Kamar Multi-Pax ({paxCount} Jamaah)</span>
+                                  </label>
+                                  {hasInfant && (
+                                    <span className="text-[11px] font-bold bg-amber-100 text-amber-900 border border-amber-300 px-2.5 py-0.5 rounded-full inline-flex items-center gap-1 shrink-0">
+                                      🍼 Terdeteksi Anggota Bayi / Infant
+                                    </span>
+                                  )}
+                                </div>
+
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                  {/* Combo Double + Triple */}
+                                  <button
+                                    type="button"
+                                    onClick={() => setRoomUpgrade("combo_double_triple")}
+                                    className={cn(
+                                      "p-3 rounded-xl border-2 text-left transition-all flex flex-col justify-between gap-1.5",
+                                      roomUpgrade === "combo_double_triple"
+                                        ? "border-blue-600 bg-blue-50/90 ring-1 ring-blue-500 shadow-sm"
+                                        : "border-gray-200 bg-white hover:border-gray-300"
+                                    )}
+                                  >
+                                    <div className="flex items-center justify-between">
+                                      <span className="font-bold text-xs text-gray-900">Upgrade Double + Triple</span>
+                                      {roomUpgrade === "combo_double_triple" && <Check className="w-3.5 h-3.5 text-blue-600" />}
+                                    </div>
+                                    <p className="text-[11px] text-gray-500">Kombinasi Kamar Double & Triple</p>
+                                    <p className="text-xs font-bold text-blue-700 mt-1">Kombinasi Upgrade</p>
+                                  </button>
+
+                                  {/* Combo Quad + Mix */}
+                                  <button
+                                    type="button"
+                                    onClick={() => setRoomUpgrade("combo_quad_mix")}
+                                    className={cn(
+                                      "p-3 rounded-xl border-2 text-left transition-all flex flex-col justify-between gap-1.5",
+                                      roomUpgrade === "combo_quad_mix"
+                                        ? "border-blue-600 bg-blue-50/90 ring-1 ring-blue-500 shadow-sm"
+                                        : "border-gray-200 bg-white hover:border-gray-300"
+                                    )}
+                                  >
+                                    <div className="flex items-center justify-between">
+                                      <span className="font-bold text-xs text-gray-900">Quad Family & Mix</span>
+                                      {roomUpgrade === "combo_quad_mix" && <Check className="w-3.5 h-3.5 text-blue-600" />}
+                                    </div>
+                                    <p className="text-[11px] text-gray-500">1 Kamar Quad + Sisa Kamar Mix</p>
+                                    <p className="text-xs font-bold text-emerald-700 mt-1">Base (+ Rp 0)</p>
+                                  </button>
+
+                                  {/* QUINF (Quad + Infant) */}
+                                  <button
+                                    type="button"
+                                    onClick={() => setRoomUpgrade("quinf")}
+                                    className={cn(
+                                      "p-3 rounded-xl border-2 text-left transition-all flex flex-col justify-between gap-1.5 relative overflow-hidden",
+                                      roomUpgrade === "quinf"
+                                        ? "border-amber-600 bg-amber-50/90 ring-1 ring-amber-500 shadow-sm"
+                                        : "border-gray-200 bg-white hover:border-gray-300"
+                                    )}
+                                  >
+                                    {hasInfant && (
+                                      <span className="absolute top-0 right-0 bg-amber-500 text-white text-[9px] font-extrabold px-2 py-0.5 rounded-bl">
+                                        Infant Recommended
+                                      </span>
+                                    )}
+                                    <div className="flex items-center justify-between">
+                                      <span className="font-bold text-xs text-amber-950">QUINF (Quad + Infant)</span>
+                                      {roomUpgrade === "quinf" && <Check className="w-3.5 h-3.5 text-amber-600" />}
+                                    </div>
+                                    <p className="text-[11px] text-gray-500">1 Kamar Quad (4 Dewasa + 1 Bayi)</p>
+                                    <p className="text-xs font-bold text-amber-800 mt-1">Khusus Rombongan Ada Infant</p>
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Pricing Summary Breakdown */}
+                            <div className="bg-slate-900 text-white rounded-xl p-4 space-y-2 text-xs shadow-inner">
+                              <div className="flex justify-between items-center text-slate-300">
+                                <span>Harga Base Paket ({isMultiCluster ? activeCluster?.clusterName : "Reguler"}):</span>
+                                <span>Rp {basePrice.toLocaleString("id-ID")} / pax</span>
+                              </div>
+                              {roomSurcharge > 0 && (
+                                <div className="flex justify-between items-center text-amber-300 font-medium">
+                                  <span>Upgrade Kamar ({roomUpgrade.toUpperCase().replace(/_/g, " ")}):</span>
+                                  <span>+ Rp {roomSurcharge.toLocaleString("id-ID")} / pax</span>
+                                </div>
+                              )}
+                              <div className="flex justify-between items-center text-slate-200 font-semibold pt-1 border-t border-slate-700">
+                                <span>Total per Pax:</span>
+                                <span>Rp {pricePerPax.toLocaleString("id-ID")} / pax</span>
+                              </div>
+                              <div className="flex justify-between items-center text-sm font-extrabold text-blue-400 pt-1.5 border-t border-slate-700">
+                                <span>Total Registrasi Rombongan ({paxCount} PAX):</span>
+                                <span className="text-base text-emerald-400">
+                                  Rp {totalPriceGroup.toLocaleString("id-ID")}
+                                </span>
+                              </div>
+                            </div>
                           </div>
-                        )}
-                        <div className="flex justify-between items-center text-slate-200 font-semibold pt-1 border-t border-slate-700">
-                          <span>Total per Pax:</span>
-                          <span>Rp {pricePerPax.toLocaleString("id-ID")} / pax</span>
-                        </div>
-                        <div className="flex justify-between items-center text-sm font-extrabold text-blue-400 pt-1.5 border-t border-slate-700">
-                          <span>Total Registrasi Rombongan ({paxCount} PAX):</span>
-                          <span className="text-base text-emerald-400">
-                            Rp {totalPriceGroup.toLocaleString("id-ID")}
-                          </span>
-                        </div>
-                      </div>
+                        );
+                      })()}
                     </div>
                   );
                 })()}
