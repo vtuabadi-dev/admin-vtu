@@ -13,6 +13,7 @@ import {
 import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X, Split, Layers } from "lucide-react";
 import { generateVtuGroupCode } from "@/shared/lib/group-code.helper";
 import { PairingCanvas } from "./components/PairingCanvas";
+import { useOperationalStore } from "@/stores/operational-store";
 
   interface MasterDataOptions {
     airlines: any[];
@@ -938,6 +939,10 @@ export default function GeneratePaketPage() {
         setOcrWarning("");
         setOcrSuccess(false);
         fetchExistingGroups();
+
+        // Invalidate operational store so newly generated packages appear instantly on /admin/keberangkatan
+        useOperationalStore.getState().setIsLoaded(false);
+        useOperationalStore.getState().loadAllData();
 
         scrollToTop();
       } else {
@@ -2275,6 +2280,10 @@ export default function GeneratePaketPage() {
                         date: p.childDate,
                       })),
                     });
+
+                    // Invalidate operational store so newly generated packages appear instantly on /admin/keberangkatan
+                    useOperationalStore.getState().setIsLoaded(false);
+                    useOperationalStore.getState().loadAllData();
                   } else {
                     alert(resJson.message || "Gagal menyimpan pasangan paket.");
                   }
