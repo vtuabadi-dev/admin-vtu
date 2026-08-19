@@ -182,36 +182,22 @@ export async function POST(request: NextRequest) {
         console.warn("[register] Local vault save failed:", vaultErr?.message || vaultErr);
       }
 
-      // Save to Google Drive if configured (OAuth2 User 200GB Storage)
+      // Save to Google Drive Cloud Vault V2 (Reads pre-provisioned Folder ID from DB - 0ms hierarchy lookup)
       try {
-        const { isGoogleDriveConfigured, getOrCreateFolder, createPackageFolderHierarchy } = await import("@/server/storage/google-drive");
+        const { isGoogleDriveConfigured } = await import("@/server/storage/google-drive");
         if (isGoogleDriveConfigured()) {
           const { getStorageAdapter } = await import("@/server/storage");
           const driveStorage = getStorageAdapter();
 
-          let targetFolderId: string | undefined = undefined;
-          if (paket) {
-            try {
-              const depDate = paket.tanggalBerangkat ? new Date(paket.tanggalBerangkat) : new Date();
-              const year = depDate.getFullYear();
-              const monthNum = String(depDate.getMonth() + 1).padStart(2, "0");
-              const monthNames = ["JANUARI", "FEBRUARI", "MARET", "APRIL", "MEI", "JUNI", "JULI", "AGUSTUS", "SEPTEMBER", "OKTOBER", "NOVEMBER", "DESEMBER"];
-              const monthName = `${monthNum} - ${monthNames[depDate.getMonth()]} ${year}`;
-              const packageName = (paket.namaPaket || "PAKET REGULER").toUpperCase().trim();
+          const driveFolders = (paket?.driveFolderIds as Record<string, string> | null) || null;
+          const targetFolderId = driveFolders?.formulirPendaftaran;
 
-              const folderRegistry = await createPackageFolderHierarchy(year, monthName, packageName);
-              targetFolderId = folderRegistry.formulirPendaftaran;
-            } catch (hErr) {
-              console.warn("[register] Package folder hierarchy warning, fallback to root FORMULIR PENDAFTARAN:", hErr);
-            }
+          if (targetFolderId) {
+            await driveStorage.upload(pdfFilename, pdfBuffer, "application/pdf", targetFolderId);
+            console.log(`[register] PDF formulir berhasil disimpan ke Cloud Vault: ${pdfFilename} (Folder ID: ${targetFolderId})`);
+          } else {
+            console.warn(`[register] Storage Notice: STORAGE_NOT_PROVISIONED. Package "${paket?.namaPaket || body.paketId}" lacks pre-provisioned formulirPendaftaran folder ID in DB.`);
           }
-
-          if (!targetFolderId) {
-            targetFolderId = await getOrCreateFolder("FORMULIR PENDAFTARAN");
-          }
-
-          await driveStorage.upload(pdfFilename, pdfBuffer, "application/pdf", targetFolderId);
-          console.log("[register] PDF formulir berhasil disimpan ke Google Drive:", pdfFilename, "Folder ID:", targetFolderId);
         } else {
           console.warn("[register] Google Drive belum dikonfigurasi di Vercel env (GOOGLE_DRIVE_FOLDER_ID, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REFRESH_TOKEN)");
         }

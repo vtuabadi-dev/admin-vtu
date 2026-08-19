@@ -164,6 +164,31 @@ export async function createPackageFolderHierarchy(
   };
 }
 
+export async function provisionPackageStorage(packageId: string): Promise<DriveFolderRegistry | undefined> {
+  if (!isGoogleDriveConfigured()) return undefined;
+  const { prisma } = await import("@/server/db/client");
+  const paket = await prisma.keberangkatan.findUnique({ where: { id: packageId } });
+  if (!paket) return undefined;
+
+  const depDate = paket.tanggalBerangkat ? new Date(paket.tanggalBerangkat) : new Date();
+  const year = depDate.getFullYear();
+  const monthNum = String(depDate.getMonth() + 1).padStart(2, "0");
+  const monthNames = ["JANUARI", "FEBRUARI", "MARET", "APRIL", "MEI", "JUNI", "JULI", "AGUSTUS", "SEPTEMBER", "OKTOBER", "NOVEMBER", "DESEMBER"];
+  const monthName = `${monthNum} - ${monthNames[depDate.getMonth()]} ${year}`;
+  const packageName = (paket.namaPaket || "PAKET REGULER").toUpperCase().trim();
+
+  console.log(`[Cloud Vault Provisioning START] Package: "${packageName}" (ID: ${packageId})`);
+  const folderRegistry = await createPackageFolderHierarchy(year, monthName, packageName);
+
+  await prisma.keberangkatan.update({
+    where: { id: packageId },
+    data: { driveFolderIds: folderRegistry as any },
+  });
+
+  console.log(`[Cloud Vault Provisioning COMPLETE] Package: "${packageName}" (ID: ${packageId}) - Folder IDs saved to DB.`);
+  return folderRegistry;
+}
+
 export async function getOrCreateFormulirPendaftaranDriveFolder(packageFolderId?: string): Promise<string | undefined> {
   if (!isGoogleDriveConfigured()) return undefined;
   try {

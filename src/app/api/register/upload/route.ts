@@ -66,16 +66,20 @@ export async function POST(request: NextRequest) {
     // Save file to storage — uses Google Drive if configured, local vault fallback
     const tempId = `tmp_${Date.now()}_${crypto.randomUUID().slice(0, 8)}`;
     const { getStorageAdapter } = await import("@/server/storage");
-    const { isGoogleDriveConfigured, getOrCreateFolder } = await import("@/server/storage/google-drive");
+    const { isGoogleDriveConfigured } = await import("@/server/storage/google-drive");
     const storage = getStorageAdapter();
     const storagePath = signaturePath(tempId);
 
     let targetFolderId: string | undefined = undefined;
+    const paketIdParam = formData.get("paketId") as string | null;
     if (isGoogleDriveConfigured()) {
-      try {
-        targetFolderId = await getOrCreateFolder("TANDA TANGAN");
-      } catch (folderErr) {
-        console.warn("[upload] Folder TANDA TANGAN creation warning:", folderErr);
+      if (paketIdParam) {
+        try {
+          const { prisma } = await import("@/server/db/client");
+          const paketInfo = await prisma.keberangkatan.findUnique({ where: { id: paketIdParam } });
+          const driveFolders = (paketInfo?.driveFolderIds as Record<string, string> | null) || null;
+          targetFolderId = driveFolders?.tandaTangan;
+        } catch { /* non-blocking */ }
       }
     }
 
