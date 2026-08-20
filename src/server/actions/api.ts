@@ -116,6 +116,33 @@ export async function getInvoiceList() {
   }) as any;
 }
 
+export async function createInvoice(data: {
+  groupId: string;
+  nomorInvoice?: string;
+  nominal: number;
+  jatuhTempo?: string;
+  catatan?: string;
+}) {
+  const nomorInvoice =
+    data.nomorInvoice ||
+    `INV-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${String(Math.floor(Math.random() * 9000) + 1000)}`;
+
+  const created = await prisma.invoice.create({
+    data: {
+      id: nomorInvoice,
+      groupId: data.groupId,
+      nomorInvoice,
+      tipe: "pelunasan",
+      jumlah: data.nominal,
+      sisaTagihan: data.nominal,
+      status: "unpaid",
+      jatuhTempo: data.jatuhTempo ? new Date(data.jatuhTempo) : new Date(Date.now() + 14 * 86400000),
+    },
+  });
+
+  return created;
+}
+
 export async function getPembayaranList() {
   return await prisma.pembayaran.findMany({
     orderBy: { createdAt: "desc" },
