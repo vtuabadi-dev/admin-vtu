@@ -295,6 +295,24 @@ export const packageService = {
       }
     }
 
+    // 5. Trigger Telegram Broadcast (Async Background Notification)
+    try {
+      const { sendPackageBroadcast } = await import("./telegram-broadcast.service");
+      await sendPackageBroadcast({
+        packages: createdList,
+        kodeGrup,
+        flyerBase64List: Array.isArray(data.flyerBase64List)
+          ? data.flyerBase64List
+          : data.flyerBase64
+          ? [data.flyerBase64]
+          : [],
+        startingPointCode: sCode,
+        startingPointName: startingPoint?.name,
+      });
+    } catch (telegramErr) {
+      console.error("[PackageService] Gagal mengirim Telegram broadcast:", telegramErr);
+    }
+
     return departureDates.length === 1 ? createdList[0] : createdList;
   },
 

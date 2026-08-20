@@ -7,6 +7,7 @@ import { Tabs } from "@/shared/components/ui/Tabs";
 import { Select } from "@/shared/components/ui/Select";
 import { Button } from "@/shared/components/ui/Button";
 import { OcrSettingsTab } from "./components/OcrSettingsTab";
+import { TelegramBroadcastTab } from "./components/TelegramBroadcastTab";
 
 // ── Settings section wrapper ──
 function SettingSection({ title, desc, children }: { title: string; desc?: string; children: React.ReactNode }) {
@@ -400,6 +401,7 @@ export default function PengaturanPage() {
             { value: "akun", label: "Profil & Akun" },
             { value: "sistem", label: "Preferensi Sistem" },
             { value: "notifikasi", label: "Notifikasi" },
+            { value: "broadcast", label: "Broadcast Telegram" },
             { value: "operasional", label: "Aturan Operasional" },
             { value: "ocr", label: "Integrasi OCR" },
             { value: "infra", label: "Infrastruktur" },
@@ -413,6 +415,8 @@ export default function PengaturanPage() {
                 return <PreferensiSistem />;
               case "notifikasi":
                 return <NotifikasiSettings />;
+              case "broadcast":
+                return <TelegramBroadcastTab />;
               case "operasional":
                 return <AturanOperasional />;
               case "ocr":

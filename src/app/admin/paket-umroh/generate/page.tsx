@@ -867,6 +867,21 @@ export default function GeneratePaketPage() {
       }
     }
 
+    const flyerBase64List = flyerFiles.length > 0
+      ? await (async () => {
+          const promises = flyerFiles.map((file) => {
+            return new Promise<string>((resolve) => {
+              const reader = new FileReader();
+              reader.onload = () => resolve(reader.result as string);
+              reader.onerror = () => resolve("");
+              reader.readAsDataURL(file);
+            });
+          });
+          const results = await Promise.all(promises);
+          return results.filter(Boolean);
+        })()
+      : [];
+
     const payload = {
       packageTypeId: formData.jenisPaketId,
       startingPointId: formData.startingPointId,
@@ -886,6 +901,7 @@ export default function GeneratePaketPage() {
       targetMaterialisasi: Number(formData.targetMaterialisasi || 30),
       isAdaKlaster: formData.isAdaKlaster,
       clusterConfigs: formData.isAdaKlaster === "ya" ? activeClusterConfigs : null,
+      flyerBase64List,
     };
 
     try {
@@ -2286,6 +2302,21 @@ export default function GeneratePaketPage() {
                   const childCityName = options?.cities.find(c => c.id === formData.startingPointId)?.name || "Surabaya";
                   const computedSplitLabel = splitType === "promo" ? (promoLabel || "PROMO SPECIAL") : childCityName;
 
+                  const flyerBase64List = flyerFiles.length > 0
+                    ? await (async () => {
+                        const promises = flyerFiles.map((file) => {
+                          return new Promise<string>((resolve) => {
+                            const reader = new FileReader();
+                            reader.onload = () => resolve(reader.result as string);
+                            reader.onerror = () => resolve("");
+                            reader.readAsDataURL(file);
+                          });
+                        });
+                        const results = await Promise.all(promises);
+                        return results.filter(Boolean);
+                      })()
+                    : [];
+
                   const payload = {
                     packageTypeId: formData.jenisPaketId,
                     startingPointId: formData.startingPointId,
@@ -2311,6 +2342,7 @@ export default function GeneratePaketPage() {
                     promoLabel: splitType === "promo" ? (promoLabel || "PROMO SPECIAL") : undefined,
                     kodeGrup: selectedParentGroup.kodeGrup,
                     pairedItems: pairs,
+                    flyerBase64List: flyerBase64List,
                   };
 
                   const res = await fetch("/api/keberangkatan", {
