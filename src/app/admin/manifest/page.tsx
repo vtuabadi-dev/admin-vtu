@@ -20,6 +20,7 @@ import {
   CheckCircle2,
   Trash2,
   ArrowRightLeft,
+  CheckSquare,
 } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/shared/components/ui/Card";
 import { Button } from "@/shared/components/ui/Button";
@@ -143,15 +144,21 @@ function ManifestPageContent() {
   const urlPaketId = searchParams.get("paketId") || "";
   const fromSource = searchParams.get("from") || "";
 
+  const storeKeberangkatan = useOperationalStore((s) => s.keberangkatanList);
+  const storeJamaah = useOperationalStore((s) => s.jamaahList);
+  const storeGroups = useOperationalStore((s) => s.groupList);
+  const setStoreKeberangkatan = useOperationalStore((s) => s.setKeberangkatanList);
+  const setStoreJamaah = useOperationalStore((s) => s.setJamaahList);
+  const setStoreGroups = useOperationalStore((s) => s.setGroupList);
+
   const [manifests, setManifests] = useState<Manifest[]>([]);
-  const [keberangkatanList, setKeberangkatanList] = useState<Keberangkatan[]>([]);
-  const [groups, setGroups] = useState<RegistrationGroup[]>([]);
-  const [allJamaah, setAllJamaah] = useState<Jamaah[]>([]);
+  const [keberangkatanList, setKeberangkatanList] = useState<Keberangkatan[]>(storeKeberangkatan);
+  const [groups, setGroups] = useState<RegistrationGroup[]>(storeGroups);
+  const [allJamaah, setAllJamaah] = useState<Jamaah[]>(storeJamaah);
   const [selectedKeberangkatan, setSelectedKeberangkatan] = useState<string>(urlPaketId);
   const [searchQuery, setSearchQuery] = useState<string>("");
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState<boolean>(storeKeberangkatan.length === 0);
   const [error, setError] = useState<Error | null>(null);
-
 
   // Excel Import Modal state
   const [importModalOpen, setImportModalOpen] = useState(false);
@@ -173,6 +180,7 @@ function ManifestPageContent() {
   const [isMoving, setIsMoving] = useState(false);
 
   // Multi-Select & Bulk Delete State
+  const [isSelectMode, setIsSelectMode] = useState<boolean>(false);
   const [selectedJamaahIds, setSelectedJamaahIds] = useState<string[]>([]);
   const [bulkDeleteModalOpen, setBulkDeleteModalOpen] = useState(false);
   const [bulkDeleteMode, setBulkDeleteMode] = useState<"soft" | "hard">("soft");
@@ -186,8 +194,20 @@ function ManifestPageContent() {
     }
   }, [urlPaketId]);
 
+  // Hydrate local state from store if store populates after mount
+  useEffect(() => {
+    if (storeKeberangkatan.length > 0 && keberangkatanList.length === 0) {
+      setKeberangkatanList(storeKeberangkatan);
+      setAllJamaah(storeJamaah);
+      setGroups(storeGroups);
+      setLoading(false);
+    }
+  }, [storeKeberangkatan, storeJamaah, storeGroups, keberangkatanList.length]);
+
   const loadAllData = useCallback(async () => {
-    setLoading(true);
+    if (storeKeberangkatan.length === 0 && keberangkatanList.length === 0) {
+      setLoading(true);
+    }
     setError(null);
     try {
       const [resMan, resKbr, resJam, resGrp] = await Promise.all([
@@ -206,16 +226,25 @@ function ManifestPageContent() {
       const jsonJam = await resJam.json();
       const jsonGrp = resGrp.ok ? await resGrp.json() : { data: [] };
 
+      const kbrData = jsonKbr.data ?? [];
+      const jamData = jsonJam.data ?? [];
+      const grpData = jsonGrp.data ?? [];
+
       setManifests(jsonMan.data ?? []);
-      setKeberangkatanList(jsonKbr.data ?? []);
-      setAllJamaah(jsonJam.data ?? []);
-      setGroups(jsonGrp.data ?? []);
+      setKeberangkatanList(kbrData);
+      setAllJamaah(jamData);
+      setGroups(grpData);
+
+      // Hydrate operational store for fast instant navigation
+      if (kbrData.length > 0) setStoreKeberangkatan(kbrData);
+      if (jamData.length > 0) setStoreJamaah(jamData);
+      if (grpData.length > 0) setStoreGroups(grpData);
     } catch (err: any) {
       setError(err instanceof Error ? err : new Error("Database Connection Error"));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [keberangkatanList.length, setStoreGroups, setStoreJamaah, setStoreKeberangkatan, storeKeberangkatan.length]);
 
   useEffect(() => {
     loadAllData();
@@ -667,443 +696,498 @@ function ManifestPageContent() {
       </Card>
 
       {/* ACTIVE PACKAGE HEADER & NOTION MASTER TABLE VIEW */}
-      {activePackage ? (
-        <div className="space-y-4">
-          {/* Active Package Banner Card */}
-          <Card variant="operational" className="bg-gradient-to-r from-stone-900 via-stone-850 to-stone-900 text-white border-stone-800 shadow-md">
-            <CardContent className="p-5">
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div className="space-y-1.5">
-                  <div className="flex items-center gap-2">
-                    <span className="bg-primary/20 text-primary border border-primary/30 text-[10px] font-bold px-2 py-0.5 rounded uppercase font-mono">
-                      {activePackage.kode}
-                    </span>
-                    <StatusBadge status={activePackage.status} />
+      {selectedKeberangkatan ? (
+        activePackage ? (
+          <div className="space-y-4">
+            {/* Active Package Banner Card */}
+            <Card variant="operational" className="bg-gradient-to-r from-stone-900 via-stone-850 to-stone-900 text-white border-stone-800 shadow-md">
+              <CardContent className="p-5">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                  <div className="space-y-1.5">
+                    <div className="flex items-center gap-2">
+                      <span className="bg-primary/20 text-primary border border-primary/30 text-[10px] font-bold px-2 py-0.5 rounded uppercase font-mono">
+                        {activePackage.kode}
+                      </span>
+                      <StatusBadge status={activePackage.status} />
+                    </div>
+                    <h2 className="text-xl font-bold tracking-tight text-amber-400">
+                      {activePackage.namaPaket || activePackage.paketUmroh?.namaPaket || "PAKET UMROH"}
+                    </h2>
+                    <div className="flex flex-wrap items-center gap-4 text-xs text-stone-300 pt-1">
+                      <span className="flex items-center gap-1.5">
+                        <CalendarDays className="h-3.5 w-3.5 text-amber-400" />
+                        Berangkat: <strong className="text-white">{formatDate(activePackage.tanggalBerangkat)}</strong>
+                      </span>
+                      <span className="text-stone-600">•</span>
+                      <span className="flex items-center gap-1.5">
+                        <CalendarDays className="h-3.5 w-3.5 text-amber-400" />
+                        Pulang: <strong className="text-white">{formatDate(activePackage.tanggalPulang)}</strong>
+                      </span>
+                      <span className="text-stone-600">•</span>
+                      <span className="flex items-center gap-1.5">
+                        <Plane className="h-3.5 w-3.5 text-amber-400" />
+                        Maskapai: <strong className="text-white">{activePackage.maskapai || "Saudia Airlines"}</strong>
+                      </span>
+                    </div>
                   </div>
-                  <h2 className="text-xl font-bold tracking-tight text-amber-400">
-                    {activePackage.namaPaket || activePackage.paketUmroh?.namaPaket || "PAKET UMROH"}
-                  </h2>
-                  <div className="flex flex-wrap items-center gap-4 text-xs text-stone-300 pt-1">
-                    <span className="flex items-center gap-1.5">
-                      <CalendarDays className="h-3.5 w-3.5 text-amber-400" />
-                      Berangkat: <strong className="text-white">{formatDate(activePackage.tanggalBerangkat)}</strong>
-                    </span>
-                    <span className="text-stone-600">•</span>
-                    <span className="flex items-center gap-1.5">
-                      <CalendarDays className="h-3.5 w-3.5 text-amber-400" />
-                      Pulang: <strong className="text-white">{formatDate(activePackage.tanggalPulang)}</strong>
-                    </span>
-                    <span className="text-stone-600">•</span>
-                    <span className="flex items-center gap-1.5">
-                      <Plane className="h-3.5 w-3.5 text-amber-400" />
-                      Maskapai: <strong className="text-white">{activePackage.maskapai || "Saudia Airlines"}</strong>
-                    </span>
+
+                  <div className="flex items-center gap-3 bg-stone-800/80 border border-stone-700/60 rounded-xl p-3 shrink-0">
+                    <div className="text-center px-3 border-r border-stone-700">
+                      <p className="text-[10px] text-stone-400 font-semibold uppercase">Total Pax</p>
+                      <p className="text-xl font-bold text-white">{activePackageJamaah.length}</p>
+                    </div>
+                    <div className="text-center px-3 border-r border-stone-700">
+                      <p className="text-[10px] text-stone-400 font-semibold uppercase">Rombongan</p>
+                      <p className="text-xl font-bold text-amber-400">{groupedJamaahList.length}</p>
+                    </div>
+                    <div className="text-center px-3">
+                      <p className="text-[10px] text-stone-400 font-semibold uppercase">Kuota Seat</p>
+                      <p className="text-xl font-bold text-emerald-400">
+                        {activePackage.terisi}/{activePackage.maxSeat || activePackage.kuota || 45}
+                      </p>
+                    </div>
                   </div>
                 </div>
+              </CardContent>
+            </Card>
 
-                <div className="flex items-center gap-3 bg-stone-800/80 border border-stone-700/60 rounded-xl p-3 shrink-0">
-                  <div className="text-center px-3 border-r border-stone-700">
-                    <p className="text-[10px] text-stone-400 font-semibold uppercase">Total Pax</p>
-                    <p className="text-xl font-bold text-white">{activePackageJamaah.length}</p>
-                  </div>
-                  <div className="text-center px-3 border-r border-stone-700">
-                    <p className="text-[10px] text-stone-400 font-semibold uppercase">Rombongan</p>
-                    <p className="text-xl font-bold text-amber-400">{groupedJamaahList.length}</p>
-                  </div>
-                  <div className="text-center px-3">
-                    <p className="text-[10px] text-stone-400 font-semibold uppercase">Kuota Seat</p>
-                    <p className="text-xl font-bold text-emerald-400">
-                      {activePackage.terisi}/{activePackage.maxSeat || activePackage.kuota || 45}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+            {/* NOTION-STYLE MASTER TABLE */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between px-1">
+                <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                  <Sparkles className="h-3.5 w-3.5 text-amber-500" />
+                  Data Jamaah Manifest Paket ({filteredActiveJamaah.length} Pax)
+                </p>
+                <div className="flex items-center gap-3">
+                  {/* Select Mode / Multi Delete Button */}
+                  {isSelectMode ? (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-7 text-xs border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/40 text-amber-900 dark:text-amber-200"
+                      onClick={() => {
+                        setIsSelectMode(false);
+                        setSelectedJamaahIds([]);
+                      }}
+                    >
+                      <X className="mr-1 h-3.5 w-3.5" />
+                      Selesai Pilih
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-7 text-xs border-stone-300 dark:border-stone-700 text-stone-700 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800"
+                      onClick={() => setIsSelectMode(true)}
+                    >
+                      <CheckSquare className="mr-1 h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+                      Pilih / Hapus Banyak
+                    </Button>
+                  )}
 
-          {/* NOTION-STYLE MASTER TABLE */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between px-1">
-              <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                <Sparkles className="h-3.5 w-3.5 text-amber-500" />
-                Data Jamaah Manifest Paket ({filteredActiveJamaah.length} Pax)
-              </p>
-              <div className="flex items-center gap-3">
-                <Button
-                  variant="link"
-                  size="sm"
-                  className="text-xs text-emerald-600 dark:text-emerald-400 h-auto p-0 hover:underline"
-                  onClick={() => {
-                    setExcelFile(null);
-                    setExcelPreviewRows([]);
-                    setImportModalOpen(true);
-                  }}
-                >
-                  <FileSpreadsheet className="mr-1 h-3.5 w-3.5" />
-                  + Import Excel ke Paket Ini
-                </Button>
-                <span className="text-[11px] text-muted-foreground italic">
-                  * Single Source of Truth: Nama Paspor &gt; KTP &gt; Registrasi Awal
-                </span>
-              </div>
-            </div>
-
-            {/* Floating Bulk Action Bar */}
-            {selectedJamaahIds.length > 0 && (
-              <div className="flex items-center justify-between p-3.5 bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-700/60 rounded-xl shadow-sm animate-in fade-in-0 duration-200">
-                <div className="flex items-center gap-2.5 text-amber-900 dark:text-amber-200 text-xs font-bold">
-                  <span className="bg-amber-600 text-white rounded-full min-w-[22px] h-5 px-1.5 flex items-center justify-center text-[11px] font-extrabold shadow-xs">
-                    {selectedJamaahIds.length}
-                  </span>
-                  <span>Jamaah Terpilih (Termasuk Seluruh Anggota Rombongan)</span>
-                </div>
-                <div className="flex items-center gap-2">
                   <Button
-                    variant="ghost"
+                    variant="link"
                     size="sm"
-                    className="h-8 text-xs text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-white"
-                    onClick={() => setSelectedJamaahIds([])}
-                  >
-                    Batal Pilih
-                  </Button>
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    className="h-8 text-xs font-bold bg-red-600 hover:bg-red-700 text-white flex items-center gap-1.5 shadow-sm"
+                    className="text-xs text-emerald-600 dark:text-emerald-400 h-auto p-0 hover:underline"
                     onClick={() => {
-                      setBulkDeleteMode("soft");
-                      setBulkDeleteConfirmText("");
-                      setBulkDeleteModalOpen(true);
+                      setExcelFile(null);
+                      setExcelPreviewRows([]);
+                      setImportModalOpen(true);
                     }}
                   >
-                    <Trash2 className="h-3.5 w-3.5" />
-                    Hapus {selectedJamaahIds.length} Jamaah Terpilih
+                    <FileSpreadsheet className="mr-1 h-3.5 w-3.5" />
+                    + Import Excel ke Paket Ini
                   </Button>
+                  <span className="text-[11px] text-muted-foreground italic">
+                    * Single Source of Truth: Nama Paspor &gt; KTP &gt; Registrasi Awal
+                  </span>
                 </div>
               </div>
-            )}
 
-            <div className="rounded-xl border border-stone-200 dark:border-stone-800 bg-card shadow-sm overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full border-collapse text-left text-xs font-medium">
-                  <thead className="bg-stone-100/90 dark:bg-stone-900/90 border-b border-stone-200 dark:border-stone-800 sticky top-0 z-10 backdrop-blur-xs">
-                    <tr>
-                      <th className="px-2 py-3 font-bold uppercase tracking-wider text-[10px] text-stone-700 dark:text-stone-300 border-r border-stone-200/70 dark:border-stone-800/70 w-10 text-center sticky left-0 bg-stone-100/90 dark:bg-stone-900/90 z-20">
-                        <input
-                          type="checkbox"
-                          className="h-4 w-4 rounded border-stone-300 text-amber-600 focus:ring-amber-500 cursor-pointer"
-                          checked={isAllSelected}
-                          onChange={toggleSelectAll}
-                          title={isAllSelected ? "Batal Pilih Semua" : "Pilih Semua Jamaah"}
-                        />
-                      </th>
-                      <th className="px-3 py-3 font-bold uppercase tracking-wider text-[10px] text-stone-700 dark:text-stone-300 border-r border-stone-200/70 dark:border-stone-800/70 min-w-[200px]">
-                        KELUARGA / ROMBONGAN
-                      </th>
-                      <th className="px-2 py-3 font-bold uppercase tracking-wider text-[10px] text-stone-700 dark:text-stone-300 border-r border-stone-200/70 dark:border-stone-800/70 w-16 text-center">
-                        NO JAMAAH
-                      </th>
-                      <th className="px-3 py-3 font-bold uppercase tracking-wider text-[10px] text-stone-700 dark:text-stone-300 border-r border-stone-200/70 dark:border-stone-800/70 min-w-[100px]">
-                        ID REGISTER
-                      </th>
-                      <th className="px-3 py-3 font-bold uppercase tracking-wider text-[10px] text-stone-700 dark:text-stone-300 border-r border-stone-200/70 dark:border-stone-800/70 min-w-[130px]">
-                        NO ID (*)
-                      </th>
-                      <th className="px-3 py-3 font-bold uppercase tracking-wider text-[10px] text-stone-700 dark:text-stone-300 border-r border-stone-200/70 dark:border-stone-800/70 w-24">
-                        JENIS IDENTITAS (*)
-                      </th>
-                      <th className="px-3 py-3 font-bold uppercase tracking-wider text-[10px] text-stone-700 dark:text-stone-300 border-r border-stone-200/70 dark:border-stone-800/70 min-w-[170px]">
-                        NAMA
-                      </th>
-                      <th className="px-3 py-3 font-bold uppercase tracking-wider text-[10px] text-stone-700 dark:text-stone-300 border-r border-stone-200/70 dark:border-stone-800/70 min-w-[130px]">
-                        NO PASPOR
-                      </th>
-                      <th className="px-3 py-3 font-bold uppercase tracking-wider text-[10px] text-stone-700 dark:text-stone-300 border-r border-stone-200/70 dark:border-stone-800/70 min-w-[130px]">
-                        TGL DIKELUARKAN
-                      </th>
-                      <th className="px-3 py-3 font-bold uppercase tracking-wider text-[10px] text-stone-700 dark:text-stone-300 border-r border-stone-200/70 dark:border-stone-800/70 min-w-[130px]">
-                        TGL HABIS
-                      </th>
-                      <th className="px-3 py-3 font-bold uppercase tracking-wider text-[10px] text-stone-700 dark:text-stone-300 border-r border-stone-200/70 dark:border-stone-800/70 min-w-[130px]">
-                        KOTA PASPOR
-                      </th>
-                      <th className="px-3 py-3 font-bold uppercase tracking-wider text-[10px] text-stone-700 dark:text-stone-300 border-r border-stone-200/70 dark:border-stone-800/70 min-w-[130px]">
-                        HOTEL MAKKAH
-                      </th>
-                      <th className="px-3 py-3 font-bold uppercase tracking-wider text-[10px] text-stone-700 dark:text-stone-300 border-r border-stone-200/70 dark:border-stone-800/70 min-w-[130px]">
-                        HOTEL MADINAH
-                      </th>
-                      <th className="px-3 py-3 font-bold uppercase tracking-wider text-[10px] text-stone-700 dark:text-stone-300 border-r border-stone-200/70 dark:border-stone-800/70 min-w-[120px]">
-                        KAMAR
-                      </th>
-                      <th className="px-2 py-3 font-bold uppercase tracking-wider text-[10px] text-stone-700 dark:text-stone-300 border-r border-stone-200/70 dark:border-stone-800/70 w-12 text-center">
-                        JK (*)
-                      </th>
-                      <th className="px-3 py-3 font-bold uppercase tracking-wider text-[10px] text-stone-700 dark:text-stone-300 border-r border-stone-200/70 dark:border-stone-800/70">
-                        TEMPAT LAHIR (*)
-                      </th>
-                      <th className="px-3 py-3 font-bold uppercase tracking-wider text-[10px] text-stone-700 dark:text-stone-300 border-r border-stone-200/70 dark:border-stone-800/70 w-24">
-                        TGL LAHIR (*)
-                      </th>
-                      <th className="px-2 py-3 font-bold uppercase tracking-wider text-[10px] text-stone-700 dark:text-stone-300 border-r border-stone-200/70 dark:border-stone-800/70 w-14 text-center">
-                        UMUR
-                      </th>
-                      <th className="px-3 py-3 font-bold uppercase tracking-wider text-[10px] text-stone-700 dark:text-stone-300 border-r border-stone-200/70 dark:border-stone-800/70">
-                        STATUS MENIKAH
-                      </th>
-                      <th className="px-3 py-3 font-bold uppercase tracking-wider text-[10px] text-stone-700 dark:text-stone-300 border-r border-stone-200/70 dark:border-stone-800/70 min-w-[110px]">
-                        NO TELP/HP
-                      </th>
-                      <th className="px-3 py-3 font-bold uppercase tracking-wider text-[10px] text-stone-700 dark:text-stone-300 border-r border-stone-200/70 dark:border-stone-800/70 min-w-[140px]">
-                        KOTA/KAB (*)
-                      </th>
-                      <th className="px-3 py-3 font-bold uppercase tracking-wider text-[10px] text-stone-700 dark:text-stone-300 border-r border-stone-200/70 dark:border-stone-800/70 w-28">
-                        PROVINSI (*)
-                      </th>
-                      <th className="px-3 py-3 font-bold uppercase tracking-wider text-[10px] text-stone-700 dark:text-stone-300 min-w-[200px] border-r border-stone-200/70 dark:border-stone-800/70">
-                        ALAMAT
-                      </th>
-                      <th className="px-3 py-3 font-bold uppercase tracking-wider text-[10px] text-stone-700 dark:text-stone-300 w-24 text-center sticky right-0 bg-stone-100/90 dark:bg-stone-900/90 shadow-[-4px_0_6px_-4px_rgba(0,0,0,0.1)]">
-                        AKSI
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-stone-200/60 dark:divide-stone-800/60">
-                    {filteredActiveJamaah.length === 0 ? (
+              {/* Floating Bulk Action Bar */}
+              {isSelectMode && selectedJamaahIds.length > 0 && (
+                <div className="flex items-center justify-between p-3.5 bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-700/60 rounded-xl shadow-sm animate-in fade-in-0 duration-200">
+                  <div className="flex items-center gap-2.5 text-amber-900 dark:text-amber-200 text-xs font-bold">
+                    <span className="bg-amber-600 text-white rounded-full min-w-[22px] h-5 px-1.5 flex items-center justify-center text-[11px] font-extrabold shadow-xs">
+                      {selectedJamaahIds.length}
+                    </span>
+                    <span>Jamaah Terpilih (Termasuk Seluruh Anggota Rombongan)</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 text-xs text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-white"
+                      onClick={() => setSelectedJamaahIds([])}
+                    >
+                      Batal Pilih
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      className="h-8 text-xs font-bold bg-red-600 hover:bg-red-700 text-white flex items-center gap-1.5 shadow-sm"
+                      onClick={() => {
+                        setBulkDeleteMode("soft");
+                        setBulkDeleteConfirmText("");
+                        setBulkDeleteModalOpen(true);
+                      }}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                      Hapus {selectedJamaahIds.length} Jamaah Terpilih
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              <div className="rounded-xl border border-stone-200 dark:border-stone-800 bg-card shadow-sm overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse text-left text-xs font-medium">
+                    <thead className="bg-stone-100/90 dark:bg-stone-900/90 border-b border-stone-200 dark:border-stone-800 sticky top-0 z-10 backdrop-blur-xs">
                       <tr>
-                        <td colSpan={22} className="px-4 py-12 text-center text-stone-500">
-                          <div className="space-y-3">
-                            <p>Belum ada data jamaah terdaftar pada paket ini.</p>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => {
-                                setExcelFile(null);
-                                setExcelPreviewRows([]);
-                                setImportModalOpen(true);
-                              }}
-                            >
-                              <FileSpreadsheet className="mr-2 h-4 w-4 text-emerald-600" />
-                              Import Data Jamaah dari File Excel
-                            </Button>
-                          </div>
-                        </td>
+                        {isSelectMode && (
+                          <th className="px-2 py-3 font-bold uppercase tracking-wider text-[10px] text-stone-700 dark:text-stone-300 border-r border-stone-200/70 dark:border-stone-800/70 w-10 text-center sticky left-0 bg-stone-100/90 dark:bg-stone-900/90 z-20">
+                            <input
+                              type="checkbox"
+                              className="h-4 w-4 rounded border-stone-300 text-amber-600 focus:ring-amber-500 cursor-pointer"
+                              checked={isAllSelected}
+                              onChange={toggleSelectAll}
+                              title={isAllSelected ? "Batal Pilih Semua" : "Pilih Semua Jamaah"}
+                            />
+                          </th>
+                        )}
+                        <th className="px-3 py-3 font-bold uppercase tracking-wider text-[10px] text-stone-700 dark:text-stone-300 border-r border-stone-200/70 dark:border-stone-800/70 min-w-[200px]">
+                          KELUARGA / ROMBONGAN
+                        </th>
+                        <th className="px-2 py-3 font-bold uppercase tracking-wider text-[10px] text-stone-700 dark:text-stone-300 border-r border-stone-200/70 dark:border-stone-800/70 w-16 text-center">
+                          NO JAMAAH
+                        </th>
+                        <th className="px-3 py-3 font-bold uppercase tracking-wider text-[10px] text-stone-700 dark:text-stone-300 border-r border-stone-200/70 dark:border-stone-800/70 min-w-[100px]">
+                          ID REGISTER
+                        </th>
+                        <th className="px-3 py-3 font-bold uppercase tracking-wider text-[10px] text-stone-700 dark:text-stone-300 border-r border-stone-200/70 dark:border-stone-800/70 min-w-[130px]">
+                          NO ID (*)
+                        </th>
+                        <th className="px-3 py-3 font-bold uppercase tracking-wider text-[10px] text-stone-700 dark:text-stone-300 border-r border-stone-200/70 dark:border-stone-800/70 w-24">
+                          JENIS IDENTITAS (*)
+                        </th>
+                        <th className="px-3 py-3 font-bold uppercase tracking-wider text-[10px] text-stone-700 dark:text-stone-300 border-r border-stone-200/70 dark:border-stone-800/70 min-w-[170px]">
+                          NAMA
+                        </th>
+                        <th className="px-3 py-3 font-bold uppercase tracking-wider text-[10px] text-stone-700 dark:text-stone-300 border-r border-stone-200/70 dark:border-stone-800/70 min-w-[130px]">
+                          NO PASPOR
+                        </th>
+                        <th className="px-3 py-3 font-bold uppercase tracking-wider text-[10px] text-stone-700 dark:text-stone-300 border-r border-stone-200/70 dark:border-stone-800/70 min-w-[130px]">
+                          TGL DIKELUARKAN
+                        </th>
+                        <th className="px-3 py-3 font-bold uppercase tracking-wider text-[10px] text-stone-700 dark:text-stone-300 border-r border-stone-200/70 dark:border-stone-800/70 min-w-[130px]">
+                          TGL HABIS
+                        </th>
+                        <th className="px-3 py-3 font-bold uppercase tracking-wider text-[10px] text-stone-700 dark:text-stone-300 border-r border-stone-200/70 dark:border-stone-800/70 min-w-[130px]">
+                          KOTA PASPOR
+                        </th>
+                        <th className="px-3 py-3 font-bold uppercase tracking-wider text-[10px] text-stone-700 dark:text-stone-300 border-r border-stone-200/70 dark:border-stone-800/70 min-w-[130px]">
+                          HOTEL MAKKAH
+                        </th>
+                        <th className="px-3 py-3 font-bold uppercase tracking-wider text-[10px] text-stone-700 dark:text-stone-300 border-r border-stone-200/70 dark:border-stone-800/70 min-w-[130px]">
+                          HOTEL MADINAH
+                        </th>
+                        <th className="px-3 py-3 font-bold uppercase tracking-wider text-[10px] text-stone-700 dark:text-stone-300 border-r border-stone-200/70 dark:border-stone-800/70 min-w-[120px]">
+                          KAMAR
+                        </th>
+                        <th className="px-2 py-3 font-bold uppercase tracking-wider text-[10px] text-stone-700 dark:text-stone-300 border-r border-stone-200/70 dark:border-stone-800/70 w-12 text-center">
+                          JK (*)
+                        </th>
+                        <th className="px-3 py-3 font-bold uppercase tracking-wider text-[10px] text-stone-700 dark:text-stone-300 border-r border-stone-200/70 dark:border-stone-800/70">
+                          TEMPAT LAHIR (*)
+                        </th>
+                        <th className="px-3 py-3 font-bold uppercase tracking-wider text-[10px] text-stone-700 dark:text-stone-300 border-r border-stone-200/70 dark:border-stone-800/70 w-24">
+                          TGL LAHIR (*)
+                        </th>
+                        <th className="px-2 py-3 font-bold uppercase tracking-wider text-[10px] text-stone-700 dark:text-stone-300 border-r border-stone-200/70 dark:border-stone-800/70 w-14 text-center">
+                          UMUR
+                        </th>
+                        <th className="px-3 py-3 font-bold uppercase tracking-wider text-[10px] text-stone-700 dark:text-stone-300 border-r border-stone-200/70 dark:border-stone-800/70">
+                          STATUS MENIKAH
+                        </th>
+                        <th className="px-3 py-3 font-bold uppercase tracking-wider text-[10px] text-stone-700 dark:text-stone-300 border-r border-stone-200/70 dark:border-stone-800/70 min-w-[110px]">
+                          NO TELP/HP
+                        </th>
+                        <th className="px-3 py-3 font-bold uppercase tracking-wider text-[10px] text-stone-700 dark:text-stone-300 border-r border-stone-200/70 dark:border-stone-800/70 min-w-[140px]">
+                          KOTA/KAB (*)
+                        </th>
+                        <th className="px-3 py-3 font-bold uppercase tracking-wider text-[10px] text-stone-700 dark:text-stone-300 border-r border-stone-200/70 dark:border-stone-800/70 w-28">
+                          PROVINSI (*)
+                        </th>
+                        <th className="px-3 py-3 font-bold uppercase tracking-wider text-[10px] text-stone-700 dark:text-stone-300 min-w-[200px] border-r border-stone-200/70 dark:border-stone-800/70">
+                          ALAMAT
+                        </th>
+                        <th className="px-3 py-3 font-bold uppercase tracking-wider text-[10px] text-stone-700 dark:text-stone-300 w-24 text-center sticky right-0 bg-stone-100/90 dark:bg-stone-900/90 shadow-[-4px_0_6px_-4px_rgba(0,0,0,0.1)]">
+                          AKSI
+                        </th>
                       </tr>
-                    ) : (
-                      groupedJamaahList.map((group) => {
-                        const groupMergeText = formatGroupMergeLabel(group.groupObj, group.members);
-                        const totalInGroup = group.members.length;
-
-                        return group.members.map((j: any, memberIdx) => {
-                          const currentNoJamaah = globalNoJamaahCounter++;
-                          const isFirstInGroup = memberIdx === 0;
-
-                          // Single Source of Truth Name & Paspor Resolution
-                          const namaSot = getSingleSourceOfTruthName(j);
-                          const pasporInfo = getPasporDetails(j);
-
-                          // Flexible ID Resolution
-                          const hasPaspor = Boolean(pasporInfo.noPaspor && pasporInfo.noPaspor !== "-");
-                          const noId = hasPaspor ? pasporInfo.noPaspor : j.nik || "-";
-                          const jenisIdentitas = hasPaspor ? "PASPOR" : j.nik ? "KTP" : "-";
-
-                          // ID Register Format
-                          const baseCode = group.groupObj?.kodeRegistrasi || j.registrationId || j.groupId || "2980";
-                          const idRegister = formatIdRegister(baseCode, memberIdx, totalInGroup);
-
-                          const tipeKamarDisplay = j.tipeKamar || (group.groupObj as any)?.roomUpgrade || "Upgrade Double";
-                          const statusMenikahDisplay = j.statusMenikah || "Belum Menikah";
-                          const kotaDisplay = j.kota || "JAKARTA SELATAN";
-                          const provinsiDisplay = j.provinsi && j.provinsi !== "-" ? j.provinsi : deriveProvinsi(j.provinsi, j.kota);
-
-                          return (
-                            <tr
-                              key={j.id}
-                              className={`hover:bg-amber-50/40 dark:hover:bg-amber-950/20 transition-colors ${
-                                selectedJamaahIds.includes(j.id) ? "bg-amber-50/60 dark:bg-amber-950/30 font-semibold" : ""
-                              }`}
-                            >
-                              {/* CHECKBOX COL */}
-                              <td className="px-2 py-2.5 text-center border-r border-stone-200/50 dark:border-stone-800/50 sticky left-0 bg-white/90 dark:bg-card/90 z-10">
-                                <input
-                                  type="checkbox"
-                                  className="h-4 w-4 rounded border-stone-300 text-amber-600 focus:ring-amber-500 cursor-pointer"
-                                  checked={selectedJamaahIds.includes(j.id)}
-                                  onChange={() => toggleSelectRow(j.id)}
-                                  title="Mencentang jamaah ini akan memilih seluruh anggota rombongan"
-                                />
-                              </td>
-
-                              {/* MERGED CELL: KELUARGA/ROMBONGAN */}
-                              {isFirstInGroup && (
-                                <td
-                                  rowSpan={totalInGroup}
-                                  className="p-3 text-center align-middle font-bold text-[11px] bg-amber-50/80 dark:bg-amber-950/30 text-amber-950 dark:text-amber-200 border-r-2 border-r-amber-400 dark:border-r-amber-700 border-b border-stone-200 dark:border-stone-800 shadow-xs"
-                                >
-                                  <span>{groupMergeText}</span>
-                                </td>
-                              )}
-
-                              {/* NO JAMAAH */}
-                              <td className="px-2 py-2.5 text-center font-bold font-mono text-stone-700 dark:text-stone-300 border-r border-stone-200/50 dark:border-stone-800/50">
-                                {currentNoJamaah}
-                              </td>
-
-                              {/* ID REGISTER */}
-                              <td className="px-3 py-2.5 font-mono font-semibold text-stone-800 dark:text-stone-200 border-r border-stone-200/50 dark:border-stone-800/50">
-                                {idRegister}
-                              </td>
-
-                              {/* NO ID */}
-                              <td className="px-3 py-2.5 font-mono text-stone-700 dark:text-stone-300 border-r border-stone-200/50 dark:border-stone-800/50">
-                                {noId}
-                              </td>
-
-                              {/* JENIS IDENTITAS */}
-                              <td className="px-3 py-2.5 border-r border-stone-200/50 dark:border-stone-800/50">
-                                <span
-                                  className={`inline-block px-2 py-0.5 text-[10px] font-bold rounded ${
-                                    jenisIdentitas === "PASPOR"
-                                      ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
-                                      : "bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-300"
-                                  }`}
-                                >
-                                  {jenisIdentitas}
-                                </span>
-                              </td>
-
-                              {/* NAMA */}
-                              <td className="px-3 py-2.5 font-bold text-stone-900 dark:text-white border-r border-stone-200/50 dark:border-stone-800/50">
-                                {namaSot}
-                              </td>
-
-                              {/* NO PASPOR */}
-                              <td className="px-3 py-2.5 font-mono font-semibold text-stone-800 dark:text-stone-200 border-r border-stone-200/50 dark:border-stone-800/50">
-                                {pasporInfo.noPaspor}
-                              </td>
-
-                              {/* TGL DIKELUARKAN */}
-                              <td className="px-3 py-2.5 font-mono text-stone-700 dark:text-stone-300 border-r border-stone-200/50 dark:border-stone-800/50">
-                                {formatDisplayDate(pasporInfo.tglDikeluarkan)}
-                              </td>
-
-                              {/* TGL HABIS */}
-                              <td className="px-3 py-2.5 font-mono text-stone-700 dark:text-stone-300 border-r border-stone-200/50 dark:border-stone-800/50">
-                                {formatDisplayDate(pasporInfo.tglHabis)}
-                              </td>
-
-                              {/* KOTA PASPOR */}
-                              <td className="px-3 py-2.5 border-r border-stone-200/50 dark:border-stone-800/50 font-semibold text-stone-800 dark:text-stone-200">
-                                {pasporInfo.kotaPaspor}
-                              </td>
-
-                              {/* HOTEL MAKKAH */}
-                              <td className="px-3 py-2.5 border-r border-stone-200/50 dark:border-stone-800/50">
-                                {activePackage.hotelMekkah || j.hotelMekkah || "Safwah Tower"}
-                              </td>
-
-                              {/* HOTEL MADINAH */}
-                              <td className="px-3 py-2.5 border-r border-stone-200/50 dark:border-stone-800/50">
-                                {activePackage.hotelMadinah || j.hotelMadinah || "Durrat Al Eiman"}
-                              </td>
-
-                              {/* KAMAR */}
-                              <td className="px-3 py-2.5 border-r border-stone-200/50 dark:border-stone-800/50 uppercase font-semibold text-stone-700 dark:text-stone-300">
-                                {tipeKamarDisplay}
-                              </td>
-
-                              {/* JENIS KELAMIN */}
-                              <td className="px-2 py-2.5 text-center font-bold border-r border-stone-200/50 dark:border-stone-800/50">
-                                {j.jenisKelamin || "L"}
-                              </td>
-
-                              {/* TEMPAT LAHIR */}
-                              <td className="px-3 py-2.5 border-r border-stone-200/50 dark:border-stone-800/50">
-                                {j.tempatLahir || "-"}
-                              </td>
-
-                              {/* TGL LAHIR */}
-                              <td className="px-3 py-2.5 border-r border-stone-200/50 dark:border-stone-800/50 font-mono">
-                                {formatDisplayDate(j.tanggalLahir)}
-                              </td>
-
-                              {/* UMUR */}
-                              <td className="px-2 py-2.5 text-center font-semibold border-r border-stone-200/50 dark:border-stone-800/50">
-                                {calculateAge(j.tanggalLahir)}
-                              </td>
-
-                              {/* STATUS MENIKAH */}
-                              <td className="px-3 py-2.5 border-r border-stone-200/50 dark:border-stone-800/50">
-                                {statusMenikahDisplay}
-                              </td>
-
-                              {/* NO TELP/HP */}
-                              <td className="px-3 py-2.5 border-r border-stone-200/50 dark:border-stone-800/50 font-mono">
-                                {j.nomorTelepon || "-"}
-                              </td>
-
-                              {/* KOTA/KAB */}
-                              <td className="px-3 py-2.5 border-r border-stone-200/50 dark:border-stone-800/50 font-semibold text-stone-800 dark:text-stone-200">
-                                {kotaDisplay}
-                              </td>
-
-                              {/* PROVINSI */}
-                              <td className="px-3 py-2.5 border-r border-stone-200/50 dark:border-stone-800/50 font-bold uppercase text-[10px] text-amber-800 dark:text-amber-300">
-                                {provinsiDisplay}
-                              </td>
-
-                              <td
-                                className="px-3 py-2.5 text-stone-600 dark:text-stone-400 max-w-[240px] truncate border-r border-stone-200/50 dark:border-stone-800/50"
-                                title={j.alamat}
+                    </thead>
+                    <tbody className="divide-y divide-stone-200/60 dark:divide-stone-800/60">
+                      {filteredActiveJamaah.length === 0 ? (
+                        <tr>
+                          <td colSpan={isSelectMode ? 23 : 22} className="px-4 py-12 text-center text-stone-500">
+                            <div className="space-y-3">
+                              <p>Belum ada data jamaah terdaftar pada paket ini.</p>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  setExcelFile(null);
+                                  setExcelPreviewRows([]);
+                                  setImportModalOpen(true);
+                                }}
                               >
-                                {j.alamat || "-"}
-                              </td>
+                                <FileSpreadsheet className="mr-2 h-4 w-4 text-emerald-600" />
+                                Import Data Jamaah dari File Excel
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      ) : (
+                        groupedJamaahList.map((group) => {
+                          const groupMergeText = formatGroupMergeLabel(group.groupObj, group.members);
+                          const totalInGroup = group.members.length;
 
-                              {/* AKSI */}
-                              <td className="px-3 py-2.5 text-center sticky right-0 bg-white/90 dark:bg-card/90 backdrop-blur-sm shadow-[-4px_0_6px_-4px_rgba(0,0,0,0.05)] border-l border-stone-200/50 dark:border-stone-800/50">
-                                <div className="flex items-center justify-center gap-2">
-                                  {isFirstInGroup && (
+                          return group.members.map((j: any, memberIdx) => {
+                            const currentNoJamaah = globalNoJamaahCounter++;
+                            const isFirstInGroup = memberIdx === 0;
+
+                            // Single Source of Truth Name & Paspor Resolution
+                            const namaSot = getSingleSourceOfTruthName(j);
+                            const pasporInfo = getPasporDetails(j);
+
+                            // Flexible ID Resolution
+                            const hasPaspor = Boolean(pasporInfo.noPaspor && pasporInfo.noPaspor !== "-");
+                            const noId = hasPaspor ? pasporInfo.noPaspor : j.nik || "-";
+                            const jenisIdentitas = hasPaspor ? "PASPOR" : j.nik ? "KTP" : "-";
+
+                            // ID Register Format
+                            const baseCode = group.groupObj?.kodeRegistrasi || j.registrationId || j.groupId || "2980";
+                            const idRegister = formatIdRegister(baseCode, memberIdx, totalInGroup);
+
+                            const tipeKamarDisplay = j.tipeKamar || (group.groupObj as any)?.roomUpgrade || "Upgrade Double";
+                            const statusMenikahDisplay = j.statusMenikah || "Belum Menikah";
+                            const kotaDisplay = j.kota || "JAKARTA SELATAN";
+                            const provinsiDisplay = j.provinsi && j.provinsi !== "-" ? j.provinsi : deriveProvinsi(j.provinsi, j.kota);
+
+                            return (
+                              <tr
+                                key={j.id}
+                                className={`hover:bg-amber-50/40 dark:hover:bg-amber-950/20 transition-colors ${
+                                  selectedJamaahIds.includes(j.id) ? "bg-amber-50/60 dark:bg-amber-950/30 font-semibold" : ""
+                                }`}
+                              >
+                                {/* CHECKBOX COL */}
+                                {isSelectMode && (
+                                  <td className="px-2 py-2.5 text-center border-r border-stone-200/50 dark:border-stone-800/50 sticky left-0 bg-white/90 dark:bg-card/90 z-10">
+                                    <input
+                                      type="checkbox"
+                                      className="h-4 w-4 rounded border-stone-300 text-amber-600 focus:ring-amber-500 cursor-pointer"
+                                      checked={selectedJamaahIds.includes(j.id)}
+                                      onChange={() => toggleSelectRow(j.id)}
+                                      title="Mencentang jamaah ini akan memilih seluruh anggota rombongan"
+                                    />
+                                  </td>
+                                )}
+
+                                {/* MERGED CELL: KELUARGA/ROMBONGAN */}
+                                {isFirstInGroup && (
+                                  <td
+                                    rowSpan={totalInGroup}
+                                    className="p-3 text-center align-middle font-bold text-[11px] bg-amber-50/80 dark:bg-amber-950/30 text-amber-950 dark:text-amber-200 border-r-2 border-r-amber-400 dark:border-r-amber-700 border-b border-stone-200 dark:border-stone-800 shadow-xs"
+                                  >
+                                    <span>{groupMergeText}</span>
+                                  </td>
+                                )}
+
+                                {/* NO JAMAAH */}
+                                <td className="px-2 py-2.5 text-center font-bold font-mono text-stone-700 dark:text-stone-300 border-r border-stone-200/50 dark:border-stone-800/50">
+                                  {currentNoJamaah}
+                                </td>
+
+                                {/* ID REGISTER */}
+                                <td className="px-3 py-2.5 font-mono font-semibold text-stone-800 dark:text-stone-200 border-r border-stone-200/50 dark:border-stone-800/50">
+                                  {idRegister}
+                                </td>
+
+                                {/* NO ID */}
+                                <td className="px-3 py-2.5 font-mono text-stone-700 dark:text-stone-300 border-r border-stone-200/50 dark:border-stone-800/50">
+                                  {noId}
+                                </td>
+
+                                {/* JENIS IDENTITAS */}
+                                <td className="px-3 py-2.5 border-r border-stone-200/50 dark:border-stone-800/50">
+                                  <span
+                                    className={`inline-block px-2 py-0.5 text-[10px] font-bold rounded ${
+                                      jenisIdentitas === "PASPOR"
+                                        ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
+                                        : "bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-300"
+                                    }`}
+                                  >
+                                    {jenisIdentitas}
+                                  </span>
+                                </td>
+
+                                {/* NAMA */}
+                                <td className="px-3 py-2.5 font-bold text-stone-900 dark:text-white border-r border-stone-200/50 dark:border-stone-800/50">
+                                  {namaSot}
+                                </td>
+
+                                {/* NO PASPOR */}
+                                <td className="px-3 py-2.5 font-mono font-semibold text-stone-800 dark:text-stone-200 border-r border-stone-200/50 dark:border-stone-800/50">
+                                  {pasporInfo.noPaspor}
+                                </td>
+
+                                {/* TGL DIKELUARKAN */}
+                                <td className="px-3 py-2.5 font-mono text-stone-700 dark:text-stone-300 border-r border-stone-200/50 dark:border-stone-800/50">
+                                  {formatDisplayDate(pasporInfo.tglDikeluarkan)}
+                                </td>
+
+                                {/* TGL HABIS */}
+                                <td className="px-3 py-2.5 font-mono text-stone-700 dark:text-stone-300 border-r border-stone-200/50 dark:border-stone-800/50">
+                                  {formatDisplayDate(pasporInfo.tglHabis)}
+                                </td>
+
+                                {/* KOTA PASPOR */}
+                                <td className="px-3 py-2.5 border-r border-stone-200/50 dark:border-stone-800/50 font-semibold text-stone-800 dark:text-stone-200">
+                                  {pasporInfo.kotaPaspor}
+                                </td>
+
+                                {/* HOTEL MAKKAH */}
+                                <td className="px-3 py-2.5 border-r border-stone-200/50 dark:border-stone-800/50">
+                                  {activePackage.hotelMekkah || j.hotelMekkah || "Safwah Tower"}
+                                </td>
+
+                                {/* HOTEL MADINAH */}
+                                <td className="px-3 py-2.5 border-r border-stone-200/50 dark:border-stone-800/50">
+                                  {activePackage.hotelMadinah || j.hotelMadinah || "Durrat Al Eiman"}
+                                </td>
+
+                                {/* KAMAR */}
+                                <td className="px-3 py-2.5 border-r border-stone-200/50 dark:border-stone-800/50 uppercase font-semibold text-stone-700 dark:text-stone-300">
+                                  {tipeKamarDisplay}
+                                </td>
+
+                                {/* JENIS KELAMIN */}
+                                <td className="px-2 py-2.5 text-center font-bold border-r border-stone-200/50 dark:border-stone-800/50">
+                                  {j.jenisKelamin || "L"}
+                                </td>
+
+                                {/* TEMPAT LAHIR */}
+                                <td className="px-3 py-2.5 border-r border-stone-200/50 dark:border-stone-800/50">
+                                  {j.tempatLahir || "-"}
+                                </td>
+
+                                {/* TGL LAHIR */}
+                                <td className="px-3 py-2.5 border-r border-stone-200/50 dark:border-stone-800/50 font-mono">
+                                  {formatDisplayDate(j.tanggalLahir)}
+                                </td>
+
+                                {/* UMUR */}
+                                <td className="px-2 py-2.5 text-center font-semibold border-r border-stone-200/50 dark:border-stone-800/50">
+                                  {calculateAge(j.tanggalLahir)}
+                                </td>
+
+                                {/* STATUS MENIKAH */}
+                                <td className="px-3 py-2.5 border-r border-stone-200/50 dark:border-stone-800/50">
+                                  {statusMenikahDisplay}
+                                </td>
+
+                                {/* NO TELP/HP */}
+                                <td className="px-3 py-2.5 border-r border-stone-200/50 dark:border-stone-800/50 font-mono">
+                                  {j.nomorTelepon || "-"}
+                                </td>
+
+                                {/* KOTA/KAB */}
+                                <td className="px-3 py-2.5 border-r border-stone-200/50 dark:border-stone-800/50 font-semibold text-stone-800 dark:text-stone-200">
+                                  {kotaDisplay}
+                                </td>
+
+                                {/* PROVINSI */}
+                                <td className="px-3 py-2.5 border-r border-stone-200/50 dark:border-stone-800/50 font-bold uppercase text-[10px] text-amber-800 dark:text-amber-300">
+                                  {provinsiDisplay}
+                                </td>
+
+                                <td
+                                  className="px-3 py-2.5 text-stone-600 dark:text-stone-400 max-w-[240px] truncate border-r border-stone-200/50 dark:border-stone-800/50"
+                                  title={j.alamat}
+                                >
+                                  {j.alamat || "-"}
+                                </td>
+
+                                {/* AKSI */}
+                                <td className="px-3 py-2.5 text-center sticky right-0 bg-white/90 dark:bg-card/90 backdrop-blur-sm shadow-[-4px_0_6px_-4px_rgba(0,0,0,0.05)] border-l border-stone-200/50 dark:border-stone-800/50">
+                                  <div className="flex items-center justify-center gap-2">
+                                    {isFirstInGroup && (
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="h-7 px-2 text-[10px] border-stone-200/60 dark:border-stone-800/60 hover:bg-sky-50 hover:text-sky-600"
+                                        title="Pindah Paket"
+                                        onClick={() => {
+                                          setGroupToMove(group);
+                                          setTargetPaketId("");
+                                          setMoveModalOpen(true);
+                                        }}
+                                      >
+                                        <ArrowRightLeft className="h-3 w-3" />
+                                      </Button>
+                                    )}
                                     <Button
                                       variant="outline"
                                       size="sm"
-                                      className="h-7 px-2 text-[10px] border-stone-200/60 dark:border-stone-800/60 hover:bg-sky-50 hover:text-sky-600"
-                                      title="Pindah Paket"
+                                      className="h-7 px-2 text-[10px] border-stone-200/60 dark:border-stone-800/60 hover:bg-red-50 hover:text-red-600"
+                                      title="Hapus Jamaah"
                                       onClick={() => {
-                                        setGroupToMove(group);
-                                        setTargetPaketId("");
-                                        setMoveModalOpen(true);
+                                        setJamaahToDelete(j);
+                                        setDeleteMode("soft");
+                                        setDeleteConfirmText("");
+                                        setDeleteModalOpen(true);
                                       }}
                                     >
-                                      <ArrowRightLeft className="h-3 w-3" />
+                                      <Trash2 className="h-3 w-3" />
                                     </Button>
-                                  )}
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    className="h-7 px-2 text-[10px] border-stone-200/60 dark:border-stone-800/60 hover:bg-red-50 hover:text-red-600"
-                                    title="Hapus Jamaah"
-                                    onClick={() => {
-                                      setJamaahToDelete(j);
-                                      setDeleteMode("soft");
-                                      setDeleteConfirmText("");
-                                      setDeleteModalOpen(true);
-                                    }}
-                                  >
-                                    <Trash2 className="h-3 w-3" />
-                                  </Button>
-                                </div>
-                              </td>
-                            </tr>
-                          );
-                        });
-                      })
-                    )}
-                  </tbody>
-                </table>
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          });
+                        })
+                      )}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
           </div>
-        </div>
+        ) : (
+          /* SKELETON LOADER FOR ACTIVE PACKAGE MANIFEST VIEW */
+          <div className="space-y-4 animate-pulse">
+            <div className="bg-stone-900 border border-stone-800 rounded-xl p-5 shadow-md">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="space-y-2">
+                  <div className="h-4 w-28 bg-stone-800 rounded"></div>
+                  <div className="h-6 w-72 bg-amber-500/20 rounded"></div>
+                  <div className="h-4 w-96 bg-stone-800 rounded"></div>
+                </div>
+                <div className="flex items-center gap-3 bg-stone-800/80 rounded-xl p-3 h-16 w-64"></div>
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-stone-200 dark:border-stone-800 bg-card p-4 space-y-3 shadow-xs">
+              <div className="h-4 w-48 bg-stone-200 dark:bg-stone-800 rounded"></div>
+              <div className="space-y-2.5 pt-2">
+                {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
+                  <div key={i} className="h-10 w-full bg-stone-100 dark:bg-stone-900/60 rounded-lg"></div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )
       ) : (
         /* MANIFEST CARDS VIEW (All Manifests Summary List) */
         <div className="space-y-4">
