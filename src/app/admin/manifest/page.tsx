@@ -20,7 +20,6 @@ import {
   CheckCircle2,
   Trash2,
   ArrowRightLeft,
-  CheckSquare,
 } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/shared/components/ui/Card";
 import { Button } from "@/shared/components/ui/Button";
@@ -780,7 +779,7 @@ function ManifestPageContent() {
                       className="h-7 text-xs border-stone-300 dark:border-stone-700 text-stone-700 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800"
                       onClick={() => setIsSelectMode(true)}
                     >
-                      <CheckSquare className="mr-1 h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+                      <Trash2 className="mr-1 h-3.5 w-3.5 text-red-600 dark:text-red-400" />
                       Pilih / Hapus Banyak
                     </Button>
                   )}
