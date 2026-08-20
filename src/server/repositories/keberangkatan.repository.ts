@@ -487,8 +487,8 @@ export const keberangkatanRepo = {
         });
       }
 
-      // Format Individual / Standalone Packages
-      const individualList = standaloneList.map((k) => {
+      // Format Individual / Single-Date Packages (all individual departures)
+      const individualList = allKeberangkatan.map((k) => {
         const dateStr = k.tanggalBerangkat.toISOString().split("T")[0]!;
         const startingName = k.startingPoint?.name || 
           (k.namaPaket.includes("SURABAYA") || k.namaPaket.includes("SBY") ? "Surabaya" :
