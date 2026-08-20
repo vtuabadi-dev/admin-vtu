@@ -3,14 +3,12 @@
 import { useEffect, useState, useCallback, useMemo, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
-  Plus,
   Eye,
   Pencil,
   Download,
   FileText,
   X,
   Building2,
-  Users,
   CalendarDays,
   Plane,
   Search,
@@ -29,11 +27,10 @@ import { Input } from "@/shared/components/ui/Input";
 import { Select } from "@/shared/components/ui/Select";
 import { StatusBadge } from "@/shared/components/ui/Badge";
 import { Modal } from "@/shared/components/ui/Modal";
-import { Table } from "@/shared/components/ui/Table";
 import { ErrorState } from "@/shared/components/ui/ErrorState";
 import { formatDateShort, formatDate } from "@/shared/lib/utils";
-import { getHotelCombinations, generateHotelLabel } from "@/shared/lib/hotel-utils";
-import type { Manifest, ManifestRow, Keberangkatan, Jamaah, HotelCombinationSummary, RegistrationGroup } from "@/shared/types";
+import { generateHotelLabel } from "@/shared/lib/hotel-utils";
+import type { Manifest, Keberangkatan, Jamaah, RegistrationGroup } from "@/shared/types";
 import { useOperationalStore } from "@/stores/operational-store";
 
 // ── Helper Utilities ─────────────────────────────────────────
@@ -154,12 +151,7 @@ function ManifestPageContent() {
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
-  const [modalOpen, setModalOpen] = useState(false);
 
-  // Form state for generate modal
-  const [formKeberangkatan, setFormKeberangkatan] = useState("");
-  const [formTemplate, setFormTemplate] = useState("default");
-  const [formNama, setFormNama] = useState("");
 
   // Excel Import Modal state
   const [importModalOpen, setImportModalOpen] = useState(false);
@@ -349,116 +341,7 @@ function ManifestPageContent() {
     }
   }
 
-  function handleGenerate() {
-    setFormKeberangkatan(selectedKeberangkatan || "");
-    setFormTemplate("default");
-    setFormNama("");
-    setModalOpen(true);
-  }
 
-  const selectedKbrForModal = useMemo(
-    () => keberangkatanList.find((k) => k.id === formKeberangkatan) ?? null,
-    [keberangkatanList, formKeberangkatan]
-  );
-
-  const modalKbrJamaah = useMemo(() => {
-    if (!selectedKbrForModal) return [];
-    return allJamaah.filter((j) => selectedKbrForModal.jamaahIds?.includes(j.id));
-  }, [selectedKbrForModal, allJamaah]);
-
-  const siskopatuhCombinations = useMemo<HotelCombinationSummary[]>(() => {
-    if (!selectedKbrForModal || formTemplate !== "siskopatuh") return [];
-    return getHotelCombinations(modalKbrJamaah);
-  }, [selectedKbrForModal, formTemplate, modalKbrJamaah]);
-
-  function generatePreviewRows(): ManifestRow[] {
-    if (!selectedKbrForModal) return [];
-    if (formTemplate === "siskopatuh") return [];
-    return modalKbrJamaah.map((j, idx) => ({
-      id: `preview-${idx}`,
-      nomorUrut: idx + 1,
-      jamaahId: j.id,
-      nomorPaspor: j.nomorPaspor,
-      namaLengkap: j.namaLengkap,
-      tempatLahir: j.tempatLahir,
-      tanggalLahir: j.tanggalLahir,
-      nomorKursi: undefined,
-      nomorKamar: undefined,
-      catatan: undefined,
-    }));
-  }
-
-  const previewColumns = [
-    { key: "nomorUrut", header: "No.", accessor: (row: Record<string, unknown>) => row.nomorUrut as number, className: "w-12" },
-    { key: "namaLengkap", header: "Nama Lengkap", accessor: (row: Record<string, unknown>) => row.namaLengkap as string },
-    { key: "nomorPaspor", header: "No. Paspor", accessor: (row: Record<string, unknown>) => row.nomorPaspor as string },
-    { key: "nomorKursi", header: "No. Kursi", accessor: (row: Record<string, unknown>) => (row.nomorKursi as string) ?? "-" },
-    { key: "nomorKamar", header: "No. Kamar", accessor: (row: Record<string, unknown>) => (row.nomorKamar as string) ?? "-" },
-  ];
-
-  async function doGenerate() {
-    if (!selectedKbrForModal || !formNama.trim()) return;
-
-    const buildManifestData = (rows: ManifestRow[], kode: string, nama: string, hotelMekkah?: string, hotelMadinah?: string) => ({
-      keberangkatanId: selectedKbrForModal!.id,
-      kode,
-      namaManifest: nama,
-      templateId: formTemplate,
-      hotelMekkah: hotelMekkah ?? selectedKbrForModal!.hotelMekkahId,
-      hotelMadinah: hotelMadinah ?? selectedKbrForModal!.hotelMadinahId,
-      status: "draft" as const,
-      data: rows,
-    });
-
-    try {
-      if (formTemplate === "siskopatuh") {
-        const combinations = getHotelCombinations(modalKbrJamaah);
-        for (let idx = 0; idx < combinations.length; idx++) {
-          const combo = combinations[idx]!;
-          const filteredJamaah = modalKbrJamaah.filter(
-            (j) => j.hotelMekkah === combo.hotelMekkah && j.hotelMadinah === combo.hotelMadinah
-          );
-          const label = generateHotelLabel(combo.hotelMekkah, combo.hotelMadinah);
-          const seq = String(idx + 1).padStart(3, "0");
-          const rows: ManifestRow[] = filteredJamaah.map((j, i) => ({
-            id: `mrow-${Date.now()}-${idx}-${i}`,
-            nomorUrut: i + 1,
-            jamaahId: j.id,
-            nomorPaspor: j.nomorPaspor,
-            namaLengkap: j.namaLengkap,
-            tempatLahir: j.tempatLahir,
-            tanggalLahir: j.tanggalLahir,
-          }));
-          await fetch("/api/manifests", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(buildManifestData(rows, `MAN/${selectedKbrForModal!.kode}/SKP/${seq}`, `${formNama.trim()} — ${label}`, combo.hotelMekkah, combo.hotelMadinah)),
-          });
-        }
-      } else {
-        const rows: ManifestRow[] = modalKbrJamaah.map((j, i) => ({
-          id: `mrow-${Date.now()}-${i}`,
-          nomorUrut: i + 1,
-          jamaahId: j.id,
-          nomorPaspor: j.nomorPaspor,
-          namaLengkap: j.namaLengkap,
-          tempatLahir: j.tempatLahir,
-          tanggalLahir: j.tanggalLahir,
-        }));
-        const seq = String(Date.now()).slice(-5);
-        await fetch("/api/manifests", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(buildManifestData(rows, `MAN/${selectedKbrForModal!.kode}/${seq}`, formNama.trim())),
-        });
-      }
-
-      setModalOpen(false);
-      loadAllData();
-    } catch (err) {
-      console.error("Failed to generate manifest:", err);
-    }
-  }
 
   // ── Excel Import Parsing & Execution ────────────────────────
 
@@ -721,10 +604,6 @@ function ManifestPageContent() {
               Import Excel Manifest
             </Button>
           )}
-          <Button onClick={handleGenerate}>
-            <Plus className="mr-2 h-4 w-4" />
-            Generate Manifest Baru
-          </Button>
         </div>
       </div>
 
@@ -1460,117 +1339,7 @@ function ManifestPageContent() {
         </div>
       </Modal>
 
-      {/* Generate Manifest Modal */}
-      <Modal
-        open={modalOpen}
-        onClose={() => setModalOpen(false)}
-        title="Generate Manifest Baru"
-        description="Pilih keberangkatan dan template untuk membuat manifest"
-        size="xl"
-      >
-        <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <Select
-              label="Pilih Keberangkatan"
-              options={keberangkatanList.map((k) => ({
-                value: k.id,
-                label: `${k.kode} — ${k.namaPaket || k.paketUmroh?.namaPaket || "-"}`,
-              }))}
-              placeholder="-- Pilih Keberangkatan --"
-              value={formKeberangkatan}
-              onChange={(e) => setFormKeberangkatan(e.target.value)}
-            />
-            <Select
-              label="Template Manifest"
-              options={[
-                { value: "default", label: "Template Standar" },
-                { value: "detailed", label: "Template Detail" },
-                { value: "airline", label: "Template Maskapai" },
-                { value: "siskopatuh", label: "Template SISKOPATUH" },
-              ]}
-              value={formTemplate}
-              onChange={(e) => setFormTemplate(e.target.value)}
-            />
-          </div>
-          <Input
-            label="Nama Manifest"
-            placeholder="Contoh: Manifest Penerbangan SV-818"
-            value={formNama}
-            onChange={(e) => setFormNama(e.target.value)}
-          />
 
-          {formKeberangkatan && formTemplate !== "siskopatuh" && (
-            <div>
-              <p className="text-sm font-medium mb-2">
-                Pratinjau Data Jamaah ({generatePreviewRows().length} orang)
-              </p>
-              <Table
-                columns={previewColumns}
-                data={generatePreviewRows() as unknown as Record<string, unknown>[]}
-                keyField="id"
-                dense
-              />
-            </div>
-          )}
-
-          {formTemplate === "siskopatuh" && selectedKbrForModal && (
-            <div>
-              <p className="text-sm font-medium mb-2">
-                Hotel Combinations — {siskopatuhCombinations.length} manifest akan dibuat
-              </p>
-              {siskopatuhCombinations.length === 0 ? (
-                <p className="text-sm text-muted-foreground py-4 text-center">
-                  Tidak ada data jamaah untuk paket ini
-                </p>
-              ) : (
-                <table className="w-full text-sm border rounded-md overflow-hidden">
-                  <thead>
-                    <tr className="bg-muted/50 text-left text-xs font-medium text-muted-foreground">
-                      <th className="px-3 py-2">No.</th>
-                      <th className="px-3 py-2">Kombinasi Hotel</th>
-                      <th className="px-3 py-2 text-right">Jumlah Jamaah</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y">
-                    {siskopatuhCombinations.map((combo, idx) => (
-                      <tr key={combo.label}>
-                        <td className="px-3 py-2 text-xs">{idx + 1}</td>
-                        <td className="px-3 py-2">
-                          <div className="flex items-center gap-1.5">
-                            <Building2 className="h-3.5 w-3.5 text-muted-foreground" />
-                            <span className="font-medium">{combo.label}</span>
-                          </div>
-                          <p className="text-[10px] text-muted-foreground mt-0.5">
-                            {combo.hotelMekkah} — {combo.hotelMadinah}
-                          </p>
-                        </td>
-                        <td className="px-3 py-2 text-right">
-                          <span className="inline-flex items-center gap-1 text-xs">
-                            <Users className="h-3 w-3 text-muted-foreground" />
-                            {combo.jumlahJamaah} orang
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-            </div>
-          )}
-
-          <div className="flex justify-end gap-2 pt-2">
-            <Button variant="outline" onClick={() => setModalOpen(false)}>
-              Batal
-            </Button>
-            <Button
-              disabled={!formKeberangkatan || !formNama.trim()}
-              onClick={doGenerate}
-            >
-              Generate Sekarang
-            </Button>
-          </div>
-        </div>
-      </Modal>
 
       {/* Delete Jamaah Modal */}
       <Modal
