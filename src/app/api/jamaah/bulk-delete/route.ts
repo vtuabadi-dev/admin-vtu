@@ -74,17 +74,16 @@ export async function POST(request: NextRequest) {
           tx.alokasiPembayaran.deleteMany({ where: { jamaahId: { in: ids } } }).catch(() => {}),
         ]);
 
-        // B. Hard delete the jamaah records
-        await tx.jamaah.deleteMany({
-          where: { id: { in: ids } },
-        });
+        // B. Analyze affected groups: re-assign group leader if partially deleted, or collect empty groups
+        const emptyGroupIds: string[] = [];
 
-        // C. Check affected groups and update/cleanup empty ones
         for (const gId of affectedGroupIds) {
-          const remainingMembers = await tx.jamaah.findMany({
+          const allGroupMembers = await tx.jamaah.findMany({
             where: { groupId: gId },
             select: { id: true },
           });
+
+          const remainingMembers = allGroupMembers.filter((m) => !ids.includes(m.id));
 
           if (remainingMembers.length > 0) {
             const groupObj = await tx.registrationGroup.findUnique({
@@ -92,7 +91,7 @@ export async function POST(request: NextRequest) {
               select: { ketuaGroupId: true },
             });
 
-            // Re-assign group leader if the leader was among the deleted jamaah
+            // Re-assign group leader BEFORE deleting jamaah if current leader is being deleted
             if (groupObj && ids.includes(groupObj.ketuaGroupId || "")) {
               await tx.registrationGroup.update({
                 where: { id: gId },
@@ -108,19 +107,29 @@ export async function POST(request: NextRequest) {
               });
             }
           } else {
-            // Group has no remaining members -> clean up billing & delete empty group
-            await Promise.all([
-              tx.invoiceItem.deleteMany({ where: { invoice: { groupId: gId } } }).catch(() => {}),
-              tx.invoice.deleteMany({ where: { groupId: gId } }).catch(() => {}),
-              tx.pembayaran.deleteMany({ where: { groupId: gId } }).catch(() => {}),
-              tx.invoiceSplitConfig.deleteMany({ where: { groupId: gId } }).catch(() => {}),
-              tx.reminder.deleteMany({ where: { groupId: gId } }).catch(() => {}),
-            ]);
-            await tx.registrationGroup.delete({ where: { id: gId } }).catch(() => {});
+            emptyGroupIds.push(gId);
           }
         }
 
-        // D. Decrement filled seats for affected packages
+        // C. Clean up and delete completely empty groups FIRST to release 'KetuaGroup' foreign keys
+        if (emptyGroupIds.length > 0) {
+          await Promise.all([
+            tx.invoiceItem.deleteMany({ where: { invoice: { groupId: { in: emptyGroupIds } } } }).catch(() => {}),
+            tx.invoice.deleteMany({ where: { groupId: { in: emptyGroupIds } } }).catch(() => {}),
+            tx.pembayaran.deleteMany({ where: { groupId: { in: emptyGroupIds } } }).catch(() => {}),
+            tx.invoiceSplitConfig.deleteMany({ where: { groupId: { in: emptyGroupIds } } }).catch(() => {}),
+            tx.reminder.deleteMany({ where: { groupId: { in: emptyGroupIds } } }).catch(() => {}),
+          ]);
+
+          const groupIn = emptyGroupIds.map((g) => `'${g.replace(/'/g, "''")}'`).join(",");
+          await tx.$executeRawUnsafe(`DELETE FROM "registration_groups" WHERE "id" IN (${groupIn})`);
+        }
+
+        // D. Hard delete the jamaah records
+        const jamaahIn = ids.map((j) => `'${j.replace(/'/g, "''")}'`).join(",");
+        await tx.$executeRawUnsafe(`DELETE FROM "jamaah" WHERE "id" IN (${jamaahIn})`);
+
+        // E. Decrement filled seats for affected packages
         for (const [pId, activeCount] of Object.entries(activePaxPerPackage)) {
           const kbr = await tx.keberangkatan.findUnique({ where: { id: pId } });
           if (kbr && kbr.terisi > 0) {

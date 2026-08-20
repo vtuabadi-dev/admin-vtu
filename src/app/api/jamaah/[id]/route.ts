@@ -79,33 +79,43 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
         await tx.penghuniKamar.deleteMany({ where: { jamaahId: jamaah.id } }).catch(() => {});
         await tx.alokasiPembayaran.deleteMany({ where: { jamaahId: jamaah.id } }).catch(() => {});
 
-        // 2. Delete the jamaah record FIRST (frees FK reference to registrationGroup)
-        await tx.jamaah.delete({ where: { id: jamaah.id } });
-
-        // 3. Handle RegistrationGroup update or cleanup AFTER jamaah is deleted
+        // 2. Handle RegistrationGroup update or cleanup BEFORE jamaah is deleted
         if (jamaah.groupId && jamaah.group) {
           if (otherMembers.length > 0) {
             // Re-assign group leader if deleted jamaah was leader
             if (jamaah.group.ketuaGroupId === jamaah.id && otherMembers[0]) {
               await tx.registrationGroup.update({
                 where: { id: jamaah.groupId },
-                data: { ketuaGroupId: otherMembers[0].id },
+                data: {
+                  ketuaGroupId: otherMembers[0].id,
+                  jumlahAnggota: otherMembers.length,
+                },
+              });
+            } else {
+              await tx.registrationGroup.update({
+                where: { id: jamaah.groupId },
+                data: { jumlahAnggota: otherMembers.length },
               });
             }
-            await tx.registrationGroup.update({
-              where: { id: jamaah.groupId },
-              data: { jumlahAnggota: { decrement: 1 } },
-            });
           } else {
-            // No other members left in group -> clean up billing & delete empty group
-            await tx.invoiceItem.deleteMany({ where: { invoice: { groupId: jamaah.groupId } } }).catch(() => {});
-            await tx.invoice.deleteMany({ where: { groupId: jamaah.groupId } }).catch(() => {});
-            await tx.pembayaran.deleteMany({ where: { groupId: jamaah.groupId } }).catch(() => {});
-            await tx.invoiceSplitConfig.deleteMany({ where: { groupId: jamaah.groupId } }).catch(() => {});
-            await tx.reminder.deleteMany({ where: { groupId: jamaah.groupId } }).catch(() => {});
-            await tx.registrationGroup.delete({ where: { id: jamaah.groupId } }).catch(() => {});
+            // No other members left in group -> clean up billing & delete empty group FIRST
+            await Promise.all([
+              tx.invoiceItem.deleteMany({ where: { invoice: { groupId: jamaah.groupId } } }).catch(() => {}),
+              tx.invoice.deleteMany({ where: { groupId: jamaah.groupId } }).catch(() => {}),
+              tx.pembayaran.deleteMany({ where: { groupId: jamaah.groupId } }).catch(() => {}),
+              tx.invoiceSplitConfig.deleteMany({ where: { groupId: jamaah.groupId } }).catch(() => {}),
+              tx.reminder.deleteMany({ where: { groupId: jamaah.groupId } }).catch(() => {}),
+            ]);
+            await tx.$executeRawUnsafe(
+              `DELETE FROM "registration_groups" WHERE "id" = '${jamaah.groupId.replace(/'/g, "''")}'`
+            );
           }
         }
+
+        // 3. Delete the jamaah record
+        await tx.$executeRawUnsafe(
+          `DELETE FROM "jamaah" WHERE "id" = '${jamaah.id.replace(/'/g, "''")}'`
+        );
 
         // 4. Decrement package capacity if active
         if (wasActive && paketId) {
