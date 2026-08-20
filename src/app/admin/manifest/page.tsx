@@ -1037,8 +1037,6 @@ function ManifestPageContent() {
                           const kotaDisplay = j.kota || "JAKARTA SELATAN";
                           const provinsiDisplay = j.provinsi && j.provinsi !== "-" ? j.provinsi : deriveProvinsi(j.provinsi, j.kota);
 
-                          const isGroupFullySelected = group.members.every((m: any) => selectedJamaahIds.includes(m.id));
-
                           return (
                             <tr
                               key={j.id}
@@ -1063,16 +1061,7 @@ function ManifestPageContent() {
                                   rowSpan={totalInGroup}
                                   className="p-3 text-center align-middle font-bold text-[11px] bg-amber-50/80 dark:bg-amber-950/30 text-amber-950 dark:text-amber-200 border-r-2 border-r-amber-400 dark:border-r-amber-700 border-b border-stone-200 dark:border-stone-800 shadow-xs"
                                 >
-                                  <div className="flex flex-col items-center justify-center gap-1.5">
-                                    <input
-                                      type="checkbox"
-                                      className="h-4 w-4 rounded border-stone-300 text-amber-600 focus:ring-amber-500 cursor-pointer"
-                                      checked={isGroupFullySelected}
-                                      onChange={() => toggleSelectRow(j.id)}
-                                      title="Pilih/Batal Pilih Seluruh Rombongan Ini"
-                                    />
-                                    <span>{groupMergeText}</span>
-                                  </div>
+                                  <span>{groupMergeText}</span>
                                 </td>
                               )}
 
