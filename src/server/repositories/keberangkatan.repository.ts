@@ -64,6 +64,10 @@ function mapKeberangkatan(row: any): Keberangkatan {
     nomorPenerbangan: row.nomorPenerbangan ?? "-",
     kodeIndividu: row.kodeIndividu ?? undefined,
     paketGrupId: row.paketGrupId ?? undefined,
+    parentKeberangkatanId: row.parentKeberangkatanId ?? undefined,
+    splitReason: row.splitReason ?? undefined,
+    splitLabel: row.splitLabel ?? undefined,
+    promoLabel: row.promoLabel ?? undefined,
     driveFolderIds: row.driveFolderIds ?? undefined,
     hotelOptions: parsedHotelOptions,
   };
@@ -119,6 +123,10 @@ export const keberangkatanRepo = {
         kode: data.kode,
         kodeIndividu: data.kodeIndividu || data.kode,
         paketGrupId: data.paketGrupId,
+        parentKeberangkatanId: data.parentKeberangkatanId,
+        splitReason: data.splitReason,
+        splitLabel: data.splitLabel,
+        promoLabel: data.promoLabel,
         driveFolderIds: data.driveFolderIds ? (data.driveFolderIds as any) : undefined,
         paketUmrohId: data.paketUmrohId,
         tanggalBerangkat: new Date(data.tanggalBerangkat),
@@ -154,7 +162,11 @@ export const keberangkatanRepo = {
     if (data.hotelMekkah !== undefined) updateData.hotelMekkah = data.hotelMekkah;
     if (data.hotelMadinah !== undefined) updateData.hotelMadinah = data.hotelMadinah;
     if (data.hotelOptions !== undefined) updateData.hotelOptions = data.hotelOptions;
-    if (data.paketUmrohId !== undefined) updateData.paketUmrohId = data.paketUmrohId;
+    if (data.paketGrupId !== undefined) updateData.paketGrupId = data.paketGrupId;
+    if (data.parentKeberangkatanId !== undefined) updateData.parentKeberangkatanId = data.parentKeberangkatanId;
+    if (data.splitReason !== undefined) updateData.splitReason = data.splitReason;
+    if (data.splitLabel !== undefined) updateData.splitLabel = data.splitLabel;
+    if (data.promoLabel !== undefined) updateData.promoLabel = data.promoLabel;
     if (data.tanggalBerangkat !== undefined) updateData.tanggalBerangkat = new Date(data.tanggalBerangkat);
     if (data.tanggalPulang !== undefined) updateData.tanggalPulang = new Date(data.tanggalPulang);
     if (data.nomorPenerbangan !== undefined) updateData.nomorPenerbangan = data.nomorPenerbangan;

@@ -10,7 +10,7 @@ import {
   MOCK_LANDING_PATTERN, 
   MOCK_KLASTER
 } from "@/shared/lib/mock-data";
-import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X, Split, Layers } from "lucide-react";
+import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X, Split, Layers, Tag } from "lucide-react";
 import { generateVtuGroupCode } from "@/shared/lib/group-code.helper";
 import { PairingCanvas } from "./components/PairingCanvas";
 import { useOperationalStore } from "@/stores/operational-store";
@@ -48,6 +48,8 @@ export default function GeneratePaketPage() {
 
   // Mode Generator (Buat Paket Baru vs Pecah Starting Point)
   const [generateMode, setGenerateMode] = useState<"new" | "split">("new");
+  const [splitType, setSplitType] = useState<"starting_point" | "promo">("starting_point");
+  const [promoLabel, setPromoLabel] = useState<string>("");
   const [existingGroupsData, setExistingGroupsData] = useState<{ groups: any[]; individuals: any[] }>({ groups: [], individuals: [] });
   const [parentTypeFilter, setParentTypeFilter] = useState<"group" | "individual">("group");
   const [loadingGroups, setLoadingGroups] = useState(false);
@@ -2078,10 +2080,10 @@ export default function GeneratePaketPage() {
             </div>
             <div>
               <div className="font-bold text-sm text-foreground flex items-center gap-1.5">
-                ➕ Tambah Starting Point Paket (Dual Starting Point)
+                🔀 Split Paket (Pecahan Paket / Multi-Variant)
               </div>
               <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
-                Menghubungkan paket cabang (Starting Ke-2) dengan Paket Induk eksisting melalui Canvas Drag &amp; Drop.
+                Membuat pecahan paket dari Paket Utama, baik karena menambah Starting Point baru (misal Surabaya, Medan) maupun membuat Promo (Early Bird, Flash Sale, Diskon Group) dengan nama/label promo tersendiri.
               </p>
             </div>
           </button>
@@ -2089,7 +2091,52 @@ export default function GeneratePaketPage() {
 
         {/* Selected Parent Group Selector when in "split" mode */}
         {generateMode === "split" && (
-          <div className="mt-4 p-4 bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-700/60 rounded-xl space-y-3">
+          <div className="mt-4 p-4 bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-700/60 rounded-xl space-y-4">
+            {/* Split Sub-Type Selector (Starting Point vs Promo) */}
+            <div className="p-3 bg-amber-100/60 dark:bg-amber-900/40 border border-amber-300 dark:border-amber-700 rounded-lg space-y-2">
+              <label className="text-xs font-bold text-amber-900 dark:text-amber-200 flex items-center gap-1.5">
+                <Tag className="h-3.5 w-3.5 text-amber-600" /> Tipe Pecahan Paket (Split Variant)
+              </label>
+              <div className="flex flex-wrap items-center gap-4 pt-1">
+                <label className="flex items-center gap-1.5 text-xs font-bold text-stone-800 dark:text-stone-200 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="splitType"
+                    value="starting_point"
+                    checked={splitType === "starting_point"}
+                    onChange={() => setSplitType("starting_point")}
+                    className="text-amber-600 focus:ring-amber-500 h-4 w-4"
+                  />
+                  <span>📍 Tambah Starting Point (Kota Cabang)</span>
+                </label>
+                <label className="flex items-center gap-1.5 text-xs font-bold text-stone-800 dark:text-stone-200 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="splitType"
+                    value="promo"
+                    checked={splitType === "promo"}
+                    onChange={() => setSplitType("promo")}
+                    className="text-amber-600 focus:ring-amber-500 h-4 w-4"
+                  />
+                  <span>🏷️ Paket Promo (Variant Promo / Diskon)</span>
+                </label>
+              </div>
+
+              {splitType === "promo" && (
+                <div className="pt-2 space-y-1">
+                  <label className="text-[11px] font-bold text-amber-900 dark:text-amber-200">
+                    Nama / Label Promo (Contoh: &quot;Promo Early Bird Ramadhan&quot;, &quot;Flash Sale&quot;, &quot;Diskon Group&quot;):
+                  </label>
+                  <Input
+                    placeholder="Masukkan nama promo..."
+                    value={promoLabel}
+                    onChange={(e) => setPromoLabel(e.target.value)}
+                    className="h-8 text-xs bg-white dark:bg-card border-amber-300 dark:border-amber-700"
+                  />
+                </div>
+              )}
+            </div>
+
             <div className="flex items-center justify-between flex-wrap gap-2">
               <span className="text-xs font-extrabold text-amber-800 dark:text-amber-300 uppercase tracking-wider flex items-center gap-1.5">
                 <Split className="h-4 w-4" /> Langkah 1: Pilih Paket Induk Eksisting
@@ -2237,6 +2284,7 @@ export default function GeneratePaketPage() {
                 setLoading(true);
                 try {
                   const childCityName = options?.cities.find(c => c.id === formData.startingPointId)?.name || "Surabaya";
+                  const computedSplitLabel = splitType === "promo" ? (promoLabel || "PROMO SPECIAL") : childCityName;
 
                   const payload = {
                     packageTypeId: formData.jenisPaketId,
@@ -2246,7 +2294,7 @@ export default function GeneratePaketPage() {
                     durasiHari: Number(formData.durasiHari || 9),
                     durationDays: Number(formData.durasiHari || 9),
                     departureDates: pairs.map(p => p.childDate),
-                    namaPaket: formData.namaPaket || `Umroh ${childCityName}`,
+                    namaPaket: formData.namaPaket || (splitType === "promo" ? `[PROMO] ${formData.namaPaket || promoLabel || "Umroh Promo"}` : `Umroh ${childCityName}`),
                     hargaBase: Number(formData.hargaBase || 35000000),
                     hargaPaket: Number(formData.hargaBase || 35000000),
                     hotelMekkahId: formData.hotelMekkahId,
@@ -2258,6 +2306,9 @@ export default function GeneratePaketPage() {
                     clusterConfigs: formData.isAdaKlaster === "ya" ? clusterConfigs : null,
                     paketGrupId: selectedParentGroup.type === "group" ? selectedParentGroupId : undefined,
                     parentKeberangkatanId: selectedParentGroup.type === "individual" ? selectedParentGroup.keberangkatanId : undefined,
+                    splitReason: splitType,
+                    splitLabel: computedSplitLabel,
+                    promoLabel: splitType === "promo" ? (promoLabel || "PROMO SPECIAL") : undefined,
                     kodeGrup: selectedParentGroup.kodeGrup,
                     pairedItems: pairs,
                   };

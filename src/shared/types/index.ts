@@ -356,6 +356,11 @@ export interface Keberangkatan {
   kuota?: number;
   kodeIndividu?: string;
   paketGrupId?: string;
+  parentKeberangkatanId?: string;
+  splitReason?: string;
+  splitLabel?: string;
+  promoLabel?: string;
+  childKeberangkatanList?: Keberangkatan[];
   driveFolderIds?: any;
   hotelOptions?: any;
 }

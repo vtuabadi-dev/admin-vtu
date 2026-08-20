@@ -314,6 +314,10 @@ model Keberangkatan {
   hotelOptions        Json // { hotelMekkah: string; hotelMadinah: string }[]
   kodeIndividu        String?             @unique
   paketGrupId         String?
+  parentKeberangkatanId String?
+  splitReason           String? // "starting_point" | "promo" | "none"
+  splitLabel            String?
+  promoLabel            String?
   driveFolderIds      Json?
   status              StatusKeberangkatan @default(scheduled)
   kuota               Int
@@ -325,9 +329,11 @@ model Keberangkatan {
   updatedAt           DateTime            @updatedAt
 
   // Relations
-  paketUmroh         PaketUmroh?        @relation(fields: [paketUmrohId], references: [id])
-  paketGrup          PaketGrup?         @relation(fields: [paketGrupId], references: [id])
-  maskapaiMaster     MasterAirline?     @relation(fields: [maskapaiId], references: [id], onDelete: Cascade)
+  paketUmroh            PaketUmroh?        @relation(fields: [paketUmrohId], references: [id])
+  paketGrup             PaketGrup?         @relation(fields: [paketGrupId], references: [id])
+  parentKeberangkatan   Keberangkatan?     @relation("ParentChildKeberangkatan", fields: [parentKeberangkatanId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  childKeberangkatanList Keberangkatan[]   @relation("ParentChildKeberangkatan")
+  maskapaiMaster        MasterAirline?     @relation(fields: [maskapaiId], references: [id], onDelete: Cascade)
   hotelMekkahMaster  MasterHotel?       @relation("HotelMekkah", fields: [hotelMekkahId], references: [id])
   hotelMadinahMaster MasterHotel?       @relation("HotelMadinah", fields: [hotelMadinahId], references: [id])
   startingPoint      MasterCity?        @relation("StartingPoint", fields: [startingPointId], references: [id])

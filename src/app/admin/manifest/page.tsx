@@ -3,12 +3,8 @@
 import { useEffect, useState, useCallback, useMemo, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
-  Eye,
-  Pencil,
   Download,
-  FileText,
   X,
-  Building2,
   CalendarDays,
   Plane,
   Search,
@@ -20,8 +16,11 @@ import {
   CheckCircle2,
   Trash2,
   ArrowRightLeft,
+  Split,
+  Tag,
+  Layers,
 } from "lucide-react";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/shared/components/ui/Card";
+import { Card, CardContent } from "@/shared/components/ui/Card";
 import { Button } from "@/shared/components/ui/Button";
 import { Input } from "@/shared/components/ui/Input";
 import { Select } from "@/shared/components/ui/Select";
@@ -29,7 +28,6 @@ import { StatusBadge } from "@/shared/components/ui/Badge";
 import { Modal } from "@/shared/components/ui/Modal";
 import { ErrorState } from "@/shared/components/ui/ErrorState";
 import { formatDateShort, formatDate } from "@/shared/lib/utils";
-import { generateHotelLabel } from "@/shared/lib/hotel-utils";
 import type { Manifest, Keberangkatan, Jamaah, RegistrationGroup } from "@/shared/types";
 import { useOperationalStore } from "@/stores/operational-store";
 
@@ -150,7 +148,7 @@ function ManifestPageContent() {
   const setStoreJamaah = useOperationalStore((s) => s.setJamaahList);
   const setStoreGroups = useOperationalStore((s) => s.setGroupList);
 
-  const [manifests, setManifests] = useState<Manifest[]>([]);
+  const [, setManifests] = useState<Manifest[]>([]);
   const [keberangkatanList, setKeberangkatanList] = useState<Keberangkatan[]>(storeKeberangkatan);
   const [groups, setGroups] = useState<RegistrationGroup[]>(storeGroups);
   const [allJamaah, setAllJamaah] = useState<Jamaah[]>(storeJamaah);
@@ -254,6 +252,64 @@ function ManifestPageContent() {
     if (!selectedKeberangkatan) return null;
     return keberangkatanList.find((k) => k.id === selectedKeberangkatan) ?? null;
   }, [keberangkatanList, selectedKeberangkatan]);
+
+  // Group keberangkatan packages into hierarchy (Parent & Split Packages)
+  const groupedPackageTree = useMemo(() => {
+    if (!keberangkatanList || keberangkatanList.length === 0) return [];
+
+    const parentMap = new Map<string, Keberangkatan>();
+    const childrenMap = new Map<string, Keberangkatan[]>();
+
+    // First pass: register root parents vs child split packages
+    keberangkatanList.forEach((k) => {
+      const parentId = k.parentKeberangkatanId;
+      if (parentId) {
+        if (!childrenMap.has(parentId)) {
+          childrenMap.set(parentId, []);
+        }
+        childrenMap.get(parentId)!.push(k);
+      } else {
+        parentMap.set(k.id, k);
+      }
+    });
+
+    // Also handle packages sharing same paketGrupId if parentId wasn't explicitly saved
+    keberangkatanList.forEach((k) => {
+      if (!k.parentKeberangkatanId && k.paketGrupId) {
+        const siblings = keberangkatanList.filter(
+          (other) => other.paketGrupId === k.paketGrupId && other.id !== k.id
+        );
+        if (siblings.length > 0) {
+          const groupParent =
+            keberangkatanList.find(
+              (other) =>
+                other.paketGrupId === k.paketGrupId &&
+                !other.parentKeberangkatanId &&
+                !other.splitReason
+            ) || siblings[0];
+
+          if (groupParent && groupParent.id !== k.id) {
+            if (!childrenMap.has(groupParent.id)) {
+              childrenMap.set(groupParent.id, []);
+            }
+            if (!childrenMap.get(groupParent.id)!.some((c) => c.id === k.id)) {
+              childrenMap.get(groupParent.id)!.push(k);
+            }
+            parentMap.delete(k.id);
+          }
+        }
+      }
+    });
+
+    const result: { parent: Keberangkatan; children: Keberangkatan[] }[] = [];
+
+    parentMap.forEach((parent) => {
+      const children = childrenMap.get(parent.id) || [];
+      result.push({ parent, children });
+    });
+
+    return result;
+  }, [keberangkatanList]);
 
   // Jamaah belonging to the active package
   const activePackageJamaah = useMemo(() => {
@@ -1191,7 +1247,13 @@ function ManifestPageContent() {
         /* MANIFEST CARDS VIEW (All Manifests Summary List) */
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-base font-bold text-foreground">Daftar Dokumen Manifest Terbuat</h2>
+            <h2 className="text-base font-bold text-foreground flex items-center gap-2">
+              <Layers className="h-4 w-4 text-amber-500" />
+              Daftar Paket Keberangkatan & Manifest
+            </h2>
+            <span className="text-xs text-muted-foreground font-mono">
+              Total {keberangkatanList.length} Paket
+            </span>
           </div>
 
           {loading ? (
@@ -1202,87 +1264,167 @@ function ManifestPageContent() {
             <div className="flex h-40 items-center justify-center">
               <ErrorState onRetry={loadAllData} message={error.message} />
             </div>
-          ) : manifests.length === 0 ? (
+          ) : groupedPackageTree.length === 0 ? (
             <div className="flex h-40 items-center justify-center text-sm text-muted-foreground border rounded-xl bg-card">
-              Belum ada dokumen manifest terbuat. Pilih paket di atas untuk melihat Laman Manifest Utama.
+              Belum ada data paket keberangkatan terdaftar.
             </div>
           ) : (
-            <div className="grid gap-4">
-              {manifests.map((manifest) => {
-                const keberangkatan = keberangkatanList.find(
-                  (k) => k.id === manifest.keberangkatanId
+            <div className="space-y-4">
+              {groupedPackageTree.map(({ parent, children }) => {
+                const parentGroupIds = new Set(
+                  groups.filter((g) => g.paketKeberangkatanId === parent.id).map((g) => g.id)
                 );
+                const parentJamaah = allJamaah.filter(
+                  (j) =>
+                    (parent.jamaahIds?.includes(j.id) || parentGroupIds.has(j.groupId)) &&
+                    j.status !== "batal"
+                );
+                const parentGroups = groups.filter((g) => g.paketKeberangkatanId === parent.id);
+
                 return (
-                  <Card key={manifest.id} variant="operational">
-                    <CardHeader>
-                      <div className="flex items-start justify-between">
-                        <div className="space-y-1">
-                          <CardTitle className="flex items-center gap-2">
-                            <FileText className="h-4 w-4 text-muted-foreground" />
-                            {manifest.namaManifest}
-                            {manifest.hotelMekkah && manifest.hotelMadinah && (
-                              <span className="inline-flex items-center gap-1 rounded-full bg-info/10 px-2 py-0.5 text-[10px] font-medium text-info">
-                                <Building2 className="h-3 w-3" />
-                                {generateHotelLabel(manifest.hotelMekkah, manifest.hotelMadinah)}
+                  <div
+                    key={parent.id}
+                    className="p-4 bg-stone-950/90 border border-stone-800 rounded-2xl shadow-md space-y-3"
+                  >
+                    {/* PAKET UTAMA (Parent Card Header) */}
+                    <div
+                      onClick={() => {
+                        setSelectedKeberangkatan(parent.id);
+                        router.push(`/admin/manifest?paketId=${parent.id}`);
+                      }}
+                      className="p-5 bg-gradient-to-r from-stone-900 via-stone-850 to-stone-900 border border-stone-800 hover:border-amber-500/60 text-white rounded-xl shadow-sm transition-all cursor-pointer group"
+                    >
+                      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                        <div className="space-y-1.5">
+                          <div className="flex items-center flex-wrap gap-2">
+                            <span className="bg-amber-500/20 text-amber-400 border border-amber-500/30 text-[10px] font-bold px-2 py-0.5 rounded uppercase font-mono">
+                              {parent.kode}
+                            </span>
+                            {children.length > 0 && (
+                              <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-bold px-2 py-0.5 rounded uppercase flex items-center gap-1">
+                                <Split className="h-3 w-3" /> Paket Utama ({children.length} Pecahan)
                               </span>
                             )}
-                          </CardTitle>
-                          <CardDescription>
-                            {manifest.kode}
-                          </CardDescription>
+                            <StatusBadge status={parent.status} />
+                          </div>
+                          <h3 className="text-lg font-bold tracking-tight text-amber-400 group-hover:text-amber-300 transition-colors">
+                            {parent.namaPaket || parent.paketUmroh?.namaPaket || "PAKET UMROH"}
+                          </h3>
+                          <div className="flex flex-wrap items-center gap-4 text-xs text-stone-300 pt-1">
+                            <span className="flex items-center gap-1.5">
+                              <CalendarDays className="h-3.5 w-3.5 text-amber-400" />
+                              Berangkat: <strong className="text-white">{formatDate(parent.tanggalBerangkat)}</strong>
+                            </span>
+                            <span className="text-stone-600">•</span>
+                            <span className="flex items-center gap-1.5">
+                              <CalendarDays className="h-3.5 w-3.5 text-amber-400" />
+                              Pulang: <strong className="text-white">{formatDate(parent.tanggalPulang)}</strong>
+                            </span>
+                            <span className="text-stone-600">•</span>
+                            <span className="flex items-center gap-1.5">
+                              <Plane className="h-3.5 w-3.5 text-amber-400" />
+                              Maskapai: <strong className="text-white">{parent.maskapai || "Saudia Airlines"}</strong>
+                            </span>
+                          </div>
                         </div>
-                        <StatusBadge status={manifest.status} />
+
+                        {/* Materialization Metrics Box */}
+                        <div className="flex items-center gap-3 bg-stone-800/90 border border-stone-700/60 rounded-xl p-3 shrink-0 self-start md:self-auto">
+                          <div className="text-center px-3 border-r border-stone-700">
+                            <p className="text-[10px] text-stone-400 font-semibold uppercase">Total Pax</p>
+                            <p className="text-xl font-bold text-white">{parentJamaah.length}</p>
+                          </div>
+                          <div className="text-center px-3 border-r border-stone-700">
+                            <p className="text-[10px] text-stone-400 font-semibold uppercase">Rombongan</p>
+                            <p className="text-xl font-bold text-amber-400">{parentGroups.length}</p>
+                          </div>
+                          <div className="text-center px-3">
+                            <p className="text-[10px] text-stone-400 font-semibold uppercase">Kuota Seat</p>
+                            <p className="text-xl font-bold text-emerald-400">
+                              {parent.terisi}/{parent.maxSeat || parent.kuota || 45}
+                            </p>
+                          </div>
+                        </div>
                       </div>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="grid grid-cols-4 gap-4 text-sm">
-                        <div>
-                          <span className="text-muted-foreground">Keberangkatan:</span>
-                          <p className="font-medium">{keberangkatan?.kode ?? "-"}</p>
-                        </div>
-                        <div>
-                          <span className="text-muted-foreground">Jumlah Jamaah:</span>
-                          <p className="font-medium">{manifest.data?.length ?? 0} orang</p>
-                        </div>
-                        <div>
-                          <span className="text-muted-foreground">Dibuat:</span>
-                          <p className="font-medium">{formatDateShort(manifest.createdAt)}</p>
-                        </div>
-                        <div>
-                          <span className="text-muted-foreground">Diupdate:</span>
-                          <p className="font-medium">{formatDateShort(manifest.updatedAt)}</p>
-                        </div>
+                    </div>
+
+                    {/* PECAHAN PAKET (Children Split Packages) */}
+                    {children.length > 0 && (
+                      <div className="pl-4 space-y-2.5 pt-1 border-l-2 border-dashed border-amber-500/40 ml-4">
+                        <p className="text-[11px] font-extrabold uppercase tracking-wider text-amber-400/90 flex items-center gap-1.5 pl-1">
+                          <Split className="h-3.5 w-3.5" />
+                          Pecahan Paket ({children.length} Variant Split / Starting / Promo)
+                        </p>
+                        {children.map((child) => {
+                          const childGroupIds = new Set(
+                            groups.filter((g) => g.paketKeberangkatanId === child.id).map((g) => g.id)
+                          );
+                          const childJamaah = allJamaah.filter(
+                            (j) =>
+                              (child.jamaahIds?.includes(j.id) || childGroupIds.has(j.groupId)) &&
+                              j.status !== "batal"
+                          );
+                          const childGroups = groups.filter((g) => g.paketKeberangkatanId === child.id);
+                          const isPromo = child.splitReason === "promo" || !!child.promoLabel;
+
+                          return (
+                            <div
+                              key={child.id}
+                              onClick={() => {
+                                setSelectedKeberangkatan(child.id);
+                                router.push(`/admin/manifest?paketId=${child.id}`);
+                              }}
+                              className="p-4 bg-stone-900/90 border border-stone-800 hover:border-amber-500/50 text-white rounded-xl shadow-xs transition-all cursor-pointer flex flex-col md:flex-row md:items-center justify-between gap-4 group"
+                            >
+                              <div className="space-y-1">
+                                <div className="flex items-center flex-wrap gap-2">
+                                  {isPromo ? (
+                                    <span className="bg-purple-500/20 text-purple-300 border border-purple-500/30 text-[10px] font-bold px-2 py-0.5 rounded uppercase flex items-center gap-1">
+                                      <Tag className="h-3 w-3" /> Promo: {child.promoLabel || child.splitLabel || "PROMO SPECIAL"}
+                                    </span>
+                                  ) : (
+                                    <span className="bg-sky-500/20 text-sky-300 border border-sky-500/30 text-[10px] font-bold px-2 py-0.5 rounded uppercase flex items-center gap-1">
+                                      📍 Starting Point: {child.splitLabel || child.namaPaket}
+                                    </span>
+                                  )}
+                                  <span className="bg-amber-500/20 text-amber-400 border border-amber-500/30 text-[10px] font-bold px-2 py-0.5 rounded uppercase font-mono">
+                                    {child.kode}
+                                  </span>
+                                  <StatusBadge status={child.status} />
+                                </div>
+                                <h4 className="text-base font-bold text-white group-hover:text-amber-300 transition-colors">
+                                  {child.namaPaket}
+                                </h4>
+                                <div className="flex flex-wrap items-center gap-3 text-xs text-stone-400">
+                                  <span>Berangkat: <strong className="text-stone-200">{formatDate(child.tanggalBerangkat)}</strong></span>
+                                  <span>•</span>
+                                  <span>Maskapai: <strong className="text-stone-200">{child.maskapai || "Saudia"}</strong></span>
+                                </div>
+                              </div>
+
+                              {/* Child Materialization Metrics Box */}
+                              <div className="flex items-center gap-2.5 bg-stone-850/80 border border-stone-750/60 rounded-lg p-2.5 shrink-0 self-start md:self-auto">
+                                <div className="text-center px-2.5 border-r border-stone-700">
+                                  <p className="text-[9px] text-stone-400 font-semibold uppercase">Total Pax</p>
+                                  <p className="text-base font-bold text-white">{childJamaah.length}</p>
+                                </div>
+                                <div className="text-center px-2.5 border-r border-stone-700">
+                                  <p className="text-[9px] text-stone-400 font-semibold uppercase">Rombongan</p>
+                                  <p className="text-base font-bold text-amber-400">{childGroups.length}</p>
+                                </div>
+                                <div className="text-center px-2.5">
+                                  <p className="text-[9px] text-stone-400 font-semibold uppercase">Kuota Seat</p>
+                                  <p className="text-base font-bold text-emerald-400">
+                                    {child.terisi}/{child.maxSeat || child.kuota || 45}
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
-                      <div className="mt-4 flex items-center gap-2 pt-3 border-t">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => router.push(`/admin/manifest?paketId=${manifest.keberangkatanId}`)}
-                        >
-                          <Eye className="mr-1 h-3 w-3" />
-                          Lihat Manifest Utama Paket
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => router.push(`/admin/manifest/${manifest.id}`)}
-                        >
-                          <Pencil className="mr-1 h-3 w-3" />
-                          Edit Manifest Row
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() =>
-                            router.push(`/admin/manifest/${manifest.id}/export`)
-                          }
-                        >
-                          <Download className="mr-1 h-3 w-3" />
-                          Export CSV
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
+                    )}
+                  </div>
                 );
               })}
             </div>
