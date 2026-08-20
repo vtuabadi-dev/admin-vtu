@@ -127,6 +127,9 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
             });
           }
         }
+      }, {
+        timeout: 30000,
+        maxWait: 10000,
       });
 
       return NextResponse.json({ success: true, message: "Jamaah berhasil dihapus permanen" });
@@ -146,6 +149,9 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
             });
           }
         }
+      }, {
+        timeout: 30000,
+        maxWait: 10000,
       });
 
       return NextResponse.json({ success: true, message: "Jamaah berhasil dibatalkan (soft delete)" });

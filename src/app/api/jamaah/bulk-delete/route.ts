@@ -65,82 +65,106 @@ export async function POST(request: NextRequest) {
         new Set(targetJamaah.map((j) => j.groupId).filter(Boolean) as string[])
       );
 
-      await prisma.$transaction(async (tx) => {
-        // A. Delete child records for all target jamaah
-        await Promise.all([
-          tx.dokumenItem.deleteMany({ where: { jamaahId: { in: ids } } }).catch(() => {}),
-          tx.manifestRow.deleteMany({ where: { jamaahId: { in: ids } } }).catch(() => {}),
-          tx.penghuniKamar.deleteMany({ where: { jamaahId: { in: ids } } }).catch(() => {}),
-          tx.alokasiPembayaran.deleteMany({ where: { jamaahId: { in: ids } } }).catch(() => {}),
-        ]);
+      // Pre-fetch all members of affected groups in ONE single query
+      const allMembersInAffectedGroups = affectedGroupIds.length > 0
+        ? await prisma.jamaah.findMany({
+            where: { groupId: { in: affectedGroupIds } },
+            select: { id: true, groupId: true },
+          })
+        : [];
 
-        // B. Analyze affected groups: re-assign group leader if partially deleted, or collect empty groups
-        const emptyGroupIds: string[] = [];
+      // Pre-fetch current registration groups in ONE single query
+      const affectedGroups = affectedGroupIds.length > 0
+        ? await prisma.registrationGroup.findMany({
+            where: { id: { in: affectedGroupIds } },
+            select: { id: true, ketuaGroupId: true },
+          })
+        : [];
 
-        for (const gId of affectedGroupIds) {
-          const allGroupMembers = await tx.jamaah.findMany({
-            where: { groupId: gId },
-            select: { id: true },
-          });
+      const membersByGroup = new Map<string, string[]>();
+      for (const m of allMembersInAffectedGroups) {
+        const list = membersByGroup.get(m.groupId) || [];
+        list.push(m.id);
+        membersByGroup.set(m.groupId, list);
+      }
 
-          const remainingMembers = allGroupMembers.filter((m) => !ids.includes(m.id));
+      const emptyGroupIds: string[] = [];
+      const partialGroupUpdates: { id: string; ketuaGroupId?: string; jumlahAnggota: number }[] = [];
 
-          if (remainingMembers.length > 0) {
-            const groupObj = await tx.registrationGroup.findUnique({
-              where: { id: gId },
-              select: { ketuaGroupId: true },
-            });
+      for (const group of affectedGroups) {
+        const groupMemberIds = membersByGroup.get(group.id) || [];
+        const remainingMemberIds = groupMemberIds.filter((mId) => !ids.includes(mId));
 
-            // Re-assign group leader BEFORE deleting jamaah if current leader is being deleted
-            if (groupObj && ids.includes(groupObj.ketuaGroupId || "")) {
-              await tx.registrationGroup.update({
-                where: { id: gId },
-                data: {
-                  ketuaGroupId: remainingMembers[0]!.id,
-                  jumlahAnggota: remainingMembers.length,
-                },
-              });
-            } else {
-              await tx.registrationGroup.update({
-                where: { id: gId },
-                data: { jumlahAnggota: remainingMembers.length },
-              });
-            }
-          } else {
-            emptyGroupIds.push(gId);
+        if (remainingMemberIds.length > 0) {
+          const updateData: { id: string; ketuaGroupId?: string; jumlahAnggota: number } = {
+            id: group.id,
+            jumlahAnggota: remainingMemberIds.length,
+          };
+          if (ids.includes(group.ketuaGroupId)) {
+            updateData.ketuaGroupId = remainingMemberIds[0];
           }
+          partialGroupUpdates.push(updateData);
+        } else {
+          emptyGroupIds.push(group.id);
         }
+      }
 
-        // C. Clean up and delete completely empty groups FIRST to release 'KetuaGroup' foreign keys
-        if (emptyGroupIds.length > 0) {
+      await prisma.$transaction(
+        async (tx) => {
+          // A. Delete child records for all target jamaah
           await Promise.all([
-            tx.invoiceItem.deleteMany({ where: { invoice: { groupId: { in: emptyGroupIds } } } }).catch(() => {}),
-            tx.invoice.deleteMany({ where: { groupId: { in: emptyGroupIds } } }).catch(() => {}),
-            tx.pembayaran.deleteMany({ where: { groupId: { in: emptyGroupIds } } }).catch(() => {}),
-            tx.invoiceSplitConfig.deleteMany({ where: { groupId: { in: emptyGroupIds } } }).catch(() => {}),
-            tx.reminder.deleteMany({ where: { groupId: { in: emptyGroupIds } } }).catch(() => {}),
+            tx.dokumenItem.deleteMany({ where: { jamaahId: { in: ids } } }).catch(() => {}),
+            tx.manifestRow.deleteMany({ where: { jamaahId: { in: ids } } }).catch(() => {}),
+            tx.penghuniKamar.deleteMany({ where: { jamaahId: { in: ids } } }).catch(() => {}),
+            tx.alokasiPembayaran.deleteMany({ where: { jamaahId: { in: ids } } }).catch(() => {}),
           ]);
 
-          const groupIn = emptyGroupIds.map((g) => `'${g.replace(/'/g, "''")}'`).join(",");
-          await tx.$executeRawUnsafe(`DELETE FROM "registration_groups" WHERE "id" IN (${groupIn})`);
-        }
-
-        // D. Hard delete the jamaah records
-        const jamaahIn = ids.map((j) => `'${j.replace(/'/g, "''")}'`).join(",");
-        await tx.$executeRawUnsafe(`DELETE FROM "jamaah" WHERE "id" IN (${jamaahIn})`);
-
-        // E. Decrement filled seats for affected packages
-        for (const [pId, activeCount] of Object.entries(activePaxPerPackage)) {
-          const kbr = await tx.keberangkatan.findUnique({ where: { id: pId } });
-          if (kbr && kbr.terisi > 0) {
-            const newTerisi = Math.max(0, kbr.terisi - activeCount);
-            await tx.keberangkatan.update({
-              where: { id: pId },
-              data: { terisi: newTerisi },
+          // B. Update partially deleted groups (reassign leader if deleted & update count)
+          for (const upd of partialGroupUpdates) {
+            await tx.registrationGroup.update({
+              where: { id: upd.id },
+              data: {
+                ...(upd.ketuaGroupId ? { ketuaGroupId: upd.ketuaGroupId } : {}),
+                jumlahAnggota: upd.jumlahAnggota,
+              },
             });
           }
+
+          // C. Clean up and delete completely empty groups FIRST to release 'KetuaGroup' foreign keys
+          if (emptyGroupIds.length > 0) {
+            await Promise.all([
+              tx.invoiceItem.deleteMany({ where: { invoice: { groupId: { in: emptyGroupIds } } } }).catch(() => {}),
+              tx.invoice.deleteMany({ where: { groupId: { in: emptyGroupIds } } }).catch(() => {}),
+              tx.pembayaran.deleteMany({ where: { groupId: { in: emptyGroupIds } } }).catch(() => {}),
+              tx.invoiceSplitConfig.deleteMany({ where: { groupId: { in: emptyGroupIds } } }).catch(() => {}),
+              tx.reminder.deleteMany({ where: { groupId: { in: emptyGroupIds } } }).catch(() => {}),
+            ]);
+
+            const groupIn = emptyGroupIds.map((g) => `'${g.replace(/'/g, "''")}'`).join(",");
+            await tx.$executeRawUnsafe(`DELETE FROM "registration_groups" WHERE "id" IN (${groupIn})`);
+          }
+
+          // D. Hard delete the jamaah records
+          const jamaahIn = ids.map((j) => `'${j.replace(/'/g, "''")}'`).join(",");
+          await tx.$executeRawUnsafe(`DELETE FROM "jamaah" WHERE "id" IN (${jamaahIn})`);
+
+          // E. Decrement filled seats for affected packages
+          for (const [pId, activeCount] of Object.entries(activePaxPerPackage)) {
+            const kbr = await tx.keberangkatan.findUnique({ where: { id: pId } });
+            if (kbr && kbr.terisi > 0) {
+              const newTerisi = Math.max(0, kbr.terisi - activeCount);
+              await tx.keberangkatan.update({
+                where: { id: pId },
+                data: { terisi: newTerisi },
+              });
+            }
+          }
+        },
+        {
+          timeout: 30000,
+          maxWait: 10000,
         }
-      });
+      );
 
       return NextResponse.json({
         success: true,
@@ -149,23 +173,29 @@ export async function POST(request: NextRequest) {
       });
     } else {
       // Soft Delete Mode (status = "batal")
-      await prisma.$transaction(async (tx) => {
-        await tx.jamaah.updateMany({
-          where: { id: { in: ids } },
-          data: { status: "batal" },
-        });
+      await prisma.$transaction(
+        async (tx) => {
+          await tx.jamaah.updateMany({
+            where: { id: { in: ids } },
+            data: { status: "batal" },
+          });
 
-        for (const [pId, activeCount] of Object.entries(activePaxPerPackage)) {
-          const kbr = await tx.keberangkatan.findUnique({ where: { id: pId } });
-          if (kbr && kbr.terisi > 0) {
-            const newTerisi = Math.max(0, kbr.terisi - activeCount);
-            await tx.keberangkatan.update({
-              where: { id: pId },
-              data: { terisi: newTerisi },
-            });
+          for (const [pId, activeCount] of Object.entries(activePaxPerPackage)) {
+            const kbr = await tx.keberangkatan.findUnique({ where: { id: pId } });
+            if (kbr && kbr.terisi > 0) {
+              const newTerisi = Math.max(0, kbr.terisi - activeCount);
+              await tx.keberangkatan.update({
+                where: { id: pId },
+                data: { terisi: newTerisi },
+              });
+            }
           }
+        },
+        {
+          timeout: 30000,
+          maxWait: 10000,
         }
-      });
+      );
 
       return NextResponse.json({
         success: true,
