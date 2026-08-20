@@ -897,10 +897,10 @@ function ManifestPageContent() {
               <div className="rounded-xl border border-stone-200 dark:border-stone-800 bg-card shadow-sm overflow-hidden">
                 <div className="overflow-x-auto">
                   <table className="w-full border-collapse text-left text-xs font-medium">
-                    <thead className="bg-gradient-to-b from-stone-100 via-stone-200/80 to-stone-300 dark:from-stone-800 dark:via-stone-850 dark:to-stone-900 border-t border-t-white/90 dark:border-t-stone-700/60 border-b-2 border-b-stone-400/80 dark:border-b-stone-950 sticky top-0 z-10 shadow-md backdrop-blur-md">
+                    <thead className="bg-gradient-to-b from-stone-100 via-stone-200 to-stone-300 dark:from-stone-800 dark:via-stone-850 dark:to-stone-900 border-t border-t-white/90 dark:border-t-stone-700/60 border-b-2 border-b-stone-400/80 dark:border-b-stone-950 sticky top-0 z-10 shadow-md">
                       <tr>
                         {isSelectMode && (
-                          <th className="px-2 py-3 font-extrabold uppercase tracking-wider text-[10px] text-stone-800 dark:text-stone-100 border-r border-stone-300/80 dark:border-stone-700/80 w-10 text-center sticky left-0 bg-gradient-to-b from-stone-100 via-stone-200/80 to-stone-300 dark:from-stone-800 dark:via-stone-850 dark:to-stone-900 z-20 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
+                          <th className="px-2 py-3 font-extrabold uppercase tracking-wider text-[10px] text-stone-800 dark:text-stone-100 border-r border-stone-300/80 dark:border-stone-700/80 w-10 text-center sticky left-0 bg-gradient-to-b from-stone-100 via-stone-200 to-stone-300 dark:from-stone-800 dark:via-stone-850 dark:to-stone-900 z-20 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
                             <input
                               type="checkbox"
                               className="h-4 w-4 rounded border-stone-300 text-amber-600 focus:ring-amber-500 cursor-pointer"
@@ -976,7 +976,7 @@ function ManifestPageContent() {
                         <th className="px-3 py-3 font-extrabold uppercase tracking-wider text-[10px] text-stone-800 dark:text-stone-100 min-w-[200px] border-r border-stone-300/80 dark:border-stone-700/80 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
                           ALAMAT
                         </th>
-                        <th className="px-3 py-3 font-extrabold uppercase tracking-wider text-[10px] text-stone-800 dark:text-stone-100 w-24 text-center sticky right-0 bg-gradient-to-b from-stone-100 via-stone-200/80 to-stone-300 dark:from-stone-800 dark:via-stone-850 dark:to-stone-900 shadow-[-4px_0_6px_-4px_rgba(0,0,0,0.2),inset_0_1px_0_rgba(255,255,255,0.7)] dark:shadow-[-4px_0_6px_-4px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,255,255,0.05)] z-20">
+                        <th className="px-3 py-3 font-extrabold uppercase tracking-wider text-[10px] text-stone-800 dark:text-stone-100 w-24 text-center sticky right-0 bg-gradient-to-b from-stone-100 via-stone-200 to-stone-300 dark:from-stone-800 dark:via-stone-850 dark:to-stone-900 shadow-[-4px_0_6px_-4px_rgba(0,0,0,0.2),inset_0_1px_0_rgba(255,255,255,0.7)] dark:shadow-[-4px_0_6px_-4px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,255,255,0.05)] z-20">
                           AKSI
                         </th>
                       </tr>
@@ -1038,7 +1038,7 @@ function ManifestPageContent() {
                               >
                                 {/* CHECKBOX COL */}
                                 {isSelectMode && (
-                                  <td className="px-2 py-2.5 text-center border-r border-stone-200/50 dark:border-stone-800/50 sticky left-0 bg-white/90 dark:bg-card/90 z-10">
+                                  <td className="px-2 py-2.5 text-center border-r border-stone-200/50 dark:border-stone-800/50 sticky left-0 bg-white dark:bg-stone-900 z-10">
                                     <input
                                       type="checkbox"
                                       className="h-4 w-4 rounded border-stone-300 text-amber-600 focus:ring-amber-500 cursor-pointer"
@@ -1175,7 +1175,7 @@ function ManifestPageContent() {
                                 </td>
 
                                 {/* AKSI */}
-                                <td className="px-3 py-2.5 text-center sticky right-0 bg-white/90 dark:bg-card/90 backdrop-blur-sm shadow-[-4px_0_6px_-4px_rgba(0,0,0,0.05)] border-l border-stone-200/50 dark:border-stone-800/50">
+                                <td className="px-3 py-2.5 text-center sticky right-0 bg-white dark:bg-stone-900 shadow-[-4px_0_6px_-4px_rgba(0,0,0,0.15)] border-l border-stone-200/50 dark:border-stone-800/50 z-10">
                                   <div className="flex items-center justify-center gap-2">
                                     {isFirstInGroup && (
                                       <Button
