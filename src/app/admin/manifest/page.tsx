@@ -311,6 +311,45 @@ function ManifestPageContent() {
     return result;
   }, [keberangkatanList]);
 
+  // Group package hierarchy by Departure Month
+  const groupedByMonth = useMemo(() => {
+    if (!groupedPackageTree || groupedPackageTree.length === 0) return [];
+
+    const monthNames = [
+      "JANUARI", "FEBRUARI", "MARET", "APRIL", "MEI", "JUNI",
+      "JULI", "AGUSTUS", "SEPTEMBER", "OKTOBER", "NOVEMBER", "DESEMBER"
+    ];
+
+    const map = new Map<
+      string,
+      { label: string; yearMonthSortKey: number; items: typeof groupedPackageTree }
+    >();
+
+    groupedPackageTree.forEach((group) => {
+      let key = "LAINNYA";
+      let label = "TANGGAL BELUM DITETAPKAN";
+      let yearMonthSortKey = 999999;
+
+      if (group.parent.tanggalBerangkat) {
+        const d = new Date(group.parent.tanggalBerangkat);
+        if (!isNaN(d.getTime())) {
+          const m = monthNames[d.getMonth()];
+          const y = d.getFullYear();
+          key = `${m}_${y}`;
+          label = `${m} ${y}`;
+          yearMonthSortKey = y * 100 + d.getMonth();
+        }
+      }
+
+      if (!map.has(key)) {
+        map.set(key, { label, yearMonthSortKey, items: [] });
+      }
+      map.get(key)!.items.push(group);
+    });
+
+    return Array.from(map.values()).sort((a, b) => a.yearMonthSortKey - b.yearMonthSortKey);
+  }, [groupedPackageTree]);
+
   // Jamaah belonging to the active package
   const activePackageJamaah = useMemo(() => {
     if (!activePackage) return [];
@@ -1264,185 +1303,205 @@ function ManifestPageContent() {
             <div className="flex h-40 items-center justify-center">
               <ErrorState onRetry={loadAllData} message={error.message} />
             </div>
-          ) : groupedPackageTree.length === 0 ? (
+          ) : groupedByMonth.length === 0 ? (
             <div className="flex h-40 items-center justify-center text-sm text-muted-foreground border rounded-xl bg-card">
               Belum ada data paket keberangkatan terdaftar.
             </div>
           ) : (
-            <div className="space-y-4">
-              {groupedPackageTree.map(({ parent, children }) => {
-                const parentGroupIds = new Set(
-                  groups.filter((g) => g.paketKeberangkatanId === parent.id).map((g) => g.id)
-                );
-                const parentJamaah = allJamaah.filter(
-                  (j) =>
-                    (parent.jamaahIds?.includes(j.id) || parentGroupIds.has(j.groupId)) &&
-                    j.status !== "batal"
-                );
-                const parentQuota = parent.maxSeat || parent.kuota || 45;
-                const parentFilled = parentJamaah.length;
-                const parentDeficit = parentQuota - parentFilled;
-
-                return (
-                  <div
-                    key={parent.id}
-                    className="p-4 bg-stone-950/90 border border-stone-800 rounded-2xl shadow-md space-y-3"
-                  >
-                    {/* PAKET UTAMA (Parent Card Header) */}
-                    <div
-                      onClick={() => {
-                        setSelectedKeberangkatan(parent.id);
-                        router.push(`/admin/manifest?paketId=${parent.id}`);
-                      }}
-                      className="p-5 bg-gradient-to-r from-stone-900 via-stone-850 to-stone-900 border border-stone-800 hover:border-amber-500/60 text-white rounded-xl shadow-sm transition-all cursor-pointer group"
-                    >
-                      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                        <div className="space-y-1.5">
-                          <div className="flex items-center flex-wrap gap-2">
-                            <span className="bg-amber-500/20 text-amber-400 border border-amber-500/30 text-[10px] font-bold px-2 py-0.5 rounded uppercase font-mono">
-                              {parent.kode}
-                            </span>
-                            {children.length > 0 && (
-                              <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-bold px-2 py-0.5 rounded uppercase flex items-center gap-1">
-                                <Split className="h-3 w-3" /> Paket Utama ({children.length} Pecahan)
-                              </span>
-                            )}
-                            <StatusBadge status={parent.status} />
-                          </div>
-                          <h3 className="text-lg font-bold tracking-tight text-amber-400 group-hover:text-amber-300 transition-colors">
-                            {parent.namaPaket || parent.paketUmroh?.namaPaket || "PAKET UMROH"}
-                          </h3>
-                          <div className="flex flex-wrap items-center gap-4 text-xs text-stone-300 pt-1">
-                            <span className="flex items-center gap-1.5">
-                              <CalendarDays className="h-3.5 w-3.5 text-amber-400" />
-                              Berangkat: <strong className="text-white">{formatDate(parent.tanggalBerangkat)}</strong>
-                            </span>
-                            <span className="text-stone-600">•</span>
-                            <span className="flex items-center gap-1.5">
-                              <CalendarDays className="h-3.5 w-3.5 text-amber-400" />
-                              Pulang: <strong className="text-white">{formatDate(parent.tanggalPulang)}</strong>
-                            </span>
-                            <span className="text-stone-600">•</span>
-                            <span className="flex items-center gap-1.5">
-                              <Plane className="h-3.5 w-3.5 text-amber-400" />
-                              Maskapai: <strong className="text-white">{parent.maskapai || "Saudia Airlines"}</strong>
-                            </span>
-                          </div>
-                        </div>
-
-                        {/* Materialization Metrics Box */}
-                        <div className="flex items-center gap-3 bg-stone-800/90 border border-stone-700/60 rounded-xl p-3 shrink-0 self-start md:self-auto">
-                          <div className="text-center px-3 border-r border-stone-700">
-                            <p className="text-[10px] text-stone-400 font-semibold uppercase">Total Pax</p>
-                            <p className="text-xl font-bold text-white">{parentFilled}</p>
-                          </div>
-                          <div className="text-center px-3 border-r border-stone-700 min-w-[95px] flex flex-col items-center justify-center">
-                            <p className="text-[10px] text-stone-400 font-semibold uppercase">Materialisasi</p>
-                            {parentDeficit > 0 ? (
-                              <p className="text-sm font-bold text-amber-400 mt-1">Kurang {parentDeficit} Pax</p>
-                            ) : (
-                              <div className="mt-1 flex items-center justify-center" title="Kuota Terpenuhi">
-                                <CheckCircle2 className="h-6 w-6 text-emerald-400" />
-                              </div>
-                            )}
-                          </div>
-                          <div className="text-center px-3">
-                            <p className="text-[10px] text-stone-400 font-semibold uppercase">Kuota Seat</p>
-                            <p className="text-xl font-bold text-emerald-400">
-                              {parentFilled}/{parentQuota}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
+            <div className="space-y-8">
+              {groupedByMonth.map(({ label, items }) => (
+                <div key={label} className="space-y-4">
+                  {/* Aesthetic Month Divider Line with Center Badge */}
+                  <div className="relative flex items-center justify-center my-6 py-2">
+                    <div className="flex-grow border-t border-amber-500/30 dark:border-amber-500/20 bg-gradient-to-r from-transparent via-amber-500/40 to-amber-500/10 h-[1px]"></div>
+                    <div className="flex items-center gap-2 px-4 py-1.5 rounded-full bg-stone-900 border border-amber-500/40 text-amber-300 font-extrabold text-xs tracking-wider uppercase shadow-md shrink-0">
+                      <CalendarDays className="h-3.5 w-3.5 text-amber-400" />
+                      <span>KEBERANGKATAN {label}</span>
+                      <span className="ml-1 bg-amber-500/20 text-amber-400 text-[10px] px-2 py-0.5 rounded-full font-mono">
+                        {items.length} Paket
+                      </span>
                     </div>
+                    <div className="flex-grow border-t border-amber-500/30 dark:border-amber-500/20 bg-gradient-to-l from-transparent via-amber-500/40 to-amber-500/10 h-[1px]"></div>
+                  </div>
 
-                    {/* PECAHAN PAKET (Children Split Packages) */}
-                    {children.length > 0 && (
-                      <div className="pl-4 space-y-2.5 pt-1 border-l-2 border-dashed border-amber-500/40 ml-4">
-                        <p className="text-[11px] font-extrabold uppercase tracking-wider text-amber-400/90 flex items-center gap-1.5 pl-1">
-                          <Split className="h-3.5 w-3.5" />
-                          Pecahan Paket ({children.length} Variant Split / Starting / Promo)
-                        </p>
-                        {children.map((child) => {
-                          const childGroupIds = new Set(
-                            groups.filter((g) => g.paketKeberangkatanId === child.id).map((g) => g.id)
-                          );
-                          const childJamaah = allJamaah.filter(
-                            (j) =>
-                              (child.jamaahIds?.includes(j.id) || childGroupIds.has(j.groupId)) &&
-                              j.status !== "batal"
-                          );
-                          const childQuota = child.maxSeat || child.kuota || 45;
-                          const childFilled = childJamaah.length;
-                          const childDeficit = childQuota - childFilled;
-                          const isPromo = child.splitReason === "promo" || !!child.promoLabel;
+                  {/* Month's Package Cards */}
+                  <div className="space-y-4">
+                    {items.map(({ parent, children }) => {
+                      const parentGroupIds = new Set(
+                        groups.filter((g) => g.paketKeberangkatanId === parent.id).map((g) => g.id)
+                      );
+                      const parentJamaah = allJamaah.filter(
+                        (j) =>
+                          (parent.jamaahIds?.includes(j.id) || parentGroupIds.has(j.groupId)) &&
+                          j.status !== "batal"
+                      );
+                      const parentQuota = parent.maxSeat || parent.kuota || 45;
+                      const parentFilled = parentJamaah.length;
+                      const parentDeficit = parentQuota - parentFilled;
 
-                          return (
-                            <div
-                              key={child.id}
-                              onClick={() => {
-                                setSelectedKeberangkatan(child.id);
-                                router.push(`/admin/manifest?paketId=${child.id}`);
-                              }}
-                              className="p-4 bg-stone-900/90 border border-stone-800 hover:border-amber-500/50 text-white rounded-xl shadow-xs transition-all cursor-pointer flex flex-col md:flex-row md:items-center justify-between gap-4 group"
-                            >
-                              <div className="space-y-1">
+                      return (
+                        <div
+                          key={parent.id}
+                          className="p-4 bg-stone-950/90 border border-stone-800 rounded-2xl shadow-md space-y-3"
+                        >
+                          {/* PAKET UTAMA (Parent Card Header) */}
+                          <div
+                            onClick={() => {
+                              setSelectedKeberangkatan(parent.id);
+                              router.push(`/admin/manifest?paketId=${parent.id}`);
+                            }}
+                            className="p-5 bg-gradient-to-r from-stone-900 via-stone-850 to-stone-900 border border-stone-800 hover:border-amber-500/60 text-white rounded-xl shadow-sm transition-all cursor-pointer group"
+                          >
+                            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                              <div className="space-y-1.5">
                                 <div className="flex items-center flex-wrap gap-2">
-                                  {isPromo ? (
-                                    <span className="bg-purple-500/20 text-purple-300 border border-purple-500/30 text-[10px] font-bold px-2 py-0.5 rounded uppercase flex items-center gap-1">
-                                      <Tag className="h-3 w-3" /> Promo: {child.promoLabel || child.splitLabel || "PROMO SPECIAL"}
-                                    </span>
-                                  ) : (
-                                    <span className="bg-sky-500/20 text-sky-300 border border-sky-500/30 text-[10px] font-bold px-2 py-0.5 rounded uppercase flex items-center gap-1">
-                                      📍 Starting Point: {child.splitLabel || child.namaPaket}
+                                  <span className="bg-amber-500/20 text-amber-400 border border-amber-500/30 text-[10px] font-bold px-2 py-0.5 rounded uppercase font-mono">
+                                    {parent.kode}
+                                  </span>
+                                  {children.length > 0 && (
+                                    <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-bold px-2 py-0.5 rounded uppercase flex items-center gap-1">
+                                      <Split className="h-3 w-3" /> Paket Utama ({children.length} Pecahan)
                                     </span>
                                   )}
-                                  <span className="bg-amber-500/20 text-amber-400 border border-amber-500/30 text-[10px] font-bold px-2 py-0.5 rounded uppercase font-mono">
-                                    {child.kode}
-                                  </span>
-                                  <StatusBadge status={child.status} />
+                                  <StatusBadge status={parent.status} />
                                 </div>
-                                <h4 className="text-base font-bold text-white group-hover:text-amber-300 transition-colors">
-                                  {child.namaPaket}
-                                </h4>
-                                <div className="flex flex-wrap items-center gap-3 text-xs text-stone-400">
-                                  <span>Berangkat: <strong className="text-stone-200">{formatDate(child.tanggalBerangkat)}</strong></span>
-                                  <span>•</span>
-                                  <span>Maskapai: <strong className="text-stone-200">{child.maskapai || "Saudia"}</strong></span>
+                                <h3 className="text-lg font-bold tracking-tight text-amber-400 group-hover:text-amber-300 transition-colors">
+                                  {parent.namaPaket || parent.paketUmroh?.namaPaket || "PAKET UMROH"}
+                                </h3>
+                                <div className="flex flex-wrap items-center gap-4 text-xs text-stone-300 pt-1">
+                                  <span className="flex items-center gap-1.5">
+                                    <CalendarDays className="h-3.5 w-3.5 text-amber-400" />
+                                    Berangkat: <strong className="text-white">{formatDate(parent.tanggalBerangkat)}</strong>
+                                  </span>
+                                  <span className="text-stone-600">•</span>
+                                  <span className="flex items-center gap-1.5">
+                                    <CalendarDays className="h-3.5 w-3.5 text-amber-400" />
+                                    Pulang: <strong className="text-white">{formatDate(parent.tanggalPulang)}</strong>
+                                  </span>
+                                  <span className="text-stone-600">•</span>
+                                  <span className="flex items-center gap-1.5">
+                                    <Plane className="h-3.5 w-3.5 text-amber-400" />
+                                    Maskapai: <strong className="text-white">{parent.maskapai || "Saudia Airlines"}</strong>
+                                  </span>
                                 </div>
                               </div>
 
-                              {/* Child Materialization Metrics Box */}
-                              <div className="flex items-center gap-2.5 bg-stone-850/80 border border-stone-750/60 rounded-lg p-2.5 shrink-0 self-start md:self-auto">
-                                <div className="text-center px-2.5 border-r border-stone-700">
-                                  <p className="text-[9px] text-stone-400 font-semibold uppercase">Total Pax</p>
-                                  <p className="text-base font-bold text-white">{childFilled}</p>
+                              {/* Materialization Metrics Box */}
+                              <div className="flex items-center gap-3 bg-stone-800/90 border border-stone-700/60 rounded-xl p-3 shrink-0 self-start md:self-auto">
+                                <div className="text-center px-3 border-r border-stone-700">
+                                  <p className="text-[10px] text-stone-400 font-semibold uppercase">Total Pax</p>
+                                  <p className="text-xl font-bold text-white">{parentFilled}</p>
                                 </div>
-                                <div className="text-center px-2.5 border-r border-stone-700 min-w-[85px] flex flex-col items-center justify-center">
-                                  <p className="text-[9px] text-stone-400 font-semibold uppercase">Materialisasi</p>
-                                  {childDeficit > 0 ? (
-                                    <p className="text-xs font-bold text-amber-400 mt-0.5">Kurang {childDeficit} Pax</p>
+                                <div className="text-center px-3 border-r border-stone-700 min-w-[95px] flex flex-col items-center justify-center">
+                                  <p className="text-[10px] text-stone-400 font-semibold uppercase">Materialisasi</p>
+                                  {parentDeficit > 0 ? (
+                                    <p className="text-sm font-bold text-amber-400 mt-1">Kurang {parentDeficit} Pax</p>
                                   ) : (
-                                    <div className="mt-0.5 flex items-center justify-center" title="Kuota Terpenuhi">
-                                      <CheckCircle2 className="h-5 w-5 text-emerald-400" />
+                                    <div className="mt-1 flex items-center justify-center" title="Kuota Terpenuhi">
+                                      <CheckCircle2 className="h-6 w-6 text-emerald-400" />
                                     </div>
                                   )}
                                 </div>
-                                <div className="text-center px-2.5">
-                                  <p className="text-[9px] text-stone-400 font-semibold uppercase">Kuota Seat</p>
-                                  <p className="text-base font-bold text-emerald-400">
-                                    {childFilled}/{childQuota}
+                                <div className="text-center px-3">
+                                  <p className="text-[10px] text-stone-400 font-semibold uppercase">Kuota Seat</p>
+                                  <p className="text-xl font-bold text-emerald-400">
+                                    {parentFilled}/{parentQuota}
                                   </p>
                                 </div>
                               </div>
                             </div>
-                          );
-                        })}
-                      </div>
-                    )}
+                          </div>
+
+                          {/* PECAHAN PAKET (Children Split Packages) */}
+                          {children.length > 0 && (
+                            <div className="pl-4 space-y-2.5 pt-1 border-l-2 border-dashed border-amber-500/40 ml-4">
+                              <p className="text-[11px] font-extrabold uppercase tracking-wider text-amber-400/90 flex items-center gap-1.5 pl-1">
+                                <Split className="h-3.5 w-3.5" />
+                                Pecahan Paket ({children.length} Variant Split / Starting / Promo)
+                              </p>
+                              {children.map((child) => {
+                                const childGroupIds = new Set(
+                                  groups.filter((g) => g.paketKeberangkatanId === child.id).map((g) => g.id)
+                                );
+                                const childJamaah = allJamaah.filter(
+                                  (j) =>
+                                    (child.jamaahIds?.includes(j.id) || childGroupIds.has(j.groupId)) &&
+                                    j.status !== "batal"
+                                );
+                                const childQuota = child.maxSeat || child.kuota || 45;
+                                const childFilled = childJamaah.length;
+                                const childDeficit = childQuota - childFilled;
+                                const isPromo = child.splitReason === "promo" || !!child.promoLabel;
+
+                                return (
+                                  <div
+                                    key={child.id}
+                                    onClick={() => {
+                                      setSelectedKeberangkatan(child.id);
+                                      router.push(`/admin/manifest?paketId=${child.id}`);
+                                    }}
+                                    className="p-4 bg-stone-900/90 border border-stone-800 hover:border-amber-500/50 text-white rounded-xl shadow-xs transition-all cursor-pointer flex flex-col md:flex-row md:items-center justify-between gap-4 group"
+                                  >
+                                    <div className="space-y-1">
+                                      <div className="flex items-center flex-wrap gap-2">
+                                        {isPromo ? (
+                                          <span className="bg-purple-500/20 text-purple-300 border border-purple-500/30 text-[10px] font-bold px-2 py-0.5 rounded uppercase flex items-center gap-1">
+                                            <Tag className="h-3 w-3" /> Promo: {child.promoLabel || child.splitLabel || "PROMO SPECIAL"}
+                                          </span>
+                                        ) : (
+                                          <span className="bg-sky-500/20 text-sky-300 border border-sky-500/30 text-[10px] font-bold px-2 py-0.5 rounded uppercase flex items-center gap-1">
+                                            📍 Starting Point: {child.splitLabel || child.namaPaket}
+                                          </span>
+                                        )}
+                                        <span className="bg-amber-500/20 text-amber-400 border border-amber-500/30 text-[10px] font-bold px-2 py-0.5 rounded uppercase font-mono">
+                                          {child.kode}
+                                        </span>
+                                        <StatusBadge status={child.status} />
+                                      </div>
+                                      <h4 className="text-base font-bold text-white group-hover:text-amber-300 transition-colors">
+                                        {child.namaPaket}
+                                      </h4>
+                                      <div className="flex flex-wrap items-center gap-3 text-xs text-stone-400">
+                                        <span>Berangkat: <strong className="text-stone-200">{formatDate(child.tanggalBerangkat)}</strong></span>
+                                        <span>•</span>
+                                        <span>Maskapai: <strong className="text-stone-200">{child.maskapai || "Saudia"}</strong></span>
+                                      </div>
+                                    </div>
+
+                                    {/* Child Materialization Metrics Box */}
+                                    <div className="flex items-center gap-2.5 bg-stone-850/80 border border-stone-750/60 rounded-lg p-2.5 shrink-0 self-start md:self-auto">
+                                      <div className="text-center px-2.5 border-r border-stone-700">
+                                        <p className="text-[9px] text-stone-400 font-semibold uppercase">Total Pax</p>
+                                        <p className="text-base font-bold text-white">{childFilled}</p>
+                                      </div>
+                                      <div className="text-center px-2.5 border-r border-stone-700 min-w-[85px] flex flex-col items-center justify-center">
+                                        <p className="text-[9px] text-stone-400 font-semibold uppercase">Materialisasi</p>
+                                        {childDeficit > 0 ? (
+                                          <p className="text-xs font-bold text-amber-400 mt-0.5">Kurang {childDeficit} Pax</p>
+                                        ) : (
+                                          <div className="mt-0.5 flex items-center justify-center" title="Kuota Terpenuhi">
+                                            <CheckCircle2 className="h-5 w-5 text-emerald-400" />
+                                          </div>
+                                        )}
+                                      </div>
+                                      <div className="text-center px-2.5">
+                                        <p className="text-[9px] text-stone-400 font-semibold uppercase">Kuota Seat</p>
+                                        <p className="text-base font-bold text-emerald-400">
+                                          {childFilled}/{childQuota}
+                                        </p>
+                                      </div>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
-                );
-              })}
+                </div>
+              ))}
             </div>
           )}
         </div>
