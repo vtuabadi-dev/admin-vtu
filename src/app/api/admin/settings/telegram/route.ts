@@ -21,7 +21,7 @@ export async function GET() {
     return NextResponse.json({ success: false, message: perm.reason }, { status: 403 });
   }
 
-  const config = getTelegramConfig();
+  const config = await getTelegramConfig();
 
   // Mask botToken for security when sending to frontend
   let maskedToken = "";
@@ -99,7 +99,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Save updated configuration
-    const updated = updateTelegramConfig({
+    const updated = await updateTelegramConfig({
       botToken: body.botToken !== undefined ? body.botToken : undefined,
       groupIdJakarta: body.groupIdJakarta !== undefined ? body.groupIdJakarta : undefined,
       groupIdSurabaya: body.groupIdSurabaya !== undefined ? body.groupIdSurabaya : undefined,

@@ -1,5 +1,6 @@
 import fs from "fs";
 import path from "path";
+import { prisma } from "@/server/db/client";
 
 export interface TelegramConfig {
   botToken: string;
@@ -28,7 +29,26 @@ function getDefaultConfig(): TelegramConfig {
   };
 }
 
-export function getTelegramConfig(): TelegramConfig {
+export async function getTelegramConfig(): Promise<TelegramConfig> {
+  // 1. Try reading from PostgreSQL Database (Primary Storage across Serverless Instances)
+  try {
+    const rows = await prisma.$queryRawUnsafe<{ value: any }[]>(
+      `SELECT value FROM system_settings WHERE key = 'telegram_config' LIMIT 1;`
+    );
+    if (rows && rows.length > 0 && rows[0]?.value) {
+      const parsed = typeof rows[0].value === "string" ? JSON.parse(rows[0].value) : rows[0].value;
+      return {
+        botToken: parsed.botToken || process.env.TELEGRAM_BOT_TOKEN || "",
+        groupIdJakarta: parsed.groupIdJakarta || process.env.TELEGRAM_GROUP_ID_JAKARTA || "",
+        groupIdSurabaya: parsed.groupIdSurabaya || process.env.TELEGRAM_GROUP_ID_SURABAYA || "",
+        enabled: parsed.enabled !== undefined ? Boolean(parsed.enabled) : process.env.TELEGRAM_BROADCAST_ENABLED !== "false",
+      };
+    }
+  } catch {
+    // Database table not yet created or connection error — fallback to file/env
+  }
+
+  // 2. Try reading from local file system
   try {
     const configFile = getConfigFile();
     if (fs.existsSync(configFile)) {
@@ -48,13 +68,32 @@ export function getTelegramConfig(): TelegramConfig {
   return getDefaultConfig();
 }
 
-export function updateTelegramConfig(partialConfig: Partial<TelegramConfig>): TelegramConfig {
-  const current = getTelegramConfig();
+export async function updateTelegramConfig(partialConfig: Partial<TelegramConfig>): Promise<TelegramConfig> {
+  const current = await getTelegramConfig();
   const updated: TelegramConfig = {
     ...current,
     ...partialConfig,
   };
 
+  // 1. Persist to PostgreSQL Database
+  try {
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS system_settings (
+        key TEXT PRIMARY KEY,
+        value JSONB,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      );
+    `);
+    await prisma.$executeRawUnsafe(`
+      INSERT INTO system_settings (key, value, updated_at)
+      VALUES ('telegram_config', $1::jsonb, NOW())
+      ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW();
+    `, JSON.stringify(updated));
+  } catch (dbErr) {
+    console.error("[Telegram Service] Gagal menyimpan konfigurasi ke database:", dbErr);
+  }
+
+  // 2. Also write to local file system
   try {
     const configDir = getConfigDir();
     if (!fs.existsSync(configDir)) {
@@ -126,7 +165,7 @@ export async function sendPackageBroadcast(
   flyerMessageId?: number;
   replyMessageId?: number;
 }> {
-  const baseConfig = getTelegramConfig();
+  const baseConfig = await getTelegramConfig();
   const config: TelegramConfig = {
     ...baseConfig,
     ...configOverride,
