@@ -311,7 +311,7 @@ function ManifestPageContent() {
     return result;
   }, [keberangkatanList]);
 
-  // Group package hierarchy by Departure Month
+  // Group package hierarchy by Departure Month & Year
   const groupedByMonth = useMemo(() => {
     if (!groupedPackageTree || groupedPackageTree.length === 0) return [];
 
@@ -320,27 +320,51 @@ function ManifestPageContent() {
       "JULI", "AGUSTUS", "SEPTEMBER", "OKTOBER", "NOVEMBER", "DESEMBER"
     ];
 
+    const parseMonthYear = (dateInput?: string | Date | null) => {
+      if (!dateInput) return { key: "LAINNYA", label: "KEBERANGKATAN MENDATANG", yearMonthSortKey: 999999 };
+
+      let d = dateInput instanceof Date ? dateInput : new Date(dateInput);
+      if (!isNaN(d.getTime())) {
+        const m = monthNames[d.getMonth()];
+        const y = d.getFullYear();
+        return { key: `${m}_${y}`, label: `${m} ${y}`, yearMonthSortKey: y * 100 + d.getMonth() };
+      }
+
+      if (typeof dateInput === "string") {
+        const str = dateInput.trim().toUpperCase();
+        const yearMatch = str.match(/\b(20\d\d)\b/);
+        const y = yearMatch && yearMatch[1] ? parseInt(yearMatch[1], 10) : new Date().getFullYear();
+
+        let monthIdx = -1;
+        if (str.includes("JAN")) monthIdx = 0;
+        else if (str.includes("FEB")) monthIdx = 1;
+        else if (str.includes("MAR")) monthIdx = 2;
+        else if (str.includes("APR")) monthIdx = 3;
+        else if (str.includes("MEI") || str.includes("MAY")) monthIdx = 4;
+        else if (str.includes("JUN")) monthIdx = 5;
+        else if (str.includes("JUL")) monthIdx = 6;
+        else if (str.includes("AGT") || str.includes("AGU") || str.includes("AUG")) monthIdx = 7;
+        else if (str.includes("SEP")) monthIdx = 8;
+        else if (str.includes("OKT") || str.includes("OCT")) monthIdx = 9;
+        else if (str.includes("NOV")) monthIdx = 10;
+        else if (str.includes("DES") || str.includes("DEC")) monthIdx = 11;
+
+        if (monthIdx !== -1) {
+          const m = monthNames[monthIdx];
+          return { key: `${m}_${y}`, label: `${m} ${y}`, yearMonthSortKey: y * 100 + monthIdx };
+        }
+      }
+
+      return { key: "LAINNYA", label: "KEBERANGKATAN MENDATANG", yearMonthSortKey: 999999 };
+    };
+
     const map = new Map<
       string,
       { label: string; yearMonthSortKey: number; items: typeof groupedPackageTree }
     >();
 
     groupedPackageTree.forEach((group) => {
-      let key = "LAINNYA";
-      let label = "TANGGAL BELUM DITETAPKAN";
-      let yearMonthSortKey = 999999;
-
-      if (group.parent.tanggalBerangkat) {
-        const d = new Date(group.parent.tanggalBerangkat);
-        if (!isNaN(d.getTime())) {
-          const m = monthNames[d.getMonth()];
-          const y = d.getFullYear();
-          key = `${m}_${y}`;
-          label = `${m} ${y}`;
-          yearMonthSortKey = y * 100 + d.getMonth();
-        }
-      }
-
+      const { key, label, yearMonthSortKey } = parseMonthYear(group.parent.tanggalBerangkat);
       if (!map.has(key)) {
         map.set(key, { label, yearMonthSortKey, items: [] });
       }
