@@ -62,6 +62,48 @@ function deriveProvinsi(provinsi?: string, kota?: string): string {
   return "DKI JAKARTA";
 }
 
+function getAirlineCode(maskapaiStr?: string | null): string {
+  if (!maskapaiStr) return "SV";
+  const str = maskapaiStr.trim().toUpperCase();
+
+  if (str.length <= 3 && /^[A-Z0-9]+$/.test(str)) return str;
+
+  if (str.includes("SAUDI")) return "SV";
+  if (str.includes("GARUDA")) return "GA";
+  if (str.includes("LION")) return "JT";
+  if (str.includes("BATIK")) return "ID";
+  if (str.includes("OMAN")) return "WY";
+  if (str.includes("EMIRATES")) return "EK";
+  if (str.includes("QATAR")) return "QR";
+  if (str.includes("ETIHAD")) return "EY";
+  if (str.includes("FLYNAS") || str.includes("NAS")) return "XY";
+  if (str.includes("INDIGO")) return "6E";
+  if (str.includes("MALAYSIA")) return "MH";
+  if (str.includes("SINGAPORE")) return "SQ";
+
+  return str.slice(0, 3);
+}
+
+function formatPackageTitleShort(namaPaket?: string | null): string {
+  if (!namaPaket) return "PAKET UMROH";
+  let title = namaPaket;
+
+  title = title.replace(/\(\s*SAUDIA\s+AIRLINES\s*\)/gi, "(SV)");
+  title = title.replace(/\(\s*SAUDIAN?\s+AIRLINES?\s*\)/gi, "(SV)");
+  title = title.replace(/\(\s*SAUDIA\s*\)/gi, "(SV)");
+  title = title.replace(/\(\s*GARUDA\s+INDONESIA\s*\)/gi, "(GA)");
+  title = title.replace(/\(\s*GARUDA\s*\)/gi, "(GA)");
+  title = title.replace(/\(\s*LION\s+AIR\s*\)/gi, "(JT)");
+  title = title.replace(/\(\s*BATIK\s+AIR\s*\)/gi, "(ID)");
+  title = title.replace(/\(\s*OMAN\s+AIR\s*\)/gi, "(WY)");
+  title = title.replace(/\(\s*EMIRATES\s*\)/gi, "(EK)");
+  title = title.replace(/\(\s*QATAR\s+AIRWAYS\s*\)/gi, "(QR)");
+  title = title.replace(/\(\s*ETIHAD\s+AIRWAYS\s*\)/gi, "(EY)");
+  title = title.replace(/\(\s*FLYNAS\s*\)/gi, "(XY)");
+
+  return title;
+}
+
 function getPasporDetails(j: any) {
   let pasporDoc: any = null;
   if (j.dokumen && Array.isArray(j.dokumen)) {
@@ -762,7 +804,7 @@ function ManifestPageContent() {
               <Select
                 options={keberangkatanList.map((k) => ({
                   value: k.id,
-                  label: `${k.kode} — ${k.namaPaket || k.paketUmroh?.namaPaket || "-"} (${formatDateShort(k.tanggalBerangkat)})`,
+                  label: `${k.kode} — ${formatPackageTitleShort(k.namaPaket || k.paketUmroh?.namaPaket || "-")} (${formatDateShort(k.tanggalBerangkat)})`,
                 }))}
                 placeholder="-- Pilih Paket Keberangkatan Aktif --"
                 value={selectedKeberangkatan}
@@ -829,7 +871,7 @@ function ManifestPageContent() {
                       <StatusBadge status={activePackage.status} />
                     </div>
                     <h2 className="text-xl font-bold tracking-tight text-amber-400">
-                      {activePackage.namaPaket || activePackage.paketUmroh?.namaPaket || "PAKET UMROH"}
+                      {formatPackageTitleShort(activePackage.namaPaket || activePackage.paketUmroh?.namaPaket || "PAKET UMROH")}
                     </h2>
                     <div className="flex flex-wrap items-center gap-4 text-xs text-stone-300 pt-1">
                       <span className="flex items-center gap-1.5">
@@ -844,7 +886,7 @@ function ManifestPageContent() {
                       <span className="text-stone-600">•</span>
                       <span className="flex items-center gap-1.5">
                         <Plane className="h-3.5 w-3.5 text-amber-400" />
-                        Maskapai: <strong className="text-white">{activePackage.maskapai || "Saudia Airlines"}</strong>
+                        Maskapai: <strong className="text-white">{getAirlineCode(activePackage.maskapai)}</strong>
                       </span>
                     </div>
                   </div>
@@ -1390,7 +1432,7 @@ function ManifestPageContent() {
                                   <StatusBadge status={parent.status} />
                                 </div>
                                 <h3 className="text-lg font-bold tracking-tight text-amber-400 group-hover:text-amber-300 transition-colors">
-                                  {parent.namaPaket || parent.paketUmroh?.namaPaket || "PAKET UMROH"}
+                                  {formatPackageTitleShort(parent.namaPaket || parent.paketUmroh?.namaPaket || "PAKET UMROH")}
                                 </h3>
                                 <div className="flex flex-wrap items-center gap-4 text-xs text-stone-300 pt-1">
                                   <span className="flex items-center gap-1.5">
@@ -1405,7 +1447,7 @@ function ManifestPageContent() {
                                   <span className="text-stone-600">•</span>
                                   <span className="flex items-center gap-1.5">
                                     <Plane className="h-3.5 w-3.5 text-amber-400" />
-                                    Maskapai: <strong className="text-white">{parent.maskapai || "Saudia Airlines"}</strong>
+                                    Maskapai: <strong className="text-white">{getAirlineCode(parent.maskapai)}</strong>
                                   </span>
                                 </div>
                               </div>
@@ -1483,12 +1525,12 @@ function ManifestPageContent() {
                                         <StatusBadge status={child.status} />
                                       </div>
                                       <h4 className="text-base font-bold text-white group-hover:text-amber-300 transition-colors">
-                                        {child.namaPaket}
+                                        {formatPackageTitleShort(child.namaPaket)}
                                       </h4>
                                       <div className="flex flex-wrap items-center gap-3 text-xs text-stone-400">
                                         <span>Berangkat: <strong className="text-stone-200">{formatDate(child.tanggalBerangkat)}</strong></span>
                                         <span>•</span>
-                                        <span>Maskapai: <strong className="text-stone-200">{child.maskapai || "Saudia"}</strong></span>
+                                        <span>Maskapai: <strong className="text-stone-200">{getAirlineCode(child.maskapai)}</strong></span>
                                       </div>
                                     </div>
 
