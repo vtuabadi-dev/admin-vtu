@@ -59,21 +59,30 @@ export async function POST(request: NextRequest) {
 
     if (body.action === "test") {
       const targetGroup = body.targetGroup === "surabaya" ? "surabaya" : "jakarta";
-      const result = await sendPackageBroadcast({
-        packages: [
-          {
-            namaPaket: `[TES BROADCAST] Paket Umroh ${targetGroup === "surabaya" ? "Surabaya" : "Jakarta"}`,
-            maskapai: "Saudia Airlines",
-            hotelMekkah: "Pulman Zamzam / Setaraf",
-            hotelMadinah: "Frontel Al Harithia / Setaraf",
-            hargaPaket: 32500000,
-            kuota: 45,
-            kodeIndividu: `VTU-9D-REG-${targetGroup === "surabaya" ? "SUB" : "JKT"}-SV-20260906`,
-          },
-        ],
-        startingPointCode: targetGroup === "surabaya" ? "SUB" : "JKT",
-        startingPointName: targetGroup === "surabaya" ? "Surabaya" : "Jakarta",
-      });
+      const configOverride: any = {};
+      if (body.botToken) configOverride.botToken = body.botToken;
+      if (body.groupIdJakarta) configOverride.groupIdJakarta = body.groupIdJakarta;
+      if (body.groupIdSurabaya) configOverride.groupIdSurabaya = body.groupIdSurabaya;
+      if (body.enabled !== undefined) configOverride.enabled = Boolean(body.enabled);
+
+      const result = await sendPackageBroadcast(
+        {
+          packages: [
+            {
+              namaPaket: `[TES BROADCAST] Paket Umroh ${targetGroup === "surabaya" ? "Surabaya" : "Jakarta"}`,
+              maskapai: "Saudia Airlines",
+              hotelMekkah: "Pulman Zamzam / Setaraf",
+              hotelMadinah: "Frontel Al Harithia / Setaraf",
+              hargaPaket: 32500000,
+              kuota: 45,
+              kodeIndividu: `VTU-9D-REG-${targetGroup === "surabaya" ? "SUB" : "JKT"}-SV-20260906`,
+            },
+          ],
+          startingPointCode: targetGroup === "surabaya" ? "SUB" : "JKT",
+          startingPointName: targetGroup === "surabaya" ? "Surabaya" : "Jakarta",
+        },
+        configOverride
+      );
 
       if (!result.success) {
         return NextResponse.json(

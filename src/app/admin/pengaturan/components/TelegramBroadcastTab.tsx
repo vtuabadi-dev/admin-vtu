@@ -76,14 +76,14 @@ export function TelegramBroadcastTab() {
           enabled,
         }),
       });
-      const json = await res.json();
-      if (json.success) {
+      const json = await res.json().catch(() => null);
+      if (res.ok && json?.success) {
         setFeedback({ type: "success", message: "Konfigurasi Broadcast Telegram berhasil disimpan!" });
       } else {
-        setFeedback({ type: "error", message: json.message || "Gagal menyimpan konfigurasi." });
+        setFeedback({ type: "error", message: json?.message || `Gagal menyimpan konfigurasi (HTTP ${res.status}).` });
       }
     } catch (err) {
-      setFeedback({ type: "error", message: (err as Error).message });
+      setFeedback({ type: "error", message: `Gagal menghubungi server: ${(err as Error).message}` });
     } finally {
       setSaving(false);
     }
@@ -102,19 +102,23 @@ export function TelegramBroadcastTab() {
         body: JSON.stringify({
           action: "test",
           targetGroup,
+          botToken,
+          groupIdJakarta,
+          groupIdSurabaya,
+          enabled,
         }),
       });
-      const json = await res.json();
-      if (json.success) {
+      const json = await res.json().catch(() => null);
+      if (res.ok && json?.success) {
         setFeedback({
           type: "success",
           message: json.message || `Tes pesan broadcast berhasil dikirim ke grup ${targetGroup.toUpperCase()}!`,
         });
       } else {
-        setFeedback({ type: "error", message: json.message || "Gagal mengirim pesan tes." });
+        setFeedback({ type: "error", message: json?.message || `Gagal mengirim pesan tes ke Telegram (HTTP ${res.status}).` });
       }
     } catch (err) {
-      setFeedback({ type: "error", message: (err as Error).message });
+      setFeedback({ type: "error", message: `Gagal menghubungi server: ${(err as Error).message}` });
     } finally {
       if (targetGroup === "jakarta") setTestingJkt(false);
       else setTestingSub(false);

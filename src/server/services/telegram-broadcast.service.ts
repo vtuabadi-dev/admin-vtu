@@ -8,8 +8,16 @@ export interface TelegramConfig {
   enabled: boolean;
 }
 
-const CONFIG_DIR = path.join(process.cwd(), "storage");
-const CONFIG_FILE = path.join(CONFIG_DIR, "telegram_config.json");
+function getConfigDir(): string {
+  if (process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME) {
+    return path.join("/tmp", "storage");
+  }
+  return path.join(process.cwd(), "storage");
+}
+
+function getConfigFile(): string {
+  return path.join(getConfigDir(), "telegram_config.json");
+}
 
 function getDefaultConfig(): TelegramConfig {
   return {
@@ -22,8 +30,9 @@ function getDefaultConfig(): TelegramConfig {
 
 export function getTelegramConfig(): TelegramConfig {
   try {
-    if (fs.existsSync(CONFIG_FILE)) {
-      const raw = fs.readFileSync(CONFIG_FILE, "utf-8");
+    const configFile = getConfigFile();
+    if (fs.existsSync(configFile)) {
+      const raw = fs.readFileSync(configFile, "utf-8");
       const parsed = JSON.parse(raw);
       return {
         botToken: parsed.botToken || process.env.TELEGRAM_BOT_TOKEN || "",
@@ -47,10 +56,11 @@ export function updateTelegramConfig(partialConfig: Partial<TelegramConfig>): Te
   };
 
   try {
-    if (!fs.existsSync(CONFIG_DIR)) {
-      fs.mkdirSync(CONFIG_DIR, { recursive: true });
+    const configDir = getConfigDir();
+    if (!fs.existsSync(configDir)) {
+      fs.mkdirSync(configDir, { recursive: true });
     }
-    fs.writeFileSync(CONFIG_FILE, JSON.stringify(updated, null, 2), "utf-8");
+    fs.writeFileSync(getConfigFile(), JSON.stringify(updated, null, 2), "utf-8");
   } catch (err) {
     console.error("[Telegram Service] Gagal menyimpan file konfigurasi:", err);
   }
@@ -106,14 +116,21 @@ export interface BroadcastPackageDataParams {
   startingPointName?: string;
 }
 
-export async function sendPackageBroadcast(params: BroadcastPackageDataParams): Promise<{
+export async function sendPackageBroadcast(
+  params: BroadcastPackageDataParams,
+  configOverride?: Partial<TelegramConfig>
+): Promise<{
   success: boolean;
   message?: string;
   targetGroup?: string;
   flyerMessageId?: number;
   replyMessageId?: number;
 }> {
-  const config = getTelegramConfig();
+  const baseConfig = getTelegramConfig();
+  const config: TelegramConfig = {
+    ...baseConfig,
+    ...configOverride,
+  };
 
   if (!config.enabled) {
     console.log("[Telegram Broadcast] Telegram broadcast non-aktif dalam konfigurasi.");
