@@ -97,7 +97,7 @@ export async function POST(request: NextRequest) {
               await tx.registrationGroup.update({
                 where: { id: gId },
                 data: {
-                  ketuaGroupId: remainingMembers[0].id,
+                  ketuaGroupId: remainingMembers[0]!.id,
                   jumlahAnggota: remainingMembers.length,
                 },
               });

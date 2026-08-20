@@ -284,7 +284,7 @@ function ManifestPageContent() {
   // Reset selection when package or search query changes
   useEffect(() => {
     setSelectedJamaahIds([]);
-  }, [selectedKeberangkatan, searchQuery, filterStatus]);
+  }, [selectedKeberangkatan, searchQuery]);
 
   const isAllSelected = useMemo(() => {
     if (filteredActiveJamaah.length === 0) return false;
