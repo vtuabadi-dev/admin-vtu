@@ -841,10 +841,10 @@ function ManifestPageContent() {
               <div className="rounded-xl border border-stone-200 dark:border-stone-800 bg-card shadow-sm overflow-hidden">
                 <div className="overflow-x-auto">
                   <table className="w-full border-collapse text-left text-xs font-medium">
-                    <thead className="bg-stone-100/90 dark:bg-stone-900/90 border-b border-stone-200 dark:border-stone-800 sticky top-0 z-10 backdrop-blur-xs">
+                    <thead className="bg-gradient-to-b from-stone-100 via-stone-200/80 to-stone-300 dark:from-stone-800 dark:via-stone-850 dark:to-stone-900 border-t border-t-white/90 dark:border-t-stone-700/60 border-b-2 border-b-stone-400/80 dark:border-b-stone-950 sticky top-0 z-10 shadow-md backdrop-blur-md">
                       <tr>
                         {isSelectMode && (
-                          <th className="px-2 py-3 font-bold uppercase tracking-wider text-[10px] text-stone-700 dark:text-stone-300 border-r border-stone-200/70 dark:border-stone-800/70 w-10 text-center sticky left-0 bg-stone-100/90 dark:bg-stone-900/90 z-20">
+                          <th className="px-2 py-3 font-extrabold uppercase tracking-wider text-[10px] text-stone-800 dark:text-stone-100 border-r border-stone-300/80 dark:border-stone-700/80 w-10 text-center sticky left-0 bg-gradient-to-b from-stone-100 via-stone-200/80 to-stone-300 dark:from-stone-800 dark:via-stone-850 dark:to-stone-900 z-20 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
                             <input
                               type="checkbox"
                               className="h-4 w-4 rounded border-stone-300 text-amber-600 focus:ring-amber-500 cursor-pointer"
@@ -854,73 +854,73 @@ function ManifestPageContent() {
                             />
                           </th>
                         )}
-                        <th className="px-3 py-3 font-bold uppercase tracking-wider text-[10px] text-stone-700 dark:text-stone-300 border-r border-stone-200/70 dark:border-stone-800/70 min-w-[200px]">
+                        <th className="px-3 py-3 font-extrabold uppercase tracking-wider text-[10px] text-stone-800 dark:text-stone-100 border-r border-stone-300/80 dark:border-stone-700/80 min-w-[200px] shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
                           KELUARGA / ROMBONGAN
                         </th>
-                        <th className="px-2 py-3 font-bold uppercase tracking-wider text-[10px] text-stone-700 dark:text-stone-300 border-r border-stone-200/70 dark:border-stone-800/70 w-16 text-center">
+                        <th className="px-2 py-3 font-extrabold uppercase tracking-wider text-[10px] text-stone-800 dark:text-stone-100 border-r border-stone-300/80 dark:border-stone-700/80 w-16 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
                           NO JAMAAH
                         </th>
-                        <th className="px-3 py-3 font-bold uppercase tracking-wider text-[10px] text-stone-700 dark:text-stone-300 border-r border-stone-200/70 dark:border-stone-800/70 min-w-[100px]">
+                        <th className="px-3 py-3 font-extrabold uppercase tracking-wider text-[10px] text-stone-800 dark:text-stone-100 border-r border-stone-300/80 dark:border-stone-700/80 min-w-[100px] shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
                           ID REGISTER
                         </th>
-                        <th className="px-3 py-3 font-bold uppercase tracking-wider text-[10px] text-stone-700 dark:text-stone-300 border-r border-stone-200/70 dark:border-stone-800/70 min-w-[130px]">
+                        <th className="px-3 py-3 font-extrabold uppercase tracking-wider text-[10px] text-stone-800 dark:text-stone-100 border-r border-stone-300/80 dark:border-stone-700/80 min-w-[130px] shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
                           NO ID (*)
                         </th>
-                        <th className="px-3 py-3 font-bold uppercase tracking-wider text-[10px] text-stone-700 dark:text-stone-300 border-r border-stone-200/70 dark:border-stone-800/70 w-24">
+                        <th className="px-3 py-3 font-extrabold uppercase tracking-wider text-[10px] text-stone-800 dark:text-stone-100 border-r border-stone-300/80 dark:border-stone-700/80 w-24 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
                           JENIS IDENTITAS (*)
                         </th>
-                        <th className="px-3 py-3 font-bold uppercase tracking-wider text-[10px] text-stone-700 dark:text-stone-300 border-r border-stone-200/70 dark:border-stone-800/70 min-w-[170px]">
+                        <th className="px-3 py-3 font-extrabold uppercase tracking-wider text-[10px] text-stone-800 dark:text-stone-100 border-r border-stone-300/80 dark:border-stone-700/80 min-w-[170px] shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
                           NAMA
                         </th>
-                        <th className="px-3 py-3 font-bold uppercase tracking-wider text-[10px] text-stone-700 dark:text-stone-300 border-r border-stone-200/70 dark:border-stone-800/70 min-w-[130px]">
+                        <th className="px-3 py-3 font-extrabold uppercase tracking-wider text-[10px] text-stone-800 dark:text-stone-100 border-r border-stone-300/80 dark:border-stone-700/80 min-w-[130px] shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
                           NO PASPOR
                         </th>
-                        <th className="px-3 py-3 font-bold uppercase tracking-wider text-[10px] text-stone-700 dark:text-stone-300 border-r border-stone-200/70 dark:border-stone-800/70 min-w-[130px]">
+                        <th className="px-3 py-3 font-extrabold uppercase tracking-wider text-[10px] text-stone-800 dark:text-stone-100 border-r border-stone-300/80 dark:border-stone-700/80 min-w-[130px] shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
                           TGL DIKELUARKAN
                         </th>
-                        <th className="px-3 py-3 font-bold uppercase tracking-wider text-[10px] text-stone-700 dark:text-stone-300 border-r border-stone-200/70 dark:border-stone-800/70 min-w-[130px]">
+                        <th className="px-3 py-3 font-extrabold uppercase tracking-wider text-[10px] text-stone-800 dark:text-stone-100 border-r border-stone-300/80 dark:border-stone-700/80 min-w-[130px] shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
                           TGL HABIS
                         </th>
-                        <th className="px-3 py-3 font-bold uppercase tracking-wider text-[10px] text-stone-700 dark:text-stone-300 border-r border-stone-200/70 dark:border-stone-800/70 min-w-[130px]">
+                        <th className="px-3 py-3 font-extrabold uppercase tracking-wider text-[10px] text-stone-800 dark:text-stone-100 border-r border-stone-300/80 dark:border-stone-700/80 min-w-[130px] shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
                           KOTA PASPOR
                         </th>
-                        <th className="px-3 py-3 font-bold uppercase tracking-wider text-[10px] text-stone-700 dark:text-stone-300 border-r border-stone-200/70 dark:border-stone-800/70 min-w-[130px]">
+                        <th className="px-3 py-3 font-extrabold uppercase tracking-wider text-[10px] text-stone-800 dark:text-stone-100 border-r border-stone-300/80 dark:border-stone-700/80 min-w-[130px] shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
                           HOTEL MAKKAH
                         </th>
-                        <th className="px-3 py-3 font-bold uppercase tracking-wider text-[10px] text-stone-700 dark:text-stone-300 border-r border-stone-200/70 dark:border-stone-800/70 min-w-[130px]">
+                        <th className="px-3 py-3 font-extrabold uppercase tracking-wider text-[10px] text-stone-800 dark:text-stone-100 border-r border-stone-300/80 dark:border-stone-700/80 min-w-[130px] shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
                           HOTEL MADINAH
                         </th>
-                        <th className="px-3 py-3 font-bold uppercase tracking-wider text-[10px] text-stone-700 dark:text-stone-300 border-r border-stone-200/70 dark:border-stone-800/70 min-w-[120px]">
+                        <th className="px-3 py-3 font-extrabold uppercase tracking-wider text-[10px] text-stone-800 dark:text-stone-100 border-r border-stone-300/80 dark:border-stone-700/80 min-w-[120px] shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
                           KAMAR
                         </th>
-                        <th className="px-2 py-3 font-bold uppercase tracking-wider text-[10px] text-stone-700 dark:text-stone-300 border-r border-stone-200/70 dark:border-stone-800/70 w-12 text-center">
+                        <th className="px-2 py-3 font-extrabold uppercase tracking-wider text-[10px] text-stone-800 dark:text-stone-100 border-r border-stone-300/80 dark:border-stone-700/80 w-12 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
                           JK (*)
                         </th>
-                        <th className="px-3 py-3 font-bold uppercase tracking-wider text-[10px] text-stone-700 dark:text-stone-300 border-r border-stone-200/70 dark:border-stone-800/70">
+                        <th className="px-3 py-3 font-extrabold uppercase tracking-wider text-[10px] text-stone-800 dark:text-stone-100 border-r border-stone-300/80 dark:border-stone-700/80 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
                           TEMPAT LAHIR (*)
                         </th>
-                        <th className="px-3 py-3 font-bold uppercase tracking-wider text-[10px] text-stone-700 dark:text-stone-300 border-r border-stone-200/70 dark:border-stone-800/70 w-24">
+                        <th className="px-3 py-3 font-extrabold uppercase tracking-wider text-[10px] text-stone-800 dark:text-stone-100 border-r border-stone-300/80 dark:border-stone-700/80 w-24 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
                           TGL LAHIR (*)
                         </th>
-                        <th className="px-2 py-3 font-bold uppercase tracking-wider text-[10px] text-stone-700 dark:text-stone-300 border-r border-stone-200/70 dark:border-stone-800/70 w-14 text-center">
+                        <th className="px-2 py-3 font-extrabold uppercase tracking-wider text-[10px] text-stone-800 dark:text-stone-100 border-r border-stone-300/80 dark:border-stone-700/80 w-14 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
                           UMUR
                         </th>
-                        <th className="px-3 py-3 font-bold uppercase tracking-wider text-[10px] text-stone-700 dark:text-stone-300 border-r border-stone-200/70 dark:border-stone-800/70">
+                        <th className="px-3 py-3 font-extrabold uppercase tracking-wider text-[10px] text-stone-800 dark:text-stone-100 border-r border-stone-300/80 dark:border-stone-700/80 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
                           STATUS MENIKAH
                         </th>
-                        <th className="px-3 py-3 font-bold uppercase tracking-wider text-[10px] text-stone-700 dark:text-stone-300 border-r border-stone-200/70 dark:border-stone-800/70 min-w-[110px]">
+                        <th className="px-3 py-3 font-extrabold uppercase tracking-wider text-[10px] text-stone-800 dark:text-stone-100 border-r border-stone-300/80 dark:border-stone-700/80 min-w-[110px] shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
                           NO TELP/HP
                         </th>
-                        <th className="px-3 py-3 font-bold uppercase tracking-wider text-[10px] text-stone-700 dark:text-stone-300 border-r border-stone-200/70 dark:border-stone-800/70 min-w-[140px]">
+                        <th className="px-3 py-3 font-extrabold uppercase tracking-wider text-[10px] text-stone-800 dark:text-stone-100 border-r border-stone-300/80 dark:border-stone-700/80 min-w-[140px] shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
                           KOTA/KAB (*)
                         </th>
-                        <th className="px-3 py-3 font-bold uppercase tracking-wider text-[10px] text-stone-700 dark:text-stone-300 border-r border-stone-200/70 dark:border-stone-800/70 w-28">
+                        <th className="px-3 py-3 font-extrabold uppercase tracking-wider text-[10px] text-stone-800 dark:text-stone-100 border-r border-stone-300/80 dark:border-stone-700/80 w-28 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
                           PROVINSI (*)
                         </th>
-                        <th className="px-3 py-3 font-bold uppercase tracking-wider text-[10px] text-stone-700 dark:text-stone-300 min-w-[200px] border-r border-stone-200/70 dark:border-stone-800/70">
+                        <th className="px-3 py-3 font-extrabold uppercase tracking-wider text-[10px] text-stone-800 dark:text-stone-100 min-w-[200px] border-r border-stone-300/80 dark:border-stone-700/80 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
                           ALAMAT
                         </th>
-                        <th className="px-3 py-3 font-bold uppercase tracking-wider text-[10px] text-stone-700 dark:text-stone-300 w-24 text-center sticky right-0 bg-stone-100/90 dark:bg-stone-900/90 shadow-[-4px_0_6px_-4px_rgba(0,0,0,0.1)]">
+                        <th className="px-3 py-3 font-extrabold uppercase tracking-wider text-[10px] text-stone-800 dark:text-stone-100 w-24 text-center sticky right-0 bg-gradient-to-b from-stone-100 via-stone-200/80 to-stone-300 dark:from-stone-800 dark:via-stone-850 dark:to-stone-900 shadow-[-4px_0_6px_-4px_rgba(0,0,0,0.2),inset_0_1px_0_rgba(255,255,255,0.7)] dark:shadow-[-4px_0_6px_-4px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,255,255,0.05)] z-20">
                           AKSI
                         </th>
                       </tr>
