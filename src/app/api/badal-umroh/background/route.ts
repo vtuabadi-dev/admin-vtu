@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
-export const revalidate = 60; // Auto-check/revalidate every 60 seconds
 
 const BADAL_BG_FOLDER_ID = process.env.GOOGLE_DRIVE_BADAL_BG_FOLDER_ID || "1DpAiGYRvrZe3BwlH2eKeUFogZzlLnl_c";
 const DRIVE_API = "https://www.googleapis.com/drive/v3";
