@@ -1668,6 +1668,9 @@ export default function RegisterPage() {
                             {clusters.map((cl: any, idx: number) => {
                               const isSelected = selectedClusterIndex === idx;
                               const clPrice = Number(cl.hargaBase || 0);
+                              const isPromo = cl.isPromo || cl.clusterName?.toUpperCase().includes("PROMO") || (cl as any).promo;
+                              const isTanpaPerlengkapan = cl.perlengkapan === "EXCLUDE" || cl.tanpaPerlengkapan || (cl as any).isTanpaPerlengkapan;
+
                               return (
                                 <button
                                   key={idx}
@@ -1677,24 +1680,58 @@ export default function RegisterPage() {
                                     if (cl.clusterName) setHotelUpgrade(cl.clusterName);
                                   }}
                                   className={cn(
-                                    "p-3.5 rounded-xl border-2 text-left transition-all relative flex flex-col justify-between gap-2",
+                                    "p-3.5 rounded-xl border-2 text-left transition-all relative flex flex-col justify-between gap-2.5",
                                     isSelected
-                                      ? "border-blue-600 bg-blue-50/80 shadow-sm ring-1 ring-blue-500"
-                                      : "border-gray-200 bg-white hover:border-gray-300"
+                                      ? isPromo
+                                        ? "border-purple-600 bg-purple-50/80 shadow-sm ring-1 ring-purple-500"
+                                        : "border-blue-600 bg-blue-50/80 shadow-sm ring-1 ring-blue-500"
+                                      : isPromo
+                                        ? "border-purple-200 bg-gradient-to-br from-purple-50/30 to-white hover:border-purple-300"
+                                        : "border-gray-200 bg-white hover:border-gray-300"
                                   )}
                                 >
-                                  <div className="flex items-center justify-between">
-                                    <span className="font-bold text-sm text-gray-900">
-                                      {cl.clusterName || `Klaster ${idx + 1}`}
-                                    </span>
-                                    {isSelected && <CheckCircle2 className="w-4 h-4 text-blue-600" />}
+                                  <div className="flex items-start justify-between gap-2">
+                                    <div className="space-y-1">
+                                      <div className="flex items-center gap-1.5 flex-wrap">
+                                        <span className={cn(
+                                          "font-bold text-sm",
+                                          isPromo ? "text-purple-900" : "text-gray-900"
+                                        )}>
+                                          {cl.clusterName || `Klaster ${idx + 1}`}
+                                        </span>
+                                        {isPromo && (
+                                          <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-gradient-to-r from-purple-500/20 to-pink-500/20 text-purple-800 border border-purple-400/40">
+                                            🏷️ PROMO DEAL
+                                          </span>
+                                        )}
+                                      </div>
+                                      
+                                      {/* Perlengkapan Indicator */}
+                                      <div>
+                                        {isTanpaPerlengkapan ? (
+                                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-rose-50 text-rose-700 border border-rose-200">
+                                            ⚠️ Tanpa Perlengkapan (LA Only)
+                                          </span>
+                                        ) : (
+                                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                            🎁 Termasuk Perlengkapan Lengkap
+                                          </span>
+                                        )}
+                                      </div>
+                                    </div>
+                                    {isSelected && <CheckCircle2 className={cn("w-5 h-5 shrink-0", isPromo ? "text-purple-600" : "text-blue-600")} />}
                                   </div>
-                                  <div className="text-xs text-gray-600 space-y-0.5">
+
+                                  <div className="text-xs text-gray-600 space-y-0.5 bg-white/70 p-2 rounded-lg border border-gray-100">
                                     <p>🕋 Mekkah: <strong>{cl.hotelMekkah || "TBA"}</strong></p>
                                     <p>🕌 Madinah: <strong>{cl.hotelMadinah || "TBA"}</strong></p>
                                   </div>
-                                  <div className="text-xs font-semibold text-blue-700 pt-1 border-t border-gray-100">
-                                    Harga Base Klaster: Rp {clPrice.toLocaleString("id-ID")} / pax
+
+                                  <div className={cn(
+                                    "text-xs font-bold pt-1.5 border-t",
+                                    isPromo ? "text-purple-700 border-purple-100" : "text-blue-700 border-gray-100"
+                                  )}>
+                                    Harga Base: <span className="text-sm font-extrabold">Rp {clPrice.toLocaleString("id-ID")}</span> / pax
                                   </div>
                                 </button>
                               );

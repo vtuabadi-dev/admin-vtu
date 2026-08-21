@@ -19,51 +19,73 @@ export async function GET(request: NextRequest) {
     let isDualStartingGroup = false;
 
     if (namaPaket && namaPaket !== "ALL") {
-      // First check if there is a PaketGrup with this name
-      const matchGrup = await prisma.paketGrup.findFirst({
-        where: { namaPaket: namaPaket },
-        select: { id: true },
+      // Find matching package or group
+      const matchKeb = await prisma.keberangkatan.findFirst({
+        where: {
+          OR: [
+            { namaPaket: namaPaket },
+            { kode: namaPaket },
+            { kodeIndividu: namaPaket },
+            { id: namaPaket },
+          ],
+        },
+        select: {
+          id: true,
+          paketGrupId: true,
+          parentKeberangkatanId: true,
+          namaPaket: true,
+          kode: true,
+          kodeIndividu: true,
+          tanggalBerangkat: true,
+        },
       });
 
-      let matchKeb = null;
-      let targetGrupId = matchGrup?.id || null;
+      const matchGrup = !matchKeb
+        ? await prisma.paketGrup.findFirst({
+            where: { namaPaket: namaPaket },
+            select: { id: true },
+          })
+        : null;
 
-      if (!targetGrupId) {
-        matchKeb = await prisma.keberangkatan.findFirst({
-          where: {
-            OR: [
-              { namaPaket: namaPaket },
-              { kode: namaPaket },
-              { kodeIndividu: namaPaket },
-            ],
-          },
-          select: { id: true, paketGrupId: true, namaPaket: true, kode: true, kodeIndividu: true },
-        });
-        targetGrupId = matchKeb?.paketGrupId || null;
-      }
+      const rootParentId = matchKeb?.parentKeberangkatanId || matchKeb?.id || null;
+      const targetGrupId = matchKeb?.paketGrupId || matchGrup?.id || null;
 
-      if (targetGrupId) {
-        const groupMembers = await prisma.keberangkatan.findMany({
-          where: { paketGrupId: targetGrupId },
-          select: { namaPaket: true, kode: true, kodeIndividu: true },
-        });
+      // Find all related packages in the whole group (Parent + All Split Branches)
+      const groupMembers = await prisma.keberangkatan.findMany({
+        where: {
+          OR: [
+            ...(rootParentId ? [{ id: rootParentId }, { parentKeberangkatanId: rootParentId }] : []),
+            ...(targetGrupId ? [{ paketGrupId: targetGrupId }] : []),
+            ...(matchKeb ? [{ namaPaket: matchKeb.namaPaket }] : []),
+          ],
+        },
+        select: {
+          id: true,
+          namaPaket: true,
+          kode: true,
+          kodeIndividu: true,
+          splitLabel: true,
+        },
+      });
 
-        const namesSet = new Set<string>();
-        const uniqueTitles: string[] = [];
+      const namesSet = new Set<string>();
+      const uniqueTitles: string[] = [];
 
-        groupMembers.forEach((g) => {
-          if (g.namaPaket) {
-            namesSet.add(g.namaPaket);
-            if (!uniqueTitles.includes(g.namaPaket)) {
-              uniqueTitles.push(g.namaPaket);
-            }
+      groupMembers.forEach((g) => {
+        if (g.namaPaket) {
+          namesSet.add(g.namaPaket);
+          if (!uniqueTitles.includes(g.namaPaket)) {
+            uniqueTitles.push(g.namaPaket);
           }
-          if (g.kode) namesSet.add(g.kode);
-          if (g.kodeIndividu) namesSet.add(g.kodeIndividu);
-        });
+        }
+        if (g.kode) namesSet.add(g.kode);
+        if (g.kodeIndividu) namesSet.add(g.kodeIndividu);
+        namesSet.add(g.id);
+      });
 
+      if (namesSet.size > 0) {
         targetPackageNames = Array.from(namesSet);
-        linkedPackageNames = uniqueTitles;
+        linkedPackageNames = uniqueTitles.length > 0 ? uniqueTitles : [namaPaket];
         if (linkedPackageNames.length > 1) {
           isDualStartingGroup = true;
         }

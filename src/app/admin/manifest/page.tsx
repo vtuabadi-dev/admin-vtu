@@ -1072,6 +1072,9 @@ function ManifestPageContent() {
                         <th className="px-3 py-3 font-extrabold uppercase tracking-wider text-[10px] text-stone-800 dark:text-stone-100 border-r border-stone-300/80 dark:border-stone-700/80 min-w-[130px] shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
                           KOTA PASPOR
                         </th>
+                        <th className="px-3 py-3 font-extrabold uppercase tracking-wider text-[10px] text-stone-800 dark:text-stone-100 border-r border-stone-300/80 dark:border-stone-700/80 min-w-[150px] shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
+                          KLASTER &amp; FASILITAS
+                        </th>
                         <th className="px-3 py-3 font-extrabold uppercase tracking-wider text-[10px] text-stone-800 dark:text-stone-100 border-r border-stone-300/80 dark:border-stone-700/80 min-w-[130px] shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
                           HOTEL MAKKAH
                         </th>
@@ -1116,7 +1119,7 @@ function ManifestPageContent() {
                     <tbody className="divide-y divide-stone-200/60 dark:divide-stone-800/60">
                       {filteredActiveJamaah.length === 0 ? (
                         <tr>
-                          <td colSpan={isSelectMode ? 23 : 22} className="px-4 py-12 text-center text-stone-500">
+                          <td colSpan={isSelectMode ? 24 : 23} className="px-4 py-12 text-center text-stone-500">
                             <div className="space-y-3">
                               <p>Belum ada data jamaah terdaftar pada paket ini.</p>
                               <Button
@@ -1242,6 +1245,42 @@ function ManifestPageContent() {
                                 {/* KOTA PASPOR */}
                                 <td className="px-3 py-2.5 border-r border-stone-200/50 dark:border-stone-800/50 font-semibold text-stone-800 dark:text-stone-200">
                                   {pasporInfo.kotaPaspor}
+                                </td>
+
+                                {/* KLASTER & FASILITAS */}
+                                <td className="px-3 py-2.5 border-r border-stone-200/50 dark:border-stone-800/50">
+                                  {(() => {
+                                    const klasterName = (group.groupObj as any)?.hotelUpgrade || j.hotelUpgrade || j.cluster || "SILVER";
+                                    const isPromoKlaster = klasterName.toUpperCase().includes("PROMO");
+                                    const isTanpaPerlengkapan = (group.groupObj as any)?.tanpaPerlengkapan || (group.groupObj as any)?.perlengkapan === "EXCLUDE" || j.tanpaPerlengkapan;
+
+                                    return (
+                                      <div className="space-y-1">
+                                        <div>
+                                          {isPromoKlaster ? (
+                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-extrabold bg-purple-500/20 text-purple-800 dark:text-purple-300 border border-purple-500/40">
+                                              🏷️ {klasterName}
+                                            </span>
+                                          ) : (
+                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/15 text-amber-900 dark:text-amber-300 border border-amber-500/30">
+                                              🏢 {klasterName}
+                                            </span>
+                                          )}
+                                        </div>
+                                        <div>
+                                          {isTanpaPerlengkapan ? (
+                                            <span className="inline-flex items-center gap-0.5 text-[9px] font-semibold text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/50 px-1.5 py-0.5 rounded border border-rose-200 dark:border-rose-800">
+                                              ⚠️ Tanpa Perlengkapan
+                                            </span>
+                                          ) : (
+                                            <span className="inline-flex items-center gap-0.5 text-[9px] font-semibold text-emerald-700 dark:emerald-400 bg-emerald-50 dark:bg-emerald-950/50 px-1.5 py-0.5 rounded border border-emerald-200 dark:border-emerald-800">
+                                              🎁 Termasuk Perlengkapan
+                                            </span>
+                                          )}
+                                        </div>
+                                      </div>
+                                    );
+                                  })()}
                                 </td>
 
                                 {/* HOTEL MAKKAH */}

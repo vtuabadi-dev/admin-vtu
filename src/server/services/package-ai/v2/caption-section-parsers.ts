@@ -523,7 +523,7 @@ export function parseEquipmentStatus(text: string): ExtractionField<'ya' | 'tida
  */
 export function parsePricingMode(text: string): ExtractionField<PricingMode> {
   const upper = text.toUpperCase();
-  const clusterKeywords = ['SILVER', 'GOLD', 'PLATINUM', 'BRONZE'];
+  const clusterKeywords = ['SILVER', 'GOLD', 'PLATINUM', 'BRONZE', 'PROMO'];
 
   const hasCluster = clusterKeywords.some(kw => upper.includes(kw));
 
