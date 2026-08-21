@@ -250,12 +250,24 @@ export const packageService = {
         );
       }
 
+      let formattedPackageName = departureDates.length > 1 ? formattedNamaPaket : (data.namaPaket || formattedNamaPaket);
+      if (data.splitReason === "promo" && (data.promoLabel || data.splitLabel)) {
+        const pLabel = data.promoLabel || data.splitLabel;
+        if (!formattedPackageName.toLowerCase().includes(pLabel.toLowerCase())) {
+          formattedPackageName = `${formattedPackageName} (${pLabel})`;
+        }
+      }
+
       const created = await keberangkatanRepo.create({
         kode: kodeIndividu,
         kodeIndividu,
         paketGrupId,
+        parentKeberangkatanId: data.parentKeberangkatanId || undefined,
+        splitReason: data.splitReason || (data.splitType || undefined),
+        splitLabel: data.splitLabel || data.promoLabel || undefined,
+        promoLabel: data.promoLabel || (data.splitReason === "promo" ? data.splitLabel : undefined),
         driveFolderIds,
-        namaPaket: departureDates.length > 1 ? formattedNamaPaket : (data.namaPaket || formattedNamaPaket),
+        namaPaket: formattedPackageName,
         hargaPaket: parseInt(data.hargaBase || data.hargaPaket || "0", 10),
         tanggalBerangkat: depDate.toISOString(),
         tanggalPulang: retDate.toISOString(),

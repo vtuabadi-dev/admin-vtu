@@ -376,9 +376,46 @@ export default function KeberangkatanListPage() {
           return (
             <Card key={k.id} variant="operational" className="flex flex-col h-full border shadow-sm">
               <CardHeader className="pb-3 border-b bg-muted/10">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <CardTitle className="text-base">{k.namaPaket || k.paketUmroh?.namaPaket || "-"}</CardTitle>
+                <div className="flex items-start justify-between gap-2">
+                  <div className="space-y-1.5 flex-1 min-w-0">
+                    {/* Promo or Split Variant Badges */}
+                    {(() => {
+                      const isPromo = (k as any).splitReason === "promo" || !!(k as any).promoLabel || !!(k as any).promoText || k.kode.includes("_V");
+                      const promoName = (k as any).promoLabel || (k as any).promoText || ((k as any).splitReason === "promo" ? (k as any).splitLabel : null) || (k.kode.includes("_V") ? "Promo Bintang 5" : null);
+
+                      const isBranchSplit = (k as any).splitReason === "starting_point" || !!(k as any).parentKeberangkatanId;
+                      const branchName = (k as any).splitLabel || (k as any).startingPoint?.name || "Cabang";
+
+                      if (isPromo && promoName) {
+                        return (
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-extrabold bg-gradient-to-r from-amber-500/20 to-orange-500/20 text-amber-900 dark:text-amber-200 border border-amber-500/40 shadow-xs">
+                              🏷️ Promo: {promoName}
+                            </span>
+                            <span className="text-[10px] font-bold text-amber-700 dark:text-amber-400 bg-amber-100 dark:bg-amber-950/60 px-2 py-0.5 rounded border border-amber-300 dark:border-amber-800">
+                              🔀 Pecahan Paket (Variant)
+                            </span>
+                          </div>
+                        );
+                      }
+
+                      if (isBranchSplit) {
+                        return (
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-extrabold bg-blue-500/15 text-blue-900 dark:text-blue-200 border border-blue-500/30">
+                              📍 Starting Point Cabang: {branchName}
+                            </span>
+                            <span className="text-[10px] font-bold text-blue-700 dark:text-blue-400 bg-blue-100 dark:bg-blue-950/60 px-2 py-0.5 rounded border border-blue-300 dark:border-blue-800">
+                              🔀 Pecahan Paket
+                            </span>
+                          </div>
+                        );
+                      }
+
+                      return null;
+                    })()}
+
+                    <CardTitle className="text-base font-bold leading-snug">{k.namaPaket || k.paketUmroh?.namaPaket || "-"}</CardTitle>
                     <p className="text-xs text-muted-foreground mt-0.5 font-mono">
                       {k.kode}
                     </p>
