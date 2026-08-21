@@ -185,7 +185,8 @@ export const packageService = {
     // 3. Create Keberangkatan for each date
     const createdList = [];
 
-    for (const depDate of departureDates) {
+    for (let i = 0; i < departureDates.length; i++) {
+      const depDate = departureDates[i]!;
       const depYear = depDate.getFullYear();
       const retDate = new Date(depDate);
       retDate.setDate(retDate.getDate() + durasiHari - 1);
@@ -258,6 +259,11 @@ export const packageService = {
         }
       }
 
+      const pairedItemForThisDate = Array.isArray(data.pairedItems) ? data.pairedItems[i] : null;
+      const assignedChildSeat = typeof pairedItemForThisDate?.childSeat === "number"
+        ? pairedItemForThisDate.childSeat
+        : parseInt(data.kapasitas || data.kuota || "45", 10);
+
       const created = await keberangkatanRepo.create({
         kode: kodeIndividu,
         kodeIndividu,
@@ -280,8 +286,8 @@ export const packageService = {
         hotelMadinahId: data.hotelMadinahId,
         startingPointId: data.startingPointId,
         packageTypeId: data.packageTypeId,
-        kuota: parseInt(data.kapasitas || data.kuota || "45", 10),
-        maxSeat: parseInt(data.kapasitas || data.maxSeat || "45", 10),
+        kuota: assignedChildSeat,
+        maxSeat: assignedChildSeat,
         targetMaterialisasi: parseInt(data.targetMaterialisasi || data.targetMaterialis || "30", 10),
         terisi: 0,
         status: "scheduled",

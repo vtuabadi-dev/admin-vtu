@@ -213,6 +213,45 @@ export default function KeberangkatanListPage() {
     return result;
   }, [keberangkatan, selectedMonth, searchQuery]);
 
+  // Group related packages (Parents and their children / variants) to compute joint accumulation quota
+  const groupStatsMap = useMemo(() => {
+    const map = new Map<string, {
+      allPackages: Keberangkatan[];
+      totalGroupQuota: number;
+      totalGroupFilled: number;
+      parentPackage: Keberangkatan | null;
+      childPackages: Keberangkatan[];
+    }>();
+
+    keberangkatan.forEach((k) => {
+      const baseCode = (k.kode || "").replace(/_V\d+$/i, "").trim();
+      const groupKey = k.paketGrupId || (baseCode ? `code_${baseCode}` : `pkg_${k.id}`);
+
+      if (!map.has(groupKey)) {
+        map.set(groupKey, {
+          allPackages: [],
+          totalGroupQuota: 0,
+          totalGroupFilled: 0,
+          parentPackage: null,
+          childPackages: [],
+        });
+      }
+      const entry = map.get(groupKey)!;
+      entry.allPackages.push(k);
+      entry.totalGroupQuota += (k.maxSeat || k.kuota || 0);
+      entry.totalGroupFilled += (k.terisi || 0);
+
+      const isChild = !!k.parentKeberangkatanId || (k as any).splitReason === "promo" || k.kode.includes("_V");
+      if (isChild) {
+        entry.childPackages.push(k);
+      } else {
+        entry.parentPackage = k;
+      }
+    });
+
+    return map;
+  }, [keberangkatan]);
+
   if (loading && keberangkatan.length === 0) {
     return (
       <div className="space-y-6 animate-pulse p-1">
@@ -364,7 +403,7 @@ export default function KeberangkatanListPage() {
       ) : (
         <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
           {filteredKeberangkatan.map((k) => {
-          const maxSeat = k.maxSeat || 0;
+          const maxSeat = k.maxSeat || k.kuota || 0;
           const persen = maxSeat > 0 ? Math.round((k.terisi / maxSeat) * 100) : 0;
           const progressColor =
             persen >= 90
@@ -372,6 +411,13 @@ export default function KeberangkatanListPage() {
               : persen >= 50
                 ? "bg-warning"
                 : "bg-primary";
+
+          const baseCode = (k.kode || "").replace(/_V\d+$/i, "").trim();
+          const groupKey = k.paketGrupId || (baseCode ? `code_${baseCode}` : `pkg_${k.id}`);
+          const groupStats = groupStatsMap.get(groupKey);
+          const isPartOfSplit = groupStats ? groupStats.allPackages.length > 1 : false;
+          const groupTotalQuota = groupStats ? groupStats.totalGroupQuota : maxSeat;
+          const groupTotalFilled = groupStats ? groupStats.totalGroupFilled : k.terisi;
 
           return (
             <Card key={k.id} variant="operational" className="flex flex-col h-full border shadow-sm">
@@ -633,24 +679,75 @@ export default function KeberangkatanListPage() {
                 </div>
 
                 {/* Bottom Pinned Section: Kuota Progress & Action Buttons */}
-                <div className="space-y-4 mt-auto pt-3 border-t border-border">
+                <div className="space-y-3 mt-auto pt-3 border-t border-border">
                   {/* Kuota Progress */}
                   <div className="space-y-2">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">Kuota Terisi</span>
-                      <span className="font-semibold">
-                        {k.terisi}/{maxSeat} ({persen}%)
-                      </span>
+                    <div className="flex items-center justify-between text-sm flex-wrap gap-1">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-muted-foreground font-medium">Kuota Paket Ini:</span>
+                        <span className="font-bold text-foreground">
+                          {k.terisi}/{maxSeat} Pax ({persen}%)
+                        </span>
+                      </div>
+                      {isPartOfSplit && (
+                        <span className="text-[11px] font-bold text-primary bg-primary/10 border border-primary/25 px-2 py-0.5 rounded-md">
+                          Total Rombongan: {groupTotalQuota} Seat
+                        </span>
+                      )}
                     </div>
-                    <div className="h-2.5 w-full rounded-full bg-muted">
+
+                    <div className="h-2.5 w-full rounded-full bg-muted overflow-hidden">
                       <div
                         className={cn(
                           "h-2.5 rounded-full transition-all",
                           progressColor
                         )}
-                        style={{ width: `${persen}%` }}
+                        style={{ width: `${Math.min(persen, 100)}%` }}
                       />
                     </div>
+
+                    {/* Akumulasi Kuota Rombongan Gabungan (Induk & Seluruh Variant/Pecahan) */}
+                    {isPartOfSplit && groupStats && (
+                      <div className="p-2.5 rounded-lg bg-muted/40 border border-border/80 space-y-2 text-xs">
+                        <div className="flex items-center justify-between font-semibold flex-wrap gap-1">
+                          <span className="flex items-center gap-1 text-muted-foreground">
+                            👥 Akumulasi Rombongan ({groupStats.allPackages.length} Paket):
+                          </span>
+                          <span className="text-foreground font-bold">
+                            {groupTotalFilled} / {groupTotalQuota} Pax Terisi ({groupTotalQuota > 0 ? Math.round((groupTotalFilled / groupTotalQuota) * 100) : 0}%)
+                          </span>
+                        </div>
+
+                        {/* Breakdown per paket dalam rombongan */}
+                        <div className="flex flex-wrap gap-1.5 pt-0.5">
+                          {groupStats.allPackages.map((pkg) => {
+                            const isThis = pkg.id === k.id;
+                            const pkgIsPromo = (pkg as any).splitReason === "promo" || (pkg as any).promoLabel || pkg.kode.includes("_V");
+                            const pkgLabel = pkgIsPromo 
+                              ? `Promo ${(pkg as any).promoLabel || (pkg as any).splitLabel || "V2"}`
+                              : (pkg as any).splitReason === "starting_point"
+                              ? `Cabang ${(pkg as any).splitLabel || "Cabang"}`
+                              : "Paket Induk";
+
+                            return (
+                              <span
+                                key={pkg.id}
+                                className={cn(
+                                  "inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium border",
+                                  isThis
+                                    ? "bg-primary/15 text-primary border-primary/40 font-bold shadow-2xs"
+                                    : "bg-background text-muted-foreground border-border"
+                                )}
+                              >
+                                {isThis && "👉 "}
+                                {pkgLabel}: <strong className="text-foreground">{pkg.maxSeat || pkg.kuota} Seat</strong>
+                                <span className="text-[10px] opacity-75">({pkg.terisi} terisi)</span>
+                              </span>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {/* Action */}
