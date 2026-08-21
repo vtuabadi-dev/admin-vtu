@@ -153,6 +153,7 @@ export interface BroadcastPackageDataParams {
   flyerBase64List?: string[];
   startingPointCode?: string;
   startingPointName?: string;
+  customCaption?: string;
 }
 
 export async function sendPackageBroadcast(
@@ -203,22 +204,34 @@ export async function sendPackageBroadcast(
   const kuota = samplePkg.kuota || 45;
   const starting = params.startingPointName || params.startingPointCode || targetName;
 
-  // Build HTML Caption
-  const captionLines = [
-    `<b>🎉 PAKET UMROH BARU DIBUAT</b>`,
-    ``,
-    `📌 <b>Nama Paket:</b> ${namaPaket}`,
-    `📍 <b>Starting Point:</b> ${starting}`,
-    `✈️ <b>Maskapai:</b> ${maskapai}`,
-    `🏨 <b>Hotel Mekkah:</b> ${hotelMekkah}`,
-    `🏨 <b>Hotel Madinah:</b> ${hotelMadinah}`,
-    `💰 <b>Harga Base:</b> Rp ${hargaPaket}`,
-    `👥 <b>Kuota:</b> ${kuota} Pax`,
-    `📅 <b>Jumlah Tanggal:</b> ${pkgList.length} Tanggal Keberangkatan`,
-    ``,
-    `<i>Sistem Operasional VTU Abadi</i>`,
-  ];
-  const caption = captionLines.join("\n");
+  // Build Caption: Use User's uploaded/entered custom caption as primary
+  let caption = "";
+  let useHtmlParseMode = true;
+
+  if (params.customCaption && params.customCaption.trim()) {
+    caption = params.customCaption.trim();
+    // Only enable HTML parse mode if user's caption contains basic HTML tags, otherwise send as plain text
+    const hasHtmlTags = /<\/?(b|i|u|s|code|pre|a|strong|em)(\s+[^>]*)?>/i.test(caption);
+    useHtmlParseMode = hasHtmlTags;
+  } else {
+    // Default fallback template ONLY if user didn't enter any custom caption
+    const captionLines = [
+      `<b>🎉 PAKET UMROH BARU DIBUAT</b>`,
+      ``,
+      `📌 <b>Nama Paket:</b> ${namaPaket}`,
+      `📍 <b>Starting Point:</b> ${starting}`,
+      `✈️ <b>Maskapai:</b> ${maskapai}`,
+      `🏨 <b>Hotel Mekkah:</b> ${hotelMekkah}`,
+      `🏨 <b>Hotel Madinah:</b> ${hotelMadinah}`,
+      `💰 <b>Harga Base:</b> Rp ${hargaPaket}`,
+      `👥 <b>Kuota:</b> ${kuota} Pax`,
+      `📅 <b>Jumlah Tanggal:</b> ${pkgList.length} Tanggal Keberangkatan`,
+      ``,
+      `<i>Sistem Operasional VTU Abadi</i>`,
+    ];
+    caption = captionLines.join("\n");
+    useHtmlParseMode = true;
+  }
 
   let flyerMessageId: number | undefined;
 
@@ -232,7 +245,9 @@ export async function sendPackageBroadcast(
         const formData = new FormData();
         formData.append("chat_id", groupId);
         formData.append("caption", caption);
-        formData.append("parse_mode", "HTML");
+        if (useHtmlParseMode) {
+          formData.append("parse_mode", "HTML");
+        }
         const blob = new Blob([buffer as any], { type: mimeType });
         formData.append("photo", blob, "flyer.jpg");
 
@@ -265,7 +280,9 @@ export async function sendPackageBroadcast(
           // Attach caption only to the first photo in media group
           if (idx === 0) {
             item.caption = caption;
-            item.parse_mode = "HTML";
+            if (useHtmlParseMode) {
+              item.parse_mode = "HTML";
+            }
           }
           return item;
         });
@@ -286,14 +303,18 @@ export async function sendPackageBroadcast(
       }
     } else {
       // No flyer uploaded -> Send text message as main message
+      const textPayload: any = {
+        chat_id: groupId,
+        text: caption,
+      };
+      if (useHtmlParseMode) {
+        textPayload.parse_mode = "HTML";
+      }
+
       const res = await fetch(`https://api.telegram.org/bot${config.botToken}/sendMessage`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          chat_id: groupId,
-          text: caption,
-          parse_mode: "HTML",
-        }),
+        body: JSON.stringify(textPayload),
       });
       const resJson = await res.json();
       if (resJson.ok) {

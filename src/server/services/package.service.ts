@@ -308,6 +308,7 @@ export const packageService = {
           : [],
         startingPointCode: sCode,
         startingPointName: startingPoint?.name,
+        customCaption: data.caption || data.customCaption || "",
       });
     } catch (telegramErr) {
       console.error("[PackageService] Gagal mengirim Telegram broadcast:", telegramErr);

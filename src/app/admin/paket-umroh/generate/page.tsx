@@ -901,6 +901,7 @@ export default function GeneratePaketPage() {
       targetMaterialisasi: Number(formData.targetMaterialisasi || 30),
       isAdaKlaster: formData.isAdaKlaster,
       clusterConfigs: formData.isAdaKlaster === "ya" ? activeClusterConfigs : null,
+      caption: caption || undefined,
       flyerBase64List,
     };
 
@@ -1539,6 +1540,19 @@ export default function GeneratePaketPage() {
                 )}
               </div>
             </div>
+
+            {/* Custom Caption for Telegram Broadcast */}
+            <div className="pt-2 border-t">
+              <label className="block text-xs font-semibold mb-1 text-muted-foreground">
+                Caption / Teks Pemasaran Broadcast Telegram (Opsional)
+              </label>
+              <textarea
+                value={caption}
+                onChange={(e) => setCaption(e.target.value)}
+                placeholder="Tuliskan atau tempel caption pemasaran di sini. Jika diisi, bot Telegram akan menyiarkan caption ini langsung ke grup..."
+                className="w-full h-20 p-2.5 text-xs rounded-md border border-input bg-transparent focus:outline-none focus:ring-1 focus:ring-primary min-h-[56px]"
+              />
+            </div>
           </div>
         </div>
 
@@ -1982,6 +1996,19 @@ export default function GeneratePaketPage() {
                 />
               </div>
             )}
+
+            {/* Custom Caption for Telegram Broadcast */}
+            <div className="md:col-span-3 pt-2 border-t">
+              <label className="block text-xs font-semibold mb-1 text-emerald-900 dark:text-emerald-300">
+                Caption / Teks Pemasaran Broadcast Telegram
+              </label>
+              <textarea
+                value={caption}
+                onChange={(e) => setCaption(e.target.value)}
+                placeholder="Tuliskan atau tempel caption pemasaran di sini..."
+                className="w-full h-20 p-2.5 text-xs rounded-md border border-input bg-card focus:outline-none focus:ring-1 focus:ring-primary min-h-[56px]"
+              />
+            </div>
           </div>
         </div>
 
@@ -2342,6 +2369,7 @@ export default function GeneratePaketPage() {
                     promoLabel: splitType === "promo" ? (promoLabel || "PROMO SPECIAL") : undefined,
                     kodeGrup: selectedParentGroup.kodeGrup,
                     pairedItems: pairs,
+                    caption: caption || undefined,
                     flyerBase64List: flyerBase64List,
                   };
 
