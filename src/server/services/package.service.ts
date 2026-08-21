@@ -363,8 +363,16 @@ export const packageService = {
     if (data.tourLeader?.nama) {
       changes.push(`TL: ${data.tourLeader.nama}`);
     }
-    if (data.muthowif?.nama) {
-      changes.push(`Muthowif: ${data.muthowif.nama}`);
+    if (data.maxSeat !== undefined || data.kuota !== undefined) {
+      const newSeat = data.maxSeat ?? data.kuota;
+      const oldSeat = before?.maxSeat ?? before?.kuota;
+      if (newSeat !== oldSeat) changes.push(`Kuota Seat (${oldSeat} -> ${newSeat} Pax)`);
+    }
+    if (data.targetMaterialisasi !== undefined && before?.targetMaterialisasi !== data.targetMaterialisasi) {
+      changes.push(`Target Materialisasi (${before?.targetMaterialisasi} -> ${data.targetMaterialisasi} Pax)`);
+    }
+    if (data.hargaPaket !== undefined && before?.hargaPaket !== data.hargaPaket) {
+      changes.push(`Harga Paket (Rp ${before?.hargaPaket} -> Rp ${data.hargaPaket})`);
     }
     if (changes.length === 0) changes.push("Memperbarui detail operasional paket");
 

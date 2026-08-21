@@ -170,8 +170,14 @@ export const keberangkatanRepo = {
     if (data.tanggalBerangkat !== undefined) updateData.tanggalBerangkat = new Date(data.tanggalBerangkat);
     if (data.tanggalPulang !== undefined) updateData.tanggalPulang = new Date(data.tanggalPulang);
     if (data.nomorPenerbangan !== undefined) updateData.nomorPenerbangan = data.nomorPenerbangan;
-    if (data.status !== undefined) updateData.status = data.status;
-    if (data.maxSeat !== undefined) updateData.maxSeat = data.maxSeat;
+    if (data.maxSeat !== undefined) {
+      updateData.maxSeat = data.maxSeat;
+      updateData.kuota = data.maxSeat;
+    }
+    if (data.kuota !== undefined) {
+      updateData.kuota = data.kuota;
+      if (updateData.maxSeat === undefined) updateData.maxSeat = data.kuota;
+    }
     if (data.targetMaterialisasi !== undefined) updateData.targetMaterialisasi = data.targetMaterialisasi;
     if (data.terisi !== undefined) updateData.terisi = data.terisi;
     if (data.maskapaiId !== undefined) updateData.maskapaiId = data.maskapaiId;

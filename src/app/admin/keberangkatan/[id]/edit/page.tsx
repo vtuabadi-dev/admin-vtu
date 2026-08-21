@@ -51,6 +51,9 @@ export default function EditKeberangkatanPage() {
   const [namaPaket, setNamaPaket] = useState("");
   const [tanggalBerangkat, setTanggalBerangkat] = useState("");
   const [tanggalPulang, setTanggalPulang] = useState("");
+  const [kuota, setKuota] = useState<number>(45);
+  const [targetMaterialisasi, setTargetMaterialisasi] = useState<number>(30);
+  const [hargaPaket, setHargaPaket] = useState<number>(0);
   const [hotelMekkah, setHotelMekkah] = useState("");
   const [hotelMadinah, setHotelMadinah] = useState("");
   const [pnrMain, setPnrMain] = useState("");
@@ -124,6 +127,9 @@ export default function EditKeberangkatanPage() {
         setNamaPaket(data.namaPaket || "");
         setTanggalBerangkat(depStr);
         setTanggalPulang(retStr);
+        setKuota(data.maxSeat || data.kuota || 45);
+        setTargetMaterialisasi(data.targetMaterialisasi || 30);
+        setHargaPaket(data.hargaPaket || 0);
         setHotelMekkah(data.hotelMekkah || "");
         setHotelMadinah(data.hotelMadinah || "");
 
@@ -304,6 +310,12 @@ export default function EditKeberangkatanPage() {
     setSaving(true);
     setSuccessMessage(null);
     try {
+      if (keberangkatan && Number(kuota) < (keberangkatan.terisi || 0)) {
+        alert(`Kuota seat (${kuota} Pax) tidak boleh lebih kecil dari jumlah jamaah yang sudah terdaftar (${keberangkatan.terisi} Pax).`);
+        setSaving(false);
+        return;
+      }
+
       const mainFlightNo = flightSegments[0]?.kodeFlight || pnrMain || "SV-816";
       const mainRouteStr = flightSegments.length > 0
         ? `${flightSegments[0]?.asal || "SUB"} -> ${flightSegments[flightSegments.length - 1]?.tujuan || "JED"}`
@@ -316,6 +328,10 @@ export default function EditKeberangkatanPage() {
           namaPaket,
           tanggalBerangkat,
           tanggalPulang,
+          kuota: Number(kuota || 45),
+          maxSeat: Number(kuota || 45),
+          targetMaterialisasi: Number(targetMaterialisasi || 30),
+          hargaPaket: Number(hargaPaket || 0),
           nomorPenerbangan: mainFlightNo,
           hotelMekkah,
           hotelMadinah,
@@ -444,12 +460,12 @@ export default function EditKeberangkatanPage() {
         </CardContent>
       </Card>
 
-      {/* Section 1: Jadwal & Identitas Paket */}
+      {/* Section 1: Jadwal, Kuota & Identitas Paket */}
       <Card className="border shadow-sm">
         <CardHeader className="pb-3 border-b bg-muted/20">
           <CardTitle className="text-base font-bold flex items-center gap-2 text-primary">
             <Calendar className="h-4 w-4" />
-            Jadwal Keberangkatan & Identitas Paket
+            Jadwal Keberangkatan, Kuota Seat &amp; Identitas Paket
           </CardTitle>
         </CardHeader>
         <CardContent className="p-5 space-y-4">
@@ -463,6 +479,63 @@ export default function EditKeberangkatanPage() {
               onChange={(e) => setNamaPaket(e.target.value)}
               className="text-sm font-medium"
             />
+          </div>
+
+          {/* Kuota & Kapasitas Seat */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-muted/30 p-4 rounded-xl border">
+            <div>
+              <label className="block text-xs font-bold text-foreground mb-1 flex items-center justify-between">
+                <span>Kuota Kapasitas Seat (Pax)</span>
+                <span className="text-[11px] font-semibold text-primary">
+                  Terisi: {keberangkatan.terisi || 0} Pax
+                </span>
+              </label>
+              <Input
+                type="number"
+                min={keberangkatan.terisi || 1}
+                value={kuota}
+                onChange={(e) => setKuota(parseInt(e.target.value, 10) || 0)}
+                className="font-bold text-base text-primary bg-card"
+                placeholder="45"
+              />
+              <p className="text-[11px] text-muted-foreground mt-1">
+                Kapasitas maksimal kursi yang dialokasikan untuk paket ini.
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-foreground mb-1">
+                Target Materialisasi (Pax)
+              </label>
+              <Input
+                type="number"
+                min={1}
+                value={targetMaterialisasi}
+                onChange={(e) => setTargetMaterialisasi(parseInt(e.target.value, 10) || 0)}
+                className="font-semibold bg-card"
+                placeholder="30"
+              />
+              <p className="text-[11px] text-muted-foreground mt-1">
+                Target minimal jamaah untuk keberangkatan.
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-foreground mb-1">
+                Harga Base Paket (Rp)
+              </label>
+              <Input
+                type="number"
+                min={0}
+                value={hargaPaket}
+                onChange={(e) => setHargaPaket(parseInt(e.target.value, 10) || 0)}
+                className="font-semibold bg-card"
+                placeholder="35000000"
+              />
+              <p className="text-[11px] text-muted-foreground mt-1">
+                Harga per pax paket (di luar add-on).
+              </p>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
