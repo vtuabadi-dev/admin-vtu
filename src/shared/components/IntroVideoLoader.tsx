@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { useRouter } from "next/navigation";
 import { Volume2, VolumeX, SkipForward } from "lucide-react";
 
 interface IntroVideoLoaderProps {
@@ -13,9 +12,8 @@ interface IntroVideoLoaderProps {
 export default function IntroVideoLoader({
   onComplete,
   forceShow = false,
-  videoSrc = process.env.NEXT_PUBLIC_INTRO_VIDEO_URL || "https://drive.google.com/uc?export=download&id=1jOMszvMajCWR0iVJku6hnAGKqwHWFec_",
+  videoSrc = process.env.NEXT_PUBLIC_INTRO_VIDEO_URL || "/api/assets/intro-video",
 }: IntroVideoLoaderProps) {
-  const router = useRouter();
   const [isVisible, setIsVisible] = useState(false);
   const [isFadingOut, setIsFadingOut] = useState(false);
   const [isMuted, setIsMuted] = useState(true);
@@ -56,10 +54,10 @@ export default function IntroVideoLoader({
       }
     }
 
-    // Safety timeout: if video stuck or fails after 12s, automatically transition to login
+    // Safety timeout: if video stuck or fails after 14s, automatically transition
     const safetyTimer = setTimeout(() => {
       handleFinish();
-    }, 12000);
+    }, 14000);
 
     return () => clearTimeout(safetyTimer);
   }, [isVisible]);
@@ -74,8 +72,6 @@ export default function IntroVideoLoader({
       setIsVisible(false);
       if (onComplete) {
         onComplete();
-      } else if (typeof window !== "undefined" && window.location.pathname !== "/login") {
-        router.push("/login");
       }
     }, 700);
   };
