@@ -40,7 +40,29 @@ async function getAccessToken(): Promise<string> {
   return data.access_token;
 }
 
+interface ImageCache {
+  buffer: Uint8Array;
+  mimeType: string;
+  timestamp: number;
+}
+
+let memoryCache: ImageCache | null = null;
+const CACHE_TTL_MS = 3 * 60 * 1000; // 3 minutes fresh cache in memory
+
 export async function GET() {
+  const now = Date.now();
+
+  // Instant response if memory cache is valid (<3 mins)
+  if (memoryCache && now - memoryCache.timestamp < CACHE_TTL_MS) {
+    return new NextResponse(memoryCache.buffer as any, {
+      headers: {
+        "Content-Type": memoryCache.mimeType,
+        "Cache-Control": "public, max-age=300, s-maxage=600, stale-while-revalidate=86400",
+        "Content-Disposition": "inline",
+      },
+    });
+  }
+
   try {
     const token = await getAccessToken();
 
@@ -53,6 +75,15 @@ export async function GET() {
     });
 
     if (!listRes.ok) {
+      if (memoryCache) {
+        return new NextResponse(memoryCache.buffer as any, {
+          headers: {
+            "Content-Type": memoryCache.mimeType,
+            "Cache-Control": "public, max-age=300, s-maxage=600, stale-while-revalidate=86400",
+            "Content-Disposition": "inline",
+          },
+        });
+      }
       throw new Error(`Google Drive API error: ${listRes.statusText}`);
     }
 
@@ -60,6 +91,11 @@ export async function GET() {
     const files = listData.files || [];
 
     if (files.length === 0) {
+      if (memoryCache) {
+        return new NextResponse(memoryCache.buffer as any, {
+          headers: { "Content-Type": memoryCache.mimeType },
+        });
+      }
       return new NextResponse(null, { status: 404 });
     }
 
@@ -71,20 +107,39 @@ export async function GET() {
     });
 
     if (!downloadRes.ok) {
+      if (memoryCache) {
+        return new NextResponse(memoryCache.buffer as any, {
+          headers: { "Content-Type": memoryCache.mimeType },
+        });
+      }
       throw new Error(`Failed to download image file from Google Drive: ${downloadRes.statusText}`);
     }
 
     const imageArrayBuffer = await downloadRes.arrayBuffer();
+    const buffer = new Uint8Array(imageArrayBuffer);
+    const mimeType = latestFile.mimeType || "image/png";
 
-    return new NextResponse(new Uint8Array(imageArrayBuffer), {
+    // Cache image in memory for instant delivery
+    memoryCache = {
+      buffer,
+      mimeType,
+      timestamp: now,
+    };
+
+    return new NextResponse(buffer as any, {
       headers: {
-        "Content-Type": latestFile.mimeType || "image/png",
-        "Cache-Control": "public, s-maxage=60, stale-while-revalidate=300",
+        "Content-Type": mimeType,
+        "Cache-Control": "public, max-age=300, s-maxage=600, stale-while-revalidate=86400",
         "Content-Disposition": "inline",
       },
     });
   } catch (error: any) {
     console.error("[Badal Umroh Dynamic Background Error]:", error?.message || error);
+    if (memoryCache) {
+      return new NextResponse(memoryCache.buffer as any, {
+        headers: { "Content-Type": memoryCache.mimeType },
+      });
+    }
     return new NextResponse(null, { status: 500 });
   }
 }

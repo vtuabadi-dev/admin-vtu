@@ -366,6 +366,8 @@ export default function BadalUmrohRegisterPage() {
         <img
           src="/api/badal-umroh/background"
           alt="Background Badal Umroh"
+          loading="eager"
+          fetchPriority="high"
           className="fixed inset-0 w-full h-full object-cover object-center pointer-events-none z-0"
           onError={(e) => {
             (e.currentTarget as HTMLImageElement).src = "/images/bg-makkah-madinah-canvas.jpg";
@@ -458,6 +460,8 @@ export default function BadalUmrohRegisterPage() {
       <img
         src="/api/badal-umroh/background"
         alt="Background Badal Umroh"
+        loading="eager"
+        fetchPriority="high"
         className="fixed inset-0 w-full h-full object-cover object-center pointer-events-none z-0"
         onError={(e) => {
           (e.currentTarget as HTMLImageElement).src = "/images/bg-makkah-madinah-canvas.jpg";
