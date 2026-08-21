@@ -1469,7 +1469,8 @@ function ManifestPageContent() {
                       );
                       const parentQuota = parent.maxSeat || parent.kuota || 45;
                       const parentFilled = parentJamaah.length;
-                      const parentDeficit = parentQuota - parentFilled;
+                      const parentTargetMat = parent.targetMaterialisasi || 30;
+                      const parentDeficit = parentTargetMat - parentFilled;
 
                       return (
                         <div
@@ -1524,12 +1525,14 @@ function ManifestPageContent() {
                                   <p className="text-[10px] text-stone-400 font-semibold uppercase">Total Pax</p>
                                   <p className="text-xl font-bold text-white">{parentFilled}</p>
                                 </div>
-                                <div className="text-center px-3 border-r border-stone-700 min-w-[95px] flex flex-col items-center justify-center">
-                                  <p className="text-[10px] text-stone-400 font-semibold uppercase">Materialisasi</p>
+                                <div className="text-center px-3 border-r border-stone-700 min-w-[100px] flex flex-col items-center justify-center">
+                                  <p className="text-[10px] text-stone-400 font-semibold uppercase">
+                                    Materialisasi ({parentTargetMat})
+                                  </p>
                                   {parentDeficit > 0 ? (
                                     <p className="text-sm font-bold text-amber-400 mt-1">Kurang {parentDeficit} Pax</p>
                                   ) : (
-                                    <div className="mt-1 flex items-center justify-center" title="Kuota Terpenuhi">
+                                    <div className="mt-1 flex items-center justify-center" title="Target Materialisasi Terpenuhi">
                                       <CheckCircle2 className="h-6 w-6 text-emerald-400" />
                                     </div>
                                   )}
@@ -1562,7 +1565,8 @@ function ManifestPageContent() {
                                 );
                                 const childQuota = child.maxSeat || child.kuota || 45;
                                 const childFilled = childJamaah.length;
-                                const childDeficit = childQuota - childFilled;
+                                const childTargetMat = child.targetMaterialisasi || parent.targetMaterialisasi || 30;
+                                const childDeficit = childTargetMat - childFilled;
                                 const isPromo = child.splitReason === "promo" || !!child.promoLabel;
 
                                 return (
@@ -1606,12 +1610,14 @@ function ManifestPageContent() {
                                         <p className="text-[9px] text-stone-400 font-semibold uppercase">Total Pax</p>
                                         <p className="text-base font-bold text-white">{childFilled}</p>
                                       </div>
-                                      <div className="text-center px-2.5 border-r border-stone-700 min-w-[85px] flex flex-col items-center justify-center">
-                                        <p className="text-[9px] text-stone-400 font-semibold uppercase">Materialisasi</p>
+                                      <div className="text-center px-2.5 border-r border-stone-700 min-w-[90px] flex flex-col items-center justify-center">
+                                        <p className="text-[9px] text-stone-400 font-semibold uppercase">
+                                          Materialisasi ({childTargetMat})
+                                        </p>
                                         {childDeficit > 0 ? (
                                           <p className="text-xs font-bold text-amber-400 mt-0.5">Kurang {childDeficit} Pax</p>
                                         ) : (
-                                          <div className="mt-0.5 flex items-center justify-center" title="Kuota Terpenuhi">
+                                          <div className="mt-0.5 flex items-center justify-center" title="Target Materialisasi Terpenuhi">
                                             <CheckCircle2 className="h-5 w-5 text-emerald-400" />
                                           </div>
                                         )}
