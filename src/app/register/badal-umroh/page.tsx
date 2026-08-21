@@ -362,10 +362,13 @@ export default function BadalUmrohRegisterPage() {
     return (
       <div className="w-full max-w-4xl mx-auto relative">
         {/* ── Dynamic Live Background from Google Drive Folder 1DpAiGYRvrZe3BwlH2eKeUFogZzlLnl_c ── */}
-        <div
-          className="fixed inset-0 bg-cover bg-center bg-no-repeat pointer-events-none z-0 transition-opacity duration-700"
-          style={{
-            backgroundImage: "url('/api/badal-umroh/background'), url('/images/bg-makkah-madinah-canvas.jpg')",
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/api/badal-umroh/background"
+          alt="Background Badal Umroh"
+          className="fixed inset-0 w-full h-full object-cover object-center pointer-events-none z-0"
+          onError={(e) => {
+            (e.currentTarget as HTMLImageElement).src = "/images/bg-makkah-madinah-canvas.jpg";
           }}
         />
         <div className="fixed inset-0 bg-black/10 pointer-events-none z-0" />
@@ -451,10 +454,13 @@ export default function BadalUmrohRegisterPage() {
   return (
     <div className="w-full max-w-4xl mx-auto relative">
       {/* ── Dynamic Live Background from Google Drive Folder 1DpAiGYRvrZe3BwlH2eKeUFogZzlLnl_c ── */}
-      <div
-        className="fixed inset-0 bg-cover bg-center bg-no-repeat pointer-events-none z-0 transition-opacity duration-700"
-        style={{
-          backgroundImage: "url('/api/badal-umroh/background'), url('/images/bg-makkah-madinah-canvas.jpg')",
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src="/api/badal-umroh/background"
+        alt="Background Badal Umroh"
+        className="fixed inset-0 w-full h-full object-cover object-center pointer-events-none z-0"
+        onError={(e) => {
+          (e.currentTarget as HTMLImageElement).src = "/images/bg-makkah-madinah-canvas.jpg";
         }}
       />
       <div className="fixed inset-0 bg-black/10 pointer-events-none z-0" />

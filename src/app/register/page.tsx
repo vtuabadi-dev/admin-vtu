@@ -957,9 +957,15 @@ export default function RegisterPage() {
   const selectedPaket = paketList.find((p) => p.id === selectedPaketId);
 
   return (
-    <div className="w-full max-w-4xl mx-auto">
-      {/* Top Notice Banner if draft was restored */}
-      {isRestoredDraft && step < 8 && !paymentProofSubmitted && (
+    <div className="w-full max-w-4xl mx-auto relative">
+      {/* ── Background Makkah & Madinah Golden Canvas Artwork ── */}
+      <div
+        className="fixed inset-0 bg-cover bg-center bg-no-repeat pointer-events-none z-0"
+        style={{ backgroundImage: `url('/images/bg-makkah-madinah-canvas.jpg')` }}
+      />
+      <div className="relative z-10">
+        {/* Top Notice Banner if draft was restored */}
+        {isRestoredDraft && step < 8 && !paymentProofSubmitted && (
         <div className="mb-4 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-xs text-amber-900 flex items-center justify-between shadow-sm">
           <div className="flex items-center gap-2.5">
             <Sparkles className="w-4 h-4 text-amber-600 shrink-0" />
@@ -2929,5 +2935,6 @@ export default function RegisterPage() {
         <a href="/login" className="text-emerald-700 font-bold hover:underline">Login di sini</a>
       </p>
     </div>
+  </div>
   );
 }

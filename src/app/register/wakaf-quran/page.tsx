@@ -218,15 +218,21 @@ export default function WakafQuranRegisterPage() {
   const isUnlocked = !isJamaahVauza || jamaahVerified === true;
 
   return (
-    <div className="w-full max-w-2xl mx-auto space-y-6">
-      <Link
-        href="/login"
-        className="inline-flex items-center gap-1.5 text-xs text-stone-700 hover:text-stone-900 bg-white/70 hover:bg-white/95 backdrop-blur-xs px-3 py-1.5 rounded-full border border-stone-300/60 shadow-2xs transition-colors"
-      >
-        <ArrowLeft className="h-3.5 w-3.5" /> Kembali ke Portal Utama / Login
-      </Link>
+    <div className="w-full max-w-2xl mx-auto space-y-6 relative">
+      {/* ── Background Makkah & Madinah Golden Canvas Artwork ── */}
+      <div
+        className="fixed inset-0 bg-cover bg-center bg-no-repeat pointer-events-none z-0"
+        style={{ backgroundImage: `url('/images/bg-makkah-madinah-canvas.jpg')` }}
+      />
+      <div className="relative z-10 space-y-6">
+        <Link
+          href="/login"
+          className="inline-flex items-center gap-1.5 text-xs text-stone-700 hover:text-stone-900 bg-white/70 hover:bg-white/95 backdrop-blur-xs px-3 py-1.5 rounded-full border border-stone-300/60 shadow-2xs transition-colors"
+        >
+          <ArrowLeft className="h-3.5 w-3.5" /> Kembali ke Portal Utama / Login
+        </Link>
 
-      <Card className="border border-[#D4AF37]/30 shadow-2xl overflow-hidden rounded-2xl bg-white/95 backdrop-blur-md">
+        <Card className="border border-[#D4AF37]/30 shadow-2xl overflow-hidden rounded-2xl bg-white/95 backdrop-blur-md">
           <CardHeader className="bg-gradient-to-r from-[#041710] via-[#082C21] to-[#0E4334] text-white p-6 text-center border-b border-[#D4AF37]/30 relative overflow-hidden">
             <div className="absolute -top-10 -right-10 w-40 h-40 bg-[#D4AF37]/10 rounded-full blur-2xl pointer-events-none" />
             <div className="mx-auto w-14 h-14 rounded-2xl bg-gradient-to-br from-[#D4AF37]/20 to-[#F5D061]/30 border border-[#D4AF37]/50 flex items-center justify-center mb-3 shadow-md">
@@ -649,5 +655,6 @@ export default function WakafQuranRegisterPage() {
           </CardContent>
         </Card>
       </div>
-    );
+    </div>
+  );
 }
