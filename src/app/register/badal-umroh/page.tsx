@@ -360,77 +360,88 @@ export default function BadalUmrohRegisterPage() {
   // ── Success Screen ──
   if (submitted) {
     return (
-      <div className="w-full max-w-4xl mx-auto">
-        <div className="text-center mb-6 bg-gradient-to-b from-white/20 to-white/05 backdrop-blur-[4px] p-6 rounded-3xl border-t border-l border-white/90 border-b border-r border-slate-900/25 shadow-[inset_1px_1px_2px_rgba(255,255,255,0.9),inset_-1px_-1px_3px_rgba(0,0,0,0.1),0_15px_35px_-10px_rgba(0,0,0,0.2)]">
-          <div className="inline-flex items-center justify-center h-14 w-14 rounded-2xl bg-gradient-to-tr from-emerald-800 to-teal-700 text-white shadow-md shadow-emerald-900/30 mb-2">
-            <CheckCircle2 className="h-8 w-8" />
-          </div>
-          <h1 className="text-2xl sm:text-3xl font-black text-slate-950 tracking-tight drop-shadow-[0_1px_2px_rgba(255,255,255,0.9)]">
-            Pendaftaran Badal Umroh Berhasil!
-          </h1>
-          <p className="text-sm font-bold text-slate-900 mt-1 drop-shadow-[0_1px_1px_rgba(255,255,255,0.9)]">
-            Jazakallah Khairan, formulir pendaftaran Anda telah berhasil dicatat oleh sistem VTU Operasional.
-          </p>
-        </div>
+      <div className="w-full max-w-4xl mx-auto relative">
+        {/* ── Dynamic Live Background from Google Drive Folder 1DpAiGYRvrZe3BwlH2eKeUFogZzlLnl_c ── */}
+        <div
+          className="fixed inset-0 bg-cover bg-center bg-no-repeat pointer-events-none z-0 transition-opacity duration-700"
+          style={{
+            backgroundImage: "url('/api/badal-umroh/background'), url('/images/bg-makkah-madinah-canvas.jpg')",
+          }}
+        />
+        <div className="fixed inset-0 bg-black/10 pointer-events-none z-0" />
 
-        <div className="bg-gradient-to-b from-white/30 to-white/10 backdrop-blur-[4px] p-6 sm:p-8 rounded-3xl border-t border-l border-white/90 border-b border-r border-slate-900/25 shadow-[inset_1px_1px_2px_rgba(255,255,255,0.9),inset_-1px_-1px_3px_rgba(0,0,0,0.1),0_15px_35px_-10px_rgba(0,0,0,0.2)] space-y-6">
-          <div className="bg-white/90 rounded-2xl p-6 border border-stone-200 shadow-xs space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-stone-100">
-              <span className="text-xs font-bold text-stone-500 uppercase tracking-wider">Pemohon / Penanggung Jawab</span>
-              <span className="text-sm font-extrabold text-stone-900">{formData.namaPemohon}</span>
+        <div className="relative z-10 space-y-6">
+          <div className="text-center bg-gradient-to-b from-white/20 to-white/05 backdrop-blur-[4px] p-6 rounded-3xl border-t border-l border-white/90 border-b border-r border-slate-900/25 shadow-[inset_1px_1px_2px_rgba(255,255,255,0.9),inset_-1px_-1px_3px_rgba(0,0,0,0.1),0_15px_35px_-10px_rgba(0,0,0,0.2)]">
+            <div className="inline-flex items-center justify-center h-14 w-14 rounded-2xl bg-gradient-to-tr from-emerald-800 to-teal-700 text-white shadow-md shadow-emerald-900/30 mb-2">
+              <CheckCircle2 className="h-8 w-8" />
             </div>
-            <div className="flex items-center justify-between pb-3 border-b border-stone-100">
-              <span className="text-xs font-bold text-stone-500 uppercase tracking-wider">WhatsApp</span>
-              <span className="text-sm font-bold text-stone-800">{formData.nomorWhatsapp}</span>
-            </div>
-            <div className="flex items-center justify-between pb-3 border-b border-stone-100">
-              <span className="text-xs font-bold text-stone-500 uppercase tracking-wider">Status Kejamaahan</span>
-              <span className="text-xs font-extrabold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200">
-                {isJamaahVauza ? "Jamaah Vauza Tiga Utama" : "Pendaftaran Umum"}
-              </span>
-            </div>
-            {isJamaahVauza && formData.namaPaketUmroh && (
+            <h1 className="text-2xl sm:text-3xl font-black text-slate-950 tracking-tight drop-shadow-[0_1px_2px_rgba(255,255,255,0.9)]">
+              Pendaftaran Badal Umroh Berhasil!
+            </h1>
+            <p className="text-sm font-bold text-slate-900 mt-1 drop-shadow-[0_1px_1px_rgba(255,255,255,0.9)]">
+              Jazakallah Khairan, formulir pendaftaran Anda telah berhasil dicatat oleh sistem VTU Operasional.
+            </p>
+          </div>
+
+          <div className="bg-gradient-to-b from-white/30 to-white/10 backdrop-blur-[4px] p-6 sm:p-8 rounded-3xl border-t border-l border-white/90 border-b border-r border-slate-900/25 shadow-[inset_1px_1px_2px_rgba(255,255,255,0.9),inset_-1px_-1px_3px_rgba(0,0,0,0.1),0_15px_35px_-10px_rgba(0,0,0,0.2)] space-y-6">
+            <div className="bg-white/90 rounded-2xl p-6 border border-stone-200 shadow-xs space-y-4">
               <div className="flex items-center justify-between pb-3 border-b border-stone-100">
-                <span className="text-xs font-bold text-stone-500 uppercase tracking-wider">Paket Umroh Rombongan</span>
-                <span className="text-xs font-bold text-stone-700">{formData.namaPaketUmroh}</span>
+                <span className="text-xs font-bold text-stone-500 uppercase tracking-wider">Pemohon / Penanggung Jawab</span>
+                <span className="text-sm font-extrabold text-stone-900">{formData.namaPemohon}</span>
               </div>
-            )}
-            <div className="pb-3 border-b border-stone-100">
-              <span className="text-xs font-bold text-stone-500 uppercase tracking-wider block mb-2">
-                Daftar Almarhum / Almarhumah ({listAlmarhum.length} Orang):
-              </span>
-              <ul className="space-y-1.5 pl-2">
-                {listAlmarhum.map((a, i) => (
-                  <li key={i} className="text-xs font-bold text-stone-800 flex items-center gap-2">
-                    <span className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-800 flex items-center justify-center text-[10px]">
-                      {i + 1}
-                    </span>
-                    <span>{a.namaAlmarhum}</span>
-                    <span className="text-[10px] font-semibold text-stone-500">
-                      ({a.jenisKelamin === "L" ? "Laki-laki / Almarhum" : "Perempuan / Almarhumah"})
-                    </span>
-                  </li>
-                ))}
-              </ul>
+              <div className="flex items-center justify-between pb-3 border-b border-stone-100">
+                <span className="text-xs font-bold text-stone-500 uppercase tracking-wider">WhatsApp</span>
+                <span className="text-sm font-bold text-stone-800">{formData.nomorWhatsapp}</span>
+              </div>
+              <div className="flex items-center justify-between pb-3 border-b border-stone-100">
+                <span className="text-xs font-bold text-stone-500 uppercase tracking-wider">Status Kejamaahan</span>
+                <span className="text-xs font-extrabold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200">
+                  {isJamaahVauza ? "Jamaah Vauza Tiga Utama" : "Pendaftaran Umum"}
+                </span>
+              </div>
+              {isJamaahVauza && formData.namaPaketUmroh && (
+                <div className="flex items-center justify-between pb-3 border-b border-stone-100">
+                  <span className="text-xs font-bold text-stone-500 uppercase tracking-wider">Paket Umroh Rombongan</span>
+                  <span className="text-xs font-bold text-stone-700">{formData.namaPaketUmroh}</span>
+                </div>
+              )}
+              <div className="pb-3 border-b border-stone-100">
+                <span className="text-xs font-bold text-stone-500 uppercase tracking-wider block mb-2">
+                  Daftar Almarhum / Almarhumah ({listAlmarhum.length} Orang):
+                </span>
+                <ul className="space-y-1.5 pl-2">
+                  {listAlmarhum.map((a, i) => (
+                    <li key={i} className="text-xs font-bold text-stone-800 flex items-center gap-2">
+                      <span className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-800 flex items-center justify-center text-[10px]">
+                        {i + 1}
+                      </span>
+                      <span>{a.namaAlmarhum}</span>
+                      <span className="text-[10px] font-semibold text-stone-500">
+                        ({a.jenisKelamin === "L" ? "Laki-laki / Almarhum" : "Perempuan / Almarhumah"})
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <div className="flex items-center justify-between pt-2">
+                <span className="text-sm font-bold text-stone-700">Total Biaya Badal:</span>
+                <span className="text-lg font-black text-emerald-800">{formatRupiah(totalBiaya)}</span>
+              </div>
             </div>
-            <div className="flex items-center justify-between pt-2">
-              <span className="text-sm font-bold text-stone-700">Total Biaya Badal:</span>
-              <span className="text-lg font-black text-emerald-800">{formatRupiah(totalBiaya)}</span>
-            </div>
-          </div>
 
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
-            <Button
-              onClick={resetForm}
-              className="w-full sm:w-auto px-6 py-2.5 bg-gradient-to-r from-emerald-800 to-teal-700 hover:from-emerald-900 hover:to-teal-800 text-white font-bold rounded-xl shadow-md"
-            >
-              Daftarkan Badal Lainnya
-            </Button>
-            <Link href="/login" className="w-full sm:w-auto">
-              <Button variant="outline" className="w-full sm:w-auto px-6 py-2.5 bg-white/80 hover:bg-white text-stone-800 font-bold rounded-xl border border-stone-300">
-                Kembali ke Portal Login
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
+              <Button
+                onClick={resetForm}
+                className="w-full sm:w-auto px-6 py-2.5 bg-gradient-to-r from-emerald-800 to-teal-700 hover:from-emerald-900 hover:to-teal-800 text-white font-bold rounded-xl shadow-md"
+              >
+                Daftarkan Badal Lainnya
               </Button>
-            </Link>
+              <Link href="/login" className="w-full sm:w-auto">
+                <Button variant="outline" className="w-full sm:w-auto px-6 py-2.5 bg-white/80 hover:bg-white text-stone-800 font-bold rounded-xl border border-stone-300">
+                  Kembali ke Portal Login
+                </Button>
+              </Link>
+            </div>
           </div>
         </div>
       </div>
@@ -438,19 +449,29 @@ export default function BadalUmrohRegisterPage() {
   }
 
   return (
-    <div className="w-full max-w-4xl mx-auto">
-      {/* ── Top Header ── */}
-      <div className="text-center mb-6 bg-gradient-to-b from-white/20 to-white/05 backdrop-blur-[4px] p-6 rounded-3xl border-t border-l border-white/90 border-b border-r border-slate-900/25 shadow-[inset_1px_1px_2px_rgba(255,255,255,0.9),inset_-1px_-1px_3px_rgba(0,0,0,0.1),0_15px_35px_-10px_rgba(0,0,0,0.2)]">
-        <div className="inline-flex items-center justify-center h-12 w-12 rounded-2xl bg-gradient-to-tr from-emerald-800 to-teal-700 text-white shadow-md shadow-emerald-900/30 mb-2">
-          <HeartHandshake className="h-6 w-6" />
+    <div className="w-full max-w-4xl mx-auto relative">
+      {/* ── Dynamic Live Background from Google Drive Folder 1DpAiGYRvrZe3BwlH2eKeUFogZzlLnl_c ── */}
+      <div
+        className="fixed inset-0 bg-cover bg-center bg-no-repeat pointer-events-none z-0 transition-opacity duration-700"
+        style={{
+          backgroundImage: "url('/api/badal-umroh/background'), url('/images/bg-makkah-madinah-canvas.jpg')",
+        }}
+      />
+      <div className="fixed inset-0 bg-black/10 pointer-events-none z-0" />
+
+      <div className="relative z-10">
+        {/* ── Top Header ── */}
+        <div className="text-center mb-6 bg-gradient-to-b from-white/20 to-white/05 backdrop-blur-[4px] p-6 rounded-3xl border-t border-l border-white/90 border-b border-r border-slate-900/25 shadow-[inset_1px_1px_2px_rgba(255,255,255,0.9),inset_-1px_-1px_3px_rgba(0,0,0,0.1),0_15px_35px_-10px_rgba(0,0,0,0.2)]">
+          <div className="inline-flex items-center justify-center h-12 w-12 rounded-2xl bg-gradient-to-tr from-emerald-800 to-teal-700 text-white shadow-md shadow-emerald-900/30 mb-2">
+            <HeartHandshake className="h-6 w-6" />
+          </div>
+          <h1 className="text-2xl sm:text-3xl font-black text-slate-950 tracking-tight drop-shadow-[0_1px_2px_rgba(255,255,255,0.9)]">
+            Pendaftaran Badal Umroh
+          </h1>
+          <p className="text-sm font-bold text-slate-900 mt-1 drop-shadow-[0_1px_1px_rgba(255,255,255,0.9)]">
+            Layanan Badal Umroh Resmi &amp; Amanah — Aman, Cepat, dan Terdokumentasi Lengkap
+          </p>
         </div>
-        <h1 className="text-2xl sm:text-3xl font-black text-slate-950 tracking-tight drop-shadow-[0_1px_2px_rgba(255,255,255,0.9)]">
-          Pendaftaran Badal Umroh
-        </h1>
-        <p className="text-sm font-bold text-slate-900 mt-1 drop-shadow-[0_1px_1px_rgba(255,255,255,0.9)]">
-          Layanan Badal Umroh Resmi &amp; Amanah — Aman, Cepat, dan Terdokumentasi Lengkap
-        </p>
-      </div>
 
       {/* ── Step Indicator ── */}
       <div className="bg-gradient-to-b from-white/20 to-white/05 backdrop-blur-[4px] p-4 sm:p-5 rounded-2xl border-t border-l border-white/90 border-b border-r border-slate-900/25 shadow-[inset_1px_1px_2px_rgba(255,255,255,0.9),inset_-1px_-1px_3px_rgba(0,0,0,0.1),0_15px_35px_-10px_rgba(0,0,0,0.2)] mb-6 overflow-x-auto">
@@ -1044,5 +1065,6 @@ export default function BadalUmrohRegisterPage() {
         </form>
       </div>
     </div>
+  </div>
   );
 }
