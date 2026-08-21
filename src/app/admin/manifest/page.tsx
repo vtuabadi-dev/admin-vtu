@@ -1475,7 +1475,7 @@ function ManifestPageContent() {
                       return (
                         <div
                           key={parent.id}
-                          className="p-4 bg-stone-950/90 border border-stone-800 rounded-2xl shadow-md space-y-3"
+                          className="p-4 bg-gradient-to-br from-teal-950/70 via-slate-950/80 to-emerald-950/70 border border-teal-500/30 hover:border-teal-400/50 rounded-2xl shadow-[0_4px_20px_rgba(13,148,136,0.15)] backdrop-blur-md space-y-3 transition-all"
                         >
                           {/* PAKET UTAMA (Parent Card Header) */}
                           <div
@@ -1483,50 +1483,50 @@ function ManifestPageContent() {
                               setSelectedKeberangkatan(parent.id);
                               router.push(`/admin/manifest?paketId=${parent.id}`);
                             }}
-                            className="p-5 bg-gradient-to-r from-stone-900 via-stone-850 to-stone-900 border border-stone-800 hover:border-amber-500/60 text-white rounded-xl shadow-sm transition-all cursor-pointer group"
+                            className="p-5 bg-gradient-to-r from-teal-950 via-teal-900/80 to-emerald-950 border border-teal-500/40 hover:border-teal-300/80 text-white rounded-xl shadow-[inset_0_1px_1px_rgba(94,234,212,0.3)] transition-all cursor-pointer group hover:shadow-[0_0_25px_rgba(20,184,166,0.25)]"
                           >
                             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                               <div className="space-y-1.5">
                                 <div className="flex items-center flex-wrap gap-2">
-                                  <span className="bg-amber-500/20 text-amber-400 border border-amber-500/30 text-[10px] font-bold px-2 py-0.5 rounded uppercase font-mono">
+                                  <span className="bg-teal-500/20 text-teal-300 border border-teal-400/40 text-[10px] font-bold px-2 py-0.5 rounded uppercase font-mono shadow-xs">
                                     {parent.kode}
                                   </span>
                                   {children.length > 0 && (
-                                    <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-bold px-2 py-0.5 rounded uppercase flex items-center gap-1">
+                                    <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-400/40 text-[10px] font-bold px-2 py-0.5 rounded uppercase flex items-center gap-1">
                                       <Split className="h-3 w-3" /> Paket Utama ({children.length} Pecahan)
                                     </span>
                                   )}
                                   <StatusBadge status={parent.status} />
                                 </div>
-                                <h3 className="text-lg font-bold tracking-tight text-amber-400 group-hover:text-amber-300 transition-colors">
+                                <h3 className="text-lg font-bold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-teal-200 via-teal-100 to-emerald-300 group-hover:from-white group-hover:to-teal-100 transition-colors">
                                   {formatPackageTitleShort(parent.namaPaket || parent.paketUmroh?.namaPaket || "PAKET UMROH")}
                                 </h3>
-                                <div className="flex flex-wrap items-center gap-4 text-xs text-stone-300 pt-1">
+                                <div className="flex flex-wrap items-center gap-4 text-xs text-teal-100/80 pt-1">
                                   <span className="flex items-center gap-1.5">
-                                    <CalendarDays className="h-3.5 w-3.5 text-amber-400" />
-                                    Berangkat: <strong className="text-white">{formatDate(parent.tanggalBerangkat)}</strong>
+                                    <CalendarDays className="h-3.5 w-3.5 text-teal-400" />
+                                    Berangkat: <strong className="text-white font-medium">{formatDate(parent.tanggalBerangkat)}</strong>
                                   </span>
-                                  <span className="text-stone-600">•</span>
+                                  <span className="text-teal-700">•</span>
                                   <span className="flex items-center gap-1.5">
-                                    <CalendarDays className="h-3.5 w-3.5 text-amber-400" />
-                                    Pulang: <strong className="text-white">{formatDate(parent.tanggalPulang)}</strong>
+                                    <CalendarDays className="h-3.5 w-3.5 text-teal-400" />
+                                    Pulang: <strong className="text-white font-medium">{formatDate(parent.tanggalPulang)}</strong>
                                   </span>
-                                  <span className="text-stone-600">•</span>
+                                  <span className="text-teal-700">•</span>
                                   <span className="flex items-center gap-1.5">
-                                    <Plane className="h-3.5 w-3.5 text-amber-400" />
-                                    Maskapai: <strong className="text-white">{getAirlineCode(parent.maskapai)}</strong>
+                                    <Plane className="h-3.5 w-3.5 text-teal-400" />
+                                    Maskapai: <strong className="text-white font-medium">{getAirlineCode(parent.maskapai)}</strong>
                                   </span>
                                 </div>
                               </div>
 
-                              {/* Materialization Metrics Box */}
-                              <div className="flex items-center gap-3 bg-stone-800/90 border border-stone-700/60 rounded-xl p-3 shrink-0 self-start md:self-auto">
-                                <div className="text-center px-3 border-r border-stone-700">
-                                  <p className="text-[10px] text-stone-400 font-semibold uppercase">Total Pax</p>
+                              {/* Materialization Metrics Box (Metallic Glass Finish) */}
+                              <div className="flex items-center gap-3 bg-gradient-to-br from-teal-950/90 via-slate-900/90 to-emerald-950/90 border border-teal-500/40 rounded-xl p-3 shrink-0 self-start md:self-auto shadow-[inset_0_1px_0_rgba(45,212,191,0.25)]">
+                                <div className="text-center px-3 border-r border-teal-800/60">
+                                  <p className="text-[10px] text-teal-300/80 font-semibold uppercase">Total Pax</p>
                                   <p className="text-xl font-bold text-white">{parentFilled}</p>
                                 </div>
-                                <div className="text-center px-3 border-r border-stone-700 min-w-[100px] flex flex-col items-center justify-center">
-                                  <p className="text-[10px] text-stone-400 font-semibold uppercase">
+                                <div className="text-center px-3 border-r border-teal-800/60 min-w-[100px] flex flex-col items-center justify-center">
+                                  <p className="text-[10px] text-teal-300/80 font-semibold uppercase">
                                     Materialisasi ({parentTargetMat})
                                   </p>
                                   {parentDeficit > 0 ? (
@@ -1538,7 +1538,7 @@ function ManifestPageContent() {
                                   )}
                                 </div>
                                 <div className="text-center px-3">
-                                  <p className="text-[10px] text-stone-400 font-semibold uppercase">Kuota Seat</p>
+                                  <p className="text-[10px] text-teal-300/80 font-semibold uppercase">Kuota Seat</p>
                                   <p className="text-xl font-bold text-emerald-400">
                                     {parentFilled}/{parentQuota}
                                   </p>
@@ -1549,8 +1549,8 @@ function ManifestPageContent() {
 
                           {/* PECAHAN PAKET (Children Split Packages) */}
                           {children.length > 0 && (
-                            <div className="pl-4 space-y-2.5 pt-1 border-l-2 border-dashed border-amber-500/40 ml-4">
-                              <p className="text-[11px] font-extrabold uppercase tracking-wider text-amber-400/90 flex items-center gap-1.5 pl-1">
+                            <div className="pl-4 space-y-2.5 pt-1 border-l-2 border-dashed border-teal-500/40 ml-4">
+                              <p className="text-[11px] font-extrabold uppercase tracking-wider text-teal-300 flex items-center gap-1.5 pl-1">
                                 <Split className="h-3.5 w-3.5" />
                                 Pecahan Paket ({children.length} Variant Split / Starting / Promo)
                               </p>
@@ -1576,7 +1576,7 @@ function ManifestPageContent() {
                                       setSelectedKeberangkatan(child.id);
                                       router.push(`/admin/manifest?paketId=${child.id}`);
                                     }}
-                                    className="p-4 bg-stone-900/90 border border-stone-800 hover:border-amber-500/50 text-white rounded-xl shadow-xs transition-all cursor-pointer flex flex-col md:flex-row md:items-center justify-between gap-4 group"
+                                    className="p-4 bg-gradient-to-r from-teal-950/90 via-slate-900/90 to-teal-950/90 border border-teal-500/30 hover:border-teal-400/60 text-white rounded-xl shadow-xs transition-all cursor-pointer flex flex-col md:flex-row md:items-center justify-between gap-4 group hover:shadow-[0_0_15px_rgba(20,184,166,0.15)]"
                                   >
                                     <div className="space-y-1">
                                       <div className="flex items-center flex-wrap gap-2">
@@ -1589,29 +1589,29 @@ function ManifestPageContent() {
                                             📍 Starting Point: {child.splitLabel || child.namaPaket}
                                           </span>
                                         )}
-                                        <span className="bg-amber-500/20 text-amber-400 border border-amber-500/30 text-[10px] font-bold px-2 py-0.5 rounded uppercase font-mono">
+                                        <span className="bg-teal-500/20 text-teal-300 border border-teal-500/30 text-[10px] font-bold px-2 py-0.5 rounded uppercase font-mono">
                                           {child.kode}
                                         </span>
                                         <StatusBadge status={child.status} />
                                       </div>
-                                      <h4 className="text-base font-bold text-white group-hover:text-amber-300 transition-colors">
+                                      <h4 className="text-base font-bold text-teal-100 group-hover:text-teal-300 transition-colors">
                                         {formatPackageTitleShort(child.namaPaket)}
                                       </h4>
-                                      <div className="flex flex-wrap items-center gap-3 text-xs text-stone-400">
-                                        <span>Berangkat: <strong className="text-stone-200">{formatDate(child.tanggalBerangkat)}</strong></span>
+                                      <div className="flex flex-wrap items-center gap-3 text-xs text-teal-200/70">
+                                        <span>Berangkat: <strong className="text-white">{formatDate(child.tanggalBerangkat)}</strong></span>
                                         <span>•</span>
-                                        <span>Maskapai: <strong className="text-stone-200">{getAirlineCode(child.maskapai)}</strong></span>
+                                        <span>Maskapai: <strong className="text-white">{getAirlineCode(child.maskapai)}</strong></span>
                                       </div>
                                     </div>
 
                                     {/* Child Materialization Metrics Box */}
-                                    <div className="flex items-center gap-2.5 bg-stone-850/80 border border-stone-750/60 rounded-lg p-2.5 shrink-0 self-start md:self-auto">
-                                      <div className="text-center px-2.5 border-r border-stone-700">
-                                        <p className="text-[9px] text-stone-400 font-semibold uppercase">Total Pax</p>
+                                    <div className="flex items-center gap-2.5 bg-gradient-to-br from-teal-950/90 to-slate-900/90 border border-teal-500/30 rounded-lg p-2.5 shrink-0 self-start md:self-auto shadow-[inset_0_1px_0_rgba(45,212,191,0.15)]">
+                                      <div className="text-center px-2.5 border-r border-teal-800/60">
+                                        <p className="text-[9px] text-teal-300/80 font-semibold uppercase">Total Pax</p>
                                         <p className="text-base font-bold text-white">{childFilled}</p>
                                       </div>
-                                      <div className="text-center px-2.5 border-r border-stone-700 min-w-[90px] flex flex-col items-center justify-center">
-                                        <p className="text-[9px] text-stone-400 font-semibold uppercase">
+                                      <div className="text-center px-2.5 border-r border-teal-800/60 min-w-[90px] flex flex-col items-center justify-center">
+                                        <p className="text-[9px] text-teal-300/80 font-semibold uppercase">
                                           Materialisasi ({childTargetMat})
                                         </p>
                                         {childDeficit > 0 ? (
@@ -1623,7 +1623,7 @@ function ManifestPageContent() {
                                         )}
                                       </div>
                                       <div className="text-center px-2.5">
-                                        <p className="text-[9px] text-stone-400 font-semibold uppercase">Kuota Seat</p>
+                                        <p className="text-[9px] text-teal-300/80 font-semibold uppercase">Kuota Seat</p>
                                         <p className="text-base font-bold text-emerald-400">
                                           {childFilled}/{childQuota}
                                         </p>
