@@ -223,9 +223,18 @@ export default function KeberangkatanListPage() {
       childPackages: Keberangkatan[];
     }>();
 
+    const getDateStr = (d: any) => {
+      if (!d) return "";
+      try { return new Date(d).toISOString().split("T")[0] || ""; } catch { return ""; }
+    };
+
     keberangkatan.forEach((k) => {
-      const baseCode = (k.kode || "").replace(/_V\d+$/i, "").trim();
-      const groupKey = k.paketGrupId || (baseCode ? `code_${baseCode}` : `pkg_${k.id}`);
+      const baseCode = (k.kode || "").replace(/_V\d+$/i, "").trim().toLowerCase();
+      const depDateStr = getDateStr(k.tanggalBerangkat);
+      // Scoped strictly by parent ID or (base code + departure date)
+      const groupKey = k.parentKeberangkatanId
+        ? `parent_${k.parentKeberangkatanId}`
+        : (baseCode && depDateStr ? `rom_${baseCode}_${depDateStr}` : `pkg_${k.id}`);
 
       if (!map.has(groupKey)) {
         map.set(groupKey, {
@@ -412,8 +421,12 @@ export default function KeberangkatanListPage() {
                 ? "bg-warning"
                 : "bg-primary";
 
-          const baseCode = (k.kode || "").replace(/_V\d+$/i, "").trim();
-          const groupKey = k.paketGrupId || (baseCode ? `code_${baseCode}` : `pkg_${k.id}`);
+          const baseCode = (k.kode || "").replace(/_V\d+$/i, "").trim().toLowerCase();
+          const depDateStr = k.tanggalBerangkat ? new Date(k.tanggalBerangkat).toISOString().split("T")[0] : "";
+          const groupKey = k.parentKeberangkatanId
+            ? `parent_${k.parentKeberangkatanId}`
+            : (baseCode && depDateStr ? `rom_${baseCode}_${depDateStr}` : `pkg_${k.id}`);
+
           const groupStats = groupStatsMap.get(groupKey);
           const isPartOfSplit = groupStats ? groupStats.allPackages.length > 1 : false;
           const groupTotalQuota = groupStats ? groupStats.totalGroupQuota : maxSeat;

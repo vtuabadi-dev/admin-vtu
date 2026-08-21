@@ -22,17 +22,27 @@ export async function getKeberangkatanList() {
         packageType: true,
       },
     });
-    return list.map((k) => ({
-      ...k,
-      tanggalBerangkat: k.tanggalBerangkat ? k.tanggalBerangkat.toISOString() : new Date().toISOString(),
-      tanggalPulang: k.tanggalPulang ? k.tanggalPulang.toISOString() : new Date().toISOString(),
-      createdAt: k.createdAt ? k.createdAt.toISOString() : new Date().toISOString(),
-      updatedAt: k.updatedAt ? k.updatedAt.toISOString() : new Date().toISOString(),
-      maskapai: k.maskapaiMaster?.name || (k.maskapai && !k.maskapai.startsWith("cm") ? k.maskapai : undefined) || "Saudia",
-      hotelMekkah: k.hotelMekkahMaster?.name || (k.hotelMekkah && !k.hotelMekkah.startsWith("cm") ? k.hotelMekkah : undefined) || "TBA",
-      hotelMadinah: k.hotelMadinahMaster?.name || (k.hotelMadinah && !k.hotelMadinah.startsWith("cm") ? k.hotelMadinah : undefined) || "TBA",
-      hotelOptions: (k as any).hotelOptions ?? [],
-    })) as any;
+    return list.map((k) => {
+      const isPromo = k.splitReason === "promo" || !!k.promoLabel || k.kode.includes("_V");
+      let nama = k.namaPaket || "PAKET UMROH";
+      if (isPromo && !nama.toUpperCase().includes("(PROMO")) {
+        const promoTag = k.promoLabel ? `(PROMO: ${k.promoLabel})` : "(PROMO)";
+        nama = `${nama} ${promoTag}`;
+      }
+
+      return {
+        ...k,
+        namaPaket: nama,
+        tanggalBerangkat: k.tanggalBerangkat ? k.tanggalBerangkat.toISOString() : new Date().toISOString(),
+        tanggalPulang: k.tanggalPulang ? k.tanggalPulang.toISOString() : new Date().toISOString(),
+        createdAt: k.createdAt ? k.createdAt.toISOString() : new Date().toISOString(),
+        updatedAt: k.updatedAt ? k.updatedAt.toISOString() : new Date().toISOString(),
+        maskapai: k.maskapaiMaster?.name || (k.maskapai && !k.maskapai.startsWith("cm") ? k.maskapai : undefined) || "Saudia",
+        hotelMekkah: k.hotelMekkahMaster?.name || (k.hotelMekkah && !k.hotelMekkah.startsWith("cm") ? k.hotelMekkah : undefined) || "TBA",
+        hotelMadinah: k.hotelMadinahMaster?.name || (k.hotelMadinah && !k.hotelMadinah.startsWith("cm") ? k.hotelMadinah : undefined) || "TBA",
+        hotelOptions: (k as any).hotelOptions ?? [],
+      };
+    }) as any;
   } catch (err) {
     console.error("getKeberangkatanList error:", err);
     return [];
@@ -60,8 +70,17 @@ export async function getKeberangkatanById(id: string) {
       },
     });
     if (!k) return null;
+
+    const isPromo = k.splitReason === "promo" || !!k.promoLabel || k.kode.includes("_V");
+    let nama = k.namaPaket || "PAKET UMROH";
+    if (isPromo && !nama.toUpperCase().includes("(PROMO")) {
+      const promoTag = k.promoLabel ? `(PROMO: ${k.promoLabel})` : "(PROMO)";
+      nama = `${nama} ${promoTag}`;
+    }
+
     return {
       ...k,
+      namaPaket: nama,
       tanggalBerangkat: k.tanggalBerangkat ? k.tanggalBerangkat.toISOString() : new Date().toISOString(),
       tanggalPulang: k.tanggalPulang ? k.tanggalPulang.toISOString() : new Date().toISOString(),
       createdAt: k.createdAt ? k.createdAt.toISOString() : new Date().toISOString(),

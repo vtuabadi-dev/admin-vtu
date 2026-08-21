@@ -302,52 +302,79 @@ function ManifestPageContent() {
     const parentMap = new Map<string, Keberangkatan>();
     const childrenMap = new Map<string, Keberangkatan[]>();
 
-    // First pass: register root parents vs child split packages
+    const getDateStr = (d: any) => {
+      if (!d) return "";
+      try { return new Date(d).toISOString().split("T")[0] || ""; } catch { return ""; }
+    };
+
+    const getBaseCode = (code: string) => (code || "").replace(/_V\d+$/i, "").trim().toLowerCase();
+
+    // 1. Identify true child split packages (promo variants, starting point splits)
+    const isChildPackage = (k: Keberangkatan) => {
+      if (k.parentKeberangkatanId) return true;
+      if (k.kode && /_V\d+$/i.test(k.kode)) return true;
+      if ((k as any).splitReason && (k as any).splitReason !== "none" && (k as any).splitReason !== "") return true;
+      return false;
+    };
+
+    const roots: Keberangkatan[] = [];
+    const children: Keberangkatan[] = [];
+
     keberangkatanList.forEach((k) => {
-      const parentId = k.parentKeberangkatanId;
-      if (parentId) {
-        if (!childrenMap.has(parentId)) {
-          childrenMap.set(parentId, []);
-        }
-        childrenMap.get(parentId)!.push(k);
+      if (isChildPackage(k)) {
+        children.push(k);
       } else {
+        roots.push(k);
         parentMap.set(k.id, k);
       }
     });
 
-    // Also handle packages sharing same paketGrupId if parentId wasn't explicitly saved
-    keberangkatanList.forEach((k) => {
-      if (!k.parentKeberangkatanId && k.paketGrupId) {
-        const siblings = keberangkatanList.filter(
-          (other) => other.paketGrupId === k.paketGrupId && other.id !== k.id
-        );
-        if (siblings.length > 0) {
-          const groupParent =
-            keberangkatanList.find(
-              (other) =>
-                other.paketGrupId === k.paketGrupId &&
-                !other.parentKeberangkatanId &&
-                !other.splitReason
-            ) || siblings[0];
+    // 2. Associate each child with its correct parent on the same departure date
+    children.forEach((child) => {
+      let matchedParent: Keberangkatan | undefined;
 
-          if (groupParent && groupParent.id !== k.id) {
-            if (!childrenMap.has(groupParent.id)) {
-              childrenMap.set(groupParent.id, []);
-            }
-            if (!childrenMap.get(groupParent.id)!.some((c) => c.id === k.id)) {
-              childrenMap.get(groupParent.id)!.push(k);
-            }
-            parentMap.delete(k.id);
-          }
+      // Match by explicit parentKeberangkatanId
+      if (child.parentKeberangkatanId) {
+        matchedParent = parentMap.get(child.parentKeberangkatanId) || keberangkatanList.find((p) => p.id === child.parentKeberangkatanId);
+      }
+
+      // Match by base code AND same departure date
+      if (!matchedParent) {
+        const childBaseCode = getBaseCode(child.kode);
+        const childDate = getDateStr(child.tanggalBerangkat);
+
+        matchedParent = roots.find((r) => {
+          const rootBaseCode = getBaseCode(r.kode);
+          const rootDate = getDateStr(r.tanggalBerangkat);
+          return rootBaseCode === childBaseCode && rootDate === childDate;
+        });
+      }
+
+      // Match by same departure date and airline
+      if (!matchedParent) {
+        const childDate = getDateStr(child.tanggalBerangkat);
+        matchedParent = roots.find((r) => {
+          const rootDate = getDateStr(r.tanggalBerangkat);
+          return rootDate === childDate && r.maskapai === child.maskapai;
+        });
+      }
+
+      if (matchedParent) {
+        if (!childrenMap.has(matchedParent.id)) {
+          childrenMap.set(matchedParent.id, []);
         }
+        childrenMap.get(matchedParent.id)!.push(child);
+      } else {
+        // Fallback: if no parent matched, treat as independent root
+        parentMap.set(child.id, child);
       }
     });
 
     const result: { parent: Keberangkatan; children: Keberangkatan[] }[] = [];
 
     parentMap.forEach((parent) => {
-      const children = childrenMap.get(parent.id) || [];
-      result.push({ parent, children });
+      const pChildren = childrenMap.get(parent.id) || [];
+      result.push({ parent, children: pChildren });
     });
 
     return result;
