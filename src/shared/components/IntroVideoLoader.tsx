@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { Volume2, VolumeX, SkipForward } from "lucide-react";
+import gsap from "gsap";
 
 interface IntroVideoLoaderProps {
   onComplete?: () => void;
@@ -14,13 +15,16 @@ export default function IntroVideoLoader({
   forceShow = false,
   videoSrc,
 }: IntroVideoLoaderProps) {
-  // Start with isVisible = true by default to guarantee ZERO flash of login page
   const [isVisible, setIsVisible] = useState(true);
   const [isVideoPlaying, setIsVideoPlaying] = useState(false);
-  const [isFadingOut, setIsFadingOut] = useState(false);
   const [isMuted, setIsMuted] = useState(true);
   const [activeVideoSrc, setActiveVideoSrc] = useState<string>(videoSrc || "/api/assets/intro-video");
+
+  const overlayRef = useRef<HTMLDivElement | null>(null);
+  const videoWrapperRef = useRef<HTMLDivElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const headerRef = useRef<HTMLDivElement | null>(null);
+  const ambientGlowRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -38,6 +42,41 @@ export default function IntroVideoLoader({
     }
   }, [forceShow, onComplete, videoSrc]);
 
+  // Ambient glow subtle pulse with GSAP
+  useEffect(() => {
+    if (!isVisible || !ambientGlowRef.current) return;
+    const ctx = gsap.context(() => {
+      gsap.to(ambientGlowRef.current, {
+        scale: 1.25,
+        opacity: 0.35,
+        duration: 3,
+        repeat: -1,
+        yoyo: true,
+        ease: "sine.inOut",
+      });
+    });
+    return () => ctx.revert();
+  }, [isVisible]);
+
+  // Handle Video Emergence with GSAP
+  const handleVideoStart = () => {
+    if (isVideoPlaying) return;
+    setIsVideoPlaying(true);
+
+    if (videoWrapperRef.current && headerRef.current) {
+      gsap.fromTo(
+        videoWrapperRef.current,
+        { scale: 0.96, opacity: 0, filter: "blur(8px)" },
+        { scale: 1, opacity: 1, filter: "blur(0px)", duration: 0.8, ease: "power3.out" }
+      );
+      gsap.fromTo(
+        headerRef.current,
+        { opacity: 0, y: -10 },
+        { opacity: 1, y: 0, duration: 0.6, delay: 0.3, ease: "power2.out" }
+      );
+    }
+  };
+
   // Attempt autoplay programmatically when visible
   useEffect(() => {
     if (!isVisible) return;
@@ -50,7 +89,7 @@ export default function IntroVideoLoader({
       if (playPromise !== undefined) {
         playPromise
           .then(() => {
-            setIsVideoPlaying(true);
+            handleVideoStart();
           })
           .catch((err) => {
             console.warn("[IntroVideoLoader] Initial play blocked, trying muted force play:", err);
@@ -58,7 +97,7 @@ export default function IntroVideoLoader({
             setIsMuted(true);
             video
               .play()
-              .then(() => setIsVideoPlaying(true))
+              .then(() => handleVideoStart())
               .catch((e) => console.warn("[IntroVideoLoader] Muted play error:", e));
           });
       }
@@ -73,18 +112,40 @@ export default function IntroVideoLoader({
   }, [isVisible]);
 
   const handleFinish = () => {
-    if (isFadingOut) return;
-    setIsFadingOut(true);
     if (typeof window !== "undefined") {
       sessionStorage.setItem("vtu_intro_played", "true");
       document.documentElement.classList.remove("intro-pending");
     }
-    setTimeout(() => {
+
+    // GSAP Cinematic Dissolve to Login Screen
+    const tl = gsap.timeline({
+      onComplete: () => {
+        setIsVisible(false);
+        if (onComplete) onComplete();
+      },
+    });
+
+    if (videoWrapperRef.current && overlayRef.current) {
+      tl.to(videoWrapperRef.current, {
+        scale: 1.04,
+        opacity: 0,
+        filter: "blur(12px)",
+        duration: 0.65,
+        ease: "power2.inOut",
+      });
+      tl.to(
+        overlayRef.current,
+        {
+          opacity: 0,
+          duration: 0.45,
+          ease: "power2.inOut",
+        },
+        "-=0.25"
+      );
+    } else {
       setIsVisible(false);
-      if (onComplete) {
-        onComplete();
-      }
-    }, 700);
+      if (onComplete) onComplete();
+    }
   };
 
   const toggleMute = () => {
@@ -98,15 +159,20 @@ export default function IntroVideoLoader({
 
   return (
     <div
-      className={`fixed inset-0 z-[9999] bg-slate-950 flex flex-col justify-between overflow-hidden transition-opacity duration-700 ease-out ${
-        isFadingOut ? "opacity-0 pointer-events-none" : "opacity-100"
-      }`}
+      ref={overlayRef}
+      className="fixed inset-0 z-[9999] bg-slate-950 flex flex-col justify-between overflow-hidden will-change-transform"
     >
-      {/* Subtle Cinematic Ambient Backdrop */}
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-emerald-900/15 rounded-full blur-3xl pointer-events-none animate-pulse" />
+      {/* Subtle GSAP-Controlled Ambient Glow */}
+      <div
+        ref={ambientGlowRef}
+        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-emerald-900/20 rounded-full blur-3xl pointer-events-none"
+      />
 
-      {/* Pure Fullscreen Intro Video Player with Smooth Emergence */}
-      <div className="absolute inset-0 z-0 bg-slate-950 flex items-center justify-center">
+      {/* Pure Fullscreen Intro Video Player with GSAP Emergence */}
+      <div
+        ref={videoWrapperRef}
+        className="absolute inset-0 z-0 bg-slate-950 flex items-center justify-center opacity-0"
+      >
         <video
           ref={videoRef}
           autoPlay
@@ -114,7 +180,7 @@ export default function IntroVideoLoader({
           playsInline
           preload="auto"
           controls={false}
-          onPlaying={() => setIsVideoPlaying(true)}
+          onPlaying={handleVideoStart}
           onCanPlay={() => {
             if (videoRef.current) {
               videoRef.current.muted = isMuted;
@@ -126,26 +192,23 @@ export default function IntroVideoLoader({
             console.warn("[IntroVideoLoader] Video element error, finishing intro:", e);
             handleFinish();
           }}
-          className={`w-full h-full object-contain object-center max-w-full max-h-screen transition-all duration-700 ease-out ${
-            isVideoPlaying ? "opacity-100 scale-100" : "opacity-0 scale-[0.98]"
-          }`}
+          className="w-full h-full object-contain object-center max-w-full max-h-screen"
         >
           <source src={activeVideoSrc} type="video/mp4" />
         </video>
       </div>
 
-      {/* Top Header Bar */}
+      {/* Top Header Bar with GSAP Fade */}
       <div
-        className={`relative z-10 p-4 sm:p-6 flex items-center justify-end transition-opacity duration-700 delay-300 ${
-          isVideoPlaying ? "opacity-100" : "opacity-0"
-        }`}
+        ref={headerRef}
+        className="relative z-10 p-4 sm:p-6 flex items-center justify-end opacity-0"
       >
         <div className="flex items-center gap-3">
           {/* Audio Toggle Button */}
           <button
             type="button"
             onClick={toggleMute}
-            className="p-2.5 bg-black/50 hover:bg-black/80 text-white rounded-full border border-white/25 backdrop-blur-md shadow-lg transition-all"
+            className="p-2.5 bg-black/50 hover:bg-black/80 text-white rounded-full border border-white/25 backdrop-blur-md shadow-lg transition-all active:scale-95"
             title={isMuted ? "Nyalakan Suara Video" : "Matikan Suara"}
           >
             {isMuted ? <VolumeX className="w-4 h-4 text-slate-300" /> : <Volume2 className="w-4 h-4 text-emerald-400" />}
@@ -155,7 +218,7 @@ export default function IntroVideoLoader({
           <button
             type="button"
             onClick={handleFinish}
-            className="px-4 py-2 bg-black/50 hover:bg-black/80 text-white rounded-full text-xs font-extrabold backdrop-blur-md border border-white/25 shadow-xl transition-all flex items-center gap-1.5"
+            className="px-4 py-2 bg-black/50 hover:bg-black/80 text-white rounded-full text-xs font-extrabold backdrop-blur-md border border-white/25 shadow-xl transition-all flex items-center gap-1.5 active:scale-95"
           >
             <span>Lewati Intro</span>
             <SkipForward className="w-3.5 h-3.5" />
