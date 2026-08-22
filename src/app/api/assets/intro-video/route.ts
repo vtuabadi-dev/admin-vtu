@@ -19,22 +19,14 @@ const TOK_P2 = "I66Nx0jTHWlVbmNsmaCcUrPV6KSs5WdF7bA";
 const AUTH_REFRESH_TOKEN = `${TOK_P1}${TOK_P2}`;
 
 async function getAccessToken(): Promise<string> {
-  const params = new URLSearchParams();
-  params.append("client_id", AUTH_CLIENT_ID);
-  params.append("client_secret", AUTH_CLIENT_SECRET);
-  params.append("refresh_token", AUTH_REFRESH_TOKEN);
-  params.append("grant_type", "refresh_token");
-
-  const res = await fetch("https://oauth2.googleapis.com/token", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: params.toString(),
-  });
-  const data = await res.json();
-  if (!data.access_token) {
-    throw new Error("Failed to get Google Drive access token: " + JSON.stringify(data));
+  const { OAuth2Client } = await import("google-auth-library");
+  const oauth2Client = new OAuth2Client(AUTH_CLIENT_ID, AUTH_CLIENT_SECRET);
+  oauth2Client.setCredentials({ refresh_token: AUTH_REFRESH_TOKEN });
+  const res = await oauth2Client.getAccessToken();
+  if (!res.token) {
+    throw new Error("Google Drive OAuth2 client did not return an access token");
   }
-  return data.access_token;
+  return res.token;
 }
 
 interface VideoCache {
