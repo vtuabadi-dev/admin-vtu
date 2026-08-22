@@ -3,60 +3,38 @@ import { NextRequest, NextResponse } from "next/server";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-const INTRO_VIDEO_FOLDER_ID = process.env.GOOGLE_DRIVE_INTRO_VIDEO_FOLDER_ID || "1jOMszvMajCWR0iVJku6hnAGKqwHWFec_";
+const INTRO_VIDEO_FOLDER_ID = "1jOMszvMajCWR0iVJku6hnAGKqwHWFec_";
 const DRIVE_API = "https://www.googleapis.com/drive/v3";
 
 const CID_P1 = "667018553984-4qm3tl8sl4uvk18u0tm25s67rj4qnnr9";
 const CID_P2 = ".apps.googleusercontent.com";
-const DEFAULT_CLIENT_ID = `${CID_P1}${CID_P2}`;
+const AUTH_CLIENT_ID = `${CID_P1}${CID_P2}`;
 
 const SEC_P1 = "GOCSPX-Ze9yqP1FeB3d0I28";
 const SEC_P2 = "GQUKwsGWWrR3";
-const DEFAULT_CLIENT_SECRET = `${SEC_P1}${SEC_P2}`;
+const AUTH_CLIENT_SECRET = `${SEC_P1}${SEC_P2}`;
 
 const TOK_P1 = "1//04GlTNMbDn4ArCgYIARAAGAQSNwF-L9IrC7zolBVYwGD4kBR5Nm1pQ8rSQJiu2U-x";
 const TOK_P2 = "I66Nx0jTHWlVbmNsmaCcUrPV6KSs5WdF7bA";
-const DEFAULT_REFRESH_TOKEN = `${TOK_P1}${TOK_P2}`;
+const AUTH_REFRESH_TOKEN = `${TOK_P1}${TOK_P2}`;
 
 async function getAccessToken(): Promise<string> {
-  const credentialPairs = [
-    {
-      cid: DEFAULT_CLIENT_ID,
-      sec: DEFAULT_CLIENT_SECRET,
-      tok: DEFAULT_REFRESH_TOKEN,
-    },
-    {
-      cid: process.env.GOOGLE_CLIENT_ID || DEFAULT_CLIENT_ID,
-      sec: process.env.GOOGLE_CLIENT_SECRET || DEFAULT_CLIENT_SECRET,
-      tok: process.env.GOOGLE_REFRESH_TOKEN || DEFAULT_REFRESH_TOKEN,
-    },
-  ];
+  const params = new URLSearchParams();
+  params.append("client_id", AUTH_CLIENT_ID);
+  params.append("client_secret", AUTH_CLIENT_SECRET);
+  params.append("refresh_token", AUTH_REFRESH_TOKEN);
+  params.append("grant_type", "refresh_token");
 
-  let lastErr = "";
-  for (const cred of credentialPairs) {
-    try {
-      const params = new URLSearchParams();
-      params.append("client_id", cred.cid);
-      params.append("client_secret", cred.sec);
-      params.append("refresh_token", cred.tok);
-      params.append("grant_type", "refresh_token");
-
-      const res = await fetch("https://oauth2.googleapis.com/token", {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: params.toString(),
-      });
-      const data = await res.json();
-      if (data.access_token) {
-        return data.access_token;
-      }
-      lastErr = JSON.stringify(data);
-    } catch (e: any) {
-      lastErr = String(e?.message || e);
-    }
+  const res = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: params.toString(),
+  });
+  const data = await res.json();
+  if (!data.access_token) {
+    throw new Error("Failed to get Google Drive access token: " + JSON.stringify(data));
   }
-
-  throw new Error("Failed to get Google Drive access token: " + lastErr);
+  return data.access_token;
 }
 
 interface VideoCache {
@@ -99,7 +77,7 @@ export async function GET(request: NextRequest) {
           videoBuffer = currentCache.buffer;
           mimeType = currentCache.mimeType;
         } else {
-          throw new Error(`Google Drive API error: ${listRes.status} ${listRes.statusText} - body: ${errBody} - tokenPrefix: ${token?.slice(0, 10)}`);
+          throw new Error(`Google Drive API error: ${listRes.status} ${listRes.statusText} - body: ${errBody}`);
         }
       } else {
         const listData = await listRes.json();
