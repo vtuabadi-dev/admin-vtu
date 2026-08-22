@@ -47,74 +47,100 @@ interface VideoCache {
   timestamp: number;
 }
 
-let memoryCache: VideoCache | null = null;
-const CACHE_CHECK_TTL_MS = 20 * 1000; // Check every 20 seconds for newly uploaded file
+const memoryCaches: Record<string, VideoCache> = {};
+const CACHE_CHECK_TTL_MS = 20 * 1000; // 20 seconds refresh check
 
 export async function GET(req: NextRequest) {
   const now = Date.now();
+  const device = req.nextUrl.searchParams.get("device") === "mobile" ? "mobile" : "desktop";
 
   try {
     let videoBuffer: Uint8Array | null = null;
     let mimeType = "video/mp4";
+    const currentCache = memoryCaches[device];
 
-    if (memoryCache && now - memoryCache.timestamp < CACHE_CHECK_TTL_MS) {
-      videoBuffer = memoryCache.buffer;
-      mimeType = memoryCache.mimeType;
+    if (currentCache && now - currentCache.timestamp < CACHE_CHECK_TTL_MS) {
+      videoBuffer = currentCache.buffer;
+      mimeType = currentCache.mimeType;
     } else {
       const token = await getAccessToken();
 
-      // Query latest video in folder 1jOMszvMajCWR0iVJku6hnAGKqwHWFec_
+      // List all video files in folder 1jOMszvMajCWR0iVJku6hnAGKqwHWFec_
       const query = `'${INTRO_VIDEO_FOLDER_ID}' in parents and (mimeType contains 'video/' or name contains '.mp4') and trashed = false`;
-      const listUrl = `${DRIVE_API}/files?q=${encodeURIComponent(query)}&orderBy=modifiedTime desc&pageSize=1&fields=files(id,name,mimeType,size)&supportsAllDrives=true&includeItemsFromAllDrives=true`;
+      const listUrl = `${DRIVE_API}/files?q=${encodeURIComponent(query)}&orderBy=modifiedTime desc&pageSize=10&fields=files(id,name,mimeType,size,modifiedTime)&supportsAllDrives=true&includeItemsFromAllDrives=true`;
 
       const listRes = await fetch(listUrl, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
       if (!listRes.ok) {
-        if (memoryCache) {
-          videoBuffer = memoryCache.buffer;
-          mimeType = memoryCache.mimeType;
+        if (currentCache) {
+          videoBuffer = currentCache.buffer;
+          mimeType = currentCache.mimeType;
         } else {
           throw new Error(`Google Drive API error: ${listRes.statusText}`);
         }
       } else {
         const listData = await listRes.json();
-        const files = listData.files || [];
+        const files: Array<{ id: string; name: string; mimeType: string }> = listData.files || [];
 
         if (files.length === 0) {
-          if (memoryCache) {
-            videoBuffer = memoryCache.buffer;
-            mimeType = memoryCache.mimeType;
+          if (currentCache) {
+            videoBuffer = currentCache.buffer;
+            mimeType = currentCache.mimeType;
           } else {
             return new NextResponse(null, { status: 404 });
           }
         } else {
-          const latestFile = files[0];
+          // Filter matching file for device
+          let targetFile = files[0];
 
-          if (memoryCache && memoryCache.fileId === latestFile.id) {
-            memoryCache.timestamp = now;
-            videoBuffer = memoryCache.buffer;
-            mimeType = memoryCache.mimeType;
+          if (device === "mobile") {
+            const mobileFile = files.find((f) =>
+              /mobile|portrait|vertikal|hp|9-16|9_16|vertical/i.test(f.name)
+            );
+            if (mobileFile) {
+              targetFile = mobileFile;
+            }
           } else {
-            const downloadRes = await fetch(`${DRIVE_API}/files/${latestFile.id}?alt=media&supportsAllDrives=true`, {
+            const desktopFile = files.find((f) =>
+              /desktop|landscape|horizontal|16-9|16_9|web|corporate/i.test(f.name)
+            );
+            if (desktopFile) {
+              targetFile = desktopFile;
+            }
+          }
+
+          if (!targetFile) {
+            if (currentCache) {
+              videoBuffer = currentCache.buffer;
+              mimeType = currentCache.mimeType;
+            } else {
+              return new NextResponse(null, { status: 404 });
+            }
+          } else if (currentCache && currentCache.fileId === targetFile.id) {
+            currentCache.timestamp = now;
+            videoBuffer = currentCache.buffer;
+            mimeType = currentCache.mimeType;
+          } else {
+            const downloadRes = await fetch(`${DRIVE_API}/files/${targetFile.id}?alt=media&supportsAllDrives=true`, {
               headers: { Authorization: `Bearer ${token}` },
             });
 
             if (!downloadRes.ok) {
-              if (memoryCache) {
-                videoBuffer = memoryCache.buffer;
-                mimeType = memoryCache.mimeType;
+              if (currentCache) {
+                videoBuffer = currentCache.buffer;
+                mimeType = currentCache.mimeType;
               } else {
                 throw new Error(`Failed to download intro video: ${downloadRes.statusText}`);
               }
             } else {
               const arrayBuf = await downloadRes.arrayBuffer();
               videoBuffer = new Uint8Array(arrayBuf);
-              mimeType = latestFile.mimeType || "video/mp4";
+              mimeType = targetFile.mimeType || "video/mp4";
 
-              memoryCache = {
-                fileId: latestFile.id,
+              memoryCaches[device] = {
+                fileId: targetFile.id,
                 buffer: videoBuffer,
                 mimeType,
                 timestamp: now,
@@ -126,9 +152,9 @@ export async function GET(req: NextRequest) {
     }
 
     if (!videoBuffer) {
-      if (memoryCache) {
-        videoBuffer = memoryCache.buffer;
-        mimeType = memoryCache.mimeType;
+      if (currentCache) {
+        videoBuffer = currentCache.buffer;
+        mimeType = currentCache.mimeType;
       } else {
         return new NextResponse(null, { status: 404 });
       }
@@ -168,11 +194,12 @@ export async function GET(req: NextRequest) {
       },
     });
   } catch (error: any) {
-    console.error("[Intro Video Stream Error]:", error?.message || error);
-    if (memoryCache) {
-      return new NextResponse(memoryCache.buffer as any, {
+    console.error(`[Intro Video Stream Error - ${device}]:`, error?.message || error);
+    const currentCache = memoryCaches[device];
+    if (currentCache) {
+      return new NextResponse(currentCache.buffer as any, {
         headers: {
-          "Content-Type": memoryCache.mimeType,
+          "Content-Type": currentCache.mimeType,
           "Accept-Ranges": "bytes",
           "Cache-Control": "public, max-age=60",
         },

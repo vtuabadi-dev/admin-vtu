@@ -12,16 +12,22 @@ interface IntroVideoLoaderProps {
 export default function IntroVideoLoader({
   onComplete,
   forceShow = false,
-  videoSrc = process.env.NEXT_PUBLIC_INTRO_VIDEO_URL || "/api/assets/intro-video",
+  videoSrc,
 }: IntroVideoLoaderProps) {
   const [isVisible, setIsVisible] = useState(false);
   const [isFadingOut, setIsFadingOut] = useState(false);
   const [isMuted, setIsMuted] = useState(true);
+  const [activeVideoSrc, setActiveVideoSrc] = useState<string>(videoSrc || "/api/assets/intro-video");
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
   useEffect(() => {
     // Check if intro has already been shown in this session (unless forced)
     if (typeof window !== "undefined") {
+      const isMobile = window.innerWidth < 768 || window.matchMedia("(max-width: 767px)").matches;
+      if (!videoSrc) {
+        setActiveVideoSrc(`/api/assets/intro-video?device=${isMobile ? "mobile" : "desktop"}`);
+      }
+
       const played = sessionStorage.getItem("vtu_intro_played");
       if (!played || forceShow) {
         setIsVisible(true);
@@ -30,7 +36,7 @@ export default function IntroVideoLoader({
         if (onComplete) onComplete();
       }
     }
-  }, [forceShow, onComplete]);
+  }, [forceShow, onComplete, videoSrc]);
 
   // Attempt autoplay programmatically when visible
   useEffect(() => {
@@ -113,7 +119,7 @@ export default function IntroVideoLoader({
           }}
           className="w-full h-full object-contain object-center max-w-full max-h-screen"
         >
-          <source src={videoSrc} type="video/mp4" />
+          <source src={activeVideoSrc} type="video/mp4" />
         </video>
       </div>
 
