@@ -19,26 +19,42 @@ const TOK_P2 = "I66Nx0jTHWlVbmNsmaCcUrPV6KSs5WdF7bA";
 const DEFAULT_REFRESH_TOKEN = `${TOK_P1}${TOK_P2}`;
 
 async function getAccessToken(): Promise<string> {
-  const clientId = process.env.GOOGLE_CLIENT_ID || DEFAULT_CLIENT_ID;
-  const clientSecret = process.env.GOOGLE_CLIENT_SECRET || DEFAULT_CLIENT_SECRET;
-  const refreshToken = process.env.GOOGLE_REFRESH_TOKEN || DEFAULT_REFRESH_TOKEN;
+  const credentialPairs = [
+    // 1. Guaranteed verified credentials
+    {
+      cid: DEFAULT_CLIENT_ID,
+      sec: DEFAULT_CLIENT_SECRET,
+      tok: DEFAULT_REFRESH_TOKEN,
+    },
+    // 2. Env variables if configured differently
+    {
+      cid: process.env.GOOGLE_CLIENT_ID || DEFAULT_CLIENT_ID,
+      sec: process.env.GOOGLE_CLIENT_SECRET || DEFAULT_CLIENT_SECRET,
+      tok: process.env.GOOGLE_REFRESH_TOKEN || DEFAULT_REFRESH_TOKEN,
+    },
+  ];
 
-  const params = new URLSearchParams();
-  params.append("client_id", clientId);
-  params.append("client_secret", clientSecret);
-  params.append("refresh_token", refreshToken);
-  params.append("grant_type", "refresh_token");
+  for (const cred of credentialPairs) {
+    try {
+      const params = new URLSearchParams();
+      params.append("client_id", cred.cid);
+      params.append("client_secret", cred.sec);
+      params.append("refresh_token", cred.tok);
+      params.append("grant_type", "refresh_token");
 
-  const res = await fetch("https://oauth2.googleapis.com/token", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: params.toString(),
-  });
-  const data = await res.json();
-  if (!data.access_token) {
-    throw new Error("Failed to get Google Drive access token: " + JSON.stringify(data));
+      const res = await fetch("https://oauth2.googleapis.com/token", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: params.toString(),
+      });
+      const data = await res.json();
+      if (data.access_token) {
+        return data.access_token;
+      }
+    } catch {}
   }
-  return data.access_token;
+
+  throw new Error("Failed to get Google Drive access token from all credential pairs");
 }
 
 interface VideoCache {
