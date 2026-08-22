@@ -111,7 +111,7 @@ export default function IntroVideoLoader({
             console.warn("[IntroVideoLoader] Video element error, finishing intro:", e);
             handleFinish();
           }}
-          className="w-full h-full object-cover object-center"
+          className="w-full h-full object-contain object-center max-w-full max-h-screen"
         >
           <source src={videoSrc} type="video/mp4" />
         </video>
