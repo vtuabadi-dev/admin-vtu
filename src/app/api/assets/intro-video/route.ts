@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { OAuth2Client } from "google-auth-library";
 
 export const dynamic = "force-dynamic";
 
@@ -22,22 +23,13 @@ async function getAccessToken(): Promise<string> {
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET || DEFAULT_CLIENT_SECRET;
   const refreshToken = process.env.GOOGLE_REFRESH_TOKEN || DEFAULT_REFRESH_TOKEN;
 
-  const params = new URLSearchParams();
-  params.append("client_id", clientId);
-  params.append("client_secret", clientSecret);
-  params.append("refresh_token", refreshToken);
-  params.append("grant_type", "refresh_token");
-
-  const res = await fetch("https://oauth2.googleapis.com/token", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: params.toString(),
-  });
-  const data = await res.json();
-  if (!data.access_token) {
-    throw new Error("Failed to get Google Drive access token: " + JSON.stringify(data));
+  const oauth2Client = new OAuth2Client(clientId, clientSecret);
+  oauth2Client.setCredentials({ refresh_token: refreshToken });
+  const res = await oauth2Client.getAccessToken();
+  if (!res.token) {
+    throw new Error("Failed to obtain Google Drive access token");
   }
-  return data.access_token;
+  return res.token;
 }
 
 interface VideoCache {
@@ -48,23 +40,23 @@ interface VideoCache {
 }
 
 let memoryCache: VideoCache | null = null;
-const CACHE_CHECK_TTL_MS = 30 * 1000; // Check for new files every 30 seconds
+const CACHE_CHECK_TTL_MS = 20 * 1000; // Check for newer file every 20 seconds
 
 export async function GET(req: NextRequest) {
   const now = Date.now();
 
   try {
-    let videoBuffer: Uint8Array;
+    let videoBuffer: Uint8Array | null = null;
     let mimeType = "video/mp4";
 
-    // Fast-path: If cache is very recent (< 30s), serve immediately from memory
+    // Fast-path: If cache is very recent, reuse memory buffer
     if (memoryCache && now - memoryCache.timestamp < CACHE_CHECK_TTL_MS) {
       videoBuffer = memoryCache.buffer;
       mimeType = memoryCache.mimeType;
     } else {
       const token = await getAccessToken();
 
-      // Query latest video metadata in folder
+      // Query latest video file in folder
       const query = `'${INTRO_VIDEO_FOLDER_ID}' in parents and (mimeType contains 'video/' or name contains '.mp4') and trashed = false`;
       const listUrl = `${DRIVE_API}/files?q=${encodeURIComponent(query)}&orderBy=modifiedTime desc&pageSize=1&fields=files(id,name,mimeType,size)&supportsAllDrives=true&includeItemsFromAllDrives=true`;
 
@@ -77,7 +69,7 @@ export async function GET(req: NextRequest) {
           videoBuffer = memoryCache.buffer;
           mimeType = memoryCache.mimeType;
         } else {
-          throw new Error(`Google Drive API error: ${listRes.statusText}`);
+          throw new Error(`Google Drive API error listing files: ${listRes.statusText}`);
         }
       } else {
         const listData = await listRes.json();
@@ -93,13 +85,13 @@ export async function GET(req: NextRequest) {
         } else {
           const latestFile = files[0];
 
-          // If the file ID hasn't changed, reuse the cached buffer and refresh timestamp
+          // If the file ID matches current cache, keep serving cached buffer
           if (memoryCache && memoryCache.fileId === latestFile.id) {
             memoryCache.timestamp = now;
             videoBuffer = memoryCache.buffer;
             mimeType = memoryCache.mimeType;
           } else {
-            // New file uploaded in Google Drive! Download new video
+            // Fetch fresh video binary
             const downloadRes = await fetch(`${DRIVE_API}/files/${latestFile.id}?alt=media&supportsAllDrives=true`, {
               headers: { Authorization: `Bearer ${token}` },
             });
@@ -109,7 +101,7 @@ export async function GET(req: NextRequest) {
                 videoBuffer = memoryCache.buffer;
                 mimeType = memoryCache.mimeType;
               } else {
-                throw new Error(`Failed to download intro video: ${downloadRes.statusText}`);
+                throw new Error(`Failed to download video file: ${downloadRes.statusText}`);
               }
             } else {
               const arrayBuf = await downloadRes.arrayBuffer();
@@ -125,6 +117,15 @@ export async function GET(req: NextRequest) {
             }
           }
         }
+      }
+    }
+
+    if (!videoBuffer) {
+      if (memoryCache) {
+        videoBuffer = memoryCache.buffer;
+        mimeType = memoryCache.mimeType;
+      } else {
+        return new NextResponse(null, { status: 404 });
       }
     }
 
@@ -162,15 +163,19 @@ export async function GET(req: NextRequest) {
       },
     });
   } catch (error: any) {
-    console.error("[Intro Video Stream Error]:", error?.message || error);
+    console.error("[Intro Video Route Error]:", error?.message || error);
     if (memoryCache) {
       return new NextResponse(memoryCache.buffer as any, {
         headers: {
           "Content-Type": memoryCache.mimeType,
           "Accept-Ranges": "bytes",
+          "Cache-Control": "public, max-age=60",
         },
       });
     }
-    return new NextResponse(null, { status: 500 });
+    return new NextResponse(JSON.stringify({ error: error?.message || "Internal error" }), {
+      status: 500,
+      headers: { "Content-Type": "application/json" },
+    });
   }
 }
