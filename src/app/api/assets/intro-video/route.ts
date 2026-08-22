@@ -1,5 +1,3 @@
-import { NextRequest, NextResponse } from "next/server";
-
 export const dynamic = "force-dynamic";
 
 const INTRO_VIDEO_FOLDER_ID = process.env.GOOGLE_DRIVE_INTRO_VIDEO_FOLDER_ID || "1jOMszvMajCWR0iVJku6hnAGKqwHWFec_";
@@ -50,9 +48,10 @@ interface VideoCache {
 const memoryCaches: Record<string, VideoCache> = {};
 const CACHE_CHECK_TTL_MS = 20 * 1000; // 20 seconds refresh check
 
-export async function GET(req: NextRequest) {
+export async function GET(request: Request) {
   const now = Date.now();
-  const device = req.nextUrl.searchParams.get("device") === "mobile" ? "mobile" : "desktop";
+  const url = new URL(request.url);
+  const device = url.searchParams.get("device") === "mobile" ? "mobile" : "desktop";
 
   try {
     let videoBuffer: Uint8Array | null = null;
@@ -89,7 +88,7 @@ export async function GET(req: NextRequest) {
             videoBuffer = currentCache.buffer;
             mimeType = currentCache.mimeType;
           } else {
-            return new NextResponse(null, { status: 404 });
+            return new Response(null, { status: 404 });
           }
         } else {
           // Filter matching file for device
@@ -116,7 +115,7 @@ export async function GET(req: NextRequest) {
               videoBuffer = currentCache.buffer;
               mimeType = currentCache.mimeType;
             } else {
-              return new NextResponse(null, { status: 404 });
+              return new Response(null, { status: 404 });
             }
           } else if (currentCache && currentCache.fileId === targetFile.id) {
             currentCache.timestamp = now;
@@ -156,12 +155,12 @@ export async function GET(req: NextRequest) {
         videoBuffer = currentCache.buffer;
         mimeType = currentCache.mimeType;
       } else {
-        return new NextResponse(null, { status: 404 });
+        return new Response(null, { status: 404 });
       }
     }
 
     const totalSize = videoBuffer.byteLength;
-    const rangeHeader = req.headers.get("range");
+    const rangeHeader = request.headers.get("range");
 
     if (rangeHeader) {
       const match = rangeHeader.match(/bytes=(\d+)-(\d*)/);
@@ -171,7 +170,7 @@ export async function GET(req: NextRequest) {
         const chunkSize = end - start + 1;
         const sliced = videoBuffer.subarray(start, end + 1);
 
-        return new NextResponse(sliced as any, {
+        return new Response(sliced as any, {
           status: 206,
           headers: {
             "Content-Range": `bytes ${start}-${end}/${totalSize}`,
@@ -184,7 +183,7 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    return new NextResponse(videoBuffer as any, {
+    return new Response(videoBuffer as any, {
       status: 200,
       headers: {
         "Accept-Ranges": "bytes",
@@ -197,7 +196,7 @@ export async function GET(req: NextRequest) {
     console.error(`[Intro Video Stream Error - ${device}]:`, error?.message || error);
     const currentCache = memoryCaches[device];
     if (currentCache) {
-      return new NextResponse(currentCache.buffer as any, {
+      return new Response(currentCache.buffer as any, {
         headers: {
           "Content-Type": currentCache.mimeType,
           "Accept-Ranges": "bytes",
@@ -205,6 +204,6 @@ export async function GET(req: NextRequest) {
         },
       });
     }
-    return new NextResponse(null, { status: 500 });
+    return new Response(null, { status: 500 });
   }
 }
