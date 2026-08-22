@@ -2,12 +2,13 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, ShieldCheck, Phone, HeartHandshake, BookOpen, ExternalLink, Download, AlertCircle, Upload, Plus, User, KeyRound, CheckCircle2 } from "lucide-react";
+import { ShieldCheck, Phone, HeartHandshake, BookOpen, ExternalLink, Download, AlertCircle, Upload, Plus, User, KeyRound, CheckCircle2 } from "lucide-react";
 import { Button } from "@/shared/components/ui/Button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/components/ui/Card";
 import { Input } from "@/shared/components/ui/Input";
 import { Badge } from "@/shared/components/ui/Badge";
 import { Modal } from "@/shared/components/ui/Modal";
+import PortalSwitcherNav from "@/shared/components/PortalSwitcherNav";
 
 export default function TrackBadalWakafPage() {
   const [step, setStep] = useState<"login" | "data">("login");
@@ -161,14 +162,10 @@ export default function TrackBadalWakafPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 py-10 px-4 flex items-center justify-center">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 py-10 px-4 flex flex-col items-center justify-center">
       <div className="w-full max-w-3xl space-y-6">
-        <Link
-          href="/login"
-          className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
-        >
-          <ArrowLeft className="h-3.5 w-3.5" /> Kembali ke Portal Utama / Login
-        </Link>
+        {/* ── Floating Unified Portal Switcher Bar ── */}
+        <PortalSwitcherNav className="mb-0" />
 
         <Card className="border border-border shadow-sm overflow-hidden">
           <CardHeader className="bg-gradient-to-r from-emerald-700 via-teal-700 to-sky-700 text-white p-6 text-center">

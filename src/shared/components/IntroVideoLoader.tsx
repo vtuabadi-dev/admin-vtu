@@ -15,13 +15,16 @@ export default function IntroVideoLoader({
   videoSrc,
 }: IntroVideoLoaderProps) {
   const [isVisible, setIsVisible] = useState(false);
+  const [isIntroReady, setIsIntroReady] = useState(false);
+  const [isVideoPlaying, setIsVideoPlaying] = useState(false);
   const [isFadingOut, setIsFadingOut] = useState(false);
   const [isMuted, setIsMuted] = useState(true);
   const [activeVideoSrc, setActiveVideoSrc] = useState<string>(videoSrc || "/api/assets/intro-video");
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
   useEffect(() => {
-    // Check if intro has already been shown in this session (unless forced)
+    let timer: ReturnType<typeof setTimeout> | null = null;
+
     if (typeof window !== "undefined") {
       const isMobile = window.innerWidth < 768 || window.matchMedia("(max-width: 767px)").matches;
       if (!videoSrc) {
@@ -31,11 +34,18 @@ export default function IntroVideoLoader({
       const played = sessionStorage.getItem("vtu_intro_played");
       if (!played || forceShow) {
         setIsVisible(true);
+        timer = setTimeout(() => {
+          setIsIntroReady(true);
+        }, 30);
       } else {
         setIsVisible(false);
         if (onComplete) onComplete();
       }
     }
+
+    return () => {
+      if (timer) clearTimeout(timer);
+    };
   }, [forceShow, onComplete, videoSrc]);
 
   // Attempt autoplay programmatically when visible
@@ -49,12 +59,16 @@ export default function IntroVideoLoader({
       const playPromise = video.play();
       if (playPromise !== undefined) {
         playPromise
+          .then(() => {
+            setIsVideoPlaying(true);
+          })
           .catch((err) => {
             console.warn("[IntroVideoLoader] Initial play blocked, trying muted force play:", err);
             video.muted = true;
             setIsMuted(true);
             video
               .play()
+              .then(() => setIsVideoPlaying(true))
               .catch((e) => console.warn("[IntroVideoLoader] Muted play error:", e));
           });
       }
@@ -93,11 +107,14 @@ export default function IntroVideoLoader({
 
   return (
     <div
-      className={`fixed inset-0 z-[9999] bg-slate-950 flex flex-col justify-between overflow-hidden transition-opacity duration-700 ${
-        isFadingOut ? "opacity-0 pointer-events-none" : "opacity-100"
+      className={`fixed inset-0 z-[9999] bg-slate-950 flex flex-col justify-between overflow-hidden transition-opacity duration-700 ease-out ${
+        !isIntroReady || isFadingOut ? "opacity-0 pointer-events-none" : "opacity-100"
       }`}
     >
-      {/* Pure Fullscreen Intro Video Player */}
+      {/* Subtle Cinematic Ambient Backdrop */}
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-emerald-900/15 rounded-full blur-3xl pointer-events-none animate-pulse" />
+
+      {/* Pure Fullscreen Intro Video Player with Smooth Emergence */}
       <div className="absolute inset-0 z-0 bg-slate-950 flex items-center justify-center">
         <video
           ref={videoRef}
@@ -106,6 +123,7 @@ export default function IntroVideoLoader({
           playsInline
           preload="auto"
           controls={false}
+          onPlaying={() => setIsVideoPlaying(true)}
           onCanPlay={() => {
             if (videoRef.current) {
               videoRef.current.muted = isMuted;
@@ -117,14 +135,18 @@ export default function IntroVideoLoader({
             console.warn("[IntroVideoLoader] Video element error, finishing intro:", e);
             handleFinish();
           }}
-          className="w-full h-full object-contain object-center max-w-full max-h-screen"
+          className={`w-full h-full object-contain object-center max-w-full max-h-screen transition-all duration-700 ease-out ${
+            isVideoPlaying ? "opacity-100 scale-100" : "opacity-0 scale-[0.98]"
+          }`}
         >
           <source src={activeVideoSrc} type="video/mp4" />
         </video>
       </div>
 
       {/* Top Header Bar */}
-      <div className="relative z-10 p-4 sm:p-6 flex items-center justify-end">
+      <div className={`relative z-10 p-4 sm:p-6 flex items-center justify-end transition-opacity duration-700 delay-300 ${
+        isVideoPlaying ? "opacity-100" : "opacity-0"
+      }`}>
         <div className="flex items-center gap-3">
           {/* Audio Toggle Button */}
           <button

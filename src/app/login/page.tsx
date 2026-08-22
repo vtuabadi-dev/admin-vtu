@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { useAuthStore } from "@/stores/auth-store";
 import { useSession } from "@/shared/hooks/use-session";
 import { cn } from "@/shared/lib/utils";
@@ -261,76 +262,88 @@ export default function LoginPage() {
           <div className="relative z-10 space-y-3.5 max-w-xl mx-auto w-full">
             
             {/* Box 1: Portal Registrasi Jamaah Umroh */}
-            <div className="flex items-center justify-between p-3.5 sm:p-4 rounded-2xl bg-white/10 backdrop-blur-md border border-[#D4AF37]/30 hover:border-[#D4AF37]/60 hover:bg-white/15 transition-all shadow-md group">
+            <Link
+              href="/register"
+              prefetch={true}
+              className="flex items-center justify-between p-3.5 sm:p-4 rounded-2xl bg-white/10 backdrop-blur-md border border-[#D4AF37]/30 hover:border-[#D4AF37] hover:bg-white/15 hover:shadow-lg hover:shadow-[#D4AF37]/10 transition-all duration-300 transform hover:-translate-y-0.5 group cursor-pointer block"
+            >
               <div className="flex items-center gap-3">
-                <div className="h-9 w-9 rounded-xl bg-[#D4AF37]/20 border border-[#D4AF37]/40 flex items-center justify-center text-[#F5D061]">
+                <div className="h-9 w-9 rounded-xl bg-[#D4AF37]/20 border border-[#D4AF37]/40 flex items-center justify-center text-[#F5D061] group-hover:scale-105 transition-transform">
                   <UserPlus className="h-4 w-4" />
                 </div>
                 <span className="text-xs sm:text-sm font-semibold text-white group-hover:text-emerald-100 transition-colors">
                   Portal Registrasi Jamaah Umroh
                 </span>
               </div>
-              <a
-                href="/register"
-                className="bg-gradient-to-r from-[#F5D061] via-[#D4AF37] to-[#B8860B] hover:brightness-110 text-slate-950 text-xs font-black px-4 py-2 rounded-xl shadow-md transition-all active:scale-95 shrink-0"
+              <span
+                className="bg-gradient-to-r from-[#F5D061] via-[#D4AF37] to-[#B8860B] group-hover:brightness-110 text-slate-950 text-xs font-black px-4 py-2 rounded-xl shadow-md transition-all active:scale-95 shrink-0"
               >
                 DAFTAR
-              </a>
-            </div>
+              </span>
+            </Link>
 
             {/* Box 2: Pendaftaran Badal Umroh */}
-            <div className="flex items-center justify-between p-3.5 sm:p-4 rounded-2xl bg-[#082C21]/80 backdrop-blur-md border border-[#D4AF37]/40 hover:border-[#F5D061] hover:bg-[#0A2E23] transition-all shadow-md group">
+            <Link
+              href="/register/badal-umroh"
+              prefetch={true}
+              className="flex items-center justify-between p-3.5 sm:p-4 rounded-2xl bg-[#082C21]/80 backdrop-blur-md border border-[#D4AF37]/40 hover:border-[#F5D061] hover:bg-[#0A2E23] hover:shadow-lg hover:shadow-[#F5D061]/15 transition-all duration-300 transform hover:-translate-y-0.5 group cursor-pointer block"
+            >
               <div className="flex items-center gap-3">
-                <div className="h-9 w-9 rounded-xl bg-[#D4AF37]/25 border border-[#D4AF37]/50 flex items-center justify-center text-[#F5D061]">
+                <div className="h-9 w-9 rounded-xl bg-[#D4AF37]/25 border border-[#D4AF37]/50 flex items-center justify-center text-[#F5D061] group-hover:scale-105 transition-transform">
                   <HeartHandshake className="h-4 w-4" />
                 </div>
                 <span className="text-xs sm:text-sm font-semibold text-[#FAF6EE] group-hover:text-[#F5D061] transition-colors">
                   Pendaftaran Badal Umroh
                 </span>
               </div>
-              <a
-                href="/register/badal-umroh"
-                className="bg-gradient-to-r from-[#F5D061] via-[#D4AF37] to-[#B8860B] hover:brightness-110 text-slate-950 text-xs font-black px-4 py-2 rounded-xl shadow-md transition-all active:scale-95 shrink-0"
+              <span
+                className="bg-gradient-to-r from-[#F5D061] via-[#D4AF37] to-[#B8860B] group-hover:brightness-110 text-slate-950 text-xs font-black px-4 py-2 rounded-xl shadow-md transition-all active:scale-95 shrink-0"
               >
                 BADAL
-              </a>
-            </div>
+              </span>
+            </Link>
 
             {/* Box 3: Pendaftaran Wakaf Al-Qur'an */}
-            <div className="flex items-center justify-between p-3.5 sm:p-4 rounded-2xl bg-white/10 backdrop-blur-md border border-[#D4AF37]/30 hover:border-[#D4AF37]/60 hover:bg-white/15 transition-all shadow-md group">
+            <Link
+              href="/register/wakaf-quran"
+              prefetch={true}
+              className="flex items-center justify-between p-3.5 sm:p-4 rounded-2xl bg-white/10 backdrop-blur-md border border-[#D4AF37]/30 hover:border-[#D4AF37] hover:bg-white/15 hover:shadow-lg hover:shadow-[#D4AF37]/10 transition-all duration-300 transform hover:-translate-y-0.5 group cursor-pointer block"
+            >
               <div className="flex items-center gap-3">
-                <div className="h-9 w-9 rounded-xl bg-[#D4AF37]/20 border border-[#D4AF37]/40 flex items-center justify-center text-[#F5D061]">
+                <div className="h-9 w-9 rounded-xl bg-[#D4AF37]/20 border border-[#D4AF37]/40 flex items-center justify-center text-[#F5D061] group-hover:scale-105 transition-transform">
                   <BookOpen className="h-4 w-4" />
                 </div>
-                <span className="text-xs sm:text-sm font-semibold text-white group-hover:text-sky-100 transition-colors">
+                <span className="text-xs sm:text-sm font-semibold text-white group-hover:text-amber-200 transition-colors">
                   Pendaftaran Wakaf Al-Qur&apos;an
                 </span>
               </div>
-              <a
-                href="/register/wakaf-quran"
-                className="bg-gradient-to-r from-[#F5D061] via-[#D4AF37] to-[#B8860B] hover:brightness-110 text-slate-950 text-xs font-black px-4 py-2 rounded-xl shadow-md transition-all active:scale-95 shrink-0"
+              <span
+                className="bg-gradient-to-r from-[#F5D061] via-[#D4AF37] to-[#B8860B] group-hover:brightness-110 text-slate-950 text-xs font-black px-4 py-2 rounded-xl shadow-md transition-all active:scale-95 shrink-0"
               >
                 WAKAF
-              </a>
-            </div>
+              </span>
+            </Link>
 
             {/* Box 4: Cek Status Badal & Wakaf (OTP WA) */}
-            <div className="flex items-center justify-between p-3.5 sm:p-4 rounded-2xl bg-[#041710]/90 backdrop-blur-md border border-[#D4AF37]/30 hover:border-[#D4AF37]/60 transition-all shadow-md group">
+            <Link
+              href="/track/badal-wakaf"
+              prefetch={true}
+              className="flex items-center justify-between p-3.5 sm:p-4 rounded-2xl bg-[#041710]/90 backdrop-blur-md border border-[#D4AF37]/30 hover:border-[#D4AF37] hover:bg-[#061F16] hover:shadow-lg hover:shadow-amber-500/10 transition-all duration-300 transform hover:-translate-y-0.5 group cursor-pointer block"
+            >
               <div className="flex items-center gap-3">
-                <div className="h-9 w-9 rounded-xl bg-amber-500/20 border border-amber-400/30 flex items-center justify-center text-amber-300">
+                <div className="h-9 w-9 rounded-xl bg-amber-500/20 border border-amber-400/30 flex items-center justify-center text-amber-300 group-hover:scale-105 transition-transform">
                   <ShieldCheck className="h-4 w-4" />
                 </div>
                 <span className="text-xs sm:text-sm font-semibold text-amber-50 group-hover:text-amber-200 transition-colors">
                   Cek Status Badal & Wakaf (OTP WA)
                 </span>
               </div>
-              <a
-                href="/track/badal-wakaf"
-                className="bg-amber-600 hover:bg-amber-700 text-white text-xs font-extrabold px-4 py-2 rounded-xl shadow-md transition-all active:scale-95 shrink-0"
+              <span
+                className="bg-amber-600 group-hover:bg-amber-500 text-white text-xs font-extrabold px-4 py-2 rounded-xl shadow-md transition-all active:scale-95 shrink-0"
               >
                 CEK STATUS
-              </a>
-            </div>
+              </span>
+            </Link>
 
           </div>
 

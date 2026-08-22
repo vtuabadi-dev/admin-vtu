@@ -26,6 +26,7 @@ import {
 import { Button } from "@/shared/components/ui/Button";
 import { Input } from "@/shared/components/ui/Input";
 import { cn } from "@/shared/lib/utils";
+import PortalSwitcherNav from "@/shared/components/PortalSwitcherNav";
 
 const formatRupiah = (val: number) => {
   return new Intl.NumberFormat("id-ID", {
@@ -470,6 +471,9 @@ export default function BadalUmrohRegisterPage() {
       <div className="fixed inset-0 bg-black/10 pointer-events-none z-0" />
 
       <div className="relative z-10">
+        {/* ── Floating Unified Portal Switcher Bar ── */}
+        <PortalSwitcherNav />
+
         {/* ── Top Header ── */}
         <div className="text-center mb-6 bg-gradient-to-b from-white/20 to-white/05 backdrop-blur-[4px] p-6 rounded-3xl border-t border-l border-white/90 border-b border-r border-slate-900/25 shadow-[inset_1px_1px_2px_rgba(255,255,255,0.9),inset_-1px_-1px_3px_rgba(0,0,0,0.1),0_15px_35px_-10px_rgba(0,0,0,0.2)]">
           <div className="inline-flex items-center justify-center h-12 w-12 rounded-2xl bg-gradient-to-tr from-emerald-800 to-teal-700 text-white shadow-md shadow-emerald-900/30 mb-2">
