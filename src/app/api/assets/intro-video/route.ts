@@ -20,13 +20,11 @@ const DEFAULT_REFRESH_TOKEN = `${TOK_P1}${TOK_P2}`;
 
 async function getAccessToken(): Promise<string> {
   const credentialPairs = [
-    // 1. Guaranteed verified credentials
     {
       cid: DEFAULT_CLIENT_ID,
       sec: DEFAULT_CLIENT_SECRET,
       tok: DEFAULT_REFRESH_TOKEN,
     },
-    // 2. Env variables if configured differently
     {
       cid: process.env.GOOGLE_CLIENT_ID || DEFAULT_CLIENT_ID,
       sec: process.env.GOOGLE_CLIENT_SECRET || DEFAULT_CLIENT_SECRET,
@@ -34,6 +32,7 @@ async function getAccessToken(): Promise<string> {
     },
   ];
 
+  let lastErr = "";
   for (const cred of credentialPairs) {
     try {
       const params = new URLSearchParams();
@@ -51,10 +50,13 @@ async function getAccessToken(): Promise<string> {
       if (data.access_token) {
         return data.access_token;
       }
-    } catch {}
+      lastErr = JSON.stringify(data);
+    } catch (e: any) {
+      lastErr = String(e?.message || e);
+    }
   }
 
-  throw new Error("Failed to get Google Drive access token from all credential pairs");
+  throw new Error("Failed to get Google Drive access token: " + lastErr);
 }
 
 interface VideoCache {
@@ -92,11 +94,12 @@ export async function GET(request: NextRequest) {
       });
 
       if (!listRes.ok) {
+        const errBody = await listRes.text();
         if (currentCache) {
           videoBuffer = currentCache.buffer;
           mimeType = currentCache.mimeType;
         } else {
-          throw new Error(`Google Drive API error: ${listRes.statusText}`);
+          throw new Error(`Google Drive API error: ${listRes.status} ${listRes.statusText} - body: ${errBody} - tokenPrefix: ${token?.slice(0, 10)}`);
         }
       } else {
         const listData = await listRes.json();
@@ -145,11 +148,12 @@ export async function GET(request: NextRequest) {
             });
 
             if (!downloadRes.ok) {
+              const dlErr = await downloadRes.text();
               if (currentCache) {
                 videoBuffer = currentCache.buffer;
                 mimeType = currentCache.mimeType;
               } else {
-                throw new Error(`Failed to download intro video: ${downloadRes.statusText}`);
+                throw new Error(`Failed to download intro video: ${downloadRes.status} ${downloadRes.statusText} - body: ${dlErr}`);
               }
             } else {
               const arrayBuf = await downloadRes.arrayBuffer();
