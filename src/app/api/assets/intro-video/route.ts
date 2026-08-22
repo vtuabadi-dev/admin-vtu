@@ -6,6 +6,12 @@ export const runtime = "nodejs";
 const INTRO_VIDEO_FOLDER_ID = "1jOMszvMajCWR0iVJku6hnAGKqwHWFec_";
 const DRIVE_API = "https://www.googleapis.com/drive/v3";
 
+// Default known IDs for instant zero-auth streaming
+const DEFAULT_FILE_IDS = {
+  desktop: "1f_0Z5bEW_5C35NvfbZ0EDcdYXRxNOQTV", // intro-desktop.mp4 (2.55MB)
+  mobile: "1Kbu7zZ-3EuboFsPiNMNPvxqUmAp56RqN",  // intro-mobile.mp4 (2.85MB)
+};
+
 const CID_P1 = "667018553984-4qm3tl8sl4uvk18u0tm25s67rj4qnnr9";
 const CID_P2 = ".apps.googleusercontent.com";
 const AUTH_CLIENT_ID = `${CID_P1}${CID_P2}`;
@@ -18,15 +24,16 @@ const TOK_P1 = "1//04GlTNMbDn4ArCgYIARAAGAQSNwF-L9IrC7zolBVYwGD4kBR5Nm1pQ8rSQJiu
 const TOK_P2 = "I66Nx0jTHWlVbmNsmaCcUrPV6KSs5WdF7bA";
 const AUTH_REFRESH_TOKEN = `${TOK_P1}${TOK_P2}`;
 
-async function getAccessToken(): Promise<string> {
-  const { OAuth2Client } = await import("google-auth-library");
-  const oauth2Client = new OAuth2Client(AUTH_CLIENT_ID, AUTH_CLIENT_SECRET);
-  oauth2Client.setCredentials({ refresh_token: AUTH_REFRESH_TOKEN });
-  const res = await oauth2Client.getAccessToken();
-  if (!res.token) {
-    throw new Error("Google Drive OAuth2 client did not return an access token");
+async function getAccessToken(): Promise<string | null> {
+  try {
+    const { OAuth2Client } = await import("google-auth-library");
+    const oauth2Client = new OAuth2Client(AUTH_CLIENT_ID, AUTH_CLIENT_SECRET);
+    oauth2Client.setCredentials({ refresh_token: AUTH_REFRESH_TOKEN });
+    const res = await oauth2Client.getAccessToken();
+    return res.token || null;
+  } catch {
+    return null;
   }
-  return res.token;
 }
 
 interface VideoCache {
@@ -37,7 +44,37 @@ interface VideoCache {
 }
 
 const memoryCaches: Record<string, VideoCache> = {};
-const CACHE_CHECK_TTL_MS = 20 * 1000; // 20s TTL
+const CACHE_CHECK_TTL_MS = 60 * 1000; // 1 minute fresh cache
+
+async function fetchVideoBinary(fileId: string, token: string | null): Promise<Uint8Array | null> {
+  // 1. Try direct Google Drive public export
+  try {
+    const publicUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;
+    const publicRes = await fetch(publicUrl);
+    if (publicRes.ok) {
+      const arr = await publicRes.arrayBuffer();
+      if (arr.byteLength > 1000) {
+        return new Uint8Array(arr);
+      }
+    }
+  } catch {}
+
+  // 2. Try with OAuth bearer token if direct download returned a confirmation page
+  if (token) {
+    try {
+      const driveUrl = `${DRIVE_API}/files/${fileId}?alt=media&supportsAllDrives=true`;
+      const authRes = await fetch(driveUrl, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (authRes.ok) {
+        const arr = await authRes.arrayBuffer();
+        return new Uint8Array(arr);
+      }
+    } catch {}
+  }
+
+  return null;
+}
 
 export async function GET(request: NextRequest) {
   const now = Date.now();
@@ -53,91 +90,55 @@ export async function GET(request: NextRequest) {
       videoBuffer = currentCache.buffer;
       mimeType = currentCache.mimeType;
     } else {
+      let targetFileId = DEFAULT_FILE_IDS[device];
       const token = await getAccessToken();
 
-      // List all video files in folder 1jOMszvMajCWR0iVJku6hnAGKqwHWFec_
-      const query = `'${INTRO_VIDEO_FOLDER_ID}' in parents and (mimeType contains 'video/' or name contains '.mp4') and trashed = false`;
-      const listUrl = `${DRIVE_API}/files?q=${encodeURIComponent(query)}&orderBy=modifiedTime desc&pageSize=10&fields=files(id,name,mimeType,size,modifiedTime)&supportsAllDrives=true&includeItemsFromAllDrives=true`;
+      // Optionally check if a newer file was uploaded to the folder
+      if (token) {
+        try {
+          const query = `'${INTRO_VIDEO_FOLDER_ID}' in parents and (mimeType contains 'video/' or name contains '.mp4') and trashed = false`;
+          const listUrl = `${DRIVE_API}/files?q=${encodeURIComponent(query)}&orderBy=modifiedTime desc&pageSize=10&fields=files(id,name,mimeType,size,modifiedTime)&supportsAllDrives=true&includeItemsFromAllDrives=true`;
 
-      const listRes = await fetch(listUrl, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+          const listRes = await fetch(listUrl, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
 
-      if (!listRes.ok) {
-        const errBody = await listRes.text();
-        if (currentCache) {
+          if (listRes.ok) {
+            const listData = await listRes.json();
+            const files: Array<{ id: string; name: string; mimeType: string }> = listData.files || [];
+
+            if (device === "mobile") {
+              const mobileFile = files.find((f) =>
+                /mobile|portrait|vertikal|hp|9-16|9_16|vertical/i.test(f.name)
+              );
+              if (mobileFile) targetFileId = mobileFile.id;
+            } else {
+              const desktopFile = files.find((f) =>
+                /desktop|landscape|horizontal|16-9|16_9|web|corporate/i.test(f.name)
+              );
+              if (desktopFile) targetFileId = desktopFile.id;
+            }
+          }
+        } catch {}
+      }
+
+      if (currentCache && currentCache.fileId === targetFileId) {
+        currentCache.timestamp = now;
+        videoBuffer = currentCache.buffer;
+        mimeType = currentCache.mimeType;
+      } else {
+        const fetchedBuffer = await fetchVideoBinary(targetFileId, token);
+        if (fetchedBuffer) {
+          videoBuffer = fetchedBuffer;
+          memoryCaches[device] = {
+            fileId: targetFileId,
+            buffer: videoBuffer,
+            mimeType: "video/mp4",
+            timestamp: now,
+          };
+        } else if (currentCache) {
           videoBuffer = currentCache.buffer;
           mimeType = currentCache.mimeType;
-        } else {
-          throw new Error(`Google Drive API error: ${listRes.status} ${listRes.statusText} - body: ${errBody}`);
-        }
-      } else {
-        const listData = await listRes.json();
-        const files: Array<{ id: string; name: string; mimeType: string }> = listData.files || [];
-
-        if (files.length === 0) {
-          if (currentCache) {
-            videoBuffer = currentCache.buffer;
-            mimeType = currentCache.mimeType;
-          } else {
-            return new NextResponse(JSON.stringify({ error: "No video files found in folder" }), { status: 404 });
-          }
-        } else {
-          let targetFile: { id: string; name: string; mimeType: string } | undefined = files[0];
-
-          if (device === "mobile") {
-            const mobileFile = files.find((f) =>
-              /mobile|portrait|vertikal|hp|9-16|9_16|vertical/i.test(f.name)
-            );
-            if (mobileFile) {
-              targetFile = mobileFile;
-            }
-          } else {
-            const desktopFile = files.find((f) =>
-              /desktop|landscape|horizontal|16-9|16_9|web|corporate/i.test(f.name)
-            );
-            if (desktopFile) {
-              targetFile = desktopFile;
-            }
-          }
-
-          if (!targetFile) {
-            if (currentCache) {
-              videoBuffer = currentCache.buffer;
-              mimeType = currentCache.mimeType;
-            } else {
-              return new NextResponse(JSON.stringify({ error: "Target file not resolved" }), { status: 404 });
-            }
-          } else if (currentCache && currentCache.fileId === targetFile.id) {
-            currentCache.timestamp = now;
-            videoBuffer = currentCache.buffer;
-            mimeType = currentCache.mimeType;
-          } else {
-            const downloadRes = await fetch(`${DRIVE_API}/files/${targetFile.id}?alt=media&supportsAllDrives=true`, {
-              headers: { Authorization: `Bearer ${token}` },
-            });
-
-            if (!downloadRes.ok) {
-              const dlErr = await downloadRes.text();
-              if (currentCache) {
-                videoBuffer = currentCache.buffer;
-                mimeType = currentCache.mimeType;
-              } else {
-                throw new Error(`Failed to download intro video: ${downloadRes.status} ${downloadRes.statusText} - body: ${dlErr}`);
-              }
-            } else {
-              const arrayBuf = await downloadRes.arrayBuffer();
-              videoBuffer = new Uint8Array(arrayBuf);
-              mimeType = targetFile.mimeType || "video/mp4";
-
-              memoryCaches[device] = {
-                fileId: targetFile.id,
-                buffer: videoBuffer,
-                mimeType,
-                timestamp: now,
-              };
-            }
-          }
         }
       }
     }
@@ -147,7 +148,7 @@ export async function GET(request: NextRequest) {
         videoBuffer = currentCache.buffer;
         mimeType = currentCache.mimeType;
       } else {
-        return new NextResponse(JSON.stringify({ error: "Video buffer is null" }), { status: 404 });
+        return new NextResponse(null, { status: 404 });
       }
     }
 
@@ -168,7 +169,7 @@ export async function GET(request: NextRequest) {
             "Accept-Ranges": "bytes",
             "Content-Length": String(chunkSize),
             "Content-Type": mimeType,
-            "Cache-Control": "public, max-age=60, s-maxage=120, stale-while-revalidate=300",
+            "Cache-Control": "public, max-age=120, s-maxage=300, stale-while-revalidate=86400",
           },
         });
       }
@@ -180,7 +181,7 @@ export async function GET(request: NextRequest) {
         "Accept-Ranges": "bytes",
         "Content-Length": String(totalSize),
         "Content-Type": mimeType,
-        "Cache-Control": "public, max-age=60, s-maxage=120, stale-while-revalidate=300",
+        "Cache-Control": "public, max-age=120, s-maxage=300, stale-while-revalidate=86400",
       },
     });
   } catch (error: any) {
@@ -195,9 +196,6 @@ export async function GET(request: NextRequest) {
         },
       });
     }
-    return new NextResponse(JSON.stringify({ error: String(error?.stack || error?.message || error) }), {
-      status: 500,
-      headers: { "Content-Type": "application/json" },
-    });
+    return new NextResponse(null, { status: 500 });
   }
 }
