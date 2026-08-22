@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
 
@@ -50,18 +50,10 @@ interface VideoCache {
 const memoryCaches: Record<string, VideoCache> = {};
 const CACHE_CHECK_TTL_MS = 20 * 1000; // 20s TTL
 
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
   const now = Date.now();
-  let device = "desktop";
-  let rangeHeader: string | null = null;
-
-  if (request && request.url) {
-    try {
-      const url = new URL(request.url);
-      device = url.searchParams.get("device") === "mobile" ? "mobile" : "desktop";
-      rangeHeader = request.headers.get("range");
-    } catch {}
-  }
+  const device = request.nextUrl.searchParams.get("device") === "mobile" ? "mobile" : "desktop";
+  const rangeHeader = request.headers.get("range");
 
   try {
     let videoBuffer: Uint8Array | null = null;
