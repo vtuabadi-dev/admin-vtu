@@ -41,13 +41,14 @@ async function getAccessToken(): Promise<string> {
 }
 
 interface VideoCache {
+  fileId: string;
   buffer: Uint8Array;
   mimeType: string;
   timestamp: number;
 }
 
 let memoryCache: VideoCache | null = null;
-const CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes cache for video
+const CACHE_CHECK_TTL_MS = 30 * 1000; // Check for new files every 30 seconds
 
 export async function GET(req: NextRequest) {
   const now = Date.now();
@@ -56,13 +57,14 @@ export async function GET(req: NextRequest) {
     let videoBuffer: Uint8Array;
     let mimeType = "video/mp4";
 
-    if (memoryCache && now - memoryCache.timestamp < CACHE_TTL_MS) {
+    // Fast-path: If cache is very recent (< 30s), serve immediately from memory
+    if (memoryCache && now - memoryCache.timestamp < CACHE_CHECK_TTL_MS) {
       videoBuffer = memoryCache.buffer;
       mimeType = memoryCache.mimeType;
     } else {
       const token = await getAccessToken();
 
-      // Find the latest video file in folder
+      // Query latest video metadata in folder
       const query = `'${INTRO_VIDEO_FOLDER_ID}' in parents and (mimeType contains 'video/' or name contains '.mp4') and trashed = false`;
       const listUrl = `${DRIVE_API}/files?q=${encodeURIComponent(query)}&orderBy=modifiedTime desc&pageSize=1&fields=files(id,name,mimeType,size)&supportsAllDrives=true&includeItemsFromAllDrives=true`;
 
@@ -90,27 +92,37 @@ export async function GET(req: NextRequest) {
           }
         } else {
           const latestFile = files[0];
-          const downloadRes = await fetch(`${DRIVE_API}/files/${latestFile.id}?alt=media&supportsAllDrives=true`, {
-            headers: { Authorization: `Bearer ${token}` },
-          });
 
-          if (!downloadRes.ok) {
-            if (memoryCache) {
-              videoBuffer = memoryCache.buffer;
-              mimeType = memoryCache.mimeType;
-            } else {
-              throw new Error(`Failed to download intro video: ${downloadRes.statusText}`);
-            }
+          // If the file ID hasn't changed, reuse the cached buffer and refresh timestamp
+          if (memoryCache && memoryCache.fileId === latestFile.id) {
+            memoryCache.timestamp = now;
+            videoBuffer = memoryCache.buffer;
+            mimeType = memoryCache.mimeType;
           } else {
-            const arrayBuf = await downloadRes.arrayBuffer();
-            videoBuffer = new Uint8Array(arrayBuf);
-            mimeType = latestFile.mimeType || "video/mp4";
+            // New file uploaded in Google Drive! Download new video
+            const downloadRes = await fetch(`${DRIVE_API}/files/${latestFile.id}?alt=media&supportsAllDrives=true`, {
+              headers: { Authorization: `Bearer ${token}` },
+            });
 
-            memoryCache = {
-              buffer: videoBuffer,
-              mimeType,
-              timestamp: now,
-            };
+            if (!downloadRes.ok) {
+              if (memoryCache) {
+                videoBuffer = memoryCache.buffer;
+                mimeType = memoryCache.mimeType;
+              } else {
+                throw new Error(`Failed to download intro video: ${downloadRes.statusText}`);
+              }
+            } else {
+              const arrayBuf = await downloadRes.arrayBuffer();
+              videoBuffer = new Uint8Array(arrayBuf);
+              mimeType = latestFile.mimeType || "video/mp4";
+
+              memoryCache = {
+                fileId: latestFile.id,
+                buffer: videoBuffer,
+                mimeType,
+                timestamp: now,
+              };
+            }
           }
         }
       }
@@ -134,7 +146,7 @@ export async function GET(req: NextRequest) {
             "Accept-Ranges": "bytes",
             "Content-Length": String(chunkSize),
             "Content-Type": mimeType,
-            "Cache-Control": "public, max-age=3600, s-maxage=86400",
+            "Cache-Control": "public, max-age=60, s-maxage=120, stale-while-revalidate=300",
           },
         });
       }
@@ -146,7 +158,7 @@ export async function GET(req: NextRequest) {
         "Accept-Ranges": "bytes",
         "Content-Length": String(totalSize),
         "Content-Type": mimeType,
-        "Cache-Control": "public, max-age=3600, s-maxage=86400",
+        "Cache-Control": "public, max-age=60, s-maxage=120, stale-while-revalidate=300",
       },
     });
   } catch (error: any) {
