@@ -1,3 +1,5 @@
+import { NextResponse } from "next/server";
+
 export const dynamic = "force-dynamic";
 
 const INTRO_VIDEO_FOLDER_ID = process.env.GOOGLE_DRIVE_INTRO_VIDEO_FOLDER_ID || "1jOMszvMajCWR0iVJku6hnAGKqwHWFec_";
@@ -46,12 +48,20 @@ interface VideoCache {
 }
 
 const memoryCaches: Record<string, VideoCache> = {};
-const CACHE_CHECK_TTL_MS = 20 * 1000; // 20 seconds refresh check
+const CACHE_CHECK_TTL_MS = 20 * 1000; // 20s TTL
 
 export async function GET(request: Request) {
   const now = Date.now();
-  const url = new URL(request.url);
-  const device = url.searchParams.get("device") === "mobile" ? "mobile" : "desktop";
+  let device = "desktop";
+  let rangeHeader: string | null = null;
+
+  if (request && request.url) {
+    try {
+      const url = new URL(request.url);
+      device = url.searchParams.get("device") === "mobile" ? "mobile" : "desktop";
+      rangeHeader = request.headers.get("range");
+    } catch {}
+  }
 
   try {
     let videoBuffer: Uint8Array | null = null;
@@ -88,11 +98,10 @@ export async function GET(request: Request) {
             videoBuffer = currentCache.buffer;
             mimeType = currentCache.mimeType;
           } else {
-            return new Response(null, { status: 404 });
+            return new NextResponse(null, { status: 404 });
           }
         } else {
-          // Filter matching file for device
-          let targetFile = files[0];
+          let targetFile: { id: string; name: string; mimeType: string } | undefined = files[0];
 
           if (device === "mobile") {
             const mobileFile = files.find((f) =>
@@ -115,7 +124,7 @@ export async function GET(request: Request) {
               videoBuffer = currentCache.buffer;
               mimeType = currentCache.mimeType;
             } else {
-              return new Response(null, { status: 404 });
+              return new NextResponse(null, { status: 404 });
             }
           } else if (currentCache && currentCache.fileId === targetFile.id) {
             currentCache.timestamp = now;
@@ -155,12 +164,11 @@ export async function GET(request: Request) {
         videoBuffer = currentCache.buffer;
         mimeType = currentCache.mimeType;
       } else {
-        return new Response(null, { status: 404 });
+        return new NextResponse(null, { status: 404 });
       }
     }
 
     const totalSize = videoBuffer.byteLength;
-    const rangeHeader = request.headers.get("range");
 
     if (rangeHeader) {
       const match = rangeHeader.match(/bytes=(\d+)-(\d*)/);
@@ -170,7 +178,7 @@ export async function GET(request: Request) {
         const chunkSize = end - start + 1;
         const sliced = videoBuffer.subarray(start, end + 1);
 
-        return new Response(sliced as any, {
+        return new NextResponse(sliced as any, {
           status: 206,
           headers: {
             "Content-Range": `bytes ${start}-${end}/${totalSize}`,
@@ -183,7 +191,7 @@ export async function GET(request: Request) {
       }
     }
 
-    return new Response(videoBuffer as any, {
+    return new NextResponse(videoBuffer as any, {
       status: 200,
       headers: {
         "Accept-Ranges": "bytes",
@@ -196,7 +204,7 @@ export async function GET(request: Request) {
     console.error(`[Intro Video Stream Error - ${device}]:`, error?.message || error);
     const currentCache = memoryCaches[device];
     if (currentCache) {
-      return new Response(currentCache.buffer as any, {
+      return new NextResponse(currentCache.buffer as any, {
         headers: {
           "Content-Type": currentCache.mimeType,
           "Accept-Ranges": "bytes",
@@ -204,6 +212,6 @@ export async function GET(request: Request) {
         },
       });
     }
-    return new Response(null, { status: 500 });
+    return new NextResponse(null, { status: 500 });
   }
 }
