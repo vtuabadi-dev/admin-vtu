@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
 const INTRO_VIDEO_FOLDER_ID = process.env.GOOGLE_DRIVE_INTRO_VIDEO_FOLDER_ID || "1jOMszvMajCWR0iVJku6hnAGKqwHWFec_";
 const DRIVE_API = "https://www.googleapis.com/drive/v3";
@@ -170,7 +171,7 @@ export async function GET(request: NextRequest) {
         const chunkSize = end - start + 1;
         const sliced = videoBuffer.subarray(start, end + 1);
 
-        return new NextResponse(sliced as any, {
+        return new NextResponse(Buffer.from(sliced), {
           status: 206,
           headers: {
             "Content-Range": `bytes ${start}-${end}/${totalSize}`,
@@ -183,7 +184,7 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    return new NextResponse(videoBuffer as any, {
+    return new NextResponse(Buffer.from(videoBuffer), {
       status: 200,
       headers: {
         "Accept-Ranges": "bytes",
@@ -196,7 +197,7 @@ export async function GET(request: NextRequest) {
     console.error(`[Intro Video Stream Error - ${device}]:`, error?.message || error);
     const currentCache = memoryCaches[device];
     if (currentCache) {
-      return new NextResponse(currentCache.buffer as any, {
+      return new NextResponse(Buffer.from(currentCache.buffer), {
         headers: {
           "Content-Type": currentCache.mimeType,
           "Accept-Ranges": "bytes",
