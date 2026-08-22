@@ -1,43 +1,44 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useRef, useEffect } from "react";
 import { usePathname } from "next/navigation";
+import gsap from "gsap";
 
 export default function PageTransitionWrapper({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const [isTransitioning, setIsTransitioning] = useState(false);
-  const [displayKey, setDisplayKey] = useState(pathname);
+  const containerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    let timer: ReturnType<typeof setTimeout> | null = null;
+    if (!containerRef.current) return;
 
-    if (pathname !== displayKey) {
-      setIsTransitioning(true);
-      timer = setTimeout(() => {
-        setDisplayKey(pathname);
-        setIsTransitioning(false);
-      }, 50);
-    }
+    // Pure GSAP Aesthetic Page Reveal on Route Mount
+    const ctx = gsap.context(() => {
+      gsap.fromTo(
+        containerRef.current,
+        {
+          opacity: 0,
+          y: 16,
+          scale: 0.994,
+          filter: "blur(3px)",
+        },
+        {
+          opacity: 1,
+          y: 0,
+          scale: 1,
+          filter: "blur(0px)",
+          duration: 0.5,
+          ease: "power3.out",
+          clearProps: "transform,filter",
+        }
+      );
+    }, containerRef);
 
-    return () => {
-      if (timer) clearTimeout(timer);
-    };
-  }, [pathname, displayKey]);
+    return () => ctx.revert();
+  }, [pathname]);
 
   return (
-    <div className="relative min-h-screen w-full">
-      {/* Sleek Golden Top Progress Glow Bar */}
-      {isTransitioning && (
-        <div className="fixed top-0 left-0 right-0 z-50 h-[3px] bg-gradient-to-r from-[#D4AF37] via-[#F5D061] to-[#B8860B] shadow-[0_0_12px_rgba(245,208,97,0.8)] animate-pulse pointer-events-none" />
-      )}
-
-      {/* Smooth Animated Content Canvas */}
-      <div
-        key={displayKey}
-        className="w-full min-h-screen animate-portal-fade-in"
-      >
-        {children}
-      </div>
+    <div ref={containerRef} className="w-full min-h-screen will-change-transform">
+      {children}
     </div>
   );
 }

@@ -200,27 +200,11 @@
   margin-bottom: 1.25rem !important;
 }
 
-/* ── SMOOTH PORTAL TRANSITION KEYFRAMES ── */
-@keyframes portalFadeIn {
-  0% {
-    opacity: 0;
-    transform: translateY(8px) scale(0.998);
-  }
-  100% {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-
-.animate-portal-fade-in {
-  animation: portalFadeIn 0.38s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-  will-change: transform, opacity;
-}
-
 /* ── PREVENT INITIAL LOGIN FLASH DURING INTRO ── */
 html.intro-pending body {
   background-color: #020617 !important;
   overflow: hidden !important;
 }
+
 
 

@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useRef, useCallback, useTransition } from "react";
 import { useRouter, usePathname } from "next/navigation";
-import { Sparkles } from "lucide-react";
+import { Compass, Sparkles } from "lucide-react";
 import gsap from "gsap";
 
 interface PortalTransitionContextType {
@@ -27,6 +27,7 @@ export function PortalTransitionProvider({ children }: { children: React.ReactNo
 
   const pageContainerRef = useRef<HTMLDivElement | null>(null);
   const curtainRef = useRef<HTMLDivElement | null>(null);
+  const goldStripeRef = useRef<HTMLDivElement | null>(null);
   const emblemCardRef = useRef<HTMLDivElement | null>(null);
   const glowRef = useRef<HTMLDivElement | null>(null);
 
@@ -49,54 +50,63 @@ export function PortalTransitionProvider({ children }: { children: React.ReactNo
 
       const tl = gsap.timeline();
 
-      // 1. Cinematic Exit Transition using GSAP
+      // 1. GSAP Luxury Exit: Camera Pushback & Satin Curtain Rise
       if (pageContainerRef.current) {
         tl.to(pageContainerRef.current, {
-          scale: 0.98,
-          opacity: 0.3,
-          filter: "blur(4px)",
-          duration: 0.25,
+          scale: 0.975,
+          opacity: 0.25,
+          filter: "blur(6px)",
+          duration: 0.3,
           ease: "power2.inOut",
         });
       }
 
-      if (curtainRef.current && emblemCardRef.current) {
+      if (curtainRef.current && emblemCardRef.current && goldStripeRef.current) {
         tl.to(
           curtainRef.current,
           {
             opacity: 1,
             pointerEvents: "auto",
-            duration: 0.28,
-            ease: "power3.out",
+            duration: 0.32,
+            ease: "expo.out",
           },
-          "-=0.15"
+          "-=0.2"
+        );
+
+        tl.fromTo(
+          goldStripeRef.current,
+          { scaleX: 0, opacity: 0 },
+          { scaleX: 1, opacity: 1, duration: 0.4, ease: "power3.out" },
+          "-=0.25"
         );
 
         tl.fromTo(
           emblemCardRef.current,
           {
-            scale: 0.85,
+            scale: 0.8,
             opacity: 0,
-            y: 20,
+            y: 25,
+            rotationX: 15,
           },
           {
             scale: 1,
             opacity: 1,
             y: 0,
-            duration: 0.35,
-            ease: "back.out(1.5)",
+            rotationX: 0,
+            duration: 0.4,
+            ease: "back.out(1.7)",
           },
-          "-=0.2"
+          "-=0.3"
         );
       }
 
-      // 2. Perform router push during curtain cover
+      // 2. Client Route Push
       setTimeout(() => {
         startTransition(() => {
           router.push(href);
         });
 
-        // 3. Cinematic Enter Transition for new page
+        // 3. GSAP Luxury Enter: Curtain Reveal & Smooth Focus
         setTimeout(() => {
           const enterTl = gsap.timeline({
             onComplete: () => {
@@ -109,10 +119,10 @@ export function PortalTransitionProvider({ children }: { children: React.ReactNo
 
           if (emblemCardRef.current) {
             enterTl.to(emblemCardRef.current, {
-              scale: 0.92,
+              scale: 0.9,
               opacity: 0,
-              y: -15,
-              duration: 0.25,
+              y: -20,
+              duration: 0.28,
               ease: "power2.in",
             });
           }
@@ -123,10 +133,10 @@ export function PortalTransitionProvider({ children }: { children: React.ReactNo
               {
                 opacity: 0,
                 pointerEvents: "none",
-                duration: 0.35,
+                duration: 0.4,
                 ease: "power3.inOut",
               },
-              "-=0.1"
+              "-=0.15"
             );
           }
 
@@ -136,22 +146,22 @@ export function PortalTransitionProvider({ children }: { children: React.ReactNo
               {
                 scale: 0.985,
                 opacity: 0,
-                y: 16,
-                filter: "blur(4px)",
+                y: 18,
+                filter: "blur(5px)",
               },
               {
                 scale: 1,
                 opacity: 1,
                 y: 0,
                 filter: "blur(0px)",
-                duration: 0.45,
+                duration: 0.5,
                 ease: "power3.out",
               },
-              "-=0.2"
+              "-=0.25"
             );
           }
-        }, 220);
-      }, 250);
+        }, 200);
+      }, 240);
     },
     [pathname, router]
   );
@@ -163,38 +173,50 @@ export function PortalTransitionProvider({ children }: { children: React.ReactNo
         {children}
       </div>
 
-      {/* ── GSAP-Controlled Emerald & Gold Silk Curtain Overlay ── */}
+      {/* ── GSAP Luxury Emerald-Obsidian Curtain Overlay ── */}
       <div
         ref={curtainRef}
-        className="fixed inset-0 z-[8888] flex flex-col items-center justify-center opacity-0 pointer-events-none bg-slate-950/75 backdrop-blur-md transition-none"
+        className="fixed inset-0 z-[8888] flex flex-col items-center justify-center opacity-0 pointer-events-none bg-gradient-to-b from-[#020B08]/90 via-[#041710]/95 to-[#020B08]/90 backdrop-blur-xl transition-none"
       >
+        {/* Top Molten Gold Streak */}
+        <div
+          ref={goldStripeRef}
+          className="absolute top-0 left-0 right-0 h-[2.5px] bg-gradient-to-r from-transparent via-[#F5D061] to-transparent origin-center shadow-[0_0_15px_rgba(245,208,97,0.9)] pointer-events-none"
+        />
+
         {/* Ambient Radial Golden Aura */}
         <div
           ref={glowRef}
-          className="absolute w-80 h-80 rounded-full bg-[#D4AF37]/20 blur-3xl animate-pulse pointer-events-none"
+          className="absolute w-96 h-96 rounded-full bg-[#D4AF37]/25 blur-3xl animate-pulse pointer-events-none"
         />
 
-        {/* Floating Emblem Card */}
+        {/* Floating High-End Glass Emblem Card */}
         <div
           ref={emblemCardRef}
-          className="relative z-10 flex flex-col items-center gap-3.5 px-7 py-5 rounded-2xl bg-black/80 border border-[#D4AF37]/45 shadow-2xl shadow-black/80"
+          className="relative z-10 flex flex-col items-center gap-3.5 px-8 py-6 rounded-3xl bg-black/85 border border-[#D4AF37]/50 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.9),0_0_30px_rgba(212,175,55,0.2)]"
         >
-          <div className="h-11 w-11 rounded-2xl bg-gradient-to-tr from-[#F5D061] via-[#D4AF37] to-[#B8860B] flex items-center justify-center text-slate-950 shadow-lg shadow-[#D4AF37]/35 animate-bounce">
-            <Sparkles className="h-5 w-5" />
+          {/* Animated Gold Icon with Shimmer */}
+          <div className="relative">
+            <div className="h-12 w-12 rounded-2xl bg-gradient-to-tr from-[#F5D061] via-[#D4AF37] to-[#B8860B] flex items-center justify-center text-slate-950 shadow-lg shadow-[#D4AF37]/40">
+              <Compass className="h-6 w-6 animate-spin-slow text-slate-950" />
+            </div>
+            <div className="absolute -top-1 -right-1 text-[#F5D061] animate-ping">
+              <Sparkles className="h-4 w-4" />
+            </div>
           </div>
 
-          <div className="text-center">
-            <div className="text-[10px] font-extrabold uppercase tracking-widest text-[#F5D061]/90 mb-1">
-              ✦ MEMBUKA PORTAL ✦
+          <div className="text-center space-y-0.5">
+            <div className="text-[10px] font-black uppercase tracking-[0.25em] text-transparent bg-clip-text bg-gradient-to-r from-[#F5D061] via-[#D4AF37] to-[#B8860B]">
+              ✦ MEMBUKA LAYANAN ✦
             </div>
-            <div className="text-sm font-black text-white tracking-wide">
+            <div className="text-sm sm:text-base font-extrabold text-white tracking-wide drop-shadow-sm">
               {targetTitle || "Portal Layanan VTU"}
             </div>
           </div>
 
-          {/* Golden Loading Bar */}
-          <div className="w-36 h-1.5 bg-white/10 rounded-full overflow-hidden mt-1">
-            <div className="h-full w-full bg-gradient-to-r from-[#F5D061] via-[#D4AF37] to-[#B8860B] animate-shimmer" />
+          {/* Luxury Micro Progress Line */}
+          <div className="w-40 h-1.5 bg-white/10 rounded-full overflow-hidden mt-1 p-0.5 border border-[#D4AF37]/30">
+            <div className="h-full w-full bg-gradient-to-r from-[#F5D061] via-[#D4AF37] to-[#B8860B] rounded-full animate-shimmer" />
           </div>
         </div>
       </div>
