@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import TransitionLink from "@/shared/components/TransitionLink";
+import { GSAPLink } from "@/shared/gsap/GSAPProvider";
 import { useAuthStore } from "@/stores/auth-store";
 import { useSession } from "@/shared/hooks/use-session";
 import { cn } from "@/shared/lib/utils";
@@ -262,7 +262,7 @@ export default function LoginPage() {
           <div className="relative z-10 space-y-3.5 max-w-xl mx-auto w-full">
             
             {/* Box 1: Portal Registrasi Jamaah Umroh */}
-            <TransitionLink
+            <GSAPLink
               href="/register"
               className="flex items-center justify-between p-3.5 sm:p-4 rounded-2xl bg-white/10 backdrop-blur-md border border-[#D4AF37]/30 hover:border-[#D4AF37] hover:bg-white/15 hover:shadow-lg hover:shadow-[#D4AF37]/10 transition-all duration-300 transform hover:-translate-y-0.5 group cursor-pointer block"
             >
@@ -279,10 +279,10 @@ export default function LoginPage() {
               >
                 DAFTAR
               </span>
-            </TransitionLink>
+            </GSAPLink>
 
             {/* Box 2: Pendaftaran Badal Umroh */}
-            <TransitionLink
+            <GSAPLink
               href="/register/badal-umroh"
               className="flex items-center justify-between p-3.5 sm:p-4 rounded-2xl bg-[#082C21]/80 backdrop-blur-md border border-[#D4AF37]/40 hover:border-[#F5D061] hover:bg-[#0A2E23] hover:shadow-lg hover:shadow-[#F5D061]/15 transition-all duration-300 transform hover:-translate-y-0.5 group cursor-pointer block"
             >
@@ -299,10 +299,10 @@ export default function LoginPage() {
               >
                 BADAL
               </span>
-            </TransitionLink>
+            </GSAPLink>
 
             {/* Box 3: Pendaftaran Wakaf Al-Qur'an */}
-            <TransitionLink
+            <GSAPLink
               href="/register/wakaf-quran"
               className="flex items-center justify-between p-3.5 sm:p-4 rounded-2xl bg-white/10 backdrop-blur-md border border-[#D4AF37]/30 hover:border-[#D4AF37] hover:bg-white/15 hover:shadow-lg hover:shadow-[#D4AF37]/10 transition-all duration-300 transform hover:-translate-y-0.5 group cursor-pointer block"
             >
@@ -319,10 +319,10 @@ export default function LoginPage() {
               >
                 WAKAF
               </span>
-            </TransitionLink>
+            </GSAPLink>
 
             {/* Box 4: Cek Status Badal & Wakaf (OTP WA) */}
-            <TransitionLink
+            <GSAPLink
               href="/track/badal-wakaf"
               className="flex items-center justify-between p-3.5 sm:p-4 rounded-2xl bg-[#041710]/90 backdrop-blur-md border border-[#D4AF37]/30 hover:border-[#D4AF37] hover:bg-[#061F16] hover:shadow-lg hover:shadow-amber-500/10 transition-all duration-300 transform hover:-translate-y-0.5 group cursor-pointer block"
             >
@@ -339,7 +339,7 @@ export default function LoginPage() {
               >
                 CEK STATUS
               </span>
-            </TransitionLink>
+            </GSAPLink>
 
           </div>
 
