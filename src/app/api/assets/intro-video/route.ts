@@ -90,7 +90,7 @@ export async function GET(request: NextRequest) {
             videoBuffer = currentCache.buffer;
             mimeType = currentCache.mimeType;
           } else {
-            return new NextResponse(null, { status: 404 });
+            return new NextResponse(JSON.stringify({ error: "No video files found in folder" }), { status: 404 });
           }
         } else {
           let targetFile: { id: string; name: string; mimeType: string } | undefined = files[0];
@@ -116,7 +116,7 @@ export async function GET(request: NextRequest) {
               videoBuffer = currentCache.buffer;
               mimeType = currentCache.mimeType;
             } else {
-              return new NextResponse(null, { status: 404 });
+              return new NextResponse(JSON.stringify({ error: "Target file not resolved" }), { status: 404 });
             }
           } else if (currentCache && currentCache.fileId === targetFile.id) {
             currentCache.timestamp = now;
@@ -156,7 +156,7 @@ export async function GET(request: NextRequest) {
         videoBuffer = currentCache.buffer;
         mimeType = currentCache.mimeType;
       } else {
-        return new NextResponse(null, { status: 404 });
+        return new NextResponse(JSON.stringify({ error: "Video buffer is null" }), { status: 404 });
       }
     }
 
@@ -204,6 +204,9 @@ export async function GET(request: NextRequest) {
         },
       });
     }
-    return new NextResponse(null, { status: 500 });
+    return new NextResponse(JSON.stringify({ error: String(error?.stack || error?.message || error) }), {
+      status: 500,
+      headers: { "Content-Type": "application/json" },
+    });
   }
 }
