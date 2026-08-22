@@ -1,10 +1,10 @@
 "use client";
 
 import React from "react";
-import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { UserPlus, HeartHandshake, BookOpen, Search, ArrowLeft } from "lucide-react";
 import { cn } from "@/shared/lib/utils";
+import TransitionLink from "./TransitionLink";
 
 interface PortalTab {
   label: string;
@@ -48,15 +48,14 @@ export default function PortalSwitcherNav({ className }: { className?: string })
       <div className="flex items-center justify-between gap-2 p-1.5 sm:p-2 rounded-2xl bg-black/40 backdrop-blur-xl border border-[#D4AF37]/35 shadow-xl shadow-black/20">
         
         {/* Back to Login button */}
-        <Link
+        <TransitionLink
           href="/login"
-          prefetch={true}
           className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold text-white/80 hover:text-[#F5D061] hover:bg-white/10 transition-all active:scale-95 shrink-0"
           title="Kembali ke Halaman Login"
         >
           <ArrowLeft className="h-3.5 w-3.5" />
           <span className="hidden md:inline">Login</span>
-        </Link>
+        </TransitionLink>
 
         {/* Portal Switcher Tabs */}
         <div className="flex items-center gap-1 sm:gap-1.5 overflow-x-auto no-scrollbar flex-1 justify-center">
@@ -65,10 +64,9 @@ export default function PortalSwitcherNav({ className }: { className?: string })
             const isActive = pathname === tab.href;
 
             return (
-              <Link
+              <TransitionLink
                 key={tab.href}
                 href={tab.href}
-                prefetch={true}
                 className={cn(
                   "flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-xl text-xs font-bold transition-all duration-300 active:scale-95 whitespace-nowrap",
                   isActive
@@ -79,7 +77,7 @@ export default function PortalSwitcherNav({ className }: { className?: string })
                 <Icon className={cn("h-3.5 w-3.5 shrink-0", isActive ? "text-slate-950" : "text-[#F5D061]")} />
                 <span className="hidden sm:inline">{tab.label}</span>
                 <span className="sm:hidden">{tab.shortLabel}</span>
-              </Link>
+              </TransitionLink>
             );
           })}
         </div>

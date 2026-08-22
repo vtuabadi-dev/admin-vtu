@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import Link from "next/link";
+import TransitionLink from "@/shared/components/TransitionLink";
 import { useAuthStore } from "@/stores/auth-store";
 import { useSession } from "@/shared/hooks/use-session";
 import { cn } from "@/shared/lib/utils";
@@ -262,9 +262,8 @@ export default function LoginPage() {
           <div className="relative z-10 space-y-3.5 max-w-xl mx-auto w-full">
             
             {/* Box 1: Portal Registrasi Jamaah Umroh */}
-            <Link
+            <TransitionLink
               href="/register"
-              prefetch={true}
               className="flex items-center justify-between p-3.5 sm:p-4 rounded-2xl bg-white/10 backdrop-blur-md border border-[#D4AF37]/30 hover:border-[#D4AF37] hover:bg-white/15 hover:shadow-lg hover:shadow-[#D4AF37]/10 transition-all duration-300 transform hover:-translate-y-0.5 group cursor-pointer block"
             >
               <div className="flex items-center gap-3">
@@ -280,12 +279,11 @@ export default function LoginPage() {
               >
                 DAFTAR
               </span>
-            </Link>
+            </TransitionLink>
 
             {/* Box 2: Pendaftaran Badal Umroh */}
-            <Link
+            <TransitionLink
               href="/register/badal-umroh"
-              prefetch={true}
               className="flex items-center justify-between p-3.5 sm:p-4 rounded-2xl bg-[#082C21]/80 backdrop-blur-md border border-[#D4AF37]/40 hover:border-[#F5D061] hover:bg-[#0A2E23] hover:shadow-lg hover:shadow-[#F5D061]/15 transition-all duration-300 transform hover:-translate-y-0.5 group cursor-pointer block"
             >
               <div className="flex items-center gap-3">
@@ -301,12 +299,11 @@ export default function LoginPage() {
               >
                 BADAL
               </span>
-            </Link>
+            </TransitionLink>
 
             {/* Box 3: Pendaftaran Wakaf Al-Qur'an */}
-            <Link
+            <TransitionLink
               href="/register/wakaf-quran"
-              prefetch={true}
               className="flex items-center justify-between p-3.5 sm:p-4 rounded-2xl bg-white/10 backdrop-blur-md border border-[#D4AF37]/30 hover:border-[#D4AF37] hover:bg-white/15 hover:shadow-lg hover:shadow-[#D4AF37]/10 transition-all duration-300 transform hover:-translate-y-0.5 group cursor-pointer block"
             >
               <div className="flex items-center gap-3">
@@ -322,12 +319,11 @@ export default function LoginPage() {
               >
                 WAKAF
               </span>
-            </Link>
+            </TransitionLink>
 
             {/* Box 4: Cek Status Badal & Wakaf (OTP WA) */}
-            <Link
+            <TransitionLink
               href="/track/badal-wakaf"
-              prefetch={true}
               className="flex items-center justify-between p-3.5 sm:p-4 rounded-2xl bg-[#041710]/90 backdrop-blur-md border border-[#D4AF37]/30 hover:border-[#D4AF37] hover:bg-[#061F16] hover:shadow-lg hover:shadow-amber-500/10 transition-all duration-300 transform hover:-translate-y-0.5 group cursor-pointer block"
             >
               <div className="flex items-center gap-3">
@@ -343,7 +339,7 @@ export default function LoginPage() {
               >
                 CEK STATUS
               </span>
-            </Link>
+            </TransitionLink>
 
           </div>
 

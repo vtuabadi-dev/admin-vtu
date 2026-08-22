@@ -4,13 +4,16 @@ import React from "react";
 import IntroVideoLoader from "./IntroVideoLoader";
 import PageTransitionWrapper from "./PageTransitionWrapper";
 import PortalBackgroundPrewarmer from "./PortalBackgroundPrewarmer";
+import { PortalTransitionProvider } from "@/shared/context/PortalTransitionContext";
 
 export default function AppIntroWrapper({ children }: { children: React.ReactNode }) {
   return (
     <>
       <IntroVideoLoader />
       <PortalBackgroundPrewarmer />
-      <PageTransitionWrapper>{children}</PageTransitionWrapper>
+      <PortalTransitionProvider>
+        <PageTransitionWrapper>{children}</PageTransitionWrapper>
+      </PortalTransitionProvider>
     </>
   );
 }

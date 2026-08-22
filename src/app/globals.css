@@ -217,3 +217,10 @@
   will-change: transform, opacity;
 }
 
+/* ── PREVENT INITIAL LOGIN FLASH DURING INTRO ── */
+html.intro-pending body {
+  background-color: #020617 !important;
+  overflow: hidden !important;
+}
+
+

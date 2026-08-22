@@ -14,8 +14,8 @@ export default function IntroVideoLoader({
   forceShow = false,
   videoSrc,
 }: IntroVideoLoaderProps) {
-  const [isVisible, setIsVisible] = useState(false);
-  const [isIntroReady, setIsIntroReady] = useState(false);
+  // Start with isVisible = true by default to guarantee ZERO flash of login page
+  const [isVisible, setIsVisible] = useState(true);
   const [isVideoPlaying, setIsVideoPlaying] = useState(false);
   const [isFadingOut, setIsFadingOut] = useState(false);
   const [isMuted, setIsMuted] = useState(true);
@@ -23,8 +23,6 @@ export default function IntroVideoLoader({
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
   useEffect(() => {
-    let timer: ReturnType<typeof setTimeout> | null = null;
-
     if (typeof window !== "undefined") {
       const isMobile = window.innerWidth < 768 || window.matchMedia("(max-width: 767px)").matches;
       if (!videoSrc) {
@@ -32,20 +30,12 @@ export default function IntroVideoLoader({
       }
 
       const played = sessionStorage.getItem("vtu_intro_played");
-      if (!played || forceShow) {
-        setIsVisible(true);
-        timer = setTimeout(() => {
-          setIsIntroReady(true);
-        }, 30);
-      } else {
+      if (played && !forceShow) {
+        document.documentElement.classList.remove("intro-pending");
         setIsVisible(false);
         if (onComplete) onComplete();
       }
     }
-
-    return () => {
-      if (timer) clearTimeout(timer);
-    };
   }, [forceShow, onComplete, videoSrc]);
 
   // Attempt autoplay programmatically when visible
@@ -87,6 +77,7 @@ export default function IntroVideoLoader({
     setIsFadingOut(true);
     if (typeof window !== "undefined") {
       sessionStorage.setItem("vtu_intro_played", "true");
+      document.documentElement.classList.remove("intro-pending");
     }
     setTimeout(() => {
       setIsVisible(false);
@@ -108,7 +99,7 @@ export default function IntroVideoLoader({
   return (
     <div
       className={`fixed inset-0 z-[9999] bg-slate-950 flex flex-col justify-between overflow-hidden transition-opacity duration-700 ease-out ${
-        !isIntroReady || isFadingOut ? "opacity-0 pointer-events-none" : "opacity-100"
+        isFadingOut ? "opacity-0 pointer-events-none" : "opacity-100"
       }`}
     >
       {/* Subtle Cinematic Ambient Backdrop */}
@@ -144,9 +135,11 @@ export default function IntroVideoLoader({
       </div>
 
       {/* Top Header Bar */}
-      <div className={`relative z-10 p-4 sm:p-6 flex items-center justify-end transition-opacity duration-700 delay-300 ${
-        isVideoPlaying ? "opacity-100" : "opacity-0"
-      }`}>
+      <div
+        className={`relative z-10 p-4 sm:p-6 flex items-center justify-end transition-opacity duration-700 delay-300 ${
+          isVideoPlaying ? "opacity-100" : "opacity-0"
+        }`}
+      >
         <div className="flex items-center gap-3">
           {/* Audio Toggle Button */}
           <button
