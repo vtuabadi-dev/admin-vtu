@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import Link from "next/link";
 import { GSAPLink } from "@/shared/gsap/GSAPProvider";
 import { usePathname } from "next/navigation";
 import { Sidebar } from "./Sidebar";
