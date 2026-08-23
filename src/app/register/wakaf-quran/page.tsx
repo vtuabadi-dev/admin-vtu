@@ -388,7 +388,7 @@ export default function WakafQuranRegisterPage() {
           fetchPriority="high"
           className="fixed inset-0 w-full h-full object-cover object-center pointer-events-none z-0"
           onError={(e) => {
-            (e.currentTarget as HTMLImageElement).src = "/images/bg-makkah-madinah-canvas.jpg";
+            (e.currentTarget as HTMLImageElement).src = "/images/wakaf-quran-bg.png";
           }}
         />
         <div className="fixed inset-0 bg-black/10 pointer-events-none z-0" />
@@ -491,7 +491,7 @@ export default function WakafQuranRegisterPage() {
         fetchPriority="high"
         className="fixed inset-0 w-full h-full object-cover object-center pointer-events-none z-0"
         onError={(e) => {
-          (e.currentTarget as HTMLImageElement).src = "/images/bg-makkah-madinah-canvas.jpg";
+          (e.currentTarget as HTMLImageElement).src = "/images/wakaf-quran-bg.png";
         }}
       />
       <div className="fixed inset-0 bg-black/10 pointer-events-none z-0" />

@@ -15,6 +15,7 @@ const CRITICAL_IMAGES = [
   "/images/bg-makkah-madinah-canvas.jpg",
   "/api/badal-umroh/background",
   "/api/wakaf-quran/background",
+  "/images/wakaf-quran-bg.png",
 ];
 
 const CRITICAL_APIS = [

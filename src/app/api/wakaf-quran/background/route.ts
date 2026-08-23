@@ -117,7 +117,7 @@ export async function GET() {
 
     const imageArrayBuffer = await downloadRes.arrayBuffer();
     const buffer = new Uint8Array(imageArrayBuffer);
-    const mimeType = latestFile.mimeType || "image/jpeg";
+    const mimeType = latestFile.mimeType || "image/png";
 
     // Cache image in memory for instant delivery
     memoryCache = {
@@ -140,6 +140,23 @@ export async function GET() {
         headers: { "Content-Type": memoryCache.mimeType },
       });
     }
+
+    try {
+      const fs = await import("fs");
+      const path = await import("path");
+      const fallbackPath = path.join(process.cwd(), "public", "images", "wakaf-quran-bg.png");
+      if (fs.existsSync(fallbackPath)) {
+        const fileBuf = fs.readFileSync(fallbackPath);
+        return new NextResponse(fileBuf as any, {
+          headers: {
+            "Content-Type": "image/png",
+            "Cache-Control": "public, max-age=300, s-maxage=600, stale-while-revalidate=86400",
+            "Content-Disposition": "inline",
+          },
+        });
+      }
+    } catch {}
+
     return new NextResponse(null, { status: 500 });
   }
 }
