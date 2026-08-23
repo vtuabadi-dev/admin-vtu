@@ -488,10 +488,11 @@ export default function BadalUmrohRegisterPage() {
         </div>
 
       {/* ── Step Indicator ── */}
-      <div className="bg-white/95 backdrop-blur-md p-4 sm:p-5 rounded-2xl border border-stone-200/90 shadow-lg mb-6 overflow-x-auto">
+      <div className="bg-gradient-to-r from-white/85 via-white/55 to-[#041710]/90 backdrop-blur-xl p-4 sm:p-5 rounded-2xl border-t border-l border-white/80 border-b border-r border-[#D4AF37]/50 shadow-[0_20px_40px_-15px_rgba(0,0,0,0.35)] mb-6 overflow-x-auto">
         <div className="flex items-start justify-between min-w-[320px] px-1 sm:px-3">
           {steps.map((s, i) => {
             const Icon = s.icon;
+            const isDarkSide = i >= 2;
             return (
               <div key={s.key} className="flex-1 flex items-start">
                 <div className="flex flex-col items-center shrink-0">
@@ -501,7 +502,10 @@ export default function BadalUmrohRegisterPage() {
                       step === s.key &&
                         "bg-gradient-to-tr from-emerald-800 to-teal-600 text-white shadow-md ring-4 ring-emerald-500/30 scale-110 border border-white",
                       step > s.key && "bg-emerald-800 text-white border border-emerald-600 shadow-sm",
-                      step < s.key && "bg-stone-100 text-stone-700 border border-stone-300 shadow-xs"
+                      step < s.key &&
+                        (isDarkSide
+                          ? "bg-[#062118]/85 text-[#F5D061] border border-[#D4AF37]/50 shadow-xs backdrop-blur-sm"
+                          : "bg-white/90 text-slate-800 border border-stone-300 shadow-xs")
                     )}
                   >
                     {step > s.key ? <Check className="w-4 h-4" /> : <Icon className="w-4 h-4" />}
@@ -509,7 +513,17 @@ export default function BadalUmrohRegisterPage() {
                   <span
                     className={cn(
                       "text-[10px] sm:text-xs font-bold mt-1.5 whitespace-nowrap text-center transition-colors",
-                      step === s.key ? "text-emerald-950 font-black" : step > s.key ? "text-emerald-900 font-extrabold" : "text-stone-700 font-bold"
+                      step === s.key
+                        ? isDarkSide
+                          ? "text-[#F5D061] font-black drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)]"
+                          : "text-emerald-950 font-black drop-shadow-[0_1px_1px_rgba(255,255,255,0.9)]"
+                        : step > s.key
+                        ? isDarkSide
+                          ? "text-emerald-300 font-extrabold drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)]"
+                          : "text-emerald-900 font-extrabold"
+                        : isDarkSide
+                        ? "text-slate-100 font-extrabold drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)]"
+                        : "text-slate-900 font-extrabold drop-shadow-[0_1px_1px_rgba(255,255,255,0.8)]"
                     )}
                   >
                     {s.label}
@@ -519,7 +533,7 @@ export default function BadalUmrohRegisterPage() {
                   <div
                     className={cn(
                       "flex-1 h-0.5 mx-2 mt-4.5 rounded-full transition-all duration-300",
-                      step > s.key ? "bg-emerald-700" : "bg-stone-300"
+                      step > s.key ? "bg-emerald-600" : isDarkSide ? "bg-slate-600/60" : "bg-stone-300"
                     )}
                   />
                 )}
