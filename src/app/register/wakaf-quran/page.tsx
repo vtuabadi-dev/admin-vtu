@@ -1,8 +1,7 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
-import gsap from "gsap";
 import {
   ArrowLeft,
   CheckCircle2,
@@ -42,45 +41,7 @@ const formatRupiah = (val: number) => {
 };
 
 export default function WakafQuranRegisterPage() {
-  const containerRef = useRef<HTMLDivElement | null>(null);
   const [hargaWakaf, setHargaWakaf] = useState<number>(350000);
-
-  // Preload background artwork immediately during intro web start & run GSAP stagger reveal on complete
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    // Immediate image preloading during intro web
-    const img = new window.Image();
-    img.src = "/api/wakaf-quran/background";
-
-    const runEntranceAnimation = () => {
-      if (!containerRef.current) return;
-      const elements = containerRef.current.querySelectorAll("[data-wakaf-portal-elem]");
-      if (elements.length > 0) {
-        gsap.fromTo(
-          elements,
-          { opacity: 0, y: 10 },
-          { opacity: 1, y: 0, duration: 0.4, stagger: 0.04, ease: "power2.out", clearProps: "all" }
-        );
-      }
-    };
-
-    const played = sessionStorage.getItem("vtu_intro_played");
-    const hasPendingClass = document.documentElement.classList.contains("intro-pending");
-
-    if (played || !hasPendingClass) {
-      runEntranceAnimation();
-    }
-
-    const handleIntroComplete = () => {
-      runEntranceAnimation();
-    };
-
-    window.addEventListener("vtu:intro-complete", handleIntroComplete);
-    return () => {
-      window.removeEventListener("vtu:intro-complete", handleIntroComplete);
-    };
-  }, []);
 
   useEffect(() => {
     fetch("/api/master/harga-layanan")
@@ -520,7 +481,7 @@ export default function WakafQuranRegisterPage() {
   }
 
   return (
-    <div ref={containerRef} className="w-full max-w-4xl mx-auto relative">
+    <div className="w-full max-w-4xl mx-auto relative">
       {/* ── Dynamic Live Background from Google Drive Folder 1IDHH8jvRkLgl4mix7msF1XEB22f88MlA ── */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
@@ -537,12 +498,10 @@ export default function WakafQuranRegisterPage() {
 
       <div className="relative z-10 space-y-6">
         {/* ── Floating Unified Portal Switcher Bar ── */}
-        <div data-wakaf-portal-elem>
-          <PortalSwitcherNav />
-        </div>
+        <PortalSwitcherNav />
 
         {/* ── Top Header ── */}
-        <div data-wakaf-portal-elem className="text-center bg-gradient-to-b from-white/20 to-white/05 backdrop-blur-[4px] p-6 rounded-3xl border-t border-l border-white/90 border-b border-r border-slate-900/25 shadow-[inset_1px_1px_2px_rgba(255,255,255,0.9),inset_-1px_-1px_3px_rgba(0,0,0,0.1),0_15px_35px_-10px_rgba(0,0,0,0.2)]">
+        <div className="text-center bg-gradient-to-b from-white/20 to-white/05 backdrop-blur-[4px] p-6 rounded-3xl border-t border-l border-white/90 border-b border-r border-slate-900/25 shadow-[inset_1px_1px_2px_rgba(255,255,255,0.9),inset_-1px_-1px_3px_rgba(0,0,0,0.1),0_15px_35px_-10px_rgba(0,0,0,0.2)]">
           <div className="inline-flex items-center justify-center h-12 w-12 rounded-2xl bg-gradient-to-tr from-emerald-800 to-teal-700 text-white shadow-md shadow-emerald-900/30 mb-2">
             <BookOpen className="h-6 w-6" />
           </div>
@@ -555,7 +514,7 @@ export default function WakafQuranRegisterPage() {
         </div>
 
         {/* ── Step Indicator ── */}
-        <div data-wakaf-portal-elem className="bg-gradient-to-r from-white/60 via-white/35 to-[#041710]/70 backdrop-blur-md p-4 sm:p-5 rounded-2xl border-t border-l border-white/90 border-b border-r border-slate-900/35 shadow-[inset_1.5px_1.5px_3px_rgba(255,255,255,0.95),inset_-1.5px_-1.5px_4px_rgba(0,0,0,0.35),0_20px_40px_-15px_rgba(0,0,0,0.35)] overflow-x-auto">
+        <div className="bg-gradient-to-r from-white/60 via-white/35 to-[#041710]/70 backdrop-blur-md p-4 sm:p-5 rounded-2xl border-t border-l border-white/90 border-b border-r border-slate-900/35 shadow-[inset_1.5px_1.5px_3px_rgba(255,255,255,0.95),inset_-1.5px_-1.5px_4px_rgba(0,0,0,0.35),0_20px_40px_-15px_rgba(0,0,0,0.35)] overflow-x-auto">
           <div className="flex items-start justify-between min-w-[320px] px-1 sm:px-3">
             {steps.map((s, i) => {
               const Icon = s.icon;
