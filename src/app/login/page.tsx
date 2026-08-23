@@ -110,18 +110,50 @@ export default function LoginPage() {
   };
 
   // GSAP Entrance & Ambient Animations
-  useLayoutEffect(() => {
-    if (!root.current) return;
-    const ctx = gsap.context(() => {
-      gsap
-        .timeline({ defaults: { ease: "power3.out" } })
-        .from("[data-bg]", { scale: 1.08, opacity: 0, duration: 1.7 })
-        .from("[data-brand]", { opacity: 0, y: 18, duration: 0.7 }, "-=1.1")
-        .from("[data-copy] > *", { opacity: 0, y: 28, duration: 0.65, stagger: 0.09 }, "-=.35")
-        .from("[data-login]", { opacity: 0, y: 28, duration: 0.8 }, "-=.3")
-        .from("[data-portal]", { opacity: 0, x: 34, duration: 0.7, stagger: 0.12 }, "-=.45")
-        .from("[data-footer]", { opacity: 0, y: 12, duration: 0.6 }, "-=.25");
+  useEffect(() => {
+    if (storeLoading || !root.current) return;
 
+    const ctx = gsap.context(() => {
+      // Entrance Timeline with explicit starting and ending values
+      const tl = gsap.timeline({ defaults: { ease: "power3.out" } });
+
+      tl.fromTo(
+        "[data-bg]",
+        { scale: 1.08, opacity: 0 },
+        { scale: 1, opacity: 1, duration: 1.5 }
+      )
+        .fromTo(
+          "[data-brand]",
+          { opacity: 0, y: 20 },
+          { opacity: 1, y: 0, duration: 0.7 },
+          "-=1.1"
+        )
+        .fromTo(
+          "[data-copy] > *",
+          { opacity: 0, y: 24 },
+          { opacity: 1, y: 0, duration: 0.65, stagger: 0.09 },
+          "-=0.35"
+        )
+        .fromTo(
+          "[data-login]",
+          { opacity: 0, y: 24 },
+          { opacity: 1, y: 0, duration: 0.75 },
+          "-=0.3"
+        )
+        .fromTo(
+          "[data-portal]",
+          { opacity: 0, x: 30 },
+          { opacity: 1, x: 0, duration: 0.65, stagger: 0.1 },
+          "-=0.4"
+        )
+        .fromTo(
+          "[data-footer]",
+          { opacity: 0, y: 12 },
+          { opacity: 1, y: 0, duration: 0.5 },
+          "-=0.2"
+        );
+
+      // Ambient Glow Loops
       gsap.to("[data-glow]", {
         x: 24,
         y: -12,
@@ -139,23 +171,25 @@ export default function LoginPage() {
         yoyo: true,
       });
 
-      gsap.utils.toArray<HTMLElement>("[data-portal]").forEach((item) => {
+      // Hover Micro-interactions
+      const portalElements = gsap.utils.toArray<HTMLElement>("[data-portal]");
+      portalElements.forEach((item) => {
         const arrow = item.querySelector("[data-arrow]");
         const enter = () => {
-          gsap.to(item, { x: 7, duration: 0.3, ease: "power2.out" });
-          if (arrow) gsap.to(arrow, { x: 5, duration: 0.3, ease: "power2.out" });
+          gsap.to(item, { x: 6, duration: 0.25, ease: "power2.out" });
+          if (arrow) gsap.to(arrow, { x: 4, duration: 0.25, ease: "power2.out" });
         };
         const leave = () => {
-          gsap.to(item, { x: 0, duration: 0.35, ease: "power2.out" });
-          if (arrow) gsap.to(arrow, { x: 0, duration: 0.35, ease: "power2.out" });
+          gsap.to(item, { x: 0, duration: 0.3, ease: "power2.out" });
+          if (arrow) gsap.to(arrow, { x: 0, duration: 0.3, ease: "power2.out" });
         };
         item.addEventListener("mouseenter", enter);
         item.addEventListener("mouseleave", leave);
       });
-    }, root);
+    }, root.current);
 
     return () => ctx.revert();
-  }, []);
+  }, [storeLoading]);
 
   if (storeLoading) {
     return (
