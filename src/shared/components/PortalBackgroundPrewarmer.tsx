@@ -14,7 +14,7 @@ const CRITICAL_ROUTES = [
 const CRITICAL_IMAGES = [
   "/images/bg-makkah-madinah-canvas.jpg",
   "/api/badal-umroh/background",
-  "/images/wakaf-quran-bg.jpg",
+  "/api/wakaf-quran/background",
 ];
 
 const CRITICAL_APIS = [

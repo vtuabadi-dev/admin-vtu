@@ -51,7 +51,7 @@ export default function WakafQuranRegisterPage() {
 
     // Immediate image preloading during intro web
     const img = new window.Image();
-    img.src = "/images/bg-makkah-madinah-canvas.jpg";
+    img.src = "/api/wakaf-quran/background";
 
     const runEntranceAnimation = () => {
       if (!containerRef.current) return;
@@ -418,14 +418,17 @@ export default function WakafQuranRegisterPage() {
   if (submitted) {
     return (
       <div className="w-full max-w-4xl mx-auto relative">
-        {/* ── Background Makkah & Madinah Golden Canvas Artwork ── */}
+        {/* ── Dynamic Live Background from Google Drive Folder 1IDHH8jvRkLgl4mix7msF1XEB22f88MlA ── */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src="/images/bg-makkah-madinah-canvas.jpg"
-          alt="Makkah & Madinah Canvas Artwork"
+          src="/api/wakaf-quran/background"
+          alt="Background Wakaf Qur'an"
           loading="eager"
           fetchPriority="high"
           className="fixed inset-0 w-full h-full object-cover object-center pointer-events-none z-0"
+          onError={(e) => {
+            (e.currentTarget as HTMLImageElement).src = "/images/bg-makkah-madinah-canvas.jpg";
+          }}
         />
         <div className="fixed inset-0 bg-black/10 pointer-events-none z-0" />
 
@@ -518,14 +521,17 @@ export default function WakafQuranRegisterPage() {
 
   return (
     <div ref={containerRef} className="w-full max-w-4xl mx-auto relative">
-      {/* ── Background Makkah & Madinah Golden Canvas Artwork ── */}
+      {/* ── Dynamic Live Background from Google Drive Folder 1IDHH8jvRkLgl4mix7msF1XEB22f88MlA ── */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        src="/images/bg-makkah-madinah-canvas.jpg"
-        alt="Makkah & Madinah Canvas Artwork"
+        src="/api/wakaf-quran/background"
+        alt="Background Wakaf Qur'an"
         loading="eager"
         fetchPriority="high"
         className="fixed inset-0 w-full h-full object-cover object-center pointer-events-none z-0"
+        onError={(e) => {
+          (e.currentTarget as HTMLImageElement).src = "/images/bg-makkah-madinah-canvas.jpg";
+        }}
       />
       <div className="fixed inset-0 bg-black/10 pointer-events-none z-0" />
 
