@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, message: "Paket keberangkatan wajib dipilih" }, { status: 400 });
     }
 
-    if (!body.signaturePath) {
+    if (!body.signaturePath && !body.signatureBase64) {
       return NextResponse.json({ success: false, message: "Tanda tangan wajib diunggah" }, { status: 400 });
     }
 

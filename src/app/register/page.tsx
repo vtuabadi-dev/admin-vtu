@@ -635,12 +635,12 @@ export default function RegisterPage() {
     }
 
     if (s === 6) {
-      if (!signaturePath && !signatureFile) errs.signature = "Tanda tangan wajib diunggah";
+      if (!signaturePath && !signatureFile && !signaturePreview) errs.signature = "Tanda tangan wajib diunggah";
     }
 
     setErrors(errs);
     return Object.keys(errs).length === 0;
-  }, [namaPerwakilan, nomorTelepon, emailPerwakilan, hasScrolledToBottom, termsAccepted, members, selectedPaketId, signaturePath, signatureFile]);
+  }, [namaPerwakilan, nomorTelepon, emailPerwakilan, hasScrolledToBottom, termsAccepted, members, selectedPaketId, signaturePath, signatureFile, signaturePreview]);
 
   const nextStep = async () => {
     // If on Step 6 (Signature step) with canvas drawn but not yet saved, auto-save before proceeding!
