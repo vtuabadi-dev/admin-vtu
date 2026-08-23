@@ -32,6 +32,7 @@ export default function GSAPIntroLoader({
       if (played && !forceShow) {
         document.documentElement.classList.remove("intro-pending");
         setIsVisible(false);
+        window.dispatchEvent(new CustomEvent("vtu:intro-complete"));
         if (onComplete) onComplete();
       }
     }
@@ -124,6 +125,7 @@ export default function GSAPIntroLoader({
     if (typeof window !== "undefined") {
       sessionStorage.setItem("vtu_intro_played", "true");
       document.documentElement.classList.remove("intro-pending");
+      window.dispatchEvent(new CustomEvent("vtu:intro-complete"));
     }
 
     if (!overlayRef.current) {

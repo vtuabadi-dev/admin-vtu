@@ -64,6 +64,26 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeMobileTab, setActiveMobileTab] = useState<"login" | "portals">("login");
+  const [isIntroPending, setIsIntroPending] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    const played = sessionStorage.getItem("vtu_intro_played");
+    const hasPendingClass = document.documentElement.classList.contains("intro-pending");
+    return !played && hasPendingClass;
+  });
+
+  // Listen for intro completion event
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const handleIntroComplete = () => {
+      setIsIntroPending(false);
+    };
+
+    window.addEventListener("vtu:intro-complete", handleIntroComplete);
+    return () => {
+      window.removeEventListener("vtu:intro-complete", handleIntroComplete);
+    };
+  }, []);
 
   // Instant admin login handler
   const handleInstantAdminLogin = async (targetEmail = "admin@vtu.id", targetPass = "admin123") => {
@@ -109,9 +129,9 @@ export default function LoginPage() {
     }
   };
 
-  // GSAP Entrance & Ambient Animations
+  // GSAP Entrance & Ambient Animations (Triggered ONLY when Intro completes & store is ready)
   useEffect(() => {
-    if (storeLoading || !root.current) return;
+    if (storeLoading || isIntroPending || !root.current) return;
 
     const ctx = gsap.context(() => {
       // Entrance Timeline with explicit starting and ending values
@@ -189,7 +209,7 @@ export default function LoginPage() {
     }, root.current);
 
     return () => ctx.revert();
-  }, [storeLoading]);
+  }, [storeLoading, isIntroPending]);
 
   if (storeLoading) {
     return (
