@@ -187,7 +187,7 @@ export function Shell({ children, role }: ShellProps) {
       </main>
 
       {/* ── Mobile Bottom Navigation Bar (PWA App Bar) ── */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#062118]/95 backdrop-blur-md border-t border-[#D4AF37]/40 h-16 flex items-center justify-around text-white px-2 shadow-2xl safe-area-bottom">
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-[#062118]/95 backdrop-blur-md border-t border-[#D4AF37]/40 h-16 flex items-center justify-around text-white px-2 shadow-2xl pb-[env(safe-area-inset-bottom)]">
         {mobileNavItems.map((item) => {
           const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
           return (

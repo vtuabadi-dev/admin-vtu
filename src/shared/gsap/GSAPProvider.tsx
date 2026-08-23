@@ -85,7 +85,10 @@ export function GSAPProvider({ children }: { children: React.ReactNode }) {
   return (
     <GSAPTransitionContext.Provider value={{ navigateTo, isNavigating }}>
       {/* Direct Clean Page Canvas */}
-      <div ref={pageWrapperRef} className="w-full min-h-screen will-change-transform">
+      <div
+        ref={pageWrapperRef}
+        className={cn("w-full min-h-screen", isNavigating && "will-change-transform")}
+      >
         {children}
       </div>
     </GSAPTransitionContext.Provider>
