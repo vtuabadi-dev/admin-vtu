@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useRef, useState, useCallback, useTransition, useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import gsap from "gsap";
+import { cn } from "@/shared/lib/utils";
 
 interface GSAPTransitionContextType {
   navigateTo: (href: string) => void;
