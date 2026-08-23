@@ -500,7 +500,7 @@ export default function WakafQuranRegisterPage() {
         </div>
 
         {/* ── Step Indicator ── */}
-        <div className="bg-gradient-to-b from-white/20 to-white/05 backdrop-blur-[4px] p-4 sm:p-5 rounded-2xl border-t border-l border-white/90 border-b border-r border-slate-900/25 shadow-[inset_1px_1px_2px_rgba(255,255,255,0.9),inset_-1px_-1px_3px_rgba(0,0,0,0.1),0_15px_35px_-10px_rgba(0,0,0,0.2)] mb-6 overflow-x-auto">
+        <div className="bg-white/95 backdrop-blur-md p-4 sm:p-5 rounded-2xl border border-stone-200/90 shadow-lg mb-6 overflow-x-auto">
           <div className="flex items-start justify-between min-w-[320px] px-1 sm:px-3">
             {steps.map((s, i) => {
               const Icon = s.icon;
@@ -511,17 +511,17 @@ export default function WakafQuranRegisterPage() {
                       className={cn(
                         "w-9 h-9 rounded-full flex items-center justify-center text-xs font-extrabold transition-all duration-200 shadow-sm",
                         step === s.key &&
-                          "bg-gradient-to-tr from-emerald-800 to-teal-600 text-white shadow-md shadow-emerald-900/30 ring-4 ring-emerald-500/30 scale-110 border border-white/80",
+                          "bg-gradient-to-tr from-emerald-800 to-teal-600 text-white shadow-md ring-4 ring-emerald-500/30 scale-110 border border-white",
                         step > s.key && "bg-emerald-800 text-white border border-emerald-600 shadow-sm",
-                        step < s.key && "bg-white/60 text-slate-700 border border-white/90 shadow-sm"
+                        step < s.key && "bg-stone-100 text-stone-700 border border-stone-300 shadow-xs"
                       )}
                     >
                       {step > s.key ? <Check className="w-4 h-4" /> : <Icon className="w-4 h-4" />}
                     </div>
                     <span
                       className={cn(
-                        "text-[10px] sm:text-xs font-bold mt-1.5 whitespace-nowrap text-center drop-shadow-[0_1px_1px_rgba(255,255,255,0.9)]",
-                        step === s.key ? "text-emerald-950 font-black" : "text-slate-700"
+                        "text-[10px] sm:text-xs font-bold mt-1.5 whitespace-nowrap text-center transition-colors",
+                        step === s.key ? "text-emerald-950 font-black" : step > s.key ? "text-emerald-900 font-extrabold" : "text-stone-700 font-bold"
                       )}
                     >
                       {s.label}
@@ -532,7 +532,7 @@ export default function WakafQuranRegisterPage() {
                     <div
                       className={cn(
                         "h-0.5 w-full mx-1 sm:mx-2 mt-4.5 rounded transition-all duration-300",
-                        step > s.key ? "bg-emerald-800" : "bg-slate-400/40"
+                        step > s.key ? "bg-emerald-700" : "bg-stone-300"
                       )}
                     />
                   )}
