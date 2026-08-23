@@ -16,10 +16,12 @@ import {
   Loader2,
   X,
   Zap,
+  Compass,
 } from "lucide-react";
 import { GSAPLink } from "@/shared/gsap/GSAPProvider";
 import { useAuthStore } from "@/stores/auth-store";
 import { useSession } from "@/shared/hooks/use-session";
+import { cn } from "@/shared/lib/utils";
 import styles from "./login.module.css";
 
 const portals = [
@@ -61,6 +63,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [activeMobileTab, setActiveMobileTab] = useState<"login" | "portals">("login");
 
   // Instant admin login handler
   const handleInstantAdminLogin = async (targetEmail = "admin@vtu.id", targetPass = "admin123") => {
@@ -173,8 +176,31 @@ export default function LoginPage() {
       <div className={styles.frame} aria-hidden="true" />
 
       <section className={styles.content}>
+        {/* ── Mobile Segmented Control Switcher ── */}
+        <div className={styles.mobileSwitcher}>
+          <button
+            type="button"
+            className={cn(styles.mobileTab, activeMobileTab === "login" && styles.mobileTabActive)}
+            onClick={() => setActiveMobileTab("login")}
+          >
+            <LockKeyhole size={15} />
+            <span>Login Admin</span>
+          </button>
+          <button
+            type="button"
+            className={cn(
+              styles.mobileTab,
+              activeMobileTab === "portals" && styles.mobileTabActive
+            )}
+            onClick={() => setActiveMobileTab("portals")}
+          >
+            <Compass size={15} />
+            <span>4 Portal Publik</span>
+          </button>
+        </div>
+
         {/* ── Left Side: Login Form ── */}
-        <div className={styles.left}>
+        <div className={cn(styles.left, activeMobileTab !== "login" && styles.hideMobile)}>
           <div data-brand className={styles.brand}>
             <div className={styles.brandMark}>
               <ShieldCheck size={24} />
@@ -309,7 +335,7 @@ export default function LoginPage() {
         </div>
 
         {/* ── Right Side: 4 Public Portals ── */}
-        <aside className={styles.right}>
+        <aside className={cn(styles.right, activeMobileTab !== "portals" && styles.hideMobile)}>
           <div className={styles.portalHeading}>
             <span>Akses Portal Lainnya</span>
             <i />

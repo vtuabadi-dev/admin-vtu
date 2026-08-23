@@ -1,14 +1,16 @@
 .page {
   position: relative;
-  min-height: 100svh;
-  overflow: hidden;
+  min-height: 100dvh;
+  overflow-y: auto;
   background: #07120f;
   color: #f7f4ea;
   font-family: Inter, system-ui, -apple-system, sans-serif;
+  padding-top: max(16px, env(safe-area-inset-top));
+  padding-bottom: max(24px, env(safe-area-inset-bottom));
 }
 
 .background {
-  position: absolute;
+  position: fixed;
   inset: -4%;
   z-index: 0;
   background: linear-gradient(90deg, rgba(4, 13, 10, 0.95) 0%, rgba(4, 13, 10, 0.8) 43%, rgba(4, 13, 10, 0.2) 100%),
@@ -18,7 +20,7 @@
 }
 
 .ambientGlow {
-  position: absolute;
+  position: fixed;
   z-index: 1;
   width: 42vw;
   height: 42vw;
@@ -32,7 +34,7 @@
 }
 
 .lightParticle {
-  position: absolute;
+  position: fixed;
   z-index: 1;
   width: 170px;
   height: 170px;
@@ -46,7 +48,7 @@
 }
 
 .frame {
-  position: absolute;
+  position: fixed;
   inset: 16px;
   z-index: 2;
   border: 1px solid rgba(216, 177, 91, 0.28);
@@ -57,25 +59,30 @@
 .content {
   position: relative;
   z-index: 3;
-  width: min(1380px, calc(100% - 100px));
-  min-height: 100svh;
+  width: min(1380px, calc(100% - 40px));
+  min-height: 100dvh;
   margin: auto;
   display: grid;
   grid-template-columns: minmax(420px, 0.9fr) minmax(500px, 1.1fr);
   align-items: center;
   gap: clamp(60px, 8vw, 130px);
-  padding: 70px 0;
+  padding: 50px 0;
+}
+
+.mobileSwitcher {
+  display: none;
 }
 
 .left {
   max-width: 570px;
+  width: 100%;
 }
 
 .brand {
   display: flex;
   align-items: center;
   gap: 12px;
-  margin-bottom: clamp(45px, 6vh, 90px);
+  margin-bottom: clamp(35px, 5vh, 80px);
 }
 
 .brandMark {
@@ -113,7 +120,7 @@
 
 .copy h1 {
   margin: 15px 0 20px;
-  font: 500 clamp(46px, 5.2vw, 76px) / 0.98 Georgia, serif;
+  font: 500 clamp(36px, 5.2vw, 76px) / 0.98 Georgia, serif;
   letter-spacing: -0.045em;
   color: #f7f4ea;
 }
@@ -127,13 +134,13 @@
   max-width: 520px;
   margin: 0;
   color: rgba(247, 244, 234, 0.68);
-  font-size: 16px;
-  line-height: 1.75;
+  font-size: 15px;
+  line-height: 1.7;
 }
 
 .login {
   width: min(100%, 470px);
-  margin-top: 36px;
+  margin-top: 32px;
 }
 
 .login label > span {
@@ -152,7 +159,7 @@
   padding: 0 16px;
   border: 1px solid rgba(247, 244, 234, 0.24);
   border-radius: 12px;
-  background: rgba(3, 15, 11, 0.45);
+  background: rgba(3, 15, 11, 0.55);
   backdrop-filter: blur(12px);
   transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
 }
@@ -160,7 +167,7 @@
 .inputWrap:focus-within {
   border-color: rgba(216, 177, 91, 0.85);
   box-shadow: 0 0 0 3px rgba(216, 177, 91, 0.18);
-  background: rgba(4, 20, 15, 0.65);
+  background: rgba(4, 20, 15, 0.75);
 }
 
 .inputWrap + label {
@@ -178,7 +185,8 @@
   outline: 0;
   background: transparent;
   color: #ffffff;
-  font: inherit;
+  font-size: 16px; /* Prevents auto-zoom on iOS Safari */
+  font-family: inherit;
 }
 
 .inputWrap input::placeholder {
@@ -221,8 +229,8 @@
 
 .remember input {
   accent-color: #d8b15b;
-  width: 16px;
-  height: 16px;
+  width: 18px;
+  height: 18px;
 }
 
 .textButton {
@@ -264,7 +272,7 @@
 }
 
 .submit:active:not(:disabled) {
-  transform: translateY(0);
+  transform: scale(0.98);
 }
 
 .submit:disabled {
@@ -306,6 +314,10 @@
   border-color: rgba(216, 177, 91, 0.7);
   background: rgba(6, 30, 22, 0.65);
   color: #ffffff;
+}
+
+.adminButton:active:not(:disabled) {
+  transform: scale(0.98);
 }
 
 .adminButton:disabled {
@@ -364,15 +376,19 @@
   text-decoration: none;
   border-top: 1px solid rgba(216, 177, 91, 0.28);
   border-bottom: 1px solid rgba(216, 177, 91, 0.08);
-  background: linear-gradient(90deg, rgba(6, 30, 22, 0.42), rgba(6, 30, 22, 0.1));
+  background: linear-gradient(90deg, rgba(6, 30, 22, 0.55), rgba(6, 30, 22, 0.2));
   backdrop-filter: blur(8px);
   border-radius: 16px;
   transition: background 0.22s ease, border-color 0.22s ease, transform 0.22s ease;
 }
 
 .portal:hover {
-  background: linear-gradient(90deg, rgba(6, 40, 29, 0.72), rgba(216, 177, 91, 0.07));
+  background: linear-gradient(90deg, rgba(6, 40, 29, 0.78), rgba(216, 177, 91, 0.12));
   border-top-color: rgba(216, 177, 91, 0.65);
+}
+
+.portal:active {
+  transform: scale(0.98);
 }
 
 .portalIcon {
@@ -434,16 +450,53 @@
 @media (max-width: 1050px) {
   .content {
     grid-template-columns: 1fr;
-    gap: 70px;
-    padding: 90px 0;
+    gap: 30px;
+    padding: 30px 0 60px;
+    width: min(100% - 32px, 640px);
   }
   .left,
   .right {
-    max-width: 720px;
+    max-width: 100%;
     justify-self: center;
   }
+  .mobileSwitcher {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px;
+    margin-bottom: 24px;
+    border-radius: 999px;
+    background: rgba(6, 30, 22, 0.75);
+    border: 1px solid rgba(216, 177, 91, 0.4);
+    backdrop-filter: blur(12px);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.4);
+  }
+  .mobileTab {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 10px 14px;
+    border-radius: 999px;
+    border: 0;
+    background: transparent;
+    color: rgba(247, 244, 234, 0.7);
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+  .mobileTabActive {
+    background: linear-gradient(100deg, #f1d894, #c99a3d);
+    color: #172015;
+    box-shadow: 0 4px 15px rgba(216, 177, 91, 0.3);
+  }
+  .hideMobile {
+    display: none !important;
+  }
   .brand {
-    margin-bottom: 60px;
+    margin-bottom: 30px;
   }
   .background {
     background: linear-gradient(90deg, rgba(4, 13, 10, 0.95), rgba(4, 13, 10, 0.84)),
@@ -453,20 +506,21 @@
 
 @media (max-width: 640px) {
   .content {
-    width: min(100% - 42px, 720px);
-    padding: 55px 0;
+    width: min(100% - 24px, 500px);
+    padding: 20px 0 40px;
   }
   .frame {
-    inset: 9px;
-    border-radius: 20px;
+    inset: 8px;
+    border-radius: 18px;
   }
   .copy h1 {
-    font-size: 43px;
+    font-size: 34px;
   }
   .portal {
     grid-template-columns: 46px 1fr 34px;
     gap: 12px;
-    min-height: 94px;
+    min-height: 90px;
+    padding: 12px 14px;
   }
   .portalIcon {
     width: 42px;

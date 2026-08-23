@@ -1,0 +1,22 @@
+{
+  "name": "VTU Operasional — Travel System",
+  "short_name": "VTU",
+  "description": "Travel Operational Automation & Management System",
+  "start_url": "/login",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#07120f",
+  "theme_color": "#07120f",
+  "icons": [
+    {
+      "src": "/images/kaaba-makkah.jpg",
+      "sizes": "192x192",
+      "type": "image/jpeg"
+    },
+    {
+      "src": "/images/kaaba-makkah.jpg",
+      "sizes": "512x512",
+      "type": "image/jpeg"
+    }
+  ]
+}

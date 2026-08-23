@@ -22,6 +22,7 @@ import {
   Wrench,
   ScrollText,
   HeartHandshake,
+  X,
   type LucideIcon,
 } from "lucide-react";
 import { useState, useEffect } from "react";
@@ -29,7 +30,6 @@ import { useAdminStore } from "@/stores/admin-store";
 import { useSession } from "@/shared/hooks/use-session";
 import { isSidebarItemVisible, isSuperAdmin } from "@/shared/lib/rbac-utils";
 import type { OperationalRole } from "@/shared/types";
-
 
 interface NavChild {
   label: string;
@@ -184,9 +184,11 @@ const jamaahNav: NavSection[] = [
 
 interface SidebarProps {
   role: OperationalRole;
+  mobileOpen?: boolean;
+  onMobileClose?: () => void;
 }
 
-export function Sidebar({ role }: SidebarProps) {
+export function Sidebar({ role, mobileOpen = false, onMobileClose }: SidebarProps) {
   const pathname = usePathname();
   const { sidebarCollapsed: collapsed, toggleSidebar } = useAdminStore();
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -194,12 +196,17 @@ export function Sidebar({ role }: SidebarProps) {
   const superAdmin = isSuperAdmin(role);
 
   // Build filtered sections based on role visibility
-  const sections = role === "jamaah" ? jamaahNav : adminNav
-    .map((section) => ({
-      ...section,
-      items: section.items.filter((item) => isSidebarItemVisible(role, section.title, item.label)),
-    }))
-    .filter((section) => section.items.length > 0);
+  const sections =
+    role === "jamaah"
+      ? jamaahNav
+      : adminNav
+          .map((section) => ({
+            ...section,
+            items: section.items.filter((item) =>
+              isSidebarItemVisible(role, section.title, item.label)
+            ),
+          }))
+          .filter((section) => section.items.length > 0);
 
   // Auto-expand parent when a child route is active
   useEffect(() => {
@@ -250,156 +257,189 @@ export function Sidebar({ role }: SidebarProps) {
   const displayEmail = user?.email ?? "";
   const avatarLetter = displayName.charAt(0).toUpperCase();
 
+  const handleNavClick = () => {
+    if (onMobileClose) {
+      onMobileClose();
+    }
+  };
+
   return (
-    <aside
-      className={cn(
-        "fixed left-0 top-0 z-40 h-screen border-r border-[#D4AF37]/30 bg-gradient-to-b from-[#041710] via-[#062118] to-[#0A2E23] text-white transition-all duration-200 flex flex-col shadow-2xl",
-        collapsed ? "w-16" : "w-60"
-      )}
-    >
-      {/* Logo */}
-      <div className="flex h-14 items-center border-b border-[#D4AF37]/30 px-4">
-        {!collapsed && (
+    <>
+      {/* ── Mobile Backdrop Overlay ── */}
+      <div
+        className={cn(
+          "fixed inset-0 z-40 bg-black/60 backdrop-blur-xs transition-opacity duration-300 md:hidden",
+          mobileOpen ? "opacity-100" : "opacity-0 pointer-events-none"
+        )}
+        onClick={onMobileClose}
+        aria-hidden="true"
+      />
+
+      {/* ── Off-Canvas Sidebar / Drawer ── */}
+      <aside
+        className={cn(
+          "fixed left-0 top-0 z-50 h-screen border-r border-[#D4AF37]/30 bg-gradient-to-b from-[#041710] via-[#062118] to-[#0A2E23] text-white flex flex-col shadow-2xl transition-all duration-300 ease-in-out",
+          mobileOpen ? "translate-x-0 w-72" : "-translate-x-full md:translate-x-0",
+          collapsed ? "md:w-16" : "md:w-60"
+        )}
+      >
+        {/* Logo Header */}
+        <div className="flex h-14 items-center justify-between border-b border-[#D4AF37]/30 px-4">
           <div className="flex items-center gap-2.5">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-tr from-[#F5D061] via-[#D4AF37] to-[#B8860B] text-slate-950 shadow-md">
               <Plane className="h-4 w-4 text-slate-950" />
             </div>
-            <div className="text-sm font-black leading-tight tracking-wide">
-              <div className="text-white">VTU <span className="text-[#F5D061] text-[10px] font-extrabold uppercase">Operasional</span></div>
-              <div className="text-[10px] text-emerald-200/70 font-medium">
-                Travel System
+            {(!collapsed || mobileOpen) && (
+              <div className="text-sm font-black leading-tight tracking-wide">
+                <div className="text-white">
+                  VTU{" "}
+                  <span className="text-[#F5D061] text-[10px] font-extrabold uppercase">
+                    Operasional
+                  </span>
+                </div>
+                <div className="text-[10px] text-emerald-200/70 font-medium">Travel System</div>
               </div>
-            </div>
+            )}
           </div>
-        )}
-        {collapsed && (
-          <div className="mx-auto flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-tr from-[#F5D061] via-[#D4AF37] to-[#B8860B] text-slate-950 shadow-md">
-            <Plane className="h-4 w-4 text-slate-950" />
-          </div>
-        )}
-      </div>
 
-      {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto py-3 px-2 space-y-4">
-        {sections.map((section) => (
-          <div key={section.title}>
-            <ul className="space-y-1">
-              {section.items.map((item) => {
-                const hasChildren = item.children !== undefined;
-                const active = isParentActive(item);
-                const isExpanded = expanded.has(item.label);
+          {/* Close button on mobile */}
+          {onMobileClose && (
+            <button
+              type="button"
+              onClick={onMobileClose}
+              className="md:hidden flex h-8 w-8 items-center justify-center rounded-lg text-emerald-200 hover:bg-[#0E4334] hover:text-white"
+              aria-label="Tutup menu"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          )}
+        </div>
 
-                if (hasChildren) {
+        {/* Navigation Items */}
+        <nav className="flex-1 overflow-y-auto py-3 px-2 space-y-4">
+          {sections.map((section) => (
+            <div key={section.title}>
+              <ul className="space-y-1">
+                {section.items.map((item) => {
+                  const hasChildren = item.children !== undefined;
+                  const active = isParentActive(item);
+                  const isExpanded = expanded.has(item.label);
+
+                  if (hasChildren) {
+                    return (
+                      <li key={item.label} className="my-1">
+                        <button
+                          onClick={() => toggleGroup(item.label)}
+                          className={cn(
+                            "w-full flex items-center gap-2.5 rounded-2xl px-3 py-2.5 text-xs font-bold transition-all text-left border shadow-xs",
+                            active && (!collapsed || mobileOpen)
+                              ? "bg-[#0E4334] text-[#F5D061] border-[#D4AF37]/60 shadow-md"
+                              : "bg-[#062118]/60 text-emerald-100/90 hover:bg-[#0E4334]/80 hover:text-white border-[#D4AF37]/20",
+                            collapsed && !mobileOpen && "justify-center px-2"
+                          )}
+                          title={collapsed && !mobileOpen ? item.label : undefined}
+                        >
+                          <div className="flex h-7 w-7 items-center justify-center rounded-xl bg-[#D4AF37]/20 border border-[#D4AF37]/40 text-[#F5D061] shrink-0">
+                            <item.icon className="h-4 w-4" />
+                          </div>
+                          {(!collapsed || mobileOpen) && (
+                            <>
+                              <span className="flex-1 font-bold text-white tracking-wide">
+                                {item.label}
+                              </span>
+                              <ChevronDown
+                                className={cn(
+                                  "h-4 w-4 shrink-0 text-[#F5D061] transition-transform duration-200",
+                                  isExpanded && "rotate-180"
+                                )}
+                              />
+                            </>
+                          )}
+                        </button>
+
+                        {/* Sub-menu items */}
+                        {(!collapsed || mobileOpen) && isExpanded && (
+                          <div className="mt-2.5 mb-1.5 relative rounded-2xl p-2 bg-[#0E4334] border-2 border-[#D4AF37]/50 shadow-2xl overflow-hidden">
+                            <div className="absolute left-2.5 top-2.5 bottom-2.5 w-1 bg-gradient-to-b from-[#F5D061] via-[#D4AF37] to-[#B8860B] rounded-full" />
+                            <ul className="pl-3 space-y-1">
+                              {item.children!.map((child) => (
+                                <li key={child.href}>
+                                  <Link
+                                    href={child.href}
+                                    onClick={handleNavClick}
+                                    className={cn(
+                                      "flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-bold transition-all",
+                                      isChildActive(child.href)
+                                        ? "bg-gradient-to-r from-[#F5D061] via-[#D4AF37] to-[#B8860B] text-slate-950 font-black shadow-md"
+                                        : "text-emerald-100 hover:bg-[#165340] hover:text-[#F5D061]"
+                                    )}
+                                  >
+                                    <div className="h-1.5 w-1.5 rounded-full bg-[#F5D061] shrink-0" />
+                                    <span className="truncate">{child.label}</span>
+                                  </Link>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                      </li>
+                    );
+                  }
+
                   return (
-                    <li key={item.label} className="my-1">
-                      <button
-                        onClick={() => toggleGroup(item.label)}
+                    <li key={item.href}>
+                      <Link
+                        href={item.href!}
+                        onClick={handleNavClick}
                         className={cn(
-                          "w-full flex items-center gap-2.5 rounded-2xl px-3 py-2.5 text-xs font-bold transition-all text-left border shadow-xs",
-                          active && !collapsed
-                            ? "bg-[#0E4334] text-[#F5D061] border-[#D4AF37]/60 shadow-md"
-                            : "bg-[#062118]/60 text-emerald-100/90 hover:bg-[#0E4334]/80 hover:text-white border-[#D4AF37]/20",
-                          collapsed && "justify-center px-2"
+                          "flex items-center gap-3 rounded-lg px-3 py-2 text-xs font-semibold transition-all",
+                          active
+                            ? "bg-[#D4AF37]/20 text-[#F5D061] border-l-2 border-[#F5D061] font-bold shadow-xs"
+                            : "text-emerald-100/75 hover:bg-[#0E4334]/70 hover:text-white",
+                          collapsed && !mobileOpen && "justify-center px-2"
                         )}
-                        title={collapsed ? item.label : undefined}
+                        title={collapsed && !mobileOpen ? item.label : undefined}
                       >
-                        <div className="flex h-7 w-7 items-center justify-center rounded-xl bg-[#D4AF37]/20 border border-[#D4AF37]/40 text-[#F5D061] shrink-0">
-                          <item.icon className="h-4 w-4" />
-                        </div>
-                        {!collapsed && (
-                          <>
-                            <span className="flex-1 font-bold text-white tracking-wide">{item.label}</span>
-                            <ChevronDown
-                              className={cn(
-                                "h-4 w-4 shrink-0 text-[#F5D061] transition-transform duration-200",
-                                isExpanded && "rotate-180"
-                              )}
-                            />
-                          </>
-                        )}
-                      </button>
-
-                      {/* ── Sub-menu Box Container (Sage Green Box with Gold Border & Vertical Bar matching Image 7) ── */}
-                      {!collapsed && isExpanded && (
-                        <div className="mt-2.5 mb-1.5 relative rounded-2xl p-2 bg-[#0E4334] border-2 border-[#D4AF37]/50 shadow-2xl overflow-hidden">
-                          {/* Left Vertical Gold Indicator Bar */}
-                          <div className="absolute left-2.5 top-2.5 bottom-2.5 w-1 bg-gradient-to-b from-[#F5D061] via-[#D4AF37] to-[#B8860B] rounded-full" />
-                          
-                          <ul className="pl-3 space-y-1">
-                            {item.children!.map((child) => (
-                              <li key={child.href}>
-                                <Link
-                                  href={child.href}
-                                  className={cn(
-                                    "flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-bold transition-all",
-                                    isChildActive(child.href)
-                                      ? "bg-gradient-to-r from-[#F5D061] via-[#D4AF37] to-[#B8860B] text-slate-950 font-black shadow-md"
-                                      : "text-emerald-100 hover:bg-[#165340] hover:text-[#F5D061]"
-                                  )}
-                                >
-                                  <div className="h-1.5 w-1.5 rounded-full bg-[#F5D061] shrink-0" />
-                                  <span className="truncate">{child.label}</span>
-                                </Link>
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
+                        <item.icon className="h-4 w-4 shrink-0" />
+                        {(!collapsed || mobileOpen) && <span>{item.label}</span>}
+                      </Link>
                     </li>
                   );
-                }
-
-                return (
-                  <li key={item.href}>
-                    <Link
-                      href={item.href!}
-                      className={cn(
-                        "flex items-center gap-3 rounded-lg px-3 py-2 text-xs font-semibold transition-all",
-                        active
-                          ? "bg-[#D4AF37]/20 text-[#F5D061] border-l-2 border-[#F5D061] font-bold shadow-xs"
-                          : "text-emerald-100/75 hover:bg-[#0E4334]/70 hover:text-white",
-                        collapsed && "justify-center px-2"
-                      )}
-                      title={collapsed ? item.label : undefined}
-                    >
-                      <item.icon className="h-4 w-4 shrink-0" />
-                      {!collapsed && <span>{item.label}</span>}
-                    </Link>
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
-        ))}
-      </nav>
-
-      {/* Footer */}
-      <div className="border-t border-[#D4AF37]/30 p-2.5 bg-[#041710]/50">
-        {!collapsed && (
-          <div className="flex items-center gap-2.5 px-2 py-1.5 mb-1">
-            <div className={cn(
-              "flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold shrink-0 border border-[#D4AF37]/40",
-              superAdmin ? "bg-[#D4AF37]/25 text-[#F5D061]" : "bg-emerald-900 text-emerald-100"
-            )}>
-              {avatarLetter}
+                })}
+              </ul>
             </div>
-            <div className="text-xs min-w-0">
-              <div className="font-bold text-white truncate leading-tight">{displayName}</div>
-              <div className="text-[10px] text-emerald-200/70 truncate leading-tight">{displayEmail}</div>
+          ))}
+        </nav>
+
+        {/* Footer */}
+        <div className="border-t border-[#D4AF37]/30 p-2.5 bg-[#041710]/50">
+          {(!collapsed || mobileOpen) && (
+            <div className="flex items-center gap-2.5 px-2 py-1.5 mb-1">
+              <div
+                className={cn(
+                  "flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold shrink-0 border border-[#D4AF37]/40",
+                  superAdmin ? "bg-[#D4AF37]/25 text-[#F5D061]" : "bg-emerald-900 text-emerald-100"
+                )}
+              >
+                {avatarLetter}
+              </div>
+              <div className="text-xs min-w-0">
+                <div className="font-bold text-white truncate leading-tight">{displayName}</div>
+                <div className="text-[10px] text-emerald-200/70 truncate leading-tight">
+                  {displayEmail}
+                </div>
+              </div>
             </div>
-          </div>
-        )}
-        <button
-          onClick={toggleSidebar}
-          className="flex w-full items-center justify-center rounded-lg py-1.5 text-emerald-200/80 hover:bg-[#0E4334] hover:text-white transition-colors"
-        >
-          {collapsed ? (
-            <ChevronRight className="h-4 w-4" />
-          ) : (
-            <ChevronLeft className="h-4 w-4" />
           )}
-        </button>
-      </div>
-    </aside>
+          <button
+            type="button"
+            onClick={toggleSidebar}
+            className="hidden md:flex w-full items-center justify-center rounded-lg py-1.5 text-emerald-200/80 hover:bg-[#0E4334] hover:text-white transition-colors"
+          >
+            {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+          </button>
+        </div>
+      </aside>
+    </>
   );
 }

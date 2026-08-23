@@ -1,10 +1,25 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import AppIntroWrapper from "@/shared/components/AppIntroWrapper";
 
 export const metadata: Metadata = {
   title: "VTU — Travel Operational System",
-  description: "Travel Operational Automation System",
+  description: "Travel Operational Automation & Management System",
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "VTU Operasional",
+  },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  viewportFit: "cover",
+  themeColor: "#07120f",
 };
 
 export default function RootLayout({
