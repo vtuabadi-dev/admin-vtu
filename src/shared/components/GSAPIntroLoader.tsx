@@ -21,7 +21,7 @@ export default function GSAPIntroLoader({
   const particleLightRef = useRef<HTMLDivElement | null>(null);
   const frameRef = useRef<HTMLDivElement | null>(null);
   const cardRef = useRef<HTMLDivElement | null>(null);
-  const logoWrapperRef = useRef<HTMLDivElement | null>(null);
+  const emblemWrapperRef = useRef<HTMLDivElement | null>(null);
   const textContentRef = useRef<HTMLDivElement | null>(null);
   const skipBtnRef = useRef<HTMLButtonElement | null>(null);
 
@@ -49,16 +49,16 @@ export default function GSAPIntroLoader({
         },
       });
 
-      // ── Stage 1: Ambient Background & Outer Frame Emergence ──
+      // ── Stage 1: Ambient Glow & Golden Outer Frame ──
       tl.fromTo(
         ambientGlowRef.current,
         { scale: 0.7, opacity: 0 },
-        { scale: 1.15, opacity: 0.35, duration: 1.4, ease: "power2.out" }
+        { scale: 1.15, opacity: 0.4, duration: 1.4, ease: "power2.out" }
       )
         .fromTo(
           particleLightRef.current,
           { opacity: 0, y: 30 },
-          { opacity: 0.5, y: 0, duration: 1.2, ease: "sine.out" },
+          { opacity: 0.55, y: 0, duration: 1.2, ease: "sine.out" },
           "-=1.0"
         )
         .fromTo(
@@ -68,7 +68,7 @@ export default function GSAPIntroLoader({
           "-=0.8"
         )
 
-        // ── Stage 2: Glass Card & Logo Emblem Zoom Unblur ──
+        // ── Stage 2: Glass Card & Vauza Tamma Emblem Zoom Unblur ──
         .fromTo(
           cardRef.current,
           { opacity: 0, y: 25, scale: 0.92, filter: "blur(12px)" },
@@ -76,17 +76,17 @@ export default function GSAPIntroLoader({
           "-=0.6"
         )
         .fromTo(
-          logoWrapperRef.current,
-          { opacity: 0, scale: 0.85, filter: "blur(8px)" },
-          { opacity: 1, scale: 1, filter: "blur(0px)", duration: 0.8, ease: "back.out(1.4)" },
+          emblemWrapperRef.current,
+          { opacity: 0, scale: 0.75, filter: "blur(10px)", rotation: -6 },
+          { opacity: 1, scale: 1, filter: "blur(0px)", rotation: 0, duration: 0.85, ease: "back.out(1.5)" },
           "-=0.45"
         )
 
-        // ── Stage 3: Typography & Taglines Stagger Shimmer ──
+        // ── Stage 3: Typography Stagger Reveal ──
         .fromTo(
           "[data-intro-text]",
-          { opacity: 0, y: 18 },
-          { opacity: 1, y: 0, duration: 0.6, stagger: 0.12, ease: "power2.out" },
+          { opacity: 0, y: 16 },
+          { opacity: 1, y: 0, duration: 0.55, stagger: 0.11, ease: "power2.out" },
           "-=0.3"
         )
         .fromTo(
@@ -96,10 +96,10 @@ export default function GSAPIntroLoader({
           "-=0.5"
         );
 
-      // Continuous Ambient Floating Loops
+      // Continuous Ambient Floating & Emblem Pulsing
       gsap.to(ambientGlowRef.current, {
         scale: 1.3,
-        opacity: 0.45,
+        opacity: 0.5,
         duration: 4,
         repeat: -1,
         yoyo: true,
@@ -107,10 +107,18 @@ export default function GSAPIntroLoader({
       });
 
       gsap.to(particleLightRef.current, {
-        opacity: 0.6,
+        opacity: 0.65,
         x: 18,
         y: -12,
         duration: 5,
+        repeat: -1,
+        yoyo: true,
+        ease: "sine.inOut",
+      });
+
+      gsap.to(emblemWrapperRef.current, {
+        y: -6,
+        duration: 2.5,
         repeat: -1,
         yoyo: true,
         ease: "sine.inOut",
@@ -146,7 +154,7 @@ export default function GSAPIntroLoader({
         scale: 1.05,
         opacity: 0,
         filter: "blur(14px)",
-        duration: 0.6,
+        duration: 0.55,
         ease: "power2.inOut",
       })
       .to(
@@ -167,22 +175,22 @@ export default function GSAPIntroLoader({
       ref={overlayRef}
       className="fixed inset-0 z-[9999] bg-[#07120f] text-[#f7f4ea] flex flex-col items-center justify-center overflow-hidden select-none will-change-transform font-sans"
     >
-      {/* Background Radial Glow */}
+      {/* Background Radial Gold & Emerald Glow */}
       <div
         ref={ambientGlowRef}
-        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[70vw] h-[70vw] max-w-[650px] max-h-[650px] rounded-full bg-gradient-to-tr from-[#D4AF37]/20 via-[#F5D061]/15 to-emerald-700/10 filter blur-[90px] pointer-events-none"
+        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[75vw] h-[75vw] max-w-[680px] max-h-[680px] rounded-full bg-gradient-to-tr from-[#D4AF37]/25 via-[#F5D061]/20 to-emerald-700/15 filter blur-[95px] pointer-events-none"
       />
 
       {/* Particle Light */}
       <div
         ref={particleLightRef}
-        className="absolute top-1/4 right-1/4 w-48 h-48 rounded-full bg-[#F5D061]/20 filter blur-[50px] pointer-events-none"
+        className="absolute top-1/4 right-1/4 w-52 h-52 rounded-full bg-[#F5D061]/25 filter blur-[55px] pointer-events-none"
       />
 
       {/* Decorative Outer Golden Frame */}
       <div
         ref={frameRef}
-        className="absolute inset-4 sm:inset-6 border border-[#D4AF37]/30 rounded-3xl pointer-events-none z-10"
+        className="absolute inset-4 sm:inset-6 border border-[#D4AF37]/35 rounded-3xl pointer-events-none z-10"
       />
 
       {/* Top Right Skip Button */}
@@ -191,7 +199,7 @@ export default function GSAPIntroLoader({
           ref={skipBtnRef}
           type="button"
           onClick={handleFinish}
-          className="px-4 py-2 bg-[#041710]/80 hover:bg-[#062118] text-[#F5D061] rounded-full text-xs font-extrabold backdrop-blur-md border border-[#D4AF37]/40 shadow-xl transition-all flex items-center gap-1.5 active:scale-95 cursor-pointer"
+          className="px-4 py-2 bg-[#041710]/80 hover:bg-[#062118] text-[#F5D061] rounded-full text-xs font-extrabold backdrop-blur-md border border-[#D4AF37]/45 shadow-xl transition-all flex items-center gap-1.5 active:scale-95 cursor-pointer"
         >
           <span>Lewati Intro</span>
           <SkipForward className="w-3.5 h-3.5" />
@@ -201,34 +209,39 @@ export default function GSAPIntroLoader({
       {/* Center Main Content Card */}
       <div
         ref={cardRef}
-        className="relative z-20 w-[92vw] max-w-[500px] p-6 sm:p-10 rounded-3xl bg-gradient-to-b from-[#062118]/90 via-[#041710]/95 to-[#030e0b]/98 border border-[#D4AF37]/45 shadow-2xl backdrop-blur-xl text-center flex flex-col items-center justify-center"
+        className="relative z-20 w-[90vw] max-w-[480px] p-6 sm:p-9 rounded-3xl bg-gradient-to-b from-[#062118]/92 via-[#041710]/96 to-[#030e0b]/99 border border-[#D4AF37]/50 shadow-2xl backdrop-blur-xl text-center flex flex-col items-center justify-center"
       >
-        {/* Subtle Top Badge */}
+        {/* Top Badge */}
         <div
           data-intro-text
-          className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-[#D4AF37]/15 border border-[#D4AF37]/35 text-[11px] font-bold text-[#F5D061] mb-5 shadow-xs"
+          className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-[#D4AF37]/15 border border-[#D4AF37]/40 text-[11px] font-bold text-[#F5D061] mb-4 shadow-xs"
         >
           <ShieldCheck className="w-3.5 h-3.5 text-[#F5D061]" />
           <span>VTU OPERATIONAL SYSTEM</span>
         </div>
 
-        {/* Vauza Tamma Official Brand Logo Image */}
+        {/* Vauza Tamma Emblem Logo (Isolated Green/Gold Checkmark & 5 Red Spheres) */}
         <div
-          ref={logoWrapperRef}
-          className="relative w-full max-w-[320px] aspect-[4/3] my-2 flex items-center justify-center rounded-2xl bg-white p-4 sm:p-5 shadow-2xl border-2 border-[#D4AF37]/60"
+          ref={emblemWrapperRef}
+          className="relative w-36 h-36 sm:w-44 sm:h-44 my-2 flex items-center justify-center rounded-full bg-gradient-to-tr from-[#062118] via-[#0E4334] to-[#041710] p-4 shadow-2xl border-2 border-[#D4AF37]/60"
         >
-          <Image
-            src="/images/vauza-tamma-logo.png"
-            alt="Vauza Tamma Logo — Berkhidmat Untuk Umat"
-            fill
-            sizes="(max-width: 640px) 280px, 320px"
-            priority
-            className="object-contain p-2"
-          />
+          {/* Subtle Radial Golden Halo Ring Behind Emblem */}
+          <div className="absolute inset-0 rounded-full bg-radial from-[#F5D061]/25 via-[#D4AF37]/10 to-transparent blur-md pointer-events-none" />
+
+          <div className="relative w-full h-full">
+            <Image
+              src="/images/vauza-tamma-emblem.png"
+              alt="Vauza Tamma Emblem"
+              fill
+              sizes="(max-width: 640px) 144px, 176px"
+              priority
+              className="object-contain p-1 filter drop-shadow-[0_4px_12px_rgba(212,175,55,0.35)]"
+            />
+          </div>
         </div>
 
         {/* Brand Text Content */}
-        <div ref={textContentRef} className="mt-5 space-y-2">
+        <div ref={textContentRef} className="mt-4 space-y-1.5">
           <p
             data-intro-text
             className="text-xs sm:text-sm font-semibold tracking-wider text-emerald-200/90 flex items-center justify-center gap-1.5"
@@ -240,24 +253,24 @@ export default function GSAPIntroLoader({
 
           <h1
             data-intro-text
-            className="text-xl sm:text-2xl font-black text-white tracking-tight drop-shadow-md font-serif"
+            className="text-2xl sm:text-3xl font-black tracking-tight drop-shadow-md font-serif text-white"
           >
-            Vauza Tamma <span className="text-[#F5D061]">Travel</span>
+            Vauza Tamma <span className="bg-gradient-to-r from-[#F5D061] via-[#D4AF37] to-[#B8860B] bg-clip-text text-transparent">Travel</span>
           </h1>
 
-          <p data-intro-text className="text-[11px] sm:text-xs text-[#F5D061]/80 font-bold uppercase tracking-widest pt-1">
+          <p data-intro-text className="text-[11px] sm:text-xs text-[#F5D061]/85 font-extrabold uppercase tracking-widest pt-0.5">
             ✦ ONO REGO — ONO RUPO ✦
           </p>
         </div>
 
         {/* Loading Progress Bar */}
-        <div data-intro-text className="w-full max-w-[200px] h-1.5 bg-[#030e0b] rounded-full overflow-hidden border border-[#D4AF37]/30 mt-6">
+        <div data-intro-text className="w-full max-w-[180px] h-1.5 bg-[#030e0b] rounded-full overflow-hidden border border-[#D4AF37]/35 mt-6">
           <div className="h-full bg-gradient-to-r from-[#F5D061] via-[#D4AF37] to-[#B8860B] rounded-full animate-pulse w-full" />
         </div>
       </div>
 
       {/* Footer Blessing Text */}
-      <div data-intro-text className="relative z-20 mt-6 text-center text-[#F5D061]/70 text-xs font-serif">
+      <div data-intro-text className="relative z-20 mt-5 text-center text-[#F5D061]/75 text-xs font-serif">
         <span>خَتَمَ اللهُ لَنَا وَلَكُمْ بِالْخَيْرِ</span>
       </div>
     </div>
