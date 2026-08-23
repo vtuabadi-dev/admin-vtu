@@ -781,7 +781,7 @@ export default function WakafQuranRegisterPage() {
                           max={1000}
                           value={formData.jumlahMushaf}
                           onChange={(e) => setFormData((p) => ({ ...p, jumlahMushaf: Math.max(1, parseInt(e.target.value, 10) || 1) }))}
-                          className="text-center font-extrabold text-sm h-10 bg-white border-stone-300 rounded-xl flex-1"
+                          className="text-center font-black text-sm h-10 bg-white text-slate-950 border-stone-300 rounded-xl flex-1"
                         />
                         <button
                           type="button"

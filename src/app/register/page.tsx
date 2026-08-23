@@ -1219,10 +1219,10 @@ export default function RegisterPage() {
                 type="button"
                 onClick={() => setPaxCount((prev) => Math.max(MIN_GROUP_SIZE, prev - 1))}
                 disabled={paxCount <= MIN_GROUP_SIZE}
-                className="w-14 h-14 rounded-xl border-2 border-gray-200 flex items-center justify-center text-gray-600 hover:border-blue-400 hover:text-blue-600 disabled:opacity-30 disabled:cursor-not-allowed transition-colors active:scale-95"
+                className="w-14 h-14 rounded-xl border-2 border-stone-300 bg-white flex items-center justify-center text-slate-800 hover:border-emerald-600 hover:text-emerald-700 disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow-xs active:scale-95 cursor-pointer"
                 aria-label="Kurangi jumlah"
               >
-                <Minus className="w-6 h-6" />
+                <Minus className="w-6 h-6 stroke-[3]" />
               </button>
 
               <div className="text-center">
@@ -1240,23 +1240,23 @@ export default function RegisterPage() {
                     }
                   }}
                   className={cn(
-                    "w-24 h-14 text-center text-2xl font-bold rounded-xl border-2",
-                    "focus:outline-none focus:ring-2 focus:ring-blue-500",
-                    errors.paxCount ? "border-red-300" : "border-gray-200"
+                    "w-24 h-14 text-center text-3xl font-black rounded-xl border-2 bg-white text-slate-950 shadow-sm",
+                    "focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-emerald-600",
+                    errors.paxCount ? "border-red-500 text-red-600" : "border-stone-300"
                   )}
                   style={{ MozAppearance: "textfield" }}
                 />
-                <p className="text-xs text-gray-400 mt-1">orang</p>
+                <p className="text-xs text-slate-800 font-extrabold mt-1.5 uppercase tracking-wider">orang</p>
               </div>
 
               <button
                 type="button"
                 onClick={() => setPaxCount((prev) => Math.min(MAX_GROUP_SIZE, prev + 1))}
                 disabled={paxCount >= MAX_GROUP_SIZE}
-                className="w-14 h-14 rounded-xl border-2 border-gray-200 flex items-center justify-center text-gray-600 hover:border-blue-400 hover:text-blue-600 disabled:opacity-30 disabled:cursor-not-allowed transition-colors active:scale-95"
+                className="w-14 h-14 rounded-xl border-2 border-stone-300 bg-white flex items-center justify-center text-slate-800 hover:border-emerald-600 hover:text-emerald-700 disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow-xs active:scale-95 cursor-pointer"
                 aria-label="Tambah jumlah"
               >
-                <Plus className="w-6 h-6" />
+                <Plus className="w-6 h-6 stroke-[3]" />
               </button>
             </div>
 
