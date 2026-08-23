@@ -1562,17 +1562,17 @@ export default function RegisterPage() {
                           }
                         }
                       }}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                      className="w-full px-3 py-2 border border-stone-300 rounded-lg text-sm font-bold text-slate-950 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-600 cursor-pointer shadow-xs"
                     >
-                      <option value="">Pilih hubungan...</option>
-                      <option value="Suami">Suami</option>
-                      <option value="Istri">Istri</option>
-                      <option value="Ayah / Ibu">Ayah / Ibu</option>
-                      <option value="Anak">Anak</option>
-                      <option value="Kakak / Adik">Kakak / Adik</option>
-                      <option value="Keluarga / Mahram">Keluarga / Mahram</option>
-                      <option value="Teman / Rekan">Teman / Rekan</option>
-                      <option value="Lainnya">Lainnya</option>
+                      <option value="" className="text-slate-950 bg-white font-extrabold py-2">Pilih hubungan...</option>
+                      <option value="Suami" className="text-slate-950 bg-white font-bold py-1.5">Suami</option>
+                      <option value="Istri" className="text-slate-950 bg-white font-bold py-1.5">Istri</option>
+                      <option value="Ayah / Ibu" className="text-slate-950 bg-white font-bold py-1.5">Ayah / Ibu</option>
+                      <option value="Anak" className="text-slate-950 bg-white font-bold py-1.5">Anak</option>
+                      <option value="Kakak / Adik" className="text-slate-950 bg-white font-bold py-1.5">Kakak / Adik</option>
+                      <option value="Keluarga / Mahram" className="text-slate-950 bg-white font-bold py-1.5">Keluarga / Mahram</option>
+                      <option value="Teman / Rekan" className="text-slate-950 bg-white font-bold py-1.5">Teman / Rekan</option>
+                      <option value="Lainnya" className="text-slate-950 bg-white font-bold py-1.5">Lainnya</option>
                     </select>
                   </div>
                 )}
@@ -1615,18 +1615,18 @@ export default function RegisterPage() {
                       }
                     }}
                     className={cn(
-                      "w-full px-4 py-3 border rounded-xl text-sm font-medium transition-colors bg-white shadow-sm",
-                      "focus:outline-none focus:ring-2 focus:ring-blue-500",
-                      errors.paket ? "border-red-400 bg-red-50/30" : "border-gray-300"
+                      "w-full px-4 py-3 border rounded-xl text-sm font-bold text-slate-950 bg-white shadow-sm transition-colors cursor-pointer",
+                      "focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-emerald-600",
+                      errors.paket ? "border-red-500 bg-red-50/30 text-red-600" : "border-stone-300"
                     )}
                   >
-                    <option value="">-- Pilih Nama Paket Umroh --</option>
+                    <option value="" className="text-slate-950 bg-white font-extrabold py-2">-- Pilih Nama Paket Umroh --</option>
                     {paketList
                       .filter((p) => p.status !== "cancelled")
                       .map((p) => {
                         const name = p.namaPaket || p.paketUmroh?.namaPaket || p.kode;
                         return (
-                          <option key={p.id} value={p.id}>
+                          <option key={p.id} value={p.id} className="text-slate-950 bg-white font-bold py-2">
                             {name}
                           </option>
                         );
@@ -2110,14 +2110,14 @@ export default function RegisterPage() {
                                                     prev.map((item, i) => (i === idx ? { ...item, tipeKamar: val } : item))
                                                   );
                                                 }}
-                                                className="px-2.5 py-1.5 border border-gray-300 rounded-lg text-xs font-semibold text-slate-800 bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                                                className="px-2.5 py-1.5 border border-stone-300 rounded-lg text-xs font-bold text-slate-950 bg-white focus:ring-2 focus:ring-emerald-600 focus:outline-none cursor-pointer"
                                               >
-                                                <option value="mix">MIX (Kamar Travel - Base +Rp0)</option>
-                                                <option value="quad">QUAD (4 Pax - Base +Rp0)</option>
-                                                <option value="triple">
+                                                <option value="mix" className="text-slate-950 bg-white font-bold py-1.5">MIX (Kamar Travel - Base +Rp0)</option>
+                                                <option value="quad" className="text-slate-950 bg-white font-bold py-1.5">QUAD (4 Pax - Base +Rp0)</option>
+                                                <option value="triple" className="text-slate-950 bg-white font-bold py-1.5">
                                                   TRIPLE (3 Pax - +Rp {upgradeTriple.toLocaleString("id-ID")})
                                                 </option>
-                                                <option value="double">
+                                                <option value="double" className="text-slate-950 bg-white font-bold py-1.5">
                                                   DOUBLE (2 Pax - +Rp {upgradeDouble.toLocaleString("id-ID")})
                                                 </option>
                                               </select>

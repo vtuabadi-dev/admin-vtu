@@ -855,11 +855,11 @@ export default function WakafQuranRegisterPage() {
                       <select
                         value={formData.lokasiWakaf}
                         onChange={(e) => setFormData((p) => ({ ...p, lokasiWakaf: e.target.value }))}
-                        className="w-full h-10 px-3 rounded-xl border border-stone-300 bg-white text-xs font-bold text-stone-800 focus:ring-2 focus:ring-emerald-500"
+                        className="w-full h-10 px-3 rounded-xl border border-stone-300 bg-white text-xs font-bold text-slate-950 focus:ring-2 focus:ring-emerald-500 cursor-pointer shadow-xs"
                       >
-                        <option value="Masjidil Haram Makkah Al-Mukarramah">Masjidil Haram Makkah Al-Mukarramah</option>
-                        <option value="Masjid Nabawi Madinah Al-Munawwarah">Masjid Nabawi Madinah Al-Munawwarah</option>
-                        <option value="Pesantren & Masjid Pelosok">Pesantren &amp; Masjid Pelosok Nusantara</option>
+                        <option value="Masjidil Haram Makkah Al-Mukarramah" className="text-slate-950 bg-white font-bold py-1.5">Masjidil Haram Makkah Al-Mukarramah</option>
+                        <option value="Masjid Nabawi Madinah Al-Munawwarah" className="text-slate-950 bg-white font-bold py-1.5">Masjid Nabawi Madinah Al-Munawwarah</option>
+                        <option value="Pesantren & Masjid Pelosok" className="text-slate-950 bg-white font-bold py-1.5">Pesantren &amp; Masjid Pelosok Nusantara</option>
                       </select>
                     </div>
                   </div>
