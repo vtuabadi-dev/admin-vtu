@@ -541,7 +541,7 @@ export default function WakafQuranRegisterPage() {
         </div>
 
         {/* ── Step Indicator ── */}
-        <div data-wakaf-portal-elem className="bg-gradient-to-r from-white/85 via-white/55 to-[#041710]/90 backdrop-blur-xl p-4 sm:p-5 rounded-2xl border-t border-l border-white/80 border-b border-r border-[#D4AF37]/50 shadow-[0_20px_40px_-15px_rgba(0,0,0,0.35)] overflow-x-auto">
+        <div data-wakaf-portal-elem className="bg-gradient-to-r from-white/60 via-white/35 to-[#041710]/70 backdrop-blur-md p-4 sm:p-5 rounded-2xl border-t border-l border-white/70 border-b border-r border-[#D4AF37]/40 shadow-[0_20px_40px_-15px_rgba(0,0,0,0.3)] overflow-x-auto">
           <div className="flex items-start justify-between min-w-[320px] px-1 sm:px-3">
             {steps.map((s, i) => {
               const Icon = s.icon;
