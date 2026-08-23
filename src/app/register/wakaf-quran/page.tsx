@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
+import gsap from "gsap";
 import {
   ArrowLeft,
   CheckCircle2,
@@ -41,7 +42,45 @@ const formatRupiah = (val: number) => {
 };
 
 export default function WakafQuranRegisterPage() {
+  const containerRef = useRef<HTMLDivElement | null>(null);
   const [hargaWakaf, setHargaWakaf] = useState<number>(350000);
+
+  // Preload background artwork immediately during intro web start & run GSAP stagger reveal on complete
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    // Immediate image preloading during intro web
+    const img = new window.Image();
+    img.src = "/images/wakaf-quran-bg.jpg";
+
+    const runEntranceAnimation = () => {
+      if (!containerRef.current) return;
+      const elements = containerRef.current.querySelectorAll("[data-wakaf-portal-elem]");
+      if (elements.length > 0) {
+        gsap.fromTo(
+          elements,
+          { opacity: 0, y: 18, filter: "blur(4px)" },
+          { opacity: 1, y: 0, filter: "blur(0px)", duration: 0.75, stagger: 0.08, ease: "power2.out" }
+        );
+      }
+    };
+
+    const played = sessionStorage.getItem("vtu_intro_played");
+    const hasPendingClass = document.documentElement.classList.contains("intro-pending");
+
+    if (played || !hasPendingClass) {
+      runEntranceAnimation();
+    }
+
+    const handleIntroComplete = () => {
+      runEntranceAnimation();
+    };
+
+    window.addEventListener("vtu:intro-complete", handleIntroComplete);
+    return () => {
+      window.removeEventListener("vtu:intro-complete", handleIntroComplete);
+    };
+  }, []);
 
   useEffect(() => {
     fetch("/api/master/harga-layanan")
@@ -474,7 +513,7 @@ export default function WakafQuranRegisterPage() {
   }
 
   return (
-    <div className="w-full max-w-4xl mx-auto relative">
+    <div ref={containerRef} className="w-full max-w-4xl mx-auto relative">
       {/* ── Background Makkah & Madinah Golden Canvas Artwork ── */}
       <div
         className="fixed inset-0 bg-cover bg-center bg-no-repeat pointer-events-none z-0"
@@ -482,12 +521,14 @@ export default function WakafQuranRegisterPage() {
       />
       <div className="fixed inset-0 bg-black/10 pointer-events-none z-0" />
 
-      <div className="relative z-10">
+      <div className="relative z-10 space-y-6">
         {/* ── Floating Unified Portal Switcher Bar ── */}
-        <PortalSwitcherNav />
+        <div data-wakaf-portal-elem>
+          <PortalSwitcherNav />
+        </div>
 
         {/* ── Top Header ── */}
-        <div className="text-center mb-6 bg-gradient-to-b from-white/20 to-white/05 backdrop-blur-[4px] p-6 rounded-3xl border-t border-l border-white/90 border-b border-r border-slate-900/25 shadow-[inset_1px_1px_2px_rgba(255,255,255,0.9),inset_-1px_-1px_3px_rgba(0,0,0,0.1),0_15px_35px_-10px_rgba(0,0,0,0.2)]">
+        <div data-wakaf-portal-elem className="text-center bg-gradient-to-b from-white/20 to-white/05 backdrop-blur-[4px] p-6 rounded-3xl border-t border-l border-white/90 border-b border-r border-slate-900/25 shadow-[inset_1px_1px_2px_rgba(255,255,255,0.9),inset_-1px_-1px_3px_rgba(0,0,0,0.1),0_15px_35px_-10px_rgba(0,0,0,0.2)]">
           <div className="inline-flex items-center justify-center h-12 w-12 rounded-2xl bg-gradient-to-tr from-emerald-800 to-teal-700 text-white shadow-md shadow-emerald-900/30 mb-2">
             <BookOpen className="h-6 w-6" />
           </div>
@@ -500,7 +541,7 @@ export default function WakafQuranRegisterPage() {
         </div>
 
         {/* ── Step Indicator ── */}
-        <div className="bg-white/95 backdrop-blur-md p-4 sm:p-5 rounded-2xl border border-stone-200/90 shadow-lg mb-6 overflow-x-auto">
+        <div data-wakaf-portal-elem className="bg-white/95 backdrop-blur-md p-4 sm:p-5 rounded-2xl border border-stone-200/90 shadow-lg overflow-x-auto">
           <div className="flex items-start justify-between min-w-[320px] px-1 sm:px-3">
             {steps.map((s, i) => {
               const Icon = s.icon;
@@ -544,7 +585,7 @@ export default function WakafQuranRegisterPage() {
 
         {/* ── Main Form Container ── */}
         <form onSubmit={handleSubmit}>
-          <div className="bg-gradient-to-b from-white/30 to-white/10 backdrop-blur-[4px] p-6 sm:p-8 rounded-3xl border-t border-l border-white/90 border-b border-r border-slate-900/25 shadow-[inset_1px_1px_2px_rgba(255,255,255,0.9),inset_-1px_-1px_3px_rgba(0,0,0,0.1),0_15px_35px_-10px_rgba(0,0,0,0.2)] space-y-6">
+          <div data-wakaf-portal-elem className="bg-gradient-to-b from-white/30 to-white/10 backdrop-blur-[4px] p-6 sm:p-8 rounded-3xl border-t border-l border-white/90 border-b border-r border-slate-900/25 shadow-[inset_1px_1px_2px_rgba(255,255,255,0.9),inset_-1px_-1px_3px_rgba(0,0,0,0.1),0_15px_35px_-10px_rgba(0,0,0,0.2)] space-y-6">
             {/* ══════════════════════════════════════════════════════════
                 LANGKAH 1: VERIFIKASI STATUS KEJAMAAHAN
             ══════════════════════════════════════════════════════════ */}
