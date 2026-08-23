@@ -1412,9 +1412,9 @@ export default function RegisterPage() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Jenis Kelamin</label>
-                  <div className="flex gap-3">
-                    <label className="flex items-center gap-2 cursor-pointer">
+                  <label className="block text-xs font-bold text-slate-800 mb-1.5">Jenis Kelamin</label>
+                  <div className="flex gap-3 sm:gap-4">
+                    <label className="flex items-center gap-2 px-3.5 py-2 rounded-xl border border-stone-300 bg-white hover:bg-stone-50 cursor-pointer shadow-xs transition-all">
                       <input
                         id={`member_${i}_gender_L`}
                         type="radio"
@@ -1429,11 +1429,11 @@ export default function RegisterPage() {
                             if (nextElem) nextElem.focus();
                           }
                         }}
-                        className="text-blue-600 focus:ring-blue-500"
+                        className="h-4 w-4 text-emerald-700 border-stone-300 focus:ring-emerald-600 cursor-pointer"
                       />
-                      <span className="text-sm">Laki-laki</span>
+                      <span className="text-sm font-extrabold text-slate-950">Laki-laki</span>
                     </label>
-                    <label className="flex items-center gap-2 cursor-pointer">
+                    <label className="flex items-center gap-2 px-3.5 py-2 rounded-xl border border-stone-300 bg-white hover:bg-stone-50 cursor-pointer shadow-xs transition-all">
                       <input
                         id={`member_${i}_gender_P`}
                         type="radio"
@@ -1448,9 +1448,9 @@ export default function RegisterPage() {
                             if (nextElem) nextElem.focus();
                           }
                         }}
-                        className="text-blue-600 focus:ring-blue-500"
+                        className="h-4 w-4 text-emerald-700 border-stone-300 focus:ring-emerald-600 cursor-pointer"
                       />
-                      <span className="text-sm">Perempuan</span>
+                      <span className="text-sm font-extrabold text-slate-950">Perempuan</span>
                     </label>
                   </div>
                 </div>
