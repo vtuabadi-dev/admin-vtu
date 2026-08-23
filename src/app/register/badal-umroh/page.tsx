@@ -488,7 +488,7 @@ export default function BadalUmrohRegisterPage() {
         </div>
 
       {/* ── Step Indicator ── */}
-      <div className="bg-gradient-to-r from-white/60 via-white/35 to-[#041710]/70 backdrop-blur-md p-4 sm:p-5 rounded-2xl border-t border-l border-white/70 border-b border-r border-[#D4AF37]/40 shadow-[0_20px_40px_-15px_rgba(0,0,0,0.3)] mb-6 overflow-x-auto">
+      <div className="bg-gradient-to-r from-white/60 via-white/35 to-[#041710]/70 backdrop-blur-md p-4 sm:p-5 rounded-2xl border-t border-l border-white/90 border-b border-r border-slate-900/35 shadow-[inset_1.5px_1.5px_3px_rgba(255,255,255,0.95),inset_-1.5px_-1.5px_4px_rgba(0,0,0,0.35),0_20px_40px_-15px_rgba(0,0,0,0.35)] mb-6 overflow-x-auto">
         <div className="flex items-start justify-between min-w-[320px] px-1 sm:px-3">
           {steps.map((s, i) => {
             const Icon = s.icon;
