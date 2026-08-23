@@ -51,7 +51,7 @@ export default function WakafQuranRegisterPage() {
 
     // Immediate image preloading during intro web
     const img = new window.Image();
-    img.src = "/images/wakaf-quran-bg.jpg";
+    img.src = "/images/bg-makkah-madinah-canvas.jpg";
 
     const runEntranceAnimation = () => {
       if (!containerRef.current) return;
@@ -59,8 +59,8 @@ export default function WakafQuranRegisterPage() {
       if (elements.length > 0) {
         gsap.fromTo(
           elements,
-          { opacity: 0, y: 18, filter: "blur(4px)" },
-          { opacity: 1, y: 0, filter: "blur(0px)", duration: 0.75, stagger: 0.08, ease: "power2.out" }
+          { opacity: 0, y: 10 },
+          { opacity: 1, y: 0, duration: 0.4, stagger: 0.04, ease: "power2.out", clearProps: "all" }
         );
       }
     };
@@ -419,9 +419,13 @@ export default function WakafQuranRegisterPage() {
     return (
       <div className="w-full max-w-4xl mx-auto relative">
         {/* ── Background Makkah & Madinah Golden Canvas Artwork ── */}
-        <div
-          className="fixed inset-0 bg-cover bg-center bg-no-repeat pointer-events-none z-0"
-          style={{ backgroundImage: `url('/images/wakaf-quran-bg.jpg')` }}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/images/bg-makkah-madinah-canvas.jpg"
+          alt="Makkah & Madinah Canvas Artwork"
+          loading="eager"
+          fetchPriority="high"
+          className="fixed inset-0 w-full h-full object-cover object-center pointer-events-none z-0"
         />
         <div className="fixed inset-0 bg-black/10 pointer-events-none z-0" />
 
@@ -515,9 +519,13 @@ export default function WakafQuranRegisterPage() {
   return (
     <div ref={containerRef} className="w-full max-w-4xl mx-auto relative">
       {/* ── Background Makkah & Madinah Golden Canvas Artwork ── */}
-      <div
-        className="fixed inset-0 bg-cover bg-center bg-no-repeat pointer-events-none z-0"
-        style={{ backgroundImage: `url('/images/wakaf-quran-bg.jpg')` }}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src="/images/bg-makkah-madinah-canvas.jpg"
+        alt="Makkah & Madinah Canvas Artwork"
+        loading="eager"
+        fetchPriority="high"
+        className="fixed inset-0 w-full h-full object-cover object-center pointer-events-none z-0"
       />
       <div className="fixed inset-0 bg-black/10 pointer-events-none z-0" />
 
