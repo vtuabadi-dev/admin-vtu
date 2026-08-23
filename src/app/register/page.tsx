@@ -1474,7 +1474,7 @@ export default function RegisterPage() {
                   </div>
 
                   <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                    <label className="block text-xs font-bold text-slate-800 mb-1.5">
                       Tanggal Lahir
                     </label>
                     <input
@@ -1482,6 +1482,7 @@ export default function RegisterPage() {
                       type="date"
                       value={member.tanggalLahir || ""}
                       onChange={(e) => updateMember(i, "tanggalLahir", e.target.value)}
+                      style={{ colorScheme: "light" }}
                       onKeyDown={(e) => {
                         if (e.key === "Enter") {
                           e.preventDefault();
@@ -1498,9 +1499,10 @@ export default function RegisterPage() {
                         }
                       }}
                       className={cn(
-                        "w-full px-3 py-2 border rounded-lg text-sm transition-colors",
-                        "focus:outline-none focus:ring-2 focus:ring-blue-500 border-gray-300",
-                        errors[`member_${i}_tglLahir`] ? "border-red-300" : ""
+                        "w-full h-11 px-3.5 py-2 border rounded-xl text-sm font-semibold text-slate-950 bg-white border-stone-300 shadow-xs transition-colors",
+                        "[color-scheme:light]",
+                        "focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-emerald-600",
+                        errors[`member_${i}_tglLahir`] ? "border-red-400 ring-1 ring-red-400" : ""
                       )}
                     />
                     {member.tanggalLahir && (() => {
