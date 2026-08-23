@@ -91,7 +91,7 @@ export const registrationRepo = {
     signedAt?: Date;
     leadStatus?: string;
     status: string;
-    members: { namaLengkap: string; jenisKelamin: string; tanggalLahir?: string | undefined; hubungan?: string | undefined; urutan: number }[];
+    members: { namaLengkap: string; jenisKelamin: string; tempatLahir?: string | undefined; tanggalLahir?: string | undefined; hubungan?: string | undefined; urutan: number }[];
   }) {
     const row = await prisma.registrationRequest.create({
       data: {

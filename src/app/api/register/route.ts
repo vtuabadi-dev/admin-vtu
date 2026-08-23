@@ -136,6 +136,7 @@ export async function POST(request: NextRequest) {
     const members = body.members.map((m, i) => ({
       namaLengkap: m.namaLengkap.toUpperCase().trim(),
       jenisKelamin: m.jenisKelamin,
+      tempatLahir: m.tempatLahir ? m.tempatLahir.toUpperCase().trim() : undefined,
       tanggalLahir: m.tanggalLahir || undefined,
       hubungan: m.hubungan ?? null,
       urutan: i + 1,

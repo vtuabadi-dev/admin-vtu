@@ -236,7 +236,7 @@ function CityCombobox({
             onChange(e.target.value.toUpperCase());
             if (!isOpen) setIsOpen(true);
           }}
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm uppercase transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 pr-8 bg-white font-bold text-gray-900 placeholder:text-gray-400 placeholder:font-normal placeholder:normal-case"
+          className="w-full h-11 px-3.5 py-2 border border-stone-300 rounded-xl text-sm font-bold uppercase transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-emerald-600 pr-8 bg-white text-slate-950 shadow-xs placeholder:text-gray-400 placeholder:font-normal placeholder:normal-case"
           placeholder={placeholder}
         />
         <ChevronDown
@@ -899,6 +899,7 @@ export default function RegisterPage() {
           members: members.map((m) => ({
             namaLengkap: m.namaLengkap,
             jenisKelamin: m.jenisKelamin,
+            tempatLahir: m.tempatLahir ? m.tempatLahir.trim().toUpperCase() : undefined,
             tanggalLahir: m.tanggalLahir || undefined,
             hubungan: m.hubungan || undefined,
           })),
@@ -1458,7 +1459,7 @@ export default function RegisterPage() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                    <label className="block text-xs font-bold text-slate-800 mb-1.5">
                       Tempat Lahir
                     </label>
                     <CityCombobox

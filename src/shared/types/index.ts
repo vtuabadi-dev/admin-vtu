@@ -858,6 +858,7 @@ export interface GroupRegistrationFormData {
   members: {
     namaLengkap: string;
     jenisKelamin: JenisKelamin;
+    tempatLahir?: string;
     tanggalLahir?: string;
     hubungan?: string;
   }[];
