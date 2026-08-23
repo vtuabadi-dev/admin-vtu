@@ -32,15 +32,15 @@ export function GSAPProvider({ children }: { children: React.ReactNode }) {
       gsap.fromTo(
         pageWrapperRef.current,
         {
-          opacity: 0,
-          y: 12,
-          scale: 0.994,
+          opacity: 0.25,
+          y: 6,
+          scale: 0.997,
         },
         {
           opacity: 1,
           y: 0,
           scale: 1,
-          duration: 0.35,
+          duration: 0.26,
           ease: "power2.out",
           clearProps: "transform",
         }
@@ -50,7 +50,7 @@ export function GSAPProvider({ children }: { children: React.ReactNode }) {
     return () => ctx.revert();
   }, [pathname]);
 
-  // ── Pure Direct GSAP Page Crossfade Transition (No Modals, No Cards) ──
+  // ── Pure Direct GSAP Page Crossfade Transition ──
   const navigateTo = useCallback(
     (href: string) => {
       if (href === pathname) return;
@@ -60,10 +60,10 @@ export function GSAPProvider({ children }: { children: React.ReactNode }) {
       // Phase 1: Smooth direct page fade-out
       if (pageWrapperRef.current) {
         gsap.to(pageWrapperRef.current, {
-          opacity: 0,
-          y: -8,
-          scale: 0.99,
-          duration: 0.18,
+          opacity: 0.25,
+          y: -4,
+          scale: 0.997,
+          duration: 0.14,
           ease: "power2.inOut",
           onComplete: () => {
             // Phase 2: Route Push

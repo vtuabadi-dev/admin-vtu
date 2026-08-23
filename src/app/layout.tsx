@@ -28,7 +28,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="id" className="light">
+    <html lang="id" className="dark bg-[#07120f]">
       <head>
         <script
           dangerouslySetInnerHTML={{
@@ -42,7 +42,7 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body className="min-h-screen bg-background font-sans antialiased">
+      <body className="min-h-screen bg-[#07120f] text-[#f7f4ea] font-sans antialiased selection:bg-[#D4AF37]/30 selection:text-[#F5D061]">
         <AppIntroWrapper>{children}</AppIntroWrapper>
       </body>
     </html>
