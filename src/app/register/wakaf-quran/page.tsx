@@ -382,7 +382,7 @@ export default function WakafQuranRegisterPage() {
         {/* ── Background Makkah & Madinah Golden Canvas Artwork ── */}
         <div
           className="fixed inset-0 bg-cover bg-center bg-no-repeat pointer-events-none z-0"
-          style={{ backgroundImage: `url('/images/bg-makkah-madinah-canvas.jpg')` }}
+          style={{ backgroundImage: `url('/images/wakaf-quran-bg.jpg')` }}
         />
         <div className="fixed inset-0 bg-black/10 pointer-events-none z-0" />
 
@@ -478,7 +478,7 @@ export default function WakafQuranRegisterPage() {
       {/* ── Background Makkah & Madinah Golden Canvas Artwork ── */}
       <div
         className="fixed inset-0 bg-cover bg-center bg-no-repeat pointer-events-none z-0"
-        style={{ backgroundImage: `url('/images/bg-makkah-madinah-canvas.jpg')` }}
+        style={{ backgroundImage: `url('/images/wakaf-quran-bg.jpg')` }}
       />
       <div className="fixed inset-0 bg-black/10 pointer-events-none z-0" />
 
