@@ -141,23 +141,28 @@ const FALLBACK_OPERATIONAL_TERMS: string[] = [
 export async function generateRegistrationPdf(data: PdfData): Promise<Buffer> {
   const { registration: reg, packageInfo } = data;
 
-  // Load signature image if available
-  let signatureBuffer: Buffer | null = null;
-  if (reg.signaturePath) {
+  // Load signature image if available (supports direct base64 dataUrl, raw base64, buffer, or storage path)
+  let signatureBuffer: Buffer | null = (data as any).signatureBuffer || null;
+  const rawSig = (data as any).signatureBase64 || (reg as any).signatureBase64 || reg.signaturePath;
+
+  if (!signatureBuffer && rawSig) {
     try {
-      if (reg.signaturePath.startsWith("data:image")) {
-        // base64 inline — extract raw buffer
-        const base64Data = reg.signaturePath.split(",")[1];
+      if (rawSig.startsWith("data:image")) {
+        // base64 inline Data URL — extract raw buffer
+        const base64Data = rawSig.split(",")[1];
         if (base64Data) signatureBuffer = Buffer.from(base64Data, "base64");
+      } else if (rawSig.length > 500 && !rawSig.includes("/") && !rawSig.includes("\\")) {
+        // Raw base64 string
+        signatureBuffer = Buffer.from(rawSig, "base64");
       } else {
         try {
           const storage = getStorageAdapter();
-          signatureBuffer = await storage.download(reg.signaturePath);
+          signatureBuffer = await storage.download(rawSig);
         } catch {
           try {
             const { createLocalAdapter } = await import("@/server/storage/local");
             const localAdapter = createLocalAdapter();
-            signatureBuffer = await localAdapter.download(reg.signaturePath);
+            signatureBuffer = await localAdapter.download(rawSig);
           } catch {
             signatureBuffer = null;
           }

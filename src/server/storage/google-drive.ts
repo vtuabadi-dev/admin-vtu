@@ -253,7 +253,47 @@ export async function provisionPackageStorage(packageId: string): Promise<DriveF
   const monthNum = String(depDate.getMonth() + 1).padStart(2, "0");
   const monthNames = ["JANUARI", "FEBRUARI", "MARET", "APRIL", "MEI", "JUNI", "JULI", "AGUSTUS", "SEPTEMBER", "OKTOBER", "NOVEMBER", "DESEMBER"];
   const monthName = `${monthNum} - ${monthNames[depDate.getMonth()]} ${year}`;
-  const packageName = (paket.namaPaket || "PAKET REGULER").toUpperCase().trim();
+
+  // Resolve standardized folder name template: [KOTA] - [TGL] [BLN] [DURASI] H [TIPE] ([MASKAPAI])
+  let packageName = "";
+  try {
+    const { generatePackageFolderName } = await import("@/server/services/package-code.service");
+    
+    let sCode = "JKT";
+    let pCode = "REG";
+    let mCode = "SV";
+
+    if (paket.startingPointId) {
+      const city = await prisma.masterCity.findUnique({ where: { id: paket.startingPointId } });
+      if (city?.code) sCode = city.code;
+    }
+    if (paket.packageTypeId) {
+      const pType = await prisma.masterPackageType.findUnique({ where: { id: paket.packageTypeId } });
+      if (pType?.code) pCode = pType.code;
+    }
+    if (paket.maskapaiId) {
+      const airline = await prisma.masterAirline.findUnique({ where: { id: paket.maskapaiId } });
+      if (airline?.code) mCode = airline.code;
+    } else if (paket.maskapai) {
+      const mRaw = paket.maskapai.toUpperCase();
+      if (mRaw.includes("SAUDIA") || mRaw.includes("SV")) mCode = "SV";
+      else if (mRaw.includes("GARUDA") || mRaw.includes("GA")) mCode = "GA";
+      else if (mRaw.includes("QATAR") || mRaw.includes("QR")) mCode = "QR";
+      else if (mRaw.includes("OMAN") || mRaw.includes("WY")) mCode = "WY";
+      else if (mRaw.includes("EMIRATES") || mRaw.includes("EK")) mCode = "EK";
+      else mCode = mRaw.slice(0, 3);
+    }
+
+    packageName = generatePackageFolderName({
+      startingPointCode: sCode,
+      tanggalBerangkat: depDate,
+      durasiHari: paket.durationDays || 12,
+      packageTypeCode: pCode,
+      maskapaiCode: mCode,
+    });
+  } catch {
+    packageName = (paket.namaPaket || "PAKET REGULER").toUpperCase().trim();
+  }
 
   console.log(`[Cloud Vault Provisioning START] Package: "${packageName}" (ID: ${packageId})`);
   const folderRegistry = await createPackageFolderHierarchy(year, monthName, packageName);

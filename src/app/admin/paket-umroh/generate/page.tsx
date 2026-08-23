@@ -1053,12 +1053,12 @@ export default function GeneratePaketPage() {
       <div className="flex flex-col gap-4">
         {/* Step 1: Dasar Paket */}
         <div className="flex flex-col gap-3">
-          <h2 className="text-lg font-semibold">Langkah 1: Dasar Paket</h2>
-          <div className="p-4 bg-card border rounded-md flex flex-col gap-4">
+          <h2 className="text-sm font-black text-slate-900 uppercase tracking-wider">Langkah 1: Dasar Paket</h2>
+          <div className="p-5 bg-white border border-stone-200 shadow-sm rounded-xl flex flex-col gap-4 text-slate-900">
             <div className="flex flex-col gap-4">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="md:col-span-2">
-                  <label className="block text-sm font-medium mb-1">Jenis Paket (Master Data)</label>
+                  <label className="block text-xs font-bold text-slate-800 mb-1.5">Jenis Paket (Master Data)</label>
                   <SearchableSelect
                     id="field-jenisPaketId"
                     nextFocusId="field-durasiHari"
@@ -1071,7 +1071,7 @@ export default function GeneratePaketPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-1">Durasi (Hari)</label>
+                  <label className="block text-xs font-bold text-slate-800 mb-1.5">Durasi (Hari)</label>
                   <Input 
                     id="field-durasiHari" 
                     type="number" 
@@ -1080,6 +1080,7 @@ export default function GeneratePaketPage() {
                     onChange={handleChange} 
                     onKeyDown={(e) => handleKeyDownNext(e, "field-startingPointId")}
                     placeholder="9" 
+                    className="h-10 bg-white border-stone-300 text-slate-950 font-bold shadow-xs focus:ring-emerald-600 focus:border-emerald-600"
                   />
                 </div>
               </div>
@@ -1089,10 +1090,10 @@ export default function GeneratePaketPage() {
 
         {/* Step 2: Penerbangan */}
         <div className="flex flex-col gap-3">
-          <h2 className="text-lg font-semibold">Langkah 2: Rute & Penerbangan</h2>
-          <div className={`p-4 bg-card border rounded-md grid grid-cols-1 ${colMode ? "md:grid-cols-2" : "md:grid-cols-3"} gap-4`}>
+          <h2 className="text-sm font-black text-slate-900 uppercase tracking-wider">Langkah 2: Rute & Penerbangan</h2>
+          <div className={cn("p-5 bg-white border border-stone-200 shadow-sm rounded-xl grid grid-cols-1 gap-4 text-slate-900", colMode ? "md:grid-cols-2" : "md:grid-cols-3")}>
             <div>
-              <label className="block text-sm font-medium mb-1">Starting Point</label>
+              <label className="block text-xs font-bold text-slate-800 mb-1.5">Starting Point</label>
               <SearchableSelect
                 id="field-startingPointId"
                 nextFocusId="field-landingPatternId"
@@ -1105,7 +1106,7 @@ export default function GeneratePaketPage() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1">Rute In-Out</label>
+              <label className="block text-xs font-bold text-slate-800 mb-1.5">Rute In-Out</label>
               <SearchableSelect
                 id="field-landingPatternId"
                 nextFocusId="field-maskapaiId"
@@ -1122,7 +1123,7 @@ export default function GeneratePaketPage() {
               />
             </div>
             <div className={colMode ? "md:col-span-2" : ""}>
-              <label className="block text-sm font-medium mb-1">Maskapai</label>
+              <label className="block text-xs font-bold text-slate-800 mb-1.5">Maskapai</label>
               <SearchableSelect
                 id="field-maskapaiId"
                 nextFocusId={
@@ -1143,13 +1144,13 @@ export default function GeneratePaketPage() {
 
         {/* Step 3: Akomodasi */}
         <div className="flex flex-col gap-3">
-          <h2 className="text-lg font-semibold">Langkah 3: Akomodasi & Hotel</h2>
-          <div className="p-4 bg-card border rounded-md flex flex-col gap-4">
+          <h2 className="text-sm font-black text-slate-900 uppercase tracking-wider">Langkah 3: Akomodasi & Hotel</h2>
+          <div className="p-5 bg-white border border-stone-200 shadow-sm rounded-xl flex flex-col gap-4 text-slate-900">
             {pathMode === "manual" && (
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between p-3.5 bg-muted/20 border rounded-lg gap-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between p-3.5 bg-stone-50 border border-stone-200 rounded-lg gap-3">
                 <div>
-                  <label className="text-sm font-semibold text-foreground block">Apakah paket ini menggunakan Klaster Seat?</label>
-                  <p className="text-xs text-muted-foreground mt-0.5">
+                  <label className="text-xs font-bold text-slate-800 block">Apakah paket ini menggunakan Klaster Seat?</label>
+                  <p className="text-[11px] text-stone-500 mt-0.5">
                     {formData.isAdaKlaster === "ya" 
                       ? "Menggunakan Klaster Seat (Bronze, Silver, Gold, Platinum)" 
                       : "Tidak Menggunakan Klaster (Satu Macam Hotel)"}
@@ -1162,8 +1163,8 @@ export default function GeneratePaketPage() {
                     aria-checked={formData.isAdaKlaster === "ya"}
                     onClick={() => setFormData(prev => ({ ...prev, isAdaKlaster: prev.isAdaKlaster === "ya" ? "tidak" : "ya" }))}
                     className={cn(
-                      "relative inline-flex h-7 w-14 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2",
-                      formData.isAdaKlaster === "ya" ? "bg-primary" : "bg-input"
+                      "relative inline-flex h-7 w-14 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-2",
+                      formData.isAdaKlaster === "ya" ? "bg-emerald-600" : "bg-stone-300"
                     )}
                   >
                     <span
@@ -1174,10 +1175,10 @@ export default function GeneratePaketPage() {
                     />
                   </button>
                   <span className={cn(
-                    "text-xs font-semibold px-2.5 py-1 rounded-md border min-w-[55px] text-center transition-colors select-none",
+                    "text-xs font-bold px-2.5 py-1 rounded-md border min-w-[55px] text-center transition-colors select-none",
                     formData.isAdaKlaster === "ya" 
-                      ? "bg-primary/10 text-primary border-primary/30" 
-                      : "bg-background text-muted-foreground border-border"
+                      ? "bg-emerald-50 text-emerald-950 border-emerald-300" 
+                      : "bg-white text-stone-700 border-stone-300"
                   )}>
                     {formData.isAdaKlaster === "ya" ? "Ya" : "Tidak"}
                   </span>
@@ -1189,7 +1190,7 @@ export default function GeneratePaketPage() {
               <div className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium mb-1">Hotel Mekkah</label>
+                    <label className="block text-xs font-bold text-slate-800 mb-1.5">Hotel Mekkah</label>
                     <SearchableSelect
                       id="field-hotelMekkahId"
                       nextFocusId="field-hotelMadinahId"
@@ -1202,7 +1203,7 @@ export default function GeneratePaketPage() {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium mb-1">Hotel Madinah</label>
+                    <label className="block text-xs font-bold text-slate-800 mb-1.5">Hotel Madinah</label>
                     <SearchableSelect
                       id="field-hotelMadinahId"
                       nextFocusId="field-upgradeDouble"
@@ -1216,9 +1217,9 @@ export default function GeneratePaketPage() {
                   </div>
                 </div>
                 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t pt-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-stone-200 pt-4">
                   <div>
-                    <label className="block text-sm font-medium mb-1">Harga Upgrade Double (Rp)</label>
+                    <label className="block text-xs font-bold text-slate-800 mb-1.5">Harga Upgrade Double (Rp)</label>
                     <Input 
                       id="field-upgradeDouble" 
                       type="text" 
@@ -1228,10 +1229,11 @@ export default function GeneratePaketPage() {
                       onChange={(e) => handleCurrencyChange("upgradeDouble", e.target.value)} 
                       onKeyDown={(e) => handleKeyDownNext(e, "field-upgradeTriple")} 
                       placeholder="Rp -" 
+                      className="h-10 bg-white border-stone-300 text-slate-950 font-bold shadow-xs focus:ring-emerald-600 focus:border-emerald-600"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium mb-1">Harga Upgrade Triple (Rp)</label>
+                    <label className="block text-xs font-bold text-slate-800 mb-1.5">Harga Upgrade Triple (Rp)</label>
                     <Input 
                       id="field-upgradeTriple" 
                       type="text" 
@@ -1241,13 +1243,14 @@ export default function GeneratePaketPage() {
                       onChange={(e) => handleCurrencyChange("upgradeTriple", e.target.value)} 
                       onKeyDown={(e) => handleKeyDownNext(e, "field-tempDate")} 
                       placeholder="Rp -" 
+                      className="h-10 bg-white border-stone-300 text-slate-950 font-bold shadow-xs focus:ring-emerald-600 focus:border-emerald-600"
                     />
                   </div>
                 </div>
               </div>
             ) : (
               <div className="space-y-4">
-                <div className="text-xs text-muted-foreground bg-amber-50/50 border border-amber-200 p-2.5 rounded-md">
+                <div className="text-xs text-amber-900 bg-amber-50 border border-amber-200 p-3 rounded-lg font-medium">
                   💡 <strong>Info:</strong> Hotel, Harga Base, serta Harga Upgrade Kamar (Double & Triple) akan dikonfigurasi untuk masing-masing klaster di bawah ini.
                 </div>
                 <div className="space-y-3">
@@ -1258,30 +1261,24 @@ export default function GeneratePaketPage() {
                     return clustersList.map((klaster, idx) => {
                       const nextKlaster = clustersList[idx + 1];
                       
-                      // Phase 1 Target: After filling Harga Base of cluster idx:
-                      // - If next cluster exists, jump to next cluster's Hotel Mekkah
-                      // - If last cluster, jump to FIRST cluster's Harga Upgrade Double
                       const nextHargaBaseTarget = nextKlaster
                         ? `field-${nextKlaster.id}-hotelMekkahId`
                         : `field-${firstCluster.id}-upgradeDouble`;
 
-                      // Phase 2 Target: After filling Harga Upgrade Triple of cluster idx:
-                      // - If next cluster exists, jump to next cluster's Harga Upgrade Double
-                      // - If last cluster, jump to Step 4 Date Input (field-tempDate)
                       const nextUpgradeTripleTarget = nextKlaster
                         ? `field-${nextKlaster.id}-upgradeDouble`
                         : "field-tempDate";
 
                       return (
-                        <div key={klaster.id} className="p-4 bg-card border rounded-md flex flex-col gap-3 shadow-sm">
-                          <div className="flex items-center justify-between border-b pb-2">
-                            <span className="text-sm font-bold text-primary">{klaster.nama} Seat Class</span>
+                        <div key={klaster.id} className="p-4 bg-stone-50 border border-stone-200 rounded-xl flex flex-col gap-3 shadow-2xs">
+                          <div className="flex items-center justify-between border-b border-stone-200 pb-2">
+                            <span className="text-xs font-black text-emerald-950 uppercase tracking-wider">{klaster.nama} Seat Class</span>
                           </div>
                           
                           {/* Hotel Selection Row */}
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                             <div>
-                              <label className="block text-xs font-semibold text-muted-foreground mb-1">Hotel Mekkah</label>
+                              <label className="block text-xs font-bold text-slate-800 mb-1">Hotel Mekkah</label>
                               <SearchableSelect
                                 id={`field-${klaster.id}-hotelMekkahId`}
                                 nextFocusId={`field-${klaster.id}-hotelMadinahId`}
@@ -1294,7 +1291,7 @@ export default function GeneratePaketPage() {
                               />
                             </div>
                             <div>
-                              <label className="block text-xs font-semibold text-muted-foreground mb-1">Hotel Madinah</label>
+                              <label className="block text-xs font-bold text-slate-800 mb-1">Hotel Madinah</label>
                               <SearchableSelect
                                 id={`field-${klaster.id}-hotelMadinahId`}
                                 nextFocusId={`field-${klaster.id}-hargaBase`}
@@ -1311,7 +1308,7 @@ export default function GeneratePaketPage() {
                           {/* Pricing Row */}
                           <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1">
                             <div>
-                              <label className="block text-xs font-semibold text-muted-foreground mb-1">Harga Base (Rp)</label>
+                              <label className="block text-xs font-bold text-slate-800 mb-1">Harga Base (Rp)</label>
                               <Input 
                                 id={`field-${klaster.id}-hargaBase`}
                                 type="text" 
@@ -1320,11 +1317,11 @@ export default function GeneratePaketPage() {
                                 value={formatNumberWithDots(clusterConfigs[klaster.id]?.hargaBase || "")} 
                                 onChange={(e) => handleClusterConfigChange(klaster.id, "hargaBase", e.target.value.replace(/\D/g, ""))} 
                                 onKeyDown={(e) => handleKeyDownNext(e, nextHargaBaseTarget)}
-                                className="h-8 text-xs"
+                                className="h-9 text-xs bg-white border-stone-300 text-slate-950 font-bold"
                               />
                             </div>
                             <div>
-                              <label className="block text-xs font-semibold text-muted-foreground mb-1">Harga Upgrade Double (Rp)</label>
+                              <label className="block text-xs font-bold text-slate-800 mb-1">Harga Upgrade Double (Rp)</label>
                               <Input 
                                 id={`field-${klaster.id}-upgradeDouble`}
                                 type="text" 
@@ -1333,11 +1330,11 @@ export default function GeneratePaketPage() {
                                 value={formatNumberWithDots(clusterConfigs[klaster.id]?.upgradeDouble || "")} 
                                 onChange={(e) => handleClusterConfigChange(klaster.id, "upgradeDouble", e.target.value.replace(/\D/g, ""))} 
                                 onKeyDown={(e) => handleKeyDownNext(e, `field-${klaster.id}-upgradeTriple`)}
-                                className="h-8 text-xs"
+                                className="h-9 text-xs bg-white border-stone-300 text-slate-950 font-bold"
                               />
                             </div>
                             <div>
-                              <label className="block text-xs font-semibold text-muted-foreground mb-1">Harga Upgrade Triple (Rp)</label>
+                              <label className="block text-xs font-bold text-slate-800 mb-1">Harga Upgrade Triple (Rp)</label>
                               <Input 
                                 id={`field-${klaster.id}-upgradeTriple`}
                                 type="text" 
@@ -1346,7 +1343,7 @@ export default function GeneratePaketPage() {
                                 value={formatNumberWithDots(clusterConfigs[klaster.id]?.upgradeTriple || "")} 
                                 onChange={(e) => handleClusterConfigChange(klaster.id, "upgradeTriple", e.target.value.replace(/\D/g, ""))} 
                                 onKeyDown={(e) => handleKeyDownNext(e, nextUpgradeTripleTarget)}
-                                className="h-8 text-xs"
+                                className="h-9 text-xs bg-white border-stone-300 text-slate-950 font-bold"
                               />
                             </div>
                           </div>
@@ -1362,12 +1359,12 @@ export default function GeneratePaketPage() {
 
         {/* Step 4: Lainnya */}
         <div className="flex flex-col gap-3">
-          <h2 className="text-lg font-semibold">Langkah 4: Operasional & Harga</h2>
+          <h2 className="text-sm font-black text-slate-900 uppercase tracking-wider">Langkah 4: Operasional & Harga</h2>
 
           {ocrDateInfo && (
-            <div className="p-4 bg-emerald-50 dark:bg-emerald-950/40 border-2 border-emerald-400 dark:border-emerald-700 rounded-xl space-y-2 shadow-sm">
+            <div className="p-4 bg-emerald-50 border-2 border-emerald-400 rounded-xl space-y-2 shadow-sm">
               <div className="flex items-center justify-between flex-wrap gap-2">
-                <div className="flex items-center gap-2 text-emerald-950 dark:text-emerald-100 font-extrabold text-sm">
+                <div className="flex items-center gap-2 text-emerald-950 font-extrabold text-sm">
                   <Sparkles className="h-5 w-5 text-amber-500 animate-bounce" />
                   <span>Hasil Ekstraksi OCR: Terdeteksi {ocrDateInfo.count} Tanggal Keberangkatan pada Flyer Utama!</span>
                 </div>
@@ -1375,12 +1372,12 @@ export default function GeneratePaketPage() {
                   {ocrDateInfo.count} Kolom Tanggal Berhasil Dibuatkan
                 </span>
               </div>
-              <p className="text-xs text-emerald-800 dark:text-emerald-200">
+              <p className="text-xs text-emerald-800">
                 Sistem Google AI Studio (Gemini) telah mendeteksi <strong>{ocrDateInfo.count} tanggal keberangkatan</strong> dari flyer utama dan otomatis membuatkan {ocrDateInfo.count} kolom input tanggal:
               </p>
               <div className="flex flex-wrap gap-2 pt-1">
                 {ocrDateInfo.dates.map((dStr, idx) => (
-                  <span key={dStr} className="px-3 py-1 bg-white dark:bg-emerald-900 border border-emerald-300 dark:border-emerald-700 text-emerald-950 dark:text-emerald-100 text-xs font-bold rounded-lg shadow-xs">
+                  <span key={dStr} className="px-3 py-1 bg-white border border-emerald-300 text-emerald-950 text-xs font-bold rounded-lg shadow-xs">
                     📅 Tanggal #{idx + 1}: {formatDateIndo(dStr)} ({dStr})
                   </span>
                 ))}
@@ -1388,34 +1385,34 @@ export default function GeneratePaketPage() {
             </div>
           )}
 
-          <div className="p-4 bg-card border rounded-md flex flex-col gap-4">
+          <div className="p-5 bg-white border border-stone-200 shadow-sm rounded-xl flex flex-col gap-4 text-slate-900">
             {/* Dynamic Auto-Expanding Tanggal Keberangkatan Inputs */}
-            <div className="flex flex-col gap-3 p-3 bg-muted/10 border rounded-lg">
+            <div className="flex flex-col gap-3 p-3.5 bg-stone-50 border border-stone-200 rounded-xl">
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <div>
-                  <label className="block text-sm font-semibold text-foreground">
+                  <label className="block text-xs font-bold text-slate-800">
                     Tanggal Keberangkatan <span className="text-red-500">*</span>
                   </label>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-[11px] text-stone-500">
                     Tanggal pertama wajib diisi. Kolom kosong berikutnya bersifat opsional dan akan bertambah otomatis saat terisi.
                   </p>
                 </div>
-                <div className="text-xs font-semibold text-emerald-800 bg-emerald-50 border border-emerald-200 px-3 py-1 rounded-full shadow-xs">
+                <div className="text-xs font-bold text-emerald-950 bg-emerald-100/80 border border-emerald-300 px-3 py-1 rounded-full shadow-2xs">
                   {departureDates.length} Tanggal Terisi &rarr; {departureDates.length} Paket akan dibuat
                 </div>
               </div>
 
               {/* Departure Dates Table Layout (CR-03 & CR-06 BR-DATE-01..04) */}
-              <div className="overflow-x-auto border rounded-xl shadow-xs bg-card pt-1">
+              <div className="overflow-x-auto border border-stone-200 rounded-xl shadow-2xs bg-white pt-1">
                 <table className="w-full text-xs text-left">
-                  <thead className="bg-emerald-50/70 dark:bg-emerald-950/40 text-emerald-900 dark:text-emerald-200 uppercase text-[10px] font-extrabold border-b border-emerald-200/60 dark:border-emerald-800/60">
+                  <thead className="bg-stone-50 text-slate-800 uppercase text-[10px] font-extrabold border-b border-stone-200">
                     <tr>
                       <th className="px-3 py-2.5 text-center w-12">No</th>
                       <th className="px-3 py-2.5">Tanggal Keberangkatan</th>
                       <th className="px-3 py-2.5">Tanggal Kepulangan (Editable)</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-border/60">
+                  <tbody className="divide-y divide-stone-200">
                     {departureDateRows.map((row, index) => {
                       const isLastEmpty = index === departureDateRows.length - 1 && !row.departureDate && !row.arrivalDate;
 
@@ -1521,7 +1518,7 @@ export default function GeneratePaketPage() {
               <div>
                 {formData.isAdaKlaster === "tidak" ? (
                   <>
-                    <label className="block text-sm font-medium mb-1">Harga Base (Rp)</label>
+                    <label className="block text-xs font-bold text-slate-800 mb-1.5">Harga Base (Rp)</label>
                     <Input 
                       id="field-hargaBase" 
                       type="text" 
@@ -1529,12 +1526,13 @@ export default function GeneratePaketPage() {
                       name="hargaBase" 
                       value={formatNumberWithDots(formData.hargaBase)} 
                       onChange={(e) => handleCurrencyChange("hargaBase", e.target.value)} 
-                      onKeyDown={(e) => handleKeyDownNext(e, "field-submitBtn")}
+                      onKeyDown={(e) => handleKeyDownNext(e, "field-submitBtn")} 
                       placeholder="Rp -" 
+                      className="h-10 bg-white border-stone-300 text-slate-950 font-bold shadow-xs focus:ring-emerald-600 focus:border-emerald-600"
                     />
                   </>
                 ) : (
-                  <div className="bg-muted/40 p-3 rounded-md border text-xs text-muted-foreground h-full flex items-center">
+                  <div className="bg-stone-50 p-3 rounded-lg border border-stone-200 text-xs text-stone-600 font-medium h-full flex items-center">
                     ℹ️ Harga Base diatur per masing-masing Klaster Seat di Langkah 3.
                   </div>
                 )}
@@ -1542,32 +1540,32 @@ export default function GeneratePaketPage() {
             </div>
 
             {/* Custom Caption for Telegram Broadcast */}
-            <div className="pt-2 border-t">
-              <label className="block text-xs font-semibold mb-1 text-muted-foreground">
+            <div className="pt-3 border-t border-stone-200">
+              <label className="block text-xs font-bold mb-1.5 text-slate-800">
                 Caption / Teks Pemasaran Broadcast Telegram (Opsional)
               </label>
               <textarea
                 value={caption}
                 onChange={(e) => setCaption(e.target.value)}
                 placeholder="Tuliskan atau tempel caption pemasaran di sini. Jika diisi, bot Telegram akan menyiarkan caption ini langsung ke grup..."
-                className="w-full h-20 p-2.5 text-xs rounded-md border border-input bg-transparent focus:outline-none focus:ring-1 focus:ring-primary min-h-[56px]"
+                className="w-full h-20 p-3 text-xs font-medium rounded-xl border border-stone-300 bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-emerald-600 min-h-[56px] shadow-xs placeholder:text-stone-400"
               />
             </div>
           </div>
         </div>
 
         {/* Bottom Action Bar */}
-        <div className="flex items-center justify-between p-4 bg-card border rounded-md shadow-sm mt-2">
-          <p className="text-xs text-muted-foreground">
+        <div className="flex items-center justify-between p-4 bg-white border border-stone-200 rounded-xl shadow-sm mt-2 text-slate-900">
+          <p className="text-xs text-stone-600 font-medium">
             💡 Tekan <strong>Enter</strong> pada kolom terakhir untuk langsung memproses pembuatan paket.
           </p>
           <div className="flex gap-2">
-            <Button variant="outline" onClick={() => router.push("/admin/paket-umroh")}>Batal</Button>
+            <Button variant="outline" onClick={() => router.push("/admin/paket-umroh")} className="bg-white border-stone-300 text-slate-800 hover:bg-stone-50 font-bold">Batal</Button>
             <Button 
               id="field-submitBtn" 
               onClick={handleGenerate} 
               disabled={loading || fetching}
-              className="px-6 font-semibold"
+              className="px-6 font-bold bg-emerald-700 hover:bg-emerald-800 text-white"
             >
               {loading ? "Memproses..." : `Generate ${departureDates.length > 0 ? departureDates.length : ""} Paket`}
             </Button>
@@ -2041,20 +2039,20 @@ export default function GeneratePaketPage() {
     <div className="flex flex-col gap-6 p-6 max-w-7xl">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
+          <h1 className="text-2xl font-black tracking-tight text-slate-900 flex items-center gap-2">
             Generate Paket Umroh
             {generateMode === "split" && (
-              <span className="text-xs font-bold px-3 py-1 bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded-full">
+              <span className="text-xs font-bold px-3 py-1 bg-amber-100 text-amber-900 border border-amber-300 rounded-full">
                 ➕ Mode Tambah Starting Point
               </span>
             )}
           </h1>
-          <p className="text-muted-foreground mt-1 text-xs">
+          <p className="text-stone-600 mt-1 text-xs font-medium">
             Wizard perakitan paket (Transaction Data) yang mengambil referensi dari Master Data.
           </p>
         </div>
         <div className="flex gap-2 shrink-0">
-          <Button variant="outline" onClick={() => router.push("/admin/paket-umroh")}>Batal</Button>
+          <Button variant="outline" onClick={() => router.push("/admin/paket-umroh")} className="bg-white border-stone-300 text-slate-800 hover:bg-stone-50 font-bold">Batal</Button>
           <Button 
             id="field-submitBtnHeader" 
             onClick={() => {
@@ -2065,7 +2063,7 @@ export default function GeneratePaketPage() {
               }
             }} 
             disabled={loading || fetching || (generateMode === "split" && (!selectedParentGroupId || (selectedParentGroup && departureDates.length !== selectedParentGroup.dateCount)))}
-            className={cn(generateMode === "split" ? "bg-amber-600 hover:bg-amber-500 text-white font-bold" : "")}
+            className={cn(generateMode === "split" ? "bg-amber-600 hover:bg-amber-500 text-white font-bold" : "bg-emerald-700 hover:bg-emerald-800 text-white font-bold")}
           >
             {loading ? "Memproses..." : generateMode === "split" ? `Lanjut Canvas Pairing (${departureDates.length} Tanggal)` : `Generate ${departureDates.length > 0 ? departureDates.length : ""} Paket`}
           </Button>
@@ -2073,12 +2071,12 @@ export default function GeneratePaketPage() {
       </div>
 
       {/* ── LANGKAH 0: MODE GENERATOR PAKET (Buat Baru vs Pecah Starting Point) ── */}
-      <div className="p-5 bg-card border rounded-2xl shadow-sm space-y-4">
-        <div className="flex items-center justify-between border-b pb-2">
-          <label className="text-xs font-extrabold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-            <Layers className="h-4 w-4 text-emerald-500" /> Modus Inventarisasi Paket
+      <div className="p-5 bg-white border border-stone-200 rounded-2xl shadow-sm space-y-4 text-slate-900">
+        <div className="flex items-center justify-between border-b border-stone-200 pb-2">
+          <label className="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-2">
+            <Layers className="h-4 w-4 text-emerald-600" /> Modus Inventarisasi Paket
           </label>
-          <span className="text-[11px] text-muted-foreground">Pilih alur pembuatan paket yang sesuai</span>
+          <span className="text-[11px] text-stone-500 font-medium">Pilih alur pembuatan paket yang sesuai</span>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -2091,18 +2089,18 @@ export default function GeneratePaketPage() {
             className={cn(
               "p-4 rounded-xl border text-left transition-all flex items-start gap-3.5",
               generateMode === "new"
-                ? "bg-primary/10 border-primary text-foreground shadow-sm ring-1 ring-primary"
-                : "bg-background border-border text-muted-foreground hover:bg-muted/50"
+                ? "bg-emerald-50/90 border-2 border-emerald-600 text-emerald-950 shadow-xs ring-1 ring-emerald-500"
+                : "bg-stone-50/80 border-stone-200 text-stone-700 hover:bg-stone-100"
             )}
           >
-            <div className={cn("p-2.5 rounded-xl shrink-0 mt-0.5", generateMode === "new" ? "bg-primary text-primary-foreground" : "bg-muted")}>
+            <div className={cn("p-2.5 rounded-xl shrink-0 mt-0.5", generateMode === "new" ? "bg-emerald-600 text-white shadow-xs" : "bg-stone-200 text-stone-600")}>
               <Layers className="h-5 w-5" />
             </div>
             <div>
-              <div className="font-bold text-sm text-foreground flex items-center gap-1.5">
+              <div className="font-extrabold text-sm text-slate-950 flex items-center gap-1.5">
                 📦 Buat Paket Baru (Fresh Single Starting Point)
               </div>
-              <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+              <p className="text-xs text-stone-600 mt-1 leading-relaxed font-medium">
                 Membuat paket keberangkatan baru dari nol untuk 1 Starting Point pertama (Jalur Manual / OCR).
               </p>
             </div>
@@ -2114,18 +2112,18 @@ export default function GeneratePaketPage() {
             className={cn(
               "p-4 rounded-xl border text-left transition-all flex items-start gap-3.5",
               generateMode === "split"
-                ? "bg-amber-500/10 border-amber-500 text-foreground shadow-sm ring-1 ring-amber-500"
-                : "bg-background border-border text-muted-foreground hover:bg-muted/50"
+                ? "bg-amber-50/90 border-2 border-amber-600 text-amber-950 shadow-xs ring-1 ring-amber-500"
+                : "bg-stone-50/80 border-stone-200 text-stone-700 hover:bg-stone-100"
             )}
           >
-            <div className={cn("p-2.5 rounded-xl shrink-0 mt-0.5", generateMode === "split" ? "bg-amber-500 text-white" : "bg-muted")}>
+            <div className={cn("p-2.5 rounded-xl shrink-0 mt-0.5", generateMode === "split" ? "bg-amber-600 text-white shadow-xs" : "bg-stone-200 text-stone-600")}>
               <Split className="h-5 w-5" />
             </div>
             <div>
-              <div className="font-bold text-sm text-foreground flex items-center gap-1.5">
+              <div className="font-extrabold text-sm text-slate-950 flex items-center gap-1.5">
                 🔀 Split Paket (Pecahan Paket / Multi-Variant)
               </div>
-              <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+              <p className="text-xs text-stone-600 mt-1 leading-relaxed font-medium">
                 Membuat pecahan paket dari Paket Utama, baik karena menambah Starting Point baru (misal Surabaya, Medan) maupun membuat Promo (Early Bird, Flash Sale, Diskon Group) dengan nama/label promo tersendiri.
               </p>
             </div>

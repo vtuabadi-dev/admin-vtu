@@ -66,45 +66,69 @@ export async function POST(request: NextRequest) {
     // Generate kode registrasi
     const kodeRegistrasi = await generateKodeRegistrasi();
 
-    // Move signature from temp to final path
-    let finalSignaturePath = body.signaturePath;
-    try {
-      if (body.signaturePath.includes("tmp_")) {
-        const { getStorageAdapter } = await import("@/server/storage");
-        const { isGoogleDriveConfigured, getOrCreateFolder } = await import("@/server/storage/google-drive");
-        const storage = getStorageAdapter();
-        const newPath = signaturePath(kodeRegistrasi);
-        const buffer = await storage.download(body.signaturePath);
+    // ── Signature Processing ──
+    let finalSignaturePath = body.signaturePath || "";
+    let signatureBuffer: Buffer | null = null;
 
+    // Check if raw base64 dataUrl is provided
+    const rawSigBase64 = body.signatureBase64 || (body.signaturePath?.startsWith("data:image") ? body.signaturePath : undefined);
+    if (rawSigBase64) {
+      try {
+        const base64Data = rawSigBase64.includes(",") ? rawSigBase64.split(",")[1] : rawSigBase64;
+        if (base64Data) {
+          signatureBuffer = Buffer.from(base64Data, "base64");
+        }
+      } catch (err) {
+        console.warn("[register] Base64 signature decode warning:", err);
+      }
+    }
+
+    // Save final signature to storage (uses existing pre-provisioned package folder)
+    try {
+      const { getStorageAdapter } = await import("@/server/storage");
+      const { isGoogleDriveConfigured, getOrCreateFolder, provisionPackageStorage } = await import("@/server/storage/google-drive");
+      const storage = getStorageAdapter();
+      const newPath = signaturePath(kodeRegistrasi);
+
+      // If buffer not yet extracted from base64, attempt storage download of temp path
+      if (!signatureBuffer && body.signaturePath && !body.signaturePath.startsWith("data:")) {
+        try {
+          signatureBuffer = await storage.download(body.signaturePath);
+        } catch {
+          try {
+            const { createLocalAdapter } = await import("@/server/storage/local");
+            const localAdapter = createLocalAdapter();
+            signatureBuffer = await localAdapter.download(body.signaturePath);
+          } catch {
+            signatureBuffer = null;
+          }
+        }
+      }
+
+      if (signatureBuffer) {
         let signatureFolderId: string | undefined = undefined;
         if (isGoogleDriveConfigured()) {
-          try {
-            const { createPackageFolderHierarchy } = await import("@/server/storage/google-drive");
-            const { generatePackageFolderName, getMonthFolderName } = await import("@/server/services/package-code.service");
-            const depDate = paket?.tanggalBerangkat ? new Date(paket.tanggalBerangkat) : new Date();
-            const year = depDate.getFullYear();
-            const monthName = getMonthFolderName(depDate);
-            const packageName = generatePackageFolderName({
-              startingPointCode: paket?.startingPointId || "JKT",
-              tanggalBerangkat: depDate,
-              durasiHari: paket?.durationDays || 12,
-              packageTypeCode: paket?.packageTypeId || "REG",
-              maskapaiCode: paket?.maskapai || "SV",
-            });
+          const driveFolders = (paket?.driveFolderIds as Record<string, string> | null) || null;
+          signatureFolderId = driveFolders?.tandaTangan;
 
-            const folderRegistry = await createPackageFolderHierarchy(year, monthName, packageName);
-            signatureFolderId = folderRegistry.tandaTangan;
-          } catch (err) {
-            console.warn("[register] Folder TANDA TANGAN error:", err);
+          if (!signatureFolderId || signatureFolderId === "local-mock") {
+            if (paket?.id) {
+              const regStorage = await provisionPackageStorage(paket.id);
+              signatureFolderId = regStorage?.tandaTangan;
+            }
+          }
+          if (!signatureFolderId) {
             signatureFolderId = await getOrCreateFolder("TANDA TANGAN");
           }
         }
 
-        finalSignaturePath = await storage.upload(newPath, buffer, "image/jpeg", signatureFolderId);
-        await storage.delete(body.signaturePath).catch(() => {});
+        finalSignaturePath = await storage.upload(newPath, signatureBuffer, "image/png", signatureFolderId);
+        if (body.signaturePath && body.signaturePath.includes("tmp_")) {
+          await storage.delete(body.signaturePath).catch(() => {});
+        }
       }
     } catch (moveErr) {
-      console.warn("[register] Signature move notice:", moveErr);
+      console.warn("[register] Signature storage notice:", moveErr);
     }
 
     // UPPERCASE all nama fields
@@ -170,7 +194,9 @@ export async function POST(request: NextRequest) {
         termsVersion: (body as any).termsVersion || "1.0",
         termsAcceptedAt: reg.termsAcceptedAt ?? reg.createdAt,
         signedAt: reg.signedAt,
-      });
+        signatureBuffer: signatureBuffer || undefined,
+        signatureBase64: rawSigBase64 || undefined,
+      } as any);
 
       // Filename format: [KODE_REGISTRASI]_[NAMA_PENDAFTAR].pdf
       const namaClean = namaPerwakilan.replace(/[^A-Z0-9]/gi, "_").replace(/_+/g, "_");

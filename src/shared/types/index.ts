@@ -865,6 +865,7 @@ export interface GroupRegistrationFormData {
   roomUpgrade?: string;
   hotelUpgrade?: string;
   signaturePath: string;
+  signatureBase64?: string;
 }
 
 // ============================================================

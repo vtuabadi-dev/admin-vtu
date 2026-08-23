@@ -60,30 +60,21 @@ export async function POST(request: NextRequest) {
       const storage = getStorageAdapter();
       const storagePath = `BUKTI_TRANSFER/${kodeRegistrasi}_${Date.now()}.jpg`;
       try {
-        const { getOrCreateFolder, isGoogleDriveConfigured, createPackageFolderHierarchy } = await import("@/server/storage/google-drive");
+        const { getOrCreateFolder, isGoogleDriveConfigured, provisionPackageStorage } = await import("@/server/storage/google-drive");
         let targetFolderId: string | undefined = undefined;
         if (isGoogleDriveConfigured()) {
           if (reg?.paketId) {
             try {
               const paketInfo = await prisma.keberangkatan.findUnique({ where: { id: reg.paketId } });
-              if (paketInfo) {
-                const { generatePackageFolderName, getMonthFolderName } = await import("@/server/services/package-code.service");
-                const depDate = paketInfo.tanggalBerangkat ? new Date(paketInfo.tanggalBerangkat) : new Date();
-                const year = depDate.getFullYear();
-                const monthName = getMonthFolderName(depDate);
-                const packageName = generatePackageFolderName({
-                  startingPointCode: paketInfo.startingPointId || "JKT",
-                  tanggalBerangkat: depDate,
-                  durasiHari: paketInfo.durationDays || 12,
-                  packageTypeCode: paketInfo.packageTypeId || "REG",
-                  maskapaiCode: paketInfo.maskapai || "SV",
-                });
+              const driveFolders = (paketInfo?.driveFolderIds as Record<string, string> | null) || null;
+              targetFolderId = driveFolders?.pembayaran;
 
-                const folderRegistry = await createPackageFolderHierarchy(year, monthName, packageName);
-                targetFolderId = folderRegistry.pembayaran;
+              if (!targetFolderId || targetFolderId === "local-mock") {
+                const regStorage = await provisionPackageStorage(reg.paketId);
+                targetFolderId = regStorage?.pembayaran;
               }
             } catch (hErr) {
-              console.warn("[payment-proof] Package folder hierarchy warning:", hErr);
+              console.warn("[payment-proof] Package folder resolution warning:", hErr);
             }
           }
 

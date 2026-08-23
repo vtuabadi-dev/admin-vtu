@@ -905,7 +905,8 @@ export default function RegisterPage() {
           paketId: selectedPaketId,
           roomUpgrade: roomUpgrade || undefined,
           hotelUpgrade: hotelUpgrade || undefined,
-          signaturePath,
+          signaturePath: signaturePath || signaturePreview || undefined,
+          signatureBase64: signaturePreview || undefined,
           signedAt,
         }),
       });

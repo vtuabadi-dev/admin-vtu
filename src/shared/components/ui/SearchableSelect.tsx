@@ -151,34 +151,34 @@ export function SearchableSelect({
         onClick={() => setOpen((prev) => !prev)}
         onKeyDown={handleKeyDown}
         className={cn(
-          "flex w-full items-center justify-between rounded-md border border-input bg-transparent px-3 text-left shadow-sm transition-colors focus:outline-none focus:ring-1 focus:ring-primary disabled:cursor-not-allowed disabled:opacity-50",
-          size === "sm" ? "h-8 text-xs" : "h-10 text-sm",
-          open && "border-primary ring-1 ring-primary"
+          "flex w-full items-center justify-between rounded-xl border border-stone-300 bg-white px-3.5 text-left text-slate-950 font-bold shadow-xs transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-emerald-600 disabled:cursor-not-allowed disabled:opacity-50",
+          size === "sm" ? "h-9 text-xs" : "h-10 text-sm",
+          open && "border-emerald-600 ring-2 ring-emerald-500"
         )}
       >
-        <span className={cn("truncate font-normal", !selectedOption && "text-muted-foreground")}>
+        <span className={cn("truncate font-bold", !selectedOption ? "text-stone-400 font-normal" : "text-slate-950")}>
           {selectedOption ? selectedOption.label : placeholder}
         </span>
         <div className="flex items-center gap-1 shrink-0 ml-2">
           {value && !disabled && (
             <span
               onClick={handleClear}
-              className="p-0.5 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+              className="p-0.5 rounded-full hover:bg-stone-100 text-stone-400 hover:text-stone-700 transition-colors cursor-pointer"
               title="Hapus Pilihan"
             >
               <X className="h-3.5 w-3.5" />
             </span>
           )}
-          <ChevronDown className={cn("h-4 w-4 opacity-50 transition-transform duration-200", open && "rotate-180")} />
+          <ChevronDown className={cn("h-4 w-4 text-stone-500 transition-transform duration-200", open && "rotate-180 text-emerald-600")} />
         </div>
       </button>
 
       {/* Popover Content */}
       {open && (
-        <div className="absolute z-50 mt-1 max-h-60 w-full overflow-hidden rounded-md border border-border bg-background shadow-2xl animate-in fade-in-0 zoom-in-95">
+        <div className="absolute z-50 mt-1 max-h-60 w-full overflow-hidden rounded-xl border border-stone-200 bg-white text-slate-900 shadow-2xl animate-in fade-in-0 zoom-in-95">
           {/* Search Header */}
-          <div className="flex items-center border-b px-2.5 py-1.5 bg-muted/40">
-            <Search className="h-4 w-4 shrink-0 opacity-50 mr-2 text-muted-foreground" />
+          <div className="flex items-center border-b border-stone-200 px-3 py-2 bg-stone-50">
+            <Search className="h-4 w-4 shrink-0 text-stone-400 mr-2" />
             <input
               ref={inputRef}
               type="text"
@@ -189,13 +189,13 @@ export function SearchableSelect({
               }}
               onKeyDown={handleKeyDown}
               placeholder={searchPlaceholder}
-              className="w-full bg-transparent text-xs focus:outline-none placeholder:text-muted-foreground"
+              className="w-full bg-transparent text-xs font-medium text-slate-900 focus:outline-none placeholder:text-stone-400"
             />
             {search && (
               <button
                 type="button"
                 onClick={() => setSearch("")}
-                className="text-xs text-muted-foreground hover:text-foreground px-1"
+                className="text-xs font-semibold text-stone-400 hover:text-stone-700 px-1"
               >
                 Clear
               </button>
@@ -203,9 +203,9 @@ export function SearchableSelect({
           </div>
 
           {/* Options List */}
-          <div ref={listRef} className="max-h-48 overflow-y-auto p-1 space-y-0.5">
+          <div ref={listRef} className="max-h-48 overflow-y-auto p-1.5 space-y-1">
             {filteredOptions.length === 0 ? (
-              <div className="py-4 text-center text-xs text-muted-foreground">
+              <div className="py-4 text-center text-xs font-medium text-stone-500">
                 Tidak ada data yang cocok
               </div>
             ) : (
@@ -219,21 +219,21 @@ export function SearchableSelect({
                     onClick={() => handleSelect(opt.value)}
                     onMouseEnter={() => setHighlightedIndex(idx)}
                     className={cn(
-                      "flex w-full items-center justify-between rounded-sm px-2.5 py-1.5 text-xs text-left transition-colors cursor-pointer",
+                      "flex w-full items-center justify-between rounded-lg px-3 py-2 text-xs text-left transition-colors cursor-pointer",
                       isSelected
-                        ? "bg-primary/10 text-primary font-medium"
+                        ? "bg-emerald-50 text-emerald-950 font-extrabold border border-emerald-300 shadow-2xs"
                         : isHighlighted
-                        ? "bg-accent text-accent-foreground"
-                        : "text-foreground hover:bg-accent hover:text-accent-foreground"
+                        ? "bg-stone-100 text-slate-950 font-bold"
+                        : "text-slate-800 font-semibold hover:bg-stone-50"
                     )}
                   >
                     <div className="flex flex-col truncate pr-2">
                       <span className="truncate">{opt.label}</span>
                       {opt.sublabel && (
-                        <span className="text-[10px] text-muted-foreground truncate">{opt.sublabel}</span>
+                        <span className="text-[10px] text-stone-500 font-normal truncate">{opt.sublabel}</span>
                       )}
                     </div>
-                    {isSelected && <Check className="h-3.5 w-3.5 shrink-0 text-primary" />}
+                    {isSelected && <Check className="h-4 w-4 shrink-0 text-emerald-700 font-black" />}
                   </button>
                 );
               })
