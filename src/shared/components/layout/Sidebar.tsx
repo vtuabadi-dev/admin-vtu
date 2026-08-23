@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { GSAPLink } from "@/shared/gsap/GSAPProvider";
 import { usePathname } from "next/navigation";
 import { cn } from "@/shared/lib/utils";
 import {
@@ -364,7 +365,7 @@ export function Sidebar({ role, mobileOpen = false, onMobileClose }: SidebarProp
                             <ul className="pl-3 space-y-1">
                               {item.children!.map((child) => (
                                 <li key={child.href}>
-                                  <Link
+                                  <GSAPLink
                                     href={child.href}
                                     onClick={handleNavClick}
                                     className={cn(
@@ -376,7 +377,7 @@ export function Sidebar({ role, mobileOpen = false, onMobileClose }: SidebarProp
                                   >
                                     <div className="h-1.5 w-1.5 rounded-full bg-[#F5D061] shrink-0" />
                                     <span className="truncate">{child.label}</span>
-                                  </Link>
+                                  </GSAPLink>
                                 </li>
                               ))}
                             </ul>
@@ -388,7 +389,7 @@ export function Sidebar({ role, mobileOpen = false, onMobileClose }: SidebarProp
 
                   return (
                     <li key={item.href}>
-                      <Link
+                      <GSAPLink
                         href={item.href!}
                         onClick={handleNavClick}
                         className={cn(
@@ -402,7 +403,7 @@ export function Sidebar({ role, mobileOpen = false, onMobileClose }: SidebarProp
                       >
                         <item.icon className="h-4 w-4 shrink-0" />
                         {(!collapsed || mobileOpen) && <span>{item.label}</span>}
-                      </Link>
+                      </GSAPLink>
                     </li>
                   );
                 })}

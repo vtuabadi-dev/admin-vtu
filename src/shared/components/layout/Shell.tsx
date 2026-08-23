@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
+import { GSAPLink } from "@/shared/gsap/GSAPProvider";
 import { usePathname } from "next/navigation";
 import { Sidebar } from "./Sidebar";
 import { cn } from "@/shared/lib/utils";
@@ -191,7 +192,7 @@ export function Shell({ children, role }: ShellProps) {
         {mobileNavItems.map((item) => {
           const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
           return (
-            <Link
+            <GSAPLink
               key={item.href}
               href={item.href}
               className={cn(
@@ -210,7 +211,7 @@ export function Shell({ children, role }: ShellProps) {
                 <item.icon className="h-4 w-4" />
               </div>
               <span className="mt-0.5">{item.label}</span>
-            </Link>
+            </GSAPLink>
           );
         })}
 
