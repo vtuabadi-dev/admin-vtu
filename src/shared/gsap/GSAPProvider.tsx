@@ -32,17 +32,13 @@ export function GSAPProvider({ children }: { children: React.ReactNode }) {
       gsap.fromTo(
         pageWrapperRef.current,
         {
-          opacity: 0.25,
-          y: 6,
-          scale: 0.997,
+          opacity: 0.4,
         },
         {
           opacity: 1,
-          y: 0,
-          scale: 1,
-          duration: 0.26,
+          duration: 0.22,
           ease: "power2.out",
-          clearProps: "transform",
+          clearProps: "opacity",
         }
       );
     }, pageWrapperRef);
@@ -60,10 +56,8 @@ export function GSAPProvider({ children }: { children: React.ReactNode }) {
       // Phase 1: Smooth direct page fade-out
       if (pageWrapperRef.current) {
         gsap.to(pageWrapperRef.current, {
-          opacity: 0.25,
-          y: -4,
-          scale: 0.997,
-          duration: 0.14,
+          opacity: 0.4,
+          duration: 0.12,
           ease: "power2.inOut",
           onComplete: () => {
             // Phase 2: Route Push

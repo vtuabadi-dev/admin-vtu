@@ -139,8 +139,8 @@ export default function LoginPage() {
 
       tl.fromTo(
         "[data-bg]",
-        { scale: 1.08, opacity: 0 },
-        { scale: 1, opacity: 1, duration: 1.5 }
+        { opacity: 0 },
+        { opacity: 1, duration: 0.9 }
       )
         .fromTo(
           "[data-brand]",
