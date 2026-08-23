@@ -1,0 +1,491 @@
+.page {
+  position: relative;
+  min-height: 100svh;
+  overflow: hidden;
+  background: #07120f;
+  color: #f7f4ea;
+  font-family: Inter, system-ui, -apple-system, sans-serif;
+}
+
+.background {
+  position: absolute;
+  inset: -4%;
+  z-index: 0;
+  background: linear-gradient(90deg, rgba(4, 13, 10, 0.95) 0%, rgba(4, 13, 10, 0.8) 43%, rgba(4, 13, 10, 0.2) 100%),
+              linear-gradient(0deg, rgba(4, 13, 10, 0.55), transparent 50%),
+              url("/images/kaaba-makkah.jpg") center/cover no-repeat;
+  will-change: transform, opacity;
+}
+
+.ambientGlow {
+  position: absolute;
+  z-index: 1;
+  width: 42vw;
+  height: 42vw;
+  right: 8%;
+  top: 10%;
+  border-radius: 50%;
+  background: rgba(216, 177, 91, 0.13);
+  filter: blur(90px);
+  pointer-events: none;
+  will-change: transform;
+}
+
+.lightParticle {
+  position: absolute;
+  z-index: 1;
+  width: 170px;
+  height: 170px;
+  right: 24%;
+  top: 14%;
+  border-radius: 50%;
+  background: rgba(240, 217, 154, 0.28);
+  filter: blur(45px);
+  pointer-events: none;
+  will-change: opacity;
+}
+
+.frame {
+  position: absolute;
+  inset: 16px;
+  z-index: 2;
+  border: 1px solid rgba(216, 177, 91, 0.28);
+  border-radius: 30px;
+  pointer-events: none;
+}
+
+.content {
+  position: relative;
+  z-index: 3;
+  width: min(1380px, calc(100% - 100px));
+  min-height: 100svh;
+  margin: auto;
+  display: grid;
+  grid-template-columns: minmax(420px, 0.9fr) minmax(500px, 1.1fr);
+  align-items: center;
+  gap: clamp(60px, 8vw, 130px);
+  padding: 70px 0;
+}
+
+.left {
+  max-width: 570px;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: clamp(45px, 6vh, 90px);
+}
+
+.brandMark {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border: 1px solid rgba(216, 177, 91, 0.65);
+  border-radius: 14px;
+  color: #f0d99a;
+  background: rgba(6, 28, 21, 0.52);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+}
+
+.brand strong {
+  display: block;
+  font: 24px Georgia, serif;
+  letter-spacing: 0.08em;
+  color: #f0d99a;
+}
+
+.brand span {
+  display: block;
+  color: rgba(247, 244, 234, 0.58);
+  font-size: 9px;
+  letter-spacing: 0.2em;
+}
+
+.kicker {
+  color: #f0d99a;
+  font-size: 14px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.copy h1 {
+  margin: 15px 0 20px;
+  font: 500 clamp(46px, 5.2vw, 76px) / 0.98 Georgia, serif;
+  letter-spacing: -0.045em;
+  color: #f7f4ea;
+}
+
+.copy h1 em {
+  color: #f0d99a;
+  font-style: normal;
+}
+
+.copy p {
+  max-width: 520px;
+  margin: 0;
+  color: rgba(247, 244, 234, 0.68);
+  font-size: 16px;
+  line-height: 1.75;
+}
+
+.login {
+  width: min(100%, 470px);
+  margin-top: 36px;
+}
+
+.login label > span {
+  display: block;
+  margin-bottom: 9px;
+  color: rgba(247, 244, 234, 0.82);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.inputWrap {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 54px;
+  padding: 0 16px;
+  border: 1px solid rgba(247, 244, 234, 0.24);
+  border-radius: 12px;
+  background: rgba(3, 15, 11, 0.45);
+  backdrop-filter: blur(12px);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+}
+
+.inputWrap:focus-within {
+  border-color: rgba(216, 177, 91, 0.85);
+  box-shadow: 0 0 0 3px rgba(216, 177, 91, 0.18);
+  background: rgba(4, 20, 15, 0.65);
+}
+
+.inputWrap + label {
+  margin-top: 18px;
+}
+
+.inputWrap svg {
+  color: rgba(216, 177, 91, 0.86);
+  flex-shrink: 0;
+}
+
+.inputWrap input {
+  width: 100%;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: #ffffff;
+  font: inherit;
+}
+
+.inputWrap input::placeholder {
+  color: rgba(247, 244, 234, 0.42);
+}
+
+.iconButton,
+.textButton {
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+
+.iconButton {
+  display: grid;
+  place-items: center;
+  color: rgba(247, 244, 234, 0.55);
+  transition: color 0.2s ease;
+}
+
+.iconButton:hover {
+  color: #f0d99a;
+}
+
+.loginMeta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 18px 0 20px;
+  font-size: 12px;
+}
+
+.remember {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: rgba(247, 244, 234, 0.66);
+  cursor: pointer;
+}
+
+.remember input {
+  accent-color: #d8b15b;
+  width: 16px;
+  height: 16px;
+}
+
+.textButton {
+  color: #f0d99a;
+  font-size: 12px;
+  font-weight: 500;
+  transition: opacity 0.2s ease;
+}
+
+.textButton:hover {
+  opacity: 0.85;
+  text-decoration: underline;
+}
+
+.submit,
+.adminButton {
+  width: 100%;
+  min-height: 52px;
+  border-radius: 999px;
+  cursor: pointer;
+  font-weight: 700;
+  transition: all 0.2s ease;
+}
+
+.submit {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  border: 0;
+  color: #172015;
+  background: linear-gradient(100deg, #f1d894, #c99a3d);
+  box-shadow: 0 10px 30px rgba(216, 177, 91, 0.2);
+}
+
+.submit:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 14px 35px rgba(216, 177, 91, 0.32);
+}
+
+.submit:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.submit:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.adminDivider {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  margin: 24px 0 15px;
+  color: rgba(247, 244, 234, 0.4);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+}
+
+.adminDivider:before,
+.adminDivider:after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: rgba(247, 244, 234, 0.14);
+}
+
+.adminButton {
+  border: 1px solid rgba(216, 177, 91, 0.35);
+  color: rgba(247, 244, 234, 0.84);
+  background: rgba(4, 18, 13, 0.38);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.adminButton:hover:not(:disabled) {
+  border-color: rgba(216, 177, 91, 0.7);
+  background: rgba(6, 30, 22, 0.65);
+  color: #ffffff;
+}
+
+.adminButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.errorBanner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 14px;
+  padding: 12px 16px;
+  border-radius: 12px;
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  background: rgba(239, 68, 68, 0.15);
+  color: #fca5a5;
+  font-size: 13px;
+}
+
+.right {
+  width: 100%;
+  max-width: 650px;
+  justify-self: end;
+}
+
+.portalHeading {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  margin-bottom: 28px;
+  color: #f0d99a;
+  font: 24px Georgia, serif;
+}
+
+.portalHeading i {
+  width: 90px;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(216, 177, 91, 0.7), transparent);
+}
+
+.portalList {
+  display: grid;
+  gap: 12px;
+}
+
+.portal {
+  display: grid;
+  grid-template-columns: 54px 1fr 40px;
+  align-items: center;
+  gap: 17px;
+  min-height: 104px;
+  padding: 15px 16px;
+  color: inherit;
+  text-decoration: none;
+  border-top: 1px solid rgba(216, 177, 91, 0.28);
+  border-bottom: 1px solid rgba(216, 177, 91, 0.08);
+  background: linear-gradient(90deg, rgba(6, 30, 22, 0.42), rgba(6, 30, 22, 0.1));
+  backdrop-filter: blur(8px);
+  border-radius: 16px;
+  transition: background 0.22s ease, border-color 0.22s ease, transform 0.22s ease;
+}
+
+.portal:hover {
+  background: linear-gradient(90deg, rgba(6, 40, 29, 0.72), rgba(216, 177, 91, 0.07));
+  border-top-color: rgba(216, 177, 91, 0.65);
+}
+
+.portalIcon {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border: 1px solid rgba(216, 177, 91, 0.32);
+  border-radius: 50%;
+  color: #f0d99a;
+  background: rgba(4, 29, 21, 0.56);
+  flex-shrink: 0;
+}
+
+.portalText strong {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 16px;
+  font-weight: 600;
+  color: #f7f4ea;
+}
+
+.portalText span {
+  display: block;
+  max-width: 450px;
+  color: rgba(247, 244, 234, 0.54);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.arrow {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border: 1px solid rgba(216, 177, 91, 0.4);
+  border-radius: 50%;
+  color: #f0d99a;
+  flex-shrink: 0;
+}
+
+.footerMessage {
+  margin-top: 40px;
+  text-align: center;
+}
+
+.footerMessage span {
+  display: block;
+  color: #f0d99a;
+  font: 20px Georgia, serif;
+}
+
+.footerMessage p {
+  margin: 8px 0 0;
+  color: rgba(247, 244, 234, 0.48);
+  font-size: 12px;
+}
+
+@media (max-width: 1050px) {
+  .content {
+    grid-template-columns: 1fr;
+    gap: 70px;
+    padding: 90px 0;
+  }
+  .left,
+  .right {
+    max-width: 720px;
+    justify-self: center;
+  }
+  .brand {
+    margin-bottom: 60px;
+  }
+  .background {
+    background: linear-gradient(90deg, rgba(4, 13, 10, 0.95), rgba(4, 13, 10, 0.84)),
+                url("/images/kaaba-makkah.jpg") center/cover no-repeat;
+  }
+}
+
+@media (max-width: 640px) {
+  .content {
+    width: min(100% - 42px, 720px);
+    padding: 55px 0;
+  }
+  .frame {
+    inset: 9px;
+    border-radius: 20px;
+  }
+  .copy h1 {
+    font-size: 43px;
+  }
+  .portal {
+    grid-template-columns: 46px 1fr 34px;
+    gap: 12px;
+    min-height: 94px;
+  }
+  .portalIcon {
+    width: 42px;
+    height: 42px;
+  }
+  .portalText strong {
+    font-size: 14px;
+  }
+  .portalText span {
+    font-size: 11px;
+  }
+  .arrow {
+    width: 32px;
+    height: 32px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page * {
+    scroll-behavior: auto !important;
+  }
+}
