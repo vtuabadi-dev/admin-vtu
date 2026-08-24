@@ -97,8 +97,18 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
                 data: { jumlahAnggota: otherMembers.length },
               });
             }
-          } else {
-            // No other members left in group -> clean up billing & delete empty group FIRST
+            // No other members left in group -> clean up billing, registrations & delete empty group FIRST
+            if (jamaah.group.kodeRegistrasi) {
+              const regReq = await tx.registrationRequest.findUnique({
+                where: { kodeRegistrasi: jamaah.group.kodeRegistrasi },
+                select: { id: true },
+              });
+              if (regReq) {
+                await tx.registrationMember.deleteMany({ where: { requestId: regReq.id } }).catch(() => {});
+                await tx.registrationRequest.delete({ where: { id: regReq.id } }).catch(() => {});
+              }
+            }
+
             await Promise.all([
               tx.invoiceItem.deleteMany({ where: { invoice: { groupId: jamaah.groupId } } }).catch(() => {}),
               tx.invoice.deleteMany({ where: { groupId: jamaah.groupId } }).catch(() => {}),
@@ -110,6 +120,11 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
               `DELETE FROM "registration_groups" WHERE "id" = '${jamaah.groupId.replace(/'/g, "''")}'`
             );
           }
+        }
+
+        // Clean up any registration member associated with this person
+        if (jamaah.namaLengkap) {
+          await tx.registrationMember.deleteMany({ where: { namaLengkap: jamaah.namaLengkap } }).catch(() => {});
         }
 
         // 3. Delete the jamaah record

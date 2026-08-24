@@ -23,7 +23,6 @@ import {
   Loader2,
   Send,
   Mail,
-  MessageSquare,
   Copy,
   Check,
   Calendar,
@@ -31,6 +30,7 @@ import {
   FileDown,
   PlusCircle,
   Trash2,
+  AlertTriangle,
   ShoppingBag,
   Building,
   Users,
@@ -464,6 +464,12 @@ function PaymentReviewTabContent() {
   const [successMessage, setSuccessMessage] = useState("");
   const [showSuccess, setShowSuccess] = useState(false);
 
+  // Delete Trial Data States
+  const [deletePaymentTarget, setDeletePaymentTarget] = useState<any | null>(null);
+  const [showDeleteAllPaymentsModal, setShowDeleteAllPaymentsModal] = useState(false);
+  const [cascadeGroupDelete, setCascadeGroupDelete] = useState(true);
+  const [isDeletingPayment, setIsDeletingPayment] = useState(false);
+
   const loadData = useCallback(async () => {
     try {
       setLoading(true);
@@ -482,6 +488,55 @@ function PaymentReviewTabContent() {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  const handleDeleteSinglePayment = async () => {
+    if (!deletePaymentTarget) return;
+    setIsDeletingPayment(true);
+    try {
+      const res = await fetch(`/api/pembayaran/${deletePaymentTarget.id}?cascade=${cascadeGroupDelete}`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      if (data.success) {
+        setSuccessMessage(data.message || "Data pembayaran berhasil dihapus");
+        setShowSuccess(true);
+        if (selectedPayment?.id === deletePaymentTarget.id) {
+          setSelectedPayment(null);
+        }
+        setDeletePaymentTarget(null);
+        loadData();
+      } else {
+        window.alert(data.message || "Gagal menghapus data pembayaran");
+      }
+    } catch {
+      window.alert("Terjadi kesalahan saat menghapus data pembayaran.");
+    } finally {
+      setIsDeletingPayment(false);
+    }
+  };
+
+  const handleDeleteAllPayments = async () => {
+    setIsDeletingPayment(true);
+    try {
+      const res = await fetch(`/api/pembayaran`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      if (data.success) {
+        setSuccessMessage(data.message || "Semua data pembayaran percobaan berhasil dihapus");
+        setShowSuccess(true);
+        setSelectedPayment(null);
+        setShowDeleteAllPaymentsModal(false);
+        loadData();
+      } else {
+        window.alert(data.message || "Gagal menghapus antrian pembayaran");
+      }
+    } catch {
+      window.alert("Terjadi kesalahan saat menghapus antrian pembayaran.");
+    } finally {
+      setIsDeletingPayment(false);
+    }
+  };
 
   const [ocrLoading, setOcrLoading] = useState(false);
   const [ocrData, setOcrData] = useState<any | null>(null);
@@ -1104,6 +1159,20 @@ function PaymentReviewTabContent() {
               Reset
             </button>
           )}
+
+          {/* Tombol Hapus Semua Data Pembayaran Percobaan */}
+          <Button
+            type="button"
+            variant="destructive"
+            size="sm"
+            onClick={() => setShowDeleteAllPaymentsModal(true)}
+            disabled={queue.length === 0 || isDeletingPayment}
+            className="h-8 px-2.5 text-xs font-bold gap-1.5 bg-red-600 hover:bg-red-700 text-white shadow-xs cursor-pointer ml-auto"
+            title="Hapus seluruh antrian data pembayaran percobaan"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            <span>Hapus Data Percobaan ({queue.length})</span>
+          </Button>
         </div>
       </div>
 
@@ -1241,6 +1310,17 @@ function PaymentReviewTabContent() {
                                     )}
                                   </>
                                 )}
+
+                                {/* Tombol Hapus Satuan */}
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-7 w-7 p-0 text-muted-foreground hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 cursor-pointer ml-0.5"
+                                  title="Hapus data pembayaran / percobaan ini"
+                                  onClick={() => setDeletePaymentTarget(p)}
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
                               </div>
                             </td>
                           </tr>
@@ -1910,6 +1990,18 @@ function PaymentReviewTabContent() {
                       Tolak Pembayaran Ini
                     </Button>
                   )}
+
+                  {/* Tombol Hapus Transaksi & Data Percobaan Ini */}
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="w-full text-xs font-bold text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 h-8 gap-1.5 border border-dashed border-red-300 dark:border-red-800 cursor-pointer mt-1"
+                    onClick={() => setDeletePaymentTarget(selectedPayment)}
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Hapus Data Transaksi / Percobaan Ini</span>
+                  </Button>
                 </div>
               </CardContent>
             </Card>
@@ -1981,16 +2073,13 @@ function PaymentReviewTabContent() {
             </div>
 
             {/* Message Preview Box */}
-            <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <span className="text-xs font-bold text-foreground flex items-center gap-1.5">
-                  <MessageSquare className="h-3.5 w-3.5 text-emerald-600" />
-                  Pratinjau Pesan Invoice
-                </span>
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-foreground">Teks Pesan WhatsApp yang Tergenerate</label>
                 <Button
-                  size="sm"
                   variant="ghost"
-                  className="h-6 text-[11px] font-bold text-amber-600 hover:bg-amber-500/10 gap-1 px-2"
+                  size="sm"
+                  className="h-6 text-[11px] gap-1 px-2 font-medium"
                   onClick={handleCopyInvoiceText}
                 >
                   {copiedInvoiceText ? (
@@ -2093,35 +2182,27 @@ function PaymentReviewTabContent() {
                 rel="noreferrer"
                 className="inline-flex items-center gap-1 text-xs font-bold text-amber-600 hover:underline"
               >
-                <ExternalLink className="h-3.5 w-3.5" /> Buka Tab Baru
+                Buka Gambar Asli <ExternalLink className="h-3.5 w-3.5" />
               </a>
             )}
           </div>
 
-          {/* Image Container */}
-          <div className="relative max-h-[65vh] overflow-auto rounded-lg border bg-stone-900/90 flex items-center justify-center p-4">
-            {previewImageUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
+          <div className="max-h-[60vh] overflow-auto flex items-center justify-center p-4 bg-muted/20 rounded-xl border">
+            {previewImageUrl && (
               <img
                 src={previewImageUrl}
                 alt="Bukti Transfer"
-                style={{ transform: `scale(${zoomLevel})`, transition: "transform 0.2s ease" }}
-                className="max-h-[55vh] object-contain rounded shadow-lg select-none"
+                style={{ transform: `scale(${zoomLevel})`, transformOrigin: "center center" }}
+                className="transition-transform duration-200 rounded-lg shadow-md max-w-full h-auto object-contain"
               />
-            ) : (
-              <p className="text-xs text-muted-foreground">Tidak ada gambar bukti transfer.</p>
             )}
-          </div>
-
-          <div className="flex justify-end pt-1">
-            <Button size="sm" onClick={() => setPreviewImageUrl(null)}>
-              Tutup Pratinjau
-            </Button>
           </div>
         </div>
       </Modal>
 
-      {/* Reject Modal */}
+      {/* ========================================================= */}
+      {/* MODAL TOLAK PEMBAYARAN */}
+      {/* ========================================================= */}
       <Modal
         open={rejectTarget !== null}
         onClose={() => {
@@ -2209,7 +2290,7 @@ function PaymentReviewTabContent() {
                     : "bg-background text-muted-foreground hover:bg-muted"
                 }`}
               >
-                <span>➖ Pengurangan / Diskon (-)</span>
+                <span>➖ Pengurangan / Potongan (-)</span>
               </button>
             </div>
           </div>
@@ -2221,34 +2302,37 @@ function PaymentReviewTabContent() {
               onChange={(e) => {
                 const cat = e.target.value;
                 setNewOrderCategory(cat);
-                const foundPreset = ORDER_PRESETS.find((p) => p.category === cat);
-                if (foundPreset) {
-                  setNewOrderName(foundPreset.defaultName);
-                  setNewOrderType(foundPreset.type);
-                  setNewOrderNominal(foundPreset.defaultNominal);
-                }
+                if (cat === "fast_train" && !newOrderName) setNewOrderName("Kereta Cepat Haramain (Fast Train)");
+                else if (cat === "upgrade_kamar" && !newOrderName) setNewOrderName("Upgrade Kamar (Double / Triple)");
+                else if (cat === "upgrade_hotel" && !newOrderName) setNewOrderName("Upgrade Hotel Bintang 5");
+                else if (cat === "perlengkapan" && !newOrderName) setNewOrderName("Penambahan Perlengkapan Umroh Lengkap");
+                else if (cat === "paspor" && !newOrderName) setNewOrderName("Biaya Penanganan / Pembuatan Paspor");
+                else if (cat === "kursi_roda" && !newOrderName) setNewOrderName("Sewa Kursi Roda & Muthawif Pendorong");
+                else if (cat === "jahit" && !newOrderName) setNewOrderName("Ongkos Jahit Seragam Batik");
+                else if (cat === "city_tour" && !newOrderName) setNewOrderName("Tambahan Extra City Tour / Ziarah Taif");
               }}
-              className="mt-1 w-full h-8 rounded-md border bg-background px-2.5 text-xs text-foreground focus:ring-1 focus:ring-primary"
+              className="mt-1 w-full rounded-md border border-stone-300 dark:border-stone-700 bg-background px-3 py-1.5 text-xs focus:ring-1 focus:ring-amber-500"
             >
-              <option value="fast_train">🚅 Kereta Cepat Haramain (Fast Train)</option>
-              <option value="upgrade_kamar">🛏️ Upgrade Kamar (Quad ke Double/Triple)</option>
-              <option value="upgrade_hotel">🏨 Upgrade Hotel (Bintang 5 / Ring 1)</option>
-              <option value="perlengkapan">🎒 Tambah Perlengkapan / Koper Umroh</option>
-              <option value="jahit_seragam">✂️ Ongkos Jahit Seragam Batik / Abaya</option>
-              <option value="kursi_roda">♿ Sewa Kursi Roda & Muthawwif Pendorong</option>
-              <option value="paspor">🛂 Biaya Penanganan Paspor & Visa Ekstra</option>
-              <option value="diskon">🎁 Potongan Khusus / Diskon Promo</option>
-              <option value="lainnya">➕ Layanan / Biaya Lainnya</option>
+              <option value="fast_train">🚄 Kereta Cepat Haramain</option>
+              <option value="upgrade_kamar">🛏️ Upgrade Kamar (Double/Triple)</option>
+              <option value="upgrade_hotel">🏨 Upgrade Hotel (Bintang 5)</option>
+              <option value="perlengkapan">🎒 Tambah Perlengkapan / Koper</option>
+              <option value="jahit">🧵 Ongkos Jahit Seragam</option>
+              <option value="kursi_roda">♿ Sewa Kursi Roda + Petugas</option>
+              <option value="paspor">🛂 Penanganan & Rekomendasi Paspor</option>
+              <option value="city_tour">🚌 Tambahan City Tour / Taif</option>
+              <option value="custom">✨ Layanan / Potongan Kustom Lainnya</option>
             </select>
           </div>
 
           <div>
-            <label className="text-[11px] font-bold text-foreground">Nama / Deskripsi Layanan</label>
+            <label className="text-[11px] font-bold text-foreground">Deskripsi / Nama Layanan</label>
             <Input
+              type="text"
               value={newOrderName}
               onChange={(e) => setNewOrderName(e.target.value)}
-              placeholder="Contoh: Ongkos Jahit Seragam Batik 2 Pax"
-              className="mt-1 h-8 text-xs font-semibold"
+              placeholder="Contoh: Tambah Kereta Cepat Haramain Makkah-Madinah"
+              className="mt-1 h-8 text-xs"
             />
           </div>
 
@@ -2288,6 +2372,118 @@ function PaymentReviewTabContent() {
               }}
             >
               Simpan Layanan
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* ========================================================= */}
+      {/* MODAL KONFIRMASI HAPUS PEMBAYARAN SATUAN */}
+      {/* ========================================================= */}
+      <Modal
+        open={Boolean(deletePaymentTarget)}
+        onClose={() => setDeletePaymentTarget(null)}
+        title="Konfirmasi Hapus Data Pembayaran"
+        size="default"
+      >
+        <div className="space-y-4 pt-1">
+          <div className="p-3 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 rounded-xl flex items-start gap-3">
+            <AlertTriangle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+            <div className="text-xs space-y-1">
+              <p className="font-bold text-red-900 dark:text-red-200">
+                Hapus Transaksi Pembayaran: {deletePaymentTarget ? formatCurrency(deletePaymentTarget.jumlah) : "-"}
+              </p>
+              <p className="text-red-700 dark:text-red-300">
+                Grup: <span className="font-bold">{deletePaymentTarget?.namaGroup ?? deletePaymentTarget?.groupId}</span> (ID Reg: {deletePaymentTarget?.kodeRegistrasi ?? "-"})
+              </p>
+            </div>
+          </div>
+
+          <label className="flex items-center gap-2 text-xs text-foreground font-medium p-2 bg-muted rounded-lg cursor-pointer">
+            <input
+              type="checkbox"
+              checked={cascadeGroupDelete}
+              onChange={(e) => setCascadeGroupDelete(e.target.checked)}
+              className="rounded text-red-600 focus:ring-red-500"
+            />
+            <span>Hapus juga seluruh data registrasi percobaan & grup jamaah terkait</span>
+          </label>
+
+          <p className="text-xs text-muted-foreground">
+            Apakah Anda yakin ingin menghapus transaksi pembayaran ini secara permanen?
+          </p>
+
+          <div className="flex justify-end gap-2 pt-2 border-t">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setDeletePaymentTarget(null)}
+              disabled={isDeletingPayment}
+            >
+              Batal
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              size="sm"
+              onClick={handleDeleteSinglePayment}
+              disabled={isDeletingPayment}
+              className="bg-red-600 hover:bg-red-700 font-bold gap-1.5"
+            >
+              {isDeletingPayment ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+              <span>{isDeletingPayment ? "Menghapus..." : "Hapus Pembayaran"}</span>
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* ========================================================= */}
+      {/* MODAL KONFIRMASI HAPUS SEMUA DATA PEMBAYARAN PERCOBAAN */}
+      {/* ========================================================= */}
+      <Modal
+        open={showDeleteAllPaymentsModal}
+        onClose={() => setShowDeleteAllPaymentsModal(false)}
+        title="Konfirmasi Hapus Seluruh Data Pembayaran Percobaan"
+        size="default"
+      >
+        <div className="space-y-4 pt-1">
+          <div className="p-3 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 rounded-xl flex items-start gap-3">
+            <AlertTriangle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+            <div className="text-xs space-y-1">
+              <p className="font-bold text-red-900 dark:text-red-200">
+                PERINGATAN: Tindakan ini bersifat PERMANEN dan tidak dapat dibatalkan!
+              </p>
+              <p className="text-red-700 dark:text-red-300">
+                Seluruh ({queue.length}) data pembayaran percobaan, alokasi pembayaran, dan kwitansi invoice terkait akan dihapus total dari database.
+              </p>
+            </div>
+          </div>
+
+          <p className="text-xs text-muted-foreground">
+            Apakah Anda benar-benar yakin ingin membersihkan antrian transaksi pembayaran percobaan ini sekarang?
+          </p>
+
+          <div className="flex justify-end gap-2 pt-2 border-t">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setShowDeleteAllPaymentsModal(false)}
+              disabled={isDeletingPayment}
+            >
+              Batal
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              size="sm"
+              onClick={handleDeleteAllPayments}
+              disabled={isDeletingPayment}
+              className="bg-red-600 hover:bg-red-700 font-bold gap-1.5"
+            >
+              {isDeletingPayment ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+              <span>{isDeletingPayment ? "Menghapus..." : "Ya, Hapus Seluruh Antrian"}</span>
             </Button>
           </div>
         </div>

@@ -15,11 +15,14 @@ import {
   CheckCircle2,
   AlertTriangle,
   XCircle,
+  Trash2,
+  Loader2,
 } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/shared/components/ui/Card";
 import { Button } from "@/shared/components/ui/Button";
 import { Input } from "@/shared/components/ui/Input";
 import { StatusBadge } from "@/shared/components/ui/Badge";
+import { Modal } from "@/shared/components/ui/Modal";
 import { RequirePermission } from "@/shared/components/RequirePermission";
 import { cn, formatDate } from "@/shared/lib/utils";
 import {
@@ -49,6 +52,9 @@ export default function ManifestDetailPage() {
     field: "nomorKursi" | "nomorKamar";
   } | null>(null);
   const [editValue, setEditValue] = useState("");
+
+  const [deleteTargetRow, setDeleteTargetRow] = useState<ManifestRow | null>(null);
+  const [isDeletingRow, setIsDeletingRow] = useState(false);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -82,6 +88,27 @@ export default function ManifestDetailPage() {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  const handleDeleteRow = async () => {
+    if (!deleteTargetRow) return;
+    setIsDeletingRow(true);
+    try {
+      const res = await fetch(`/api/manifests/${id}/rows/${deleteTargetRow.id}`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      if (data.success) {
+        setDeleteTargetRow(null);
+        loadData();
+      } else {
+        window.alert(data.message || "Gagal menghapus jamaah dari manifest");
+      }
+    } catch {
+      window.alert("Terjadi kesalahan saat menghapus data jamaah.");
+    } finally {
+      setIsDeletingRow(false);
+    }
+  };
 
   function startEdit(rowId: string, field: "nomorKursi" | "nomorKamar", currentValue: string | undefined) {
     setEditingCell({ rowId, field });
@@ -298,6 +325,9 @@ export default function ManifestDetailPage() {
                   <th className="h-9 px-3 text-left align-middle font-medium text-muted-foreground text-xs">
                     Catatan
                   </th>
+                  <th className="h-9 px-3 text-right align-middle font-medium text-muted-foreground text-xs">
+                    Aksi
+                  </th>
                 </tr>
               </thead>
               <tbody className="[&_tr:last-child]:border-0">
@@ -390,6 +420,19 @@ export default function ManifestDetailPage() {
                     <td className="px-3 py-1.5 align-middle text-xs text-muted-foreground">
                       {row.catatan || <span className="italic">—</span>}
                     </td>
+
+                    {/* Tombol Hapus Jamaah & Semua Data Terkait */}
+                    <td className="px-3 py-1.5 align-middle text-right">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 w-7 p-0 text-muted-foreground hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 cursor-pointer"
+                        title="Hapus jamaah & seluruh data terkait (pembayaran, invoice, registrasi)"
+                        onClick={() => setDeleteTargetRow(row)}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -397,6 +440,62 @@ export default function ManifestDetailPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Modal Konfirmasi Hapus Jamaah dari Manifest */}
+      <Modal
+        open={Boolean(deleteTargetRow)}
+        onClose={() => setDeleteTargetRow(null)}
+        title="Konfirmasi Hapus Jamaah dari Manifest"
+        size="default"
+      >
+        <div className="space-y-4 pt-1">
+          <div className="p-3 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 rounded-xl flex items-start gap-3">
+            <AlertTriangle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+            <div className="text-xs space-y-1">
+              <p className="font-bold text-red-900 dark:text-red-200">
+                PERINGATAN: Penghapusan Menyeluruh (Full Data Purge)
+              </p>
+              <p className="text-red-700 dark:text-red-300 leading-relaxed">
+                Menghapus jamaah <span className="font-bold underline">{deleteTargetRow?.namaLengkap}</span> (Paspor: {deleteTargetRow?.nomorPaspor || "-"}) dari manifest ini akan <span className="font-bold">MENGHAPUS SEMUA DATA TERKAIT</span> jamaah tersebut dari sistem, termasuk:
+              </p>
+              <ul className="list-disc list-inside text-red-700 dark:text-red-300 mt-1 space-y-0.5">
+                <li>Transaksi Pembayaran & Alokasi Pembayaran</li>
+                <li>Invoice & Kwitansi Resmi</li>
+                <li>Data Permohonan Registrasi & Anggota Pendaftaran</li>
+                <li>Dokumen Paspor / KTP / Visa</li>
+                <li>Alokasi Kamar Hotel & Kursi</li>
+              </ul>
+            </div>
+          </div>
+
+          <p className="text-xs text-muted-foreground">
+            Apakah Anda yakin ingin melanjutkan penghapusan total data jamaah ini?
+          </p>
+
+          <div className="flex justify-end gap-2 pt-2 border-t">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setDeleteTargetRow(null)}
+              disabled={isDeletingRow}
+            >
+              Batal
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              size="sm"
+              onClick={handleDeleteRow}
+              disabled={isDeletingRow}
+              className="bg-red-600 hover:bg-red-700 font-bold gap-1.5"
+            >
+              {isDeletingRow ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+              <span>{isDeletingRow ? "Menghapus Data..." : "Ya, Hapus Semua Data Jamaah"}</span>
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

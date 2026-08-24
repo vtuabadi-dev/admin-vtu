@@ -349,4 +349,111 @@ export const pembayaranRepo = {
       group: (r as any).group,
     }));
   },
+
+  async delete(id: string, cascadeRegistration = false) {
+    const payment = await prisma.pembayaran.findUnique({
+      where: { id },
+      include: {
+        group: {
+          include: {
+            pembayaran: true,
+            anggota: true,
+          },
+        },
+      },
+    });
+
+    if (!payment) throw new Error("Data pembayaran tidak ditemukan");
+
+    const groupId = payment.groupId;
+    const invoiceId = payment.invoiceId;
+
+    // 1. Delete allocations
+    await prisma.alokasiPembayaran.deleteMany({ where: { pembayaranId: id } }).catch(() => {});
+
+    // 2. Delete invoice if linked
+    if (invoiceId) {
+      await prisma.invoiceItem.deleteMany({ where: { invoiceId } }).catch(() => {});
+      await prisma.invoice.deleteMany({ where: { OR: [{ id: invoiceId }, { nomorInvoice: invoiceId }] } }).catch(() => {});
+    }
+
+    // 3. Delete the payment itself
+    await prisma.pembayaran.delete({ where: { id } });
+
+    // 4. Update group or cascade delete group if requested
+    if (groupId) {
+      if (cascadeRegistration && payment.group) {
+        const kodeReg = payment.group.kodeRegistrasi;
+        // Clean up group, members, registration requests, jamaah
+        await prisma.invoiceItem.deleteMany({ where: { invoice: { groupId } } }).catch(() => {});
+        await prisma.invoice.deleteMany({ where: { groupId } }).catch(() => {});
+        await prisma.pembayaran.deleteMany({ where: { groupId } }).catch(() => {});
+        await prisma.invoiceSplitConfig.deleteMany({ where: { groupId } }).catch(() => {});
+        await prisma.reminder.deleteMany({ where: { groupId } }).catch(() => {});
+
+        if (kodeReg) {
+          const regReq = await prisma.registrationRequest.findUnique({ where: { kodeRegistrasi: kodeReg }, select: { id: true } });
+          if (regReq) {
+            await prisma.registrationMember.deleteMany({ where: { requestId: regReq.id } }).catch(() => {});
+            await prisma.registrationRequest.delete({ where: { id: regReq.id } }).catch(() => {});
+          }
+        }
+
+        const jamaahIds = payment.group.anggota.map((a: any) => a.id);
+        if (jamaahIds.length > 0) {
+          await prisma.dokumenItem.deleteMany({ where: { jamaahId: { in: jamaahIds } } }).catch(() => {});
+          await prisma.manifestRow.deleteMany({ where: { jamaahId: { in: jamaahIds } } }).catch(() => {});
+          await prisma.penghuniKamar.deleteMany({ where: { jamaahId: { in: jamaahIds } } }).catch(() => {});
+        }
+
+        // Delete group and jamaah
+        await prisma.$executeRawUnsafe(`DELETE FROM "registration_groups" WHERE "id" = '${groupId.replace(/'/g, "''")}'`).catch(() => {});
+        if (jamaahIds.length > 0) {
+          const inList = jamaahIds.map((jid: string) => `'${jid.replace(/'/g, "''")}'`).join(",");
+          await prisma.$executeRawUnsafe(`DELETE FROM "jamaah" WHERE "id" IN (${inList})`).catch(() => {});
+        }
+      } else {
+        // Recalculate remaining payments
+        const remaining = await prisma.pembayaran.findMany({
+          where: { groupId, status: "verified" },
+        });
+        const newTotalBayar = remaining.reduce((sum, p) => sum + p.jumlah, 0);
+        const groupRecord = await prisma.registrationGroup.findUnique({ where: { id: groupId } });
+        if (groupRecord) {
+          const newSisa = Math.max(0, groupRecord.totalTagihan - newTotalBayar);
+          await prisma.registrationGroup.update({
+            where: { id: groupId },
+            data: {
+              totalPembayaran: newTotalBayar,
+              sisaPembayaran: newSisa,
+            },
+          });
+        }
+      }
+    }
+
+    return { success: true, id };
+  },
+
+  async deleteAll(filter?: { status?: string }) {
+    const where: any = {};
+    if (filter?.status && filter.status !== "all") {
+      where.status = filter.status;
+    }
+
+    const payments = await prisma.pembayaran.findMany({ where, select: { id: true, invoiceId: true } });
+    const ids = payments.map((p) => p.id);
+    const invoiceIds = payments.map((p) => p.invoiceId).filter(Boolean) as string[];
+
+    if (ids.length > 0) {
+      await prisma.alokasiPembayaran.deleteMany({ where: { pembayaranId: { in: ids } } }).catch(() => {});
+      if (invoiceIds.length > 0) {
+        await prisma.invoiceItem.deleteMany({ where: { invoiceId: { in: invoiceIds } } }).catch(() => {});
+        await prisma.invoice.deleteMany({ where: { OR: [{ id: { in: invoiceIds } }, { nomorInvoice: { in: invoiceIds } }] } }).catch(() => {});
+      }
+      await prisma.pembayaran.deleteMany({ where: { id: { in: ids } } });
+    }
+
+    return { count: ids.length };
+  },
 };
