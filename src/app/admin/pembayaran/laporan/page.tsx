@@ -614,6 +614,11 @@ function PaymentReviewTabContent() {
       `*Total Tagihan Disesuaikan:* Rp ${tagihanDisesuaikan.toLocaleString("id-ID")}`,
     ] : [];
 
+    const baseUrl = typeof window !== "undefined" && window.location.origin
+      ? window.location.origin
+      : "https://vtuabadi.com";
+    const downloadPdfUrl = `${baseUrl}/invoice/${encodeURIComponent(invNum)}?kode=${encodeURIComponent(kodeReg)}`;
+
     return [
       `*INVOICE PEMBAYARAN RESMI — VTU ABADI TRAVEL*`,
       `--------------------------------------------------`,
@@ -630,6 +635,9 @@ function PaymentReviewTabContent() {
       `📅 *Tanggal Transaksi:* ${tgl}`,
       `🏦 *Metode / Bank:* ${bank}`,
       `✅ *Status:* LUNAS / TERVERIFIKASI`,
+      ``,
+      `📥 *Unduh Dokumen PDF Resmi Secara Online:*`,
+      `👉 ${downloadPdfUrl}`,
       ``,
       `Dokumen kuitansi & invoice ini merupakan bukti pembayaran resmi yang diterbitkan oleh PT Vauza Tamma Abadi (VTU ABADI Travel).`,
       `Semoga Allah SWT senantiasa memberikan kelancaran dan kemudahan dalam persiapan ibadah ke Baitullah.`,
