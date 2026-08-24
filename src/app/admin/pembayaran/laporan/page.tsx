@@ -12,6 +12,13 @@ import {
   Eye,
   XCircle,
   CheckCircle2,
+  FileText,
+  Receipt,
+  Printer,
+  ExternalLink,
+  ZoomIn,
+  ZoomOut,
+  X,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/components/ui/Card";
 import { Button } from "@/shared/components/ui/Button";
@@ -317,18 +324,41 @@ function SplitInvoiceModal({
 // ============================================================
 
 function PaymentReviewTabContent() {
-  const [queue, setQueue] = useState<Pembayaran[]>([]);
+  const [queue, setQueue] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [processingId, setProcessingId] = useState<string | null>(null);
-  const [rejectTarget, setRejectTarget] = useState<Pembayaran | null>(null);
+  const [selectedPayment, setSelectedPayment] = useState<any | null>(null);
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [jenisFilter, setJenisFilter] = useState<string>("all");
+  const [searchQuery, setSearchQuery] = useState<string>("");
+  const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
+  const [zoomLevel, setZoomLevel] = useState<number>(1);
+
+  // Form Invoice States (Canvas Kanan)
+  const [invoiceNumber, setInvoiceNumber] = useState("");
+  const [invoiceDate, setInvoiceDate] = useState(new Date().toISOString().slice(0, 10));
+  const [dueDate, setDueDate] = useState("");
+  const [formJenis, setFormJenis] = useState("DP (Pendaftaran)");
+  const [formNominal, setFormNominal] = useState<number>(0);
+  const [formMetode, setFormMetode] = useState("transfer");
+  const [formBank, setFormBank] = useState("");
+  const [formRekening, setFormRekening] = useState("");
+  const [formCatatan, setFormCatatan] = useState("");
+  const [submittingInvoice, setSubmittingInvoice] = useState(false);
+
+  // Reject State
+  const [rejectTarget, setRejectTarget] = useState<any | null>(null);
   const [rejectReason, setRejectReason] = useState("");
   const [rejectNotes, setRejectNotes] = useState("");
+
+  // Toast / Feedback
   const [successMessage, setSuccessMessage] = useState("");
   const [showSuccess, setShowSuccess] = useState(false);
 
   const loadData = useCallback(async () => {
     try {
-      const res = await fetch("/api/pembayaran/review");
+      setLoading(true);
+      const res = await fetch("/api/pembayaran/review?status=all");
       if (res.ok) {
         const json = await res.json();
         setQueue(json.data ?? []);
@@ -344,20 +374,80 @@ function PaymentReviewTabContent() {
     loadData();
   }, [loadData]);
 
-  const handleApprove = useCallback(async (payment: Pembayaran) => {
+  // When a payment row is clicked to create/view invoice
+  const handleSelectPayment = (payment: any) => {
+    setSelectedPayment(payment);
+    const dateStr = new Date().toISOString().slice(0, 10);
+    const randomNum = Math.floor(1000 + Math.random() * 9000);
+    setInvoiceNumber(payment.invoiceId || `INV-${dateStr.replace(/-/g, "")}-${randomNum}`);
+    setInvoiceDate(payment.tanggal ? new Date(payment.tanggal).toISOString().slice(0, 10) : dateStr);
+
+    const d = new Date();
+    d.setDate(d.getDate() + 7);
+    setDueDate(d.toISOString().slice(0, 10));
+
+    const cat = (payment.catatan || "").toLowerCase();
+    if (cat.includes("dp") || cat.includes("daftar") || cat.includes("pendaftaran") || payment.sumber === "jamaah_dp") {
+      setFormJenis("DP (Pendaftaran)");
+    } else if (cat.includes("lunas") || cat.includes("pelunasan") || (payment.group?.totalTagihan && payment.jumlah >= payment.group.totalTagihan)) {
+      setFormJenis("Pelunasan");
+    } else {
+      setFormJenis("Cicilan / Tagihan");
+    }
+
+    setFormNominal(payment.jumlah || 0);
+    setFormMetode(payment.metode || "transfer");
+    setFormBank(payment.bankPengirim || "");
+    setFormRekening(payment.nomorRekening || "");
+    setFormCatatan(payment.catatan || "");
+  };
+
+  const handleApprove = useCallback(async (payment: any) => {
     setProcessingId(payment.id);
     try {
       const res = await fetch(`/api/pembayaran/${payment.id}/approve`, { method: "POST" });
       if (!res.ok) throw new Error("Gagal menyetujui");
-      setQueue((prev) => prev.filter((p) => p.id !== payment.id));
-      setSuccessMessage(`Pembayaran ${formatCurrency(payment.jumlah)} telah disetujui`);
+      setQueue((prev) =>
+        prev.map((p) => (p.id === payment.id ? { ...p, status: "verified" } : p))
+      );
+      if (selectedPayment?.id === payment.id) {
+        setSelectedPayment((prev: any) => prev ? { ...prev, status: "verified" } : null);
+      }
+      setSuccessMessage(`Pembayaran ${formatCurrency(payment.jumlah)} untuk ${payment.namaGroup || "Group"} telah disetujui`);
       setShowSuccess(true);
     } catch {
       window.alert("Gagal menyetujui pembayaran");
     } finally {
       setProcessingId(null);
     }
-  }, []);
+  }, [selectedPayment]);
+
+  const handleApproveFromForm = async () => {
+    if (!selectedPayment) return;
+    setSubmittingInvoice(true);
+    try {
+      const res = await fetch(`/api/pembayaran/${selectedPayment.id}/approve`, { method: "POST" });
+      if (!res.ok) throw new Error("Gagal menyetujui");
+
+      setSuccessMessage(`Invoice ${invoiceNumber} untuk ${selectedPayment.namaGroup || "Group"} (${formatCurrency(formNominal)}) berhasil diterbitkan & disetujui!`);
+      setShowSuccess(true);
+
+      setQueue((prev) =>
+        prev.map((p) =>
+          p.id === selectedPayment.id
+            ? { ...p, status: "verified", invoiceId: invoiceNumber, jumlah: formNominal }
+            : p
+        )
+      );
+      setSelectedPayment((prev: any) =>
+        prev ? { ...prev, status: "verified", invoiceId: invoiceNumber, jumlah: formNominal } : null
+      );
+    } catch {
+      window.alert("Gagal memproses approval & invoice");
+    } finally {
+      setSubmittingInvoice(false);
+    }
+  };
 
   const handleReject = useCallback(async () => {
     if (!rejectTarget || !rejectReason) return;
@@ -370,7 +460,12 @@ function PaymentReviewTabContent() {
         body: JSON.stringify({ alasanReject: alasan }),
       });
       if (!res.ok) throw new Error("Gagal menolak");
-      setQueue((prev) => prev.filter((p) => p.id !== rejectTarget.id));
+      setQueue((prev) =>
+        prev.map((p) => (p.id === rejectTarget.id ? { ...p, status: "rejected" } : p))
+      );
+      if (selectedPayment?.id === rejectTarget.id) {
+        setSelectedPayment((prev: any) => prev ? { ...prev, status: "rejected" } : null);
+      }
       setSuccessMessage(`Pembayaran ${formatCurrency(rejectTarget.jumlah)} telah ditolak`);
       setShowSuccess(true);
       setRejectTarget(null);
@@ -381,120 +476,587 @@ function PaymentReviewTabContent() {
     } finally {
       setProcessingId(null);
     }
-  }, [rejectTarget, rejectReason, rejectNotes]);
+  }, [rejectTarget, rejectReason, rejectNotes, selectedPayment]);
+
+  const getPaymentTypeBadge = (p: any) => {
+    const cat = (p.catatan || "").toLowerCase();
+    if (cat.includes("dp") || cat.includes("daftar") || cat.includes("pendaftaran") || p.sumber === "jamaah_dp") {
+      return (
+        <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-cyan-500/10 text-cyan-700 dark:text-cyan-300 border border-cyan-200 dark:border-cyan-800">
+          DP Pendaftaran
+        </span>
+      );
+    }
+    if (cat.includes("lunas") || cat.includes("pelunasan") || (p.group?.totalTagihan && p.jumlah >= p.group.totalTagihan)) {
+      return (
+        <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+          Pelunasan
+        </span>
+      );
+    }
+    return (
+      <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
+        Cicilan / Tagihan
+      </span>
+    );
+  };
+
+  const filteredQueue = queue.filter((p) => {
+    if (statusFilter !== "all" && p.status !== statusFilter) return false;
+
+    if (jenisFilter !== "all") {
+      const cat = (p.catatan || "").toLowerCase();
+      const isDP = cat.includes("dp") || cat.includes("daftar") || cat.includes("pendaftaran") || p.sumber === "jamaah_dp";
+      const isLunas = cat.includes("lunas") || cat.includes("pelunasan") || (p.group?.totalTagihan && p.jumlah >= p.group.totalTagihan);
+      if (jenisFilter === "dp" && !isDP) return false;
+      if (jenisFilter === "pelunasan" && !isLunas) return false;
+      if (jenisFilter === "tagihan" && (isDP || isLunas)) return false;
+    }
+
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      const matchKode = (p.kodeRegistrasi || "").toLowerCase().includes(q);
+      const matchName = (p.namaGroup || "").toLowerCase().includes(q);
+      const matchBank = (p.bankPengirim || "").toLowerCase().includes(q);
+      const matchNominal = String(p.jumlah).includes(q);
+      if (!matchKode && !matchName && !matchBank && !matchNominal) return false;
+    }
+
+    return true;
+  });
 
   if (loading) {
     return <LoadingSkeleton variant="table" />;
   }
 
+  // Calculate group financial summaries if available
+  const groupTotalTagihan = selectedPayment?.group?.totalTagihan || selectedPayment?.jumlah || 0;
+  const groupTotalBayar = selectedPayment?.group?.totalPembayaran || 0;
+  const groupSisaTagihan = Math.max(0, groupTotalTagihan - (groupTotalBayar + (selectedPayment?.status === "verified" ? 0 : formNominal)));
+
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      {/* Top Filter & Search Bar */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-card p-3.5 rounded-xl border shadow-xs">
         <div>
-          <h2 className="text-lg font-bold">Verifikasi & Peninjauan Slip Pembayaran</h2>
-          <p className="text-xs text-muted-foreground">Tinjau dan konfirmasi bukti transfer yang diajukan oleh jamaah/rombongan.</p>
+          <h2 className="text-base font-bold text-foreground flex items-center gap-2">
+            <ClipboardCheck className="w-4 h-4 text-amber-500" /> Peninjauan Pembayaran & Penerbitan Invoice
+          </h2>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Pilih transaksi di canvas kiri untuk memeriksa bukti transfer dan menerbitkan formulir invoice di canvas kanan.
+          </p>
         </div>
-        {queue.length > 0 && (
-          <Badge variant="warning" className="text-xs font-bold">
-            {queue.length} Menunggu Verifikasi
-          </Badge>
-        )}
+
+        <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto">
+          {/* Status Filter */}
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="px-2.5 py-1.5 bg-background border rounded-lg text-xs font-medium focus:outline-none focus:ring-1 focus:ring-primary"
+          >
+            <option value="all">Semua Status ({queue.length})</option>
+            <option value="pending">Menunggu ({queue.filter((q) => q.status === "pending").length})</option>
+            <option value="verified">Disetujui ({queue.filter((q) => q.status === "verified").length})</option>
+            <option value="rejected">Ditolak ({queue.filter((q) => q.status === "rejected").length})</option>
+          </select>
+
+          {/* Jenis Filter */}
+          <select
+            value={jenisFilter}
+            onChange={(e) => setJenisFilter(e.target.value)}
+            className="px-2.5 py-1.5 bg-background border rounded-lg text-xs font-medium focus:outline-none focus:ring-1 focus:ring-primary"
+          >
+            <option value="all">Semua Jenis</option>
+            <option value="dp">DP (Pendaftaran)</option>
+            <option value="tagihan">Cicilan / Tagihan</option>
+            <option value="pelunasan">Pelunasan</option>
+          </select>
+
+          {/* Search Box */}
+          <div className="relative flex-1 sm:w-48">
+            <Search className="w-3.5 h-3.5 text-muted-foreground absolute left-2.5 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              placeholder="Cari ID Reg / Group..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-8 pr-3 py-1.5 bg-background border rounded-lg text-xs font-medium placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+            />
+          </div>
+        </div>
       </div>
 
-      {queue.length === 0 ? (
-        <EmptyState
-          icon={ClipboardCheck}
-          title="Tidak ada pembayaran yang perlu ditinjau"
-          description="Semua pembayaran jamaah telah diverifikasi. Bukti transfer baru akan muncul di sini secara otomatis saat diajukan."
-        />
-      ) : (
-        <Card>
-          <CardContent className="p-0">
-            <div className="relative w-full overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b bg-muted/40 text-left text-xs font-bold text-muted-foreground uppercase">
-                    <th className="py-3 px-3 w-10">#</th>
-                    <th className="py-3 px-3">Group / Registrasi</th>
-                    <th className="py-3 px-3">Invoice</th>
-                    <th className="py-3 px-3 text-right">Nominal</th>
-                    <th className="py-3 px-3">Bank Pengirim</th>
-                    <th className="py-3 px-3">Bukti Transfer</th>
-                    <th className="py-3 px-3">Tanggal Upload</th>
-                    <th className="py-3 px-3 text-center">Status</th>
-                    <th className="py-3 px-3 text-center">Aksi Verifikasi</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {queue.map((p, idx) => (
-                    <tr key={p.id} className="hover:bg-muted/30">
-                      <td className="px-3 py-3 text-xs text-muted-foreground">{idx + 1}</td>
-                      <td className="px-3 py-3">
-                        <p className="text-xs font-bold text-foreground">{(p as any).namaGroup ?? p.groupId}</p>
-                        <p className="text-[10px] text-muted-foreground font-mono">{(p as any).kodeRegistrasi ?? "-"}</p>
-                      </td>
-                      <td className="px-3 py-3">
-                        <span className="font-mono text-xs text-muted-foreground">{p.invoiceId ?? "-"}</span>
-                      </td>
-                      <td className="px-3 py-3 text-right font-extrabold text-foreground">
-                        {formatCurrency(p.jumlah)}
-                      </td>
-                      <td className="px-3 py-3">
-                        <Badge variant="outline" className="text-xs font-medium">{p.bankPengirim ?? "-"}</Badge>
-                      </td>
-                      <td className="px-3 py-3">
-                        {p.buktiUrl ? (
-                          <a href={p.buktiUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs text-amber-600 hover:underline font-bold">
-                            <Eye className="h-3.5 w-3.5" /> Lihat Slip
-                          </a>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">-</span>
-                        )}
-                      </td>
-                      <td className="px-3 py-3 text-xs text-muted-foreground">{formatDate(p.tanggal)}</td>
-                      <td className="px-3 py-3 text-center">
-                        <Badge variant="warning" className="text-[10px]">Pending</Badge>
-                      </td>
-                      <td className="px-3 py-3">
-                        <div className="flex items-center justify-center gap-1.5">
-                          <Button
-                            size="sm"
-                            className="h-7 text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-bold"
-                            disabled={processingId === p.id}
-                            onClick={() => handleApprove(p)}
+      {/* 2-CANVAS SPLIT LAYOUT */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+        {/* ========================================================= */}
+        {/* CANVAS KIRI: TABEL PEMBAYARAN MASUK */}
+        {/* ========================================================= */}
+        <div className={selectedPayment ? "lg:col-span-7 space-y-4" : "lg:col-span-12 space-y-4"}>
+          {filteredQueue.length === 0 ? (
+            <EmptyState
+              icon={ClipboardCheck}
+              title="Tidak ada pembayaran ditemukan"
+              description="Tidak ada transaksi pembayaran yang cocok dengan filter pencarian saat ini."
+            />
+          ) : (
+            <Card>
+              <CardContent className="p-0">
+                <div className="relative w-full overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b bg-muted/50 text-left text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
+                        <th className="py-2.5 px-3 w-8 text-center">#</th>
+                        <th className="py-2.5 px-3">ID Reg & Group</th>
+                        <th className="py-2.5 px-3">Jenis Pembayaran</th>
+                        <th className="py-2.5 px-3 text-right">Nominal</th>
+                        <th className="py-2.5 px-3">Bank</th>
+                        <th className="py-2.5 px-3 text-center">Bukti TF</th>
+                        <th className="py-2.5 px-3 text-center">Status</th>
+                        <th className="py-2.5 px-3 text-center">Aksi Invoice</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y text-xs">
+                      {filteredQueue.map((p, idx) => {
+                        const isSelected = selectedPayment?.id === p.id;
+                        return (
+                          <tr
+                            key={p.id}
+                            className={`transition-colors cursor-pointer ${
+                              isSelected
+                                ? "bg-amber-500/10 border-l-4 border-l-amber-500 font-medium"
+                                : "hover:bg-muted/30"
+                            }`}
+                            onClick={() => handleSelectPayment(p)}
                           >
-                            <CheckCircle2 className="mr-1 h-3.5 w-3.5" />
-                            {processingId === p.id ? "..." : "Approve"}
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="destructive"
-                            className="h-7 text-xs font-bold"
-                            disabled={processingId === p.id}
-                            onClick={() => {
-                              setRejectTarget(p);
-                              setRejectReason("");
-                              setRejectNotes("");
-                            }}
-                          >
-                            <XCircle className="mr-1 h-3.5 w-3.5" />
-                            Reject
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                            <td className="px-3 py-3 text-center text-muted-foreground">{idx + 1}</td>
+                            <td className="px-3 py-3">
+                              <p className="font-bold text-foreground leading-tight">{p.namaGroup ?? p.groupId}</p>
+                              <div className="flex items-center gap-1.5 mt-0.5">
+                                <span className="font-mono text-[10px] text-amber-600 dark:text-amber-400 bg-amber-500/10 px-1 rounded">
+                                  {p.kodeRegistrasi ?? "-"}
+                                </span>
+                                <span className="text-[10px] text-muted-foreground">
+                                  {formatDate(p.tanggal)}
+                                </span>
+                              </div>
+                            </td>
+                            <td className="px-3 py-3">{getPaymentTypeBadge(p)}</td>
+                            <td className="px-3 py-3 text-right font-extrabold text-foreground">
+                              {formatCurrency(p.jumlah)}
+                            </td>
+                            <td className="px-3 py-3">
+                              <Badge variant="outline" className="text-[10px] font-mono">
+                                {p.bankPengirim ?? "Bank"}
+                              </Badge>
+                            </td>
+                            <td className="px-3 py-3 text-center" onClick={(e) => e.stopPropagation()}>
+                              {p.buktiUrl ? (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-7 w-7 p-0 rounded-full text-amber-600 hover:bg-amber-500/10 hover:text-amber-700"
+                                  title="Lihat Bukti Transfer"
+                                  onClick={() => {
+                                    setPreviewImageUrl(p.buktiUrl);
+                                    setZoomLevel(1);
+                                  }}
+                                >
+                                  <Eye className="h-4 w-4" />
+                                </Button>
+                              ) : (
+                                <span className="text-muted-foreground text-[10px]">-</span>
+                              )}
+                            </td>
+                            <td className="px-3 py-3 text-center">
+                              {p.status === "verified" ? (
+                                <Badge variant="success" className="text-[10px]">Verified</Badge>
+                              ) : p.status === "rejected" ? (
+                                <Badge variant="destructive" className="text-[10px]">Ditolak</Badge>
+                              ) : (
+                                <Badge variant="warning" className="text-[10px]">Pending</Badge>
+                              )}
+                            </td>
+                            <td className="px-3 py-3 text-center" onClick={(e) => e.stopPropagation()}>
+                              <div className="flex items-center justify-center gap-1">
+                                <Button
+                                  size="sm"
+                                  variant={isSelected ? "default" : "outline"}
+                                  className={`h-7 text-xs font-bold gap-1 ${
+                                    isSelected
+                                      ? "bg-amber-600 hover:bg-amber-700 text-white"
+                                      : "border-amber-500/30 text-amber-700 hover:bg-amber-50 dark:text-amber-300 dark:hover:bg-amber-950/50"
+                                  }`}
+                                  onClick={() => handleSelectPayment(p)}
+                                >
+                                  <FileText className="h-3.5 w-3.5" />
+                                  Buat Invoice
+                                </Button>
+                                {p.status === "pending" && (
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="h-7 w-7 p-0 text-emerald-600 hover:bg-emerald-500/10 hover:text-emerald-700"
+                                    disabled={processingId === p.id}
+                                    title="Langsung Setujui (Quick Approve)"
+                                    onClick={() => handleApprove(p)}
+                                  >
+                                    <CheckCircle2 className="h-4 w-4" />
+                                  </Button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+
+        {/* ========================================================= */}
+        {/* CANVAS KANAN: FORM INVOICE GENERATOR / PREVIEW */}
+        {/* ========================================================= */}
+        {selectedPayment ? (
+          <div className="lg:col-span-5 sticky top-4 space-y-4">
+            <Card className="border-2 border-amber-500/40 shadow-md">
+              <CardHeader className="p-4 border-b bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent flex flex-row items-center justify-between space-y-0">
+                <div className="space-y-0.5">
+                  <div className="flex items-center gap-2">
+                    <Receipt className="w-4 h-4 text-amber-600" />
+                    <CardTitle className="text-sm font-bold text-foreground">Form Penerbitan Invoice</CardTitle>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">
+                    Model invoice tagihan resmi untuk jamaah / group
+                  </p>
+                </div>
+                <div className="flex items-center gap-1">
+                  <Badge variant={selectedPayment.status === "verified" ? "success" : "warning"} className="text-[10px] font-bold">
+                    {selectedPayment.status === "verified" ? "Invoice Terbit" : "Draft Invoice"}
+                  </Badge>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 w-7 p-0 rounded-full text-muted-foreground hover:bg-muted"
+                    onClick={() => setSelectedPayment(null)}
+                    title="Tutup Form Invoice"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              </CardHeader>
+
+              <CardContent className="p-4 space-y-4 text-xs">
+                {/* 1. Header Invoice & Identitas Group */}
+                <div className="p-3 bg-muted/40 rounded-lg border space-y-2">
+                  <div className="flex items-center justify-between border-b pb-2">
+                    <div>
+                      <p className="font-extrabold text-foreground text-sm">{selectedPayment.namaGroup || "Nama Perwakilan"}</p>
+                      <p className="font-mono text-[11px] text-amber-600 dark:text-amber-400 font-bold">
+                        ID Reg: {selectedPayment.kodeRegistrasi || selectedPayment.groupId}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-[10px] text-muted-foreground">No. Invoice</span>
+                      <p className="font-mono font-bold text-foreground text-xs">{invoiceNumber}</p>
+                    </div>
+                  </div>
+
+                  {/* Paket & Tanggal Info */}
+                  <div className="grid grid-cols-2 gap-2 text-[11px] pt-1">
+                    <div>
+                      <span className="text-muted-foreground">Paket Keberangkatan:</span>
+                      <p className="font-semibold text-foreground truncate">
+                        {selectedPayment.group?.keberangkatan?.namaPaket || "Paket Umroh VTU"}
+                      </p>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Tgl Berangkat:</span>
+                      <p className="font-semibold text-foreground">
+                        {selectedPayment.group?.keberangkatan?.tanggalBerangkat
+                          ? formatDate(selectedPayment.group.keberangkatan.tanggalBerangkat)
+                          : "-"}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 2. Rincian Form Invoice Tagihan */}
+                <div className="space-y-3">
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-[11px] font-bold text-foreground">Jenis Pembayaran</label>
+                      <select
+                        value={formJenis}
+                        onChange={(e) => setFormJenis(e.target.value)}
+                        className="mt-1 w-full h-8 px-2 rounded-md border bg-background text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-primary"
+                      >
+                        <option value="DP (Pendaftaran)">DP (Pendaftaran)</option>
+                        <option value="Cicilan / Tagihan">Cicilan / Tagihan</option>
+                        <option value="Pelunasan">Pelunasan</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="text-[11px] font-bold text-foreground">Tanggal Pembayaran</label>
+                      <Input
+                        type="date"
+                        value={invoiceDate}
+                        onChange={(e) => setInvoiceDate(e.target.value)}
+                        className="h-8 text-xs font-mono mt-1"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Nominal Pembayaran Input */}
+                  <div>
+                    <div className="flex justify-between items-center">
+                      <label className="text-[11px] font-bold text-foreground">Nominal Invoice / Pembayaran (Rp)</label>
+                      <span className="text-[10px] text-amber-600 font-extrabold">{formatCurrency(formNominal)}</span>
+                    </div>
+                    <Input
+                      type="number"
+                      value={formNominal || ""}
+                      onChange={(e) => setFormNominal(Number(e.target.value))}
+                      className="h-9 font-mono font-bold text-sm text-foreground mt-1"
+                      placeholder="Masukkan nominal..."
+                    />
+                  </div>
+
+                  {/* Bank, Metode & No Rekening */}
+                  <div className="grid grid-cols-3 gap-2">
+                    <div>
+                      <label className="text-[11px] font-bold text-foreground">Metode</label>
+                      <select
+                        value={formMetode}
+                        onChange={(e) => setFormMetode(e.target.value)}
+                        className="mt-1 w-full h-8 px-2 rounded-md border bg-background text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-primary"
+                      >
+                        <option value="transfer">Transfer</option>
+                        <option value="cash">Tunai</option>
+                        <option value="virtual_account">VA</option>
+                        <option value="qris">QRIS</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-bold text-foreground">Bank Pengirim</label>
+                      <Input
+                        type="text"
+                        value={formBank}
+                        onChange={(e) => setFormBank(e.target.value)}
+                        placeholder="BCA / BSI"
+                        className="h-8 text-xs mt-1"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-bold text-foreground">Jatuh Tempo</label>
+                      <Input
+                        type="date"
+                        value={dueDate}
+                        onChange={(e) => setDueDate(e.target.value)}
+                        className="h-8 text-xs mt-1 font-mono"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-[11px] font-bold text-foreground">No. Rekening / Ref Transaksi</label>
+                    <Input
+                      type="text"
+                      value={formRekening}
+                      onChange={(e) => setFormRekening(e.target.value)}
+                      placeholder="Nomor referensi / rekening pengirim"
+                      className="h-8 text-xs mt-1 font-mono"
+                    />
+                  </div>
+
+                  {/* Catatan / Keterangan */}
+                  <div>
+                    <label className="text-[11px] font-bold text-foreground">Keterangan / Catatan Transaksi</label>
+                    <textarea
+                      value={formCatatan}
+                      onChange={(e) => setFormCatatan(e.target.value)}
+                      placeholder="Contoh: Pembayaran DP 3 Pax Paket Umroh 17 Juni"
+                      className="mt-1 w-full rounded-md border bg-background px-2.5 py-1.5 text-xs focus:ring-1 focus:ring-primary min-h-[50px]"
+                    />
+                  </div>
+                </div>
+
+                {/* 3. Bukti Slip Thumbnail Preview di dalam Form */}
+                {selectedPayment.buktiUrl && (
+                  <div className="p-2.5 bg-amber-500/5 border border-amber-500/20 rounded-lg flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Eye className="w-4 h-4 text-amber-600" />
+                      <div>
+                        <p className="font-bold text-foreground text-[11px]">Bukti Slip Terlampir</p>
+                        <p className="text-[10px] text-muted-foreground">Tersedia dokumen bukti transfer jamaah</p>
+                      </div>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-7 text-[11px] font-bold border-amber-500/40 text-amber-700 dark:text-amber-300"
+                      onClick={() => {
+                        setPreviewImageUrl(selectedPayment.buktiUrl);
+                        setZoomLevel(1);
+                      }}
+                    >
+                      Buka Slip
+                    </Button>
+                  </div>
+                )}
+
+                {/* 4. Ringkasan Keuangan Group */}
+                <div className="p-3 bg-muted/60 rounded-lg border space-y-1.5 text-[11px]">
+                  <p className="font-bold text-foreground text-xs border-b pb-1">Kalkulasi Tagihan Group</p>
+                  <div className="flex justify-between text-muted-foreground">
+                    <span>Total Tagihan Paket:</span>
+                    <span className="font-mono font-medium text-foreground">{formatCurrency(groupTotalTagihan)}</span>
+                  </div>
+                  <div className="flex justify-between text-muted-foreground">
+                    <span>Total Terbayar Sebelumnya:</span>
+                    <span className="font-mono font-medium text-foreground">{formatCurrency(groupTotalBayar)}</span>
+                  </div>
+                  <div className="flex justify-between font-bold text-amber-700 dark:text-amber-300">
+                    <span>Pembayaran Invoice Ini:</span>
+                    <span className="font-mono font-extrabold">{formatCurrency(formNominal)}</span>
+                  </div>
+                  <div className="flex justify-between font-extrabold text-foreground border-t pt-1">
+                    <span>Sisa Tagihan Setelah Ini:</span>
+                    <span className="font-mono text-emerald-600 dark:text-emerald-400">
+                      {formatCurrency(groupSisaTagihan)}
+                    </span>
+                  </div>
+                </div>
+
+                {/* 5. Action Buttons di Form Invoice */}
+                <div className="pt-2 border-t flex flex-col gap-2">
+                  <div className="flex gap-2">
+                    {selectedPayment.status !== "verified" && (
+                      <Button
+                        className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold h-9 text-xs"
+                        disabled={submittingInvoice}
+                        onClick={handleApproveFromForm}
+                      >
+                        <CheckCircle2 className="h-4 w-4 mr-1.5" />
+                        {submittingInvoice ? "Menerbitkan..." : "Approve & Terbitkan Invoice"}
+                      </Button>
+                    )}
+                    <Button
+                      variant="outline"
+                      className="font-bold h-9 text-xs gap-1.5"
+                      onClick={() => window.print()}
+                    >
+                      <Printer className="h-4 w-4" />
+                      Cetak Invoice
+                    </Button>
+                  </div>
+
+                  {selectedPayment.status === "pending" && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-destructive hover:bg-destructive/10 text-xs font-bold"
+                      onClick={() => {
+                        setRejectTarget(selectedPayment);
+                        setRejectReason("");
+                        setRejectNotes("");
+                      }}
+                    >
+                      <XCircle className="h-3.5 w-3.5 mr-1" />
+                      Tolak Pembayaran Ini
+                    </Button>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        ) : null}
+      </div>
+
+      {/* ========================================================= */}
+      {/* MODAL PRATINJAU BUKTI TRANSFER (TOMBOL MATA) */}
+      {/* ========================================================= */}
+      <Modal
+        open={previewImageUrl !== null}
+        onClose={() => setPreviewImageUrl(null)}
+        title="Pratinjau Bukti Transfer Pembayaran"
+        size="lg"
+      >
+        <div className="space-y-4 pt-1">
+          <div className="flex items-center justify-between bg-muted/40 p-2 rounded-lg text-xs">
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 text-xs gap-1"
+                onClick={() => setZoomLevel((z) => Math.max(0.6, z - 0.2))}
+              >
+                <ZoomOut className="h-3.5 w-3.5" /> Perkecil
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 text-xs gap-1"
+                onClick={() => setZoomLevel((z) => Math.min(2.5, z + 0.2))}
+              >
+                <ZoomIn className="h-3.5 w-3.5" /> Perbesar
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 text-xs"
+                onClick={() => setZoomLevel(1)}
+              >
+                Reset ({Math.round(zoomLevel * 100)}%)
+              </Button>
             </div>
-          </CardContent>
-        </Card>
-      )}
+
+            {previewImageUrl && (
+              <a
+                href={previewImageUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1 text-xs font-bold text-amber-600 hover:underline"
+              >
+                <ExternalLink className="h-3.5 w-3.5" /> Buka Tab Baru
+              </a>
+            )}
+          </div>
+
+          {/* Image Container */}
+          <div className="relative max-h-[65vh] overflow-auto rounded-lg border bg-stone-900/90 flex items-center justify-center p-4">
+            {previewImageUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={previewImageUrl}
+                alt="Bukti Transfer"
+                style={{ transform: `scale(${zoomLevel})`, transition: "transform 0.2s ease" }}
+                className="max-h-[55vh] object-contain rounded shadow-lg select-none"
+              />
+            ) : (
+              <p className="text-xs text-muted-foreground">Tidak ada gambar bukti transfer.</p>
+            )}
+          </div>
+
+          <div className="flex justify-end pt-1">
+            <Button size="sm" onClick={() => setPreviewImageUrl(null)}>
+              Tutup Pratinjau
+            </Button>
+          </div>
+        </div>
+      </Modal>
 
       {/* Reject Modal */}
       <Modal
         open={rejectTarget !== null}
-        onClose={() => { setRejectTarget(null); setRejectReason(""); setRejectNotes(""); }}
+        onClose={() => {
+          setRejectTarget(null);
+          setRejectReason("");
+          setRejectNotes("");
+        }}
         title="Tolak Pembayaran"
         description={`Nominal: ${rejectTarget ? formatCurrency(rejectTarget.jumlah) : "-"}`}
         size="sm"
@@ -520,7 +1082,11 @@ function PaymentReviewTabContent() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => { setRejectTarget(null); setRejectReason(""); setRejectNotes(""); }}
+              onClick={() => {
+                setRejectTarget(null);
+                setRejectReason("");
+                setRejectNotes("");
+              }}
             >
               Batal
             </Button>
@@ -541,7 +1107,9 @@ function PaymentReviewTabContent() {
       <Modal open={showSuccess} onClose={() => setShowSuccess(false)} title="Berhasil" size="sm">
         <p className="text-sm font-medium">{successMessage}</p>
         <div className="flex justify-end mt-4">
-          <Button size="sm" onClick={() => setShowSuccess(false)}>Tutup</Button>
+          <Button size="sm" onClick={() => setShowSuccess(false)}>
+            Tutup
+          </Button>
         </div>
       </Modal>
     </div>

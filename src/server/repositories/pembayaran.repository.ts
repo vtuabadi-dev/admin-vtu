@@ -138,16 +138,48 @@ export const pembayaranRepo = {
     return mapPembayaran(row);
   },
 
-  async getReviewQueue() {
+  async getReviewQueue(statusFilter?: string) {
+    const whereClause: any = {};
+    if (statusFilter && statusFilter !== "all") {
+      whereClause.status = statusFilter;
+    }
     const rows = await prisma.pembayaran.findMany({
-      where: { status: "pending", sumber: "jamaah" },
-      include: { alokasi: true, group: { select: { kodeRegistrasi: true, namaGroup: true } } },
-      orderBy: { tanggal: "asc" },
+      where: whereClause,
+      include: {
+        alokasi: true,
+        group: {
+          select: {
+            id: true,
+            kodeRegistrasi: true,
+            namaGroup: true,
+            totalTagihan: true,
+            totalPembayaran: true,
+            sisaPembayaran: true,
+            keberangkatan: {
+              select: {
+                id: true,
+                kode: true,
+                namaPaket: true,
+                tanggalBerangkat: true,
+              },
+            },
+            anggota: {
+              select: {
+                id: true,
+                namaLengkap: true,
+                nomorPeserta: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: { tanggal: "desc" },
     });
     return rows.map((r: any) => ({
       ...mapPembayaran(r),
       kodeRegistrasi: (r as any).group?.kodeRegistrasi,
       namaGroup: (r as any).group?.namaGroup,
+      group: (r as any).group,
     }));
   },
 };
