@@ -1,7 +1,7 @@
 import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/shared/lib/utils";
 
-const cardVariants = cva("rounded-lg border bg-card text-card-foreground shadow-sm", {
+const cardVariants = cva("rounded-lg border border-slate-200 bg-white text-slate-900 shadow-sm", {
   variants: {
     variant: {
       default: "",

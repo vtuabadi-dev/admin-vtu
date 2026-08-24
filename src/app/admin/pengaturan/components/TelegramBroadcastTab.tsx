@@ -6,10 +6,10 @@ import { Button } from "@/shared/components/ui/Button";
 
 function SettingSection({ title, desc, children }: { title: string; desc?: string; children: React.ReactNode }) {
   return (
-    <div className="space-y-3 pb-6 border-b last:border-b-0 last:pb-0">
+    <div className="space-y-3 pb-6 border-b border-slate-200 last:border-b-0 last:pb-0">
       <div>
-        <h3 className="text-sm font-semibold">{title}</h3>
-        {desc && <p className="text-xs text-muted-foreground mt-0.5">{desc}</p>}
+        <h3 className="text-sm font-bold text-slate-900">{title}</h3>
+        {desc && <p className="text-xs text-slate-500 mt-0.5">{desc}</p>}
       </div>
       <div className="space-y-3">{children}</div>
     </div>
@@ -20,8 +20,8 @@ function SettingRow({ label, desc, children }: { label: string; desc?: string; c
   return (
     <div className="flex items-start justify-between gap-4">
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium">{label}</p>
-        {desc && <p className="text-xs text-muted-foreground mt-0.5">{desc}</p>}
+        <p className="text-sm font-semibold text-slate-800">{label}</p>
+        {desc && <p className="text-xs text-slate-500 mt-0.5">{desc}</p>}
       </div>
       <div className="shrink-0">{children}</div>
     </div>
@@ -100,25 +100,29 @@ export function TelegramBroadcastTab() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          action: "test",
+          action: "test_broadcast",
           targetGroup,
           botToken,
           groupIdJakarta,
           groupIdSurabaya,
-          enabled,
         }),
       });
+
       const json = await res.json().catch(() => null);
+
       if (res.ok && json?.success) {
         setFeedback({
           type: "success",
-          message: json.message || `Tes pesan broadcast berhasil dikirim ke grup ${targetGroup.toUpperCase()}!`,
+          message: `Uji coba broadcast ke grup ${targetGroup.toUpperCase()} berhasil dikirim! ID Pesan: ${json.messageId || "ok"}`,
         });
       } else {
-        setFeedback({ type: "error", message: json?.message || `Gagal mengirim pesan tes ke Telegram (HTTP ${res.status}).` });
+        setFeedback({
+          type: "error",
+          message: json?.message || `Gagal mengirim pesan uji coba (HTTP ${res.status}).`,
+        });
       }
     } catch (err) {
-      setFeedback({ type: "error", message: `Gagal menghubungi server: ${(err as Error).message}` });
+      setFeedback({ type: "error", message: `Error koneksi: ${(err as Error).message}` });
     } finally {
       if (targetGroup === "jakarta") setTestingJkt(false);
       else setTestingSub(false);
@@ -134,20 +138,20 @@ export function TelegramBroadcastTab() {
   return (
     <div className="space-y-6">
       {/* Header Status Card */}
-      <div className="flex items-center justify-between rounded-lg border bg-card p-4">
+      <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
         <div className="flex items-center gap-3">
           <div
             className={`flex h-10 w-10 items-center justify-center rounded-full ${
               enabled && isConfigured
-                ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-                : "bg-amber-500/10 text-amber-600 dark:text-amber-400"
+                ? "bg-emerald-100 text-emerald-700"
+                : "bg-amber-100 text-amber-700"
             }`}
           >
             <Radio className="h-5 w-5 animate-pulse" />
           </div>
           <div>
-            <h4 className="text-sm font-semibold">Status Gateway Telegram</h4>
-            <p className="text-xs text-muted-foreground">
+            <h4 className="text-sm font-bold text-slate-900">Status Gateway Telegram</h4>
+            <p className="text-xs text-slate-500 font-medium">
               {enabled
                 ? isConfigured
                   ? "Broadcast Otomatis Aktif & Terkonfigurasi"
@@ -158,11 +162,11 @@ export function TelegramBroadcastTab() {
         </div>
         <div className="flex items-center gap-2">
           {enabled && isConfigured ? (
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2.5 py-1 text-xs font-medium text-emerald-600 dark:text-emerald-400">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-bold text-emerald-800">
               <CheckCircle2 className="h-3.5 w-3.5" /> Ready
             </span>
           ) : (
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/10 px-2.5 py-1 text-xs font-medium text-amber-600 dark:text-amber-400">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-2.5 py-1 text-xs font-bold text-amber-800">
               <AlertCircle className="h-3.5 w-3.5" /> Perlu Setup
             </span>
           )}
@@ -171,10 +175,10 @@ export function TelegramBroadcastTab() {
 
       {feedback && (
         <div
-          className={`rounded-md p-3 text-xs font-medium ${
+          className={`rounded-lg p-3 text-xs font-semibold ${
             feedback.type === "success"
-              ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20"
-              : "bg-destructive/10 text-destructive border border-destructive/20"
+              ? "bg-emerald-50 text-emerald-800 border border-emerald-200"
+              : "bg-rose-50 text-rose-800 border border-rose-200"
           }`}
         >
           {feedback.message}
@@ -194,7 +198,7 @@ export function TelegramBroadcastTab() {
             type="checkbox"
             checked={enabled}
             onChange={(e) => setEnabled(e.target.checked)}
-            className="h-4 w-4 rounded border-input text-primary focus:ring-primary mt-1"
+            className="h-4 w-4 rounded border-slate-300 text-emerald-700 focus:ring-emerald-500 mt-1"
           />
         </SettingRow>
 
@@ -208,12 +212,12 @@ export function TelegramBroadcastTab() {
               value={botToken}
               onChange={(e) => setBotToken(e.target.value)}
               placeholder="Masukkan Token Bot Telegram"
-              className="h-9 w-72 rounded-md border border-input bg-transparent px-3 pr-9 py-1 text-sm font-mono"
+              className="h-9 w-72 rounded-md border border-slate-300 bg-white px-3 pr-9 py-1 text-sm font-mono text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500"
             />
             <button
               type="button"
               onClick={() => setShowToken(!showToken)}
-              className="absolute right-2 text-muted-foreground hover:text-foreground"
+              className="absolute right-2 text-slate-400 hover:text-slate-700"
             >
               {showToken ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
             </button>
@@ -235,7 +239,7 @@ export function TelegramBroadcastTab() {
             value={groupIdJakarta}
             onChange={(e) => setGroupIdJakarta(e.target.value)}
             placeholder="-1001234567890"
-            className="h-9 w-72 rounded-md border border-input bg-transparent px-3 py-1 text-sm font-mono"
+            className="h-9 w-72 rounded-md border border-slate-300 bg-white px-3 py-1 text-sm font-mono text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500"
           />
         </SettingRow>
 
@@ -248,7 +252,7 @@ export function TelegramBroadcastTab() {
             value={groupIdSurabaya}
             onChange={(e) => setGroupIdSurabaya(e.target.value)}
             placeholder="-1009876543210"
-            className="h-9 w-72 rounded-md border border-input bg-transparent px-3 py-1 text-sm font-mono"
+            className="h-9 w-72 rounded-md border border-slate-300 bg-white px-3 py-1 text-sm font-mono text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500"
           />
         </SettingRow>
       </SettingSection>
