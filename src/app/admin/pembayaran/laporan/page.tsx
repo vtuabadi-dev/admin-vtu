@@ -21,6 +21,11 @@ import {
   X,
   Sparkles,
   Loader2,
+  Send,
+  Mail,
+  MessageSquare,
+  Copy,
+  Check,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/components/ui/Card";
 import { Button } from "@/shared/components/ui/Button";
@@ -353,6 +358,12 @@ function PaymentReviewTabContent() {
   const [rejectReason, setRejectReason] = useState("");
   const [rejectNotes, setRejectNotes] = useState("");
 
+  // Send Invoice Modal States
+  const [sendInvoiceTarget, setSendInvoiceTarget] = useState<any | null>(null);
+  const [targetPhone, setTargetPhone] = useState("");
+  const [targetEmail, setTargetEmail] = useState("");
+  const [copiedInvoiceText, setCopiedInvoiceText] = useState(false);
+
   // Toast / Feedback
   const [successMessage, setSuccessMessage] = useState("");
   const [showSuccess, setShowSuccess] = useState(false);
@@ -472,6 +483,95 @@ function PaymentReviewTabContent() {
     }
   }, [selectedPayment]);
 
+  useEffect(() => {
+    if (sendInvoiceTarget) {
+      const p = sendInvoiceTarget;
+      const phone =
+        p.group?.ketuaGroup?.nomorTelepon ||
+        p.group?.anggota?.[0]?.nomorTelepon ||
+        "";
+      const email =
+        p.group?.ketuaGroup?.email ||
+        p.group?.anggota?.[0]?.email ||
+        "";
+      setTargetPhone(phone);
+      setTargetEmail(email);
+      setCopiedInvoiceText(false);
+    }
+  }, [sendInvoiceTarget]);
+
+  const generateInvoiceMessage = useCallback((p: any, invNum: string, nominal: number) => {
+    const groupName = p.namaGroup || p.group?.namaGroup || "Bapak/Ibu";
+    const kodeReg = p.kodeRegistrasi || p.group?.kodeRegistrasi || "-";
+    const paketName = p.group?.keberangkatan?.namaPaket || "Paket Umroh VTU";
+    const tgl = p.tanggal
+      ? new Date(p.tanggal).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })
+      : new Date().toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });
+    const bank = p.bankPengirim || formBank || "Bank Transfer";
+
+    return [
+      `*INVOICE PEMBAYARAN RESMI — VTU ABADI TRAVEL*`,
+      `--------------------------------------------------`,
+      `Assalamu'alaikum Warahmatullahi Wabarakatuh.`,
+      ``,
+      `Yth. *${groupName}* (Kode Reg: *${kodeReg}*)`,
+      `Alhamdulillah, pembayaran Anda telah berhasil kami verifikasi dengan rincian sebagai berikut:`,
+      ``,
+      `📄 *No. Invoice:* ${invNum}`,
+      `📦 *Paket Umroh:* ${paketName}`,
+      `💳 *Jenis Pembayaran:* ${formJenis || "DP Pendaftaran"}`,
+      `💰 *Nominal Terverifikasi:* Rp ${nominal.toLocaleString("id-ID")}`,
+      `📅 *Tanggal Transaksi:* ${tgl}`,
+      `🏦 *Metode / Bank:* ${bank}`,
+      `✅ *Status:* LUNAS / TERVERIFIKASI`,
+      ``,
+      `Dokumen kuitansi & invoice ini merupakan bukti pembayaran resmi yang diterbitkan oleh PT Vauza Tamma Abadi (VTU ABADI Travel).`,
+      `Semoga Allah SWT senantiasa memberikan kelancaran dan kemudahan dalam persiapan ibadah ke Baitullah.`,
+      ``,
+      `Wassalamu'alaikum Warahmatullahi Wabarakatuh.`,
+      `*Finance & Operational Team — VTU ABADI Travel*`,
+      `🌐 https://vtuabadi.com`,
+    ].join("\n");
+  }, [formJenis, formBank]);
+
+  const handleSendWhatsApp = () => {
+    if (!sendInvoiceTarget) return;
+    const cleanPhone = (targetPhone || "").replace(/[^0-9]/g, "").replace(/^0/, "62");
+    const msg = generateInvoiceMessage(
+      sendInvoiceTarget,
+      sendInvoiceTarget.invoiceId || invoiceNumber,
+      sendInvoiceTarget.jumlah || formNominal
+    );
+    const waUrl = cleanPhone
+      ? `https://wa.me/${cleanPhone}?text=${encodeURIComponent(msg)}`
+      : `https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`;
+    window.open(waUrl, "_blank");
+  };
+
+  const handleSendEmail = () => {
+    if (!sendInvoiceTarget) return;
+    const subject = `Invoice Pembayaran Resmi VTU ABADI — ${sendInvoiceTarget.invoiceId || invoiceNumber} (${sendInvoiceTarget.namaGroup || sendInvoiceTarget.kodeRegistrasi})`;
+    const msg = generateInvoiceMessage(
+      sendInvoiceTarget,
+      sendInvoiceTarget.invoiceId || invoiceNumber,
+      sendInvoiceTarget.jumlah || formNominal
+    );
+    const mailtoUrl = `mailto:${targetEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(msg)}`;
+    window.location.href = mailtoUrl;
+  };
+
+  const handleCopyInvoiceText = () => {
+    if (!sendInvoiceTarget) return;
+    const msg = generateInvoiceMessage(
+      sendInvoiceTarget,
+      sendInvoiceTarget.invoiceId || invoiceNumber,
+      sendInvoiceTarget.jumlah || formNominal
+    );
+    navigator.clipboard.writeText(msg);
+    setCopiedInvoiceText(true);
+    setTimeout(() => setCopiedInvoiceText(false), 2500);
+  };
+
   const handleApproveFromForm = async () => {
     if (!selectedPayment) return;
     setSubmittingInvoice(true);
@@ -482,16 +582,14 @@ function PaymentReviewTabContent() {
       setSuccessMessage(`Invoice ${invoiceNumber} untuk ${selectedPayment.namaGroup || "Group"} (${formatCurrency(formNominal)}) berhasil diterbitkan & disetujui!`);
       setShowSuccess(true);
 
+      const updated = { ...selectedPayment, status: "verified", invoiceId: invoiceNumber, jumlah: formNominal };
       setQueue((prev) =>
         prev.map((p) =>
-          p.id === selectedPayment.id
-            ? { ...p, status: "verified", invoiceId: invoiceNumber, jumlah: formNominal }
-            : p
+          p.id === selectedPayment.id ? updated : p
         )
       );
-      setSelectedPayment((prev: any) =>
-        prev ? { ...prev, status: "verified", invoiceId: invoiceNumber, jumlah: formNominal } : null
-      );
+      setSelectedPayment(updated);
+      setSendInvoiceTarget(updated);
     } catch {
       window.alert("Gagal memproses approval & invoice");
     } finally {
@@ -728,30 +826,47 @@ function PaymentReviewTabContent() {
                             </td>
                             <td className="px-3 py-3 text-center" onClick={(e) => e.stopPropagation()}>
                               <div className="flex items-center justify-center gap-1">
-                                <Button
-                                  size="sm"
-                                  variant={isSelected ? "default" : "outline"}
-                                  className={`h-7 text-xs font-bold gap-1 ${
-                                    isSelected
-                                      ? "bg-amber-600 hover:bg-amber-700 text-white"
-                                      : "border-amber-500/30 text-amber-700 hover:bg-amber-50 dark:text-amber-300 dark:hover:bg-amber-950/50"
-                                  }`}
-                                  onClick={() => handleSelectPayment(p)}
-                                >
-                                  <FileText className="h-3.5 w-3.5" />
-                                  Buat Invoice
-                                </Button>
-                                {p.status === "pending" && (
+                                {p.status === "verified" ? (
                                   <Button
                                     size="sm"
-                                    variant="ghost"
-                                    className="h-7 w-7 p-0 text-emerald-600 hover:bg-emerald-500/10 hover:text-emerald-700"
-                                    disabled={processingId === p.id}
-                                    title="Langsung Setujui (Quick Approve)"
-                                    onClick={() => handleApprove(p)}
+                                    className="h-7 text-xs font-bold gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs"
+                                    onClick={() => {
+                                      handleSelectPayment(p);
+                                      setSendInvoiceTarget(p);
+                                    }}
+                                    title="Kirim Invoice ke Jamaah"
                                   >
-                                    <CheckCircle2 className="h-4 w-4" />
+                                    <Send className="h-3.5 w-3.5" />
+                                    Kirim Invoice
                                   </Button>
+                                ) : (
+                                  <>
+                                    <Button
+                                      size="sm"
+                                      variant={isSelected ? "default" : "outline"}
+                                      className={`h-7 text-xs font-bold gap-1 ${
+                                        isSelected
+                                          ? "bg-amber-600 hover:bg-amber-700 text-white"
+                                          : "border-amber-500/30 text-amber-700 hover:bg-amber-50 dark:text-amber-300 dark:hover:bg-amber-950/50"
+                                      }`}
+                                      onClick={() => handleSelectPayment(p)}
+                                    >
+                                      <FileText className="h-3.5 w-3.5" />
+                                      Buat Invoice
+                                    </Button>
+                                    {p.status === "pending" && (
+                                      <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        className="h-7 w-7 p-0 text-emerald-600 hover:bg-emerald-500/10 hover:text-emerald-700"
+                                        disabled={processingId === p.id}
+                                        title="Langsung Setujui (Quick Approve)"
+                                        onClick={() => handleApprove(p)}
+                                      >
+                                        <CheckCircle2 className="h-4 w-4" />
+                                      </Button>
+                                    )}
+                                  </>
                                 )}
                               </div>
                             </td>
@@ -1043,8 +1158,35 @@ function PaymentReviewTabContent() {
 
                 {/* 5. Action Buttons di Form Invoice */}
                 <div className="pt-2 border-t flex flex-col gap-2">
-                  <div className="flex gap-2">
-                    {selectedPayment.status !== "verified" && (
+                  {selectedPayment.status === "verified" ? (
+                    <div className="space-y-2">
+                      <div className="p-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-900 dark:text-emerald-300 flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+                          <span className="text-xs font-semibold">Invoice telah diterbitkan & diverifikasi</span>
+                        </div>
+                        <Badge variant="success" className="text-[10px]">Terbit</Badge>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold h-9 text-xs gap-1.5 shadow-sm"
+                          onClick={() => setSendInvoiceTarget(selectedPayment)}
+                        >
+                          <Send className="h-4 w-4" />
+                          Kirim Invoice (WhatsApp / Email)
+                        </Button>
+                        <Button
+                          variant="outline"
+                          className="font-bold h-9 text-xs gap-1.5"
+                          onClick={() => window.print()}
+                        >
+                          <Printer className="h-4 w-4" />
+                          Cetak
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex gap-2">
                       <Button
                         className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold h-9 text-xs"
                         disabled={submittingInvoice}
@@ -1053,16 +1195,16 @@ function PaymentReviewTabContent() {
                         <CheckCircle2 className="h-4 w-4 mr-1.5" />
                         {submittingInvoice ? "Menerbitkan..." : "Approve & Terbitkan Invoice"}
                       </Button>
-                    )}
-                    <Button
-                      variant="outline"
-                      className="font-bold h-9 text-xs gap-1.5"
-                      onClick={() => window.print()}
-                    >
-                      <Printer className="h-4 w-4" />
-                      Cetak Invoice
-                    </Button>
-                  </div>
+                      <Button
+                        variant="outline"
+                        className="font-bold h-9 text-xs gap-1.5"
+                        onClick={() => window.print()}
+                      >
+                        <Printer className="h-4 w-4" />
+                        Cetak Invoice
+                      </Button>
+                    </div>
+                  )}
 
                   {selectedPayment.status === "pending" && (
                     <Button
@@ -1085,6 +1227,100 @@ function PaymentReviewTabContent() {
           </div>
         ) : null}
       </div>
+
+      {/* ========================================================= */}
+      {/* MODAL KIRIM INVOICE (WHATSAPP & EMAIL) */}
+      {/* ========================================================= */}
+      <Modal
+        open={sendInvoiceTarget !== null}
+        onClose={() => setSendInvoiceTarget(null)}
+        title="Kirim Invoice Resmi ke Jamaah / Group"
+        description={`Nomor Invoice: ${sendInvoiceTarget?.invoiceId || invoiceNumber} — ${sendInvoiceTarget?.namaGroup || "Group"}`}
+        size="lg"
+      >
+        {sendInvoiceTarget && (
+          <div className="space-y-4 pt-1">
+            {/* Recipient Details */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-muted/40 rounded-xl text-xs">
+              <div>
+                <label className="text-[10px] font-bold uppercase text-muted-foreground">Nomor WhatsApp PIC / Jamaah</label>
+                <Input
+                  className="mt-1 h-8 text-xs font-mono"
+                  placeholder="Contoh: 081234567890"
+                  value={targetPhone}
+                  onChange={(e) => setTargetPhone(e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="text-[10px] font-bold uppercase text-muted-foreground">Email PIC / Jamaah</label>
+                <Input
+                  className="mt-1 h-8 text-xs font-mono"
+                  placeholder="email@jamaah.com"
+                  value={targetEmail}
+                  onChange={(e) => setTargetEmail(e.target.value)}
+                />
+              </div>
+            </div>
+
+            {/* Message Preview Box */}
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                  <MessageSquare className="h-3.5 w-3.5 text-emerald-600" />
+                  Pratinjau Pesan Invoice
+                </span>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-6 text-[11px] font-bold text-amber-600 hover:bg-amber-500/10 gap-1 px-2"
+                  onClick={handleCopyInvoiceText}
+                >
+                  {copiedInvoiceText ? (
+                    <>
+                      <Check className="h-3 w-3 text-emerald-600" />
+                      <span className="text-emerald-600">Tersalin!</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="h-3 w-3" />
+                      Salin Pesan
+                    </>
+                  )}
+                </Button>
+              </div>
+              <textarea
+                readOnly
+                rows={10}
+                value={generateInvoiceMessage(
+                  sendInvoiceTarget,
+                  sendInvoiceTarget.invoiceId || invoiceNumber,
+                  sendInvoiceTarget.jumlah || formNominal
+                )}
+                className="w-full text-xs font-mono p-3 rounded-lg border bg-stone-900 text-stone-100 dark:bg-stone-950 leading-relaxed resize-none"
+              />
+            </div>
+
+            {/* Send Buttons */}
+            <div className="flex flex-col sm:flex-row gap-2 pt-2 border-t">
+              <Button
+                className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold h-9 text-xs gap-1.5 shadow-sm"
+                onClick={handleSendWhatsApp}
+              >
+                <Send className="h-4 w-4" />
+                Kirim via WhatsApp (Buka Chat)
+              </Button>
+              <Button
+                variant="outline"
+                className="font-bold h-9 text-xs gap-1.5 border-emerald-500/30 text-emerald-700 hover:bg-emerald-50 dark:text-emerald-300"
+                onClick={handleSendEmail}
+              >
+                <Mail className="h-4 w-4" />
+                Kirim via Email
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
 
       {/* ========================================================= */}
       {/* MODAL PRATINJAU BUKTI TRANSFER (TOMBOL MATA) */}

@@ -314,6 +314,16 @@ export const pembayaranRepo = {
                 id: true,
                 namaLengkap: true,
                 nomorPeserta: true,
+                nomorTelepon: true,
+                email: true,
+              },
+            },
+            ketuaGroup: {
+              select: {
+                id: true,
+                namaLengkap: true,
+                nomorTelepon: true,
+                email: true,
               },
             },
           },
