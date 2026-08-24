@@ -244,7 +244,10 @@ export default function AdminDashboardPage() {
 
   const pkgOptions = [
     { value: "all", label: "Semua Paket" },
-    ...kbrList.map((k) => ({ value: k.id, label: k.paketUmroh?.namaPaket || "-" })),
+    ...kbrList.map((k) => ({
+      value: k.id,
+      label: `${k.kode} — ${k.namaPaket || k.paketUmroh?.namaPaket || "Paket Umroh"}`,
+    })),
   ];
 
   const criticalCount = displayAlerts.filter((a) => a.tipe === "danger").length;
@@ -587,7 +590,7 @@ export default function AdminDashboardPage() {
                 <Package className="h-4 w-4 text-primary" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold">{selectedKbr.paketUmroh?.namaPaket || "-"}</p>
+                <p className="text-sm font-semibold">{selectedKbr.namaPaket || selectedKbr.paketUmroh?.namaPaket || "-"}</p>
                 <p className="text-xs text-muted-foreground">
                   {selectedKbr.kode} &middot;{" "}
                   {new Date(selectedKbr.tanggalBerangkat).toLocaleDateString("id-ID", {
@@ -595,7 +598,7 @@ export default function AdminDashboardPage() {
                     month: "long",
                     year: "numeric",
                   })}{" "}
-                  &middot; {selectedKbr.maskapaiId || "-"} ({selectedKbr.nomorPenerbangan})
+                  &middot; {selectedKbr.maskapai || selectedKbr.maskapaiId || "-"} ({selectedKbr.nomorPenerbangan})
                 </p>
               </div>
               <StatusBadge status={selectedKbr.status} />
@@ -701,9 +704,9 @@ export default function AdminDashboardPage() {
                   data={filteredKbrList.map((k) => ({
                     id: k.id,
                     kode: k.kode,
-                    namaPaket: k.paketUmroh?.namaPaket || "-",
+                    namaPaket: k.namaPaket || k.paketUmroh?.namaPaket || "-",
                     tanggalBerangkat: k.tanggalBerangkat,
-                    kuota: k.maxSeat,
+                    kuota: k.maxSeat || k.kuota || 0,
                     terisi: k.terisi,
                     status: k.status,
                   }))}
