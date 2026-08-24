@@ -31,6 +31,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import PortalSwitcherNav from "@/shared/components/PortalSwitcherNav";
+import { SearchableSelect } from "@/shared/components/ui/SearchableSelect";
 import type { JenisKelamin, Keberangkatan } from "@/shared/types";
 
 type Step = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
@@ -326,6 +327,35 @@ export default function RegisterPage() {
   const [isCustomRoomAssignment, setIsCustomRoomAssignment] = useState(false);
   const [hotelUpgrade, setHotelUpgrade] = useState("");
   const [loadingPaket, setLoadingPaket] = useState(false);
+
+  const packageOptions = useMemo(() => {
+    return paketList
+      .filter((p) => p.status !== "cancelled")
+      .map((p) => {
+        const name = p.namaPaket || p.paketUmroh?.namaPaket || p.kode;
+        const tgl = p.tanggalBerangkat
+          ? new Date(p.tanggalBerangkat).toLocaleDateString("id-ID", {
+              day: "numeric",
+              month: "short",
+              year: "numeric",
+            })
+          : "";
+        const maskapai = p.maskapai || "";
+        const harga = p.hargaPaket || p.paketUmroh?.hargaBase;
+        const sub = [
+          tgl ? `Tgl: ${tgl}` : "",
+          maskapai ? `Flight: ${maskapai}` : "",
+          harga ? `Rp ${Number(harga).toLocaleString("id-ID")}` : "",
+        ]
+          .filter(Boolean)
+          .join(" • ");
+        return {
+          value: p.id,
+          label: name,
+          sublabel: sub || undefined,
+        };
+      });
+  }, [paketList]);
 
   // Step 6: Signature
   const [signatureMode, setSignatureMode] = useState<"draw" | "upload">("draw");
@@ -1603,39 +1633,28 @@ export default function RegisterPage() {
               </div>
             ) : (
               <div className="space-y-5">
-                {/* Package Select Dropdown */}
+                {/* Package Select Dropdown (Searchable) */}
                 <div>
                   <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1.5">
                     Nama Paket Keberangkatan
                   </label>
-                  <select
+                  <SearchableSelect
+                    options={packageOptions}
                     value={selectedPaketId}
-                    onChange={(e) => {
-                      const val = e.target.value;
+                    onChange={(val) => {
                       setSelectedPaketId(val);
                       setSelectedClusterIndex(0);
                       if (errors.paket) {
                         setErrors((prev) => ({ ...prev, paket: "" }));
                       }
                     }}
+                    placeholder="-- Pilih / Cari Nama Paket Umroh --"
+                    searchPlaceholder="Ketik nama paket, tanggal, atau maskapai..."
                     className={cn(
-                      "w-full px-4 py-3 border rounded-xl text-sm font-bold text-slate-950 bg-white shadow-sm transition-colors cursor-pointer",
-                      "focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-emerald-600",
-                      errors.paket ? "border-red-500 bg-red-50/30 text-red-600" : "border-stone-300"
+                      "w-full rounded-xl shadow-xs",
+                      errors.paket && "border-red-500 ring-1 ring-red-500"
                     )}
-                  >
-                    <option value="" className="text-slate-950 bg-white font-extrabold py-2">-- Pilih Nama Paket Umroh --</option>
-                    {paketList
-                      .filter((p) => p.status !== "cancelled")
-                      .map((p) => {
-                        const name = p.namaPaket || p.paketUmroh?.namaPaket || p.kode;
-                        return (
-                          <option key={p.id} value={p.id} className="text-slate-950 bg-white font-bold py-2">
-                            {name}
-                          </option>
-                        );
-                      })}
-                  </select>
+                  />
                   {errors.paket && <p className="text-xs text-red-500 mt-1">{errors.paket}</p>}
                 </div>
 
