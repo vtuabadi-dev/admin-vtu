@@ -145,4 +145,31 @@ export const registrationRepo = {
     const rows = await prisma.registrationRequest.groupBy({ by: ["status"], _count: true });
     return Object.fromEntries(rows.map((r: any) => [r.status, r._count]));
   },
+
+  async delete(id: string) {
+    await prisma.registrationMember.deleteMany({ where: { requestId: id } });
+    const row = await prisma.registrationRequest.delete({
+      where: { id },
+    });
+    return mapRequest(row);
+  },
+
+  async deleteAll(status?: string) {
+    const where: any = {};
+    if (status) where.status = status;
+    const requests = await prisma.registrationRequest.findMany({
+      where,
+      select: { id: true },
+    });
+    const ids = requests.map((r) => r.id);
+    if (ids.length > 0) {
+      await prisma.registrationMember.deleteMany({
+        where: { requestId: { in: ids } },
+      });
+      await prisma.registrationRequest.deleteMany({
+        where: { id: { in: ids } },
+      });
+    }
+    return { count: ids.length };
+  },
 };

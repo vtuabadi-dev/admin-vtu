@@ -13,6 +13,9 @@ import {
   ChevronLeft,
   Upload,
   CheckCircle,
+  Trash2,
+  AlertTriangle,
+  Loader2,
 } from "lucide-react";
 import {
   Card,
@@ -22,6 +25,7 @@ import { Button } from "@/shared/components/ui/Button";
 import { Input } from "@/shared/components/ui/Input";
 import { Select } from "@/shared/components/ui/Select";
 import { Badge } from "@/shared/components/ui/Badge";
+import { Modal } from "@/shared/components/ui/Modal";
 import { cn } from "@/shared/lib/utils";
 import { formatCurrency } from "@/shared/lib/utils";
 import {
@@ -128,6 +132,9 @@ function LeadManagementPanel() {
   const [loadingLeads, setLoadingLeads] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>("");
+  const [showDeleteAllModal, setShowDeleteAllModal] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<any | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const fetchLeads = useCallback(async () => {
     setLoadingLeads(true);
@@ -143,6 +150,47 @@ function LeadManagementPanel() {
       setLoadingLeads(false);
     }
   }, [statusFilter]);
+
+  const handleDeleteAll = async () => {
+    setIsDeleting(true);
+    try {
+      const res = await fetch(`/api/admin/registrations${statusFilter ? `?status=${statusFilter}` : ""}`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      if (data.success) {
+        setShowDeleteAllModal(false);
+        fetchLeads();
+      } else {
+        window.alert(data.message || "Gagal menghapus riwayat pendaftaran");
+      }
+    } catch {
+      window.alert("Terjadi kesalahan saat menghapus data.");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const handleDeleteSingle = async () => {
+    if (!deleteTarget) return;
+    setIsDeleting(true);
+    try {
+      const res = await fetch(`/api/admin/registrations/${deleteTarget.id}`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      if (data.success) {
+        setDeleteTarget(null);
+        fetchLeads();
+      } else {
+        window.alert(data.message || "Gagal menghapus riwayat pendaftaran");
+      }
+    } catch {
+      window.alert("Terjadi kesalahan saat menghapus data.");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   const leadStatuses = ["BARU", "DIHUBUNGI", "FOLLOW_UP", "MENUNGGU_DP", "DP_MASUK"];
 
@@ -216,63 +264,95 @@ function LeadManagementPanel() {
   return (
     <Card>
       <CardContent className="p-4 space-y-4">
-        <div className="flex items-center justify-between">
-          <h3 className="font-semibold text-sm">Lead Registrasi ({leads.length})</h3>
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-3 py-1.5 border border-gray-300 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="">Semua Status</option>
-            {allStatuses.map((s) => (
-              <option key={s} value={s}>{STATUS_LABELS[s] ?? s}</option>
-            ))}
-          </select>
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b pb-3">
+          <div className="flex items-center gap-2">
+            <h3 className="font-bold text-sm text-foreground">Riwayat Pendaftaran & Lead ({leads.length})</h3>
+          </div>
+
+          <div className="flex items-center gap-2 flex-wrap">
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="px-3 py-1.5 border border-gray-300 dark:border-stone-700 bg-background rounded-lg text-xs font-medium focus:outline-none focus:ring-2 focus:ring-primary"
+            >
+              <option value="">Semua Status</option>
+              {allStatuses.map((s) => (
+                <option key={s} value={s}>{STATUS_LABELS[s] ?? s}</option>
+              ))}
+            </select>
+
+            {/* Tombol Hapus Seluruh Riwayat Pendaftaran */}
+            <Button
+              type="button"
+              variant="destructive"
+              size="sm"
+              onClick={() => setShowDeleteAllModal(true)}
+              disabled={leads.length === 0 || isDeleting}
+              className="h-8 px-3 text-xs font-bold gap-1.5 bg-red-600 hover:bg-red-700 text-white shadow-xs transition-colors cursor-pointer"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>Hapus Semua Riwayat ({leads.length})</span>
+            </Button>
+          </div>
         </div>
 
         {loadingLeads ? (
-          <p className="text-sm text-muted-foreground text-center py-4">Memuat...</p>
+          <p className="text-sm text-muted-foreground text-center py-4">Memuat data pendaftaran...</p>
         ) : leads.length === 0 ? (
-          <p className="text-sm text-muted-foreground text-center py-4">Belum ada lead registrasi.</p>
+          <div className="text-center py-6 space-y-1">
+            <p className="text-sm font-semibold text-muted-foreground">Tidak ada riwayat pendaftaran.</p>
+            <p className="text-xs text-muted-foreground">Riwayat pendaftaran kosong atau telah dibersihkan.</p>
+          </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b text-left">
-                  <th className="py-2 pr-3 font-medium text-xs text-gray-500">Kode</th>
-                  <th className="py-2 pr-3 font-medium text-xs text-gray-500">Perwakilan</th>
-                  <th className="py-2 pr-3 font-medium text-xs text-gray-500">PAX</th>
-                  <th className="py-2 pr-3 font-medium text-xs text-gray-500">Status</th>
-                  <th className="py-2 font-medium text-xs text-gray-500">Aksi</th>
+                  <th className="py-2 pr-3 font-semibold text-xs text-muted-foreground">Kode Registrasi</th>
+                  <th className="py-2 pr-3 font-semibold text-xs text-muted-foreground">Nama Perwakilan</th>
+                  <th className="py-2 pr-3 font-semibold text-xs text-muted-foreground">PAX</th>
+                  <th className="py-2 pr-3 font-semibold text-xs text-muted-foreground">Status</th>
+                  <th className="py-2 font-semibold text-xs text-muted-foreground text-right pr-2">Aksi</th>
                 </tr>
               </thead>
               <tbody>
-                {leads.slice(0, 20).map((lead: any) => (
-                  <tr key={lead.id} className="border-b last:border-0 hover:bg-gray-50">
-                    <td className="py-2 pr-3 font-mono text-xs">{lead.kodeRegistrasi}</td>
-                    <td className="py-2 pr-3">
-                      <p className="font-medium">{lead.namaPerwakilan}</p>
-                      <p className="text-xs text-gray-400">{lead.nomorTelepon}</p>
+                {leads.map((lead: any) => (
+                  <tr key={lead.id} className="border-b last:border-0 hover:bg-muted/40 transition-colors">
+                    <td className="py-2.5 pr-3 font-mono text-xs font-bold text-foreground">{lead.kodeRegistrasi}</td>
+                    <td className="py-2.5 pr-3">
+                      <p className="font-semibold text-foreground text-xs">{lead.namaPerwakilan}</p>
+                      <p className="text-[11px] text-muted-foreground">{lead.nomorTelepon}</p>
                     </td>
-                    <td className="py-2 pr-3 text-xs">{lead.paxCount} org</td>
-                    <td className="py-2 pr-3">
-                      <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[lead.leadStatus ?? "BARU"] ?? "bg-gray-100 text-gray-600"}`}>
+                    <td className="py-2.5 pr-3 text-xs font-semibold">{lead.paxCount} pax</td>
+                    <td className="py-2.5 pr-3">
+                      <span className={`inline-block px-2 py-0.5 rounded-full text-[11px] font-bold ${STATUS_COLORS[lead.leadStatus ?? "BARU"] ?? "bg-gray-100 text-gray-600"}`}>
                         {STATUS_LABELS[lead.leadStatus ?? "BARU"] ?? (lead.leadStatus ?? "BARU")}
                       </span>
                     </td>
-                    <td className="py-2">
-                      <div className="flex gap-1.5">
+                    <td className="py-2.5 text-right pr-2">
+                      <div className="flex items-center justify-end gap-1.5">
                         {getActionsForLeadStatus(lead.leadStatus ?? "BARU").map((action) => (
                           <button
                             key={action.nextStatus}
                             type="button"
                             disabled={actionLoading === lead.id}
                             onClick={() => handleStatusChange(lead.id, action.nextStatus)}
-                            className={`px-2 py-1 text-xs text-white rounded ${action.variant} disabled:opacity-50`}
+                            className={`px-2 py-1 text-xs text-white rounded font-medium ${action.variant} disabled:opacity-50 cursor-pointer`}
                           >
                             {actionLoading === lead.id ? "..." : action.label}
                           </button>
                         ))}
+
+                        {/* Tombol Hapus Satuan */}
+                        <button
+                          type="button"
+                          onClick={() => setDeleteTarget(lead)}
+                          disabled={actionLoading === lead.id}
+                          className="p-1.5 text-muted-foreground hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 rounded transition-colors cursor-pointer ml-1"
+                          title="Hapus riwayat pendaftaran ini"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -281,6 +361,95 @@ function LeadManagementPanel() {
             </table>
           </div>
         )}
+
+        {/* Modal Konfirmasi Hapus Seluruh Riwayat */}
+        <Modal
+          open={showDeleteAllModal}
+          onClose={() => setShowDeleteAllModal(false)}
+          title="Konfirmasi Hapus Seluruh Riwayat Pendaftaran"
+          size="default"
+        >
+          <div className="space-y-4 pt-2">
+            <div className="p-3 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 rounded-xl flex items-start gap-3">
+              <AlertTriangle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+              <div className="text-xs space-y-1">
+                <p className="font-bold text-red-900 dark:text-red-200">
+                  PERINGATAN: Tindakan ini bersifat PERMANEN dan tidak dapat dibatalkan!
+                </p>
+                <p className="text-red-700 dark:text-red-300">
+                  Seluruh ({leads.length}) data riwayat pendaftaran jamaah{statusFilter ? ` dengan status ${STATUS_LABELS[statusFilter] ?? statusFilter}` : ""} beserta seluruh data anggota jamaah terkait akan dihapus total dari database.
+                </p>
+              </div>
+            </div>
+
+            <p className="text-xs text-muted-foreground">
+              Apakah Anda benar-benar yakin ingin menghapus seluruh riwayat pendaftaran ini sekarang?
+            </p>
+
+            <div className="flex justify-end gap-2 pt-2 border-t">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setShowDeleteAllModal(false)}
+                disabled={isDeleting}
+              >
+                Batal
+              </Button>
+              <Button
+                type="button"
+                variant="destructive"
+                size="sm"
+                onClick={handleDeleteAll}
+                disabled={isDeleting}
+                className="bg-red-600 hover:bg-red-700 font-bold gap-1.5"
+              >
+                {isDeleting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                <span>{isDeleting ? "Menghapus..." : "Ya, Hapus Seluruh Riwayat"}</span>
+              </Button>
+            </div>
+          </div>
+        </Modal>
+
+        {/* Modal Konfirmasi Hapus Satuan */}
+        <Modal
+          open={Boolean(deleteTarget)}
+          onClose={() => setDeleteTarget(null)}
+          title="Konfirmasi Hapus Riwayat Pendaftaran"
+          size="sm"
+        >
+          <div className="space-y-3 pt-2">
+            <p className="text-xs text-foreground">
+              Apakah Anda yakin ingin menghapus riwayat pendaftaran untuk:
+            </p>
+            <div className="p-2.5 bg-muted rounded-lg border text-xs font-mono">
+              <p className="font-bold text-foreground">{deleteTarget?.kodeRegistrasi}</p>
+              <p className="text-muted-foreground">{deleteTarget?.namaPerwakilan} ({deleteTarget?.paxCount} Pax)</p>
+            </div>
+            <div className="flex justify-end gap-2 pt-2 border-t">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setDeleteTarget(null)}
+                disabled={isDeleting}
+              >
+                Batal
+              </Button>
+              <Button
+                type="button"
+                variant="destructive"
+                size="sm"
+                onClick={handleDeleteSingle}
+                disabled={isDeleting}
+                className="bg-red-600 hover:bg-red-700 font-bold gap-1.5"
+              >
+                {isDeleting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                <span>{isDeleting ? "Menghapus..." : "Hapus"}</span>
+              </Button>
+            </div>
+          </div>
+        </Modal>
       </CardContent>
     </Card>
   );

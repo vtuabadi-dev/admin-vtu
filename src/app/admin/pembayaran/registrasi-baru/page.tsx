@@ -17,6 +17,8 @@ import {
   XCircle,
   Eye,
   Loader2,
+  Trash2,
+  AlertTriangle,
 } from "lucide-react";
 import { LoadingSkeleton } from "@/shared/components/LoadingSkeleton";
 import { EmptyState } from "@/shared/components/EmptyState";
@@ -63,6 +65,9 @@ export default function RegistrasiBaruPage() {
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [rejectTarget, setRejectTarget] = useState<RegistrationRequest | null>(null);
   const [rejectNotes, setRejectNotes] = useState("");
+  const [showDeleteAllModal, setShowDeleteAllModal] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<RegistrationRequest | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [result, setResult] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [accounts, setAccounts] = useState<
     { namaLengkap: string; username: string; tempPassword: string }[] | null
@@ -86,6 +91,49 @@ export default function RegistrasiBaruPage() {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  const handleDeleteAll = async () => {
+    setIsDeleting(true);
+    try {
+      const res = await fetch(`/api/admin/registrations${activeTab ? `?status=${activeTab}` : ""}`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      if (data.success) {
+        setShowDeleteAllModal(false);
+        setResult({ type: "success", message: `Berhasil menghapus ${data.count} riwayat pendaftaran.` });
+        loadData();
+      } else {
+        setResult({ type: "error", message: data.message || "Gagal menghapus riwayat pendaftaran" });
+      }
+    } catch {
+      setResult({ type: "error", message: "Terjadi kesalahan saat menghapus data" });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const handleDeleteSingle = async () => {
+    if (!deleteTarget) return;
+    setIsDeleting(true);
+    try {
+      const res = await fetch(`/api/admin/registrations/${deleteTarget.id}`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      if (data.success) {
+        setDeleteTarget(null);
+        setResult({ type: "success", message: `Riwayat pendaftaran ${deleteTarget.kodeRegistrasi} berhasil dihapus.` });
+        loadData();
+      } else {
+        setResult({ type: "error", message: data.message || "Gagal menghapus riwayat pendaftaran" });
+      }
+    } catch {
+      setResult({ type: "error", message: "Terjadi kesalahan saat menghapus data" });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   const handleApprove = async (id: string) => {
     setProcessingId(id);
@@ -141,9 +189,24 @@ export default function RegistrasiBaruPage() {
   return (
     <div className="space-y-6 p-6">
       {/* Header */}
-      <div>
-        <h1 className="text-xl font-bold text-gray-900">Registrasi Baru</h1>
-        <p className="text-sm text-gray-500 mt-1">Review & approval permohonan registrasi grup jamaah</p>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-bold text-gray-900">Registrasi Baru</h1>
+          <p className="text-sm text-gray-500 mt-1">Review & approval permohonan registrasi grup jamaah</p>
+        </div>
+
+        {/* Tombol Hapus Seluruh Riwayat Pendaftaran */}
+        <Button
+          type="button"
+          variant="destructive"
+          size="sm"
+          onClick={() => setShowDeleteAllModal(true)}
+          disabled={requests.length === 0 || isDeleting}
+          className="h-9 px-3.5 text-xs font-bold gap-1.5 bg-red-600 hover:bg-red-700 text-white shadow-xs transition-colors cursor-pointer"
+        >
+          <Trash2 className="w-4 h-4" />
+          <span>Hapus Semua Riwayat ({requests.length})</span>
+        </Button>
       </div>
 
       {/* Result notification */}
@@ -205,7 +268,7 @@ export default function RegistrasiBaruPage() {
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-2">
-                      <h3 className="font-semibold text-gray-900">{req.kodeRegistrasi}</h3>
+                      <h3 className="font-semibold text-gray-900 font-mono">{req.kodeRegistrasi}</h3>
                       <Badge className={STATUS_COLOR[req.status] ?? "bg-gray-100"}>
                         {STATUS_LABEL[req.status] ?? req.status}
                       </Badge>
@@ -266,6 +329,17 @@ export default function RegistrasiBaruPage() {
                         </Button>
                       </>
                     )}
+
+                    {/* Tombol Hapus Riwayat Pendaftaran Satuan */}
+                    <button
+                      type="button"
+                      onClick={() => setDeleteTarget(req)}
+                      disabled={processingId === req.id}
+                      className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors cursor-pointer"
+                      title="Hapus riwayat pendaftaran ini"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
                   </div>
                 </div>
               </CardContent>
@@ -273,6 +347,95 @@ export default function RegistrasiBaruPage() {
           ))}
         </div>
       )}
+
+      {/* Modal Konfirmasi Hapus Seluruh Riwayat */}
+      <Modal
+        open={showDeleteAllModal}
+        onClose={() => setShowDeleteAllModal(false)}
+        title="Konfirmasi Hapus Seluruh Riwayat Pendaftaran"
+        size="default"
+      >
+        <div className="space-y-4 pt-2">
+          <div className="p-3 bg-red-50 border border-red-200 rounded-xl flex items-start gap-3">
+            <AlertTriangle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+            <div className="text-xs space-y-1">
+              <p className="font-bold text-red-900">
+                PERINGATAN: Tindakan ini bersifat PERMANEN dan tidak dapat dibatalkan!
+              </p>
+              <p className="text-red-700">
+                Seluruh ({requests.length}) data riwayat pendaftaran jamaah{activeTab ? ` dengan status ${STATUS_LABEL[activeTab] ?? activeTab}` : ""} beserta seluruh data anggota jamaah terkait akan dihapus total dari database.
+              </p>
+            </div>
+          </div>
+
+          <p className="text-xs text-gray-600">
+            Apakah Anda benar-benar yakin ingin menghapus seluruh riwayat pendaftaran ini sekarang?
+          </p>
+
+          <div className="flex justify-end gap-2 pt-2 border-t">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setShowDeleteAllModal(false)}
+              disabled={isDeleting}
+            >
+              Batal
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              size="sm"
+              onClick={handleDeleteAll}
+              disabled={isDeleting}
+              className="bg-red-600 hover:bg-red-700 font-bold gap-1.5"
+            >
+              {isDeleting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+              <span>{isDeleting ? "Menghapus..." : "Ya, Hapus Seluruh Riwayat"}</span>
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Modal Konfirmasi Hapus Satuan */}
+      <Modal
+        open={Boolean(deleteTarget)}
+        onClose={() => setDeleteTarget(null)}
+        title="Konfirmasi Hapus Riwayat Pendaftaran"
+        size="sm"
+      >
+        <div className="space-y-3 pt-2">
+          <p className="text-xs text-gray-700">
+            Apakah Anda yakin ingin menghapus riwayat pendaftaran untuk:
+          </p>
+          <div className="p-2.5 bg-gray-50 rounded-lg border text-xs font-mono">
+            <p className="font-bold text-gray-900">{deleteTarget?.kodeRegistrasi}</p>
+            <p className="text-gray-600">{deleteTarget?.namaPerwakilan} ({deleteTarget?.paxCount} Pax)</p>
+          </div>
+          <div className="flex justify-end gap-2 pt-2 border-t">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setDeleteTarget(null)}
+              disabled={isDeleting}
+            >
+              Batal
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              size="sm"
+              onClick={handleDeleteSingle}
+              disabled={isDeleting}
+              className="bg-red-600 hover:bg-red-700 font-bold gap-1.5"
+            >
+              {isDeleting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+              <span>{isDeleting ? "Menghapus..." : "Hapus"}</span>
+            </Button>
+          </div>
+        </div>
+      </Modal>
 
       {/* Detail Modal */}
       <Modal open={showDetail} onClose={() => setShowDetail(false)} title="Detail Registrasi">
