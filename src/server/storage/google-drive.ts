@@ -185,9 +185,16 @@ export async function createPackageFolderHierarchy(
     );
   }
 
-  const rootIndukId =
-    process.env.GOOGLE_DRIVE_KELENGKAPAN_JAMAAH_FOLDER_ID ||
-    "19e3zObFKihQG1rjPyb_NxoJQGagDVZfs";
+  const vtuRootFolderId = getGoogleDriveFolderId();
+  let rootIndukId = process.env.GOOGLE_DRIVE_KELENGKAPAN_JAMAAH_FOLDER_ID;
+  if (!rootIndukId) {
+    try {
+      rootIndukId = await getOrCreateFolder("KELENGKAPAN DATA JAMAAH", vtuRootFolderId);
+    } catch {
+      rootIndukId = vtuRootFolderId;
+    }
+  }
+
   const yearId = await getOrCreateFolder(String(year), rootIndukId);
   const monthId = await getOrCreateMonthFolder(monthFolderName, yearId);
   const packageFolderId = await getOrCreateFolder(packageFolderName, monthId);
@@ -239,7 +246,9 @@ export async function createPackageFolderHierarchy(
 export async function provisionPackageStorage(packageId: string): Promise<DriveFolderRegistry | undefined> {
   if (!isGoogleDriveConfigured()) return undefined;
   const { prisma } = await import("@/server/db/client");
-  const paket = await prisma.keberangkatan.findUnique({ where: { id: packageId } });
+  const paket = await prisma.keberangkatan.findFirst({
+    where: { OR: [{ id: packageId }, { kode: packageId }] },
+  });
   if (!paket) return undefined;
 
   // Reuse existing valid folder registry if available
@@ -266,11 +275,17 @@ export async function provisionPackageStorage(packageId: string): Promise<DriveF
     if (paket.startingPointId) {
       const city = await prisma.masterCity.findUnique({ where: { id: paket.startingPointId } });
       if (city?.code) sCode = city.code;
+    } else if (paket.namaPaket) {
+      const nUpper = paket.namaPaket.toUpperCase();
+      if (nUpper.includes("SBY") || nUpper.includes("SURABAYA") || nUpper.includes("SUB")) sCode = "SUB";
+      else if (nUpper.includes("JKT") || nUpper.includes("JAKARTA")) sCode = "JKT";
     }
+
     if (paket.packageTypeId) {
       const pType = await prisma.masterPackageType.findUnique({ where: { id: paket.packageTypeId } });
       if (pType?.code) pCode = pType.code;
     }
+
     if (paket.maskapaiId) {
       const airline = await prisma.masterAirline.findUnique({ where: { id: paket.maskapaiId } });
       if (airline?.code) mCode = airline.code;
@@ -281,13 +296,22 @@ export async function provisionPackageStorage(packageId: string): Promise<DriveF
       else if (mRaw.includes("QATAR") || mRaw.includes("QR")) mCode = "QR";
       else if (mRaw.includes("OMAN") || mRaw.includes("WY")) mCode = "WY";
       else if (mRaw.includes("EMIRATES") || mRaw.includes("EK")) mCode = "EK";
+      else if (mRaw.includes("BRUNEI") || mRaw.includes("ROYAL") || mRaw.includes("BI")) mCode = "BI";
       else mCode = mRaw.slice(0, 3);
+    }
+
+    let durasi = paket.durationDays || 12;
+    if (!paket.durationDays && paket.namaPaket) {
+      const match = paket.namaPaket.match(/(\d{1,2})\s*(?:h|hari)\b/i);
+      if (match && match[1]) {
+        durasi = parseInt(match[1], 10);
+      }
     }
 
     packageName = generatePackageFolderName({
       startingPointCode: sCode,
       tanggalBerangkat: depDate,
-      durasiHari: paket.durationDays || 12,
+      durasiHari: durasi,
       packageTypeCode: pCode,
       maskapaiCode: mCode,
     });
@@ -295,15 +319,15 @@ export async function provisionPackageStorage(packageId: string): Promise<DriveF
     packageName = (paket.namaPaket || "PAKET REGULER").toUpperCase().trim();
   }
 
-  console.log(`[Cloud Vault Provisioning START] Package: "${packageName}" (ID: ${packageId})`);
+  console.log(`[Cloud Vault Provisioning START] Package: "${packageName}" (ID: ${paket.id})`);
   const folderRegistry = await createPackageFolderHierarchy(year, monthName, packageName);
 
   await prisma.keberangkatan.update({
-    where: { id: packageId },
+    where: { id: paket.id },
     data: { driveFolderIds: folderRegistry as any },
   });
 
-  console.log(`[Cloud Vault Provisioning COMPLETE] Package: "${packageName}" (ID: ${packageId}) - Folder IDs saved to DB.`);
+  console.log(`[Cloud Vault Provisioning COMPLETE] Package: "${packageName}" (ID: ${paket.id}) - Folder IDs saved to DB.`);
   return folderRegistry;
 }
 

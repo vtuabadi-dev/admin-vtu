@@ -21,7 +21,7 @@ export async function POST(
   }
 
   try {
-    const packageId = params.id;
+    const packageId = decodeURIComponent(params.id);
     const registry = await provisionPackageStorage(packageId);
 
     if (!registry) {
