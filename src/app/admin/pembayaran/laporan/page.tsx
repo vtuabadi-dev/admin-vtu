@@ -27,7 +27,10 @@ import {
   Copy,
   Check,
   Calendar,
+  Download,
+  FileDown,
 } from "lucide-react";
+import { downloadInvoicePdf, shareInvoicePdf } from "@/shared/lib/invoice-pdf";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/components/ui/Card";
 import { Button } from "@/shared/components/ui/Button";
 import { Input } from "@/shared/components/ui/Input";
@@ -538,30 +541,93 @@ function PaymentReviewTabContent() {
     ].join("\n");
   }, [formJenis, formBank]);
 
-  const handleSendWhatsApp = () => {
+  const getInvoicePdfPayload = useCallback((p: any, invNum: string, nominal: number) => {
+    const rawTgl = p.tanggal ? new Date(p.tanggal) : new Date();
+    const formattedTgl = !isNaN(rawTgl.getTime())
+      ? rawTgl.toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })
+      : new Date().toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });
+
+    const totalTagihanVal = p.group?.totalTagihan || p.jumlah || nominal || 0;
+    const totalBayarVal = p.group?.totalPembayaran || 0;
+    const sisaTagihanVal = Math.max(0, totalTagihanVal - (totalBayarVal + (p.status === "verified" ? 0 : nominal)));
+
+    return {
+      invoiceNumber: invNum,
+      invoiceDate: formattedTgl,
+      dueDate: dueDate || "Sesuai Jadwal",
+      namaGroup: p.namaGroup || p.group?.namaGroup || "Bapak/Ibu",
+      kodeRegistrasi: p.kodeRegistrasi || p.group?.kodeRegistrasi || "-",
+      namaPaket: p.group?.keberangkatan?.namaPaket || formCatatan || "Paket Umroh VTU",
+      tanggalBerangkat: p.group?.keberangkatan?.tanggalBerangkat
+        ? new Date(p.group.keberangkatan.tanggalBerangkat).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })
+        : undefined,
+      jenisPembayaran: formJenis || "DP Pendaftaran",
+      nominal: nominal || p.jumlah || 0,
+      metode: formMetode || p.metode || "Transfer",
+      bank: formBank || p.bankPengirim || "BSI / Mandiri",
+      nomorRekening: formRekening || p.nomorRekening || "-",
+      catatan: formCatatan || p.catatan || "",
+      totalTagihan: totalTagihanVal,
+      totalPembayaran: totalBayarVal,
+      sisaTagihan: sisaTagihanVal,
+      picPhone: targetPhone || p.group?.ketuaGroup?.nomorTelepon,
+      picEmail: targetEmail || p.group?.ketuaGroup?.email,
+    };
+  }, [dueDate, formJenis, formMetode, formBank, formRekening, formCatatan, targetPhone, targetEmail]);
+
+  const handleDownloadPdf = useCallback((paymentObj?: any) => {
+    const p = paymentObj || sendInvoiceTarget || selectedPayment;
+    if (!p) return;
+    const invNum = p.invoiceId || invoiceNumber;
+    const nom = p.jumlah || formNominal;
+    const payload = getInvoicePdfPayload(p, invNum, nom);
+    downloadInvoicePdf(payload);
+    setSuccessMessage(`File PDF Invoice ${invNum} berhasil diunduh!`);
+    setShowSuccess(true);
+  }, [sendInvoiceTarget, selectedPayment, invoiceNumber, formNominal, getInvoicePdfPayload]);
+
+  const handleSendWhatsApp = async () => {
     if (!sendInvoiceTarget) return;
+    const invNum = sendInvoiceTarget.invoiceId || invoiceNumber;
+    const nom = sendInvoiceTarget.jumlah || formNominal;
+    const payload = getInvoicePdfPayload(sendInvoiceTarget, invNum, nom);
+
+    // 1. If Web Share API with file attachment is supported (Mobile / Chrome), trigger native share
+    if (typeof navigator !== "undefined" && typeof navigator.share === "function") {
+      const shared = await shareInvoicePdf(payload);
+      if (shared) return;
+    }
+
+    // 2. Otherwise: Download PDF file & open WhatsApp Chat with text
+    downloadInvoicePdf(payload);
+
     const cleanPhone = (targetPhone || "").replace(/[^0-9]/g, "").replace(/^0/, "62");
-    const msg = generateInvoiceMessage(
-      sendInvoiceTarget,
-      sendInvoiceTarget.invoiceId || invoiceNumber,
-      sendInvoiceTarget.jumlah || formNominal
-    );
+    const msg = generateInvoiceMessage(sendInvoiceTarget, invNum, nom);
     const waUrl = cleanPhone
       ? `https://wa.me/${cleanPhone}?text=${encodeURIComponent(msg)}`
       : `https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`;
     window.open(waUrl, "_blank");
+
+    setSuccessMessage("File PDF Invoice berhasil diunduh & WhatsApp telah dibuka. Anda dapat langsung melampirkan file PDF tersebut ke chat!");
+    setShowSuccess(true);
   };
 
   const handleSendEmail = () => {
     if (!sendInvoiceTarget) return;
-    const subject = `Invoice Pembayaran Resmi VTU ABADI — ${sendInvoiceTarget.invoiceId || invoiceNumber} (${sendInvoiceTarget.namaGroup || sendInvoiceTarget.kodeRegistrasi})`;
-    const msg = generateInvoiceMessage(
-      sendInvoiceTarget,
-      sendInvoiceTarget.invoiceId || invoiceNumber,
-      sendInvoiceTarget.jumlah || formNominal
-    );
+    const invNum = sendInvoiceTarget.invoiceId || invoiceNumber;
+    const nom = sendInvoiceTarget.jumlah || formNominal;
+    const payload = getInvoicePdfPayload(sendInvoiceTarget, invNum, nom);
+
+    // Download PDF for user to attach
+    downloadInvoicePdf(payload);
+
+    const subject = `Invoice Pembayaran Resmi VTU ABADI — ${invNum} (${sendInvoiceTarget.namaGroup || sendInvoiceTarget.kodeRegistrasi})`;
+    const msg = generateInvoiceMessage(sendInvoiceTarget, invNum, nom);
     const mailtoUrl = `mailto:${targetEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(msg)}`;
     window.location.href = mailtoUrl;
+
+    setSuccessMessage("File PDF Invoice telah diunduh untuk dilampirkan ke email!");
+    setShowSuccess(true);
   };
 
   const handleCopyInvoiceText = () => {
@@ -583,7 +649,7 @@ function PaymentReviewTabContent() {
       const res = await fetch(`/api/pembayaran/${selectedPayment.id}/approve`, { method: "POST" });
       if (!res.ok) throw new Error("Gagal menyetujui");
 
-      setSuccessMessage(`Invoice ${invoiceNumber} untuk ${selectedPayment.namaGroup || "Group"} (${formatCurrency(formNominal)}) berhasil diterbitkan & disetujui!`);
+      setSuccessMessage(`Invoice ${invoiceNumber} untuk ${selectedPayment.namaGroup || "Group"} (${formatCurrency(formNominal)}) berhasil diterbitkan!`);
       setShowSuccess(true);
 
       const updated = { ...selectedPayment, status: "verified", invoiceId: invoiceNumber, jumlah: formNominal };
@@ -594,6 +660,10 @@ function PaymentReviewTabContent() {
       );
       setSelectedPayment(updated);
       setSendInvoiceTarget(updated);
+
+      // Auto-generate & download official PDF invoice upon issuance
+      const payload = getInvoicePdfPayload(updated, invoiceNumber, formNominal);
+      downloadInvoicePdf(payload);
     } catch {
       window.alert("Gagal memproses approval & invoice");
     } finally {
@@ -1276,13 +1346,21 @@ function PaymentReviewTabContent() {
                         </div>
                         <Badge variant="success" className="text-[10px]">Terbit</Badge>
                       </div>
-                      <div className="flex gap-2">
+                      <div className="flex gap-2 flex-wrap">
                         <Button
                           className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold h-9 text-xs gap-1.5 shadow-sm"
                           onClick={() => setSendInvoiceTarget(selectedPayment)}
                         >
                           <Send className="h-4 w-4" />
                           Kirim Invoice (WhatsApp / Email)
+                        </Button>
+                        <Button
+                          variant="outline"
+                          className="font-bold h-9 text-xs gap-1.5 border-emerald-600/30 text-emerald-700 hover:bg-emerald-50 dark:text-emerald-300"
+                          onClick={() => handleDownloadPdf(selectedPayment)}
+                        >
+                          <Download className="h-4 w-4" />
+                          Unduh PDF
                         </Button>
                         <Button
                           variant="outline"
@@ -1295,7 +1373,7 @@ function PaymentReviewTabContent() {
                       </div>
                     </div>
                   ) : (
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 flex-wrap">
                       <Button
                         className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold h-9 text-xs"
                         disabled={submittingInvoice}
@@ -1306,11 +1384,19 @@ function PaymentReviewTabContent() {
                       </Button>
                       <Button
                         variant="outline"
+                        className="font-bold h-9 text-xs gap-1.5 border-emerald-600/30 text-emerald-700 hover:bg-emerald-50 dark:text-emerald-300"
+                        onClick={() => handleDownloadPdf(selectedPayment)}
+                      >
+                        <Download className="h-4 w-4" />
+                        Unduh PDF
+                      </Button>
+                      <Button
+                        variant="outline"
                         className="font-bold h-9 text-xs gap-1.5"
                         onClick={() => window.print()}
                       >
                         <Printer className="h-4 w-4" />
-                        Cetak Invoice
+                        Cetak
                       </Button>
                     </div>
                   )}
@@ -1349,6 +1435,35 @@ function PaymentReviewTabContent() {
       >
         {sendInvoiceTarget && (
           <div className="space-y-4 pt-1">
+            {/* Official PDF Document Card */}
+            <div className="flex items-center justify-between p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-emerald-600 text-white rounded-lg shadow-xs">
+                  <FileDown className="h-5 w-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-emerald-950 dark:text-emerald-200">
+                      Invoice-{(sendInvoiceTarget?.invoiceId || invoiceNumber).replace(/[^a-zA-Z0-9-_]/g, "")}.pdf
+                    </span>
+                    <Badge variant="success" className="text-[9px] px-1.5 py-0">Dokumen PDF Siap</Badge>
+                  </div>
+                  <p className="text-[10px] text-emerald-800 dark:text-emerald-400 mt-0.5">
+                    Dokumen resmi kuitansi & invoice PT Vauza Tamma Abadi (Otomatis terlampir saat kirim)
+                  </p>
+                </div>
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-8 text-xs font-bold border-emerald-600/40 text-emerald-700 hover:bg-emerald-100 dark:text-emerald-300 gap-1.5"
+                onClick={() => handleDownloadPdf(sendInvoiceTarget)}
+              >
+                <Download className="h-3.5 w-3.5" />
+                Unduh PDF
+              </Button>
+            </div>
+
             {/* Recipient Details */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-muted/40 rounded-xl text-xs">
               <div>
@@ -1399,7 +1514,7 @@ function PaymentReviewTabContent() {
               </div>
               <textarea
                 readOnly
-                rows={10}
+                rows={9}
                 value={generateInvoiceMessage(
                   sendInvoiceTarget,
                   sendInvoiceTarget.invoiceId || invoiceNumber,
@@ -1416,7 +1531,7 @@ function PaymentReviewTabContent() {
                 onClick={handleSendWhatsApp}
               >
                 <Send className="h-4 w-4" />
-                Kirim via WhatsApp (Buka Chat)
+                Kirim via WhatsApp (Unduh & Buka Chat)
               </Button>
               <Button
                 variant="outline"
@@ -1425,6 +1540,14 @@ function PaymentReviewTabContent() {
               >
                 <Mail className="h-4 w-4" />
                 Kirim via Email
+              </Button>
+              <Button
+                variant="outline"
+                className="font-bold h-9 text-xs gap-1.5"
+                onClick={() => handleDownloadPdf(sendInvoiceTarget)}
+              >
+                <Download className="h-4 w-4" />
+                Unduh PDF
               </Button>
             </div>
           </div>
