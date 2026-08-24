@@ -56,7 +56,7 @@ export async function GET() {
       { header: "Kode Paket", key: "kode", width: 20 },
       { header: "Nama Paket", key: "namaPaket", width: 35 },
       { header: "Tanggal Berangkat (YYYY-MM-DD)", key: "tanggalBerangkat", width: 30 },
-      { header: "Tanggal Pulang (YYYY-MM-DD)", key: "tanggalPulang", width: 30 },
+      { header: "Durasi / Tanggal Pulang (Opsional / Hari)", key: "tanggalPulang", width: 35 },
       { header: "Maskapai", key: "maskapai", width: 22 },
       { header: "Starting Point", key: "startingPoint", width: 22 },
       { header: "Nomor Penerbangan", key: "nomorPenerbangan", width: 20 },

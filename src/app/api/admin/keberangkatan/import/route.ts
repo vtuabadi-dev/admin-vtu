@@ -113,6 +113,45 @@ function parseExcelDate(cell: any): Date | null {
   return parseDateString(strVal);
 }
 
+function extractDurationFromText(text?: string): number {
+  if (!text) return 12;
+  const matchH = text.match(/(\d{1,2})\s*(?:h|hari|day|days)\b/i);
+  if (matchH && matchH[1]) {
+    const days = parseInt(matchH[1], 10);
+    if (days >= 3 && days <= 40) return days;
+  }
+  const matchNum = text.match(/\b(\d{1,2})\b/);
+  if (matchNum && matchNum[1]) {
+    const days = parseInt(matchNum[1], 10);
+    if (days >= 3 && days <= 40) return days;
+  }
+  return 12;
+}
+
+function parseDurationOrDate(cell: any, departureDate: Date, rawNamaPaket: string): { returnDate: Date; durationDays: number } {
+  const parsedDate = parseExcelDate(cell);
+  if (parsedDate && parsedDate.getTime() > departureDate.getTime()) {
+    const diffMs = parsedDate.getTime() - departureDate.getTime();
+    const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
+    return { returnDate: parsedDate, durationDays: diffDays > 0 ? diffDays : 12 };
+  }
+
+  const cellStr = String(cell?.text || cell?.value || "").trim();
+  let duration = extractDurationFromText(cellStr);
+
+  if (!duration || duration === 12) {
+    const titleDuration = extractDurationFromText(rawNamaPaket);
+    if (titleDuration && titleDuration !== 12) {
+      duration = titleDuration;
+    }
+  }
+
+  const retDate = new Date(departureDate.getTime());
+  retDate.setDate(retDate.getDate() + duration);
+
+  return { returnDate: retDate, durationDays: duration };
+}
+
 export async function POST(request: NextRequest) {
   try {
     const session = await auth();
@@ -242,18 +281,18 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // Validate dates using robust parseExcelDate
+      // Validate departure date & dynamically auto-calculate return date (via date, duration number, or package title)
       let departureDate: Date;
       let returnDate: Date;
       try {
         const parsedDep = parseExcelDate(cellBerangkat);
-        const parsedRet = parseExcelDate(cellPulang);
-
-        if (!parsedDep || !parsedRet) {
-          throw new Error("Format tanggal keberangkatan atau kepulangan tidak valid. Gunakan YYYY-MM-DD atau DD/MM/YYYY.");
+        if (!parsedDep) {
+          throw new Error("Format tanggal keberangkatan tidak valid. Gunakan YYYY-MM-DD atau DD/MM/YYYY.");
         }
         departureDate = parsedDep;
-        returnDate = parsedRet;
+
+        const { returnDate: calcRet } = parseDurationOrDate(cellPulang, departureDate, rawNamaPaket);
+        returnDate = calcRet;
       } catch (err: any) {
         errors.push(`Baris ${rowNumber}: ${err.message}`);
         continue;
