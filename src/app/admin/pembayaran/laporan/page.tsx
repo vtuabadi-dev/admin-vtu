@@ -26,6 +26,7 @@ import {
   MessageSquare,
   Copy,
   Check,
+  Calendar,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/components/ui/Card";
 import { Button } from "@/shared/components/ui/Button";
@@ -337,6 +338,9 @@ function PaymentReviewTabContent() {
   const [selectedPayment, setSelectedPayment] = useState<any | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [jenisFilter, setJenisFilter] = useState<string>("all");
+  const [datePreset, setDatePreset] = useState<string>("all");
+  const [startDate, setStartDate] = useState<string>("");
+  const [endDate, setEndDate] = useState<string>("");
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
   const [zoomLevel, setZoomLevel] = useState<number>(1);
@@ -661,6 +665,39 @@ function PaymentReviewTabContent() {
       if (jenisFilter === "tagihan" && (isDP || isLunas)) return false;
     }
 
+    // Filter Tanggal
+    if (datePreset !== "all") {
+      const rawDate = p.tanggal || p.createdAt;
+      if (rawDate) {
+        const itemDate = new Date(rawDate);
+        if (!isNaN(itemDate.getTime())) {
+          const itemYMD = itemDate.toISOString().slice(0, 10);
+          const now = new Date();
+          const todayYMD = now.toISOString().slice(0, 10);
+
+          if (datePreset === "today") {
+            if (itemYMD !== todayYMD) return false;
+          } else if (datePreset === "yesterday") {
+            const yest = new Date(now);
+            yest.setDate(yest.getDate() - 1);
+            if (itemYMD !== yest.toISOString().slice(0, 10)) return false;
+          } else if (datePreset === "this_week") {
+            const sevenDaysAgo = new Date(now);
+            sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+            const sevenDaysYMD = sevenDaysAgo.toISOString().slice(0, 10);
+            if (itemYMD < sevenDaysYMD) return false;
+          } else if (datePreset === "this_month") {
+            const itemMonth = itemYMD.slice(0, 7);
+            const currentMonth = todayYMD.slice(0, 7);
+            if (itemMonth !== currentMonth) return false;
+          } else if (datePreset === "custom") {
+            if (startDate && itemYMD < startDate) return false;
+            if (endDate && itemYMD > endDate) return false;
+          }
+        }
+      }
+    }
+
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase().trim();
       const matchKode = (p.kodeRegistrasi || "").toLowerCase().includes(q);
@@ -696,6 +733,58 @@ function PaymentReviewTabContent() {
         </div>
 
         <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto">
+          {/* Date Filter Dropdown & Custom Range */}
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <div className="relative">
+              <Calendar className="w-3.5 h-3.5 text-muted-foreground absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <select
+                value={datePreset}
+                onChange={(e) => setDatePreset(e.target.value)}
+                className="pl-8 pr-2.5 py-1.5 bg-background border rounded-lg text-xs font-medium focus:outline-none focus:ring-1 focus:ring-primary"
+              >
+                <option value="all">📅 Semua Tanggal</option>
+                <option value="today">Hari Ini</option>
+                <option value="yesterday">Kemarin</option>
+                <option value="this_week">7 Hari Terakhir</option>
+                <option value="this_month">Bulan Ini</option>
+                <option value="custom">Rentang Custom...</option>
+              </select>
+            </div>
+
+            {datePreset === "custom" && (
+              <div className="flex items-center gap-1 bg-background border rounded-lg px-2 py-1">
+                <input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  className="bg-transparent text-xs font-mono focus:outline-none"
+                  title="Tanggal Mulai"
+                />
+                <span className="text-muted-foreground text-[10px]">s/d</span>
+                <input
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className="bg-transparent text-xs font-mono focus:outline-none"
+                  title="Tanggal Selesai"
+                />
+                {(startDate || endDate) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setStartDate("");
+                      setEndDate("");
+                    }}
+                    className="p-0.5 text-muted-foreground hover:text-foreground"
+                    title="Reset rentang tanggal"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+
           {/* Status Filter */}
           <select
             value={statusFilter}
@@ -721,7 +810,7 @@ function PaymentReviewTabContent() {
           </select>
 
           {/* Search Box */}
-          <div className="relative flex-1 sm:w-48">
+          <div className="relative flex-1 sm:w-44">
             <Search className="w-3.5 h-3.5 text-muted-foreground absolute left-2.5 top-1/2 -translate-y-1/2" />
             <input
               type="text"
@@ -731,6 +820,26 @@ function PaymentReviewTabContent() {
               className="w-full pl-8 pr-3 py-1.5 bg-background border rounded-lg text-xs font-medium placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
             />
           </div>
+
+          {/* Quick Reset All Filters Button */}
+          {(datePreset !== "all" || statusFilter !== "all" || jenisFilter !== "all" || searchQuery) && (
+            <button
+              type="button"
+              onClick={() => {
+                setDatePreset("all");
+                setStartDate("");
+                setEndDate("");
+                setStatusFilter("all");
+                setJenisFilter("all");
+                setSearchQuery("");
+              }}
+              className="px-2 py-1.5 text-xs text-amber-600 hover:text-amber-700 dark:text-amber-400 font-bold flex items-center gap-1 hover:bg-amber-500/10 rounded-lg transition-colors"
+              title="Reset Semua Filter"
+            >
+              <X className="w-3.5 h-3.5" />
+              Reset
+            </button>
+          )}
         </div>
       </div>
 
