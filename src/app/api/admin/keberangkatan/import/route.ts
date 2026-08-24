@@ -17,13 +17,14 @@ function parseExcelSerialDate(serial: number): Date | null {
   return isNaN(dateInfo.getTime()) ? null : dateInfo;
 }
 
-function parseDateString(str: string): Date | null {
+function parseDateString(str?: string): Date | null {
+  if (!str) return null;
   const clean = str.trim();
   if (!clean) return null;
 
   // ISO format YYYY-MM-DD or YYYY/MM/DD
   const isoMatch = clean.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
-  if (isoMatch) {
+  if (isoMatch && isoMatch[1] && isoMatch[2] && isoMatch[3]) {
     const y = parseInt(isoMatch[1], 10);
     const m = parseInt(isoMatch[2], 10) - 1;
     const d = parseInt(isoMatch[3], 10);
@@ -33,7 +34,7 @@ function parseDateString(str: string): Date | null {
 
   // Indonesian / European format DD/MM/YYYY or DD-MM-YYYY or DD.MM.YYYY
   const dmyMatch = clean.match(/^(\d{1,2})[-/. ](\d{1,2})[-/. ](\d{4})/);
-  if (dmyMatch) {
+  if (dmyMatch && dmyMatch[1] && dmyMatch[2] && dmyMatch[3]) {
     const d = parseInt(dmyMatch[1], 10);
     const m = parseInt(dmyMatch[2], 10) - 1;
     const y = parseInt(dmyMatch[3], 10);
@@ -43,7 +44,7 @@ function parseDateString(str: string): Date | null {
 
   // Short year format DD/MM/YY or DD-MM-YY
   const dmyShortMatch = clean.match(/^(\d{1,2})[-/. ](\d{1,2})[-/. ](\d{2})$/);
-  if (dmyShortMatch) {
+  if (dmyShortMatch && dmyShortMatch[1] && dmyShortMatch[2] && dmyShortMatch[3]) {
     const d = parseInt(dmyShortMatch[1], 10);
     const m = parseInt(dmyShortMatch[2], 10) - 1;
     let y = parseInt(dmyShortMatch[3], 10);
@@ -69,12 +70,12 @@ function parseDateString(str: string): Date | null {
   };
 
   const textMonthMatch = clean.match(/^(\d{1,2})\s+([a-zA-Z]+)\s+(\d{4})/);
-  if (textMonthMatch) {
+  if (textMonthMatch && textMonthMatch[1] && textMonthMatch[2] && textMonthMatch[3]) {
     const d = parseInt(textMonthMatch[1], 10);
     const mStr = textMonthMatch[2].toLowerCase();
     const y = parseInt(textMonthMatch[3], 10);
-    if (mStr in MONTH_NAMES) {
-      const date = new Date(y, MONTH_NAMES[mStr], d);
+    if (mStr in MONTH_NAMES && MONTH_NAMES[mStr] !== undefined) {
+      const date = new Date(y, MONTH_NAMES[mStr]!, d);
       return isNaN(date.getTime()) ? null : date;
     }
   }
@@ -187,8 +188,6 @@ export async function POST(request: NextRequest) {
       const cell3Text = row.getCell(3).text?.trim();
       const isLegacyFormat = /^\d+$/.test(cell3Text?.replace(/[^0-9]/g, "") || "") && cell3Text.length > 5;
 
-      let rawTanggalBerangkat: string;
-      let rawTanggalPulang: string;
       let rawMaskapai: string;
       let rawStartingPoint: string | undefined;
       let rawNomorPenerbangan: string;
