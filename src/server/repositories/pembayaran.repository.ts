@@ -284,8 +284,28 @@ export const pembayaranRepo = {
                 id: true,
                 kode: true,
                 namaPaket: true,
+                hargaPaket: true,
                 tanggalBerangkat: true,
+                tanggalPulang: true,
+                hotelMekkah: true,
+                hotelMadinah: true,
+                packageType: {
+                  select: { name: true },
+                },
               },
+            },
+            pembayaran: {
+              select: {
+                id: true,
+                tanggal: true,
+                jumlah: true,
+                metode: true,
+                bankPengirim: true,
+                status: true,
+                catatan: true,
+                invoiceId: true,
+              },
+              orderBy: { tanggal: "asc" },
             },
             anggota: {
               select: {
@@ -294,6 +314,7 @@ export const pembayaranRepo = {
                 nomorPeserta: true,
                 nomorTelepon: true,
                 email: true,
+                alamat: true,
               },
             },
             ketuaGroup: {
@@ -302,6 +323,7 @@ export const pembayaranRepo = {
                 namaLengkap: true,
                 nomorTelepon: true,
                 email: true,
+                alamat: true,
               },
             },
           },

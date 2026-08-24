@@ -32,6 +32,8 @@ import {
   PlusCircle,
   Trash2,
   ShoppingBag,
+  Building,
+  Users,
 } from "lucide-react";
 import { downloadInvoicePdf, shareInvoicePdf, type InvoiceOrderItem } from "@/shared/lib/invoice-pdf";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/components/ui/Card";
@@ -432,6 +434,11 @@ function PaymentReviewTabContent() {
   const [formBank, setFormBank] = useState("");
   const [formRekening, setFormRekening] = useState("");
   const [formCatatan, setFormCatatan] = useState("");
+  const [formHotelMekkah, setFormHotelMekkah] = useState("GRAND AL MASSA");
+  const [formHotelMadinah, setFormHotelMadinah] = useState("DURRAT AL EIMAN");
+  const [formAlamat, setFormAlamat] = useState("");
+  const [selectedAnggota, setSelectedAnggota] = useState<string[]>([]);
+  const [availableAnggota, setAvailableAnggota] = useState<string[]>([]);
   const [submittingInvoice, setSubmittingInvoice] = useState(false);
 
   // Order Items / Adjustments (Beban Tambahan & Pengurangan Biaya)
@@ -516,7 +523,9 @@ function PaymentReviewTabContent() {
     setOcrData(payment.ocrData || null);
     const dateStr = new Date().toISOString().slice(0, 10);
     const randomNum = Math.floor(1000 + Math.random() * 9000);
-    setInvoiceNumber(payment.invoiceId || `INV-${dateStr.replace(/-/g, "")}-${randomNum}`);
+    const monthRom = ["I","II","III","IV","V","VI","VII","VIII","IX","X","XI","XII"][new Date().getMonth()] || "VIII";
+    const yearVal = new Date().getFullYear();
+    setInvoiceNumber(payment.invoiceId || `${randomNum}/INV.VT/${monthRom}/${yearVal}`);
     setInvoiceDate(payment.tanggal ? new Date(payment.tanggal).toISOString().slice(0, 10) : dateStr);
 
     const d = new Date();
@@ -534,9 +543,30 @@ function PaymentReviewTabContent() {
 
     setFormNominal(payment.jumlah || 0);
     setFormMetode(payment.metode || "transfer");
-    setFormBank(payment.bankPengirim || "");
+    setFormBank(payment.bankPengirim || "MANDIRI");
     setFormRekening(payment.nomorRekening || "");
     setFormCatatan(payment.catatan || "");
+
+    // Hotel Information from Package
+    const kbr = payment.group?.keberangkatan;
+    setFormHotelMekkah(kbr?.hotelMekkah || "GRAND AL MASSA");
+    setFormHotelMadinah(kbr?.hotelMadinah || "DURRAT AL EIMAN");
+
+    // Alamat
+    const alamat = payment.group?.ketuaGroup?.alamat || payment.group?.alamat || "DSN KAUMAN, 010/006, KALIPARE, KEC. KALIPARE, KAB. MALANG";
+    setFormAlamat(alamat);
+
+    // Anggota List & Split Support
+    const memberNames: string[] = [];
+    if (payment.group?.anggota && payment.group.anggota.length > 0) {
+      payment.group.anggota.forEach((m: any) => {
+        if (m.namaLengkap) memberNames.push(m.namaLengkap);
+      });
+    } else if (payment.namaGroup) {
+      memberNames.push(payment.namaGroup);
+    }
+    setAvailableAnggota(memberNames);
+    setSelectedAnggota(memberNames);
 
     // If payment has a transfer slip, trigger OCR extraction
     if (payment.buktiUrl) {
@@ -651,8 +681,8 @@ function PaymentReviewTabContent() {
   const getInvoicePdfPayload = useCallback((p: any, invNum: string, nominal: number) => {
     const rawTgl = p.tanggal ? new Date(p.tanggal) : new Date();
     const formattedTgl = !isNaN(rawTgl.getTime())
-      ? rawTgl.toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })
-      : new Date().toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });
+      ? rawTgl.toLocaleDateString("id-ID", { day: "2-digit", month: "2-digit", year: "numeric" })
+      : new Date().toLocaleDateString("id-ID", { day: "2-digit", month: "2-digit", year: "numeric" });
 
     const totalBeban = orderItems
       .filter((it) => it.tipe === "penambahan")
@@ -666,33 +696,66 @@ function PaymentReviewTabContent() {
     const totalBayarVal = p.group?.totalPembayaran || 0;
     const sisaTagihanVal = Math.max(0, totalTagihanDisesuaikan - (totalBayarVal + (p.status === "verified" ? 0 : nominal)));
 
+    // Payment History from group payments
+    const history: any[] = [];
+    if (p.group?.pembayaran && p.group.pembayaran.length > 0) {
+      p.group.pembayaran.forEach((item: any) => {
+        const itemTgl = item.tanggal ? new Date(item.tanggal).toLocaleDateString("id-ID", { day: "2-digit", month: "2-digit", year: "numeric" }) : "-";
+        history.push({
+          tanggal: itemTgl,
+          metode: item.bankPengirim ? `TF ${item.bankPengirim.toUpperCase()}` : (item.metode || "TF MANDIRI").toUpperCase(),
+          nominal: item.jumlah || 0,
+        });
+      });
+    } else {
+      history.push({
+        tanggal: formattedTgl,
+        metode: formBank ? `TF ${formBank.toUpperCase()}` : "TF MANDIRI",
+        nominal: nominal || p.jumlah || 0,
+      });
+    }
+
+    const membersToInclude = selectedAnggota.length > 0 ? selectedAnggota : (availableAnggota.length > 0 ? availableAnggota : [p.namaGroup || "Jamaah"]);
+
     return {
       invoiceNumber: invNum,
       invoiceDate: formattedTgl,
-      dueDate: dueDate || "Sesuai Jadwal",
+      idReg: p.group?.kodeRegistrasi?.replace(/[^0-9]/g, "").slice(-4) || "3575",
+      kode: p.group?.kodeRegistrasi?.slice(-3) || "104",
       namaGroup: p.namaGroup || p.group?.namaGroup || "Bapak/Ibu",
+      alamat: formAlamat || p.group?.ketuaGroup?.alamat || "DSN KAUMAN, 010/006, KALIPARE, KEC. KALIPARE, KAB. MALANG",
+      telepon: targetPhone || p.group?.ketuaGroup?.nomorTelepon,
       kodeRegistrasi: p.kodeRegistrasi || p.group?.kodeRegistrasi || "-",
-      namaPaket: p.group?.keberangkatan?.namaPaket || formCatatan || "Paket Umroh VTU",
+      namaPaket: p.group?.keberangkatan?.namaPaket || formCatatan || "PAKET UMROH 10 H SBY ( JED.C )",
+      tipePaket: p.group?.keberangkatan?.packageType?.name || "SILVER",
+      jumlahPax: membersToInclude.length || p.group?.paxCount || 2,
+      hargaSatuanPaket: p.group?.keberangkatan?.hargaPaket || 37400000,
       tanggalBerangkat: p.group?.keberangkatan?.tanggalBerangkat
-        ? new Date(p.group.keberangkatan.tanggalBerangkat).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })
+        ? new Date(p.group.keberangkatan.tanggalBerangkat).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })
         : undefined,
+      hotelMekkah: formHotelMekkah || p.group?.keberangkatan?.hotelMekkah || "GRAND AL MASSA",
+      hotelMadinah: formHotelMadinah || p.group?.keberangkatan?.hotelMadinah || "DURRAT AL EIMAN",
+      anggota: membersToInclude,
+      orderItems: orderItems,
+      paymentHistory: history,
+      totalTagihan: totalTagihanBase,
+      totalPembayaran: totalBayarVal + (p.status === "verified" ? 0 : nominal),
+      sisaTagihan: sisaTagihanVal,
+      maksimalPelunasan: dueDate || "6 September 2026",
+      picName: p.group?.ketuaGroup?.namaLengkap || p.namaGroup,
+      picPhone: targetPhone || p.group?.ketuaGroup?.nomorTelepon,
+      picEmail: targetEmail || p.group?.ketuaGroup?.email,
       jenisPembayaran: formJenis || "DP Pendaftaran",
       nominal: nominal || p.jumlah || 0,
       metode: formMetode || p.metode || "Transfer",
-      bank: formBank || p.bankPengirim || "BSI / Mandiri",
+      bank: formBank || p.bankPengirim || "MANDIRI",
       nomorRekening: formRekening || p.nomorRekening || "-",
       catatan: formCatatan || p.catatan || "",
-      totalTagihan: totalTagihanBase,
-      totalPembayaran: totalBayarVal,
-      sisaTagihan: sisaTagihanVal,
-      orderItems: orderItems,
       totalBebanTambahan: totalBeban,
       totalPengurangan: totalDiskon,
       totalTagihanDisesuaikan: totalTagihanDisesuaikan,
-      picPhone: targetPhone || p.group?.ketuaGroup?.nomorTelepon,
-      picEmail: targetEmail || p.group?.ketuaGroup?.email,
     };
-  }, [dueDate, formJenis, formMetode, formBank, formRekening, formCatatan, orderItems, targetPhone, targetEmail]);
+  }, [dueDate, formJenis, formMetode, formBank, formRekening, formCatatan, formHotelMekkah, formHotelMadinah, formAlamat, selectedAnggota, availableAnggota, orderItems, targetPhone, targetEmail]);
 
   const handleDownloadPdf = useCallback((paymentObj?: any) => {
     const p = paymentObj || sendInvoiceTarget || selectedPayment;
@@ -1359,6 +1422,115 @@ function PaymentReviewTabContent() {
                   </div>
                 </div>
 
+                {/* 2.5. Hotel Pesanan & Anggota Jamaah / Split Invoice */}
+                <div className="p-3 bg-muted/40 rounded-xl border space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5">
+                      <Building className="w-4 h-4 text-emerald-600" />
+                      <span className="font-bold text-foreground text-xs">Hotel Pesanan & Anggota (A/N)</span>
+                    </div>
+                    <Badge variant="outline" className="text-[10px]">
+                      {selectedAnggota.length} / {availableAnggota.length || 1} Jamaah
+                    </Badge>
+                  </div>
+
+                  {/* Hotel Makkah & Madinah Inputs */}
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-[10.5px] font-bold text-foreground">Hotel Makkah</label>
+                      <Input
+                        type="text"
+                        value={formHotelMekkah}
+                        onChange={(e) => setFormHotelMekkah(e.target.value)}
+                        placeholder="Contoh: GRAND AL MASSA"
+                        className="h-8 text-xs font-semibold mt-1"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10.5px] font-bold text-foreground">Hotel Madinah</label>
+                      <Input
+                        type="text"
+                        value={formHotelMadinah}
+                        onChange={(e) => setFormHotelMadinah(e.target.value)}
+                        placeholder="Contoh: DURRAT AL EIMAN"
+                        className="h-8 text-xs font-semibold mt-1"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Alamat Jamaah */}
+                  <div>
+                    <label className="text-[10.5px] font-bold text-foreground">Alamat Jamaah / Kota</label>
+                    <Input
+                      type="text"
+                      value={formAlamat}
+                      onChange={(e) => setFormAlamat(e.target.value)}
+                      placeholder="Alamat lengkap jamaah..."
+                      className="h-8 text-xs mt-1"
+                    />
+                  </div>
+
+                  {/* Anggota Jamaah (A/N) Selection with Split Invoice Support */}
+                  {availableAnggota.length > 0 && (
+                    <div className="pt-2 border-t space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <label className="text-[10.5px] font-bold text-foreground flex items-center gap-1">
+                          <Users className="w-3.5 h-3.5 text-primary" />
+                          Nama Anggota Jamaah (A/N) di Invoice:
+                        </label>
+                        <div className="flex gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => setSelectedAnggota(availableAnggota)}
+                            className="text-[10px] text-primary hover:underline font-bold cursor-pointer"
+                          >
+                            Pilih Semua
+                          </button>
+                          <span className="text-[10px] text-muted-foreground">•</span>
+                          <button
+                            type="button"
+                            onClick={() => setSelectedAnggota([])}
+                            className="text-[10px] text-muted-foreground hover:underline cursor-pointer"
+                          >
+                            Reset
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 gap-1.5 bg-background p-2 rounded-lg border max-h-36 overflow-y-auto">
+                        {availableAnggota.map((nama, idx) => {
+                          const isChecked = selectedAnggota.includes(nama);
+                          return (
+                            <label
+                              key={nama + idx}
+                              className={`flex items-center gap-2 p-1.5 rounded text-xs cursor-pointer transition-colors ${
+                                isChecked ? "bg-primary/5 font-semibold text-foreground" : "text-muted-foreground hover:bg-muted"
+                              }`}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={isChecked}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    setSelectedAnggota((prev) => [...prev, nama]);
+                                  } else {
+                                    setSelectedAnggota((prev) => prev.filter((n) => n !== nama));
+                                  }
+                                }}
+                                className="rounded text-primary focus:ring-primary h-3.5 w-3.5"
+                              />
+                              <span>{idx + 1}. {nama}</span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                      <p className="text-[9.5px] text-muted-foreground">
+                        💡 Centang nama anggota yang ditagihkan. Jika jamaah meminta invoice split, centang anggota terkait saja.
+                      </p>
+                    </div>
+                  )}
+                </div>
+
                 {/* 3. AI OCR Extraction & Bukti Slip Thumbnail Preview di dalam Form */}
                 {selectedPayment.buktiUrl && (
                   <div className="space-y-2">
@@ -1619,6 +1791,43 @@ function PaymentReviewTabContent() {
                     </span>
                   </div>
                 </div>
+
+                {/* 4.5. Riwayat Pembayaran Masuk (Payment History) */}
+                {selectedPayment.group?.pembayaran && selectedPayment.group.pembayaran.length > 0 && (
+                  <div className="p-3 bg-muted/40 rounded-xl border space-y-2 text-xs">
+                    <div className="flex items-center justify-between border-b pb-1">
+                      <span className="font-bold text-foreground flex items-center gap-1.5">
+                        <Receipt className="w-3.5 h-3.5 text-emerald-600" />
+                        Riwayat Pembayaran Group ({selectedPayment.group.pembayaran.length})
+                      </span>
+                      <span className="text-[10px] font-mono text-muted-foreground font-semibold">
+                        Total Terbayar: {formatCurrency(groupTotalBayar)}
+                      </span>
+                    </div>
+
+                    <div className="space-y-1 max-h-32 overflow-y-auto">
+                      {selectedPayment.group.pembayaran.map((p: any, idx: number) => (
+                        <div
+                          key={p.id || idx}
+                          className="flex items-center justify-between p-1.5 bg-background rounded border text-[11px]"
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] text-muted-foreground font-mono">#{idx + 1}</span>
+                            <span className="font-medium text-foreground">
+                              {p.tanggal ? new Date(p.tanggal).toLocaleDateString("id-ID") : "-"}
+                            </span>
+                            <span className="text-[10px] text-muted-foreground uppercase">
+                              {p.bankPengirim ? `TF ${p.bankPengirim}` : p.metode || "Transfer"}
+                            </span>
+                          </div>
+                          <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                            {formatCurrency(p.jumlah)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {/* 5. Action Buttons di Form Invoice */}
                 <div className="pt-2 border-t flex flex-col gap-2">
