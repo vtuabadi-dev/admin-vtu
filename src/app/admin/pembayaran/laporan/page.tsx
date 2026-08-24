@@ -440,7 +440,7 @@ function PaymentReviewTabContent() {
 
     // If payment has a transfer slip, trigger OCR extraction
     if (payment.buktiUrl) {
-      if (!payment.ocrData) {
+      if (!payment.ocrData || payment.ocrData.extractedVia === "fallback_heuristic" || !payment.ocrData.nominal) {
         runOcrOnPayment(payment);
       } else {
         const o = payment.ocrData;

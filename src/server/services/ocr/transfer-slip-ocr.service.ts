@@ -17,7 +17,20 @@ export interface SlipOcrResult {
   extractedVia: "gemini_vision" | "fallback_heuristic";
 }
 
-function getGeminiApiKey(): string {
+async function getGeminiApiKey(): Promise<string> {
+  try {
+    const { loadProviders } = await import("@/server/services/ocr/registry");
+    const { reactivateExpiredCooldowns, isInCooldown } = await import("@/server/services/ocr/cooldown-manager");
+    let providers = await loadProviders();
+    await reactivateExpiredCooldowns(providers);
+    const active = providers.filter((p) => p.isActive && p.apiKey?.trim() && !isInCooldown(p));
+    if (active.length > 0 && active[0]?.apiKey) {
+      return active[0].apiKey.trim();
+    }
+  } catch (e) {
+    console.warn("[slip-ocr] Error loading DB OCR providers:", e);
+  }
+
   const envKey =
     process.env.GEMINI_API_KEY ||
     process.env.GOOGLE_VISION_API_KEY ||
@@ -26,196 +39,172 @@ function getGeminiApiKey(): string {
   return envKey.trim();
 }
 
-/**
- * Heuristic fallback parser when AI API is unavailable
- */
-export function parseSlipHeuristic(text: string): Partial<SlipOcrResult> {
-  const result: Partial<SlipOcrResult> = {
-    confidence: 0.7,
-    extractedVia: "fallback_heuristic",
-  };
+async function getImageBuffer(imageUrl: string): Promise<{ buffer: Buffer; mimeType: string } | null> {
+  if (!imageUrl) return null;
 
-  // Extract nominal (e.g. Rp 25.000.000 or 25,000,000.00 or Total: 25000000)
-  const nominalMatch =
-    text.match(/(?:rp|idr|nominal|jumlah|total|amount)[\s.:]*([\d.,]+)/i) ||
-    text.match(/([\d]{1,3}(?:[.,]\d{3})+(?:[.,]\d{2})?)/);
-  if (nominalMatch?.[1]) {
-    const cleanNum = nominalMatch[1].replace(/[^\d]/g, "");
-    const parsed = parseInt(cleanNum, 10);
-    if (!isNaN(parsed) && parsed > 1000) {
-      result.nominal = parsed;
+  // 1. Data URL
+  if (imageUrl.startsWith("data:")) {
+    const parts = imageUrl.split(",");
+    if (parts[0] && parts[1]) {
+      const header = parts[0].split(";")[0];
+      const mimeType = header ? header.replace("data:", "") : "image/jpeg";
+      return { buffer: Buffer.from(parts[1], "base64"), mimeType };
     }
   }
 
-  // Extract date (e.g. 24/08/2026 or 2026-08-24 or 24-Aug-2026)
-  const dateMatch =
-    text.match(/(\d{4}[-/.]\d{2}[-/.]\d{2})/) ||
-    text.match(/(\d{2}[-/.]\d{2}[-/.]\d{4})/);
-  if (dateMatch?.[1]) {
-    const rawDate = dateMatch[1];
-    const firstPart = rawDate.split("-")[0];
-    if (rawDate.includes("-") && firstPart && firstPart.length === 4) {
-      result.tanggalTransfer = rawDate;
-    } else {
-      const parts = rawDate.split(/[-/.]/);
-      if (parts.length === 3 && parts[0] && parts[1] && parts[2]) {
-        if (parts[2].length === 4) {
-          result.tanggalTransfer = `${parts[2]}-${parts[1].padStart(2, "0")}-${parts[0].padStart(2, "0")}`;
-        }
+  // 2. Absolute HTTP/HTTPS URL
+  if (imageUrl.startsWith("http://") || imageUrl.startsWith("https://")) {
+    try {
+      const res = await fetch(imageUrl);
+      if (res.ok) {
+        const mimeType = res.headers.get("content-type") || "image/jpeg";
+        const arr = await res.arrayBuffer();
+        return { buffer: Buffer.from(arr), mimeType };
       }
+    } catch (e) {
+      console.warn("[slip-ocr] Fetch HTTP imageUrl failed:", e);
     }
   }
 
-  // Extract Bank
-  const banks = ["BCA", "BSI", "MANDIRI", "BRI", "BNI", "PERMATA", "CIMB", "JAGO", "BSI", "MUAMALAT"];
-  for (const b of banks) {
-    if (new RegExp(`\\b${b}\\b`, "i").test(text)) {
-      result.bankPengirim = b;
-      break;
+  // 3. Storage Adapter download (storage path or API query string)
+  try {
+    let cleanPath = imageUrl;
+    if (imageUrl.includes("?")) {
+      const qs = imageUrl.split("?")[1] || "";
+      const params = new URLSearchParams(qs);
+      cleanPath = params.get("path") || params.get("id") || cleanPath;
     }
+    cleanPath = cleanPath.replace(/^\/+/, "");
+
+    const { getStorageAdapter } = await import("@/server/storage");
+    const storage = getStorageAdapter();
+    const buf = await storage.download(cleanPath);
+    if (buf && buf.length > 0) {
+      let mimeType = "image/jpeg";
+      if (buf[0] === 0x89 && buf[1] === 0x50) mimeType = "image/png";
+      else if (buf[0] === 0x25 && buf[1] === 0x50) mimeType = "application/pdf";
+      return { buffer: buf, mimeType };
+    }
+  } catch (err) {
+    console.warn("[slip-ocr] Storage adapter download failed:", err);
   }
 
-  // Extract reference number
-  const refMatch = text.match(/(?:ref|referensi|no\s*transaksi|trace|stan)[\s.:]*([A-Z0-9-]{6,})/i);
-  if (refMatch?.[1]) {
-    result.nomorReferensi = refMatch[1].trim();
+  // 4. Local storage fallback
+  try {
+    let cleanPath = imageUrl.includes("?")
+      ? new URLSearchParams(imageUrl.split("?")[1] || "").get("path") || imageUrl
+      : imageUrl;
+    cleanPath = cleanPath.replace(/^\/+/, "");
+    const { createLocalAdapter } = await import("@/server/storage/local");
+    const local = createLocalAdapter();
+    const buf = await local.download(cleanPath);
+    if (buf && buf.length > 0) {
+      let mimeType = "image/jpeg";
+      if (buf[0] === 0x89 && buf[1] === 0x50) mimeType = "image/png";
+      return { buffer: buf, mimeType };
+    }
+  } catch (err2) {
+    console.warn("[slip-ocr] Local storage download fallback failed:", err2);
   }
 
-  return result;
+  return null;
 }
 
 /**
- * Extract transfer slip details using Gemini Vision with fallback
+ * Extract transfer slip details using Gemini Vision AI
  */
 export async function extractTransferSlip(
   imageUrl: string,
   paymentId?: string
 ): Promise<SlipOcrResult> {
-  const apiKey = getGeminiApiKey();
+  const apiKey = await getGeminiApiKey();
+  const imgData = await getImageBuffer(imageUrl);
 
-  if (apiKey && imageUrl) {
+  if (apiKey && imgData?.buffer) {
     try {
-      let imageBuffer: Buffer | null = null;
-      let mimeType = "image/jpeg";
+      const genAI = new GoogleGenerativeAI(apiKey);
+      const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
-      if (imageUrl.startsWith("data:")) {
-        const parts = imageUrl.split(",");
-        if (parts[0] && parts[1]) {
-          const header = parts[0].split(";")[0];
-          mimeType = header ? header.replace("data:", "") : "image/jpeg";
-          imageBuffer = Buffer.from(parts[1], "base64");
-        }
-      } else if (imageUrl.startsWith("http://") || imageUrl.startsWith("https://")) {
-        const res = await fetch(imageUrl);
-        if (res.ok) {
-          const contentType = res.headers.get("content-type");
-          if (contentType) mimeType = contentType;
-          const arr = await res.arrayBuffer();
-          imageBuffer = Buffer.from(arr);
-        }
-      }
-
-      if (imageBuffer) {
-        const genAI = new GoogleGenerativeAI(apiKey);
-        const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
-
-        const prompt = `Anda adalah asisten AI OCR spesialis verifikasi slip pembayaran dan bukti transfer bank Indonesia (BCA, BSI, Mandiri, BRI, BNI, dll).
-Analisis gambar slip transfer terlampir dan ekstrak datanya dalam format JSON murni:
+      const prompt = `Anda adalah asisten AI OCR spesialis verifikasi slip pembayaran bank Indonesia (Livin' by Mandiri, BCA Mobile, myBCA, BRImo, BSI Mobile, BNI Mobile, Permata, dll).
+Analisis gambar struk/slip bukti transfer ini dengan sangat teliti dan ekstrak informasinya ke dalam JSON valid:
 {
-  "nominal": number (angka bulat integer, contoh: 25000000),
-  "tanggalTransfer": string (format YYYY-MM-DD, contoh: "2026-08-24"),
-  "jamTransfer": string (format HH:mm:ss atau HH:mm, contoh: "14:32:00"),
-  "bankPengirim": string (nama bank pengirim, contoh: "BCA"),
-  "bankTujuan": string (nama bank tujuan, contoh: "BSI"),
-  "namaPengirim": string (nama pemilik rekening pengirim),
-  "namaPenerima": string (nama pemilik rekening penerima / VTU),
+  "nominal": number (angka bulat murni nominal uang yang berhasil ditransfer, contoh: 5000000),
+  "tanggalTransfer": string (format YYYY-MM-DD, contoh: "2026-08-23"),
+  "jamTransfer": string (format HH:mm:ss atau HH:mm, contoh: "22:31:31"),
+  "bankPengirim": string (nama bank pengirim/aplikasi, contoh: "Mandiri", "BCA", "BSI", "BRI", "BNI"),
+  "bankTujuan": string (nama bank tujuan penerima, contoh: "Mandiri", "BSI"),
+  "namaPengirim": string (nama pengirim/rekening sumber, contoh: "ZAHRA ZAKIRAH"),
+  "namaPenerima": string (nama penerima/rekening tujuan, contoh: "VAUZA TAMMA ABADI"),
   "nomorRekeningPengirim": string (nomor rekening pengirim jika ada),
   "nomorRekeningTujuan": string (nomor rekening tujuan jika ada),
-  "nomorReferensi": string (nomor referensi / jurnal / trace),
-  "confidence": number (nilai 0.0 - 1.0),
-  "rawText": string (ringkasan teks kunci yang terbaca)
+  "nomorReferensi": string (nomor referensi / no ref / trace id, contoh: "2608231122053061798"),
+  "confidence": number (nilai akurasi 0.0 - 1.0, contoh: 0.98),
+  "rawText": string (ringkasan teks kunci yang tertera pada slip)
 }
-HANYA kembalikan JSON valid tanpa markdown backtick tambahan.`;
+HANYA kembalikan JSON valid tanpa tag markdown backtick.`;
 
-        const result = await model.generateContent([
-          prompt,
-          {
-            inlineData: {
-              data: imageBuffer.toString("base64"),
-              mimeType,
-            },
+      const result = await model.generateContent([
+        prompt,
+        {
+          inlineData: {
+            data: imgData.buffer.toString("base64"),
+            mimeType: imgData.mimeType,
           },
-        ]);
+        },
+      ]);
 
-        const text = result.response.text();
-        const jsonMatch = text.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-          const parsed = JSON.parse(jsonMatch[0]);
-          const finalResult: SlipOcrResult = {
-            nominal: typeof parsed.nominal === "number" ? parsed.nominal : parseInt(String(parsed.nominal).replace(/[^\d]/g, ""), 10) || undefined,
-            tanggalTransfer: parsed.tanggalTransfer || undefined,
-            jamTransfer: parsed.jamTransfer || undefined,
-            bankPengirim: parsed.bankPengirim || undefined,
-            bankTujuan: parsed.bankTujuan || undefined,
-            namaPengirim: parsed.namaPengirim || undefined,
-            namaPenerima: parsed.namaPenerima || undefined,
-            nomorRekeningPengirim: parsed.nomorRekeningPengirim || undefined,
-            nomorRekeningTujuan: parsed.nomorRekeningTujuan || undefined,
-            nomorReferensi: parsed.nomorReferensi || undefined,
-            confidence: typeof parsed.confidence === "number" ? parsed.confidence : 0.95,
-            rawText: parsed.rawText || text.slice(0, 300),
-            extractedVia: "gemini_vision",
-          };
+      const text = result.response.text();
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        const parsed = JSON.parse(jsonMatch[0]);
+        const finalResult: SlipOcrResult = {
+          nominal: typeof parsed.nominal === "number" ? parsed.nominal : parseInt(String(parsed.nominal).replace(/[^\d]/g, ""), 10) || undefined,
+          tanggalTransfer: parsed.tanggalTransfer || undefined,
+          jamTransfer: parsed.jamTransfer || undefined,
+          bankPengirim: parsed.bankPengirim || undefined,
+          bankTujuan: parsed.bankTujuan || undefined,
+          namaPengirim: parsed.namaPengirim || undefined,
+          namaPenerima: parsed.namaPenerima || undefined,
+          nomorRekeningPengirim: parsed.nomorRekeningPengirim || undefined,
+          nomorRekeningTujuan: parsed.nomorRekeningTujuan || undefined,
+          nomorReferensi: parsed.nomorReferensi || undefined,
+          confidence: typeof parsed.confidence === "number" ? parsed.confidence : 0.98,
+          rawText: parsed.rawText || text.slice(0, 300),
+          extractedVia: "gemini_vision",
+        };
 
-          // Cache to database if paymentId is given
-          if (paymentId) {
-            try {
-              await prisma.pembayaran.update({
-                where: { id: paymentId },
-                data: {
-                  ocrData: finalResult as any,
-                  ...(finalResult.nominal && { jumlah: finalResult.nominal }),
-                  ...(finalResult.tanggalTransfer && { tanggal: new Date(finalResult.tanggalTransfer) }),
-                  ...(finalResult.bankPengirim && { bankPengirim: finalResult.bankPengirim }),
-                  ...(finalResult.nomorReferensi && { nomorRekening: finalResult.nomorReferensi }),
-                },
-              });
-            } catch (e) {
-              console.warn("[slip-ocr] Failed to persist OCR result to database:", e);
-            }
+        // Persist to database if paymentId is provided
+        if (paymentId) {
+          try {
+            await prisma.pembayaran.update({
+              where: { id: paymentId },
+              data: {
+                ocrData: finalResult as any,
+                ...(finalResult.nominal && { jumlah: finalResult.nominal }),
+                ...(finalResult.tanggalTransfer && { tanggal: new Date(finalResult.tanggalTransfer) }),
+                ...(finalResult.bankPengirim && { bankPengirim: finalResult.bankPengirim }),
+                ...(finalResult.nomorReferensi && { nomorRekening: finalResult.nomorReferensi }),
+              },
+            });
+          } catch (e) {
+            console.warn("[slip-ocr] Failed to persist OCR result to database:", e);
           }
-
-          return finalResult;
         }
+
+        return finalResult;
       }
     } catch (err) {
-      console.warn("[slip-ocr] Gemini vision error, falling back to heuristic:", err);
+      console.warn("[slip-ocr] Gemini vision analysis error:", err);
     }
   }
 
-  // Fallback heuristic extraction
-  const fallback = parseSlipHeuristic(imageUrl);
-  const fallbackResult: SlipOcrResult = {
-    nominal: fallback.nominal,
-    tanggalTransfer: fallback.tanggalTransfer || new Date().toISOString().slice(0, 10),
-    bankPengirim: fallback.bankPengirim || "BSI",
-    nomorReferensi: fallback.nomorReferensi,
-    confidence: fallback.confidence ?? 0.6,
+  // Fallback heuristic if AI unavailable
+  return {
+    nominal: undefined,
+    tanggalTransfer: new Date().toISOString().slice(0, 10),
+    bankPengirim: "Mandiri",
+    nomorReferensi: undefined,
+    confidence: 0.5,
     extractedVia: "fallback_heuristic",
   };
-
-  if (paymentId && fallbackResult.nominal) {
-    try {
-      await prisma.pembayaran.update({
-        where: { id: paymentId },
-        data: {
-          ocrData: fallbackResult as any,
-        },
-      });
-    } catch (e) {
-      console.warn("[slip-ocr] Failed to persist fallback OCR result:", e);
-    }
-  }
-
-  return fallbackResult;
 }

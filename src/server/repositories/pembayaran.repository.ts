@@ -237,12 +237,13 @@ export const pembayaranRepo = {
           });
         }
 
-        // Check if Pembayaran row exists for this group
-        const existingPembayaran = await prisma.pembayaran.findFirst({
+        // Check if Pembayaran rows exist for this group and deduplicate if multiple
+        const existingPayments = await prisma.pembayaran.findMany({
           where: { groupId: group.id },
+          orderBy: { createdAt: "desc" },
         });
 
-        if (!existingPembayaran) {
+        if (existingPayments.length === 0) {
           const nominalDp = 5000000 * (reg.paxCount || 1);
           await prisma.pembayaran.create({
             data: {
@@ -256,11 +257,27 @@ export const pembayaranRepo = {
               catatan: `DP Pendaftaran ${reg.paxCount} Pax - ${reg.namaPerwakilan} (${reg.kodeRegistrasi})`,
             },
           });
-        } else if (extractedBuktiUrl && !existingPembayaran.buktiUrl) {
-          await prisma.pembayaran.update({
-            where: { id: existingPembayaran.id },
-            data: { buktiUrl: extractedBuktiUrl },
-          });
+        } else {
+          // If duplicate pending payments exist for this group, keep only the newest and remove duplicates
+          const pendingDuplicates = existingPayments.filter((p) => p.status === "pending");
+          if (pendingDuplicates.length > 1) {
+            const [keep, ...removeList] = pendingDuplicates;
+            const removeIds = removeList.map((p) => p.id);
+            await prisma.pembayaran.deleteMany({
+              where: { id: { in: removeIds } },
+            });
+            if (extractedBuktiUrl && keep && !keep.buktiUrl) {
+              await prisma.pembayaran.update({
+                where: { id: keep.id },
+                data: { buktiUrl: extractedBuktiUrl },
+              });
+            }
+          } else if (extractedBuktiUrl && existingPayments[0] && !existingPayments[0].buktiUrl) {
+            await prisma.pembayaran.update({
+              where: { id: existingPayments[0].id },
+              data: { buktiUrl: extractedBuktiUrl },
+            });
+          }
         }
       }
     } catch (syncErr) {
@@ -304,7 +321,18 @@ export const pembayaranRepo = {
       },
       orderBy: { tanggal: "desc" },
     });
-    return rows.map((r: any) => ({
+    // Deduplicate mapped rows by unique groupId + status + sumber + buktiUrl so identical duplicate entries are never shown twice
+    const seen = new Set<string>();
+    const uniqueRows: any[] = [];
+    for (const r of rows) {
+      const key = `${r.groupId}_${r.status}_${r.sumber}_${r.jumlah}_${r.buktiUrl || ""}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        uniqueRows.push(r);
+      }
+    }
+
+    return uniqueRows.map((r: any) => ({
       ...mapPembayaran(r),
       kodeRegistrasi: (r as any).group?.kodeRegistrasi,
       namaGroup: (r as any).group?.namaGroup,
