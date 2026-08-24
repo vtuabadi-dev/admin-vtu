@@ -10,6 +10,108 @@ function parseNum(val: any, defaultVal = 0): number {
   return str ? parseInt(str, 10) : defaultVal;
 }
 
+function parseExcelSerialDate(serial: number): Date | null {
+  const utcDays = Math.floor(serial - 25569);
+  const utcValue = utcDays * 86400 * 1000;
+  const dateInfo = new Date(utcValue);
+  return isNaN(dateInfo.getTime()) ? null : dateInfo;
+}
+
+function parseDateString(str: string): Date | null {
+  const clean = str.trim();
+  if (!clean) return null;
+
+  // ISO format YYYY-MM-DD or YYYY/MM/DD
+  const isoMatch = clean.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+  if (isoMatch) {
+    const y = parseInt(isoMatch[1], 10);
+    const m = parseInt(isoMatch[2], 10) - 1;
+    const d = parseInt(isoMatch[3], 10);
+    const date = new Date(y, m, d);
+    return isNaN(date.getTime()) ? null : date;
+  }
+
+  // Indonesian / European format DD/MM/YYYY or DD-MM-YYYY or DD.MM.YYYY
+  const dmyMatch = clean.match(/^(\d{1,2})[-/. ](\d{1,2})[-/. ](\d{4})/);
+  if (dmyMatch) {
+    const d = parseInt(dmyMatch[1], 10);
+    const m = parseInt(dmyMatch[2], 10) - 1;
+    const y = parseInt(dmyMatch[3], 10);
+    const date = new Date(y, m, d);
+    return isNaN(date.getTime()) ? null : date;
+  }
+
+  // Short year format DD/MM/YY or DD-MM-YY
+  const dmyShortMatch = clean.match(/^(\d{1,2})[-/. ](\d{1,2})[-/. ](\d{2})$/);
+  if (dmyShortMatch) {
+    const d = parseInt(dmyShortMatch[1], 10);
+    const m = parseInt(dmyShortMatch[2], 10) - 1;
+    let y = parseInt(dmyShortMatch[3], 10);
+    y += y < 50 ? 2000 : 1900;
+    const date = new Date(y, m, d);
+    return isNaN(date.getTime()) ? null : date;
+  }
+
+  // Text month format e.g. "06 Sep 2026", "15 September 2026"
+  const MONTH_NAMES: Record<string, number> = {
+    jan: 0, januari: 0, january: 0,
+    feb: 1, februari: 1, february: 1,
+    mar: 2, maret: 2, march: 2,
+    apr: 3, april: 3,
+    mei: 4, may: 4,
+    jun: 5, juni: 5, june: 5,
+    jul: 6, juli: 6, july: 6,
+    agu: 7, agustus: 7, aug: 7, august: 7,
+    sep: 8, september: 8,
+    okt: 9, oktober: 9, oct: 9, october: 9,
+    nov: 10, november: 10,
+    des: 11, desember: 11, dec: 11, december: 11,
+  };
+
+  const textMonthMatch = clean.match(/^(\d{1,2})\s+([a-zA-Z]+)\s+(\d{4})/);
+  if (textMonthMatch) {
+    const d = parseInt(textMonthMatch[1], 10);
+    const mStr = textMonthMatch[2].toLowerCase();
+    const y = parseInt(textMonthMatch[3], 10);
+    if (mStr in MONTH_NAMES) {
+      const date = new Date(y, MONTH_NAMES[mStr], d);
+      return isNaN(date.getTime()) ? null : date;
+    }
+  }
+
+  // Native Date constructor fallback
+  const fallback = new Date(clean);
+  return isNaN(fallback.getTime()) ? null : fallback;
+}
+
+function parseExcelDate(cell: any): Date | null {
+  if (!cell) return null;
+  const val = cell.value;
+
+  // 1. Direct Date object
+  if (val instanceof Date) {
+    return isNaN(val.getTime()) ? null : val;
+  }
+
+  // 2. Formula object with Date/number result
+  if (val && typeof val === "object" && "result" in val) {
+    if (val.result instanceof Date) return isNaN(val.result.getTime()) ? null : val.result;
+    if (typeof val.result === "number") return parseExcelSerialDate(val.result);
+    if (typeof val.result === "string") return parseDateString(val.result);
+  }
+
+  // 3. Excel serial number (e.g. 46271)
+  if (typeof val === "number" && val > 10000 && val < 100000) {
+    return parseExcelSerialDate(val);
+  }
+
+  // 4. Formatted string or raw value string
+  const strVal = String(cell.text || cell.value || "").trim();
+  if (!strVal) return null;
+
+  return parseDateString(strVal);
+}
+
 export async function POST(request: NextRequest) {
   try {
     const session = await auth();
@@ -99,11 +201,12 @@ export async function POST(request: NextRequest) {
       let legacyHotelMadinah = "";
       let regColOffset = 0; // 0 for legacy/32-col, 1 for 33-col, 2 for 34-col format
 
+      let cellBerangkat = isLegacyFormat ? row.getCell(4) : row.getCell(3);
+      let cellPulang = isLegacyFormat ? row.getCell(5) : row.getCell(4);
+
       if (isLegacyFormat) {
         // Legacy 11-column format
         legacyHargaBase = parseNum(row.getCell(3).text);
-        rawTanggalBerangkat = row.getCell(4).text?.trim();
-        rawTanggalPulang = row.getCell(5).text?.trim();
         rawMaskapai = row.getCell(6).text?.trim();
         rawNomorPenerbangan = row.getCell(7).text?.trim();
         legacyHotelMekkah = row.getCell(8).text?.trim();
@@ -112,8 +215,6 @@ export async function POST(request: NextRequest) {
         rawTargetMaterialisasi = parseNum(row.getCell(11).text, 30);
       } else {
         // Modern format with Starting Point
-        rawTanggalBerangkat = row.getCell(3).text?.trim();
-        rawTanggalPulang = row.getCell(4).text?.trim();
         rawMaskapai = row.getCell(5).text?.trim();
         rawStartingPoint = row.getCell(6).text?.trim();
         rawNomorPenerbangan = row.getCell(7).text?.trim();
@@ -142,15 +243,18 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // Validate dates
+      // Validate dates using robust parseExcelDate
       let departureDate: Date;
       let returnDate: Date;
       try {
-        departureDate = new Date(rawTanggalBerangkat);
-        returnDate = new Date(rawTanggalPulang);
-        if (isNaN(departureDate.getTime()) || isNaN(returnDate.getTime())) {
-          throw new Error("Format tanggal keberangkatan atau kepulangan tidak valid. Gunakan YYYY-MM-DD.");
+        const parsedDep = parseExcelDate(cellBerangkat);
+        const parsedRet = parseExcelDate(cellPulang);
+
+        if (!parsedDep || !parsedRet) {
+          throw new Error("Format tanggal keberangkatan atau kepulangan tidak valid. Gunakan YYYY-MM-DD atau DD/MM/YYYY.");
         }
+        departureDate = parsedDep;
+        returnDate = parsedRet;
       } catch (err: any) {
         errors.push(`Baris ${rowNumber}: ${err.message}`);
         continue;
