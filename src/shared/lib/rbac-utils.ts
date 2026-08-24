@@ -72,6 +72,16 @@ export function isSidebarItemVisible(role: OperationalRole | undefined | null, s
   // SUPER_ADMIN sees everything
   if (enterprise === "SUPER_ADMIN") return true;
 
+  // Specific role restriction for admin_badal:
+  // Menubar yang muncul untuk role ini hanya submenu Badal Umroh & Wakaf (dan Dashboard)
+  if (role === "admin_badal") {
+    const badalAllowedKeys = new Set([
+      "UTAMA-Dashboard",
+      "BADAL & WAKAF-Badal Umroh & Wakaf",
+    ]);
+    return badalAllowedKeys.has(key);
+  }
+
   // Hide SUPER_ADMIN-only items
   const superAdminOnlyKeys = new Set([
     "LAINNYA-Audit Trail",
