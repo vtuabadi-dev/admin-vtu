@@ -117,9 +117,15 @@ export async function POST(request: NextRequest) {
       const { registrationRepo } = await import("@/server/repositories");
       fullRegRecord = await registrationRepo.findByKode(kodeRegistrasi);
       if (fullRegRecord) {
+        let paketInfo = null;
+        if (fullRegRecord.paketId) {
+          try {
+            paketInfo = await prisma.keberangkatan.findUnique({ where: { id: fullRegRecord.paketId } });
+          } catch { /* non-blocking */ }
+        }
         pdfBuf = await generateRegistrationPdf({
           registration: fullRegRecord,
-          packageInfo: null,
+          packageInfo: paketInfo,
           termsVersion: "1.0",
           termsAcceptedAt: fullRegRecord.termsAcceptedAt ?? fullRegRecord.createdAt,
         });

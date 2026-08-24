@@ -70,7 +70,7 @@ export async function POST(request: NextRequest) {
     const storage = getStorageAdapter();
     const storagePath = signaturePath(tempId);
 
-    let targetFolderId: string | undefined = undefined;
+    let targetFolderId: string | undefined = process.env.GOOGLE_DRIVE_TANDA_TANGAN_FOLDER_ID || "1F1lVi0_54Dre-lo941x6RmkzJAsiUrvC";
     const paketIdParam = formData.get("paketId") as string | null;
     if (isGoogleDriveConfigured()) {
       if (paketIdParam) {
@@ -78,7 +78,9 @@ export async function POST(request: NextRequest) {
           const { prisma } = await import("@/server/db/client");
           const paketInfo = await prisma.keberangkatan.findUnique({ where: { id: paketIdParam } });
           const driveFolders = (paketInfo?.driveFolderIds as Record<string, string> | null) || null;
-          targetFolderId = driveFolders?.tandaTangan;
+          if (driveFolders?.tandaTangan) {
+            targetFolderId = driveFolders.tandaTangan;
+          }
         } catch { /* non-blocking */ }
       }
     }

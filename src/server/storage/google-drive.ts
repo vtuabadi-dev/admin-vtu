@@ -384,18 +384,33 @@ export function createGoogleDriveAdapter(): StorageAdapter {
         );
       }
 
-      // Step 1: Create file metadata entry in the target parent folder
-      const metaRes = await apiFetch(`${DRIVE_API}/files?supportsAllDrives=true`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: fileName,
-          mimeType: contentType,
-          parents: [parentFolderId],
-        }),
-      });
-      const metaData = await metaRes.json();
-      const fileId = metaData.id;
+      // Step 1: Check if file with same name already exists in target parent folder (prevents duplicate files)
+      let fileId: string | undefined = undefined;
+      try {
+        const query = `'${parentFolderId}' in parents and name = '${fileName.replace(/'/g, "\\'")}' and trashed = false`;
+        const searchRes = await apiFetch(`${DRIVE_API}/files?q=${encodeURIComponent(query)}&fields=files(id,name)&supportsAllDrives=true&includeItemsFromAllDrives=true`);
+        const searchData = await searchRes.json();
+        if (searchData.files && searchData.files.length > 0) {
+          fileId = searchData.files[0].id;
+          console.log(`[Google Drive Storage] Found existing file "${fileName}" (ID: ${fileId}) in folder "${parentFolderId}". Overwriting content...`);
+        }
+      } catch (searchErr) {
+        console.warn(`[Google Drive Storage] Existing file check notice:`, searchErr);
+      }
+
+      if (!fileId) {
+        const metaRes = await apiFetch(`${DRIVE_API}/files?supportsAllDrives=true`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: fileName,
+            mimeType: contentType,
+            parents: [parentFolderId],
+          }),
+        });
+        const metaData = await metaRes.json();
+        fileId = metaData.id;
+      }
 
       // Step 2: Upload binary content to the created file entry via simple media upload
       const token = await getAccessToken();

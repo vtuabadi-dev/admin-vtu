@@ -118,7 +118,7 @@ export async function POST(request: NextRequest) {
             }
           }
           if (!signatureFolderId) {
-            signatureFolderId = await getOrCreateFolder("TANDA TANGAN");
+            signatureFolderId = process.env.GOOGLE_DRIVE_TANDA_TANGAN_FOLDER_ID || "1F1lVi0_54Dre-lo941x6RmkzJAsiUrvC";
           }
         }
 
