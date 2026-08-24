@@ -29,8 +29,11 @@ import {
   Calendar,
   Download,
   FileDown,
+  PlusCircle,
+  Trash2,
+  ShoppingBag,
 } from "lucide-react";
-import { downloadInvoicePdf, shareInvoicePdf } from "@/shared/lib/invoice-pdf";
+import { downloadInvoicePdf, shareInvoicePdf, type InvoiceOrderItem } from "@/shared/lib/invoice-pdf";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/components/ui/Card";
 import { Button } from "@/shared/components/ui/Button";
 import { Input } from "@/shared/components/ui/Input";
@@ -331,6 +334,77 @@ function SplitInvoiceModal({
 }
 
 // ============================================================
+// PRESETS PENYESUAIAN & TAMBAHAN ORDER LAYANAN
+// ============================================================
+
+const ORDER_PRESETS = [
+  {
+    category: "fast_train",
+    label: "Kereta Cepat (Fast Train)",
+    defaultName: "Tiket Kereta Cepat Haramain (Mekkah - Madinah)",
+    defaultNominal: 1250000,
+    type: "penambahan" as const,
+    icon: "🚅",
+  },
+  {
+    category: "upgrade_kamar",
+    label: "Upgrade Kamar",
+    defaultName: "Upgrade Kamar Quad ke Double/Triple",
+    defaultNominal: 3500000,
+    type: "penambahan" as const,
+    icon: "🛏️",
+  },
+  {
+    category: "upgrade_hotel",
+    label: "Upgrade Hotel",
+    defaultName: "Upgrade Hotel Bintang 5 Ring 1",
+    defaultNominal: 4500000,
+    type: "penambahan" as const,
+    icon: "🏨",
+  },
+  {
+    category: "perlengkapan",
+    label: "Tambah Perlengkapan",
+    defaultName: "Tambahan Set Koper & Seragam Umroh",
+    defaultNominal: 1200000,
+    type: "penambahan" as const,
+    icon: "🎒",
+  },
+  {
+    category: "jahit_seragam",
+    label: "Ongkos Jahit Seragam",
+    defaultName: "Ongkos Jahit Seragam Batik / Abaya",
+    defaultNominal: 250000,
+    type: "penambahan" as const,
+    icon: "✂️",
+  },
+  {
+    category: "kursi_roda",
+    label: "Sewa Kursi Roda & Pendorong",
+    defaultName: "Sewa Kursi Roda + Muthawwif Pendorong",
+    defaultNominal: 1500000,
+    type: "penambahan" as const,
+    icon: "♿",
+  },
+  {
+    category: "paspor",
+    label: "Biaya Paspor / Visa",
+    defaultName: "Biaya Penanganan Paspor & Dokumen Jamaah",
+    defaultNominal: 650000,
+    type: "penambahan" as const,
+    icon: "🛂",
+  },
+  {
+    category: "diskon",
+    label: "Diskon / Potongan Harga",
+    defaultName: "Potongan Khusus / Promo Grup Umroh",
+    defaultNominal: 1000000,
+    type: "pengurangan" as const,
+    icon: "🎁",
+  },
+];
+
+// ============================================================
 // PENINJAUAN PEMBAYARAN VIEW
 // ============================================================
 
@@ -359,6 +433,14 @@ function PaymentReviewTabContent() {
   const [formRekening, setFormRekening] = useState("");
   const [formCatatan, setFormCatatan] = useState("");
   const [submittingInvoice, setSubmittingInvoice] = useState(false);
+
+  // Order Items / Adjustments (Beban Tambahan & Pengurangan Biaya)
+  const [orderItems, setOrderItems] = useState<InvoiceOrderItem[]>([]);
+  const [showAddOrderModal, setShowAddOrderModal] = useState(false);
+  const [newOrderCategory, setNewOrderCategory] = useState("fast_train");
+  const [newOrderName, setNewOrderName] = useState("");
+  const [newOrderType, setNewOrderType] = useState<"penambahan" | "pengurangan">("penambahan");
+  const [newOrderNominal, setNewOrderNominal] = useState<number>(0);
 
   // Reject State
   const [rejectTarget, setRejectTarget] = useState<any | null>(null);
@@ -516,6 +598,22 @@ function PaymentReviewTabContent() {
       : new Date().toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });
     const bank = p.bankPengirim || formBank || "Bank Transfer";
 
+    const totalBeban = orderItems
+      .filter((it) => it.tipe === "penambahan")
+      .reduce((sum, it) => sum + (it.nominal || 0), 0);
+    const totalDiskon = orderItems
+      .filter((it) => it.tipe === "pengurangan")
+      .reduce((sum, it) => sum + (it.nominal || 0), 0);
+    const tagihanBase = p.group?.totalTagihan || p.jumlah || nominal || 0;
+    const tagihanDisesuaikan = Math.max(0, tagihanBase + totalBeban - totalDiskon);
+
+    const orderLines = orderItems.length > 0 ? [
+      ``,
+      `📋 *Rincian Tambahan Layanan / Penyesuaian:*`,
+      ...orderItems.map((item) => `• [${item.tipe === "penambahan" ? "+" : "-"}] ${item.nama}: Rp ${item.nominal.toLocaleString("id-ID")}`),
+      `*Total Tagihan Disesuaikan:* Rp ${tagihanDisesuaikan.toLocaleString("id-ID")}`,
+    ] : [];
+
     return [
       `*INVOICE PEMBAYARAN RESMI — VTU ABADI TRAVEL*`,
       `--------------------------------------------------`,
@@ -528,6 +626,7 @@ function PaymentReviewTabContent() {
       `📦 *Paket Umroh:* ${paketName}`,
       `💳 *Jenis Pembayaran:* ${formJenis || "DP Pendaftaran"}`,
       `💰 *Nominal Terverifikasi:* Rp ${nominal.toLocaleString("id-ID")}`,
+      ...orderLines,
       `📅 *Tanggal Transaksi:* ${tgl}`,
       `🏦 *Metode / Bank:* ${bank}`,
       `✅ *Status:* LUNAS / TERVERIFIKASI`,
@@ -539,7 +638,7 @@ function PaymentReviewTabContent() {
       `*Finance & Operational Team — VTU ABADI Travel*`,
       `🌐 https://vtuabadi.com`,
     ].join("\n");
-  }, [formJenis, formBank]);
+  }, [formJenis, formBank, orderItems]);
 
   const getInvoicePdfPayload = useCallback((p: any, invNum: string, nominal: number) => {
     const rawTgl = p.tanggal ? new Date(p.tanggal) : new Date();
@@ -547,9 +646,17 @@ function PaymentReviewTabContent() {
       ? rawTgl.toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })
       : new Date().toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });
 
-    const totalTagihanVal = p.group?.totalTagihan || p.jumlah || nominal || 0;
+    const totalBeban = orderItems
+      .filter((it) => it.tipe === "penambahan")
+      .reduce((sum, it) => sum + (it.nominal || 0), 0);
+    const totalDiskon = orderItems
+      .filter((it) => it.tipe === "pengurangan")
+      .reduce((sum, it) => sum + (it.nominal || 0), 0);
+
+    const totalTagihanBase = p.group?.totalTagihan || p.jumlah || nominal || 0;
+    const totalTagihanDisesuaikan = Math.max(0, totalTagihanBase + totalBeban - totalDiskon);
     const totalBayarVal = p.group?.totalPembayaran || 0;
-    const sisaTagihanVal = Math.max(0, totalTagihanVal - (totalBayarVal + (p.status === "verified" ? 0 : nominal)));
+    const sisaTagihanVal = Math.max(0, totalTagihanDisesuaikan - (totalBayarVal + (p.status === "verified" ? 0 : nominal)));
 
     return {
       invoiceNumber: invNum,
@@ -567,13 +674,17 @@ function PaymentReviewTabContent() {
       bank: formBank || p.bankPengirim || "BSI / Mandiri",
       nomorRekening: formRekening || p.nomorRekening || "-",
       catatan: formCatatan || p.catatan || "",
-      totalTagihan: totalTagihanVal,
+      totalTagihan: totalTagihanBase,
       totalPembayaran: totalBayarVal,
       sisaTagihan: sisaTagihanVal,
+      orderItems: orderItems,
+      totalBebanTambahan: totalBeban,
+      totalPengurangan: totalDiskon,
+      totalTagihanDisesuaikan: totalTagihanDisesuaikan,
       picPhone: targetPhone || p.group?.ketuaGroup?.nomorTelepon,
       picEmail: targetEmail || p.group?.ketuaGroup?.email,
     };
-  }, [dueDate, formJenis, formMetode, formBank, formRekening, formCatatan, targetPhone, targetEmail]);
+  }, [dueDate, formJenis, formMetode, formBank, formRekening, formCatatan, orderItems, targetPhone, targetEmail]);
 
   const handleDownloadPdf = useCallback((paymentObj?: any) => {
     const p = paymentObj || sendInvoiceTarget || selectedPayment;
@@ -784,10 +895,22 @@ function PaymentReviewTabContent() {
     return <LoadingSkeleton variant="table" />;
   }
 
-  // Calculate group financial summaries if available
-  const groupTotalTagihan = selectedPayment?.group?.totalTagihan || selectedPayment?.jumlah || 0;
+  // Calculate group financial summaries with order adjustments
+  const totalBebanTambahan = orderItems
+    .filter((it) => it.tipe === "penambahan")
+    .reduce((sum, it) => sum + (it.nominal || 0), 0);
+
+  const totalPengurangan = orderItems
+    .filter((it) => it.tipe === "pengurangan")
+    .reduce((sum, it) => sum + (it.nominal || 0), 0);
+
+  const groupTotalTagihanBase = selectedPayment?.group?.totalTagihan || selectedPayment?.jumlah || 0;
+  const groupTotalTagihanDisesuaikan = Math.max(0, groupTotalTagihanBase + totalBebanTambahan - totalPengurangan);
   const groupTotalBayar = selectedPayment?.group?.totalPembayaran || 0;
-  const groupSisaTagihan = Math.max(0, groupTotalTagihan - (groupTotalBayar + (selectedPayment?.status === "verified" ? 0 : formNominal)));
+  const groupSisaTagihan = Math.max(
+    0,
+    groupTotalTagihanDisesuaikan - (groupTotalBayar + (selectedPayment?.status === "verified" ? 0 : formNominal))
+  );
 
   return (
     <div className="space-y-4">
@@ -1312,13 +1435,167 @@ function PaymentReviewTabContent() {
                   </div>
                 )}
 
+                {/* 3.5. Penyesuaian Biaya & Tambahan Order (Layanan Ekstra / Potongan) */}
+                <div className="p-3 bg-gradient-to-br from-amber-500/5 via-primary/5 to-emerald-500/5 rounded-xl border border-amber-500/20 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="p-1.5 bg-amber-500/10 text-amber-600 dark:text-amber-400 rounded-lg">
+                        <ShoppingBag className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                          Tambahan Order & Penyesuaian Biaya
+                          {orderItems.length > 0 && (
+                            <Badge variant="warning" className="text-[10px] px-1.5 py-0">
+                              {orderItems.length} Item
+                            </Badge>
+                          )}
+                        </h4>
+                        <p className="text-[10px] text-muted-foreground">
+                          Tambah beban (kereta cepat, upgrade kamar, seragam) atau potongan biaya.
+                        </p>
+                      </div>
+                    </div>
+
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="h-7 text-xs font-bold border-amber-500/40 text-amber-700 dark:text-amber-300 hover:bg-amber-500/10 gap-1"
+                      onClick={() => {
+                        setNewOrderCategory("fast_train");
+                        setNewOrderName("");
+                        setNewOrderType("penambahan");
+                        setNewOrderNominal(0);
+                        setShowAddOrderModal(true);
+                      }}
+                    >
+                      <PlusCircle className="w-3.5 h-3.5" />
+                      Tambah Order
+                    </Button>
+                  </div>
+
+                  {/* Quick Preset Chips for 1-Click Adding */}
+                  <div>
+                    <p className="text-[10px] font-bold uppercase text-muted-foreground mb-1.5">Pilih Cepat Kategori Layanan:</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {ORDER_PRESETS.map((preset) => (
+                        <button
+                          key={preset.category}
+                          type="button"
+                          onClick={() => {
+                            const newItem: InvoiceOrderItem = {
+                              id: `order-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+                              kategori: preset.category,
+                              nama: preset.defaultName,
+                              tipe: preset.type,
+                              nominal: preset.defaultNominal,
+                            };
+                            setOrderItems((prev) => [...prev, newItem]);
+                          }}
+                          className="px-2 py-1 bg-background hover:bg-muted border rounded-lg text-[10.5px] font-medium text-foreground flex items-center gap-1 transition-colors shadow-2xs cursor-pointer"
+                          title={`Klik untuk tambah ${preset.label}`}
+                        >
+                          <span>{preset.icon}</span>
+                          <span>{preset.label}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Active Order Items List */}
+                  {orderItems.length > 0 ? (
+                    <div className="space-y-2 pt-1 border-t border-border/60">
+                      {orderItems.map((item) => (
+                        <div
+                          key={item.id}
+                          className="flex items-center justify-between gap-2 p-2 bg-background/90 rounded-lg border text-xs shadow-2xs"
+                        >
+                          <div className="flex items-center gap-2 flex-1 min-w-0">
+                            <span className={`px-1.5 py-0.5 rounded text-[9.5px] font-extrabold uppercase shrink-0 ${
+                              item.tipe === "penambahan"
+                                ? "bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-300 dark:border-amber-800"
+                                : "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800"
+                            }`}>
+                              {item.tipe === "penambahan" ? "+ Beban" : "- Potongan"}
+                            </span>
+                            <input
+                              type="text"
+                              value={item.nama}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setOrderItems((prev) =>
+                                  prev.map((it) => (it.id === item.id ? { ...it, nama: val } : it))
+                                );
+                              }}
+                              className="bg-transparent border-b border-dashed border-border text-xs font-semibold text-foreground flex-1 min-w-0 focus:outline-none focus:border-primary"
+                              placeholder="Nama layanan / beban"
+                            />
+                          </div>
+
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <span className="text-[10px] text-muted-foreground font-mono">Rp</span>
+                            <input
+                              type="number"
+                              value={item.nominal || ""}
+                              onChange={(e) => {
+                                const val = Number(e.target.value) || 0;
+                                setOrderItems((prev) =>
+                                  prev.map((it) => (it.id === item.id ? { ...it, nominal: val } : it))
+                                );
+                              }}
+                              className="w-24 h-7 text-xs font-mono font-bold text-right bg-muted/40 border rounded px-1.5 focus:outline-none focus:ring-1 focus:ring-primary"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setOrderItems((prev) => prev.filter((it) => it.id !== item.id));
+                              }}
+                              className="p-1 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded transition-colors"
+                              title="Hapus item order"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="p-2.5 rounded-lg border border-dashed text-center text-muted-foreground text-[11px]">
+                      Belum ada beban tambahan atau potongan order. Klik chip preset di atas atau tombol Tambah Order untuk menambahkan.
+                    </div>
+                  )}
+                </div>
+
                 {/* 4. Ringkasan Keuangan Group */}
                 <div className="p-3 bg-muted/60 rounded-lg border space-y-1.5 text-[11px]">
                   <p className="font-bold text-foreground text-xs border-b pb-1">Kalkulasi Tagihan Group</p>
                   <div className="flex justify-between text-muted-foreground">
-                    <span>Total Tagihan Paket:</span>
-                    <span className="font-mono font-medium text-foreground">{formatCurrency(groupTotalTagihan)}</span>
+                    <span>Biaya Paket Dasar:</span>
+                    <span className="font-mono font-medium text-foreground">{formatCurrency(groupTotalTagihanBase)}</span>
                   </div>
+
+                  {totalBebanTambahan > 0 && (
+                    <div className="flex justify-between text-amber-700 dark:text-amber-300 font-medium">
+                      <span>+ Tambahan Beban Order:</span>
+                      <span className="font-mono font-bold">+ {formatCurrency(totalBebanTambahan)}</span>
+                    </div>
+                  )}
+
+                  {totalPengurangan > 0 && (
+                    <div className="flex justify-between text-emerald-700 dark:text-emerald-300 font-medium">
+                      <span>- Pengurangan / Diskon:</span>
+                      <span className="font-mono font-bold">- {formatCurrency(totalPengurangan)}</span>
+                    </div>
+                  )}
+
+                  {orderItems.length > 0 && (
+                    <div className="flex justify-between font-bold text-foreground border-t border-dashed pt-1">
+                      <span>Total Tagihan Disesuaikan:</span>
+                      <span className="font-mono font-bold">{formatCurrency(groupTotalTagihanDisesuaikan)}</span>
+                    </div>
+                  )}
+
                   <div className="flex justify-between text-muted-foreground">
                     <span>Total Terbayar Sebelumnya:</span>
                     <span className="font-mono font-medium text-foreground">{formatCurrency(groupTotalBayar)}</span>
@@ -1676,6 +1953,124 @@ function PaymentReviewTabContent() {
               className="font-bold"
             >
               {processingId === rejectTarget?.id ? "Memproses..." : "Konfirmasi Penolakan"}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* ========================================================= */}
+      {/* MODAL TAMBAH ORDER / PENYESUAIAN BIAYA CUSTOM */}
+      {/* ========================================================= */}
+      <Modal
+        open={showAddOrderModal}
+        onClose={() => setShowAddOrderModal(false)}
+        title="Tambah Layanan Order / Penyesuaian Biaya"
+        description="Tambahkan beban biaya ekstra jamaah atau potongan khusus ke dalam invoice."
+        size="default"
+      >
+        <div className="space-y-3.5 pt-1">
+          <div>
+            <label className="text-[11px] font-bold text-foreground">Tipe Penyesuaian</label>
+            <div className="grid grid-cols-2 gap-2 mt-1">
+              <button
+                type="button"
+                onClick={() => setNewOrderType("penambahan")}
+                className={`p-2 rounded-lg border text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${
+                  newOrderType === "penambahan"
+                    ? "bg-amber-500/15 border-amber-500 text-amber-700 dark:text-amber-300 shadow-2xs"
+                    : "bg-background text-muted-foreground hover:bg-muted"
+                }`}
+              >
+                <span>➕ Tambahan Beban (+)</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setNewOrderType("pengurangan")}
+                className={`p-2 rounded-lg border text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${
+                  newOrderType === "pengurangan"
+                    ? "bg-emerald-500/15 border-emerald-500 text-emerald-700 dark:text-emerald-300 shadow-2xs"
+                    : "bg-background text-muted-foreground hover:bg-muted"
+                }`}
+              >
+                <span>➖ Pengurangan / Diskon (-)</span>
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <label className="text-[11px] font-bold text-foreground">Kategori Layanan</label>
+            <select
+              value={newOrderCategory}
+              onChange={(e) => {
+                const cat = e.target.value;
+                setNewOrderCategory(cat);
+                const foundPreset = ORDER_PRESETS.find((p) => p.category === cat);
+                if (foundPreset) {
+                  setNewOrderName(foundPreset.defaultName);
+                  setNewOrderType(foundPreset.type);
+                  setNewOrderNominal(foundPreset.defaultNominal);
+                }
+              }}
+              className="mt-1 w-full h-8 rounded-md border bg-background px-2.5 text-xs text-foreground focus:ring-1 focus:ring-primary"
+            >
+              <option value="fast_train">🚅 Kereta Cepat Haramain (Fast Train)</option>
+              <option value="upgrade_kamar">🛏️ Upgrade Kamar (Quad ke Double/Triple)</option>
+              <option value="upgrade_hotel">🏨 Upgrade Hotel (Bintang 5 / Ring 1)</option>
+              <option value="perlengkapan">🎒 Tambah Perlengkapan / Koper Umroh</option>
+              <option value="jahit_seragam">✂️ Ongkos Jahit Seragam Batik / Abaya</option>
+              <option value="kursi_roda">♿ Sewa Kursi Roda & Muthawwif Pendorong</option>
+              <option value="paspor">🛂 Biaya Penanganan Paspor & Visa Ekstra</option>
+              <option value="diskon">🎁 Potongan Khusus / Diskon Promo</option>
+              <option value="lainnya">➕ Layanan / Biaya Lainnya</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="text-[11px] font-bold text-foreground">Nama / Deskripsi Layanan</label>
+            <Input
+              value={newOrderName}
+              onChange={(e) => setNewOrderName(e.target.value)}
+              placeholder="Contoh: Ongkos Jahit Seragam Batik 2 Pax"
+              className="mt-1 h-8 text-xs font-semibold"
+            />
+          </div>
+
+          <div>
+            <label className="text-[11px] font-bold text-foreground">Nominal (Rupiah)</label>
+            <Input
+              type="number"
+              value={newOrderNominal || ""}
+              onChange={(e) => setNewOrderNominal(Number(e.target.value) || 0)}
+              placeholder="Contoh: 500000"
+              className="mt-1 h-8 text-xs font-mono font-bold"
+            />
+          </div>
+
+          <div className="flex gap-2 justify-end pt-3 border-t">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowAddOrderModal(false)}
+            >
+              Batal
+            </Button>
+            <Button
+              size="sm"
+              disabled={!newOrderName.trim() || newOrderNominal <= 0}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold"
+              onClick={() => {
+                const newItem: InvoiceOrderItem = {
+                  id: `order-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+                  kategori: newOrderCategory,
+                  nama: newOrderName.trim(),
+                  tipe: newOrderType,
+                  nominal: newOrderNominal,
+                };
+                setOrderItems((prev) => [...prev, newItem]);
+                setShowAddOrderModal(false);
+              }}
+            >
+              Simpan Layanan
             </Button>
           </div>
         </div>
