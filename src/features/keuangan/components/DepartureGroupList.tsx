@@ -7,6 +7,8 @@ import {
   Trash2,
   ChevronRight,
   Package,
+  Search,
+  RotateCcw,
   X,
 } from 'lucide-react';
 import { DepartureGroup, DepartureStatus, ExpenseRecord } from '../types';
@@ -41,6 +43,35 @@ export const DepartureGroupList: React.FC<DepartureGroupListProps> = ({
 }) => {
   const [editingGroup, setEditingGroup] = useState<DepartureGroup | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
+  const [monthFilter, setMonthFilter] = useState<string>('ALL');
+  const [searchQuery, setSearchQuery] = useState<string>('');
+
+  // Extract unique available departure months from groups
+  const availableMonths = React.useMemo(() => {
+    const monthMap = new Map<string, { label: string; count: number; date: Date }>();
+    const monthNames = [
+      'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+      'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+    ];
+
+    groups.forEach((g) => {
+      if (!g.departureDate) return;
+      const d = new Date(g.departureDate);
+      if (isNaN(d.getTime())) return;
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      const label = `${monthNames[d.getMonth()]} ${d.getFullYear()}`;
+      const existing = monthMap.get(key);
+      if (existing) {
+        existing.count += 1;
+      } else {
+        monthMap.set(key, { label, count: 1, date: d });
+      }
+    });
+
+    return Array.from(monthMap.entries())
+      .sort((a, b) => a[1].date.getTime() - b[1].date.getTime())
+      .map(([key, val]) => ({ key, label: val.label, count: val.count }));
+  }, [groups]);
 
   // Form Fields State
   const [code, setCode] = useState('');
@@ -127,13 +158,30 @@ export const DepartureGroupList: React.FC<DepartureGroupListProps> = ({
 
   const filteredGroups = groups.filter((g) => {
     if (statusFilter !== 'ALL' && g.status !== statusFilter) return false;
+
+    if (monthFilter !== 'ALL') {
+      if (!g.departureDate) return false;
+      const d = new Date(g.departureDate);
+      if (isNaN(d.getTime())) return false;
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      if (key !== monthFilter) return false;
+    }
+
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      const matchCode = (g.code || '').toLowerCase().includes(q);
+      const matchName = (g.name || '').toLowerCase().includes(q);
+      const matchType = (g.packageType || '').toLowerCase().includes(q);
+      if (!matchCode && !matchName && !matchType) return false;
+    }
+
     return true;
   });
 
   return (
     <div className="space-y-6">
       {/* Top Controls Bar */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+      <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
         <div>
           <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
             <Users className="w-5 h-5 text-amber-500" /> Management Grup Keberangkatan Umroh
@@ -143,7 +191,41 @@ export const DepartureGroupList: React.FC<DepartureGroupListProps> = ({
           </p>
         </div>
 
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex items-center gap-2 flex-wrap w-full lg:w-auto">
+          {/* Search Box */}
+          <div className="relative flex-1 sm:w-60">
+            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              placeholder="Cari kode / nama grup..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-8 pr-7 py-2 bg-slate-50 border border-slate-300 rounded-lg text-xs font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-600"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+
+          {/* Month Filter Dropdown */}
+          <select
+            value={monthFilter}
+            onChange={(e) => setMonthFilter(e.target.value)}
+            className="px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-xs font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-600"
+          >
+            <option value="ALL">Semua Bulan ({groups.length})</option>
+            {availableMonths.map((m) => (
+              <option key={m.key} value={m.key}>
+                {m.label} ({m.count} paket)
+              </option>
+            ))}
+          </select>
+
           {/* Status Filter */}
           <select
             value={statusFilter}
@@ -159,17 +241,65 @@ export const DepartureGroupList: React.FC<DepartureGroupListProps> = ({
         </div>
       </div>
 
-      {/* Groups Grid Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-        {filteredGroups.map((grp) => {
-          const groupExp = calculateGroupExpenses(grp.id, expenses);
-          const seatsLeft = grp.totalQuota - grp.filledQuota;
-          const quotaPercent = Math.round((grp.filledQuota / grp.totalQuota) * 100);
-          const budgetPercent = Math.round((groupExp.totalActual / grp.targetBudget) * 100);
+      {/* Month Pill Tabs */}
+      {availableMonths.length > 0 && (
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <button
+            onClick={() => setMonthFilter('ALL')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+              monthFilter === 'ALL'
+                ? 'bg-emerald-700 text-white shadow-sm'
+                : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
+            }`}
+          >
+            Semua ({groups.length})
+          </button>
+          {availableMonths.map((m) => (
+            <button
+              key={m.key}
+              onClick={() => setMonthFilter(m.key)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                monthFilter === m.key
+                  ? 'bg-emerald-700 text-white shadow-sm'
+                  : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
+              }`}
+            >
+              {m.label} ({m.count})
+            </button>
+          ))}
+        </div>
+      )}
 
-          return (
-            <div
-              key={grp.id}
+      {/* Empty State vs Groups Grid */}
+      {filteredGroups.length === 0 ? (
+        <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center shadow-sm">
+          <Calendar className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+          <h3 className="text-base font-bold text-slate-800">Tidak Ada Grup Keberangkatan</h3>
+          <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
+            Tidak ditemukan paket keberangkatan yang sesuai dengan filter bulan, status, atau pencarian yang dipilih.
+          </p>
+          <button
+            onClick={() => {
+              setMonthFilter('ALL');
+              setStatusFilter('ALL');
+              setSearchQuery('');
+            }}
+            className="mt-4 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-lg transition-colors inline-flex items-center gap-1.5"
+          >
+            <RotateCcw className="w-3.5 h-3.5" /> Reset Filter
+          </button>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          {filteredGroups.map((grp) => {
+            const groupExp = calculateGroupExpenses(grp.id, expenses);
+            const seatsLeft = grp.totalQuota - grp.filledQuota;
+            const quotaPercent = Math.round((grp.filledQuota / grp.totalQuota) * 100);
+            const budgetPercent = Math.round((groupExp.totalActual / grp.targetBudget) * 100);
+
+            return (
+              <div
+                key={grp.id}
               className="bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-all p-5 flex flex-col justify-between"
             >
               <div>
@@ -299,7 +429,8 @@ export const DepartureGroupList: React.FC<DepartureGroupListProps> = ({
             </div>
           );
         })}
-      </div>
+        </div>
+      )}
 
       {/* Modal Add / Edit Group */}
       {isModalOpen && (
