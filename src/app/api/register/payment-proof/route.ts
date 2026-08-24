@@ -22,9 +22,12 @@ export async function POST(request: NextRequest) {
     let fileBuffer: Buffer | null = null;
     let fileMime = "image/jpeg";
 
+    let nominalDpNum = 0;
     if (contentType.includes("multipart/form-data")) {
       const formData = await request.formData();
       kodeRegistrasi = (formData.get("kodeRegistrasi") as string) || "";
+      const nominalDpRaw = (formData.get("nominalDp") as string) || "";
+      nominalDpNum = parseInt(nominalDpRaw.replace(/\D/g, ""), 10) || 0;
       const file = formData.get("file") as File | null;
 
       if (!file) {
@@ -36,6 +39,9 @@ export async function POST(request: NextRequest) {
     } else {
       const body = await request.json();
       kodeRegistrasi = body.kodeRegistrasi || "";
+      if (body.nominalDp) {
+        nominalDpNum = parseInt(String(body.nominalDp).replace(/\D/g, ""), 10) || 0;
+      }
       if (body.fileBase64) {
         const base64Data = body.fileBase64.replace(/^data:image\/\w+;base64,/, "");
         fileBuffer = Buffer.from(base64Data, "base64");
@@ -49,10 +55,15 @@ export async function POST(request: NextRequest) {
     // Find registration record
     const reg = await prisma.registrationRequest.findUnique({
       where: { kodeRegistrasi },
+      include: { keberangkatan: true, members: true },
     });
 
     if (!reg) {
       return NextResponse.json({ success: false, message: "Kode registrasi tidak ditemukan" }, { status: 404 });
+    }
+
+    if (!nominalDpNum) {
+      nominalDpNum = 5000000 * (reg.paxCount || 1);
     }
 
     let buktiUrl = "";
@@ -93,7 +104,107 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Update Registration Request status and catatanAdmin
+    // Ensure RegistrationGroup exists and link to RegistrationRequest
+    let groupId = reg.groupId;
+    let group = groupId
+      ? await prisma.registrationGroup.findUnique({ where: { id: groupId } })
+      : await prisma.registrationGroup.findFirst({ where: { kodeRegistrasi: reg.kodeRegistrasi } });
+
+    if (!group) {
+      // Find or create ketua Jamaah record for FK constraint
+      const registrationId = `${reg.kodeRegistrasi}-1`;
+      let ketua = await prisma.jamaah.findUnique({
+        where: { registrationId },
+      });
+
+      if (!ketua) {
+        const parts = reg.kodeRegistrasi.split("-");
+        const year = parts[1] ?? new Date().getFullYear().toString();
+        const seq = parts[2] ?? "00001";
+        const nomorPeserta = `PS/${year}/${seq}/1`;
+
+        ketua = await prisma.jamaah.create({
+          data: {
+            registrationId,
+            groupId: "",
+            nomorPeserta,
+            namaLengkap: reg.namaPerwakilan,
+            namaAyah: "",
+            jenisKelamin: ((reg.members?.[0]?.jenisKelamin) as any) || "L",
+            tempatLahir: "-",
+            tanggalLahir: new Date("2000-01-01"),
+            nik: "",
+            nomorPaspor: "",
+            masaBerlakuPaspor: new Date("2030-01-01"),
+            nomorTelepon: reg.nomorTelepon,
+            email: reg.emailPerwakilan,
+            alamat: "-",
+            provinsi: "-",
+            kota: "-",
+            kecamatan: "-",
+            kelurahan: "-",
+            status: "registered",
+            hotelMekkah: "",
+            hotelMadinah: "",
+            syaratDisetujui: reg.termsAccepted ?? true,
+          },
+        });
+      }
+
+      const totalTagihan = (reg.keberangkatan?.hargaPaket || 0) * (reg.paxCount || 1);
+      group = await prisma.registrationGroup.create({
+        data: {
+          kodeRegistrasi: reg.kodeRegistrasi,
+          namaGroup: `GRUP ${reg.namaPerwakilan}`,
+          ketuaGroupId: ketua.id,
+          paketKeberangkatanId: reg.paketId,
+          jumlahAnggota: reg.paxCount,
+          totalTagihan,
+          totalPembayaran: 0,
+          sisaPembayaran: totalTagihan,
+          status: "active",
+        },
+      });
+
+      await prisma.jamaah.update({
+        where: { id: ketua.id },
+        data: { groupId: group.id },
+      });
+
+      groupId = group.id;
+    }
+
+    // Create Pembayaran entry for the review queue
+    if (groupId) {
+      const existingPembayaran = await prisma.pembayaran.findFirst({
+        where: { groupId },
+      });
+
+      if (!existingPembayaran) {
+        await prisma.pembayaran.create({
+          data: {
+            groupId,
+            jumlah: nominalDpNum,
+            metode: "transfer",
+            tanggal: new Date(),
+            buktiUrl: buktiUrl || undefined,
+            status: "pending",
+            sumber: "jamaah",
+            catatan: `DP Pendaftaran ${reg.paxCount} Pax - ${reg.namaPerwakilan} (${reg.kodeRegistrasi})`,
+          },
+        });
+      } else if (buktiUrl && !existingPembayaran.buktiUrl) {
+        await prisma.pembayaran.update({
+          where: { id: existingPembayaran.id },
+          data: {
+            buktiUrl,
+            jumlah: nominalDpNum > 0 ? nominalDpNum : existingPembayaran.jumlah,
+          },
+        });
+      }
+    }
+
+    // Update Registration Request status, groupId, and catatanAdmin
     const updatedNotes = [
       reg.catatanAdmin || "",
       `[Bukti DP Uploaded at ${new Date().toISOString()}]: ${buktiUrl || "File received"}`,
@@ -104,6 +215,7 @@ export async function POST(request: NextRequest) {
       data: {
         catatanAdmin: updatedNotes,
         status: "PENDING_REVIEW",
+        ...(groupId ? { groupId } : {}),
       },
     });
 
