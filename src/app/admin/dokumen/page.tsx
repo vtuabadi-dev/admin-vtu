@@ -23,6 +23,7 @@ import { StatusBadge, Badge } from "@/shared/components/ui/Badge";
 import { Button } from "@/shared/components/ui/Button";
 import { Input } from "@/shared/components/ui/Input";
 import { Select } from "@/shared/components/ui/Select";
+import { SearchableSelect } from "@/shared/components/ui/SearchableSelect";
 import { Modal } from "@/shared/components/ui/Modal";
 import { Tabs } from "@/shared/components/ui/Tabs";
 import {
@@ -260,6 +261,22 @@ export default function DokumenPage() {
     if (statusFilter === "belum_lengkap") return completionMatrix.filter((r) => !r.allMandatoryComplete);
     return completionMatrix;
   }, [completionMatrix, statusFilter]);
+
+  // --- Rekap: Package Searchable Options ---
+  const packageOptions = useMemo(() => {
+    return keberangkatanList.map((k: any) => {
+      const kode = k.kode || "";
+      const nama = k.namaPaket || k.paketUmroh?.namaPaket || "Paket Keberangkatan";
+      const tgl = k.tanggalBerangkat ? formatDate(k.tanggalBerangkat) : "";
+      const maskapai = k.maskapai ? `(${k.maskapai})` : "";
+      const sPoint = k.startingPoint ? `• ${k.startingPoint}` : "";
+      return {
+        value: k.id,
+        label: kode ? `[${kode}] ${nama}` : nama,
+        sublabel: [tgl, maskapai, sPoint].filter(Boolean).join(" "),
+      };
+    });
+  }, [keberangkatanList]);
 
   // --- Rekap: Stats ---
   const matrixStats = useMemo(() => {
@@ -584,12 +601,14 @@ export default function DokumenPage() {
               <div className="space-y-4">
                 {/* Package filter + actions */}
                 <div className="flex flex-wrap items-center gap-3">
-                  <div className="w-56">
-                    <Select
-                      options={keberangkatanList.map((k) => ({ value: k.id, label: k.paketUmroh?.namaPaket || "-" }))}
+                  <div className="w-80 sm:w-96">
+                    <SearchableSelect
+                      options={packageOptions}
                       placeholder="Pilih Paket Keberangkatan"
+                      searchPlaceholder="Cari nama paket, kode, tanggal..."
                       value={selectedPackage}
-                      onChange={(e) => setSelectedPackage(e.target.value)}
+                      onChange={(val) => setSelectedPackage(val)}
+                      size="sm"
                     />
                   </div>
                   <div className="w-40">
@@ -856,7 +875,9 @@ export default function DokumenPage() {
                                     <p className="text-[10px] text-muted-foreground font-mono">{jamaah.nomorPeserta}</p>
                                   </td>
                                   <td className="px-3 py-2.5">
-                                    <span className="text-xs">{kbr?.paketUmroh?.namaPaket ?? "-"}</span>
+                                    <span className="text-xs font-medium">
+                                      {kbr?.namaPaket || (kbr as any)?.paketUmroh?.namaPaket || (kbr?.kode ? `[${kbr.kode}]` : "-")}
+                                    </span>
                                   </td>
                                   <td className="px-3 py-2.5">
                                     <span className="text-xs font-medium">{LABEL_DOKUMEN[doc.jenis] ?? doc.jenis}</span>
