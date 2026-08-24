@@ -12,7 +12,6 @@ import {
   Eye,
   XCircle,
   CheckCircle2,
-  AlertTriangle,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/components/ui/Card";
 import { Button } from "@/shared/components/ui/Button";
@@ -492,21 +491,6 @@ function PaymentReviewTabContent() {
         </Card>
       )}
 
-      {/* Info OCR Notice */}
-      <Card variant="operational" className="border-stone-800 bg-stone-900 text-stone-200">
-        <CardContent className="pt-4 pb-4">
-          <div className="flex items-start gap-3">
-            <AlertTriangle className="h-5 w-5 text-amber-400 shrink-0 mt-0.5" />
-            <div>
-              <p className="text-xs font-bold text-amber-300">Sistem OCR Verifikasi Otomatis VTU</p>
-              <p className="text-[11px] text-stone-400 mt-0.5">
-                Modul ini mendukung verifikasi visual serta auto-extract nominal, bank pengirim, dan ID transaksi dari slip pembayaran untuk validasi cepat.
-              </p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
       {/* Reject Modal */}
       <Modal
         open={rejectTarget !== null}
@@ -569,7 +553,7 @@ function PaymentReviewTabContent() {
 // ============================================================
 
 export default function LaporanPembayaranPage() {
-  const [activeTab, setActiveTab] = useState<"laporan" | "review">("laporan");
+  const [activeTab, setActiveTab] = useState<"laporan" | "review">("review");
   const [showCreateInvoiceModal, setShowCreateInvoiceModal] = useState(false);
 
   // Group lookup
@@ -745,18 +729,6 @@ export default function LaporanPembayaranPage() {
       {/* TOP NAVIGATION TABS */}
       <div className="flex items-center gap-2 border-b border-border pb-1">
         <button
-          onClick={() => setActiveTab("laporan")}
-          className={`flex items-center gap-2 px-4 py-2 text-sm font-bold border-b-2 transition-all ${
-            activeTab === "laporan"
-              ? "border-amber-500 text-amber-600 dark:text-amber-400 bg-amber-500/10 rounded-t-lg"
-              : "border-transparent text-muted-foreground hover:text-foreground"
-          }`}
-        >
-          <CreditCard className="h-4 w-4" />
-          Daftar & Input Pembayaran Group
-        </button>
-
-        <button
           onClick={() => setActiveTab("review")}
           className={`flex items-center gap-2 px-4 py-2 text-sm font-bold border-b-2 transition-all ${
             activeTab === "review"
@@ -766,6 +738,18 @@ export default function LaporanPembayaranPage() {
         >
           <ClipboardCheck className="h-4 w-4" />
           Peninjauan Pembayaran (Slip Verification)
+        </button>
+
+        <button
+          onClick={() => setActiveTab("laporan")}
+          className={`flex items-center gap-2 px-4 py-2 text-sm font-bold border-b-2 transition-all ${
+            activeTab === "laporan"
+              ? "border-amber-500 text-amber-600 dark:text-amber-400 bg-amber-500/10 rounded-t-lg"
+              : "border-transparent text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          <CreditCard className="h-4 w-4" />
+          Daftar & Input Pembayaran Group
         </button>
       </div>
 
