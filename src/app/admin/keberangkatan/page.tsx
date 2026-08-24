@@ -433,7 +433,7 @@ export default function KeberangkatanListPage() {
           const groupTotalFilled = groupStats ? groupStats.totalGroupFilled : k.terisi;
 
           return (
-            <Card key={k.id} variant="operational" className="flex flex-col h-full border shadow-sm">
+            <Card key={k.id} variant="operational" className="flex flex-col h-full border border-slate-200/90 bg-white rounded-2xl shadow-md hover:shadow-xl shadow-slate-200/70 border-l-[6px] border-l-emerald-600 transition-all duration-200 overflow-hidden">
               <CardHeader className="pb-3 border-b bg-muted/10">
                 <div className="flex items-start justify-between gap-2">
                   <div className="space-y-1.5 flex-1 min-w-0">

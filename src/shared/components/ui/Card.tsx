@@ -1,11 +1,11 @@
 import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/shared/lib/utils";
 
-const cardVariants = cva("rounded-lg border border-slate-200 bg-white text-slate-900 shadow-sm", {
+const cardVariants = cva("rounded-xl border border-slate-200/90 bg-white text-slate-900 shadow-md shadow-slate-200/60 transition-all hover:shadow-lg", {
   variants: {
     variant: {
       default: "",
-      operational: "border-l-4 border-l-primary",
+      operational: "border-l-[6px] border-l-emerald-600",
     },
   },
   defaultVariants: {
