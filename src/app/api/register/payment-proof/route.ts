@@ -125,7 +125,7 @@ export async function POST(request: NextRequest) {
         }
         pdfBuf = await generateRegistrationPdf({
           registration: fullRegRecord,
-          packageInfo: paketInfo,
+          packageInfo: paketInfo as any,
           termsVersion: "1.0",
           termsAcceptedAt: fullRegRecord.termsAcceptedAt ?? fullRegRecord.createdAt,
         });

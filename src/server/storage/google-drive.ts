@@ -457,7 +457,7 @@ export function createGoogleDriveAdapter(): StorageAdapter {
       } catch { /* non-blocking */ }
 
       console.log(`[Google Drive Upload Success] File "${fileName}" (ID: ${fileId}, Size: ${byteSize} bytes) successfully saved to folder ID "${parentFolderId}"`);
-      return fileId;
+      return fileId || "";
     },
 
     async download(fileId: string): Promise<Buffer> {

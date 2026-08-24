@@ -86,7 +86,7 @@ export async function POST(request: NextRequest) {
     // Save final signature to storage (uses existing pre-provisioned package folder)
     try {
       const { getStorageAdapter } = await import("@/server/storage");
-      const { isGoogleDriveConfigured, getOrCreateFolder, provisionPackageStorage } = await import("@/server/storage/google-drive");
+      const { isGoogleDriveConfigured, provisionPackageStorage } = await import("@/server/storage/google-drive");
       const storage = getStorageAdapter();
       const newPath = signaturePath(kodeRegistrasi);
 
