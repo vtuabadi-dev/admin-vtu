@@ -6,8 +6,21 @@ import { prisma } from "@/server/db";
 
 function parseNum(val: any, defaultVal = 0): number {
   if (val === null || val === undefined) return defaultVal;
-  const str = String(val).replace(/[^0-9]/g, "");
-  return str ? parseInt(str, 10) : defaultVal;
+  if (typeof val === "number") {
+    if (isNaN(val)) return defaultVal;
+    return val > 2000000000 ? defaultVal : Math.floor(val);
+  }
+  if (val instanceof Date) return defaultVal;
+  const str = String(val).trim();
+  if (!str) return defaultVal;
+  if (/^\d{4}[-/]\d{1,2}[-/]\d{1,2}/.test(str) || /^\d{1,2}[-/]\d{1,2}[-/]\d{4}/.test(str)) {
+    return defaultVal;
+  }
+  const cleanStr = str.replace(/[^0-9]/g, "");
+  if (!cleanStr) return defaultVal;
+  const num = parseInt(cleanStr, 10);
+  if (isNaN(num) || num > 2000000000) return defaultVal;
+  return num;
 }
 
 function parseExcelSerialDate(serial: number): Date | null {
@@ -223,9 +236,12 @@ export async function POST(request: NextRequest) {
 
       if (!rawKode || !rawNamaPaket) continue; // Skip empty/invalid rows
 
-      // Smart format detection (33-col new format vs 32-col format vs 11-col legacy format)
-      const cell3Text = row.getCell(3).text?.trim();
-      const isLegacyFormat = /^\d+$/.test(cell3Text?.replace(/[^0-9]/g, "") || "") && cell3Text.length > 5;
+      // Format detection:
+      // In Modern format: Col 3 is ALWAYS Tanggal Berangkat (Date) and Col 4 is Durasi (Hari) / Tanggal Pulang.
+      // In Legacy 11-col format: Col 3 was Harga Base (number > 1,000,000 without date).
+      const parsedCol3 = parseExcelDate(row.getCell(3));
+      const parsedCol4 = parseExcelDate(row.getCell(4));
+      const isLegacyFormat = parsedCol3 === null && parsedCol4 !== null && parseNum(row.getCell(3).text) > 1000000;
 
       let rawMaskapai: string;
       let rawStartingPoint: string | undefined;
@@ -379,12 +395,12 @@ export async function POST(request: NextRequest) {
       }
 
       try {
-        await prisma.keberangkatan.create({
-          data: {
-            kode: rawKode,
+        await prisma.keberangkatan.upsert({
+          where: { kode: rawKode },
+          update: {
             kodeIndividu: rawKode,
             namaPaket: rawNamaPaket,
-            hargaPaket: basePrice,
+            hargaPaket: Math.min(basePrice, 2000000000),
             tanggalBerangkat: departureDate,
             tanggalPulang: returnDate,
             maskapai: rawMaskapai || "Saudia Airlines",
@@ -396,9 +412,29 @@ export async function POST(request: NextRequest) {
             hotelOptions: hotelOptions,
             include: includeList,
             pricingMode: pricingMode as any,
-            kuota: rawKuota,
-            maxSeat: rawKuota,
-            targetMaterialisasi: rawTargetMaterialisasi,
+            kuota: Math.min(rawKuota, 10000),
+            maxSeat: Math.min(rawKuota, 10000),
+            targetMaterialisasi: Math.min(rawTargetMaterialisasi, 10000),
+          },
+          create: {
+            kode: rawKode,
+            kodeIndividu: rawKode,
+            namaPaket: rawNamaPaket,
+            hargaPaket: Math.min(basePrice, 2000000000),
+            tanggalBerangkat: departureDate,
+            tanggalPulang: returnDate,
+            maskapai: rawMaskapai || "Saudia Airlines",
+            maskapaiId: maskapaiId || null,
+            startingPointId: startingPointId || null,
+            nomorPenerbangan: rawNomorPenerbangan || "SV-816",
+            hotelMekkah: summaryHotelMekkah,
+            hotelMadinah: summaryHotelMadinah,
+            hotelOptions: hotelOptions,
+            include: includeList,
+            pricingMode: pricingMode as any,
+            kuota: Math.min(rawKuota, 10000),
+            maxSeat: Math.min(rawKuota, 10000),
+            targetMaterialisasi: Math.min(rawTargetMaterialisasi, 10000),
             terisi: 0,
             status: "scheduled",
           },
