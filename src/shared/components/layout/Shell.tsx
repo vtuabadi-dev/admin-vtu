@@ -34,6 +34,7 @@ const ROLE_LABELS: Record<string, string> = {
   admin_pembayaran: "Admin Pembayaran",
   admin_manifest: "Admin Manifest",
   admin_dokumen: "Admin Dokumen",
+  admin_badal: "Admin Badal Umroh & Wakaf",
   tour_leader: "Tour Leader",
   jamaah: "Jamaah",
 };

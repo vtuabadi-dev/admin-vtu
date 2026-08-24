@@ -65,6 +65,7 @@ function ProfilAkun() {
               { value: "admin_pembayaran", label: "Admin Pembayaran" },
               { value: "admin_manifest", label: "Admin Manifest" },
               { value: "admin_dokumen", label: "Admin Dokumen" },
+              { value: "admin_badal", label: "Admin Badal Umroh & Wakaf" },
             ]}
             defaultValue="super_admin"
           />

@@ -32,6 +32,7 @@ enum OperationalRole {
   admin_pembayaran
   admin_manifest
   admin_dokumen
+  admin_badal
   tour_leader
   jamaah
 }

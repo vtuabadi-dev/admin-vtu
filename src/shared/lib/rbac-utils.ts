@@ -10,6 +10,7 @@ export function mapToEnterpriseRole(role: OperationalRole | undefined | null): E
     admin_pembayaran: "ADMIN",
     admin_manifest: "ADMIN",
     admin_dokumen: "STAFF",
+    admin_badal: "STAFF",
     tour_leader: "VIEWER",
     jamaah: "VIEWER",
   };
@@ -117,6 +118,7 @@ const ROLE_PERMISSIONS: Record<OperationalRole, Record<string, PermissionCheck>>
   admin_pembayaran: {},
   admin_manifest: {},
   admin_dokumen: {},
+  admin_badal: {},
   tour_leader: {},
   jamaah: {},
 };
@@ -186,6 +188,10 @@ function buildMatrix() {
     }
   });
 
+  modules.forEach((m) => {
+    ROLE_PERMISSIONS.admin_badal[m] = (m === "jamaah" || m === "keberangkatan") ? VIEW_ONLY : VIEW_ONLY;
+  });
+
   modules.forEach((m) => { ROLE_PERMISSIONS.tour_leader[m] = VIEW_ONLY; });
   modules.forEach((m) => { ROLE_PERMISSIONS.jamaah[m] = NONE; });
 }
@@ -251,6 +257,7 @@ const ROLE_LABELS: Record<OperationalRole, string> = {
   admin_pembayaran: "Admin Pembayaran",
   admin_manifest: "Admin Manifest",
   admin_dokumen: "Admin Dokumen",
+  admin_badal: "Admin Badal Umroh & Wakaf",
   tour_leader: "Tour Leader",
   jamaah: "Jamaah",
 };

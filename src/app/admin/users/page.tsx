@@ -23,6 +23,7 @@ const ROLE_LABELS: Record<OperationalRole, string> = {
   admin_pembayaran: "Admin Pembayaran",
   admin_manifest: "Admin Manifest",
   admin_dokumen: "Admin Dokumen",
+  admin_badal: "Admin Badal Umroh & Wakaf",
   tour_leader: "Tour Leader",
   jamaah: "Jamaah",
 };
@@ -33,6 +34,7 @@ const ROLE_BADGE_CLASSES: Record<OperationalRole, string> = {
   admin_pembayaran: "bg-emerald-500/10 text-emerald-600 border-emerald-200",
   admin_manifest: "bg-amber-500/10 text-amber-600 border-amber-200",
   admin_dokumen: "bg-indigo-500/10 text-indigo-600 border-indigo-200",
+  admin_badal: "bg-teal-500/10 text-teal-600 border-teal-200",
   tour_leader: "bg-cyan-500/10 text-cyan-600 border-cyan-200",
   jamaah: "bg-slate-500/10 text-slate-600 border-slate-200",
 };
@@ -306,6 +308,7 @@ export default function UserManagementPage() {
                   <option value="admin_pembayaran">Admin Pembayaran / Keuangan</option>
                   <option value="admin_manifest">Admin Manifest</option>
                   <option value="admin_dokumen">Admin Dokumen</option>
+                  <option value="admin_badal">Admin Badal Umroh & Wakaf</option>
                   <option value="tour_leader">Tour Leader</option>
                 </select>
               </div>

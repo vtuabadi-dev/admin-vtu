@@ -644,6 +644,7 @@ export type OperationalRole =
   | "admin_pembayaran"
   | "admin_manifest"
   | "admin_dokumen"
+  | "admin_badal"
   | "tour_leader"
   | "jamaah";
 
@@ -656,6 +657,7 @@ export const ENTERPRISE_ROLE_MAP: Record<OperationalRole, EnterpriseRole> = {
   admin_pembayaran: "ADMIN",
   admin_manifest: "ADMIN",
   admin_dokumen: "STAFF",
+  admin_badal: "STAFF",
   tour_leader: "VIEWER",
   jamaah: "VIEWER",
 };
