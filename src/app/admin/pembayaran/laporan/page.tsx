@@ -1058,6 +1058,36 @@ function PaymentReviewTabContent() {
     );
   };
 
+  const getMetodeBadge = (p: any) => {
+    const m = (p.metode || "").toLowerCase();
+    if (m === "cash" || m === "tunai") {
+      return (
+        <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+          Tunai
+        </span>
+      );
+    }
+    if (m === "qris") {
+      return (
+        <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-purple-500/10 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
+          QRIS
+        </span>
+      );
+    }
+    if (m === "virtual_account" || m === "va") {
+      return (
+        <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-blue-500/10 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+          VA
+        </span>
+      );
+    }
+    return (
+      <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-stone-500/10 text-stone-700 dark:text-stone-300 border border-stone-200 dark:border-stone-700">
+        Transfer
+      </span>
+    );
+  };
+
   const filteredQueue = queue.filter((p) => {
     if (statusFilter !== "all" && p.status !== statusFilter) return false;
 
@@ -1297,10 +1327,10 @@ function PaymentReviewTabContent() {
                         <th className="py-2.5 px-3">ID Reg & Group</th>
                         <th className="py-2.5 px-3">Jenis Pembayaran</th>
                         <th className="py-2.5 px-3 text-right">Nominal</th>
-                        <th className="py-2.5 px-3">Bank</th>
+                        <th className="py-2.5 px-3 text-center">Metode Pembayaran</th>
                         <th className="py-2.5 px-3 text-center">Bukti TF</th>
-                        <th className="py-2.5 px-3 text-center">Status</th>
-                        <th className="py-2.5 px-3 text-center">Aksi Invoice</th>
+                        {!selectedPayment && <th className="py-2.5 px-3 text-center">Status</th>}
+                        {!selectedPayment && <th className="py-2.5 px-3 text-center">Aksi Invoice</th>}
                       </tr>
                     </thead>
                     <tbody className="divide-y text-xs">
@@ -1320,7 +1350,7 @@ function PaymentReviewTabContent() {
                             <td className="px-3 py-3">
                               <p className="font-bold text-foreground leading-tight">{p.namaGroup ?? p.groupId}</p>
                               <div className="flex items-center gap-1.5 mt-0.5">
-                                <span className="font-mono text-[10px] text-amber-600 dark:text-amber-400 bg-amber-500/10 px-1 rounded">
+                                <span className="font-mono text-[10px] text-amber-600 dark:text-amber-400 bg-amber-500/10 px-1 rounded font-bold">
                                   {p.kodeRegistrasi ?? "-"}
                                 </span>
                                 <span className="text-[10px] text-muted-foreground">
@@ -1329,13 +1359,11 @@ function PaymentReviewTabContent() {
                               </div>
                             </td>
                             <td className="px-3 py-3">{getPaymentTypeBadge(p)}</td>
-                            <td className="px-3 py-3 text-right font-extrabold text-foreground">
+                            <td className="px-3 py-3 text-right font-extrabold text-foreground font-mono">
                               {formatCurrency(p.jumlah)}
                             </td>
-                            <td className="px-3 py-3">
-                              <Badge variant="outline" className="text-[10px] font-mono">
-                                {p.bankPengirim ?? "Bank"}
-                              </Badge>
+                            <td className="px-3 py-3 text-center">
+                              {getMetodeBadge(p)}
                             </td>
                             <td className="px-3 py-3 text-center" onClick={(e) => e.stopPropagation()}>
                               {p.buktiUrl ? (
@@ -1355,72 +1383,76 @@ function PaymentReviewTabContent() {
                                 <span className="text-muted-foreground text-[10px]">-</span>
                               )}
                             </td>
-                            <td className="px-3 py-3 text-center">
-                              {p.status === "verified" ? (
-                                <Badge variant="success" className="text-[10px]">Verified</Badge>
-                              ) : p.status === "rejected" ? (
-                                <Badge variant="destructive" className="text-[10px]">Ditolak</Badge>
-                              ) : (
-                                <Badge variant="warning" className="text-[10px]">Pending</Badge>
-                              )}
-                            </td>
-                            <td className="px-3 py-3 text-center" onClick={(e) => e.stopPropagation()}>
-                              <div className="flex items-center justify-center gap-1">
+                            {!selectedPayment && (
+                              <td className="px-3 py-3 text-center">
                                 {p.status === "verified" ? (
-                                  <Button
-                                    size="sm"
-                                    className="h-7 text-xs font-bold gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs"
-                                    onClick={() => {
-                                      handleSelectPayment(p);
-                                      setSendInvoiceTarget(p);
-                                    }}
-                                    title="Kirim Invoice ke Jamaah"
-                                  >
-                                    <Send className="h-3.5 w-3.5" />
-                                    Kirim Invoice
-                                  </Button>
+                                  <Badge variant="success" className="text-[10px]">Verified</Badge>
+                                ) : p.status === "rejected" ? (
+                                  <Badge variant="destructive" className="text-[10px]">Ditolak</Badge>
                                 ) : (
-                                  <>
+                                  <Badge variant="warning" className="text-[10px]">Pending</Badge>
+                                )}
+                              </td>
+                            )}
+                            {!selectedPayment && (
+                              <td className="px-3 py-3 text-center" onClick={(e) => e.stopPropagation()}>
+                                <div className="flex items-center justify-center gap-1">
+                                  {p.status === "verified" ? (
                                     <Button
                                       size="sm"
-                                      variant={isSelected ? "default" : "outline"}
-                                      className={`h-7 text-xs font-bold gap-1 ${
-                                        isSelected
-                                          ? "bg-amber-600 hover:bg-amber-700 text-white"
-                                          : "border-amber-500/30 text-amber-700 hover:bg-amber-50 dark:text-amber-300 dark:hover:bg-amber-950/50"
-                                      }`}
-                                      onClick={() => handleSelectPayment(p)}
+                                      className="h-7 text-xs font-bold gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs"
+                                      onClick={() => {
+                                        handleSelectPayment(p);
+                                        setSendInvoiceTarget(p);
+                                      }}
+                                      title="Kirim Invoice ke Jamaah"
                                     >
-                                      <FileText className="h-3.5 w-3.5" />
-                                      Buat Invoice
+                                      <Send className="h-3.5 w-3.5" />
+                                      Kirim Invoice
                                     </Button>
-                                    {p.status === "pending" && (
+                                  ) : (
+                                    <>
                                       <Button
                                         size="sm"
-                                        variant="ghost"
-                                        className="h-7 w-7 p-0 text-emerald-600 hover:bg-emerald-500/10 hover:text-emerald-700"
-                                        disabled={processingId === p.id}
-                                        title="Langsung Setujui (Quick Approve)"
-                                        onClick={() => handleApprove(p)}
+                                        variant={isSelected ? "default" : "outline"}
+                                        className={`h-7 text-xs font-bold gap-1 ${
+                                          isSelected
+                                            ? "bg-amber-600 hover:bg-amber-700 text-white"
+                                            : "border-amber-500/30 text-amber-700 hover:bg-amber-50 dark:text-amber-300 dark:hover:bg-amber-950/50"
+                                        }`}
+                                        onClick={() => handleSelectPayment(p)}
                                       >
-                                        <CheckCircle2 className="h-4 w-4" />
+                                        <FileText className="h-3.5 w-3.5" />
+                                        Buat Invoice
                                       </Button>
-                                    )}
-                                  </>
-                                )}
+                                      {p.status === "pending" && (
+                                        <Button
+                                          size="sm"
+                                          variant="ghost"
+                                          className="h-7 w-7 p-0 text-emerald-600 hover:bg-emerald-500/10 hover:text-emerald-700"
+                                          disabled={processingId === p.id}
+                                          title="Langsung Setujui (Quick Approve)"
+                                          onClick={() => handleApprove(p)}
+                                        >
+                                          <CheckCircle2 className="h-4 w-4" />
+                                        </Button>
+                                      )}
+                                    </>
+                                  )}
 
-                                {/* Tombol Hapus Satuan */}
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  className="h-7 w-7 p-0 text-muted-foreground hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 cursor-pointer ml-0.5"
-                                  title="Hapus data pembayaran / percobaan ini"
-                                  onClick={() => setDeletePaymentTarget(p)}
-                                >
-                                  <Trash2 className="h-3.5 w-3.5" />
-                                </Button>
-                              </div>
-                            </td>
+                                  {/* Tombol Hapus Satuan */}
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="h-7 w-7 p-0 text-muted-foreground hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 cursor-pointer ml-0.5"
+                                    title="Hapus data pembayaran / percobaan ini"
+                                    onClick={() => setDeletePaymentTarget(p)}
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </Button>
+                                </div>
+                              </td>
+                            )}
                           </tr>
                         );
                       })}
