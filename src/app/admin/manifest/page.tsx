@@ -159,7 +159,22 @@ function formatDisplayDate(dateInput?: string | Date): string {
 }
 
 function formatIdRegister(baseCode: string, memberIndex: number, totalInGroup: number): string {
-  const cleanCode = baseCode.replace(/^GRP-\d+-0*/, "") || baseCode;
+  if (!baseCode) return "-";
+  
+  // If baseCode is already formatted like 8759301-1, strip existing member suffix if re-indexing
+  let cleanCode = baseCode.replace(/-\d+$/, "");
+  
+  // Handle GRP-YYYY-NNNNN (e.g. GRP-2026-00003) -> 2026003 (7-digit standard register ID)
+  const grpMatch = cleanCode.match(/^GRP-(\d{4})-(\d+)$/i);
+  if (grpMatch && grpMatch[1] && grpMatch[2]) {
+    const year = grpMatch[1]; // "2026"
+    const seq = parseInt(grpMatch[2], 10) || 1;
+    cleanCode = `${year}${String(seq).padStart(3, "0")}`; // "2026003"
+  } else {
+    // If it starts with GRP- but other format, clean GRP- prefix
+    cleanCode = cleanCode.replace(/^GRP-/i, "");
+  }
+
   if (totalInGroup > 1) {
     return `${cleanCode}-${memberIndex + 1}`;
   }
