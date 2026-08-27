@@ -124,38 +124,74 @@ export default function AdminWakafQuranPage() {
 
   return (
     <div className="flex flex-col gap-6 p-6">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <BookOpen className="h-6 w-6 text-sky-600" />
-            <h1 className="text-2xl font-bold tracking-tight text-foreground">
-              Manajemen Wakaf Al-Qur&apos;an
-            </h1>
+      {/* Header & Embossed Tabs Below Title */}
+      <div className="flex flex-col gap-4 border-b pb-5">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2">
+              <BookOpen className="h-6 w-6 text-sky-600" />
+              <h1 className="text-2xl font-bold tracking-tight text-foreground">
+                Manajemen Wakaf Al-Qur&apos;an
+              </h1>
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              Kelola pendaftaran wakaf mushaf Al-Qur&apos;an di Makkah/Madinah &amp; validasi bukti pembayaran.
+            </p>
           </div>
-          <p className="text-xs text-muted-foreground mt-1">
-            Kelola pendaftaran wakaf mushaf Al-Qur&apos;an di Makkah/Madinah & validasi bukti pembayaran.
-          </p>
+
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={fetchList}
+            disabled={loading}
+            className="h-9 text-xs font-semibold gap-1.5 bg-background shadow-xs hover:bg-muted"
+            title="Segarkan Data"
+          >
+            Segarkan Data
+          </Button>
         </div>
 
-        <div className="flex items-center gap-2 border bg-muted/30 p-1 rounded-lg">
+        {/* ── TABS EMBOSSED DI BAWAH JUDUL (KIRI: VALIDASI PEMBAYARAN, KANAN: DAFTAR WAKAF) ── */}
+        <div className="inline-flex w-fit items-center gap-2 p-1.5 rounded-2xl bg-stone-200/70 dark:bg-stone-800/80 border-t border-l border-white/90 dark:border-stone-700/80 border-b border-r border-stone-300/80 dark:border-stone-950/60 shadow-[inset_1px_1px_3px_rgba(0,0,0,0.12),inset_-1px_-1px_2px_rgba(255,255,255,0.8)] backdrop-blur-xs">
+          {/* TAB 1 (KIRI): VALIDASI PEMBAYARAN */}
           <button
-            onClick={() => setActiveTab("daftar")}
-            className={`px-3 py-1.5 text-xs font-bold rounded-md transition-colors ${
-              activeTab === "daftar" ? "bg-background shadow text-foreground" : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            📖 Daftar Wakaf ({list.length})
-          </button>
-          <button
+            type="button"
             onClick={() => setActiveTab("validasi")}
-            className={`px-3 py-1.5 text-xs font-bold rounded-md transition-colors relative ${
-              activeTab === "validasi" ? "bg-background shadow text-foreground" : "text-muted-foreground hover:text-foreground"
+            className={`relative flex items-center gap-2.5 px-4 py-2 text-xs font-extrabold rounded-xl transition-all duration-200 ${
+              activeTab === "validasi"
+                ? "bg-gradient-to-b from-white to-stone-50 text-emerald-950 dark:from-stone-900 dark:to-stone-950 dark:text-emerald-300 shadow-[0_4px_12px_-2px_rgba(0,0,0,0.15),inset_0_1px_1px_rgba(255,255,255,0.9),inset_0_-1px_1px_rgba(0,0,0,0.06)] border border-stone-200/90 dark:border-stone-700/90 scale-[1.02]"
+                : "text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-200 hover:bg-white/40"
             }`}
           >
-            💳 Validasi Pembayaran ({validasiList.length})
+            <CreditCard className={`w-4 h-4 ${activeTab === "validasi" ? "text-emerald-700 dark:text-emerald-400" : "text-stone-400"}`} />
+            <span>Validasi Pembayaran</span>
+            <span className={`px-2 py-0.5 rounded-full text-[11px] font-black ${
+              validasiList.length > 0
+                ? "bg-rose-500 text-white shadow-xs"
+                : "bg-stone-200 text-stone-700 dark:bg-stone-800 dark:text-stone-300"
+            }`}>
+              {validasiList.length}
+            </span>
             {validasiList.length > 0 && (
-              <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-rose-500 rounded-full animate-ping" />
+              <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping absolute -top-0.5 -right-0.5" />
             )}
+          </button>
+
+          {/* TAB 2 (KANAN): DAFTAR WAKAF */}
+          <button
+            type="button"
+            onClick={() => setActiveTab("daftar")}
+            className={`relative flex items-center gap-2.5 px-4 py-2 text-xs font-extrabold rounded-xl transition-all duration-200 ${
+              activeTab === "daftar"
+                ? "bg-gradient-to-b from-white to-stone-50 text-sky-950 dark:from-stone-900 dark:to-stone-950 dark:text-sky-300 shadow-[0_4px_12px_-2px_rgba(0,0,0,0.15),inset_0_1px_1px_rgba(255,255,255,0.9),inset_0_-1px_1px_rgba(0,0,0,0.06)] border border-stone-200/90 dark:border-stone-700/90 scale-[1.02]"
+                : "text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-200 hover:bg-white/40"
+            }`}
+          >
+            <BookOpen className={`w-4 h-4 ${activeTab === "daftar" ? "text-sky-600 dark:text-sky-400" : "text-stone-400"}`} />
+            <span>Daftar Wakaf</span>
+            <span className="px-2 py-0.5 rounded-full text-[11px] font-black bg-stone-200 text-stone-700 dark:bg-stone-800 dark:text-stone-300">
+              {list.length}
+            </span>
           </button>
         </div>
       </div>

@@ -245,21 +245,21 @@ export default function AdminBadalUmrohPage() {
 
   return (
     <div className="flex flex-col gap-6 p-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b pb-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <HeartHandshake className="h-6 w-6 text-emerald-600" />
-            <h1 className="text-2xl font-bold tracking-tight text-foreground">
-              Manajemen Badal Umroh
-            </h1>
+      {/* Header & Embossed Tabs Below Title */}
+      <div className="flex flex-col gap-4 border-b pb-5">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2">
+              <HeartHandshake className="h-6 w-6 text-emerald-600" />
+              <h1 className="text-2xl font-bold tracking-tight text-foreground">
+                Manajemen Badal Umroh
+              </h1>
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              Kelola pendaftaran, validasi bukti transfer pembayaran, dan penugasan pelaksana Badal Umroh di Makkah.
+            </p>
           </div>
-          <p className="text-xs text-muted-foreground mt-1">
-            Kelola pendaftaran, validasi bukti transfer pembayaran, dan penugasan pelaksana Badal Umroh di Makkah.
-          </p>
-        </div>
 
-        <div className="flex items-center gap-2">
           <Button
             size="sm"
             variant="outline"
@@ -269,36 +269,52 @@ export default function AdminBadalUmrohPage() {
             title="Segarkan Data Badal Umroh"
           >
             <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin text-emerald-600" : ""}`} />
-            Segarkan
+            Segarkan Data
           </Button>
+        </div>
 
-          <div className="flex items-center gap-2 border bg-muted/30 p-1 rounded-lg">
-            <button
-              onClick={() => setActiveTab("validasi")}
-              className={`px-3 py-1.5 text-xs font-bold rounded-md transition-colors relative ${
-                activeTab === "validasi"
-                  ? "bg-background shadow text-emerald-700 dark:text-emerald-400 font-extrabold"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              💳 Validasi Pembayaran ({validasiList.length})
-              {stats.needValidation > 0 && (
-                <span className="ml-1.5 px-1.5 py-0.5 rounded-full bg-rose-500 text-white text-[10px] font-bold">
-                  {stats.needValidation}
-                </span>
-              )}
-            </button>
-            <button
-              onClick={() => setActiveTab("pelaksanaan")}
-              className={`px-3 py-1.5 text-xs font-bold rounded-md transition-colors ${
-                activeTab === "pelaksanaan"
-                  ? "bg-background shadow text-emerald-700 dark:text-emerald-400 font-extrabold"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              🕋 Pelaksanaan Badal ({pelaksanaanList.length})
-            </button>
-          </div>
+        {/* ── TABS EMBOSSED DI BAWAH JUDUL (KIRI: VALIDASI PEMBAYARAN, KANAN: PELAKSANAAN BADAL) ── */}
+        <div className="inline-flex w-fit items-center gap-2 p-1.5 rounded-2xl bg-stone-200/70 dark:bg-stone-800/80 border-t border-l border-white/90 dark:border-stone-700/80 border-b border-r border-stone-300/80 dark:border-stone-950/60 shadow-[inset_1px_1px_3px_rgba(0,0,0,0.12),inset_-1px_-1px_2px_rgba(255,255,255,0.8)] backdrop-blur-xs">
+          {/* TAB 1 (KIRI): VALIDASI PEMBAYARAN */}
+          <button
+            type="button"
+            onClick={() => setActiveTab("validasi")}
+            className={`relative flex items-center gap-2.5 px-4 py-2 text-xs font-extrabold rounded-xl transition-all duration-200 ${
+              activeTab === "validasi"
+                ? "bg-gradient-to-b from-white to-stone-50 text-emerald-950 dark:from-stone-900 dark:to-stone-950 dark:text-emerald-300 shadow-[0_4px_12px_-2px_rgba(0,0,0,0.15),inset_0_1px_1px_rgba(255,255,255,0.9),inset_0_-1px_1px_rgba(0,0,0,0.06)] border border-stone-200/90 dark:border-stone-700/90 scale-[1.02]"
+                : "text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-200 hover:bg-white/40"
+            }`}
+          >
+            <CreditCard className={`w-4 h-4 ${activeTab === "validasi" ? "text-emerald-700 dark:text-emerald-400" : "text-stone-400"}`} />
+            <span>Validasi Pembayaran</span>
+            <span className={`px-2 py-0.5 rounded-full text-[11px] font-black ${
+              validasiList.length > 0
+                ? "bg-rose-500 text-white shadow-xs"
+                : "bg-stone-200 text-stone-700 dark:bg-stone-800 dark:text-stone-300"
+            }`}>
+              {validasiList.length}
+            </span>
+            {validasiList.length > 0 && (
+              <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping absolute -top-0.5 -right-0.5" />
+            )}
+          </button>
+
+          {/* TAB 2 (KANAN): PELAKSANAAN BADAL */}
+          <button
+            type="button"
+            onClick={() => setActiveTab("pelaksanaan")}
+            className={`relative flex items-center gap-2.5 px-4 py-2 text-xs font-extrabold rounded-xl transition-all duration-200 ${
+              activeTab === "pelaksanaan"
+                ? "bg-gradient-to-b from-white to-stone-50 text-emerald-950 dark:from-stone-900 dark:to-stone-950 dark:text-emerald-300 shadow-[0_4px_12px_-2px_rgba(0,0,0,0.15),inset_0_1px_1px_rgba(255,255,255,0.9),inset_0_-1px_1px_rgba(0,0,0,0.06)] border border-stone-200/90 dark:border-stone-700/90 scale-[1.02]"
+                : "text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-200 hover:bg-white/40"
+            }`}
+          >
+            <HeartHandshake className={`w-4 h-4 ${activeTab === "pelaksanaan" ? "text-emerald-700 dark:text-emerald-400" : "text-stone-400"}`} />
+            <span>Pelaksanaan Badal</span>
+            <span className="px-2 py-0.5 rounded-full text-[11px] font-black bg-stone-200 text-stone-700 dark:bg-stone-800 dark:text-stone-300">
+              {pelaksanaanList.length}
+            </span>
+          </button>
         </div>
       </div>
 
