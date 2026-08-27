@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/shared/components/ui/Button";
 import { Input } from "@/shared/components/ui/Input";
+import { Modal } from "@/shared/components/ui/Modal";
 import { cn } from "@/shared/lib/utils";
 import PortalSwitcherNav from "@/shared/components/PortalSwitcherNav";
 
@@ -56,6 +57,9 @@ export default function WakafQuranRegisterPage() {
   const [step, setStep] = useState<number>(1);
   const [submitted, setSubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [canSubmitStep4, setCanSubmitStep4] = useState(false);
+  const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
+  const [metodePembayaranOption, setMetodePembayaranOption] = useState<"sekarang" | "nanti">("sekarang");
   const [copiedRekening, setCopiedRekening] = useState<string | null>(null);
 
   // State Pilihan Status Kejamaahan & Verifikasi Paspor
@@ -271,8 +275,15 @@ export default function WakafQuranRegisterPage() {
         alert("Jumlah mushaf minimal 1.");
         return;
       }
+      const filledNiat = niatList.map((n) => n.nama.trim()).filter(Boolean);
+      if (filledNiat.length === 0) {
+        alert("Mohon masukkan nama yang diniatkan untuk mushaf.");
+        return;
+      }
+      setCanSubmitStep4(false);
       setStep(4);
       window.scrollTo({ top: 0, behavior: "smooth" });
+      setTimeout(() => setCanSubmitStep4(true), 600);
       return;
     }
   };
@@ -308,7 +319,7 @@ export default function WakafQuranRegisterPage() {
       handleNextStep();
       return;
     }
-    if (isSubmitting) return;
+    if (!canSubmitStep4 || isSubmitting) return;
 
     if (isJamaahVauza && !jamaahVerified) {
       alert("Mohon selesaikan verifikasi data paspor jamaah terlebih dahulu.");
@@ -335,8 +346,12 @@ export default function WakafQuranRegisterPage() {
       return;
     }
 
-    setIsSubmitting(true);
+    // Buka Modal Konfirmasi Pengiriman
+    setIsConfirmModalOpen(true);
+  };
 
+  const executeFinalSubmit = async () => {
+    setIsSubmitting(true);
     try {
       const payload = {
         isJamaahVauza,
@@ -351,7 +366,7 @@ export default function WakafQuranRegisterPage() {
         lokasiWakaf: formData.lokasiWakaf,
         niatAtasNama: niatList.map((n) => n.nama.trim()).filter(Boolean).join(", "),
         catatan: formData.catatan ? formData.catatan.trim() : null,
-        buktiTransferUrl: buktiTransferPreview || null,
+        buktiTransferUrl: metodePembayaranOption === "sekarang" ? buktiTransferPreview || null : null,
       };
 
       const res = await fetch("/api/wakaf-quran", {
@@ -362,6 +377,7 @@ export default function WakafQuranRegisterPage() {
 
       const resJson = await res.json();
       if (resJson.success) {
+        setIsConfirmModalOpen(false);
         setSubmitted(true);
       } else {
         alert(`Gagal menyimpan: ${resJson.message}`);
@@ -989,50 +1005,105 @@ export default function WakafQuranRegisterPage() {
                   </div>
                 </div>
 
-                {/* Upload Bukti Pembayaran */}
-                <div className="bg-white/90 p-5 sm:p-6 rounded-2xl border border-stone-200 shadow-xs space-y-3">
+                {/* Pilihan Metode Penyampaian Bukti Transfer */}
+                <div className="bg-white/90 p-5 sm:p-6 rounded-2xl border border-stone-200 shadow-xs space-y-4">
                   <div className="flex items-center gap-2">
-                    <Upload className="w-4 h-4 text-emerald-700" />
+                    <CreditCard className="w-4 h-4 text-emerald-700" />
                     <span className="text-xs font-bold uppercase tracking-wider text-stone-800">
-                      Upload Bukti Transfer / Pembayaran (Opsional)
+                      Opsi Pembayaran &amp; Bukti Transfer
                     </span>
                   </div>
 
-                  <div className="border-2 border-dashed border-stone-300 rounded-2xl p-6 text-center hover:border-emerald-500 transition-colors bg-stone-50/50">
-                    <input
-                      type="file"
-                      id="buktiTransfer"
-                      accept="image/*,.pdf"
-                      onChange={handleFileChange}
-                      className="hidden"
-                    />
-                    <label htmlFor="buktiTransfer" className="cursor-pointer block space-y-2">
-                      <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-800 flex items-center justify-center mx-auto">
-                        <Upload className="w-6 h-6" />
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setMetodePembayaranOption("sekarang")}
+                      className={cn(
+                        "p-4 rounded-xl border-2 text-left transition-all flex flex-col justify-between gap-2 shadow-xs",
+                        metodePembayaranOption === "sekarang"
+                          ? "border-emerald-600 bg-emerald-50/50 ring-2 ring-emerald-500/20"
+                          : "border-stone-200 bg-stone-50/50 hover:bg-stone-100/50"
+                      )}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="font-extrabold text-xs text-stone-900">1. Sudah Transfer Sekarang</span>
+                        {metodePembayaranOption === "sekarang" && (
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                        )}
                       </div>
-                      <div className="text-xs font-bold text-stone-800">
-                        {buktiTransferFile ? buktiTransferFile.name : "Klik untuk unggah bukti transfer"}
+                      <p className="text-[11px] text-stone-600">
+                        Unggah foto struk / screenshot bukti transfer Anda sekarang.
+                      </p>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setMetodePembayaranOption("nanti")}
+                      className={cn(
+                        "p-4 rounded-xl border-2 text-left transition-all flex flex-col justify-between gap-2 shadow-xs",
+                        metodePembayaranOption === "nanti"
+                          ? "border-emerald-600 bg-emerald-50/50 ring-2 ring-emerald-500/20"
+                          : "border-stone-200 bg-stone-50/50 hover:bg-stone-100/50"
+                      )}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="font-extrabold text-xs text-stone-900">2. Bayar / Transfer Nanti</span>
+                        {metodePembayaranOption === "nanti" && (
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                        )}
                       </div>
-                      <p className="text-[10px] text-stone-500">Mendukung format JPG, PNG, atau PDF (Maks. 5 MB)</p>
-                    </label>
+                      <p className="text-[11px] text-stone-600">
+                        Kirim bukti transfer menyusul melalui portal tracking atau WhatsApp.
+                      </p>
+                    </button>
                   </div>
 
-                  {buktiTransferPreview && (
-                    <div className="mt-3 p-3 bg-stone-100 rounded-xl flex items-center justify-between text-xs">
-                      <div className="flex items-center gap-2 truncate">
-                        <BadgeCheck className="w-4 h-4 text-emerald-600 shrink-0" />
-                        <span className="truncate font-semibold">{buktiTransferFile?.name || "Bukti Transfer Terlampir"}</span>
+                  {metodePembayaranOption === "sekarang" ? (
+                    <div className="pt-2">
+                      <div className="border-2 border-dashed border-stone-300 rounded-2xl p-6 text-center hover:border-emerald-500 transition-colors bg-stone-50/50">
+                        <input
+                          type="file"
+                          id="buktiTransfer"
+                          accept="image/*,.pdf"
+                          onChange={handleFileChange}
+                          className="hidden"
+                        />
+                        <label htmlFor="buktiTransfer" className="cursor-pointer block space-y-2">
+                          <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-800 flex items-center justify-center mx-auto">
+                            <Upload className="w-6 h-6" />
+                          </div>
+                          <div className="text-xs font-bold text-stone-800">
+                            {buktiTransferFile ? buktiTransferFile.name : "Klik untuk unggah bukti transfer"}
+                          </div>
+                          <p className="text-[10px] text-stone-500">Mendukung format JPG, PNG, atau PDF (Maks. 5 MB)</p>
+                        </label>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setBuktiTransferFile(null);
-                          setBuktiTransferPreview("");
-                        }}
-                        className="text-rose-600 hover:text-rose-800 text-[11px] font-bold shrink-0 ml-2"
-                      >
-                        Hapus
-                      </button>
+
+                      {buktiTransferPreview && (
+                        <div className="mt-3 p-3 bg-stone-100 rounded-xl flex items-center justify-between text-xs">
+                          <div className="flex items-center gap-2 truncate">
+                            <BadgeCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+                            <span className="truncate font-semibold">{buktiTransferFile?.name || "Bukti Transfer Terlampir"}</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setBuktiTransferFile(null);
+                              setBuktiTransferPreview("");
+                            }}
+                            className="text-rose-600 hover:text-rose-800 text-[11px] font-bold shrink-0 ml-2"
+                          >
+                            Hapus
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="p-3.5 bg-amber-50 rounded-xl border border-amber-200 text-amber-900 text-xs flex items-start gap-2">
+                      <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                      <p className="text-[11px] leading-relaxed">
+                        Pendaftaran Anda akan dicatat dengan status <strong>Belum Lunas</strong>. Anda dapat melakukan pembayaran dan mengunggah bukti transfer kapan saja melalui menu <em>Tracking Badal &amp; Wakaf</em>.
+                      </p>
                     </div>
                   )}
                 </div>
@@ -1072,8 +1143,9 @@ export default function WakafQuranRegisterPage() {
                 </Button>
               ) : (
                 <Button
-                  type="submit"
-                  disabled={isSubmitting}
+                  type="button"
+                  onClick={handleSubmit}
+                  disabled={!canSubmitStep4 || isSubmitting}
                   className="bg-gradient-to-r from-emerald-800 to-teal-700 hover:from-emerald-900 hover:to-teal-800 text-white font-bold rounded-xl h-10 px-7 text-xs flex items-center gap-1.5 shadow-md"
                 >
                   {isSubmitting ? (
@@ -1090,6 +1162,76 @@ export default function WakafQuranRegisterPage() {
             </div>
           </div>
         </form>
+
+        {/* Modal Konfirmasi Pendaftaran */}
+        <Modal
+          open={isConfirmModalOpen}
+          onClose={() => setIsConfirmModalOpen(false)}
+          title="Konfirmasi Pendaftaran Wakaf Al-Qur'an"
+        >
+          <div className="space-y-4 pt-1 text-xs text-stone-800">
+            <p className="text-muted-foreground">
+              Pastikan seluruh rincian pendaftaran wakaf berikut sudah sesuai sebelum dikirim ke sistem:
+            </p>
+            <div className="bg-stone-50 p-4 rounded-xl border border-stone-200 space-y-2.5">
+              <div className="flex justify-between">
+                <span className="text-stone-500 font-medium">Pewakaf:</span>
+                <span className="font-bold text-stone-900">{formData.namaPewakaf}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-stone-500 font-medium">WhatsApp:</span>
+                <span className="font-bold text-stone-900">{formData.nomorWhatsapp}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-stone-500 font-medium">Status Kejamaahan:</span>
+                <span className="font-bold text-stone-900">{isJamaahVauza ? "Jamaah Vauza Tiga Utama" : "Pendaftaran Umum"}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-stone-500 font-medium">Jumlah Mushaf:</span>
+                <span className="font-bold text-emerald-800">{formData.jumlahMushaf} Mushaf</span>
+              </div>
+              <div className="flex justify-between border-t pt-2">
+                <span className="text-stone-600 font-bold">Total Pembayaran:</span>
+                <span className="font-black text-emerald-800 text-sm">{formatRupiah(totalBiaya)}</span>
+              </div>
+              <div className="flex justify-between border-t pt-2">
+                <span className="text-stone-500 font-medium">Status Bukti TF:</span>
+                <span className="font-bold text-stone-900">
+                  {metodePembayaranOption === "sekarang" && buktiTransferPreview
+                    ? "✓ File Bukti TF Terlampir"
+                    : "Transfer Nanti (Kirim Menyusul)"}
+                </span>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-3 border-t">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsConfirmModalOpen(false)}
+                disabled={isSubmitting}
+              >
+                Periksa Kembali
+              </Button>
+              <Button
+                type="button"
+                onClick={executeFinalSubmit}
+                disabled={isSubmitting}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold gap-1.5"
+              >
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" /> Mengirim...
+                  </>
+                ) : (
+                  <>
+                    <Send className="w-4 h-4" /> Ya, Kirim Sekarang
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        </Modal>
       </div>
     </div>
   );

@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/shared/components/ui/Button";
 import { Input } from "@/shared/components/ui/Input";
+import { Modal } from "@/shared/components/ui/Modal";
 import { cn } from "@/shared/lib/utils";
 import PortalSwitcherNav from "@/shared/components/PortalSwitcherNav";
 
@@ -54,6 +55,9 @@ export default function BadalUmrohRegisterPage() {
   const [step, setStep] = useState<number>(1);
   const [submitted, setSubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [canSubmitStep5, setCanSubmitStep5] = useState(false);
+  const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
+  const [metodePembayaranOption, setMetodePembayaranOption] = useState<"sekarang" | "nanti">("sekarang");
 
   // State Pilihan Status Kejamaahan & Verifikasi Paspor
   const [isJamaahVauza, setIsJamaahVauza] = useState<boolean>(true);
@@ -265,7 +269,9 @@ export default function BadalUmrohRegisterPage() {
         alert("Mohon lengkapi alamat pengiriman sertifikat & souvenir.");
         return;
       }
+      setCanSubmitStep5(false);
       setStep(5);
+      setTimeout(() => setCanSubmitStep5(true), 600);
     }
   };
 
@@ -281,7 +287,7 @@ export default function BadalUmrohRegisterPage() {
       handleNextStep();
       return;
     }
-    if (isSubmitting) return;
+    if (!canSubmitStep5 || isSubmitting) return;
 
     if (isJamaahVauza && !jamaahVerified) {
       alert("Mohon lakukan verifikasi data jamaah terlebih dahulu.");
@@ -299,8 +305,12 @@ export default function BadalUmrohRegisterPage() {
       return;
     }
 
-    setIsSubmitting(true);
+    // Buka Modal Konfirmasi
+    setIsConfirmModalOpen(true);
+  };
 
+  const executeFinalSubmit = async () => {
+    setIsSubmitting(true);
     try {
       const payload = {
         isJamaahVauza,
@@ -317,7 +327,7 @@ export default function BadalUmrohRegisterPage() {
         jenisKelamin: listAlmarhum[0]?.jenisKelamin || "L",
         metodeSouvenir: formData.metodeSouvenir,
         alamatPengiriman: formData.metodeSouvenir === "dikirim" ? formData.alamatPengiriman : null,
-        buktiTransferUrl: buktiTransferPreview || null,
+        buktiTransferUrl: metodePembayaranOption === "sekarang" ? buktiTransferPreview || null : null,
       };
 
       const res = await fetch("/api/badal-umroh", {
@@ -328,6 +338,7 @@ export default function BadalUmrohRegisterPage() {
 
       const resJson = await res.json();
       if (resJson.success) {
+        setIsConfirmModalOpen(false);
         setSubmitted(true);
       } else {
         alert(`Gagal menyimpan: ${resJson.message}`);
@@ -987,44 +998,101 @@ export default function BadalUmrohRegisterPage() {
                 </div>
               </div>
 
-              {/* Upload Bukti Transfer */}
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-stone-700 flex items-center gap-1.5">
-                  <Upload className="w-4 h-4 text-emerald-700" />
-                  Upload Bukti Transfer / Pembayaran
-                </label>
+              {/* Pilihan Metode Penyampaian Bukti Transfer */}
+              <div className="bg-white/90 p-5 sm:p-6 rounded-2xl border border-stone-200 shadow-xs space-y-4">
+                <div className="flex items-center gap-2">
+                  <CreditCard className="w-4 h-4 text-emerald-700" />
+                  <span className="text-xs font-bold uppercase tracking-wider text-stone-800">
+                    Opsi Pembayaran &amp; Bukti Transfer
+                  </span>
+                </div>
 
-                {buktiTransferPreview ? (
-                  <div className="flex items-center gap-3.5 p-3.5 bg-emerald-50/80 border border-emerald-200 rounded-2xl">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={buktiTransferPreview}
-                      alt="Bukti Transfer"
-                      className="h-16 w-16 object-cover rounded-xl border border-emerald-300 shadow-2xs"
-                    />
-                    <div className="flex-1 truncate">
-                      <p className="font-bold text-xs text-emerald-950 truncate">
-                        {buktiTransferFile?.name || "Bukti Transfer"}
-                      </p>
-                      <p className="text-[11px] text-emerald-700 font-medium mt-0.5">
-                        {buktiTransferFile?.size ? (buktiTransferFile.size / 1024).toFixed(0) : "0"} KB — Siap diunggah
-                      </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setMetodePembayaranOption("sekarang")}
+                    className={cn(
+                      "p-4 rounded-xl border-2 text-left transition-all flex flex-col justify-between gap-2 shadow-xs",
+                      metodePembayaranOption === "sekarang"
+                        ? "border-emerald-600 bg-emerald-50/50 ring-2 ring-emerald-500/20"
+                        : "border-stone-200 bg-stone-50/50 hover:bg-stone-100/50"
+                    )}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="font-extrabold text-xs text-stone-900">1. Sudah Transfer Sekarang</span>
+                      {metodePembayaranOption === "sekarang" && (
+                        <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                      )}
                     </div>
-                    <button
-                      type="button"
-                      onClick={handleRemoveFile}
-                      className="px-3 py-1.5 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg text-xs font-extrabold transition-colors border border-red-200"
-                    >
-                      Hapus
-                    </button>
+                    <p className="text-[11px] text-stone-600">
+                      Unggah foto struk / screenshot bukti transfer Anda sekarang.
+                    </p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setMetodePembayaranOption("nanti")}
+                    className={cn(
+                      "p-4 rounded-xl border-2 text-left transition-all flex flex-col justify-between gap-2 shadow-xs",
+                      metodePembayaranOption === "nanti"
+                        ? "border-emerald-600 bg-emerald-50/50 ring-2 ring-emerald-500/20"
+                        : "border-stone-200 bg-stone-50/50 hover:bg-stone-100/50"
+                    )}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="font-extrabold text-xs text-stone-900">2. Bayar / Transfer Nanti</span>
+                      {metodePembayaranOption === "nanti" && (
+                        <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                      )}
+                    </div>
+                    <p className="text-[11px] text-stone-600">
+                      Kirim bukti transfer menyusul melalui portal tracking atau WhatsApp.
+                    </p>
+                  </button>
+                </div>
+
+                {metodePembayaranOption === "sekarang" ? (
+                  <div className="space-y-2 pt-2">
+                    {buktiTransferPreview ? (
+                      <div className="flex items-center gap-3.5 p-3.5 bg-emerald-50/80 border border-emerald-200 rounded-2xl">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={buktiTransferPreview}
+                          alt="Bukti Transfer"
+                          className="h-16 w-16 object-cover rounded-xl border border-emerald-300 shadow-2xs"
+                        />
+                        <div className="flex-1 truncate">
+                          <p className="font-bold text-xs text-emerald-950 truncate">
+                            {buktiTransferFile?.name || "Bukti Transfer"}
+                          </p>
+                          <p className="text-[11px] text-emerald-700 font-medium mt-0.5">
+                            {buktiTransferFile?.size ? (buktiTransferFile.size / 1024).toFixed(0) : "0"} KB — Siap diunggah
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={handleRemoveFile}
+                          className="px-3 py-1.5 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg text-xs font-extrabold transition-colors border border-red-200"
+                        >
+                          Hapus
+                        </button>
+                      </div>
+                    ) : (
+                      <label className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-stone-300 hover:border-emerald-600 rounded-2xl cursor-pointer bg-white/70 hover:bg-white/95 transition-all select-none shadow-xs">
+                        <Upload className="h-7 w-7 text-stone-400 mb-2" />
+                        <span className="text-xs font-bold text-stone-800">Klik untuk Unggah Bukti Transfer</span>
+                        <span className="text-[11px] text-stone-500 mt-0.5">Format: JPG, PNG, WEBP (Maksimal 5MB)</span>
+                        <input type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
+                      </label>
+                    )}
                   </div>
                 ) : (
-                  <label className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-stone-300 hover:border-emerald-600 rounded-2xl cursor-pointer bg-white/70 hover:bg-white/95 transition-all select-none shadow-xs">
-                    <Upload className="h-7 w-7 text-stone-400 mb-2" />
-                    <span className="text-xs font-bold text-stone-800">Klik untuk Unggah Bukti Transfer</span>
-                    <span className="text-[11px] text-stone-500 mt-0.5">Format: JPG, PNG, WEBP (Maksimal 5MB)</span>
-                    <input type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
-                  </label>
+                  <div className="p-3.5 bg-amber-50 rounded-xl border border-amber-200 text-amber-900 text-xs flex items-start gap-2">
+                    <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                    <p className="text-[11px] leading-relaxed">
+                      Pendaftaran Anda akan dicatat dengan status <strong>Belum Lunas</strong>. Anda dapat melakukan pembayaran dan mengunggah bukti transfer kapan saja melalui menu <em>Tracking Badal &amp; Wakaf</em>.
+                    </p>
+                  </div>
                 )}
               </div>
             </div>
@@ -1065,8 +1133,9 @@ export default function BadalUmrohRegisterPage() {
               </Button>
             ) : (
               <Button
-                type="submit"
-                disabled={isSubmitting}
+                type="button"
+                onClick={handleSubmit}
+                disabled={!canSubmitStep5 || isSubmitting}
                 className="bg-gradient-to-r from-emerald-800 to-teal-700 hover:from-emerald-900 hover:to-teal-800 text-white font-bold rounded-xl h-10 px-7 text-xs flex items-center gap-1.5 shadow-md"
               >
                 {isSubmitting ? (
@@ -1082,6 +1151,76 @@ export default function BadalUmrohRegisterPage() {
             )}
           </div>
         </form>
+
+        {/* Modal Konfirmasi Pendaftaran Badal Umroh */}
+        <Modal
+          open={isConfirmModalOpen}
+          onClose={() => setIsConfirmModalOpen(false)}
+          title="Konfirmasi Pendaftaran Badal Umroh"
+        >
+          <div className="space-y-4 pt-1 text-xs text-stone-800">
+            <p className="text-muted-foreground">
+              Pastikan seluruh rincian pendaftaran badal umroh berikut sudah sesuai sebelum dikirim ke sistem:
+            </p>
+            <div className="bg-stone-50 p-4 rounded-xl border border-stone-200 space-y-2.5">
+              <div className="flex justify-between">
+                <span className="text-stone-500 font-medium">Pemohon:</span>
+                <span className="font-bold text-stone-900">{formData.namaPemohon}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-stone-500 font-medium">WhatsApp:</span>
+                <span className="font-bold text-stone-900">{formData.nomorWhatsapp}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-stone-500 font-medium">Status Kejamaahan:</span>
+                <span className="font-bold text-stone-900">{isJamaahVauza ? "Jamaah Vauza Tiga Utama" : "Pendaftaran Umum"}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-stone-500 font-medium">Jumlah Badal:</span>
+                <span className="font-bold text-emerald-800">{listAlmarhum.length} Jiwa</span>
+              </div>
+              <div className="flex justify-between border-t pt-2">
+                <span className="text-stone-600 font-bold">Total Pembayaran:</span>
+                <span className="font-black text-emerald-800 text-sm">{formatRupiah(totalBiaya)}</span>
+              </div>
+              <div className="flex justify-between border-t pt-2">
+                <span className="text-stone-500 font-medium">Status Bukti TF:</span>
+                <span className="font-bold text-stone-900">
+                  {metodePembayaranOption === "sekarang" && buktiTransferPreview
+                    ? "✓ File Bukti TF Terlampir"
+                    : "Transfer Nanti (Kirim Menyusul)"}
+                </span>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-3 border-t">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsConfirmModalOpen(false)}
+                disabled={isSubmitting}
+              >
+                Periksa Kembali
+              </Button>
+              <Button
+                type="button"
+                onClick={executeFinalSubmit}
+                disabled={isSubmitting}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold gap-1.5"
+              >
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" /> Mengirim...
+                  </>
+                ) : (
+                  <>
+                    <Send className="w-4 h-4" /> Ya, Kirim Sekarang
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        </Modal>
       </div>
     </div>
   </div>
