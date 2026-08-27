@@ -37,6 +37,7 @@ export async function GET(request: NextRequest) {
           kode: true,
           kodeIndividu: true,
           tanggalBerangkat: true,
+          driveFolderIds: true,
         },
       });
 
@@ -65,6 +66,7 @@ export async function GET(request: NextRequest) {
           kode: true,
           kodeIndividu: true,
           splitLabel: true,
+          driveFolderIds: true,
         },
       });
 
@@ -142,6 +144,60 @@ export async function GET(request: NextRequest) {
       orderBy: { createdAt: "desc" },
     });
 
+    // Resolve Tour Leader & Muthowif information
+    let tourLeader = "";
+    let tourLeaderKontak = "";
+    let muthowif = "";
+    let muthowifKontak = "";
+
+    // 1. From matched Keberangkatan / Group Members meta
+    const matchKebForMeta = await prisma.keberangkatan.findFirst({
+      where: namaPaket && namaPaket !== "ALL" ? {
+        OR: [
+          { namaPaket: namaPaket },
+          { kode: namaPaket },
+          { kodeIndividu: namaPaket },
+          { id: namaPaket },
+        ]
+      } : {},
+      select: { driveFolderIds: true },
+    });
+
+    if (matchKebForMeta?.driveFolderIds) {
+      const meta = matchKebForMeta.driveFolderIds as any;
+      if (meta.tourLeader?.nama) {
+        tourLeader = meta.tourLeader.nama;
+        tourLeaderKontak = meta.tourLeader.kontak || "";
+      }
+      if (meta.muthowif?.nama) {
+        muthowif = meta.muthowif.nama;
+        muthowifKontak = meta.muthowif.kontak || "";
+      }
+    }
+
+    // 2. From badalList / wakafList if not found
+    if (!tourLeader) {
+      const foundBadal = badalList.find((b) => b.namaTourLeader)?.namaTourLeader;
+      const foundWakaf = wakafList.find((w) => w.namaTourLeader)?.namaTourLeader;
+      if (foundBadal) tourLeader = foundBadal;
+      else if (foundWakaf) tourLeader = foundWakaf;
+    }
+    if (!muthowif) {
+      const foundBadal = badalList.find((b) => b.namaMuthowif)?.namaMuthowif;
+      const foundWakaf = wakafList.find((w) => w.namaMuthowif)?.namaMuthowif;
+      if (foundBadal) muthowif = foundBadal;
+      else if (foundWakaf) muthowif = foundWakaf;
+    }
+
+    // 3. From package title parsing (e.g. UST RIDHWAN UST DZUL)
+    if ((!tourLeader || !muthowif) && namaPaket) {
+      const ustMatches = namaPaket.match(/(?:UST|USTADZ|USTAZ|HABIB|KYAI)\.?\s+[A-Za-z0-9_]+/gi);
+      if (ustMatches && ustMatches.length > 0) {
+        if (!tourLeader && ustMatches[0]) tourLeader = ustMatches[0];
+        if (!muthowif && ustMatches[1]) muthowif = ustMatches[1];
+      }
+    }
+
     return NextResponse.json({
       success: true,
       data: {
@@ -149,6 +205,12 @@ export async function GET(request: NextRequest) {
         wakafList,
         linkedPackageNames,
         isDualStartingGroup,
+        petugasInfo: {
+          tourLeader,
+          tourLeaderKontak,
+          muthowif,
+          muthowifKontak,
+        },
       },
     });
   } catch (error: any) {

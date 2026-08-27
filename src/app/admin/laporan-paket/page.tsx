@@ -13,6 +13,10 @@ import {
   X,
   MessageCircle,
   Copy,
+  UserCheck,
+  Award,
+  Compass,
+  Phone,
 } from "lucide-react";
 import { Button } from "@/shared/components/ui/Button";
 import { Modal } from "@/shared/components/ui/Modal";
@@ -189,6 +193,12 @@ export default function AdminLaporanPaketPage() {
   const [laporanBadal, setLaporanBadal] = useState<any[]>([]);
   const [laporanWakaf, setLaporanWakaf] = useState<any[]>([]);
   const [linkedPackageNames, setLinkedPackageNames] = useState<string[]>([]);
+  const [petugasInfo, setPetugasInfo] = useState<{
+    tourLeader?: string;
+    tourLeaderKontak?: string;
+    muthowif?: string;
+    muthowifKontak?: string;
+  }>({});
   const [loadingLaporan, setLoadingLaporan] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
 
@@ -342,6 +352,13 @@ export default function AdminLaporanPaketPage() {
       msg += `*PAKET:* ${selectedPaket}\n\n`;
     }
 
+    if (petugasInfo.tourLeader || petugasInfo.muthowif) {
+      msg += `*PETUGAS LAPANGAN:*\n`;
+      if (petugasInfo.tourLeader) msg += `• Tour Leader (TL): ${petugasInfo.tourLeader}${petugasInfo.tourLeaderKontak ? ` (${petugasInfo.tourLeaderKontak})` : ""}\n`;
+      if (petugasInfo.muthowif) msg += `• Muthowif: ${petugasInfo.muthowif}${petugasInfo.muthowifKontak ? ` (${petugasInfo.muthowifKontak})` : ""}\n`;
+      msg += `\n`;
+    }
+
     if (laporanBadal.length > 0) {
       msg += `*Daftar Badal Umroh (${laporanBadal.length} Data)*\n`;
       laporanBadal.forEach((b, i) => {
@@ -396,6 +413,7 @@ export default function AdminLaporanPaketPage() {
       setHasSearched(false);
       setLaporanBadal([]);
       setLaporanWakaf([]);
+      setPetugasInfo({});
       try {
         const res = await fetch(
           `/api/admin/daftar-paket?bulan=${selectedBulan}&tahun=${selectedTahun}`
@@ -419,6 +437,7 @@ export default function AdminLaporanPaketPage() {
     if (!selectedPaket) {
       setLaporanBadal([]);
       setLaporanWakaf([]);
+      setPetugasInfo({});
       setHasSearched(false);
       return;
     }
@@ -434,6 +453,7 @@ export default function AdminLaporanPaketPage() {
           setLaporanBadal(resJson.data.badalList || []);
           setLaporanWakaf(resJson.data.wakafList || []);
           setLinkedPackageNames(resJson.data.linkedPackageNames || []);
+          setPetugasInfo(resJson.data.petugasInfo || {});
         }
       } catch (err) {
         console.error(err);
@@ -694,6 +714,63 @@ export default function AdminLaporanPaketPage() {
               </div>
             </Card>
           </div>
+
+          {/* Info Petugas Lapangan (Tour Leader & Muthowif) */}
+          <Card className="border border-emerald-200/80 dark:border-emerald-900/60 bg-gradient-to-r from-emerald-50/90 via-teal-50/40 to-white dark:from-emerald-950/40 dark:via-slate-900/40 dark:to-slate-900 shadow-xs overflow-hidden">
+            <div className="p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 rounded-xl bg-gradient-to-tr from-emerald-700 to-teal-600 text-white flex items-center justify-center shadow-sm shrink-0">
+                  <UserCheck className="w-6 h-6" />
+                </div>
+                <div>
+                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-800 dark:text-emerald-300">
+                    Petugas Lapangan Paket
+                  </span>
+                  <h4 className="text-sm sm:text-base font-extrabold text-foreground">
+                    Informasi Tour Leader &amp; Muthowif
+                  </h4>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 flex-1 max-w-xl">
+                {/* Tour Leader Card */}
+                <div className="flex items-center gap-3 bg-white/90 dark:bg-slate-900/90 p-3 rounded-xl border border-stone-200/80 dark:border-stone-800 shadow-2xs">
+                  <div className="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 flex items-center justify-center shrink-0">
+                    <Award className="w-4 h-4" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[10px] font-bold text-muted-foreground uppercase">Tour Leader (TL)</p>
+                    <p className="text-xs sm:text-sm font-extrabold text-foreground truncate">
+                      {petugasInfo.tourLeader || "-"}
+                    </p>
+                    {petugasInfo.tourLeaderKontak && (
+                      <p className="text-[10px] text-emerald-600 font-semibold flex items-center gap-1 mt-0.5">
+                        <Phone className="w-2.5 h-2.5" /> {petugasInfo.tourLeaderKontak}
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Muthowif Card */}
+                <div className="flex items-center gap-3 bg-white/90 dark:bg-slate-900/90 p-3 rounded-xl border border-stone-200/80 dark:border-stone-800 shadow-2xs">
+                  <div className="w-8 h-8 rounded-lg bg-teal-100 dark:bg-teal-950/80 text-teal-700 dark:text-teal-300 flex items-center justify-center shrink-0">
+                    <Compass className="w-4 h-4" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[10px] font-bold text-muted-foreground uppercase">Muthowif</p>
+                    <p className="text-xs sm:text-sm font-extrabold text-foreground truncate">
+                      {petugasInfo.muthowif || "-"}
+                    </p>
+                    {petugasInfo.muthowifKontak && (
+                      <p className="text-[10px] text-teal-600 font-semibold flex items-center gap-1 mt-0.5">
+                        <Phone className="w-2.5 h-2.5" /> {petugasInfo.muthowifKontak}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </Card>
 
           {/* Tabel Badal */}
           <Card className="border border-border shadow-sm overflow-hidden">
