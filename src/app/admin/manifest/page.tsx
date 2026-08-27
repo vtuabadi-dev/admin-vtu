@@ -168,9 +168,19 @@ function formatIdRegister(baseCode: string, memberIndex: number, totalInGroup: n
 
 function formatGroupMergeLabel(groupObj: any, groupMembers: any[]): string {
   const paxCount = groupMembers.length;
-  const roomType = groupObj?.roomUpgrade || groupObj?.tipeKamar || "UPGRADE DOUBLE";
+  const defaultRoom =
+    paxCount === 1
+      ? "SINGLE"
+      : paxCount === 2
+      ? "UPGRADE DOUBLE"
+      : paxCount === 3
+      ? "UPGRADE TRIPLE"
+      : paxCount >= 4
+      ? "UPGRADE QUAD"
+      : "UPGRADE DOUBLE";
+  const roomType = groupObj?.roomUpgrade || groupObj?.tipeKamar || defaultRoom;
   const cluster = groupObj?.hotelUpgrade || groupObj?.namaCluster || "PLATINUM (38.900)";
-  const dateStr = formatDisplayDate(groupObj?.createdAt || new Date());
+  const dateStr = formatDisplayDate(groupObj?.createdAt || groupMembers[0]?.createdAt || new Date());
   
   return `${paxCount} PAX ${String(roomType).toUpperCase()} + ${String(cluster).toUpperCase()} ${dateStr}`;
 }

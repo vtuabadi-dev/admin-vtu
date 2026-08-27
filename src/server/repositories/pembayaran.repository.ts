@@ -152,6 +152,7 @@ export const pembayaranRepo = {
         take: 10,
         include: {
           keberangkatan: true,
+          members: true,
         },
       });
 
@@ -170,28 +171,30 @@ export const pembayaranRepo = {
             where: { kodeRegistrasi: reg.kodeRegistrasi },
           });
 
-          if (!group) {
-            const registrationId = `${reg.kodeRegistrasi}-1`;
-            let ketua = await prisma.jamaah.findUnique({
-              where: { registrationId },
-            });
+          const parts = reg.kodeRegistrasi.split("-");
+          const year = parts[1] ?? new Date().getFullYear().toString();
+          const seq = parts[2] ?? "00001";
 
-            if (!ketua) {
-              const parts = reg.kodeRegistrasi.split("-");
-              const year = parts[1] ?? new Date().getFullYear().toString();
-              const seq = parts[2] ?? "00001";
-              const nomorPeserta = `PS/${year}/${seq}/1`;
+          const memberList = (reg.members && reg.members.length > 0)
+            ? (reg.members as any[]).sort((a, b) => (a.urutan || 0) - (b.urutan || 0))
+            : [{ namaLengkap: reg.namaPerwakilan, jenisKelamin: "L", tempatLahir: "-", tanggalLahir: "2000-01-01", urutan: 1 }];
 
-              ketua = await prisma.jamaah.create({
+          const createdJamaah: any[] = [];
+          for (let i = 0; i < memberList.length; i++) {
+            const m = memberList[i];
+            const regId = `${reg.kodeRegistrasi}-${i + 1}`;
+            let j = await prisma.jamaah.findUnique({ where: { registrationId: regId } });
+            if (!j) {
+              j = await prisma.jamaah.create({
                 data: {
-                  registrationId,
-                  groupId: "",
-                  nomorPeserta,
-                  namaLengkap: reg.namaPerwakilan,
+                  registrationId: regId,
+                  groupId: group?.id || "",
+                  nomorPeserta: `PS/${year}/${seq}/${i + 1}`,
+                  namaLengkap: m.namaLengkap || (i === 0 ? reg.namaPerwakilan : `Anggota ${i + 1}`),
                   namaAyah: "",
-                  jenisKelamin: "L",
-                  tempatLahir: "-",
-                  tanggalLahir: new Date("2000-01-01"),
+                  jenisKelamin: ((m.jenisKelamin) as any) || "L",
+                  tempatLahir: m.tempatLahir || "-",
+                  tanggalLahir: m.tanggalLahir ? new Date(m.tanggalLahir) : new Date("2000-01-01"),
                   nik: "",
                   nomorPaspor: "",
                   masaBerlakuPaspor: new Date("2030-01-01"),
@@ -209,27 +212,32 @@ export const pembayaranRepo = {
                 },
               });
             }
+            createdJamaah.push(j);
+          }
 
-            const totalTagihan = (reg.keberangkatan?.hargaPaket || 0) * (reg.paxCount || 1);
+          if (!group) {
+            const ketua = createdJamaah[0];
+            const totalTagihan = (reg.keberangkatan?.hargaPaket || 0) * (reg.paxCount || memberList.length || 1);
             group = await prisma.registrationGroup.create({
               data: {
                 kodeRegistrasi: reg.kodeRegistrasi,
                 namaGroup: `GRUP ${reg.namaPerwakilan}`,
                 ketuaGroupId: ketua.id,
                 paketKeberangkatanId: reg.paketId,
-                jumlahAnggota: reg.paxCount,
+                jumlahAnggota: reg.paxCount || memberList.length,
                 totalTagihan,
                 totalPembayaran: 0,
                 sisaPembayaran: totalTagihan,
                 status: "active",
               },
             });
-
-            await prisma.jamaah.update({
-              where: { id: ketua.id },
-              data: { groupId: group.id },
-            });
           }
+
+          // Ensure all jamaah in this registration are linked to the group
+          await prisma.jamaah.updateMany({
+            where: { id: { in: createdJamaah.map((j) => j.id) } },
+            data: { groupId: group.id },
+          });
 
           await prisma.registrationRequest.update({
             where: { id: reg.id },

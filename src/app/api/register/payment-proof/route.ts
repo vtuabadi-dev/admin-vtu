@@ -110,29 +110,30 @@ export async function POST(request: NextRequest) {
       ? await prisma.registrationGroup.findUnique({ where: { id: groupId } })
       : await prisma.registrationGroup.findFirst({ where: { kodeRegistrasi: reg.kodeRegistrasi } });
 
-    if (!group) {
-      // Find or create ketua Jamaah record for FK constraint
-      const registrationId = `${reg.kodeRegistrasi}-1`;
-      let ketua = await prisma.jamaah.findUnique({
-        where: { registrationId },
-      });
+    const parts = reg.kodeRegistrasi.split("-");
+    const year = parts[1] ?? new Date().getFullYear().toString();
+    const seq = parts[2] ?? "00001";
 
-      if (!ketua) {
-        const parts = reg.kodeRegistrasi.split("-");
-        const year = parts[1] ?? new Date().getFullYear().toString();
-        const seq = parts[2] ?? "00001";
-        const nomorPeserta = `PS/${year}/${seq}/1`;
+    const memberList = (reg.members && reg.members.length > 0)
+      ? reg.members.sort((a, b) => (a.urutan || 0) - (b.urutan || 0))
+      : [{ namaLengkap: reg.namaPerwakilan, jenisKelamin: "L", tempatLahir: "-", tanggalLahir: "2000-01-01", urutan: 1 }];
 
-        ketua = await prisma.jamaah.create({
+    const createdJamaah: any[] = [];
+    for (let i = 0; i < memberList.length; i++) {
+      const m = memberList[i]!;
+      const regId = `${reg.kodeRegistrasi}-${i + 1}`;
+      let j = await prisma.jamaah.findUnique({ where: { registrationId: regId } });
+      if (!j) {
+        j = await prisma.jamaah.create({
           data: {
-            registrationId,
-            groupId: "",
-            nomorPeserta,
-            namaLengkap: reg.namaPerwakilan,
+            registrationId: regId,
+            groupId: group?.id || "",
+            nomorPeserta: `PS/${year}/${seq}/${i + 1}`,
+            namaLengkap: m.namaLengkap || (i === 0 ? reg.namaPerwakilan : `Anggota ${i + 1}`),
             namaAyah: "",
-            jenisKelamin: ((reg.members?.[0]?.jenisKelamin) as any) || "L",
-            tempatLahir: "-",
-            tanggalLahir: new Date("2000-01-01"),
+            jenisKelamin: ((m.jenisKelamin) as any) || "L",
+            tempatLahir: m.tempatLahir || "-",
+            tanggalLahir: m.tanggalLahir ? new Date(m.tanggalLahir) : new Date("2000-01-01"),
             nik: "",
             nomorPaspor: "",
             masaBerlakuPaspor: new Date("2030-01-01"),
@@ -150,15 +151,19 @@ export async function POST(request: NextRequest) {
           },
         });
       }
+      createdJamaah.push(j);
+    }
 
-      const totalTagihan = (reg.keberangkatan?.hargaPaket || 0) * (reg.paxCount || 1);
+    if (!group) {
+      const ketua = createdJamaah[0];
+      const totalTagihan = (reg.keberangkatan?.hargaPaket || 0) * (reg.paxCount || memberList.length || 1);
       group = await prisma.registrationGroup.create({
         data: {
           kodeRegistrasi: reg.kodeRegistrasi,
           namaGroup: `GRUP ${reg.namaPerwakilan}`,
           ketuaGroupId: ketua.id,
           paketKeberangkatanId: reg.paketId,
-          jumlahAnggota: reg.paxCount,
+          jumlahAnggota: reg.paxCount || memberList.length,
           totalTagihan,
           totalPembayaran: 0,
           sisaPembayaran: totalTagihan,
@@ -166,13 +171,16 @@ export async function POST(request: NextRequest) {
         },
       });
 
-      await prisma.jamaah.update({
-        where: { id: ketua.id },
-        data: { groupId: group.id },
-      });
-
       groupId = group.id;
     }
+
+    // Ensure all jamaah in this registration are linked to the group
+    await prisma.jamaah.updateMany({
+      where: { id: { in: createdJamaah.map((j) => j.id) } },
+      data: { groupId: group.id },
+    });
+
+    groupId = group.id;
 
     // Create Pembayaran entry for the review queue
     if (groupId) {
