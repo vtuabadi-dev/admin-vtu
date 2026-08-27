@@ -22,64 +22,13 @@ export function getGoogleDriveFolderId(): string {
 
 export function isGoogleDriveConfigured(): boolean {
   const folderId = getGoogleDriveFolderId();
-  if (!folderId) return false;
-
-  // Check service account json
-  const saJson = process.env.GOOGLE_SERVICE_ACCOUNT_JSON || process.env.GOOGLE_SERVICE_ACCOUNT;
-  if (saJson) return true;
-
-  // Check service account keys
-  const saEmail = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL || process.env.GOOGLE_CLIENT_EMAIL;
-  const saKey = process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY || process.env.GOOGLE_PRIVATE_KEY;
-  if (saEmail && saKey) return true;
-
-  // Check client credentials
   const clientId = process.env.GOOGLE_CLIENT_ID || DEFAULT_CLIENT_ID;
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET || DEFAULT_CLIENT_SECRET;
   const refreshToken = process.env.GOOGLE_REFRESH_TOKEN || DEFAULT_REFRESH_TOKEN;
-  return !!(clientId && clientSecret && refreshToken);
+  return !!(folderId && clientId && clientSecret && refreshToken);
 }
 
 async function getAccessToken(): Promise<string> {
-  // Try service account from JSON first
-  const saJson = process.env.GOOGLE_SERVICE_ACCOUNT_JSON || process.env.GOOGLE_SERVICE_ACCOUNT;
-  if (saJson) {
-    try {
-      const sa = JSON.parse(saJson);
-      if (sa.client_email && sa.private_key) {
-        const { JWT } = await import("google-auth-library");
-        const jwtClient = new JWT({
-          email: sa.client_email,
-          key: sa.private_key,
-          scopes: ["https://www.googleapis.com/auth/drive"],
-        });
-        const creds = await jwtClient.authorize();
-        if (creds.access_token) return creds.access_token;
-      }
-    } catch (err: any) {
-      console.error("[Google Drive Service Account JSON Auth Failure]", err);
-    }
-  }
-
-  // Try service account from individual keys
-  const saEmail = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL || process.env.GOOGLE_CLIENT_EMAIL;
-  const saKey = process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY || process.env.GOOGLE_PRIVATE_KEY;
-  if (saEmail && saKey) {
-    try {
-      const { JWT } = await import("google-auth-library");
-      const jwtClient = new JWT({
-        email: saEmail,
-        key: saKey.replace(/\\n/g, "\n"),
-        scopes: ["https://www.googleapis.com/auth/drive"],
-      });
-      const creds = await jwtClient.authorize();
-      if (creds.access_token) return creds.access_token;
-    } catch (err: any) {
-      console.error("[Google Drive Service Account Keys Auth Failure]", err);
-    }
-  }
-
-  // Fallback to client OAuth2
   const clientId = process.env.GOOGLE_CLIENT_ID || DEFAULT_CLIENT_ID;
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET || DEFAULT_CLIENT_SECRET;
   const refreshToken = process.env.GOOGLE_REFRESH_TOKEN || DEFAULT_REFRESH_TOKEN;
