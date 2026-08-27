@@ -60,6 +60,16 @@ export default function WakafQuranRegisterPage() {
         }
       })
       .catch(console.error);
+
+    fetch("/api/master/rekening-layanan?tipeLayanan=WAKAF_QURAN")
+      .then((res) => res.json())
+      .then((json) => {
+        if (json.success && Array.isArray(json.data) && json.data.length > 0) {
+          const active = json.data.filter((r: any) => r.isActive);
+          if (active.length > 0) setRekeningList(active);
+        }
+      })
+      .catch(console.error);
   }, []);
 
   // Multi-step State (1: Verifikasi/Status, 2: Pewakaf, 3: Mushaf & Niat, 4: Pembayaran)
@@ -70,6 +80,18 @@ export default function WakafQuranRegisterPage() {
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
   const [metodePembayaranOption, setMetodePembayaranOption] = useState<"sekarang" | "nanti">("sekarang");
   const [activePaketList, setActivePaketList] = useState<string[]>([]);
+  const [rekeningList, setRekeningList] = useState<any[]>([
+    {
+      namaBank: "Bank Syariah Indonesia (BSI)",
+      nomorRekening: "721 888 9991",
+      atasNama: "PT VAUZA TIGA UTAMA",
+    },
+    {
+      namaBank: "Bank Mandiri",
+      nomorRekening: "142 00 9988 7766",
+      atasNama: "PT VAUZA TIGA UTAMA",
+    },
+  ]);
   const [copiedRekening, setCopiedRekening] = useState<string | null>(null);
 
   // State Pilihan Status Kejamaahan & Verifikasi Paspor
@@ -1013,37 +1035,36 @@ export default function WakafQuranRegisterPage() {
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div className="bg-white/10 p-3.5 rounded-xl border border-white/15 flex items-center justify-between">
-                      <div>
-                        <div className="text-[10px] font-bold text-emerald-300 uppercase">Bank Syariah Indonesia (BSI)</div>
-                        <div className="text-base font-black tracking-wider text-white">721 888 9991</div>
-                        <div className="text-[10px] text-slate-300">a.n. PT VAUZA TIGA UTAMA</div>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => handleCopyRekening("7218889991", "BSI")}
-                        className="p-2 rounded-lg bg-white/10 hover:bg-white/20 text-white transition-colors"
-                        title="Salin Nomor Rekening"
+                    {rekeningList.map((rek, idx) => (
+                      <div
+                        key={rek.id || idx}
+                        className="bg-white/10 p-3.5 rounded-xl border border-white/15 flex items-center justify-between gap-2"
                       >
-                        {copiedRekening === "BSI" ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
-                      </button>
-                    </div>
-
-                    <div className="bg-white/10 p-3.5 rounded-xl border border-white/15 flex items-center justify-between">
-                      <div>
-                        <div className="text-[10px] font-bold text-emerald-300 uppercase">Bank Mandiri</div>
-                        <div className="text-base font-black tracking-wider text-white">142 00 9988 7766</div>
-                        <div className="text-[10px] text-slate-300">a.n. PT VAUZA TIGA UTAMA</div>
+                        <div className="truncate">
+                          <div className="text-[10px] font-bold text-emerald-300 uppercase truncate">
+                            {rek.namaBank}
+                          </div>
+                          <div className="text-base font-black tracking-wider text-white font-mono">
+                            {rek.nomorRekening}
+                          </div>
+                          <div className="text-[10px] text-slate-300 truncate">
+                            a.n. {rek.atasNama}
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleCopyRekening(rek.nomorRekening, `${rek.namaBank}-${idx}`)}
+                          className="p-2 rounded-lg bg-white/10 hover:bg-white/20 text-white transition-colors shrink-0"
+                          title="Salin Nomor Rekening"
+                        >
+                          {copiedRekening === `${rek.namaBank}-${idx}` ? (
+                            <Check className="w-4 h-4 text-emerald-400" />
+                          ) : (
+                            <Copy className="w-4 h-4" />
+                          )}
+                        </button>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => handleCopyRekening("1420099887766", "Mandiri")}
-                        className="p-2 rounded-lg bg-white/10 hover:bg-white/20 text-white transition-colors"
-                        title="Salin Nomor Rekening"
-                      >
-                        {copiedRekening === "Mandiri" ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
-                      </button>
-                    </div>
+                    ))}
                   </div>
                 </div>
 

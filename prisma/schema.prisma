@@ -1291,3 +1291,30 @@ model MasterHargaLayanan {
 
   @@map("master_harga_layanan")
 }
+
+model MasterRekeningLayanan {
+  id            String   @id @default(cuid())
+  tipeLayanan   String   // 'WAKAF_QURAN' or 'BADAL_UMROH' or 'GENERAL'
+  namaBank      String
+  nomorRekening String
+  atasNama      String
+  keterangan    String?
+  isActive      Boolean  @default(true)
+  urutan        Int      @default(1)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  updatedBy     String?
+
+  @@index([tipeLayanan])
+  @@map("master_rekening_layanan")
+}
+
+model SystemSetting {
+  key       String   @id
+  value     Json?
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@map("system_settings")
+}
+
+

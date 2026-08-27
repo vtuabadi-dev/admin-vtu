@@ -22,6 +22,7 @@ import {
   Send,
   Plus,
   Check,
+  Copy,
 } from "lucide-react";
 import { Button } from "@/shared/components/ui/Button";
 import { Input } from "@/shared/components/ui/Input";
@@ -60,6 +61,16 @@ export default function BadalUmrohRegisterPage() {
         }
       })
       .catch(console.error);
+
+    fetch("/api/master/rekening-layanan?tipeLayanan=BADAL_UMROH")
+      .then((res) => res.json())
+      .then((json) => {
+        if (json.success && Array.isArray(json.data) && json.data.length > 0) {
+          const active = json.data.filter((r: any) => r.isActive);
+          if (active.length > 0) setRekeningList(active);
+        }
+      })
+      .catch(console.error);
   }, []);
 
   // Multi-step State (1: Verifikasi/Status, 2: Pemohon, 3: Almarhum, 4: Souvenir, 5: Pembayaran)
@@ -69,6 +80,14 @@ export default function BadalUmrohRegisterPage() {
   const [canSubmitStep5, setCanSubmitStep5] = useState(false);
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
   const [metodePembayaranOption, setMetodePembayaranOption] = useState<"sekarang" | "nanti">("sekarang");
+  const [rekeningList, setRekeningList] = useState<any[]>([
+    {
+      namaBank: "Bank Mandiri (IDR)",
+      nomorRekening: "142-00-1234567-8",
+      atasNama: "PT VAUZA TIGA UTAMA",
+    },
+  ]);
+  const [copiedRekening, setCopiedRekening] = useState<string | null>(null);
 
   // State Pilihan Status Kejamaahan & Verifikasi Paspor
   const [isJamaahVauza, setIsJamaahVauza] = useState<boolean>(true);
@@ -248,6 +267,12 @@ export default function BadalUmrohRegisterPage() {
   const handleRemoveFile = () => {
     setBuktiTransferFile(null);
     setBuktiTransferPreview("");
+  };
+
+  const handleCopyRekening = (noRek: string, bank: string) => {
+    navigator.clipboard.writeText(noRek.replace(/[^0-9]/g, ""));
+    setCopiedRekening(bank);
+    setTimeout(() => setCopiedRekening(null), 2000);
   };
 
   // Navigasi Langkah dengan Validasi
@@ -1028,17 +1053,44 @@ export default function BadalUmrohRegisterPage() {
               </div>
 
               {/* Info Rekening Bank */}
-              <div className="p-5 rounded-2xl bg-emerald-950 text-white shadow-md space-y-3">
-                <div className="flex items-center gap-2">
+              <div className="p-5 sm:p-6 rounded-2xl bg-gradient-to-br from-emerald-950 via-slate-950 to-teal-950 text-white shadow-md space-y-4 border border-emerald-500/30">
+                <div className="flex items-center gap-2 border-b border-white/10 pb-3">
                   <CreditCard className="w-5 h-5 text-emerald-400" />
                   <h3 className="text-xs font-extrabold uppercase tracking-wider text-emerald-300">
                     Rekening Resmi PT Vauza Tiga Utama
                   </h3>
                 </div>
-                <div className="bg-white/10 rounded-xl p-3.5 border border-white/15 space-y-1">
-                  <p className="text-xs text-emerald-200">Bank Mandiri (IDR)</p>
-                  <p className="text-lg font-mono font-black tracking-wider text-amber-300">142-00-1234567-8</p>
-                  <p className="text-xs text-emerald-100">a.n. PT VAUZA TIGA UTAMA</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {rekeningList.map((rek, idx) => (
+                    <div
+                      key={rek.id || idx}
+                      className="bg-white/10 p-3.5 rounded-xl border border-white/15 flex items-center justify-between gap-2"
+                    >
+                      <div className="truncate">
+                        <div className="text-[10px] font-bold text-emerald-300 uppercase truncate">
+                          {rek.namaBank}
+                        </div>
+                        <div className="text-base font-black tracking-wider text-white font-mono">
+                          {rek.nomorRekening}
+                        </div>
+                        <div className="text-[10px] text-slate-300 truncate">
+                          a.n. {rek.atasNama}
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleCopyRekening(rek.nomorRekening, `${rek.namaBank}-${idx}`)}
+                        className="p-2 rounded-lg bg-white/10 hover:bg-white/20 text-white transition-colors shrink-0"
+                        title="Salin Nomor Rekening"
+                      >
+                        {copiedRekening === `${rek.namaBank}-${idx}` ? (
+                          <Check className="w-4 h-4 text-emerald-400" />
+                        ) : (
+                          <Copy className="w-4 h-4" />
+                        )}
+                      </button>
+                    </div>
+                  ))}
                 </div>
               </div>
 
