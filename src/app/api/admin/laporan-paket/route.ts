@@ -134,6 +134,8 @@ export async function GET(request: NextRequest) {
         namaPaketUmroh: true,
         namaTourLeader: true,
         namaMuthowif: true,
+        namaPewakaf: true,
+        nomorWhatsapp: true,
         niatAtasNama: true,
         jumlahMushaf: true,
         lokasiWakaf: true,

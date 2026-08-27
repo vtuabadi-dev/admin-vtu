@@ -477,8 +477,8 @@ export default function AdminLaporanPaketPage() {
       nama,
       jumlahMushaf: qtyPerName,
       lokasiWakaf: w.lokasiWakaf,
-      namaTourLeader: w.namaTourLeader,
-      namaMuthowif: w.namaMuthowif,
+      namaPewakaf: w.namaPewakaf || "-",
+      nomorWhatsapp: w.nomorWhatsapp || "-",
     }));
   });
 
@@ -837,7 +837,7 @@ export default function AdminLaporanPaketPage() {
             <div className="p-4 bg-sky-600 text-white font-bold text-xs flex items-center justify-between">
               <span className="flex items-center gap-2">
                 <BookOpen className="h-4 w-4" />
-                DAFTAR KOLEKTIF NIAT WAKAF AL-QUR&apos;AN (TANPA NAMA PEWAKAF)
+                DAFTAR KOLEKTIF WAKAF AL-QUR&apos;AN
                 <span className="opacity-80 font-normal">
                   — {linkedPackageNames.length > 1 ? linkedPackageNames.join(" & ") : selectedPaket}
                 </span>
@@ -851,7 +851,7 @@ export default function AdminLaporanPaketPage() {
                 <thead className="bg-muted text-muted-foreground uppercase text-[11px] font-semibold border-b">
                   <tr>
                     <th className="px-4 py-3">No</th>
-                    <th className="px-4 py-3">Tour Leader / Muthowif</th>
+                    <th className="px-4 py-3">Pendaftar Wakaf &amp; No. Telpon</th>
                     <th className="px-4 py-3">Nama Yang Diniatkan Wakaf</th>
                     <th className="px-4 py-3">Jumlah Mushaf</th>
                   </tr>
@@ -862,11 +862,16 @@ export default function AdminLaporanPaketPage() {
                       <tr key={item.uniqueKey} className="hover:bg-muted/40">
                         <td className="px-4 py-3 font-semibold text-muted-foreground">{index + 1}</td>
                         <td className="px-4 py-3">
-                          <div>TL: <span className="font-semibold">{item.namaTourLeader || "-"}</span></div>
-                          <div>Muthowif: <span className="font-semibold">{item.namaMuthowif || "-"}</span></div>
+                          <div className="font-bold text-foreground">{item.namaPewakaf || "-"}</div>
+                          {item.nomorWhatsapp && item.nomorWhatsapp !== "-" && (
+                            <div className="text-[11px] text-muted-foreground flex items-center gap-1 mt-0.5 font-medium">
+                              <Phone className="w-3 h-3 text-sky-600 dark:text-sky-400 shrink-0" />
+                              <span>{item.nomorWhatsapp}</span>
+                            </div>
+                          )}
                         </td>
-                        <td className="px-4 py-3 font-bold text-sm">{item.nama}</td>
-                        <td className="px-4 py-3"><Badge className="bg-sky-600 text-white">{item.jumlahMushaf} Mushaf</Badge></td>
+                        <td className="px-4 py-3 font-bold text-sm text-foreground">{item.nama}</td>
+                        <td className="px-4 py-3"><Badge className="bg-sky-600 text-white font-bold">{item.jumlahMushaf} Mushaf</Badge></td>
                       </tr>
                     ))
                   ) : (
