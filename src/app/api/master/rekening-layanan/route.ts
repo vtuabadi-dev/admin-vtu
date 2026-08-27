@@ -5,45 +5,40 @@ import { auth } from "@/server/auth";
 
 export const dynamic = "force-dynamic";
 
-const DEFAULT_REKENING: Record<string, Array<{ namaBank: string; nomorRekening: string; atasNama: string; keterangan?: string }>> = {
-  WAKAF_QURAN: [
-    {
-      namaBank: "Bank Syariah Indonesia (BSI)",
-      nomorRekening: "721 888 9991",
-      atasNama: "PT VAUZA TIGA UTAMA",
-      keterangan: "Rekening Khusus Infaq & Wakaf Al-Qur'an",
-    },
-    {
-      namaBank: "Bank Mandiri",
-      nomorRekening: "142 00 9988 7766",
-      atasNama: "PT VAUZA TIGA UTAMA",
-      keterangan: "Rekening Operasional Wakaf Al-Qur'an",
-    },
-  ],
-  BADAL_UMROH: [
-    {
-      namaBank: "Bank Mandiri (IDR)",
-      nomorRekening: "142-00-1234567-8",
-      atasNama: "PT VAUZA TIGA UTAMA",
-      keterangan: "Rekening Khusus Badal Umroh Amanah",
-    },
-    {
-      namaBank: "Bank Syariah Indonesia (BSI)",
-      nomorRekening: "721 888 9991",
-      atasNama: "PT VAUZA TIGA UTAMA",
-      keterangan: "Rekening Khusus Badal Umroh BSI",
-    },
-  ],
-};
+const DEFAULT_REKENING = [
+  {
+    tipeLayanan: "BADAL_WAKAF",
+    namaBank: "Bank Syariah Indonesia (BSI)",
+    nomorRekening: "721 888 9991",
+    atasNama: "PT VAUZA TIGA UTAMA",
+    keterangan: "Rekening Resmi Operasional Badal & Wakaf",
+    isActive: true,
+    urutan: 1,
+  },
+  {
+    tipeLayanan: "BADAL_WAKAF",
+    namaBank: "Bank Mandiri",
+    nomorRekening: "142 00 9988 7766",
+    atasNama: "PT VAUZA TIGA UTAMA",
+    keterangan: "Rekening Resmi Operasional Badal & Wakaf",
+    isActive: true,
+    urutan: 2,
+  },
+];
 
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const tipeLayanan = searchParams.get("tipeLayanan"); // 'WAKAF_QURAN' | 'BADAL_UMROH'
+    const tipeLayanan = searchParams.get("tipeLayanan");
 
-    const where: any = {};
-    if (tipeLayanan) {
-      where.tipeLayanan = tipeLayanan;
+    let where: any = {};
+    if (tipeLayanan && tipeLayanan !== "ALL" && tipeLayanan !== "BADAL_WAKAF") {
+      where = {
+        OR: [
+          { tipeLayanan: "BADAL_WAKAF" },
+          { tipeLayanan: tipeLayanan },
+        ],
+      };
     }
 
     let records = await prisma.masterRekeningLayanan.findMany({
@@ -51,20 +46,19 @@ export async function GET(request: NextRequest) {
       orderBy: [{ urutan: "asc" }, { createdAt: "asc" }],
     });
 
-    // If database is empty for the requested type, seed default fallbacks into DB
-    if (records.length === 0 && tipeLayanan && DEFAULT_REKENING[tipeLayanan]) {
-      const defaults = DEFAULT_REKENING[tipeLayanan];
+    // If database is completely empty, seed default unified records
+    if (records.length === 0) {
       const created = await Promise.all(
-        defaults.map((item, idx) =>
+        DEFAULT_REKENING.map((item) =>
           prisma.masterRekeningLayanan.create({
             data: {
-              tipeLayanan,
+              tipeLayanan: "BADAL_WAKAF",
               namaBank: item.namaBank,
               nomorRekening: item.nomorRekening,
               atasNama: item.atasNama,
-              keterangan: item.keterangan || null,
+              keterangan: item.keterangan,
               isActive: true,
-              urutan: idx + 1,
+              urutan: item.urutan,
             },
           })
         )
@@ -89,10 +83,11 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { id, tipeLayanan, namaBank, nomorRekening, atasNama, keterangan, isActive, urutan } = body;
 
-    if (!tipeLayanan || !namaBank?.trim() || !nomorRekening?.trim() || !atasNama?.trim()) {
+    if (!namaBank?.trim() || !nomorRekening?.trim() || !atasNama?.trim()) {
       return NextResponse.json({ success: false, message: "Data rekening tidak lengkap" }, { status: 400 });
     }
 
+    const targetTipe = tipeLayanan || "BADAL_WAKAF";
     const updatedBy = session.user.name || session.user.email || "Admin";
 
     let result;
@@ -100,7 +95,7 @@ export async function POST(request: NextRequest) {
       result = await prisma.masterRekeningLayanan.update({
         where: { id },
         data: {
-          tipeLayanan,
+          tipeLayanan: targetTipe,
           namaBank: namaBank.trim(),
           nomorRekening: nomorRekening.trim(),
           atasNama: atasNama.trim(),
@@ -113,7 +108,7 @@ export async function POST(request: NextRequest) {
     } else {
       result = await prisma.masterRekeningLayanan.create({
         data: {
-          tipeLayanan,
+          tipeLayanan: targetTipe,
           namaBank: namaBank.trim(),
           nomorRekening: nomorRekening.trim(),
           atasNama: atasNama.trim(),

@@ -45,8 +45,7 @@ export default function MasterBadalWakafPage() {
     WAKAF_QURAN: 350000,
   });
 
-  // Rekening State
-  const [activeRekeningTab, setActiveRekeningTab] = useState<"WAKAF_QURAN" | "BADAL_UMROH">("WAKAF_QURAN");
+  // Rekening State (Tersatu untuk Badal & Wakaf)
   const [rekeningList, setRekeningList] = useState<RekeningItem[]>([]);
   const [loadingRekening, setLoadingRekening] = useState(false);
 
@@ -56,11 +55,11 @@ export default function MasterBadalWakafPage() {
   const [savingRekening, setSavingRekening] = useState(false);
 
   const [formRekening, setFormRekening] = useState<RekeningItem>({
-    tipeLayanan: "WAKAF_QURAN",
+    tipeLayanan: "BADAL_UMROH",
     namaBank: "",
     nomorRekening: "",
     atasNama: "PT VAUZA TIGA UTAMA",
-    keterangan: "",
+    keterangan: "Rekening Resmi Operasional Badal & Wakaf",
     isActive: true,
     urutan: 1,
   });
@@ -80,7 +79,7 @@ export default function MasterBadalWakafPage() {
   const fetchRekening = async () => {
     try {
       setLoadingRekening(true);
-      const res = await fetch(`/api/master/rekening-layanan?tipeLayanan=${activeRekeningTab}`);
+      const res = await fetch("/api/master/rekening-layanan");
       const json = await res.json();
       if (json.success && json.data) {
         setRekeningList(json.data);
@@ -93,12 +92,8 @@ export default function MasterBadalWakafPage() {
   };
 
   useEffect(() => {
-    Promise.all([fetchPrices()]).finally(() => setLoading(false));
+    Promise.all([fetchPrices(), fetchRekening()]).finally(() => setLoading(false));
   }, []);
-
-  useEffect(() => {
-    fetchRekening();
-  }, [activeRekeningTab]);
 
   const handleUpdatePrice = async (tipeLayanan: string, harga: number) => {
     setSavingPrice(true);
@@ -125,11 +120,11 @@ export default function MasterBadalWakafPage() {
   const handleOpenAddRekening = () => {
     setEditingRekening(null);
     setFormRekening({
-      tipeLayanan: activeRekeningTab,
+      tipeLayanan: "BADAL_UMROH",
       namaBank: "",
       nomorRekening: "",
       atasNama: "PT VAUZA TIGA UTAMA",
-      keterangan: activeRekeningTab === "WAKAF_QURAN" ? "Rekening Khusus Wakaf Al-Qur'an" : "Rekening Khusus Badal Umroh",
+      keterangan: "Rekening Resmi Operasional Badal & Wakaf",
       isActive: true,
       urutan: rekeningList.length + 1,
     });
@@ -140,7 +135,7 @@ export default function MasterBadalWakafPage() {
     setEditingRekening(item);
     setFormRekening({
       id: item.id,
-      tipeLayanan: item.tipeLayanan,
+      tipeLayanan: item.tipeLayanan || "BADAL_UMROH",
       namaBank: item.namaBank,
       nomorRekening: item.nomorRekening,
       atasNama: item.atasNama,
@@ -216,7 +211,7 @@ export default function MasterBadalWakafPage() {
           Master Badal Umroh &amp; Wakaf Al-Qur&apos;an
         </h1>
         <p className="text-slate-500 text-sm">
-          Kelola referensi harga utama dan konfigurasi rekening bank resmi khusus untuk layanan Badal Umroh dan Wakaf Al-Qur&apos;an (terpisah dari rekening paket umroh reguler).
+          Kelola referensi harga utama dan konfigurasi rekening bank resmi khusus untuk program Badal Umroh dan Wakaf Al-Qur&apos;an (terpisah dari rekening paket umroh reguler).
         </p>
       </div>
 
@@ -315,63 +310,34 @@ export default function MasterBadalWakafPage() {
       </div>
 
       {/* ════════════════════════════════════════════════════════════════════
-          BAGIAN 2: MASTER REKENING KHUSUS BADAL & WAKAF
+          BAGIAN 2: MASTER REKENING RESMI BADAL & WAKAF (SATU KESATUAN)
       ════════════════════════════════════════════════════════════════════ */}
       <div className="space-y-4 pt-4 border-t">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
             <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
               <CreditCard className="h-5 w-5 text-emerald-600" />
-              2. Master Rekening Khusus Pembayaran
+              2. Master Rekening Resmi Badal Umroh &amp; Wakaf Al-Qur&apos;an
             </h2>
             <p className="text-xs text-slate-500 mt-0.5">
-              Rekening ini terpisah dari rekening paket umroh reguler dan akan otomatis tampil pada portal pendaftaran &amp; tracking.
+              Daftar rekening bank resmi ini digunakan bersama untuk program Badal Umroh dan Wakaf Al-Qur&apos;an (terpisah dari rekening paket umroh reguler).
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
-            <div className="flex items-center bg-slate-100 p-1 rounded-lg border text-xs">
-              <button
-                type="button"
-                onClick={() => setActiveRekeningTab("WAKAF_QURAN")}
-                className={`px-3 py-1.5 rounded-md font-bold transition-all ${
-                  activeRekeningTab === "WAKAF_QURAN"
-                    ? "bg-white text-indigo-700 shadow-xs"
-                    : "text-slate-600 hover:text-slate-900"
-                }`}
-              >
-                📖 Rekening Wakaf Qur&apos;an
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveRekeningTab("BADAL_UMROH")}
-                className={`px-3 py-1.5 rounded-md font-bold transition-all ${
-                  activeRekeningTab === "BADAL_UMROH"
-                    ? "bg-white text-emerald-700 shadow-xs"
-                    : "text-slate-600 hover:text-slate-900"
-                }`}
-              >
-                🕋 Rekening Badal Umroh
-              </button>
-            </div>
-
-            <Button
-              size="sm"
-              onClick={handleOpenAddRekening}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold gap-1.5 h-9"
-            >
-              <Plus className="h-4 w-4" /> Tambah Rekening
-            </Button>
-          </div>
+          <Button
+            size="sm"
+            onClick={handleOpenAddRekening}
+            className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold gap-1.5 h-9"
+          >
+            <Plus className="h-4 w-4" /> Tambah Rekening
+          </Button>
         </div>
 
         {/* Info Banner */}
         <div className="p-3.5 bg-blue-50/80 border border-blue-200 rounded-xl text-blue-900 text-xs flex items-start gap-2.5">
           <Info className="h-4 w-4 text-blue-600 shrink-0 mt-0.5" />
           <p className="text-[11.5px] leading-relaxed">
-            Daftar rekening di bawah ini khusus digunakan untuk penerimaan dana{" "}
-            <strong>{activeRekeningTab === "WAKAF_QURAN" ? "Wakaf Mushaf Al-Qur'an" : "Badal Umroh"}</strong>.
-            Calon pewakaf / pemohon dapat memilih salah satu rekening resmi ini saat transfer.
+            Daftar rekening resmi di bawah ini otomatis tampil pada portal pendaftaran <strong>Wakaf Al-Qur&apos;an</strong>, portal pendaftaran <strong>Badal Umroh</strong>, serta halaman tracking jamaah.
           </p>
         </div>
 
@@ -449,21 +415,9 @@ export default function MasterBadalWakafPage() {
       <Modal
         open={isRekeningModalOpen}
         onClose={() => setIsRekeningModalOpen(false)}
-        title={editingRekening ? "Edit Konfigurasi Rekening" : `Tambah Rekening ${activeRekeningTab === "WAKAF_QURAN" ? "Wakaf Qur'an" : "Badal Umroh"}`}
+        title={editingRekening ? "Edit Konfigurasi Rekening" : "Tambah Rekening Resmi Badal & Wakaf"}
       >
         <div className="space-y-4 pt-1 text-xs">
-          <div className="space-y-1.5">
-            <label className="font-bold text-slate-700">Tipe Peruntukan Layanan</label>
-            <select
-              value={formRekening.tipeLayanan}
-              onChange={(e) => setFormRekening({ ...formRekening, tipeLayanan: e.target.value as any })}
-              className="w-full h-10 px-3 rounded-xl border border-input bg-background text-xs font-semibold"
-            >
-              <option value="WAKAF_QURAN">Wakaf Mushaf Al-Qur&apos;an</option>
-              <option value="BADAL_UMROH">Badal Umroh</option>
-            </select>
-          </div>
-
           <div className="space-y-1.5">
             <label className="font-bold text-slate-700">Nama Bank *</label>
             <Input
@@ -499,7 +453,7 @@ export default function MasterBadalWakafPage() {
             <Input
               value={formRekening.keterangan || ""}
               onChange={(e) => setFormRekening({ ...formRekening, keterangan: e.target.value })}
-              placeholder="Contoh: Rekening Khusus Infaq & Wakaf Al-Qur'an"
+              placeholder="Contoh: Rekening Resmi Operasional Badal & Wakaf"
               className="text-xs h-10 rounded-xl"
             />
           </div>
@@ -548,4 +502,5 @@ export default function MasterBadalWakafPage() {
     </div>
   );
 }
+
 

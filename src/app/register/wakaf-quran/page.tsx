@@ -61,7 +61,7 @@ export default function WakafQuranRegisterPage() {
       })
       .catch(console.error);
 
-    fetch("/api/master/rekening-layanan?tipeLayanan=WAKAF_QURAN")
+    fetch("/api/master/rekening-layanan")
       .then((res) => res.json())
       .then((json) => {
         if (json.success && Array.isArray(json.data) && json.data.length > 0) {
