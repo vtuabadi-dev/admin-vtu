@@ -514,10 +514,11 @@ export default function DokumenPage() {
         body: formData,
       });
 
-      if (!res.ok) throw new Error("Gagal mengupload file");
+      const json = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(json?.message || "Gagal mengupload file");
+      }
 
-      const json = await res.json();
-      
       // Update documents list
       setUploadDocuments((prev) => {
         const existing = prev.find((d) => d.jenis === jenis);
@@ -529,7 +530,7 @@ export default function DokumenPage() {
       });
     } catch (err) {
       console.error("Upload error:", err);
-      alert("Gagal mengupload file");
+      alert(`Gagal mengupload file: ${(err as Error).message}`);
     } finally {
       setUploading(false);
     }

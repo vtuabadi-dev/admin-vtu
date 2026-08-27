@@ -98,17 +98,40 @@ export async function POST(request: NextRequest) {
 
     // Update DB
     const semuaDokumen = await dokumenRepo.findByJamaah(jamaahId);
-    const dokumenItem = semuaDokumen.find((d: { id: string; jenis: string }) => d.jenis === jenisDokumen);
+    let dokumenItem = semuaDokumen.find((d: { id: string; jenis: string }) => d.jenis === jenisDokumen);
+    const fileUrl = await storage.getUrl(fileId);
 
     if (dokumenItem) {
-      await dokumenRepo.updateFileStatus(dokumenItem.id, "valid");
+      const updated = await prisma.dokumenItem.update({
+        where: { id: dokumenItem.id },
+        data: {
+          fileUrl,
+          uploadedAt: new Date(),
+          fileStatus: "valid",
+          status: "processing",
+        },
+      });
+      dokumenItem = dokumenRepo.mapDokumen(updated);
+    } else {
+      const created = await prisma.dokumenItem.create({
+        data: {
+          jamaahId,
+          jenis: jenisDokumen,
+          wajib: true,
+          fileUrl,
+          uploadedAt: new Date(),
+          fileStatus: "valid",
+          status: "processing",
+        },
+      });
+      dokumenItem = dokumenRepo.mapDokumen(created);
     }
 
     return NextResponse.json({
       success: true,
       data: {
         dokumen: dokumenItem,
-        fileUrl: await storage.getUrl(fileId),
+        fileUrl,
         fileId,
         status: "uploaded",
       },
