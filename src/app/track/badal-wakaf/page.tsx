@@ -32,6 +32,7 @@ export default function TrackBadalWakafPage() {
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
   const [selectedTarget, setSelectedTarget] = useState<{ type: "badal" | "wakaf"; id: string } | null>(null);
   const [buktiUrlInput, setBuktiUrlInput] = useState("");
+  const [buktiFilePreview, setBuktiFilePreview] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
 
   // Modal Tambah Order Wakaf Baru
@@ -42,6 +43,23 @@ export default function TrackBadalWakafPage() {
     niatList: [""],
     catatan: "",
   });
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        alert("Ukuran file maksimal 5MB");
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = reader.result as string;
+        setBuktiFilePreview(result);
+        setBuktiUrlInput(result);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   // Login Handler menggunakan Kombinasi Nama Pendaftar & Nomor WA
   const handleTrackLogin = async (e: React.FormEvent) => {
@@ -83,20 +101,25 @@ export default function TrackBadalWakafPage() {
   // Upload Bukti Pembayaran
   const handleUploadBuktiSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedTarget || !buktiUrlInput) return;
+    const finalUrl = buktiFilePreview || buktiUrlInput;
+    if (!selectedTarget || !finalUrl.trim()) {
+      alert("Mohon pilih file bukti bayar atau masukkan link bukti transfer.");
+      return;
+    }
     try {
       setIsUploading(true);
       const endpoint = selectedTarget.type === "badal" ? "/api/badal-umroh/upload-bukti" : "/api/wakaf-quran/upload-bukti";
       const res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: selectedTarget.id, buktiBayarUrl: buktiUrlInput }),
+        body: JSON.stringify({ id: selectedTarget.id, buktiBayarUrl: finalUrl.trim() }),
       });
       const data = await res.json();
       if (data.success) {
-        alert("Bukti pembayaran berhasil diunggah! Status pembayaran kini Menunggu Konfirmasi Admin.");
+        alert("Bukti pembayaran berhasil dikirim! Status pembayaran kini Menunggu Konfirmasi Admin.");
         setUploadModalOpen(false);
         setBuktiUrlInput("");
+        setBuktiFilePreview(null);
         // Refresh data login
         const refreshRes = await fetch("/api/badal-umroh/track-login", {
           method: "POST",
@@ -390,24 +413,38 @@ export default function TrackBadalWakafPage() {
                             <div className="pt-2 flex flex-wrap items-center justify-between gap-2 border-t text-xs">
                               <div className="flex items-center gap-2">
                                 {item.buktiBayarUrl ? (
-                                  <a
-                                    href={item.buktiBayarUrl}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="inline-flex items-center gap-1 text-emerald-600 hover:underline font-semibold"
-                                  >
-                                    <CheckCircle2 className="h-3.5 w-3.5" /> Lihat Bukti Bayar
-                                  </a>
+                                  <div className="flex items-center gap-2">
+                                    <a
+                                      href={item.buktiBayarUrl}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="inline-flex items-center gap-1 text-emerald-600 hover:underline font-bold"
+                                    >
+                                      <CheckCircle2 className="h-3.5 w-3.5" /> Lihat Bukti Bayar
+                                    </a>
+                                    {item.paymentStatus !== "Lunas" && (
+                                      <button
+                                        onClick={() => {
+                                          setSelectedTarget({ type: "badal", id: item.id });
+                                          setUploadModalOpen(true);
+                                        }}
+                                        className="text-[11px] text-muted-foreground hover:text-emerald-600 underline font-semibold ml-1"
+                                      >
+                                        (Kirim Ulang)
+                                      </button>
+                                    )}
+                                  </div>
                                 ) : (
-                                  <button
+                                  <Button
+                                    size="sm"
                                     onClick={() => {
                                       setSelectedTarget({ type: "badal", id: item.id });
                                       setUploadModalOpen(true);
                                     }}
-                                    className="inline-flex items-center gap-1 text-rose-600 hover:underline font-bold"
+                                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs gap-1.5 h-8 px-3 shadow-xs"
                                   >
-                                    <Upload className="h-3.5 w-3.5" /> Unggah Bukti Bayar
-                                  </button>
+                                    <Upload className="h-3.5 w-3.5" /> Kirim Bukti Transfer
+                                  </Button>
                                 )}
                               </div>
 
@@ -529,22 +566,74 @@ export default function TrackBadalWakafPage() {
                               </div>
                               <div>
                                 <p className="text-muted-foreground">Status Pembayaran:</p>
-                                <p className="font-bold text-emerald-600">{item.paymentStatus || "Lunas"}</p>
+                                <div className="flex items-center gap-2 mt-0.5">
+                                  <span
+                                    className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
+                                      item.paymentStatus === "Lunas"
+                                        ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800"
+                                        : item.paymentStatus === "Menunggu Konfirmasi"
+                                        ? "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 border border-amber-300 dark:border-amber-800"
+                                        : "bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300 border border-rose-300 dark:border-rose-800"
+                                    }`}
+                                  >
+                                    {item.paymentStatus || "Belum Bayar"}
+                                  </span>
+                                </div>
                               </div>
                             </div>
 
-                            {item.sertifikatUrl && (
-                              <div className="pt-2 flex justify-end border-t">
-                                <a
-                                  href={item.sertifikatUrl}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  className="inline-flex items-center gap-1 px-3 py-1 bg-emerald-600 text-white rounded text-[11px] font-bold hover:bg-emerald-700"
-                                >
-                                  <Download className="h-3 w-3" /> Unduh Sertifikat Wakaf
-                                </a>
+                            {/* Bukti Bayar & Dokumen Sertifikat */}
+                            <div className="pt-2.5 flex flex-wrap items-center justify-between gap-2 border-t text-xs">
+                              <div className="flex items-center gap-2">
+                                {item.buktiBayarUrl ? (
+                                  <div className="flex items-center gap-2">
+                                    <a
+                                      href={item.buktiBayarUrl}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="inline-flex items-center gap-1 text-emerald-600 hover:underline font-bold"
+                                    >
+                                      <CheckCircle2 className="h-3.5 w-3.5" /> Lihat Bukti Bayar
+                                    </a>
+                                    {item.paymentStatus !== "Lunas" && (
+                                      <button
+                                        onClick={() => {
+                                          setSelectedTarget({ type: "wakaf", id: item.id });
+                                          setUploadModalOpen(true);
+                                        }}
+                                        className="text-[11px] text-muted-foreground hover:text-emerald-600 underline font-semibold ml-1"
+                                      >
+                                        (Kirim Ulang)
+                                      </button>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <Button
+                                    size="sm"
+                                    onClick={() => {
+                                      setSelectedTarget({ type: "wakaf", id: item.id });
+                                      setUploadModalOpen(true);
+                                    }}
+                                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs gap-1.5 h-8 px-3 shadow-xs"
+                                  >
+                                    <Upload className="h-3.5 w-3.5" /> Kirim Bukti Transfer
+                                  </Button>
+                                )}
                               </div>
-                            )}
+
+                              <div className="flex items-center gap-2">
+                                {item.sertifikatUrl && (
+                                  <a
+                                    href={item.sertifikatUrl}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="inline-flex items-center gap-1 px-3 py-1 bg-emerald-600 text-white rounded text-[11px] font-bold hover:bg-emerald-700 shadow-xs"
+                                  >
+                                    <Download className="h-3 w-3" /> Unduh Sertifikat Wakaf
+                                  </a>
+                                )}
+                              </div>
+                            </div>
                           </div>
                         </Card>
                       ))
@@ -560,24 +649,98 @@ export default function TrackBadalWakafPage() {
       {/* Modal Upload Bukti Pembayaran */}
       <Modal
         open={uploadModalOpen}
-        onClose={() => setUploadModalOpen(false)}
-        title="Unggah Bukti Pembayaran"
+        onClose={() => {
+          setUploadModalOpen(false);
+          setBuktiFilePreview(null);
+          setBuktiUrlInput("");
+        }}
+        title="Kirim Bukti Pembayaran / Transfer"
       >
         <form onSubmit={handleUploadBuktiSubmit} className="space-y-4 text-xs">
+          <div className="space-y-2">
+            <label className="font-bold text-foreground flex items-center justify-between">
+              <span>Pilih Foto / Struk Bukti Transfer</span>
+              <span className="text-[10px] text-muted-foreground font-normal">Maks 5MB (JPG, PNG)</span>
+            </label>
+            
+            <div className="border-2 border-dashed border-stone-300 dark:border-stone-700 rounded-xl p-4 text-center hover:border-emerald-500 transition-colors bg-stone-50/60 dark:bg-stone-900/60">
+              <input
+                type="file"
+                id="trackBuktiFileInput"
+                accept="image/*,application/pdf"
+                onChange={handleFileChange}
+                className="hidden"
+              />
+              <label
+                htmlFor="trackBuktiFileInput"
+                className="cursor-pointer flex flex-col items-center justify-center gap-1.5"
+              >
+                <div className="w-10 h-10 rounded-full bg-emerald-100 dark:bg-emerald-950/70 text-emerald-600 flex items-center justify-center">
+                  <Upload className="w-5 h-5" />
+                </div>
+                <span className="text-xs font-bold text-emerald-700 dark:text-emerald-400">
+                  {buktiFilePreview ? "Ganti Foto / Struk Terpilih" : "Klik untuk Pilih Foto / Screenshot Struk"}
+                </span>
+                <span className="text-[10px] text-muted-foreground">
+                  Screenshot m-Banking, foto struk ATM, atau bukti transfer
+                </span>
+              </label>
+
+              {buktiFilePreview && (
+                <div className="mt-3 p-2 bg-white dark:bg-stone-950 rounded-lg border flex items-center justify-center">
+                  <img
+                    src={buktiFilePreview}
+                    alt="Preview Bukti Bayar"
+                    className="max-h-36 object-contain rounded"
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="relative flex py-1 items-center">
+            <div className="flex-grow border-t border-stone-200 dark:border-stone-800"></div>
+            <span className="flex-shrink mx-2 text-[10px] text-muted-foreground uppercase font-bold">atau gunakan tautan link</span>
+            <div className="flex-grow border-t border-stone-200 dark:border-stone-800"></div>
+          </div>
+
           <div className="space-y-1">
-            <label className="font-semibold text-foreground">URL / Link Bukti Transfer Pembayaran</label>
+            <label className="font-semibold text-foreground">URL / Link Bukti Transfer</label>
             <Input
               type="text"
-              required
-              value={buktiUrlInput}
-              onChange={(e) => setBuktiUrlInput(e.target.value)}
-              placeholder="https://..."
+              value={buktiUrlInput.startsWith("data:") ? "" : buktiUrlInput}
+              onChange={(e) => {
+                setBuktiUrlInput(e.target.value);
+                setBuktiFilePreview(null);
+              }}
+              placeholder="https://drive.google.com/... atau link gambar"
             />
           </div>
-          <div className="flex justify-end gap-2 pt-2">
-            <Button type="button" variant="outline" onClick={() => setUploadModalOpen(false)}>Batal</Button>
-            <Button type="submit" disabled={isUploading} className="bg-emerald-600 text-white">
-              {isUploading ? "Mengunggah..." : "Simpan Bukti Pembayaran"}
+
+          <div className="flex justify-end gap-2 pt-2 border-t">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setUploadModalOpen(false);
+                setBuktiFilePreview(null);
+                setBuktiUrlInput("");
+              }}
+            >
+              Batal
+            </Button>
+            <Button
+              type="submit"
+              disabled={isUploading || (!buktiFilePreview && !buktiUrlInput.trim())}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs gap-1.5"
+            >
+              {isUploading ? (
+                "Mengunggah..."
+              ) : (
+                <>
+                  <CheckCircle2 className="w-4 h-4" /> Kirim Bukti Transfer
+                </>
+              )}
             </Button>
           </div>
         </form>
