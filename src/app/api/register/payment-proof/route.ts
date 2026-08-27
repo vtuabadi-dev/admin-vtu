@@ -22,23 +22,26 @@ export async function POST(request: NextRequest) {
     let fileBuffer: Buffer | null = null;
     let fileMime = "image/jpeg";
 
+    let metodePembayaran = "transfer";
     let nominalDpNum = 0;
     if (contentType.includes("multipart/form-data")) {
       const formData = await request.formData();
       kodeRegistrasi = (formData.get("kodeRegistrasi") as string) || "";
+      metodePembayaran = (formData.get("metodePembayaran") as string) || "transfer";
       const nominalDpRaw = (formData.get("nominalDp") as string) || "";
       nominalDpNum = parseInt(nominalDpRaw.replace(/\D/g, ""), 10) || 0;
       const file = formData.get("file") as File | null;
 
-      if (!file) {
-        return NextResponse.json({ success: false, message: "File bukti transfer wajib diunggah" }, { status: 400 });
+      if (file && file.size > 0) {
+        fileBuffer = Buffer.from(await file.arrayBuffer());
+        fileMime = file.type || "image/jpeg";
+      } else if (metodePembayaran !== "cash" && metodePembayaran !== "tunai") {
+        return NextResponse.json({ success: false, message: "File bukti transfer wajib diunggah untuk metode transfer" }, { status: 400 });
       }
-
-      fileBuffer = Buffer.from(await file.arrayBuffer());
-      fileMime = file.type || "image/jpeg";
     } else {
       const body = await request.json();
       kodeRegistrasi = body.kodeRegistrasi || "";
+      metodePembayaran = body.metodePembayaran || "transfer";
       if (body.nominalDp) {
         nominalDpNum = parseInt(String(body.nominalDp).replace(/\D/g, ""), 10) || 0;
       }
@@ -184,6 +187,12 @@ export async function POST(request: NextRequest) {
 
     // Create Pembayaran entry for the review queue
     if (groupId) {
+      const isCash = metodePembayaran === "cash" || metodePembayaran === "tunai";
+      const paymentMethod = isCash ? "cash" : "transfer";
+      const catatanText = isCash
+        ? `DP Pendaftaran (Tunai / Bayar di Kantor) ${reg.paxCount} Pax - ${reg.namaPerwakilan} (${reg.kodeRegistrasi})`
+        : `DP Pendaftaran ${reg.paxCount} Pax - ${reg.namaPerwakilan} (${reg.kodeRegistrasi})`;
+
       const existingPembayaran = await prisma.pembayaran.findFirst({
         where: { groupId },
       });
@@ -193,19 +202,21 @@ export async function POST(request: NextRequest) {
           data: {
             groupId,
             jumlah: nominalDpNum,
-            metode: "transfer",
+            metode: paymentMethod,
             tanggal: new Date(),
             buktiUrl: buktiUrl || undefined,
             status: "pending",
             sumber: "jamaah",
-            catatan: `DP Pendaftaran ${reg.paxCount} Pax - ${reg.namaPerwakilan} (${reg.kodeRegistrasi})`,
+            catatan: catatanText,
           },
         });
-      } else if (buktiUrl && !existingPembayaran.buktiUrl) {
+      } else {
         await prisma.pembayaran.update({
           where: { id: existingPembayaran.id },
           data: {
-            buktiUrl,
+            metode: paymentMethod,
+            catatan: catatanText,
+            ...(buktiUrl ? { buktiUrl } : {}),
             jumlah: nominalDpNum > 0 ? nominalDpNum : existingPembayaran.jumlah,
           },
         });
@@ -215,7 +226,7 @@ export async function POST(request: NextRequest) {
     // Update Registration Request status, groupId, and catatanAdmin
     const updatedNotes = [
       reg.catatanAdmin || "",
-      `[Bukti DP Uploaded at ${new Date().toISOString()}]: ${buktiUrl || "File received"}`,
+      `[Metode DP ${metodePembayaran.toUpperCase()} at ${new Date().toISOString()}]: ${buktiUrl || (metodePembayaran === "cash" ? "Bayar Tunai di Kantor" : "File received")}`,
     ].filter(Boolean).join("\n");
 
     await prisma.registrationRequest.update({

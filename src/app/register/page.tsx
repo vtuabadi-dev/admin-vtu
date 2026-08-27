@@ -402,6 +402,7 @@ export default function RegisterPage() {
   const [copiedRef, setCopiedRef] = useState(false);
   const [isCustomDp, setIsCustomDp] = useState(false);
   const [customDpAmount, setCustomDpAmount] = useState("");
+  const [paymentMethodOption, setPaymentMethodOption] = useState<"transfer" | "tunai">("transfer");
 
   // Draft auto-resume indicator
   const [isRestoredDraft, setIsRestoredDraft] = useState(false);
@@ -692,7 +693,7 @@ export default function RegisterPage() {
 
   // Handle payment proof upload & submission for Step 8
   const handlePaymentProofSubmit = async () => {
-    if (!paymentProofFile && !paymentProofPreview) {
+    if (paymentMethodOption === "transfer" && !paymentProofFile && !paymentProofPreview) {
       setPaymentProofError("Silakan pilih/unggah foto bukti transfer DP.");
       return;
     }
@@ -708,6 +709,7 @@ export default function RegisterPage() {
     try {
       const formData = new FormData();
       formData.append("kodeRegistrasi", kodeReg);
+      formData.append("metodePembayaran", paymentMethodOption === "tunai" ? "cash" : "transfer");
 
       const defaultDpPerPax = 5000000;
       const minimalDpStandard = defaultDpPerPax * paxCount;
@@ -720,8 +722,8 @@ export default function RegisterPage() {
       }
 
       const res = await fetch("/api/register/payment-proof", {
-        method: "POST",
-        body: formData,
+         method: "POST",
+         body: formData,
       });
 
       const data = await res.json();
@@ -729,10 +731,10 @@ export default function RegisterPage() {
         setPaymentProofSubmitted(true);
         clearDraftFromStorage();
       } else {
-        setPaymentProofError(data.message || "Gagal mengunggah bukti transfer DP.");
+        setPaymentProofError(data.message || "Gagal memproses pembayaran DP.");
       }
     } catch {
-      setPaymentProofError("Gagal mengunggah bukti transfer. Periksa koneksi internet Anda.");
+      setPaymentProofError("Gagal memproses pembayaran DP. Periksa koneksi internet Anda.");
     } finally {
       setIsUploadingProof(false);
     }
@@ -2581,13 +2583,29 @@ export default function RegisterPage() {
                 <div className="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center shadow-sm">
                   <Check className="w-8 h-8 text-green-600" />
                 </div>
-                <h2 className="text-2xl font-extrabold text-gray-900">Bukti Pembayaran DP Berhasil Diunggah! 🎉</h2>
+                <h2 className="text-2xl font-extrabold text-gray-900">
+                  {paymentMethodOption === "tunai" 
+                    ? "Registrasi Tunai Berhasil Dicatat! 🎉" 
+                    : "Bukti Pembayaran DP Berhasil Diunggah! 🎉"}
+                </h2>
                 <p className="text-sm text-gray-600 max-w-md mx-auto">
-                  Terima kasih <strong>{namaPerwakilan}</strong>. Bukti transfer DP untuk kode registrasi{" "}
-                  <span className="font-mono font-bold text-blue-800">
-                    {submitResult?.kodeRegistrasi || (submitResult as any)?.data?.kodeRegistrasi || "-"}
-                  </span>{" "}
-                  telah berhasil dikirim dan akan diverifikasi oleh Tim Keuangan VTU ABADI dalam 1x24 jam.
+                  {paymentMethodOption === "tunai" ? (
+                    <>
+                      Terima kasih <strong>{namaPerwakilan}</strong>. Registrasi rombongan Anda untuk kode registrasi{" "}
+                      <span className="font-mono font-bold text-blue-800">
+                        {submitResult?.kodeRegistrasi || (submitResult as any)?.data?.kodeRegistrasi || "-"}
+                      </span>{" "}
+                      dengan metode <strong>Pembayaran Tunai (Bayar di Kantor)</strong> telah berhasil dicatat. Silakan kunjungi kantor VTU Travel untuk menyelesaikan pembayaran DP tunai Anda.
+                    </>
+                  ) : (
+                    <>
+                      Terima kasih <strong>{namaPerwakilan}</strong>. Bukti transfer DP untuk kode registrasi{" "}
+                      <span className="font-mono font-bold text-blue-800">
+                        {submitResult?.kodeRegistrasi || (submitResult as any)?.data?.kodeRegistrasi || "-"}
+                      </span>{" "}
+                      telah berhasil dikirim dan akan diverifikasi oleh Tim Keuangan VTU ABADI dalam 1x24 jam.
+                    </>
+                  )}
                 </p>
                 <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 max-w-md mx-auto text-left text-xs space-y-1.5 text-blue-900">
                   <p className="font-bold flex items-center gap-1.5"><ShieldCheck className="w-4 h-4 text-blue-600" /> Informasi Selanjutnya:</p>
@@ -2616,6 +2634,68 @@ export default function RegisterPage() {
                   <p className="text-xs text-blue-100 mt-1">
                     Silakan selesaikan pembayaran DP minimal 30% untuk mengamankan kuota pendaftaran rombongan Anda.
                   </p>
+                </div>
+
+                {/* Payment Method Selector (Transfer vs Tunai) */}
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-gray-700 uppercase tracking-wider block">
+                    Pilih Metode Pembayaran DP:
+                  </label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPaymentMethodOption("transfer");
+                        setPaymentProofError("");
+                      }}
+                      className={cn(
+                        "p-3.5 rounded-xl border-2 text-left transition-all flex items-start justify-between gap-2",
+                        paymentMethodOption === "transfer"
+                          ? "border-blue-600 bg-blue-50/70 ring-2 ring-blue-500/20 shadow-xs"
+                          : "border-slate-200 bg-white hover:bg-slate-50 text-slate-600"
+                      )}
+                    >
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-1.5 font-bold text-xs text-slate-900">
+                          <CreditCard className="w-4 h-4 text-blue-600" />
+                          <span>1. Transfer Bank (BSI / Online)</span>
+                        </div>
+                        <p className="text-[11px] text-slate-500 leading-snug">
+                          Transfer ke rekening resmi VTU & upload foto bukti transfer.
+                        </p>
+                      </div>
+                      {paymentMethodOption === "transfer" && (
+                        <CheckCircle2 className="w-4 h-4 text-blue-600 flex-shrink-0 mt-0.5" />
+                      )}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPaymentMethodOption("tunai");
+                        setPaymentProofError("");
+                      }}
+                      className={cn(
+                        "p-3.5 rounded-xl border-2 text-left transition-all flex items-start justify-between gap-2",
+                        paymentMethodOption === "tunai"
+                          ? "border-emerald-600 bg-emerald-50/70 ring-2 ring-emerald-500/20 shadow-xs"
+                          : "border-slate-200 bg-white hover:bg-slate-50 text-slate-600"
+                      )}
+                    >
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-1.5 font-bold text-xs text-slate-900">
+                          <Building2 className="w-5 h-5 text-emerald-600" />
+                          <span>2. Pembayaran Tunai (Cash di Kantor)</span>
+                        </div>
+                        <p className="text-[11px] text-slate-500 leading-snug">
+                          Bayar langsung di kantor VTU Travel atau melalui perwakilan resmi.
+                        </p>
+                      </div>
+                      {paymentMethodOption === "tunai" && (
+                        <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0 mt-0.5" />
+                      )}
+                    </button>
+                  </div>
                 </div>
 
                 {/* Summary & Bank Details Grid */}
@@ -2734,98 +2814,148 @@ export default function RegisterPage() {
                     })()}
                   </div>
 
-                  {/* Bank Transfer Info */}
-                  <div className="bg-white border-2 border-blue-200 rounded-xl p-4 shadow-sm space-y-3">
-                    <div className="flex items-center gap-2 border-b pb-2">
-                      <Building2 className="w-5 h-5 text-blue-600" />
-                      <div>
-                        <h3 className="text-xs font-bold text-gray-900 uppercase">Rekening Tujuan Pembayaran</h3>
-                        <p className="text-[10px] text-gray-500">Transfer Resmi PT VTU ABADI TRAVEL</p>
+                  {paymentMethodOption === "transfer" ? (
+                    <div className="bg-white border-2 border-blue-200 rounded-xl p-4 shadow-sm space-y-3">
+                      <div className="flex items-center gap-2 border-b pb-2">
+                        <Building2 className="w-5 h-5 text-blue-600" />
+                        <div>
+                          <h3 className="text-xs font-bold text-gray-900 uppercase">Rekening Tujuan Pembayaran</h3>
+                          <p className="text-[10px] text-gray-500">Transfer Resmi PT VTU ABADI TRAVEL</p>
+                        </div>
+                      </div>
+
+                      <div className="space-y-2 text-xs">
+                        {(() => {
+                          let bankName = "Bank Syariah Indonesia (BSI)";
+                          let bankAccount = "7123 4567 89";
+                          let bankHolder = "PT VTU ABADI TRAVEL";
+                          if (typeof window !== "undefined") {
+                            const saved = localStorage.getItem("vtu_bank_config");
+                            if (saved) {
+                              try {
+                                const parsed = JSON.parse(saved);
+                                if (parsed.bankName) bankName = parsed.bankName;
+                                if (parsed.bankAccount) bankAccount = parsed.bankAccount;
+                                if (parsed.bankHolder) bankHolder = parsed.bankHolder;
+                              } catch (e) { }
+                            }
+                          }
+                          const rawAccountNum = bankAccount.replace(/\s+/g, "");
+
+                          return (
+                            <>
+                              <div className="bg-blue-50 p-2.5 rounded-lg border border-blue-100">
+                                <p className="text-[10px] text-blue-600 font-semibold uppercase">Nama Bank</p>
+                                <p className="font-bold text-gray-900 text-sm">{bankName}</p>
+                              </div>
+
+                              <div className="bg-blue-50 p-2.5 rounded-lg border border-blue-100 flex items-center justify-between">
+                                <div>
+                                  <p className="text-[10px] text-blue-600 font-semibold uppercase">Nomor Rekening</p>
+                                  <p className="font-mono font-bold text-blue-900 text-base">{bankAccount}</p>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(rawAccountNum);
+                                    setCopiedAccount(true);
+                                    setTimeout(() => setCopiedAccount(false), 2000);
+                                  }}
+                                  className="px-2.5 py-1 bg-white border border-blue-300 rounded text-[11px] font-semibold text-blue-700 hover:bg-blue-100 flex items-center gap-1"
+                                >
+                                  {copiedAccount ? <Check className="w-3.5 h-3.5 text-green-600" /> : <Copy className="w-3.5 h-3.5" />}
+                                  {copiedAccount ? "Tersalin" : "Salin"}
+                                </button>
+                              </div>
+
+                              <div className="bg-blue-50 p-2.5 rounded-lg border border-blue-100">
+                                <p className="text-[10px] text-blue-600 font-semibold uppercase">Atas Nama Rekening</p>
+                                <p className="font-bold text-gray-900">{bankHolder}</p>
+                              </div>
+                            </>
+                          );
+                        })()}
+
+                        <div className="bg-amber-50 p-2.5 rounded-lg border border-amber-200 flex items-center justify-between">
+                          <div>
+                            <p className="text-[10px] text-amber-700 font-semibold uppercase">Berita Transfer / Ref</p>
+                            <p className="font-mono font-bold text-amber-900">
+                              {submitResult?.kodeRegistrasi || (submitResult as any)?.data?.kodeRegistrasi || "-"}
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const refCode = submitResult?.kodeRegistrasi || (submitResult as any)?.data?.kodeRegistrasi || "";
+                              navigator.clipboard.writeText(refCode);
+                              setCopiedRef(true);
+                              setTimeout(() => setCopiedRef(false), 2000);
+                            }}
+                            className="px-2.5 py-1 bg-white border border-amber-300 rounded text-[11px] font-semibold text-amber-800 hover:bg-amber-100 flex items-center gap-1"
+                          >
+                            {copiedRef ? <Check className="w-3.5 h-3.5 text-green-600" /> : <Copy className="w-3.5 h-3.5" />}
+                            {copiedRef ? "Tersalin" : "Salin Ref"}
+                          </button>
+                        </div>
                       </div>
                     </div>
-
-                    <div className="space-y-2 text-xs">
-                      {(() => {
-                        let bankName = "Bank Syariah Indonesia (BSI)";
-                        let bankAccount = "7123 4567 89";
-                        let bankHolder = "PT VTU ABADI TRAVEL";
-                        if (typeof window !== "undefined") {
-                          const saved = localStorage.getItem("vtu_bank_config");
-                          if (saved) {
-                            try {
-                              const parsed = JSON.parse(saved);
-                              if (parsed.bankName) bankName = parsed.bankName;
-                              if (parsed.bankAccount) bankAccount = parsed.bankAccount;
-                              if (parsed.bankHolder) bankHolder = parsed.bankHolder;
-                            } catch (e) { }
-                          }
-                        }
-                        const rawAccountNum = bankAccount.replace(/\s+/g, "");
-
-                        return (
-                          <>
-                            <div className="bg-blue-50 p-2.5 rounded-lg border border-blue-100">
-                              <p className="text-[10px] text-blue-600 font-semibold uppercase">Nama Bank</p>
-                              <p className="font-bold text-gray-900 text-sm">{bankName}</p>
-                            </div>
-
-                            <div className="bg-blue-50 p-2.5 rounded-lg border border-blue-100 flex items-center justify-between">
-                              <div>
-                                <p className="text-[10px] text-blue-600 font-semibold uppercase">Nomor Rekening</p>
-                                <p className="font-mono font-bold text-blue-900 text-base">{bankAccount}</p>
-                              </div>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  navigator.clipboard.writeText(rawAccountNum);
-                                  setCopiedAccount(true);
-                                  setTimeout(() => setCopiedAccount(false), 2000);
-                                }}
-                                className="px-2.5 py-1 bg-white border border-blue-300 rounded text-[11px] font-semibold text-blue-700 hover:bg-blue-100 flex items-center gap-1"
-                              >
-                                {copiedAccount ? <Check className="w-3.5 h-3.5 text-green-600" /> : <Copy className="w-3.5 h-3.5" />}
-                                {copiedAccount ? "Tersalin" : "Salin"}
-                              </button>
-                            </div>
-
-                            <div className="bg-blue-50 p-2.5 rounded-lg border border-blue-100">
-                              <p className="text-[10px] text-blue-600 font-semibold uppercase">Atas Nama Rekening</p>
-                              <p className="font-bold text-gray-900">{bankHolder}</p>
-                            </div>
-                          </>
-                        );
-                      })()}
-
-                      <div className="bg-amber-50 p-2.5 rounded-lg border border-amber-200 flex items-center justify-between">
+                  ) : (
+                    <div className="bg-white border-2 border-emerald-200 rounded-xl p-4 shadow-sm space-y-3">
+                      <div className="flex items-center gap-2 border-b pb-2">
+                        <Building2 className="w-5 h-5 text-emerald-600" />
                         <div>
-                          <p className="text-[10px] text-amber-700 font-semibold uppercase">Berita Transfer / Ref</p>
-                          <p className="font-mono font-bold text-amber-900">
-                            {submitResult?.kodeRegistrasi || (submitResult as any)?.data?.kodeRegistrasi || "-"}
+                          <h3 className="text-xs font-bold text-gray-900 uppercase">Pembayaran Tunai (Cash)</h3>
+                          <p className="text-[10px] text-gray-500">Bayar Langsung ke Kantor PT VTU ABADI TRAVEL</p>
+                        </div>
+                      </div>
+
+                      <div className="space-y-2 text-xs">
+                        <div className="bg-emerald-50 p-2.5 rounded-lg border border-emerald-100">
+                          <p className="text-[10px] text-emerald-600 font-semibold uppercase">Lokasi Kantor Pusat</p>
+                          <p className="font-bold text-gray-900 text-sm">PT Vauza Tamma Abadi</p>
+                          <p className="text-gray-700 mt-1">Ruko Griya Shanta, Jl. Soekarno Hatta No.1, Kota Malang, Jawa Timur</p>
+                        </div>
+
+                        <div className="bg-amber-50 p-2.5 rounded-lg border border-amber-200 flex items-center justify-between">
+                          <div>
+                            <p className="text-[10px] text-amber-700 font-semibold uppercase">Kode Registrasi Referensi</p>
+                            <p className="font-mono font-bold text-amber-900 text-base">
+                              {submitResult?.kodeRegistrasi || (submitResult as any)?.data?.kodeRegistrasi || "-"}
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const refCode = submitResult?.kodeRegistrasi || (submitResult as any)?.data?.kodeRegistrasi || "";
+                              navigator.clipboard.writeText(refCode);
+                              setCopiedRef(true);
+                              setTimeout(() => setCopiedRef(false), 2000);
+                            }}
+                            className="px-2.5 py-1 bg-white border border-amber-300 rounded text-[11px] font-semibold text-amber-800 hover:bg-amber-100 flex items-center gap-1"
+                          >
+                            {copiedRef ? <Check className="w-3.5 h-3.5 text-green-600" /> : <Copy className="w-3.5 h-3.5" />}
+                            {copiedRef ? "Tersalin" : "Salin Ref"}
+                          </button>
+                        </div>
+
+                        <div className="bg-emerald-50 p-2.5 rounded-lg border border-emerald-100">
+                          <p className="text-[10px] text-emerald-600 font-semibold uppercase">Instruksi Pembayaran</p>
+                          <p className="text-gray-700 mt-1 font-medium leading-relaxed">
+                            Silakan kunjungi kantor kami pada jam operasional (Senin - Sabtu, 08:00 - 17:00 WIB) dengan menunjukkan <strong>Kode Registrasi Referensi</strong> di atas untuk menyelesaikan administrasi DP tunai dan menerima kwitansi resmi.
                           </p>
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const refCode = submitResult?.kodeRegistrasi || (submitResult as any)?.data?.kodeRegistrasi || "";
-                            navigator.clipboard.writeText(refCode);
-                            setCopiedRef(true);
-                            setTimeout(() => setCopiedRef(false), 2000);
-                          }}
-                          className="px-2.5 py-1 bg-white border border-amber-300 rounded text-[11px] font-semibold text-amber-800 hover:bg-amber-100 flex items-center gap-1"
-                        >
-                          {copiedRef ? <Check className="w-3.5 h-3.5 text-green-600" /> : <Copy className="w-3.5 h-3.5" />}
-                          {copiedRef ? "Tersalin" : "Salin Ref"}
-                        </button>
                       </div>
                     </div>
-                  </div>
+                  )}
                 </div>
 
                 {/* Upload File Box */}
                 <div className="bg-slate-50 border border-slate-200 rounded-xl p-5 space-y-4">
                   <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
                     <Upload className="w-4 h-4 text-blue-600" />
-                    Upload Foto / File Bukti Transfer DP
+                    {paymentMethodOption === "tunai" 
+                      ? "Upload Foto Kuitansi / Tanda Terima Tunai (Opsional)" 
+                      : "Upload Foto / File Bukti Transfer DP"}
                   </h3>
 
                   <div className="border-2 border-dashed border-blue-300 bg-white rounded-xl p-6 text-center space-y-3 hover:bg-blue-50/50 transition-colors">
@@ -2833,7 +2963,7 @@ export default function RegisterPage() {
                       <div className="space-y-3">
                         <img
                           src={paymentProofPreview}
-                          alt="Bukti Transfer DP"
+                          alt="Kuitansi / Bukti Pembayaran DP"
                           className="max-h-48 max-w-full mx-auto rounded-lg shadow-sm border object-contain"
                         />
                         <p className="text-xs text-gray-500 font-medium">{paymentProofFile?.name}</p>
@@ -2845,14 +2975,18 @@ export default function RegisterPage() {
                           }}
                           className="text-xs text-red-600 hover:underline font-semibold"
                         >
-                          Ganti File Bukti Transfer
+                          Ganti File
                         </button>
                       </div>
                     ) : (
                       <label className="cursor-pointer block space-y-2">
                         <Upload className="w-10 h-10 text-blue-500 mx-auto" />
                         <div>
-                          <p className="text-sm font-semibold text-gray-700">Pilih Foto atau File Bukti Transfer</p>
+                          <p className="text-sm font-semibold text-gray-700">
+                            {paymentMethodOption === "tunai" 
+                              ? "Pilih Foto Kuitansi Pembayaran (Jika Ada)" 
+                              : "Pilih Foto atau File Bukti Transfer"}
+                          </p>
                           <p className="text-xs text-gray-400">Format: JPG, JPEG, PNG, PDF (Maksimal 5 MB)</p>
                         </div>
                         <input
@@ -2894,12 +3028,14 @@ export default function RegisterPage() {
                       {isUploadingProof ? (
                         <>
                           <Loader2 className="w-4 h-4 animate-spin" />
-                          Mengunggah Bukti Pembayaran...
+                          Memproses Pembayaran...
                         </>
                       ) : (
                         <>
                           <Check className="w-4 h-4" />
-                          Kirim Bukti Pembayaran DP
+                          {paymentMethodOption === "tunai" 
+                            ? "Konfirmasi Pendaftaran & Bayar di Kantor" 
+                            : "Kirim Bukti Pembayaran DP"}
                         </>
                       )}
                     </button>
