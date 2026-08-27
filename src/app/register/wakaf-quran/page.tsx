@@ -67,12 +67,7 @@ export default function WakafQuranRegisterPage() {
   const [verifiedData, setVerifiedData] = useState<{ namaLengkap: string; nomorPaspor: string; paketName: string } | null>(null);
   const [verifyMessage, setVerifyMessage] = useState<string>("");
 
-  // State Multi-Niat (Tanda Tambah +)
-  const [niatList, setNiatList] = useState<Array<{ id: string; nama: string }>>([
-    { id: "1", nama: "" },
-  ]);
-
-  // State Form Data
+  // State Form Data (Default 5 Mushaf)
   const [formData, setFormData] = useState({
     namaPaketUmroh: "",
     namaPewakaf: "",
@@ -82,6 +77,15 @@ export default function WakafQuranRegisterPage() {
     lokasiWakaf: "Masjidil Haram Makkah Al-Mukarramah",
     catatan: "",
   });
+
+  // State Multi-Niat (Otomatis sinkron dengan Jumlah Mushaf)
+  const [niatList, setNiatList] = useState<Array<{ id: string; nama: string }>>([
+    { id: "1", nama: "" },
+    { id: "2", nama: "" },
+    { id: "3", nama: "" },
+    { id: "4", nama: "" },
+    { id: "5", nama: "" },
+  ]);
 
   const [buktiTransferFile, setBuktiTransferFile] = useState<File | null>(null);
   const [buktiTransferPreview, setBuktiTransferPreview] = useState<string>("");
@@ -93,17 +97,36 @@ export default function WakafQuranRegisterPage() {
     { key: 4, label: "Pembayaran", icon: CreditCard },
   ];
 
+  // Helper Sinkronisasi Jumlah Mushaf & Baris Niat
+  const updateJumlahMushaf = (newCount: number) => {
+    const validCount = Math.max(1, Math.min(500, newCount));
+    setFormData((p) => ({ ...p, jumlahMushaf: validCount }));
+    setNiatList((prev) => {
+      if (prev.length === validCount) return prev;
+      if (prev.length < validCount) {
+        const added = Array.from({ length: validCount - prev.length }, (_, i) => ({
+          id: String(Date.now() + Math.random() + i),
+          nama: "",
+        }));
+        return [...prev, ...added];
+      } else {
+        return prev.slice(0, validCount);
+      }
+    });
+  };
+
   // Handlers Multi-Niat
   const handleAddNiat = () => {
-    setNiatList((prev) => [
-      ...prev,
-      { id: String(Date.now() + Math.random()), nama: "" },
-    ]);
+    updateJumlahMushaf(formData.jumlahMushaf + 1);
   };
 
   const handleRemoveNiat = (id: string) => {
     if (niatList.length <= 1) return;
-    setNiatList((prev) => prev.filter((item) => item.id !== id));
+    setNiatList((prev) => {
+      const next = prev.filter((item) => item.id !== id);
+      setFormData((p) => ({ ...p, jumlahMushaf: next.length }));
+      return next;
+    });
   };
 
   const handleNiatChange = (id: string, value: string) => {
@@ -341,7 +364,9 @@ export default function WakafQuranRegisterPage() {
     setNomorPasporJamaah("");
     setJamaahVerified(null);
     setVerifiedData(null);
-    setNiatList([{ id: "1", nama: "" }]);
+    setNiatList(
+      Array.from({ length: 5 }, (_, i) => ({ id: String(i + 1), nama: "" }))
+    );
     setFormData({
       namaPaketUmroh: "",
       namaPewakaf: "",
@@ -757,7 +782,7 @@ export default function WakafQuranRegisterPage() {
                       <div className="flex items-center gap-2">
                         <button
                           type="button"
-                          onClick={() => setFormData((p) => ({ ...p, jumlahMushaf: Math.max(1, p.jumlahMushaf - 1) }))}
+                          onClick={() => updateJumlahMushaf(formData.jumlahMushaf - 1)}
                           className="h-10 w-10 rounded-xl border border-stone-300 bg-stone-100 hover:bg-stone-200 flex items-center justify-center font-bold text-stone-800 transition-colors shadow-xs"
                         >
                           <Minus className="h-4 w-4" />
@@ -765,14 +790,21 @@ export default function WakafQuranRegisterPage() {
                         <Input
                           type="number"
                           min={1}
-                          max={1000}
+                          max={500}
                           value={formData.jumlahMushaf}
-                          onChange={(e) => setFormData((p) => ({ ...p, jumlahMushaf: Math.max(1, parseInt(e.target.value, 10) || 1) }))}
+                          onChange={(e) => {
+                            const val = parseInt(e.target.value, 10);
+                            if (!isNaN(val)) {
+                              updateJumlahMushaf(val);
+                            } else {
+                              updateJumlahMushaf(1);
+                            }
+                          }}
                           className="text-center font-black text-sm h-10 bg-white text-slate-950 border-stone-300 rounded-xl flex-1"
                         />
                         <button
                           type="button"
-                          onClick={() => setFormData((p) => ({ ...p, jumlahMushaf: p.jumlahMushaf + 1 }))}
+                          onClick={() => updateJumlahMushaf(formData.jumlahMushaf + 1)}
                           className="h-10 w-10 rounded-xl border border-stone-300 bg-stone-100 hover:bg-stone-200 flex items-center justify-center font-bold text-stone-800 transition-colors shadow-xs"
                         >
                           <Plus className="h-4 w-4" />
@@ -790,13 +822,13 @@ export default function WakafQuranRegisterPage() {
                     </div>
                   </div>
 
-                  {/* Multi-Niat List */}
+                  {/* Multi-Niat List (Sesuai Jumlah Mushaf) */}
                   <div className="pt-2 border-t border-stone-100 space-y-3">
-                    <div className="flex items-center justify-between">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
                       <div className="flex items-center gap-1.5">
                         <Heart className="w-4 h-4 text-emerald-700" />
                         <span className="text-xs font-bold uppercase tracking-wider text-emerald-950">
-                          Niat Atas Nama (Daftar Nama yang Diniatkan)
+                          Niat Atas Nama ({formData.jumlahMushaf} Baris Isian Sesuai {formData.jumlahMushaf} Mushaf)
                         </span>
                       </div>
                       <Button
@@ -804,9 +836,9 @@ export default function WakafQuranRegisterPage() {
                         variant="outline"
                         size="sm"
                         onClick={handleAddNiat}
-                        className="bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border-emerald-300 font-bold text-xs h-8 px-3 rounded-lg flex items-center gap-1"
+                        className="bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border-emerald-300 font-bold text-xs h-8 px-3 rounded-lg flex items-center gap-1 self-start sm:self-auto"
                       >
-                        <Plus className="w-3.5 h-3.5" /> Tambah Nama
+                        <Plus className="w-3.5 h-3.5" /> Tambah Mushaf / Nama
                       </Button>
                     </div>
 
@@ -818,7 +850,7 @@ export default function WakafQuranRegisterPage() {
                           </span>
                           <Input
                             type="text"
-                            placeholder={`Contoh: H. Ahmad Fauzi / Almarhum H. Mahmud (Mushaf ${idx + 1})`}
+                            placeholder={`Nama yang diniatkan (Mushaf ke-${idx + 1}) Contoh: Almarhum H. Ahmad / Fulan bin Fulan`}
                             value={niat.nama}
                             onChange={(e) => handleNiatChange(niat.id, e.target.value)}
                             className="bg-white border-stone-300 rounded-xl text-xs h-10 flex-1"
@@ -828,7 +860,7 @@ export default function WakafQuranRegisterPage() {
                               type="button"
                               onClick={() => handleRemoveNiat(niat.id)}
                               className="p-2 text-rose-600 hover:bg-rose-50 rounded-lg transition-colors shrink-0"
-                              title="Hapus Nama"
+                              title="Hapus baris ini (mengurangi 1 mushaf)"
                             >
                               <Trash2 className="w-4 h-4" />
                             </button>

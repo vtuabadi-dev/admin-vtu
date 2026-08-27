@@ -40,7 +40,7 @@ export default function TrackBadalWakafPage() {
   const [newWakafForm, setNewWakafForm] = useState({
     jumlahMushaf: 5,
     lokasiWakaf: "Masjidil Haram Makkah Al-Mukarramah",
-    niatList: [""],
+    niatList: ["", "", "", "", ""],
     catatan: "",
   });
 
@@ -758,26 +758,53 @@ export default function TrackBadalWakafPage() {
             <Input
               type="number"
               min={1}
+              max={100}
               required
               value={newWakafForm.jumlahMushaf}
-              onChange={(e) => setNewWakafForm((p) => ({ ...p, jumlahMushaf: parseInt(e.target.value) || 1 }))}
+              onChange={(e) => {
+                const count = Math.max(1, parseInt(e.target.value, 10) || 1);
+                setNewWakafForm((p) => {
+                  let nextList = [...p.niatList];
+                  if (nextList.length < count) {
+                    nextList = [...nextList, ...Array(count - nextList.length).fill("")];
+                  } else if (nextList.length > count) {
+                    nextList = nextList.slice(0, count);
+                  }
+                  return { ...p, jumlahMushaf: count, niatList: nextList };
+                });
+              }}
             />
           </div>
 
-          <div className="space-y-1">
-            <label className="font-semibold text-foreground">Niat Atas Nama (Wakaf)</label>
-            <Input
-              type="text"
-              required
-              value={newWakafForm.niatList[0]}
-              onChange={(e) => setNewWakafForm((p) => ({ ...p, niatList: [e.target.value] }))}
-              placeholder="Fulan bin Fulan..."
-            />
+          <div className="space-y-2">
+            <label className="font-semibold text-foreground">
+              Daftar Niat Atas Nama ({newWakafForm.jumlahMushaf} Mushaf)
+            </label>
+            <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
+              {newWakafForm.niatList.map((niat, idx) => (
+                <div key={idx} className="flex items-center gap-2">
+                  <span className="w-6 h-6 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 font-bold text-xs flex items-center justify-center shrink-0">
+                    {idx + 1}
+                  </span>
+                  <Input
+                    type="text"
+                    required
+                    value={niat}
+                    onChange={(e) => {
+                      const updated = [...newWakafForm.niatList];
+                      updated[idx] = e.target.value;
+                      setNewWakafForm((p) => ({ ...p, niatList: updated }));
+                    }}
+                    placeholder={`Nama yang diniatkan (Mushaf ${idx + 1})`}
+                  />
+                </div>
+              ))}
+            </div>
           </div>
 
-          <div className="flex justify-end gap-2 pt-2">
+          <div className="flex justify-end gap-2 pt-2 border-t">
             <Button type="button" variant="outline" onClick={() => setAddWakafOpen(false)}>Batal</Button>
-            <Button type="submit" disabled={isUploading} className="bg-sky-600 text-white">
+            <Button type="submit" disabled={isUploading} className="bg-sky-600 hover:bg-sky-700 text-white font-bold">
               {isUploading ? "Memproses..." : "Kirim Pesanan Wakaf"}
             </Button>
           </div>
