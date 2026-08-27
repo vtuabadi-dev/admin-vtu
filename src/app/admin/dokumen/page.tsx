@@ -234,13 +234,30 @@ export default function DokumenPage() {
           // Build matrix from sorted jamaah
           const matrix = sortedJamaah.map((j: any) => {
             const g = groups[j.groupId];
+            const mappedDocs: Record<string, any> = {};
+            (j.dokumen ?? []).forEach((d: any) => {
+              mappedDocs[d.jenis] = d;
+            });
+
+            // Calculate progress & completeness
+            const mandatoryCount = ALL_DOC_JENIS.length;
+            const completedCount = ALL_DOC_JENIS.filter((jenis) => {
+              const doc = mappedDocs[jenis];
+              return doc && (doc.status === "verified" || doc.status === "lengkap");
+            }).length;
+
+            const completionPercentage = Math.round((completedCount / mandatoryCount) * 100);
+            const allMandatoryComplete = completedCount === mandatoryCount;
+
             return {
               jamaahId: j.id,
               namaLengkap: j.namaLengkap,
               nomorPeserta: j.nomorPeserta,
               groupId: j.groupId,
               kodeRegistrasi: g?.kodeRegistrasi || j.registrationId || "-",
-              dokumen: j.dokumen ?? [],
+              dokumen: mappedDocs,
+              completionPercentage,
+              allMandatoryComplete,
             };
           });
           setCompletionMatrix(matrix);
@@ -620,6 +637,46 @@ export default function DokumenPage() {
     loadReviewQueue(reviewFilter);
   }
 
+  async function handleGoToUpload(row: any) {
+    setUploadSearching(true);
+    setUploadError("");
+    setSelectedJamaah(null);
+    setFoundMembers([]);
+    setUploadPreviews({});
+    setOcrResults({});
+
+    try {
+      const res = await fetch(`/api/jamaah?groupId=${row.groupId}&limit=50`);
+      if (!res.ok) throw new Error("Gagal mencari data jamaah");
+
+      const json = await res.json();
+      const jamaahList = json.data ?? [];
+
+      if (jamaahList.length === 0) {
+        setUploadError("Jamaah tidak ditemukan");
+        return;
+      }
+
+      const sortedMatches = [...jamaahList].sort((a: any, b: any) => {
+        const numA = parseInt((a.nomorPeserta || a.registrationId || "0").replace(/\D/g, ""), 10) || 0;
+        const numB = parseInt((b.nomorPeserta || b.registrationId || "0").replace(/\D/g, ""), 10) || 0;
+        if (numA !== numB) return numA - numB;
+        return (a.registrationId || "").localeCompare(b.registrationId || "");
+      });
+
+      setFoundMembers(sortedMatches);
+      const targetMember = sortedMatches.find((m: any) => m.id === row.jamaahId) || sortedMatches[0];
+      await selectJamaahMember(targetMember);
+      
+      setActiveTab("upload");
+      setUploadSearchId(row.nomorPeserta || row.kodeRegistrasi);
+    } catch (err) {
+      setUploadError((err as Error).message);
+    } finally {
+      setUploadSearching(false);
+    }
+  }
+
   // --- Render: Loading ---
   if (loading) {
     return (
@@ -776,6 +833,7 @@ export default function DokumenPage() {
                                 </th>
                               ))}
                               <th className="h-10 px-3 text-center font-medium text-muted-foreground text-xs">Completion</th>
+                              <th className="h-10 px-3 text-center font-medium text-muted-foreground text-xs">Aksi</th>
                             </tr>
                           </thead>
                           <tbody>
@@ -823,6 +881,17 @@ export default function DokumenPage() {
                                       {row.completionPercentage}%
                                     </span>
                                   </div>
+                                </td>
+                                <td className="px-3 py-2.5 text-center">
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-7 text-[10px] font-bold gap-1 border-stone-300 dark:border-stone-700 hover:bg-stone-100 dark:hover:bg-stone-850"
+                                    onClick={() => handleGoToUpload(row)}
+                                  >
+                                    <Edit3 className="h-3.5 w-3.5" />
+                                    Lengkapi Data
+                                  </Button>
                                 </td>
                               </tr>
                             ))}
