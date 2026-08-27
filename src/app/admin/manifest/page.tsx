@@ -1116,7 +1116,7 @@ function ManifestPageContent() {
                         </th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-stone-200/60 dark:divide-stone-800/60">
+                    <tbody className="bg-white dark:bg-stone-900">
                       {filteredActiveJamaah.length === 0 ? (
                         <tr>
                           <td colSpan={isSelectMode ? 24 : 23} className="px-4 py-12 text-center text-stone-500">
@@ -1145,6 +1145,13 @@ function ManifestPageContent() {
                           return group.members.map((j: any, memberIdx) => {
                             const currentNoJamaah = globalNoJamaahCounter++;
                             const isFirstInGroup = memberIdx === 0;
+                            const isLastInGroup = memberIdx === totalInGroup - 1;
+
+                            // Bright distinct separator for the last member of each rombongan/group
+                            const rowBorderClass = isLastInGroup
+                              ? "border-b-[2.5px] border-b-amber-400 dark:border-b-amber-500 shadow-[0_1px_0_rgba(245,158,11,0.2)]"
+                              : "border-b border-stone-200/60 dark:border-stone-800/60";
+                            const cellBorder = `border-r border-stone-200/50 dark:border-stone-800/50 ${rowBorderClass}`;
 
                             // Single Source of Truth Name & Paspor Resolution
                             const namaSot = getSingleSourceOfTruthName(j);
@@ -1173,7 +1180,7 @@ function ManifestPageContent() {
                               >
                                 {/* CHECKBOX COL */}
                                 {isSelectMode && (
-                                  <td className="px-2 py-2.5 text-center border-r border-stone-200/50 dark:border-stone-800/50 sticky left-0 bg-white dark:bg-stone-900 z-10">
+                                  <td className={`px-2 py-2.5 text-center sticky left-0 bg-white dark:bg-stone-900 z-10 ${cellBorder}`}>
                                     <input
                                       type="checkbox"
                                       className="h-4 w-4 rounded border-stone-300 text-amber-600 focus:ring-amber-500 cursor-pointer"
@@ -1188,29 +1195,29 @@ function ManifestPageContent() {
                                 {isFirstInGroup && (
                                   <td
                                     rowSpan={totalInGroup}
-                                    className="p-3 text-center align-middle font-bold text-[11px] bg-amber-50/80 dark:bg-amber-950/30 text-amber-950 dark:text-amber-200 border-r-2 border-r-amber-400 dark:border-r-amber-700 border-b border-stone-200 dark:border-stone-800 shadow-xs"
+                                    className="p-3 text-center align-middle font-bold text-[11px] bg-amber-50/80 dark:bg-amber-950/30 text-amber-950 dark:text-amber-200 border-r-2 border-r-amber-400 dark:border-r-amber-700 border-b-[2.5px] border-b-amber-400 dark:border-b-amber-500 shadow-xs"
                                   >
                                     <span>{groupMergeText}</span>
                                   </td>
                                 )}
 
                                 {/* NO JAMAAH */}
-                                <td className="px-2 py-2.5 text-center font-bold font-mono text-stone-700 dark:text-stone-300 border-r border-stone-200/50 dark:border-stone-800/50">
+                                <td className={`px-2 py-2.5 text-center font-bold font-mono text-stone-700 dark:text-stone-300 ${cellBorder}`}>
                                   {currentNoJamaah}
                                 </td>
 
                                 {/* ID REGISTER */}
-                                <td className="px-3 py-2.5 font-mono font-semibold text-stone-800 dark:text-stone-200 border-r border-stone-200/50 dark:border-stone-800/50">
+                                <td className={`px-3 py-2.5 font-mono font-semibold text-stone-800 dark:text-stone-200 ${cellBorder}`}>
                                   {idRegister}
                                 </td>
 
                                 {/* NO ID */}
-                                <td className="px-3 py-2.5 font-mono text-stone-700 dark:text-stone-300 border-r border-stone-200/50 dark:border-stone-800/50">
+                                <td className={`px-3 py-2.5 font-mono text-stone-700 dark:text-stone-300 ${cellBorder}`}>
                                   {noId}
                                 </td>
 
                                 {/* JENIS IDENTITAS */}
-                                <td className="px-3 py-2.5 border-r border-stone-200/50 dark:border-stone-800/50">
+                                <td className={`px-3 py-2.5 ${cellBorder}`}>
                                   <span
                                     className={`inline-block px-2 py-0.5 text-[10px] font-bold rounded ${
                                       jenisIdentitas === "PASPOR"
@@ -1223,32 +1230,32 @@ function ManifestPageContent() {
                                 </td>
 
                                 {/* NAMA */}
-                                <td className="px-3 py-2.5 font-bold text-stone-900 dark:text-white border-r border-stone-200/50 dark:border-stone-800/50">
+                                <td className={`px-3 py-2.5 font-bold text-stone-900 dark:text-white ${cellBorder}`}>
                                   {namaSot}
                                 </td>
 
                                 {/* NO PASPOR */}
-                                <td className="px-3 py-2.5 font-mono font-semibold text-stone-800 dark:text-stone-200 border-r border-stone-200/50 dark:border-stone-800/50">
+                                <td className={`px-3 py-2.5 font-mono font-semibold text-stone-800 dark:text-stone-200 ${cellBorder}`}>
                                   {pasporInfo.noPaspor}
                                 </td>
 
                                 {/* TGL DIKELUARKAN */}
-                                <td className="px-3 py-2.5 font-mono text-stone-700 dark:text-stone-300 border-r border-stone-200/50 dark:border-stone-800/50">
+                                <td className={`px-3 py-2.5 font-mono text-stone-700 dark:text-stone-300 ${cellBorder}`}>
                                   {formatDisplayDate(pasporInfo.tglDikeluarkan)}
                                 </td>
 
                                 {/* TGL HABIS */}
-                                <td className="px-3 py-2.5 font-mono text-stone-700 dark:text-stone-300 border-r border-stone-200/50 dark:border-stone-800/50">
+                                <td className={`px-3 py-2.5 font-mono text-stone-700 dark:text-stone-300 ${cellBorder}`}>
                                   {formatDisplayDate(pasporInfo.tglHabis)}
                                 </td>
 
                                 {/* KOTA PASPOR */}
-                                <td className="px-3 py-2.5 border-r border-stone-200/50 dark:border-stone-800/50 font-semibold text-stone-800 dark:text-stone-200">
+                                <td className={`px-3 py-2.5 font-semibold text-stone-800 dark:text-stone-200 ${cellBorder}`}>
                                   {pasporInfo.kotaPaspor}
                                 </td>
 
                                 {/* KLASTER & FASILITAS */}
-                                <td className="px-3 py-2.5 border-r border-stone-200/50 dark:border-stone-800/50">
+                                <td className={`px-3 py-2.5 ${cellBorder}`}>
                                   {(() => {
                                     const klasterName = (group.groupObj as any)?.hotelUpgrade || j.hotelUpgrade || j.cluster || "SILVER";
                                     const isPromoKlaster = klasterName.toUpperCase().includes("PROMO");
@@ -1284,69 +1291,69 @@ function ManifestPageContent() {
                                 </td>
 
                                 {/* HOTEL MAKKAH */}
-                                <td className="px-3 py-2.5 border-r border-stone-200/50 dark:border-stone-800/50">
+                                <td className={`px-3 py-2.5 ${cellBorder}`}>
                                   {activePackage.hotelMekkah || j.hotelMekkah || "Safwah Tower"}
                                 </td>
 
                                 {/* HOTEL MADINAH */}
-                                <td className="px-3 py-2.5 border-r border-stone-200/50 dark:border-stone-800/50">
+                                <td className={`px-3 py-2.5 ${cellBorder}`}>
                                   {activePackage.hotelMadinah || j.hotelMadinah || "Durrat Al Eiman"}
                                 </td>
 
                                 {/* KAMAR */}
-                                <td className="px-3 py-2.5 border-r border-stone-200/50 dark:border-stone-800/50 uppercase font-semibold text-stone-700 dark:text-stone-300">
+                                <td className={`px-3 py-2.5 uppercase font-semibold text-stone-700 dark:text-stone-300 ${cellBorder}`}>
                                   {tipeKamarDisplay}
                                 </td>
 
                                 {/* JENIS KELAMIN */}
-                                <td className="px-2 py-2.5 text-center font-bold border-r border-stone-200/50 dark:border-stone-800/50">
+                                <td className={`px-2 py-2.5 text-center font-bold ${cellBorder}`}>
                                   {j.jenisKelamin || "L"}
                                 </td>
 
                                 {/* TEMPAT LAHIR */}
-                                <td className="px-3 py-2.5 border-r border-stone-200/50 dark:border-stone-800/50">
+                                <td className={`px-3 py-2.5 ${cellBorder}`}>
                                   {j.tempatLahir || "-"}
                                 </td>
 
                                 {/* TGL LAHIR */}
-                                <td className="px-3 py-2.5 border-r border-stone-200/50 dark:border-stone-800/50 font-mono">
+                                <td className={`px-3 py-2.5 font-mono ${cellBorder}`}>
                                   {formatDisplayDate(j.tanggalLahir)}
                                 </td>
 
                                 {/* UMUR */}
-                                <td className="px-2 py-2.5 text-center font-semibold border-r border-stone-200/50 dark:border-stone-800/50">
+                                <td className={`px-2 py-2.5 text-center font-semibold ${cellBorder}`}>
                                   {calculateAge(j.tanggalLahir)}
                                 </td>
 
                                 {/* STATUS MENIKAH */}
-                                <td className="px-3 py-2.5 border-r border-stone-200/50 dark:border-stone-800/50">
+                                <td className={`px-3 py-2.5 ${cellBorder}`}>
                                   {statusMenikahDisplay}
                                 </td>
 
                                 {/* NO TELP/HP */}
-                                <td className="px-3 py-2.5 border-r border-stone-200/50 dark:border-stone-800/50 font-mono">
+                                <td className={`px-3 py-2.5 font-mono ${cellBorder}`}>
                                   {j.nomorTelepon || "-"}
                                 </td>
 
                                 {/* KOTA/KAB */}
-                                <td className="px-3 py-2.5 border-r border-stone-200/50 dark:border-stone-800/50 font-semibold text-stone-800 dark:text-stone-200">
+                                <td className={`px-3 py-2.5 font-semibold text-stone-800 dark:text-stone-200 ${cellBorder}`}>
                                   {kotaDisplay}
                                 </td>
 
                                 {/* PROVINSI */}
-                                <td className="px-3 py-2.5 border-r border-stone-200/50 dark:border-stone-800/50 font-bold uppercase text-[10px] text-amber-800 dark:text-amber-300">
+                                <td className={`px-3 py-2.5 font-bold uppercase text-[10px] text-amber-800 dark:text-amber-300 ${cellBorder}`}>
                                   {provinsiDisplay}
                                 </td>
 
                                 <td
-                                  className="px-3 py-2.5 text-stone-600 dark:text-stone-400 max-w-[240px] truncate border-r border-stone-200/50 dark:border-stone-800/50"
+                                  className={`px-3 py-2.5 text-stone-600 dark:text-stone-400 max-w-[240px] truncate ${cellBorder}`}
                                   title={j.alamat}
                                 >
                                   {j.alamat || "-"}
                                 </td>
 
                                 {/* AKSI */}
-                                <td className="px-3 py-2.5 text-center sticky right-0 bg-white dark:bg-stone-900 shadow-[-4px_0_6px_-4px_rgba(0,0,0,0.15)] border-l border-stone-200/50 dark:border-stone-800/50 z-10">
+                                <td className={`px-3 py-2.5 text-center sticky right-0 bg-white dark:bg-stone-900 shadow-[-4px_0_6px_-4px_rgba(0,0,0,0.15)] border-l border-stone-200/50 dark:border-stone-800/50 z-10 ${rowBorderClass}`}>
                                   <div className="flex items-center justify-center gap-2">
                                     {isFirstInGroup && (
                                       <Button
