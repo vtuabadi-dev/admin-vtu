@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Search,
   CreditCard,
@@ -96,10 +96,12 @@ function CreateInvoiceModal({
   const [loading, setLoading] = useState(false);
   const [groupInfo, setGroupInfo] = useState<any>(null);
   const [lookupError, setLookupError] = useState("");
+  const [h40Warning, setH40Warning] = useState<{ isLate: boolean; days: number; h40Formatted: string } | null>(null);
 
   async function handleSearchGroup() {
     setLookupError("");
     setGroupInfo(null);
+    setH40Warning(null);
     if (!kodeGroup.trim()) {
       setLookupError("Masukkan kode registrasi group");
       return;
@@ -113,6 +115,30 @@ function CreateInvoiceModal({
       setGroupInfo(group);
       if (group.sisaPembayaran) {
         setNominal(group.sisaPembayaran);
+      }
+
+      // Calculate H-40 for group's package departure
+      const tglBerangkatRaw = (group as any)?.paketKeberangkatan?.tanggalBerangkat || (group as any)?.keberangkatan?.tanggalBerangkat;
+      if (tglBerangkatRaw) {
+        const tglBerangkat = new Date(tglBerangkatRaw);
+        const h40 = new Date(tglBerangkat);
+        h40.setDate(h40.getDate() - 40);
+
+        const now = new Date();
+        const diffMs = tglBerangkat.getTime() - now.getTime();
+        const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+        const isLate = days <= 40 || now.getTime() >= h40.getTime();
+        const h40Formatted = h40.toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });
+
+        setH40Warning({ isLate, days, h40Formatted });
+
+        if (isLate) {
+          const fallback = new Date();
+          fallback.setDate(fallback.getDate() + 3);
+          setJatuhTempo(fallback.toISOString().slice(0, 10));
+        } else {
+          setJatuhTempo(h40.toISOString().slice(0, 10));
+        }
       }
     } catch {
       setLookupError("Gagal mencari data group");
@@ -136,6 +162,7 @@ function CreateInvoiceModal({
       setJatuhTempo("");
       setCatatan("");
       setGroupInfo(null);
+      setH40Warning(null);
     } catch (e) {
       console.error("Failed to create invoice:", e);
       alert("Gagal menerbitkan invoice baru.");
@@ -186,15 +213,37 @@ function CreateInvoiceModal({
           </div>
 
           <div>
-            <label className="text-xs font-bold uppercase tracking-wider text-foreground">
-              3. Tanggal Jatuh Tempo (Batas Akhir Pelunasan)
-            </label>
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold uppercase tracking-wider text-foreground">
+                3. Tanggal Jatuh Tempo (Batas Akhir Pelunasan)
+              </label>
+              {h40Warning && (
+                <span
+                  className={`text-[9.5px] font-bold px-1.5 py-0.5 rounded border ${
+                    h40Warning.isLate
+                      ? "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300 border-red-300 dark:border-red-800 animate-pulse"
+                      : "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800"
+                  }`}
+                >
+                  {h40Warning.isLate ? "⚠️ ≤ H-40 Mepet" : "Standar H-40"}
+                </span>
+              )}
+            </div>
             <Input
               type="date"
               value={jatuhTempo}
               onChange={(e) => setJatuhTempo(e.target.value)}
-              className="mt-1 text-sm"
+              className={`mt-1 text-sm ${h40Warning?.isLate ? "border-red-500 font-bold bg-red-50/30" : ""}`}
             />
+            {h40Warning?.isLate ? (
+              <p className="mt-1 text-[11px] text-red-600 dark:text-red-400 font-medium">
+                ⚠️ Batas normal H-40 ({h40Warning.h40Formatted}) sudah lewat / $\le$ 40 hari lagi. Silakan sesuaikan tanggal jatuh tempo manual!
+              </p>
+            ) : h40Warning ? (
+              <p className="mt-1 text-[11px] text-emerald-600 dark:text-emerald-400">
+                Otomatis diset ke batas akhir pelunasan H-40 Keberangkatan ({h40Warning.h40Formatted}).
+              </p>
+            ) : null}
           </div>
 
           <div>
@@ -572,6 +621,30 @@ function PaymentReviewTabContent() {
     }
   }, []);
 
+  // Calculation helper for H-40 & late registration warning indicator
+  const h40Info = useMemo(() => {
+    if (!selectedPayment?.group?.keberangkatan?.tanggalBerangkat) return null;
+    const tglBerangkat = new Date(selectedPayment.group.keberangkatan.tanggalBerangkat);
+    if (isNaN(tglBerangkat.getTime())) return null;
+
+    const h40Date = new Date(tglBerangkat);
+    h40Date.setDate(h40Date.getDate() - 40);
+
+    const regDate = selectedPayment.tanggal ? new Date(selectedPayment.tanggal) : new Date();
+    const diffMs = tglBerangkat.getTime() - regDate.getTime();
+    const daysToDeparture = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    const isLate = daysToDeparture <= 40 || regDate.getTime() >= h40Date.getTime();
+
+    return {
+      tglBerangkat,
+      h40Date,
+      daysToDeparture,
+      isLate,
+      h40Formatted: h40Date.toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" }),
+      tglBerangkatFormatted: tglBerangkat.toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" }),
+    };
+  }, [selectedPayment]);
+
   // When a payment row is clicked to create/view invoice
   const handleSelectPayment = (payment: any) => {
     setSelectedPayment(payment);
@@ -583,9 +656,32 @@ function PaymentReviewTabContent() {
     setInvoiceNumber(payment.invoiceId || `${randomNum}/INV.VT/${monthRom}/${yearVal}`);
     setInvoiceDate(payment.tanggal ? new Date(payment.tanggal).toISOString().slice(0, 10) : dateStr);
 
-    const d = new Date();
-    d.setDate(d.getDate() + 7);
-    setDueDate(d.toISOString().slice(0, 10));
+    // Calculate H-40 Jatuh Tempo Pelunasan from Paket Keberangkatan
+    const tglBerangkatRaw = payment.group?.keberangkatan?.tanggalBerangkat;
+    const regDate = payment.tanggal ? new Date(payment.tanggal) : new Date();
+
+    if (tglBerangkatRaw) {
+      const tglBerangkat = new Date(tglBerangkatRaw);
+      const h40Date = new Date(tglBerangkat);
+      h40Date.setDate(h40Date.getDate() - 40);
+
+      const diffMs = tglBerangkat.getTime() - regDate.getTime();
+      const daysToDeparture = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+      if (daysToDeparture <= 40 || regDate.getTime() >= h40Date.getTime()) {
+        // Late registration (within H-40): default to +3 days from registration date
+        const fallbackDue = new Date(regDate);
+        fallbackDue.setDate(fallbackDue.getDate() + 3);
+        setDueDate(fallbackDue.toISOString().slice(0, 10));
+      } else {
+        // Normal registration: default strictly to H-40 before departure
+        setDueDate(h40Date.toISOString().slice(0, 10));
+      }
+    } else {
+      const d = new Date(regDate);
+      d.setDate(d.getDate() + 14);
+      setDueDate(d.toISOString().slice(0, 10));
+    }
 
     const cat = (payment.catatan || "").toLowerCase();
     if (cat.includes("dp") || cat.includes("daftar") || cat.includes("pendaftaran") || payment.sumber === "jamaah_dp") {
@@ -796,7 +892,9 @@ function PaymentReviewTabContent() {
       totalTagihan: totalTagihanBase,
       totalPembayaran: totalBayarVal + (p.status === "verified" ? 0 : nominal),
       sisaTagihan: sisaTagihanVal,
-      maksimalPelunasan: dueDate || "6 September 2026",
+      maksimalPelunasan: dueDate
+        ? new Date(dueDate).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })
+        : (h40Info?.h40Formatted || "-"),
       picName: p.group?.ketuaGroup?.namaLengkap || p.namaGroup,
       picPhone: targetPhone || p.group?.ketuaGroup?.nomorTelepon,
       picEmail: targetEmail || p.group?.ketuaGroup?.email,
@@ -1469,15 +1567,52 @@ function PaymentReviewTabContent() {
                       />
                     </div>
                     <div>
-                      <label className="text-[11px] font-bold text-foreground">Jatuh Tempo</label>
+                      <div className="flex items-center justify-between">
+                        <label className="text-[11px] font-bold text-foreground">Jatuh Tempo</label>
+                        {h40Info && (
+                          <span
+                            className={`text-[9.5px] font-bold px-1.5 py-0.5 rounded border ${
+                              h40Info.isLate
+                                ? "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300 border-red-300 dark:border-red-800 animate-pulse"
+                                : "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800"
+                            }`}
+                          >
+                            {h40Info.isLate ? "⚠️ ≤ H-40 Mepet" : "Standar H-40"}
+                          </span>
+                        )}
+                      </div>
                       <Input
                         type="date"
                         value={dueDate}
                         onChange={(e) => setDueDate(e.target.value)}
-                        className="h-8 text-xs mt-1 font-mono"
+                        className={`h-8 text-xs mt-1 font-mono ${
+                          h40Info?.isLate ? "border-red-500 focus:ring-red-500 bg-red-50/40 dark:bg-red-950/20 font-bold" : ""
+                        }`}
                       />
                     </div>
                   </div>
+
+                  {/* Warning Alert if Registered at or less than H-40 */}
+                  {h40Info?.isLate ? (
+                    <div className="p-3 bg-red-50/95 dark:bg-red-950/40 border-2 border-red-400 dark:border-red-800 rounded-xl flex items-start gap-2.5 text-red-900 dark:text-red-200">
+                      <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5 animate-pulse" />
+                      <div className="text-[11px] space-y-1">
+                        <p className="font-black text-red-800 dark:text-red-300">
+                          ⚠️ PERINGATAN: PENDAFTARAN PADA RENTANG H-40 KEBERANGKATAN ({h40Info.daysToDeparture} HARI LAGI)
+                        </p>
+                        <p className="leading-relaxed text-red-700 dark:text-red-300">
+                          Batas akhir standar pelunasan sistem adalah <strong>H-40 Keberangkatan ({h40Info.h40Formatted})</strong>. Karena pendaftaran dilakukan saat sisa waktu $\le$ 40 hari (atau melewati batas H-40), silakan <strong>sesuaikan dan ubah tanggal jatuh tempo pembayaran pelunasan secara manual</strong> pada kolom di atas!
+                        </p>
+                      </div>
+                    </div>
+                  ) : h40Info ? (
+                    <div className="p-2.5 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 rounded-lg flex items-center gap-2 text-emerald-800 dark:text-emerald-300 text-[11px]">
+                      <CheckCircle className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
+                      <span>
+                        Tenggat batas akhir pelunasan otomatis diset ke <strong>H-40 Keberangkatan ({h40Info.h40Formatted})</strong>.
+                      </span>
+                    </div>
+                  ) : null}
 
                   <div>
                     <label className="text-[11px] font-bold text-foreground">No. Rekening / Ref Transaksi</label>

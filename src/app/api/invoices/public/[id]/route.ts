@@ -183,7 +183,9 @@ export async function GET(
       sisaTagihan: group?.sisaPembayaran !== undefined ? group.sisaPembayaran : 0,
       maksimalPelunasan: invoice?.jatuhTempo
         ? new Date(invoice.jatuhTempo).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })
-        : "6 September 2026",
+        : (group?.keberangkatan?.tanggalBerangkat
+            ? new Date(new Date(group.keberangkatan.tanggalBerangkat).getTime() - 40 * 86400000).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })
+            : "-"),
       status: invoice?.status || payment?.status || "verified",
       picPhone: group?.ketuaGroup?.nomorTelepon,
       picEmail: group?.ketuaGroup?.email,
