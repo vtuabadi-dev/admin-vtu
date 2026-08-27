@@ -51,10 +51,15 @@ export const jamaahRepo = {
     if (params?.groupId) where.groupId = params.groupId;
     if (params?.status) where.status = params.status;
     if (params?.search) {
+      const s = params.search.trim();
       where.OR = [
-        { namaLengkap: { contains: params.search, mode: "insensitive" } },
-        { nomorPaspor: { contains: params.search, mode: "insensitive" } },
-        { registrationId: { contains: params.search, mode: "insensitive" } },
+        { namaLengkap: { contains: s, mode: "insensitive" } },
+        { nomorPaspor: { contains: s, mode: "insensitive" } },
+        { registrationId: { contains: s, mode: "insensitive" } },
+        { nomorPeserta: { contains: s, mode: "insensitive" } },
+        { nik: { contains: s, mode: "insensitive" } },
+        { group: { kodeRegistrasi: { contains: s, mode: "insensitive" } } },
+        { group: { namaGroup: { contains: s, mode: "insensitive" } } },
       ];
     }
     const [rows, total] = await Promise.all([

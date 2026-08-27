@@ -150,6 +150,7 @@ export default function DokumenPage() {
   const [uploadSearching, setUploadSearching] = useState(false);
   const [uploadError, setUploadError] = useState("");
   const [selectedJamaah, setSelectedJamaah] = useState<any>(null);
+  const [foundMembers, setFoundMembers] = useState<any[]>([]);
   const [uploadDocuments, setUploadDocuments] = useState<any[]>([]);
   const [uploadPreviews, setUploadPreviews] = useState<Record<string, string>>({});
   const [uploading, setUploading] = useState(false);
@@ -393,42 +394,65 @@ export default function DokumenPage() {
   }
 
   // --- Upload Dokumen Tab Functions ---
-  async function handleSearchJamaah() {
-    if (!uploadSearchId.trim()) return;
-    setUploadSearching(true);
-    setUploadError("");
-    setSelectedJamaah(null);
+  async function selectJamaahMember(member: any) {
+    setSelectedJamaah(member);
     setUploadDocuments([]);
     setUploadPreviews({});
     setOcrResults({});
 
     try {
-      const res = await fetch(`/api/jamaah?search=${encodeURIComponent(uploadSearchId.trim())}`);
-      if (!res.ok) throw new Error("Gagal mencari jamaah");
-      
-      const json = await res.json();
-      const jamaahList = json.data ?? [];
-      
-      if (jamaahList.length === 0) {
-        setUploadError("Jamaah tidak ditemukan dengan ID tersebut");
-        return;
-      }
-
-      // Find exact match by registrationId
-      const exactMatch = jamaahList.find((j: any) => j.registrationId === uploadSearchId.trim());
-      if (!exactMatch) {
-        setUploadError("Jamaah tidak ditemukan dengan ID tersebut");
-        return;
-      }
-
-      setSelectedJamaah(exactMatch);
-      
-      // Load existing documents
-      const docRes = await fetch(`/api/jamaah/${exactMatch.id}/dokumen`);
+      const docRes = await fetch(`/api/jamaah/${member.id}/dokumen`);
       if (docRes.ok) {
         const docJson = await docRes.json();
         setUploadDocuments(docJson.data ?? []);
       }
+    } catch { /* graceful */ }
+  }
+
+  async function handleSearchJamaah() {
+    const q = uploadSearchId.trim();
+    if (!q) return;
+    setUploadSearching(true);
+    setUploadError("");
+    setSelectedJamaah(null);
+    setFoundMembers([]);
+    setUploadDocuments([]);
+    setUploadPreviews({});
+    setOcrResults({});
+
+    try {
+      const res = await fetch(`/api/jamaah?search=${encodeURIComponent(q)}&limit=50`);
+      if (!res.ok) throw new Error("Gagal mencari data jamaah");
+      
+      const json = await res.json();
+      let jamaahList = json.data ?? [];
+
+      // Fallback search if needed (e.g. without trailing member suffix or with 7-digit ID)
+      if (jamaahList.length === 0) {
+        const cleanQ = q.replace(/-\d+$/, "");
+        const fallbackRes = await fetch(`/api/jamaah?search=${encodeURIComponent(cleanQ)}&limit=50`);
+        if (fallbackRes.ok) {
+          const fbJson = await fallbackRes.json();
+          jamaahList = fbJson.data ?? [];
+        }
+      }
+      
+      if (jamaahList.length === 0) {
+        setUploadError(`Jamaah atau grup tidak ditemukan dengan kata kunci "${q}"`);
+        return;
+      }
+
+      // Sort matched members chronologically by registrationId / nomorPeserta (1: Ketua, 2: Istri, 3: Anak)
+      const sortedMatches = [...jamaahList].sort((a: any, b: any) => {
+        const numA = parseInt((a.nomorPeserta || a.registrationId || "0").replace(/\D/g, ""), 10) || 0;
+        const numB = parseInt((b.nomorPeserta || b.registrationId || "0").replace(/\D/g, ""), 10) || 0;
+        if (numA !== numB) return numA - numB;
+        return (a.registrationId || "").localeCompare(b.registrationId || "");
+      });
+
+      setFoundMembers(sortedMatches);
+      // Automatically select the first member (Ketua)
+      await selectJamaahMember(sortedMatches[0]);
     } catch (err) {
       setUploadError((err as Error).message);
     } finally {
@@ -438,6 +462,7 @@ export default function DokumenPage() {
 
   function handleClearJamaah() {
     setSelectedJamaah(null);
+    setFoundMembers([]);
     setUploadDocuments([]);
     setUploadPreviews({});
     setOcrResults({});
@@ -1015,9 +1040,15 @@ export default function DokumenPage() {
                         <label className="text-sm font-medium">Cari Jamaah berdasarkan ID Registrasi</label>
                         <div className="flex gap-2 mt-2">
                           <Input
-                            placeholder="Masukkan ID Registrasi (GRP-YYYY-NNNNN-N)"
+                            placeholder="Masukkan Kode Grup (GRP-2026-00003), No. Peserta, ID Registrasi, atau Nama Jamaah"
                             value={uploadSearchId}
                             onChange={(e) => setUploadSearchId(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                e.preventDefault();
+                                handleSearchJamaah();
+                              }
+                            }}
                             className="flex-1"
                           />
                           <Button
@@ -1042,21 +1073,51 @@ export default function DokumenPage() {
                   </CardContent>
                 </Card>
 
-                {/* Selected Jamaah Info */}
+                {/* Selected Jamaah Info & Rombongan Switcher */}
                 {selectedJamaah && (
                   <Card>
-                    <CardContent className="pt-4">
+                    <CardContent className="pt-4 space-y-3">
                       <div className="flex items-center justify-between">
                         <div>
-                          <h3 className="text-lg font-semibold">{selectedJamaah.namaLengkap}</h3>
-                          <p className="text-sm text-muted-foreground">
-                            No. Peserta: {selectedJamaah.nomorPeserta} | ID: {selectedJamaah.registrationId}
+                          <div className="flex items-center gap-2">
+                            <h3 className="text-lg font-bold text-stone-900 dark:text-white">{selectedJamaah.namaLengkap}</h3>
+                            <span className="inline-block px-2 py-0.5 text-[10px] font-bold rounded bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-300">
+                              {selectedJamaah.jenisKelamin === "P" ? "Perempuan" : "Laki-laki"}
+                            </span>
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            No. Peserta: <span className="font-mono font-semibold">{selectedJamaah.nomorPeserta}</span> | ID Registrasi: <span className="font-mono font-semibold">{selectedJamaah.registrationId}</span>
                           </p>
                         </div>
-                        <Button variant="outline" onClick={handleClearJamaah}>
-                          Clear
+                        <Button variant="outline" size="sm" onClick={handleClearJamaah}>
+                          Ganti Jamaah / Clear
                         </Button>
                       </div>
+
+                      {/* Multi-member switcher for family/group */}
+                      {foundMembers.length > 1 && (
+                        <div className="flex flex-wrap items-center gap-2 pt-3 border-t border-stone-200 dark:border-stone-800">
+                          <span className="text-xs font-bold text-stone-600 dark:text-stone-400 mr-1">Anggota Rombongan ({foundMembers.length} Pax):</span>
+                          {foundMembers.map((m: any, idx: number) => {
+                            const isCurrent = selectedJamaah.id === m.id;
+                            return (
+                              <Button
+                                key={m.id}
+                                type="button"
+                                size="sm"
+                                variant={isCurrent ? "default" : "outline"}
+                                className={cn(
+                                  "h-7 text-xs font-semibold rounded-lg transition-all",
+                                  isCurrent ? "shadow-sm bg-stone-900 text-white dark:bg-stone-100 dark:text-stone-900" : "text-stone-700 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800"
+                                )}
+                                onClick={() => selectJamaahMember(m)}
+                              >
+                                {idx + 1}. {m.namaLengkap} {idx === 0 ? "(Ketua)" : ""}
+                              </Button>
+                            );
+                          })}
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
                 )}
