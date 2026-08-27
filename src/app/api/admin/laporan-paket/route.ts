@@ -200,6 +200,13 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // Resolve WhatsApp Group Link for Package
+    let waGroupLink = "";
+    if (matchKebForMeta?.driveFolderIds) {
+      const meta = matchKebForMeta.driveFolderIds as any;
+      waGroupLink = meta.waGroupLink || meta.waGroupId || "";
+    }
+
     return NextResponse.json({
       success: true,
       data: {
@@ -207,6 +214,7 @@ export async function GET(request: NextRequest) {
         wakafList,
         linkedPackageNames,
         isDualStartingGroup,
+        waGroupLink,
         petugasInfo: {
           tourLeader,
           tourLeaderKontak,

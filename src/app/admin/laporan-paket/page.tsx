@@ -17,8 +17,12 @@ import {
   Award,
   Compass,
   Phone,
+  Users,
+  Link2,
+  Edit2,
 } from "lucide-react";
 import { Button } from "@/shared/components/ui/Button";
+import { Input } from "@/shared/components/ui/Input";
 import { Modal } from "@/shared/components/ui/Modal";
 
 const formatRupiah = (val: number) => {
@@ -226,6 +230,83 @@ export default function AdminLaporanPaketPage() {
   const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
   const [waTemplate, setWaTemplate] = useState("");
 
+  // WhatsApp Group ID/Link State
+  const [waGroupLink, setWaGroupLink] = useState<string>("");
+  const [isWaGroupModalOpen, setIsWaGroupModalOpen] = useState(false);
+  const [waGroupInput, setWaGroupInput] = useState("");
+  const [savingWaGroup, setSavingWaGroup] = useState(false);
+
+  const resolveWaGroupUrl = (rawLink: string) => {
+    let clean = rawLink.trim();
+    if (clean.startsWith("http://") || clean.startsWith("https://")) {
+      return clean;
+    }
+    if (clean.startsWith("chat.whatsapp.com/")) {
+      return `https://${clean}`;
+    }
+    if (/^[A-Za-z0-9_-]{15,35}$/.test(clean)) {
+      return `https://chat.whatsapp.com/${clean}`;
+    }
+    if (/^[0-9+]+$/.test(clean.replace(/[\s-]/g, ""))) {
+      const phone = clean.replace(/[^0-9]/g, "");
+      return `https://wa.me/${phone}`;
+    }
+    return `https://chat.whatsapp.com/${clean}`;
+  };
+
+  const handleOpenWhatsAppGroup = (targetLink?: string) => {
+    const linkToUse = targetLink || waGroupLink;
+    if (!linkToUse || !linkToUse.trim()) {
+      setWaGroupInput("");
+      setIsWaGroupModalOpen(true);
+      return;
+    }
+
+    navigator.clipboard.writeText(waTemplate);
+    const groupUrl = resolveWaGroupUrl(linkToUse);
+    alert("✓ Teks laporan telah disalin ke clipboard!\n\nMembuka grup WhatsApp paket... Silakan Paste (Ctrl+V) dan kirim ke grup.");
+    window.open(groupUrl, "_blank");
+  };
+
+  const handleSaveAndOpenWaGroup = async () => {
+    if (!waGroupInput.trim()) {
+      alert("Mohon masukkan Link Undangan atau ID Grup WhatsApp.");
+      return;
+    }
+    setSavingWaGroup(true);
+    try {
+      const res = await fetch("/api/admin/laporan-paket/wa-group", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          namaPaket: selectedPaket,
+          waGroupLink: waGroupInput.trim(),
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setWaGroupLink(waGroupInput.trim());
+        if (typeof window !== "undefined") {
+          localStorage.setItem(`wa_group_${selectedPaket}`, waGroupInput.trim());
+        }
+        setIsWaGroupModalOpen(false);
+        handleOpenWhatsAppGroup(waGroupInput.trim());
+      } else {
+        alert(data.message || "Gagal menyimpan link grup WhatsApp");
+      }
+    } catch (err) {
+      console.error(err);
+      setWaGroupLink(waGroupInput.trim());
+      if (typeof window !== "undefined") {
+        localStorage.setItem(`wa_group_${selectedPaket}`, waGroupInput.trim());
+      }
+      setIsWaGroupModalOpen(false);
+      handleOpenWhatsAppGroup(waGroupInput.trim());
+    } finally {
+      setSavingWaGroup(false);
+    }
+  };
+
   useEffect(() => {
     fetch("/api/master/harga-layanan")
       .then((res) => res.json())
@@ -414,6 +495,7 @@ export default function AdminLaporanPaketPage() {
       setLaporanBadal([]);
       setLaporanWakaf([]);
       setPetugasInfo({});
+      setWaGroupLink("");
       try {
         const res = await fetch(
           `/api/admin/daftar-paket?bulan=${selectedBulan}&tahun=${selectedTahun}`
@@ -438,6 +520,7 @@ export default function AdminLaporanPaketPage() {
       setLaporanBadal([]);
       setLaporanWakaf([]);
       setPetugasInfo({});
+      setWaGroupLink("");
       setHasSearched(false);
       return;
     }
@@ -454,6 +537,10 @@ export default function AdminLaporanPaketPage() {
           setLaporanWakaf(resJson.data.wakafList || []);
           setLinkedPackageNames(resJson.data.linkedPackageNames || []);
           setPetugasInfo(resJson.data.petugasInfo || {});
+          
+          const localSaved = typeof window !== "undefined" ? localStorage.getItem(`wa_group_${selectedPaket}`) : null;
+          const resolvedWaLink = resJson.data.waGroupLink || localSaved || "";
+          setWaGroupLink(resolvedWaLink);
         }
       } catch (err) {
         console.error(err);
@@ -925,25 +1012,58 @@ export default function AdminLaporanPaketPage() {
                 value={waTemplate}
                 onChange={(e) => setWaTemplate(e.target.value)}
               />
-              <div className="flex items-center justify-end gap-3 pt-2">
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    navigator.clipboard.writeText(waTemplate);
-                    alert("Template berhasil disalin ke clipboard!");
-                  }}
-                  className="gap-2"
-                >
-                  <Copy className="h-4 w-4" /> Salin Teks
-                </Button>
-                <a
-                  href={`https://wa.me/?text=${encodeURIComponent(waTemplate)}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-10 px-4 py-2 bg-emerald-600 text-white hover:bg-emerald-700 gap-2"
-                >
-                  <MessageCircle className="h-4 w-4" /> Buka WhatsApp Desktop/Web
-                </a>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-border">
+                <div className="flex items-center gap-2">
+                  {waGroupLink ? (
+                    <div className="flex items-center gap-1.5 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-800 px-3 py-1.5 rounded-lg text-xs">
+                      <Users className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                      <span className="text-muted-foreground">Grup WA:</span>
+                      <span className="font-bold text-emerald-800 dark:text-emerald-300 truncate max-w-[140px] sm:max-w-[200px]">
+                        {waGroupLink.replace("https://chat.whatsapp.com/", "")}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setWaGroupInput(waGroupLink);
+                          setIsWaGroupModalOpen(true);
+                        }}
+                        className="text-[11px] text-emerald-700 dark:text-emerald-400 hover:underline font-bold ml-1 flex items-center gap-0.5"
+                      >
+                        <Edit2 className="w-3 h-3" /> Ganti
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setWaGroupInput("");
+                        setIsWaGroupModalOpen(true);
+                      }}
+                      className="text-[11px] text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/50 border border-amber-300 dark:border-amber-800 px-2.5 py-1.5 rounded-lg flex items-center gap-1 font-bold hover:bg-amber-100"
+                    >
+                      <Link2 className="w-3.5 h-3.5 shrink-0" /> + Hubungkan ID Grup WA
+                    </button>
+                  )}
+                </div>
+
+                <div className="flex items-center justify-end gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      navigator.clipboard.writeText(waTemplate);
+                      alert("Teks laporan berhasil disalin ke clipboard!");
+                    }}
+                    className="gap-2 text-xs"
+                  >
+                    <Copy className="h-4 w-4" /> Salin Teks
+                  </Button>
+                  <Button
+                    onClick={() => handleOpenWhatsAppGroup()}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2 font-bold text-xs"
+                  >
+                    <MessageCircle className="h-4 w-4" /> Buka WhatsApp Desktop/Web
+                  </Button>
+                </div>
               </div>
             </div>
           ) : (
@@ -1081,6 +1201,58 @@ export default function AdminLaporanPaketPage() {
               className="bg-emerald-600 hover:bg-emerald-700 text-white"
             >
               {linking ? "Menghubungkan..." : "Gabungkan Laporan"}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Modal Hubungkan ID / Link Grup WhatsApp */}
+      <Modal
+        open={isWaGroupModalOpen}
+        onClose={() => setIsWaGroupModalOpen(false)}
+        title="Hubungkan Grup WhatsApp Paket"
+      >
+        <div className="space-y-4 pt-1 text-xs">
+          <div className="p-3 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 rounded-xl space-y-1">
+            <p className="font-bold text-emerald-900 dark:text-emerald-200">
+              Paket: {selectedPaket}
+            </p>
+            <p className="text-muted-foreground text-[11px]">
+              Masukkan Link Undangan atau ID Grup WhatsApp untuk paket ini. Anda hanya perlu mengisinya <strong>sekali untuk pertama kali</strong>. Selanjutnya sistem akan langsung membuka grup WhatsApp paket ini dan teks laporan siap dikirim.
+            </p>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="font-bold text-foreground block">
+              Link Undangan / ID Grup WhatsApp *
+            </label>
+            <Input
+              type="text"
+              placeholder="Contoh: https://chat.whatsapp.com/J7bKmX... atau ID Grup"
+              value={waGroupInput}
+              onChange={(e) => setWaGroupInput(e.target.value)}
+              className="text-xs h-10"
+            />
+            <p className="text-[10px] text-muted-foreground">
+              Buka WhatsApp &gt; Info Grup &gt; Undang via Tautan &gt; Salin Tautan
+            </p>
+          </div>
+
+          <div className="flex items-center justify-end gap-2 pt-3 border-t">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsWaGroupModalOpen(false)}
+            >
+              Batal
+            </Button>
+            <Button
+              type="button"
+              onClick={handleSaveAndOpenWaGroup}
+              disabled={savingWaGroup || !waGroupInput.trim()}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold gap-1.5"
+            >
+              {savingWaGroup ? "Menyimpan..." : "Simpan & Buka WhatsApp"}
             </Button>
           </div>
         </div>
