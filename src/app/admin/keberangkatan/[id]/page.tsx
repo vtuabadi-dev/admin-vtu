@@ -150,7 +150,26 @@ export default function KeberangkatanDetailPage() {
         const gMap = new Map(safeGroups.map((g: any) => [g.id, g.namaGroup || g.kodeRegistrasi || "-"]));
         setGroupMap(gMap);
 
-        const pkgJamaah = safeJamaah.filter((j: any) => pkgGroupIds.has(j.groupId) || j.paketKeberangkatanId === id);
+        const pkgJamaahRaw = safeJamaah.filter((j: any) => pkgGroupIds.has(j.groupId) || j.paketKeberangkatanId === id);
+        const pkgJamaah = [...pkgJamaahRaw].sort((a: any, b: any) => {
+          const gA = safeGroups.find((g: any) => g.id === a.groupId);
+          const gB = safeGroups.find((g: any) => g.id === b.groupId);
+
+          const timeA = gA ? new Date(gA.updatedAt || gA.createdAt || 0).getTime() : new Date(a.createdAt).getTime();
+          const timeB = gB ? new Date(gB.updatedAt || gB.createdAt || 0).getTime() : new Date(b.createdAt).getTime();
+
+          if (timeA !== timeB) return timeA - timeB;
+
+          const numA = parseInt((a.nomorPeserta || a.registrationId || "0").replace(/\D/g, ""), 10) || 0;
+          const numB = parseInt((b.nomorPeserta || b.registrationId || "0").replace(/\D/g, ""), 10) || 0;
+          if (numA !== numB) return numA - numB;
+
+          const regA = a.registrationId || "";
+          const regB = b.registrationId || "";
+          if (regA !== regB) return regA.localeCompare(regB);
+
+          return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+        });
         setJamaahList(pkgJamaah);
         setDocRows(buildDocRows(pkgJamaah));
       } catch (err) {

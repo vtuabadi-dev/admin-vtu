@@ -154,8 +154,26 @@ export default function JamaahListPage() {
         break;
     }
 
-    return list;
-  }, [jamaahList, search, activeTab, getStatusPembayaran]);
+    return [...list].sort((a, b) => {
+      const gA = groups.find((g) => g.id === a.groupId);
+      const gB = groups.find((g) => g.id === b.groupId);
+
+      const timeA = gA ? new Date(gA.updatedAt || gA.createdAt || 0).getTime() : new Date(a.createdAt).getTime();
+      const timeB = gB ? new Date(gB.updatedAt || gB.createdAt || 0).getTime() : new Date(b.createdAt).getTime();
+
+      if (timeA !== timeB) return timeA - timeB;
+
+      const numA = parseInt((a.nomorPeserta || a.registrationId || "0").replace(/\D/g, ""), 10) || 0;
+      const numB = parseInt((b.nomorPeserta || b.registrationId || "0").replace(/\D/g, ""), 10) || 0;
+      if (numA !== numB) return numA - numB;
+
+      const regA = a.registrationId || "";
+      const regB = b.registrationId || "";
+      if (regA !== regB) return regA.localeCompare(regB);
+
+      return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+    });
+  }, [jamaahList, groups, search, activeTab, getStatusPembayaran]);
 
   // --- Loading state ---
 

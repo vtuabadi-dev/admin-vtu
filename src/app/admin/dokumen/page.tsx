@@ -117,7 +117,7 @@ export default function DokumenPage() {
 
   // Shared data
   const [keberangkatanList, setKeberangkatanList] = useState<Keberangkatan[]>([]);
-  const [groups, setGroups] = useState<Record<string, { namaGroup: string; kodeRegistrasi: string; paketId: string }>>({});
+  const [groups, setGroups] = useState<Record<string, { namaGroup: string; kodeRegistrasi: string; paketId: string; createdAt?: string; updatedAt?: string }>>({});
 
   // --- Rekap Tab State ---
   const [selectedPackage, setSelectedPackage] = useState("");
@@ -174,9 +174,15 @@ export default function DokumenPage() {
         if (groupsRes.ok) {
           const json = await groupsRes.json();
           const groupList = json.data ?? [];
-          const groupMap: Record<string, { namaGroup: string; kodeRegistrasi: string; paketId: string }> = {};
+          const groupMap: Record<string, { namaGroup: string; kodeRegistrasi: string; paketId: string; createdAt?: string; updatedAt?: string }> = {};
           groupList.forEach((g: any) => {
-            groupMap[g.id] = { namaGroup: g.namaGroup, kodeRegistrasi: g.kodeRegistrasi, paketId: g.paketKeberangkatanId };
+            groupMap[g.id] = {
+              namaGroup: g.namaGroup,
+              kodeRegistrasi: g.kodeRegistrasi,
+              paketId: g.paketKeberangkatanId,
+              createdAt: g.createdAt,
+              updatedAt: g.updatedAt,
+            };
           });
           setGroups(groupMap);
         }
@@ -200,14 +206,42 @@ export default function DokumenPage() {
             const g = groups[j.groupId];
             return g?.paketId === selectedPackage;
           });
-          // Build matrix from jamaah documents
-          const matrix = pkgJamaah.map((j: any) => ({
-            jamaahId: j.id,
-            namaLengkap: j.namaLengkap,
-            nomorPeserta: j.nomorPeserta,
-            groupId: j.groupId,
-            dokumen: j.dokumen ?? [],
-          }));
+
+          // Sort jamaah chronologically:
+          // 1. Groups sorted by package entry timestamp (old groups first, new arrivals / transfers last)
+          // 2. Members within the same group sorted by registrationId / nomorPeserta (1: Zamroni, 2: Safina, 3: Faqih)
+          const sortedJamaah = [...pkgJamaah].sort((a: any, b: any) => {
+            const groupA = groups[a.groupId];
+            const groupB = groups[b.groupId];
+
+            const timeA = groupA ? new Date(groupA.updatedAt || groupA.createdAt || 0).getTime() : new Date(a.createdAt).getTime();
+            const timeB = groupB ? new Date(groupB.updatedAt || groupB.createdAt || 0).getTime() : new Date(b.createdAt).getTime();
+
+            if (timeA !== timeB) return timeA - timeB;
+
+            const numA = parseInt((a.nomorPeserta || a.registrationId || "0").replace(/\D/g, ""), 10) || 0;
+            const numB = parseInt((b.nomorPeserta || b.registrationId || "0").replace(/\D/g, ""), 10) || 0;
+            if (numA !== numB) return numA - numB;
+
+            const regA = a.registrationId || "";
+            const regB = b.registrationId || "";
+            if (regA !== regB) return regA.localeCompare(regB);
+
+            return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+          });
+
+          // Build matrix from sorted jamaah
+          const matrix = sortedJamaah.map((j: any) => {
+            const g = groups[j.groupId];
+            return {
+              jamaahId: j.id,
+              namaLengkap: j.namaLengkap,
+              nomorPeserta: j.nomorPeserta,
+              groupId: j.groupId,
+              kodeRegistrasi: g?.kodeRegistrasi || j.registrationId || "-",
+              dokumen: j.dokumen ?? [],
+            };
+          });
           setCompletionMatrix(matrix);
         }
       } catch { /* graceful */ }

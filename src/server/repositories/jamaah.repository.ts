@@ -58,7 +58,7 @@ export const jamaahRepo = {
       ];
     }
     const [rows, total] = await Promise.all([
-      prisma.jamaah.findMany({ where, include: { dokumen: true }, take: params?.limit, skip: params?.offset, orderBy: { createdAt: "asc" } }),
+      prisma.jamaah.findMany({ where, include: { dokumen: true }, take: params?.limit, skip: params?.offset, orderBy: [{ registrationId: "asc" }, { createdAt: "asc" }] }),
       prisma.jamaah.count({ where }),
     ]);
     return { data: rows.map(mapJamaah), total };
