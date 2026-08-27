@@ -51,10 +51,12 @@ export default function AdminBadalUmrohPage() {
   const [editItem, setEditItem] = useState<any | null>(null);
   const [editStatus, setEditStatus] = useState("Pending");
   const [editPaymentStatus, setEditPaymentStatus] = useState("Belum Bayar");
+  const [editNamaPaket, setEditNamaPaket] = useState("");
   const [petugasBadal, setPetugasBadal] = useState("");
   const [sertifikatUrl, setSertifikatUrl] = useState("");
   const [videoUrl, setVideoUrl] = useState("");
   const [catatanText, setCatatanText] = useState("");
+  const [daftarPaketList, setDaftarPaketList] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
 
   // Payment Proof Preview Modal
@@ -103,6 +105,14 @@ export default function AdminBadalUmrohPage() {
 
   useEffect(() => {
     fetchList();
+    fetch("/api/wakaf-quran/daftar-paket")
+      .then((res) => res.json())
+      .then((json) => {
+        if (json.success && Array.isArray(json.data)) {
+          setDaftarPaketList(json.data);
+        }
+      })
+      .catch(console.error);
   }, []);
 
   // Filtered List based on Search & Status
@@ -159,6 +169,7 @@ export default function AdminBadalUmrohPage() {
           sertifikatUrl,
           videoUrl,
           catatan: catatanText,
+          namaPaketUmroh: editNamaPaket,
         }),
       });
       const resJson = await res.json();
@@ -175,6 +186,7 @@ export default function AdminBadalUmrohPage() {
                   sertifikatUrl,
                   videoUrl,
                   catatan: catatanText,
+                  namaPaketUmroh: editNamaPaket,
                 }
               : item
           )
@@ -649,6 +661,7 @@ export default function AdminBadalUmrohPage() {
                                 setSertifikatUrl(item.sertifikatUrl || "");
                                 setVideoUrl(item.videoUrl || "");
                                 setCatatanText(item.catatan || "");
+                                setEditNamaPaket(item.namaPaketUmroh || "");
                               }}
                               className="h-8 px-2.5 gap-1.5 font-bold"
                             >
@@ -704,6 +717,29 @@ export default function AdminBadalUmrohPage() {
               <p className="text-base font-extrabold text-emerald-950 dark:text-emerald-100">{editItem.namaAlmarhum}</p>
               <p className="text-xs text-emerald-800 dark:text-emerald-300 font-medium">
                 Pemohon: {editItem.namaPemohon} ({editItem.nomorWhatsapp})
+              </p>
+            </div>
+
+            {/* Alokasi Rombongan Paket Umroh */}
+            <div className="space-y-1.5 p-3 bg-emerald-50/70 dark:bg-emerald-950/40 rounded-xl border border-emerald-200 dark:border-emerald-900">
+              <label className="font-bold text-foreground flex items-center justify-between">
+                <span>Alokasikan ke Paket Umroh</span>
+                <span className="text-[10px] text-emerald-700 dark:text-emerald-300 font-bold">Agar masuk Laporan Paket</span>
+              </label>
+              <select
+                value={editNamaPaket}
+                onChange={(e) => setEditNamaPaket(e.target.value)}
+                className="w-full h-10 px-3 rounded-lg border border-input bg-background text-xs font-semibold text-foreground"
+              >
+                <option value="">-- Tanpa Paket (Pendaftar Lepas / Umum) --</option>
+                {daftarPaketList.map((pkt) => (
+                  <option key={pkt} value={pkt}>
+                    {pkt}
+                  </option>
+                ))}
+              </select>
+              <p className="text-[10.5px] text-muted-foreground leading-tight">
+                Jika dipilihkan salah satu paket, pendaftaran badal ini otomatis masuk ke Laporan Kolektif Paket Umroh terkait.
               </p>
             </div>
 

@@ -40,12 +40,23 @@ const formatRupiah = (val: number) => {
 export default function BadalUmrohRegisterPage() {
   const [hargaPerBadal, setHargaPerBadal] = useState<number>(2500000);
 
+  const [activePaketList, setActivePaketList] = useState<string[]>([]);
+
   useEffect(() => {
     fetch("/api/master/harga-layanan")
       .then((res) => res.json())
       .then((json) => {
         if (json.success && json.data?.BADAL_UMROH) {
           setHargaPerBadal(json.data.BADAL_UMROH);
+        }
+      })
+      .catch(console.error);
+
+    fetch("/api/wakaf-quran/daftar-paket")
+      .then((res) => res.json())
+      .then((json) => {
+        if (json.success && Array.isArray(json.data)) {
+          setActivePaketList(json.data);
         }
       })
       .catch(console.error);
@@ -620,6 +631,39 @@ export default function BadalUmrohRegisterPage() {
                   </div>
                 </button>
               </div>
+
+              {/* Pilihan Paket Umroh Jika Pendaftar Umum */}
+              {!isJamaahVauza && (
+                <div className="p-5 rounded-2xl bg-white/90 border border-stone-200/90 shadow-xs space-y-3">
+                  <div className="flex items-center gap-2 pb-2 border-b border-stone-100">
+                    <Building2 className="w-4 h-4 text-emerald-700" />
+                    <h3 className="text-xs font-extrabold uppercase tracking-wider text-stone-800">
+                      Alokasi Rombongan Paket Umroh (Opsional)
+                    </h3>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-stone-700">
+                      Pilih Rombongan Paket Pelaksanaan (Jika Ada)
+                    </label>
+                    <select
+                      value={formData.namaPaketUmroh}
+                      onChange={(e) => setFormData((p) => ({ ...p, namaPaketUmroh: e.target.value }))}
+                      className="w-full h-10 px-3 rounded-xl border border-stone-300 bg-white text-xs font-semibold text-stone-800 focus:ring-2 focus:ring-emerald-500 outline-none"
+                    >
+                      <option value="">-- Pelaksanaan Umum (Tidak Terikat Rombongan Tertentu) --</option>
+                      {activePaketList.map((pkt) => (
+                        <option key={pkt} value={pkt}>
+                          {pkt}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="text-[11px] text-stone-500 leading-relaxed">
+                      Pilih paket jika Anda ingin pelaksanaan badal umroh ini dimasukkan ke dalam laporan grup rombongan umroh tertentu.
+                    </p>
+                  </div>
+                </div>
+              )}
 
               {/* Form Verifikasi Paspor Jika Jamaah VTU */}
               {isJamaahVauza && (

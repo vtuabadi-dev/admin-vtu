@@ -51,6 +51,15 @@ export default function WakafQuranRegisterPage() {
         }
       })
       .catch(console.error);
+
+    fetch("/api/wakaf-quran/daftar-paket")
+      .then((res) => res.json())
+      .then((json) => {
+        if (json.success && Array.isArray(json.data)) {
+          setActivePaketList(json.data);
+        }
+      })
+      .catch(console.error);
   }, []);
 
   // Multi-step State (1: Verifikasi/Status, 2: Pewakaf, 3: Mushaf & Niat, 4: Pembayaran)
@@ -60,6 +69,7 @@ export default function WakafQuranRegisterPage() {
   const [canSubmitStep4, setCanSubmitStep4] = useState(false);
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
   const [metodePembayaranOption, setMetodePembayaranOption] = useState<"sekarang" | "nanti">("sekarang");
+  const [activePaketList, setActivePaketList] = useState<string[]>([]);
   const [copiedRekening, setCopiedRekening] = useState<string | null>(null);
 
   // State Pilihan Status Kejamaahan & Verifikasi Paspor
@@ -664,6 +674,38 @@ export default function WakafQuranRegisterPage() {
                     </div>
                   </div>
                 </div>
+
+                {!isJamaahVauza && (
+                  <div className="bg-white/90 p-5 sm:p-6 rounded-2xl border border-stone-200 shadow-xs space-y-3">
+                    <div className="flex items-center gap-2 border-b border-stone-100 pb-3">
+                      <Building2 className="w-4 h-4 text-emerald-700" />
+                      <span className="text-xs font-bold uppercase tracking-wider text-emerald-950">
+                        Alokasi Rombongan Paket Umroh (Opsional)
+                      </span>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-stone-700">
+                        Pilih Rombongan Paket Penyaluran (Jika Ada)
+                      </label>
+                      <select
+                        value={formData.namaPaketUmroh}
+                        onChange={(e) => setFormData((p) => ({ ...p, namaPaketUmroh: e.target.value }))}
+                        className="w-full h-10 px-3 rounded-xl border border-stone-300 bg-white text-xs font-semibold text-stone-800 focus:ring-2 focus:ring-emerald-500 outline-none"
+                      >
+                        <option value="">-- Penyaluran Umum (Tidak Terikat Rombongan Tertentu) --</option>
+                        {activePaketList.map((pkt) => (
+                          <option key={pkt} value={pkt}>
+                            {pkt}
+                          </option>
+                        ))}
+                      </select>
+                      <p className="text-[11px] text-stone-500 leading-relaxed">
+                        Pilih paket jika Anda ingin niat wakaf Al-Qur&apos;an ini disalurkan dan dimasukkan ke dalam laporan grup rombongan umroh tertentu.
+                      </p>
+                    </div>
+                  </div>
+                )}
 
                 {isJamaahVauza && (
                   <div className="bg-white/90 p-5 sm:p-6 rounded-2xl border border-stone-200 shadow-xs space-y-4">

@@ -18,7 +18,9 @@ export default function AdminWakafQuranPage() {
   const [editItem, setEditItem] = useState<any | null>(null);
   const [editStatus, setEditStatus] = useState("Pending");
   const [editPaymentStatus, setEditPaymentStatus] = useState("Belum Bayar");
+  const [editNamaPaket, setEditNamaPaket] = useState("");
   const [fotoPenyerahanUrl, setFotoPenyerahanUrl] = useState("");
+  const [daftarPaketList, setDaftarPaketList] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
 
   const fetchList = async () => {
@@ -40,6 +42,17 @@ export default function AdminWakafQuranPage() {
     fetchList();
   }, [statusFilter]);
 
+  useEffect(() => {
+    fetch("/api/wakaf-quran/daftar-paket")
+      .then((res) => res.json())
+      .then((json) => {
+        if (json.success && Array.isArray(json.data)) {
+          setDaftarPaketList(json.data);
+        }
+      })
+      .catch(console.error);
+  }, []);
+
   const handleSave = async () => {
     if (!editItem) return;
     try {
@@ -51,6 +64,7 @@ export default function AdminWakafQuranPage() {
           status: editStatus,
           paymentStatus: editPaymentStatus,
           fotoPenyerahanUrl,
+          namaPaketUmroh: editNamaPaket,
         }),
       });
       const resJson = await res.json();
@@ -201,10 +215,24 @@ export default function AdminWakafQuranPage() {
                                 <Badge variant="outline" className="text-[10px] px-1.5 py-0">Umum</Badge>
                               )}
                             </div>
-                            {item.isJamaahVauza && item.namaPaketUmroh && (
+                            {item.namaPaketUmroh ? (
                               <span className="text-[11px] font-medium text-sky-700 dark:text-sky-300">
-                                {item.namaPaketUmroh} (TL: {item.namaTourLeader || "-"} / Muthowif: {item.namaMuthowif || "-"})
+                                📦 {item.namaPaketUmroh} {item.namaTourLeader || item.namaMuthowif ? `(TL: ${item.namaTourLeader || "-"} / Muthowif: ${item.namaMuthowif || "-"})` : ""}
                               </span>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditItem(item);
+                                  setEditStatus(item.status);
+                                  setEditPaymentStatus(item.paymentStatus || "Belum Bayar");
+                                  setFotoPenyerahanUrl(item.fotoPenyerahanUrl || "");
+                                  setEditNamaPaket(item.namaPaketUmroh || "");
+                                }}
+                                className="text-[10.5px] text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 hover:bg-amber-100 border border-amber-300 dark:border-amber-800 px-1.5 py-0.5 rounded w-fit font-bold flex items-center gap-1 transition-colors"
+                              >
+                                ⚠️ Lepas (+ Alokasikan ke Paket)
+                              </button>
                             )}
                             <a
                               href={`https://wa.me/${item.nomorWhatsapp.replace(/[^0-9]/g, "")}`}
@@ -258,6 +286,7 @@ export default function AdminWakafQuranPage() {
                                 setEditStatus(item.status);
                                 setEditPaymentStatus(item.paymentStatus || "Belum Bayar");
                                 setFotoPenyerahanUrl(item.fotoPenyerahanUrl || "");
+                                setEditNamaPaket(item.namaPaketUmroh || "");
                               }}
                               className="h-8 px-2"
                             >
@@ -389,6 +418,29 @@ export default function AdminWakafQuranPage() {
             <div>
               <p className="font-semibold text-muted-foreground">Pewakaf / Niat:</p>
               <p className="text-sm font-bold text-sky-700 dark:text-sky-400">{editItem.namaPeserta || editItem.namaPewakaf} ({editItem.jumlahMushaf} Mushaf)</p>
+            </div>
+
+            {/* Alokasi Rombongan Paket Umroh */}
+            <div className="space-y-1.5 p-3 bg-sky-50/70 dark:bg-sky-950/40 rounded-xl border border-sky-200 dark:border-sky-800">
+              <label className="font-bold text-foreground flex items-center justify-between">
+                <span>Alokasikan ke Paket Umroh</span>
+                <span className="text-[10px] text-sky-700 dark:text-sky-300 font-bold">Agar masuk Laporan Paket</span>
+              </label>
+              <select
+                value={editNamaPaket}
+                onChange={(e) => setEditNamaPaket(e.target.value)}
+                className="w-full h-9 px-3 rounded-lg border border-input bg-background text-xs font-semibold text-foreground"
+              >
+                <option value="">-- Tanpa Paket (Pendaftar Lepas / Umum) --</option>
+                {daftarPaketList.map((pkt) => (
+                  <option key={pkt} value={pkt}>
+                    {pkt}
+                  </option>
+                ))}
+              </select>
+              <p className="text-[10.5px] text-muted-foreground leading-tight">
+                Jika dipilihkan salah satu paket, pendaftaran ini otomatis masuk ke Laporan Kolektif Paket Umroh terkait.
+              </p>
             </div>
 
             <div className="space-y-1.5">

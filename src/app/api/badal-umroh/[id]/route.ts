@@ -15,7 +15,7 @@ export async function PATCH(
 
     const { id } = params;
     const body = await request.json();
-    const { status, paymentStatus, buktiBayarUrl, petugasBadal, sertifikatUrl, videoUrl, catatan } = body;
+    const { status, paymentStatus, buktiBayarUrl, petugasBadal, sertifikatUrl, videoUrl, catatan, namaPaketUmroh } = body;
 
     const updated = await prisma.badalUmrohRegistration.update({
       where: { id },
@@ -27,6 +27,7 @@ export async function PATCH(
         ...(sertifikatUrl !== undefined ? { sertifikatUrl } : {}),
         ...(videoUrl !== undefined ? { videoUrl } : {}),
         ...(catatan !== undefined ? { catatan } : {}),
+        ...(namaPaketUmroh !== undefined ? { namaPaketUmroh: namaPaketUmroh || null } : {}),
       },
     });
 
