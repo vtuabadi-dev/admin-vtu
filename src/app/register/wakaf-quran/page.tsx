@@ -304,6 +304,10 @@ export default function WakafQuranRegisterPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (step < 4) {
+      handleNextStep();
+      return;
+    }
     if (isSubmitting) return;
 
     if (isJamaahVauza && !jamaahVerified) {
@@ -315,6 +319,19 @@ export default function WakafQuranRegisterPage() {
     if (!formData.namaPewakaf.trim() || !formData.nomorWhatsapp.trim()) {
       alert("Mohon lengkapi data pewakaf dan nomor WhatsApp.");
       setStep(2);
+      return;
+    }
+
+    if (formData.jumlahMushaf < 1) {
+      alert("Jumlah mushaf minimal 1.");
+      setStep(3);
+      return;
+    }
+
+    const filledNiat = niatList.map((n) => n.nama.trim()).filter(Boolean);
+    if (filledNiat.length === 0) {
+      alert("Mohon masukkan nama yang diniatkan untuk mushaf.");
+      setStep(3);
       return;
     }
 
@@ -555,7 +572,15 @@ export default function WakafQuranRegisterPage() {
         </div>
 
         {/* ── Main Form Container ── */}
-        <form onSubmit={handleSubmit}>
+        <form
+          onSubmit={handleSubmit}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && step < 4) {
+              e.preventDefault();
+              handleNextStep();
+            }
+          }}
+        >
           <div data-wakaf-portal-elem className="bg-gradient-to-b from-white/30 to-white/10 backdrop-blur-[4px] p-6 sm:p-8 rounded-3xl border-t border-l border-white/90 border-b border-r border-slate-900/25 shadow-[inset_1px_1px_2px_rgba(255,255,255,0.9),inset_-1px_-1px_3px_rgba(0,0,0,0.1),0_15px_35px_-10px_rgba(0,0,0,0.2)] space-y-6">
             {/* ══════════════════════════════════════════════════════════
                 LANGKAH 1: VERIFIKASI STATUS KEJAMAAHAN

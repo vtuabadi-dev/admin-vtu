@@ -277,6 +277,10 @@ export default function BadalUmrohRegisterPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (step < 5) {
+      handleNextStep();
+      return;
+    }
     if (isSubmitting) return;
 
     if (isJamaahVauza && !jamaahVerified) {
@@ -525,7 +529,16 @@ export default function BadalUmrohRegisterPage() {
 
       {/* ── Form Card Container ── */}
       <div className="bg-gradient-to-b from-white/30 to-white/10 backdrop-blur-[4px] p-6 sm:p-8 rounded-3xl border-t border-l border-white/90 border-b border-r border-slate-900/25 shadow-[inset_1px_1px_2px_rgba(255,255,255,0.9),inset_-1px_-1px_3px_rgba(0,0,0,0.1),0_15px_35px_-10px_rgba(0,0,0,0.2)]">
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form
+          onSubmit={handleSubmit}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && step < 5) {
+              e.preventDefault();
+              handleNextStep();
+            }
+          }}
+          className="space-y-6"
+        >
           {/* ════════════════════════════════════════════════════════════════════
               LANGKAH 1: STATUS & VERIFIKASI JAMAAN
           ════════════════════════════════════════════════════════════════════ */}
