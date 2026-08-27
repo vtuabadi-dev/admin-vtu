@@ -45,8 +45,17 @@ const TAHUN_LIST = Array.from({ length: 5 }, (_, i) => String(currentYear - i));
 
 const DEFAULT_HEADER = `*LAPORAN KOLEKTIF BADAL UMROH & WAKAF QURAN*`;
 const DEFAULT_BADAL_FORMAT = `[no]. [nama] ([gender] - [hubungan])`;
-const DEFAULT_WAKAF_FORMAT = `[no]. [nama] ([jumlah] Mushaf) - [lokasi]`;
+const DEFAULT_WAKAF_FORMAT = `[no]. [nama] ([jumlah] Mushaf)`;
 const DEFAULT_FOOTER = `Demikian laporan kolektif paket ini.`;
+
+const splitNiatNames = (niatStr: string | null | undefined): string[] => {
+  if (!niatStr || !niatStr.trim()) return ["Niat Hamba Allah / Keluarga"];
+  const parts = niatStr
+    .split(/[\n,;]+/)
+    .map((s) => s.replace(/^\d+[\.\)\-]\s*/, "").trim())
+    .filter((s) => s.length > 0);
+  return parts.length > 0 ? parts : [niatStr.trim()];
+};
 
 // ── Searchable Combobox ──
 function SearchableCombobox({
@@ -275,7 +284,16 @@ export default function AdminLaporanPaketPage() {
     if (typeof window !== "undefined" && isTemplateModalOpen) {
       setWaHeader(localStorage.getItem("wa_header") || DEFAULT_HEADER);
       setWaBadalFormat(localStorage.getItem("wa_badal_format") || DEFAULT_BADAL_FORMAT);
-      setWaWakafFormat(localStorage.getItem("wa_wakaf_format") || DEFAULT_WAKAF_FORMAT);
+      
+      const storedWakaf = localStorage.getItem("wa_wakaf_format");
+      if (!storedWakaf || storedWakaf.includes("[lokasi]")) {
+        const cleanedWakaf = storedWakaf ? storedWakaf.replace(/\s*-\s*\[lokasi\]/g, "").replace(/\[lokasi\]/g, "").trim() : DEFAULT_WAKAF_FORMAT;
+        setWaWakafFormat(cleanedWakaf || DEFAULT_WAKAF_FORMAT);
+        localStorage.setItem("wa_wakaf_format", cleanedWakaf || DEFAULT_WAKAF_FORMAT);
+      } else {
+        setWaWakafFormat(storedWakaf);
+      }
+
       setWaFooter(localStorage.getItem("wa_footer") || DEFAULT_FOOTER);
       setActiveWaTab("preview");
     }
@@ -308,7 +326,9 @@ export default function AdminLaporanPaketPage() {
   const generateWaTemplate = (
     header = typeof window !== "undefined" ? localStorage.getItem("wa_header") || DEFAULT_HEADER : DEFAULT_HEADER,
     badalFormat = typeof window !== "undefined" ? localStorage.getItem("wa_badal_format") || DEFAULT_BADAL_FORMAT : DEFAULT_BADAL_FORMAT,
-    wakafFormat = typeof window !== "undefined" ? localStorage.getItem("wa_wakaf_format") || DEFAULT_WAKAF_FORMAT : DEFAULT_WAKAF_FORMAT,
+    wakafFormat = typeof window !== "undefined" 
+      ? (localStorage.getItem("wa_wakaf_format")?.replace(/\s*-\s*\[lokasi\]/g, "").replace(/\[lokasi\]/g, "").trim() || DEFAULT_WAKAF_FORMAT) 
+      : DEFAULT_WAKAF_FORMAT,
     footer = typeof window !== "undefined" ? localStorage.getItem("wa_footer") || DEFAULT_FOOTER : DEFAULT_FOOTER
   ) => {
     let msg = `${header}\n\n`;
@@ -340,13 +360,25 @@ export default function AdminLaporanPaketPage() {
     if (laporanWakaf.length > 0) {
       const totalMushaf = laporanWakaf.reduce((sum, w) => sum + (w.jumlahMushaf || 0), 0);
       msg += `*Daftar Wakaf Al-Quran (${totalMushaf} Mushaf)*\n`;
-      laporanWakaf.forEach((w, i) => {
-        let line = wakafFormat
-          .replaceAll("[no]", String(i + 1))
-          .replaceAll("[nama]", w.niatAtasNama || "Hamba Allah")
-          .replaceAll("[jumlah]", String(w.jumlahMushaf || 0))
-          .replaceAll("[lokasi]", w.lokasiWakaf || "");
-        msg += `${line}\n`;
+      let counter = 1;
+      laporanWakaf.forEach((w) => {
+        const names = splitNiatNames(w.niatAtasNama);
+        const qtyPerName =
+          names.length > 1
+            ? Math.max(1, Math.round((w.jumlahMushaf || 1) / names.length))
+            : (w.jumlahMushaf || 1);
+        names.forEach((nama) => {
+          let line = wakafFormat
+            .replaceAll("[no]", String(counter))
+            .replaceAll("[nama]", nama)
+            .replaceAll("[jumlah]", String(qtyPerName))
+            .replaceAll(" - [lokasi]", "")
+            .replaceAll("-[lokasi]", "")
+            .replaceAll("[lokasi]", "")
+            .trim();
+          msg += `${line}\n`;
+          counter++;
+        });
       });
       msg += `\n`;
     }
@@ -413,6 +445,22 @@ export default function AdminLaporanPaketPage() {
   }, [selectedPaket, refreshCounter]);
 
   const bulanLabel = BULAN_LIST.find((b) => b.value === selectedBulan)?.label ?? "";
+
+  const flattenedWakafList = laporanWakaf.flatMap((w) => {
+    const names = splitNiatNames(w.niatAtasNama);
+    const qtyPerName =
+      names.length > 1
+        ? Math.max(1, Math.round((w.jumlahMushaf || 1) / names.length))
+        : (w.jumlahMushaf || 1);
+    return names.map((nama, idx) => ({
+      uniqueKey: `${w.id}-${idx}`,
+      nama,
+      jumlahMushaf: qtyPerName,
+      lokasiWakaf: w.lokasiWakaf,
+      namaTourLeader: w.namaTourLeader,
+      namaMuthowif: w.namaMuthowif,
+    }));
+  });
 
   return (
     <div className="flex flex-col gap-6 p-6">
@@ -718,7 +766,7 @@ export default function AdminLaporanPaketPage() {
                 </span>
               </span>
               <Badge variant="outline" className="text-white border-white/40">
-                {laporanWakaf.length} Catatan · {laporanWakaf.reduce((s: number, w: any) => s + (w.jumlahMushaf || 0), 0)} Mushaf
+                {flattenedWakafList.length} Nama · {laporanWakaf.reduce((s: number, w: any) => s + (w.jumlahMushaf || 0), 0)} Mushaf
               </Badge>
             </div>
             <div className="overflow-x-auto">
@@ -727,28 +775,26 @@ export default function AdminLaporanPaketPage() {
                   <tr>
                     <th className="px-4 py-3">No</th>
                     <th className="px-4 py-3">Tour Leader / Muthowif</th>
-                    <th className="px-4 py-3">Daftar Nama-Nama Yang Diniatkan Wakaf</th>
+                    <th className="px-4 py-3">Nama Yang Diniatkan Wakaf</th>
                     <th className="px-4 py-3">Jumlah Mushaf</th>
-                    <th className="px-4 py-3">Lokasi Penyaluran</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {laporanWakaf.length > 0 ? (
-                    laporanWakaf.map((item, index) => (
-                      <tr key={item.id} className="hover:bg-muted/40">
+                  {flattenedWakafList.length > 0 ? (
+                    flattenedWakafList.map((item, index) => (
+                      <tr key={item.uniqueKey} className="hover:bg-muted/40">
                         <td className="px-4 py-3 font-semibold text-muted-foreground">{index + 1}</td>
                         <td className="px-4 py-3">
                           <div>TL: <span className="font-semibold">{item.namaTourLeader || "-"}</span></div>
                           <div>Muthowif: <span className="font-semibold">{item.namaMuthowif || "-"}</span></div>
                         </td>
-                        <td className="px-4 py-3 font-bold text-sm">{item.niatAtasNama || "Niat Hamba Allah / Keluarga"}</td>
+                        <td className="px-4 py-3 font-bold text-sm">{item.nama}</td>
                         <td className="px-4 py-3"><Badge className="bg-sky-600 text-white">{item.jumlahMushaf} Mushaf</Badge></td>
-                        <td className="px-4 py-3 text-muted-foreground">{item.lokasiWakaf}</td>
                       </tr>
                     ))
                   ) : (
                     <tr>
-                      <td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">
+                      <td colSpan={4} className="px-4 py-8 text-center text-muted-foreground">
                         Tidak ada data Wakaf Al-Qur&apos;an untuk paket &quot;{selectedPaket}&quot;.
                       </td>
                     </tr>
@@ -859,7 +905,7 @@ export default function AdminLaporanPaketPage() {
                     onChange={(e) => setWaWakafFormat(e.target.value)}
                   />
                   <span className="text-[10px] text-muted-foreground block">
-                    Tag: <code className="bg-muted px-1 rounded">[no]</code> (nomor), <code className="bg-muted px-1 rounded">[nama]</code> (atas nama), <code className="bg-muted px-1 rounded">[jumlah]</code>, <code className="bg-muted px-1 rounded">[lokasi]</code>
+                    Tag: <code className="bg-muted px-1 rounded">[no]</code> (nomor), <code className="bg-muted px-1 rounded">[nama]</code> (atas nama), <code className="bg-muted px-1 rounded">[jumlah]</code> (jumlah mushaf)
                   </span>
                 </div>
 

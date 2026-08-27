@@ -24,8 +24,6 @@ import {
   Check,
   Heart,
   Copy,
-  Sparkles,
-  FileCheck2,
 } from "lucide-react";
 import { Button } from "@/shared/components/ui/Button";
 import { Input } from "@/shared/components/ui/Input";
@@ -54,7 +52,7 @@ export default function WakafQuranRegisterPage() {
       .catch(console.error);
   }, []);
 
-  // Multi-step State (1: Verifikasi/Status, 2: Pewakaf, 3: Mushaf & Niat, 4: Sertifikat, 5: Pembayaran)
+  // Multi-step State (1: Verifikasi/Status, 2: Pewakaf, 3: Mushaf & Niat, 4: Pembayaran)
   const [step, setStep] = useState<number>(1);
   const [submitted, setSubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -83,8 +81,6 @@ export default function WakafQuranRegisterPage() {
     jumlahMushaf: 5,
     lokasiWakaf: "Masjidil Haram Makkah Al-Mukarramah",
     catatan: "",
-    namaSertifikat: "",
-    opsiSertifikat: "digital", // "digital" | "fisik"
   });
 
   const [buktiTransferFile, setBuktiTransferFile] = useState<File | null>(null);
@@ -94,8 +90,7 @@ export default function WakafQuranRegisterPage() {
     { key: 1, label: "Verifikasi", icon: ShieldCheck },
     { key: 2, label: "Pewakaf", icon: User },
     { key: 3, label: "Mushaf & Niat", icon: BookOpen },
-    { key: 4, label: "Sertifikat", icon: FileCheck2 },
-    { key: 5, label: "Pembayaran", icon: CreditCard },
+    { key: 4, label: "Pembayaran", icon: CreditCard },
   ];
 
   // Handlers Multi-Niat
@@ -181,7 +176,6 @@ export default function WakafQuranRegisterPage() {
           setFormData((p) => ({
             ...p,
             namaPewakaf: resJson.data?.namaLengkap || namaPasporJamaah.trim().toUpperCase(),
-            namaSertifikat: resJson.data?.namaLengkap || namaPasporJamaah.trim().toUpperCase(),
           }));
         }
       } else if (namaPasporJamaah.trim().length >= 3 && nomorPasporJamaah.trim().length >= 3) {
@@ -196,7 +190,6 @@ export default function WakafQuranRegisterPage() {
           setFormData((p) => ({
             ...p,
             namaPewakaf: namaPasporJamaah.trim().toUpperCase(),
-            namaSertifikat: namaPasporJamaah.trim().toUpperCase(),
           }));
         }
       } else {
@@ -245,9 +238,6 @@ export default function WakafQuranRegisterPage() {
         alert("Mohon masukkan nomor WhatsApp aktif.");
         return;
       }
-      if (!formData.namaSertifikat.trim()) {
-        setFormData((p) => ({ ...p, namaSertifikat: formData.namaPewakaf.trim() }));
-      }
       setStep(3);
       window.scrollTo({ top: 0, behavior: "smooth" });
       return;
@@ -259,12 +249,6 @@ export default function WakafQuranRegisterPage() {
         return;
       }
       setStep(4);
-      window.scrollTo({ top: 0, behavior: "smooth" });
-      return;
-    }
-
-    if (step === 4) {
-      setStep(5);
       window.scrollTo({ top: 0, behavior: "smooth" });
       return;
     }
@@ -327,8 +311,6 @@ export default function WakafQuranRegisterPage() {
         lokasiWakaf: formData.lokasiWakaf,
         niatAtasNama: niatList.map((n) => n.nama.trim()).filter(Boolean).join(", "),
         catatan: formData.catatan ? formData.catatan.trim() : null,
-        namaSertifikat: formData.namaSertifikat ? formData.namaSertifikat.trim() : formData.namaPewakaf.trim(),
-        opsiSertifikat: formData.opsiSertifikat,
         buktiTransferUrl: buktiTransferPreview || null,
       };
 
@@ -368,8 +350,6 @@ export default function WakafQuranRegisterPage() {
       jumlahMushaf: 5,
       lokasiWakaf: "Masjidil Haram Makkah Al-Mukarramah",
       catatan: "",
-      namaSertifikat: "",
-      opsiSertifikat: "digital",
     });
     setBuktiTransferFile(null);
     setBuktiTransferPreview("");
@@ -729,7 +709,7 @@ export default function WakafQuranRegisterPage() {
                 <div>
                   <h2 className="text-lg font-extrabold text-slate-950">Data Pewakaf / Penanggung Jawab</h2>
                   <p className="text-xs font-semibold text-slate-700 mt-0.5">
-                    Masukkan data kontak pewakaf yang akan menerima kabar penyaluran mushaf dan e-sertifikat wakaf.
+                    Masukkan data kontak pewakaf yang akan menerima kabar dan dokumentasi penyaluran mushaf di Tanah Suci.
                   </p>
                 </div>
 
@@ -822,18 +802,12 @@ export default function WakafQuranRegisterPage() {
                       <p className="text-[10px] text-stone-500">Harga per mushaf: <strong>{formatRupiah(hargaWakaf)}</strong> (Termasuk cap stempel &amp; distribusi).</p>
                     </div>
 
-                    {/* Lokasi Penyaluran */}
+                    {/* Lokasi Penyaluran (Fixed Masjidil Haram Makkah) */}
                     <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-stone-700">Lokasi Penyaluran Utama *</label>
-                      <select
-                        value={formData.lokasiWakaf}
-                        onChange={(e) => setFormData((p) => ({ ...p, lokasiWakaf: e.target.value }))}
-                        className="w-full h-10 px-3 rounded-xl border border-stone-300 bg-white text-xs font-bold text-slate-950 focus:ring-2 focus:ring-emerald-500 cursor-pointer shadow-xs"
-                      >
-                        <option value="Masjidil Haram Makkah Al-Mukarramah" className="text-slate-950 bg-white font-bold py-1.5">Masjidil Haram Makkah Al-Mukarramah</option>
-                        <option value="Masjid Nabawi Madinah Al-Munawwarah" className="text-slate-950 bg-white font-bold py-1.5">Masjid Nabawi Madinah Al-Munawwarah</option>
-                        <option value="Pesantren & Masjid Pelosok" className="text-slate-950 bg-white font-bold py-1.5">Pesantren &amp; Masjid Pelosok Nusantara</option>
-                      </select>
+                      <label className="text-xs font-bold text-stone-700">Lokasi Penyaluran</label>
+                      <div className="h-10 px-3 rounded-xl border border-emerald-200 bg-emerald-50/60 flex items-center text-xs font-extrabold text-emerald-950 shadow-xs">
+                        Masjidil Haram Makkah Al-Mukarramah
+                      </div>
                     </div>
                   </div>
 
@@ -900,71 +874,9 @@ export default function WakafQuranRegisterPage() {
             )}
 
             {/* ══════════════════════════════════════════════════════════
-                LANGKAH 4: SERTIFIKAT & DOKUMENTASI WAKAF
+                LANGKAH 4: RINGKASAN TAGIHAN & PEMBAYARAN
             ══════════════════════════════════════════════════════════ */}
             {step === 4 && (
-              <div className="space-y-6 animate-in fade-in-0 duration-200">
-                <div>
-                  <h2 className="text-lg font-extrabold text-slate-950">Sertifikat &amp; Dokumentasi Penyaluran</h2>
-                  <p className="text-xs font-semibold text-slate-700 mt-0.5">
-                    Setiap pewakaf akan menerima E-Sertifikat resmi dan dokumentasi video dokumentasi penyaluran di Tanah Suci.
-                  </p>
-                </div>
-
-                <div className="bg-white/90 p-5 sm:p-6 rounded-2xl border border-stone-200 shadow-xs space-y-4">
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-stone-700">Nama yang Dicetak pada Sertifikat Wakaf *</label>
-                    <Input
-                      type="text"
-                      placeholder="Contoh: H. Ahmad Fauzi & Keluarga"
-                      value={formData.namaSertifikat}
-                      onChange={(e) => setFormData((p) => ({ ...p, namaSertifikat: e.target.value }))}
-                      className="bg-white border-stone-300 rounded-xl text-xs h-10"
-                    />
-                    <p className="text-[10px] text-stone-500">Nama ini akan tercantum di E-Sertifikat resmi PT Vauza Tiga Utama.</p>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
-                    <div
-                      onClick={() => setFormData((p) => ({ ...p, opsiSertifikat: "digital" }))}
-                      className={cn(
-                        "p-4 rounded-xl cursor-pointer border-2 transition-all flex items-start gap-3",
-                        formData.opsiSertifikat === "digital"
-                          ? "bg-emerald-50/90 border-emerald-600 shadow-xs ring-2 ring-emerald-500/20"
-                          : "bg-white border-stone-200 hover:border-emerald-200"
-                      )}
-                    >
-                      <Sparkles className="w-5 h-5 text-emerald-700 shrink-0 mt-0.5" />
-                      <div>
-                        <div className="text-xs font-extrabold text-stone-900">E-Sertifikat Digital (PDF HD)</div>
-                        <p className="text-[11px] text-stone-600 mt-0.5">Dikirim langsung via WhatsApp resmi setelah penyaluran selesai.</p>
-                      </div>
-                    </div>
-
-                    <div
-                      onClick={() => setFormData((p) => ({ ...p, opsiSertifikat: "fisik" }))}
-                      className={cn(
-                        "p-4 rounded-xl cursor-pointer border-2 transition-all flex items-start gap-3",
-                        formData.opsiSertifikat === "fisik"
-                          ? "bg-emerald-50/90 border-emerald-600 shadow-xs ring-2 ring-emerald-500/20"
-                          : "bg-white border-stone-200 hover:border-emerald-200"
-                      )}
-                    >
-                      <FileCheck2 className="w-5 h-5 text-emerald-700 shrink-0 mt-0.5" />
-                      <div>
-                        <div className="text-xs font-extrabold text-stone-900">Sertifikat Cetak + E-Sertifikat</div>
-                        <p className="text-[11px] text-stone-600 mt-0.5">Sertifikat fisik resmi dapat diambil di kantor atau dikirimkan.</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* ══════════════════════════════════════════════════════════
-                LANGKAH 5: RINGKASAN TAGIHAN & PEMBAYARAN
-            ══════════════════════════════════════════════════════════ */}
-            {step === 5 && (
               <div className="space-y-6 animate-in fade-in-0 duration-200">
                 <div>
                   <h2 className="text-lg font-extrabold text-slate-950">Ringkasan Tagihan &amp; Pembayaran</h2>
@@ -1114,7 +1026,7 @@ export default function WakafQuranRegisterPage() {
                 </Link>
               )}
 
-              {step < 5 ? (
+              {step < 4 ? (
                 <Button
                   type="button"
                   onClick={handleNextStep}
