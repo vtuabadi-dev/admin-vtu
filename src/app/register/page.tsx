@@ -1029,55 +1029,48 @@ export default function RegisterPage() {
       </div>
 
       {/* Step indicator */}
-      <div className="bg-gradient-to-r from-white/60 via-white/35 to-[#041710]/70 backdrop-blur-md p-4 sm:p-5 rounded-2xl border-t border-l border-white/90 border-b border-r border-slate-900/35 shadow-[inset_1.5px_1.5px_3px_rgba(255,255,255,0.95),inset_-1.5px_-1.5px_4px_rgba(0,0,0,0.35),0_20px_40px_-15px_rgba(0,0,0,0.35)] mb-6 overflow-x-auto">
-        <div className="flex items-start justify-between min-w-[320px] px-1 sm:px-3">
-          {steps.map((s, i) => {
-            const isDarkSide = i >= 4;
+      <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-md p-4 sm:p-5 rounded-2xl border-t border-l border-white/90 border-b border-r border-slate-900/20 shadow-[inset_1px_1px_2px_rgba(255,255,255,0.9),0_15px_30px_-10px_rgba(0,0,0,0.15)] mb-6 overflow-x-auto">
+        <div className="relative flex items-start justify-between min-w-[580px] sm:min-w-[620px] max-w-4xl mx-auto">
+          {/* Base Background Connecting Track */}
+          <div className="absolute top-[18px] left-[6.25%] right-[6.25%] h-0.5 bg-stone-300 dark:bg-stone-700 z-0" />
+          
+          {/* Active Progress Filled Track */}
+          <div
+            className="absolute top-[18px] left-[6.25%] h-0.5 bg-emerald-600 transition-all duration-300 z-0"
+            style={{
+              width: `${((step - 1) / (steps.length - 1)) * 87.5}%`,
+            }}
+          />
+
+          {/* Step Nodes */}
+          {steps.map((s) => {
+            const isCompleted = step > s.key;
+            const isCurrent = step === s.key;
+
             return (
-              <div key={s.key} className="flex-1 flex items-start">
-                <div className="flex flex-col items-center shrink-0">
-                  <div
-                    className={cn(
-                      "w-9 h-9 rounded-full flex items-center justify-center text-xs font-extrabold transition-all duration-200 shadow-sm",
-                      step === s.key && "bg-gradient-to-tr from-emerald-800 to-teal-600 text-white shadow-md ring-4 ring-emerald-500/30 scale-110 border border-white",
-                      step > s.key && "bg-emerald-800 text-white border border-emerald-600 shadow-sm",
-                      step < s.key &&
-                        (isDarkSide
-                          ? "bg-[#062118]/85 text-[#F5D061] border border-[#D4AF37]/50 shadow-xs backdrop-blur-sm"
-                          : "bg-white/90 text-slate-800 border border-stone-300 shadow-xs")
-                    )}
-                  >
-                    {step > s.key ? <Check className="w-4.5 h-4.5 text-white stroke-[2.5]" /> : s.key}
-                  </div>
-                  <span
-                    className={cn(
-                      "text-[10.5px] mt-2 font-bold hidden sm:block text-center whitespace-nowrap transition-colors",
-                      step === s.key
-                        ? isDarkSide
-                          ? "text-[#F5D061] font-black drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)]"
-                          : "text-emerald-950 font-black drop-shadow-[0_1px_1px_rgba(255,255,255,0.9)]"
-                        : step > s.key
-                        ? isDarkSide
-                          ? "text-emerald-300 font-extrabold drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)]"
-                          : "text-emerald-900 font-extrabold"
-                        : isDarkSide
-                        ? "text-slate-100 font-extrabold drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)]"
-                        : "text-slate-900 font-extrabold drop-shadow-[0_1px_1px_rgba(255,255,255,0.8)]"
-                    )}
-                  >
-                    {s.label}
-                  </span>
+              <div key={s.key} className="flex-1 flex flex-col items-center justify-center text-center relative z-10">
+                <div
+                  className={cn(
+                    "w-9 h-9 rounded-full flex items-center justify-center text-xs font-extrabold transition-all duration-200 shadow-sm",
+                    isCurrent && "bg-gradient-to-tr from-emerald-800 to-teal-600 text-white shadow-md ring-4 ring-emerald-500/30 scale-110 border border-white",
+                    isCompleted && "bg-emerald-800 text-white border border-emerald-600 shadow-sm",
+                    !isCurrent && !isCompleted && "bg-white text-slate-700 border border-stone-300 shadow-xs"
+                  )}
+                >
+                  {isCompleted ? <Check className="w-4.5 h-4.5 text-white stroke-[2.5]" /> : s.key}
                 </div>
-                {i < steps.length - 1 && (
-                  <div className="flex-1 flex items-center h-9 mx-1 sm:mx-2">
-                    <div
-                      className={cn(
-                        "w-full h-1 rounded-full transition-all duration-300 shadow-inner",
-                        step > s.key ? "bg-emerald-600" : isDarkSide ? "bg-slate-600/60" : "bg-stone-300"
-                      )}
-                    />
-                  </div>
-                )}
+                <span
+                  className={cn(
+                    "text-[10px] sm:text-[11px] mt-2 font-bold hidden sm:block text-center whitespace-nowrap transition-colors",
+                    isCurrent
+                      ? "text-emerald-950 font-black drop-shadow-[0_1px_1px_rgba(255,255,255,0.9)]"
+                      : isCompleted
+                      ? "text-emerald-800 font-extrabold"
+                      : "text-slate-700 font-semibold"
+                  )}
+                >
+                  {s.label}
+                </span>
               </div>
             );
           })}
