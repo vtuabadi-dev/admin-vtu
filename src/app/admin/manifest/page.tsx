@@ -452,9 +452,9 @@ function ManifestPageContent() {
       groups.filter((g) => g.paketKeberangkatanId === activePackage.id).map((g) => g.id)
     );
 
-    return allJamaah.filter(
-      (j) => (jamaahIds.has(j.id) || packageGroupIds.has(j.groupId)) && j.status !== "batal"
-    );
+    return allJamaah
+      .filter((j) => (jamaahIds.has(j.id) || packageGroupIds.has(j.groupId)) && j.status !== "batal")
+      .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
   }, [activePackage, allJamaah, groups]);
 
   // Filtered Jamaah by search query
@@ -470,7 +470,7 @@ function ManifestPageContent() {
     });
   }, [activePackageJamaah, searchQuery]);
 
-  // Group Jamaah for Row Merging (rowSpan)
+  // Group Jamaah for Row Merging (rowSpan) & Sequential Numbering by Package Entry Time
   const groupedJamaahList = useMemo(() => {
     const map = new Map<string, Jamaah[]>();
     filteredActiveJamaah.forEach((j) => {
@@ -479,14 +479,42 @@ function ManifestPageContent() {
       map.get(key)!.push(j);
     });
 
-    return Array.from(map.entries()).map(([groupId, members]) => {
+    const groupsArray = Array.from(map.entries()).map(([groupId, members]) => {
       const groupObj = groups.find((g) => g.id === groupId) || null;
+
+      // Sort members within this group by nomorPeserta ASC, registrationId ASC, or createdAt ASC
+      const sortedMembers = [...members].sort((a, b) => {
+        const numA = parseInt((a.nomorPeserta || "0").replace(/\D/g, ""), 10) || 0;
+        const numB = parseInt((b.nomorPeserta || "0").replace(/\D/g, ""), 10) || 0;
+        if (numA !== numB) return numA - numB;
+        const regA = a.registrationId || "";
+        const regB = b.registrationId || "";
+        if (regA !== regB) return regA.localeCompare(regB);
+        return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+      });
+
+      // Calculate the timestamp when this rombongan joined this package
+      // If group was transferred to this package later (updatedAt > createdAt), updatedAt reflects entry time
+      let packageEntryTime = 0;
+      if (groupObj) {
+        const created = new Date(groupObj.createdAt).getTime();
+        const updated = new Date(groupObj.updatedAt).getTime();
+        packageEntryTime = updated || created;
+      } else if (sortedMembers.length > 0) {
+        packageEntryTime = Math.min(...sortedMembers.map((m) => new Date(m.createdAt).getTime()));
+      }
+
       return {
         groupId,
-        members,
+        members: sortedMembers,
         groupObj,
+        packageEntryTime,
       };
     });
+
+    // Chronological Sort (First-In, First-Numbered):
+    // Oldest package entries come FIRST (No 1, 2, ...), newest entries / transferred groups come LAST
+    return groupsArray.sort((a, b) => a.packageEntryTime - b.packageEntryTime);
   }, [filteredActiveJamaah, groups]);
 
   // Reset selection when package or search query changes

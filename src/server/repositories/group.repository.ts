@@ -97,7 +97,7 @@ export const groupRepo = {
         include: { anggota: true },
         take: params?.limit,
         skip: params?.offset,
-        orderBy: { createdAt: "desc" },
+        orderBy: { createdAt: "asc" },
       }),
       prisma.registrationGroup.count({ where }),
     ]);
