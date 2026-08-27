@@ -463,21 +463,59 @@ export default function TrackBadalWakafPage() {
                       resultData.wakafList.map((item) => (
                         <Card key={item.id} className="border shadow-xs overflow-hidden">
                           <div className="p-4 space-y-3">
-                            <div className="flex flex-wrap items-center justify-between gap-2 border-b pb-2.5">
-                              <div>
-                                <span className="text-[11px] text-muted-foreground">Niat Atas Nama / Wakaf:</span>
-                                <h4 className="text-sm font-bold text-foreground">{item.niatAtasNama || item.namaPewakaf}</h4>
+                            <div className="flex flex-wrap items-start justify-between gap-3 border-b pb-3">
+                              <div className="space-y-2 flex-1 min-w-[240px]">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wide">
+                                    Niat Atas Nama / Wakaf:
+                                  </span>
+                                  {(() => {
+                                    const raw = item.niatAtasNama || item.namaPewakaf || "";
+                                    const names = raw.split(/[\n,;]+/).map((n: string) => n.trim()).filter(Boolean);
+                                    return (
+                                      <span className="text-[10px] font-extrabold px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-900 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800">
+                                        Total {names.length || 1} Nama
+                                      </span>
+                                    );
+                                  })()}
+                                </div>
+
+                                {(() => {
+                                  const raw = item.niatAtasNama || item.namaPewakaf || "";
+                                  const names = raw.split(/[\n,;]+/).map((n: string) => n.trim()).filter(Boolean);
+                                  if (names.length === 0) {
+                                    return <p className="text-xs font-semibold text-muted-foreground italic">-</p>;
+                                  }
+                                  return (
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-0.5">
+                                      {names.map((name: string, idx: number) => (
+                                        <div
+                                          key={idx}
+                                          className="flex items-center gap-2 bg-stone-50 dark:bg-stone-900/70 px-3 py-2 rounded-xl border border-stone-200/80 dark:border-stone-800 shadow-2xs hover:border-emerald-300 transition-colors"
+                                        >
+                                          <span className="w-5 h-5 rounded-full bg-emerald-600 text-white text-[10.5px] font-black flex items-center justify-center shrink-0 shadow-2xs">
+                                            {idx + 1}
+                                          </span>
+                                          <span className="text-xs font-bold text-foreground capitalize truncate">
+                                            {name}
+                                          </span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  );
+                                })()}
                               </div>
-                              <div className="flex items-center gap-2">
-                                <Badge className="bg-sky-100 text-sky-800 font-bold">
+
+                              <div className="flex flex-wrap items-center gap-2 shrink-0 pt-0.5">
+                                <Badge className="bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-300 font-bold px-2.5 py-1 text-xs">
                                   {item.jumlahMushaf} Mushaf Al-Qur&apos;an
                                 </Badge>
                                 <Badge
-                                  className={
+                                  className={`px-2.5 py-1 text-xs font-bold ${
                                     item.status === "Selesai"
-                                      ? "bg-emerald-100 text-emerald-800"
-                                      : "bg-amber-100 text-amber-800"
-                                  }
+                                      ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
+                                      : "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300"
+                                  }`}
                                 >
                                   Status: {item.status}
                                 </Badge>

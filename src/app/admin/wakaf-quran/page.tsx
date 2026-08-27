@@ -217,7 +217,22 @@ export default function AdminWakafQuranPage() {
                           </div>
                         </td>
                         <td className="px-4 py-3 font-semibold text-foreground">
-                          {item.niatAtasNama || "-"}
+                          {(() => {
+                            const names = (item.niatAtasNama || "").split(/[\n,;]+/).map((n: string) => n.trim()).filter(Boolean);
+                            if (names.length === 0) return <span className="text-muted-foreground italic">-</span>;
+                            return (
+                              <div className="space-y-1">
+                                {names.map((name: string, idx: number) => (
+                                  <div key={idx} className="flex items-center gap-1.5 text-xs">
+                                    <span className="w-4 h-4 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 text-[9px] font-bold flex items-center justify-center shrink-0 border border-emerald-300 dark:border-emerald-800">
+                                      {idx + 1}
+                                    </span>
+                                    <span className="font-semibold text-foreground capitalize">{name}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            );
+                          })()}
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex flex-col gap-1">
@@ -308,9 +323,24 @@ export default function AdminWakafQuranPage() {
                           </div>
                         </td>
                         <td className="px-4 py-3">
-                          <div className="flex flex-col">
+                          <div className="flex flex-col gap-1">
                             <span className="font-bold text-sky-700 dark:text-sky-400">{item.jumlahMushaf} Mushaf</span>
-                            <span className="text-[11px] text-muted-foreground">Niat: {item.niatAtasNama || "-"}</span>
+                            {(() => {
+                              const names = (item.niatAtasNama || "").split(/[\n,;]+/).map((n: string) => n.trim()).filter(Boolean);
+                              if (names.length === 0) return <span className="text-[11px] text-muted-foreground italic">Niat: -</span>;
+                              return (
+                                <div className="space-y-0.5 pt-0.5">
+                                  {names.map((name: string, idx: number) => (
+                                    <div key={idx} className="flex items-center gap-1 text-[11px]">
+                                      <span className="w-3.5 h-3.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 text-[8px] font-bold flex items-center justify-center shrink-0 border border-emerald-300 dark:border-emerald-800">
+                                        {idx + 1}
+                                      </span>
+                                      <span className="text-foreground capitalize">{name}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              );
+                            })()}
                           </div>
                         </td>
                         <td className="px-4 py-3">
