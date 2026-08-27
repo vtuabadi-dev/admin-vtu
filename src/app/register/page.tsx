@@ -994,7 +994,7 @@ export default function RegisterPage() {
       {/* ── Background Makkah & Madinah Golden Canvas Artwork ── */}
       <div
         className="fixed inset-0 bg-cover bg-center bg-no-repeat pointer-events-none z-0"
-        style={{ backgroundImage: `url('/images/bg-makkah-madinah-canvas.jpg')` }}
+        style={{ backgroundImage: `url('/assets/portals/bg-umroh.jpg')` }}
       />
       <div className="relative z-10">
         {/* ── Floating Unified Portal Switcher Bar ── */}

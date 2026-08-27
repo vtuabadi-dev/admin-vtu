@@ -359,17 +359,10 @@ export default function WakafQuranRegisterPage() {
   if (submitted) {
     return (
       <div className="w-full max-w-4xl mx-auto relative">
-        {/* ── Dynamic Live Background from Google Drive Folder 1IDHH8jvRkLgl4mix7msF1XEB22f88MlA ── */}
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src="/api/wakaf-quran/background"
-          alt="Background Wakaf Qur'an"
-          loading="eager"
-          fetchPriority="high"
-          className="fixed inset-0 w-full h-full object-cover object-center pointer-events-none z-0"
-          onError={(e) => {
-            (e.currentTarget as HTMLImageElement).src = "/images/wakaf-quran-bg.png";
-          }}
+        {/* ── High-Performance Static Background ── */}
+        <div
+          className="fixed inset-0 bg-cover bg-center bg-no-repeat pointer-events-none z-0"
+          style={{ backgroundImage: `url('/assets/portals/bg-wakaf.jpg')` }}
         />
         <div className="fixed inset-0 bg-black/10 pointer-events-none z-0" />
 
@@ -462,17 +455,10 @@ export default function WakafQuranRegisterPage() {
 
   return (
     <div className="w-full max-w-4xl mx-auto relative">
-      {/* ── Dynamic Live Background from Google Drive Folder 1IDHH8jvRkLgl4mix7msF1XEB22f88MlA ── */}
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src="/api/wakaf-quran/background"
-        alt="Background Wakaf Qur'an"
-        loading="eager"
-        fetchPriority="high"
-        className="fixed inset-0 w-full h-full object-cover object-center pointer-events-none z-0"
-        onError={(e) => {
-          (e.currentTarget as HTMLImageElement).src = "/images/wakaf-quran-bg.png";
-        }}
+      {/* ── High-Performance Static Background ── */}
+      <div
+        className="fixed inset-0 bg-cover bg-center bg-no-repeat pointer-events-none z-0"
+        style={{ backgroundImage: `url('/assets/portals/bg-wakaf.jpg')` }}
       />
       <div className="fixed inset-0 bg-black/10 pointer-events-none z-0" />
 

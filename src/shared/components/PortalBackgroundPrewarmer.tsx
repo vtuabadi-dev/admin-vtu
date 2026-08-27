@@ -12,10 +12,10 @@ const CRITICAL_ROUTES = [
 ];
 
 const CRITICAL_IMAGES = [
-  "/images/bg-makkah-madinah-canvas.jpg",
-  "/api/badal-umroh/background",
-  "/api/wakaf-quran/background",
-  "/images/wakaf-quran-bg.png",
+  "/assets/portals/bg-umroh.jpg",
+  "/assets/portals/bg-badal.jpg",
+  "/assets/portals/bg-wakaf.jpg",
+  "/assets/portals/bg-track.jpg",
 ];
 
 const CRITICAL_APIS = [
