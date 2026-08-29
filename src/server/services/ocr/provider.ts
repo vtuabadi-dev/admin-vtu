@@ -45,7 +45,7 @@ export interface OcrProvider {
 
 // Field mappings per jenis dokumen — must match DokumenJenis union
 export const DOCUMENT_FIELD_MAPS: Record<string, string[]> = {
-  paspor: ["namaLengkap", "nomorPaspor", "tanggalLahir", "tempatLahir", "masaBerlaku"],
+  paspor: ["namaLengkap", "nomorPaspor", "tempatTerbitPaspor", "tanggalTerbitPaspor", "tanggalKadaluarsa"],
   pas_foto: [],
   vaksin: ["namaLengkap"],
   ktp: ["namaLengkap", "nik", "tanggalLahir", "tempatLahir"],

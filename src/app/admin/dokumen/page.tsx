@@ -520,14 +520,24 @@ export default function DokumenPage() {
       }
 
       // Update documents list
+      const uploadedDoc = json.data.dokumen;
       setUploadDocuments((prev) => {
         const existing = prev.find((d) => d.jenis === jenis);
         if (existing) {
           return prev.map((d) => d.jenis === jenis ? { ...d, fileUrl: json.data.fileUrl, status: "processing" } : d);
         } else {
-          return [...prev, json.data.dokumen];
+          return [...prev, uploadedDoc];
         }
       });
+
+      // ── Auto-OCR setelah upload berhasil ──────────────────
+      // Trigger ekstraksi otomatis tanpa harus klik tombol
+      const fileUrl: string = json.data.fileUrl ?? uploadedDoc?.fileUrl ?? "";
+      const dokumenId: string = uploadedDoc?.id ?? "";
+      if (fileUrl && dokumenId) {
+        // Jalankan OCR di background tanpa block UI upload
+        handleExtractOcr(jenis, { fileUrl, id: dokumenId });
+      }
     } catch (err) {
       console.error("Upload error:", err);
       alert(`Gagal mengupload file: ${(err as Error).message}`);
@@ -536,8 +546,13 @@ export default function DokumenPage() {
     }
   }
 
-  async function handleExtractOcr(jenis: string) {
-    const doc = uploadDocuments.find((d) => d.jenis === jenis);
+  /**
+   * Ekstrak data OCR untuk dokumen tertentu.
+   * @param jenis     - Jenis dokumen
+   * @param overrideDoc - Opsional: pass dokumen langsung (digunakan saat auto-OCR setelah upload)
+   */
+  async function handleExtractOcr(jenis: string, overrideDoc?: { id: string; fileUrl: string }) {
+    const doc = overrideDoc ?? uploadDocuments.find((d) => d.jenis === jenis);
     if (!doc?.fileUrl) return;
 
     setExtractingOcr(jenis);
@@ -554,7 +569,10 @@ export default function DokumenPage() {
       setOcrResults((prev) => ({ ...prev, [jenis]: json.data }));
     } catch (err) {
       console.error("OCR error:", err);
-      alert(`Gagal mengekstrak data: ${(err as Error).message}`);
+      // Tidak alert saat auto-OCR, hanya log — user bisa klik manual jika gagal
+      if (!overrideDoc) {
+        alert(`Gagal mengekstrak data: ${(err as Error).message}`);
+      }
     } finally {
       setExtractingOcr(null);
     }
@@ -1245,28 +1263,46 @@ export default function DokumenPage() {
                               {/* Right: Extract Data */}
                               <div className="flex-1 space-y-3">
                                 <h4 className="text-sm font-medium">Ekstrak Data</h4>
-                                <p className="text-xs text-muted-foreground">
-                                  Klik tombol di bawah untuk mengekstrak data dari dokumen menggunakan OCR.
-                                </p>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => handleExtractOcr(jenis)}
-                                  disabled={!isUploaded || extractingOcr === jenis}
-                                  className="w-full"
-                                >
-                                  {extractingOcr === jenis ? (
-                                    <>
-                                      <RefreshCw className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-                                      Mengekstrak...
-                                    </>
-                                  ) : (
-                                    <>
-                                      <FileText className="mr-1.5 h-3.5 w-3.5" />
-                                      Ekstrak Data
-                                    </>
-                                  )}
-                                </Button>
+                                {extractingOcr === jenis ? (
+                                  <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+                                    <RefreshCw className="h-3 w-3 animate-spin" />
+                                    Mengekstrak data otomatis...
+                                  </p>
+                                ) : ocrResults[jenis] ? (
+                                  <p className="text-xs text-success flex items-center gap-1.5">
+                                    <CheckCircle className="h-3 w-3" />
+                                    Data berhasil diekstrak
+                                  </p>
+                                ) : (
+                                  <p className="text-xs text-muted-foreground">
+                                    {isUploaded
+                                      ? "Mengekstrak data otomatis setelah upload..."
+                                      : "Upload dokumen untuk memulai ekstraksi otomatis."}
+                                  </p>
+                                )}
+
+                                {/* Tombol re-ekstrak manual jika sudah ada file */}
+                                {isUploaded && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handleExtractOcr(jenis)}
+                                    disabled={extractingOcr === jenis}
+                                    className="w-full"
+                                  >
+                                    {extractingOcr === jenis ? (
+                                      <>
+                                        <RefreshCw className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                                        Mengekstrak...
+                                      </>
+                                    ) : (
+                                      <>
+                                        <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
+                                        Ekstrak Ulang
+                                      </>
+                                    )}
+                                  </Button>
+                                )}
 
                                 {/* OCR Results */}
                                 {ocrResults[jenis] && (
@@ -1284,7 +1320,7 @@ export default function DokumenPage() {
                                       {ocrResults[jenis].namaLengkap && (
                                         <div className="flex justify-between">
                                           <span className="text-muted-foreground">Nama:</span>
-                                          <span>{ocrResults[jenis].namaLengkap}</span>
+                                          <span className="text-right max-w-[60%]">{ocrResults[jenis].namaLengkap}</span>
                                         </div>
                                       )}
                                       {ocrResults[jenis].nik && (
@@ -1293,12 +1329,38 @@ export default function DokumenPage() {
                                           <span>{ocrResults[jenis].nik}</span>
                                         </div>
                                       )}
+                                      {/* ── Paspor-specific fields ── */}
                                       {ocrResults[jenis].nomorPaspor && (
                                         <div className="flex justify-between">
                                           <span className="text-muted-foreground">No. Paspor:</span>
-                                          <span>{ocrResults[jenis].nomorPaspor}</span>
+                                          <span className="font-mono font-semibold">{ocrResults[jenis].nomorPaspor}</span>
                                         </div>
                                       )}
+                                      {ocrResults[jenis].tempatTerbitPaspor && (
+                                        <div className="flex justify-between">
+                                          <span className="text-muted-foreground">Tempat Terbit:</span>
+                                          <span>{ocrResults[jenis].tempatTerbitPaspor}</span>
+                                        </div>
+                                      )}
+                                      {ocrResults[jenis].tanggalTerbitPaspor && (
+                                        <div className="flex justify-between">
+                                          <span className="text-muted-foreground">Tgl. Terbit:</span>
+                                          <span>{ocrResults[jenis].tanggalTerbitPaspor}</span>
+                                        </div>
+                                      )}
+                                      {ocrResults[jenis].tanggalKadaluarsa && (
+                                        <div className="flex justify-between">
+                                          <span className="text-muted-foreground">Tgl. Kadaluarsa:</span>
+                                          <span
+                                            className={(
+                                              new Date(ocrResults[jenis].tanggalKadaluarsa).getTime() - Date.now()
+                                            ) < 180 * 24 * 60 * 60 * 1000 ? "text-destructive font-semibold" : ""}
+                                          >
+                                            {ocrResults[jenis].tanggalKadaluarsa}
+                                          </span>
+                                        </div>
+                                      )}
+                                      {/* Legacy compat — tampilkan jika ada field lama */}
                                       {ocrResults[jenis].tanggalLahir && (
                                         <div className="flex justify-between">
                                           <span className="text-muted-foreground">Tgl. Lahir:</span>

@@ -59,13 +59,13 @@ function extractField(text: string, field: string): string {
 function getPromptForJenis(jenis: DokumenJenis): string {
   switch (jenis) {
     case "paspor":
-      return `Analisis gambar Paspor ini dan ekstrak data terstruktur berikut dalam format JSON (tanpa markdown wrapper):
+      return `Analisis gambar Paspor Indonesia ini dan ekstrak data terstruktur berikut dalam format JSON valid (tanpa markdown wrapper):
 {
-  "namaLengkap": "Nama lengkap pemegang paspor (Given Names & Surname)",
-  "nomorPaspor": "Nomor paspor (contoh: C1234567 / X1234567)",
-  "tanggalLahir": "YYYY-MM-DD",
-  "tempatLahir": "Tempat lahir",
-  "masaBerlaku": "YYYY-MM-DD",
+  "namaLengkap": "Nama lengkap pemegang paspor (contoh: MUCHAMAD ZAMRONI)",
+  "nomorPaspor": "Nomor paspor (misal: X4573266 atau C1234567 — biasanya 1 huruf + 7 digit)",
+  "tempatTerbitPaspor": "Kota/tempat penerbitan paspor (bukan tempat lahir), cari kolom 'Place of issue' atau 'Diterbitkan di'",
+  "tanggalTerbitPaspor": "Tanggal penerbitan paspor dalam format YYYY-MM-DD (cari 'Date of issue' atau 'Tanggal pengeluaran')",
+  "tanggalKadaluarsa": "Tanggal habis masa berlaku paspor dalam format YYYY-MM-DD (cari 'Date of expiry' atau 'Berlaku hingga')",
   "rawText": "Teks mentah paspor"
 }`;
     case "ktp":
