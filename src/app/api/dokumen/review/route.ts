@@ -27,7 +27,7 @@ export async function PUT(request: NextRequest) {
   try {
     const { dokumenId, manualData, dataStatus } = await request.json() as {
       dokumenId: string;
-      manualData: { namaLengkap?: string; nik?: string; nomorPaspor?: string; tanggalLahir?: string };
+      manualData: Record<string, any>;
       dataStatus?: "valid" | "pending" | "manual_edit" | "ocr_error";
     };
 

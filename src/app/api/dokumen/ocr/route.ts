@@ -6,6 +6,8 @@ import { processDocument } from "@/server/services/ocr.service";
 import { getStorageAdapter } from "@/server/storage";
 import type { DokumenJenis } from "@/shared/types";
 
+import { dokumenRepo } from "@/server/repositories";
+
 export async function POST(request: NextRequest) {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
@@ -53,6 +55,9 @@ export async function POST(request: NextRequest) {
         ocrData[field.field] = field.value;
       }
     }
+
+    // Persist OCR result and sync Jamaah & ManifestRow
+    await dokumenRepo.saveOcrResult(dokumenId, ocrData as any);
 
     return NextResponse.json({ success: true, data: ocrData });
   } catch (error) {

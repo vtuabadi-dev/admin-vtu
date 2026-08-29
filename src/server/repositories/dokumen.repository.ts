@@ -26,6 +26,70 @@ function mapDokumen(doc: any): DokumenItem {
 // Queries
 // ────────────────────────────────────────────────────────────
 
+async function syncJamaahAndManifestFromDocData(jamaahId: string, data: Record<string, any>) {
+  if (!jamaahId || !data) return;
+
+  const jamaahUpdates: Record<string, any> = {};
+  const manifestUpdates: Record<string, any> = {};
+
+  if (typeof data.namaLengkap === "string" && data.namaLengkap.trim()) {
+    const cleanedName = data.namaLengkap.trim().toUpperCase();
+    jamaahUpdates.namaLengkap = cleanedName;
+    manifestUpdates.namaLengkap = cleanedName;
+  }
+
+  if (typeof data.nomorPaspor === "string" && data.nomorPaspor.trim()) {
+    const cleanedPaspor = data.nomorPaspor.trim().toUpperCase();
+    jamaahUpdates.nomorPaspor = cleanedPaspor;
+    manifestUpdates.nomorPaspor = cleanedPaspor;
+  }
+
+  if (data.tanggalKadaluarsa) {
+    const expDate = new Date(data.tanggalKadaluarsa);
+    if (!isNaN(expDate.getTime())) {
+      jamaahUpdates.masaBerlakuPaspor = expDate;
+    }
+  } else if (data.masaBerlaku) {
+    const expDate = new Date(data.masaBerlaku);
+    if (!isNaN(expDate.getTime())) {
+      jamaahUpdates.masaBerlakuPaspor = expDate;
+    }
+  }
+
+  if (typeof data.tempatLahir === "string" && data.tempatLahir.trim()) {
+    jamaahUpdates.tempatLahir = data.tempatLahir.trim();
+    manifestUpdates.tempatLahir = data.tempatLahir.trim();
+  }
+
+  if (data.tanggalLahir) {
+    const dob = new Date(data.tanggalLahir);
+    if (!isNaN(dob.getTime())) {
+      jamaahUpdates.tanggalLahir = dob;
+      manifestUpdates.tanggalLahir = data.tanggalLahir;
+    }
+  }
+
+  if (typeof data.nik === "string" && data.nik.trim()) {
+    jamaahUpdates.nik = data.nik.trim();
+  }
+
+  // Update Jamaah if there are updates
+  if (Object.keys(jamaahUpdates).length > 0) {
+    await prisma.jamaah.update({
+      where: { id: jamaahId },
+      data: jamaahUpdates,
+    }).catch((err) => console.warn("[DokumenRepo] Failed to sync Jamaah from OCR:", err));
+  }
+
+  // Update ManifestRows if there are updates
+  if (Object.keys(manifestUpdates).length > 0) {
+    await prisma.manifestRow.updateMany({
+      where: { jamaahId },
+      data: manifestUpdates,
+    }).catch((err) => console.warn("[DokumenRepo] Failed to sync ManifestRow from OCR:", err));
+  }
+}
+
 export const dokumenRepo = {
   mapDokumen,
   async findByJamaah(jamaahId: string) {
@@ -62,6 +126,9 @@ export const dokumenRepo = {
       where: { id },
       data: { manualData: manualData as any, dataStatus },
     });
+    if (row.jamaahId && manualData) {
+      await syncJamaahAndManifestFromDocData(row.jamaahId, manualData as Record<string, any>);
+    }
     return mapDokumen(row);
   },
 
@@ -74,6 +141,9 @@ export const dokumenRepo = {
         ocrRetryCount: { increment: 0 },
       },
     });
+    if (row.jamaahId && ocrData) {
+      await syncJamaahAndManifestFromDocData(row.jamaahId, ocrData as Record<string, any>);
+    }
     return mapDokumen(row);
   },
 
