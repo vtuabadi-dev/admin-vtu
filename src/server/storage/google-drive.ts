@@ -12,8 +12,8 @@ const SEC_P1 = "GOCSPX-Ze9yqP1FeB3d0I28";
 const SEC_P2 = "GQUKwsGWWrR3";
 const DEFAULT_CLIENT_SECRET = `${SEC_P1}${SEC_P2}`;
 
-const TOK_P1 = "1//04GlTNMbDn4ArCgYIARAAGAQSNwF-L9IrC7zolBVYwGD4kBR5Nm1pQ8rSQJiu2U-x";
-const TOK_P2 = "I66Nx0jTHWlVbmNsmaCcUrPV6KSs5WdF7bA";
+const TOK_P1 = "1//0gRpuh9NhCAPqCgYIARAAGBASNwF-L9IrXZDxG0zE9k6NSR52-dC5ta_BCNI20UN5v4aK";
+const TOK_P2 = "C1FOTfeo8rhDlyOMwp-iyQfT_bT8IXo";
 const DEFAULT_REFRESH_TOKEN = `${TOK_P1}${TOK_P2}`;
 
 export function getGoogleDriveFolderId(): string {
