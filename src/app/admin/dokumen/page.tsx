@@ -107,36 +107,6 @@ function getDocCellBadge(docInfo: { status: string } | undefined) {
   return { variant: "muted" as const, label: docInfo.status, dotClass: "bg-muted-foreground/30" };
 }
 
-/** Komponen tampilan hasil OCR generik — dipakai untuk dokumen non-paspor */
-function OcrResultCard({ data }: { data: Record<string, any> }) {
-  if (!data) return null;
-  return (
-    <div className="space-y-2 rounded-md border p-3">
-      <div className="flex items-center justify-between">
-        <h5 className="text-xs font-medium">Hasil Ekstraksi</h5>
-        <Badge variant={data.confidence >= 0.7 ? "success" : "warning"} size="sm">
-          {Math.round((data.confidence ?? 0) * 100)}%
-        </Badge>
-      </div>
-      <div className="space-y-1 text-xs">
-        {data.namaLengkap && <div className="flex justify-between"><span className="text-muted-foreground">Nama:</span><span className="text-right max-w-[60%]">{data.namaLengkap}</span></div>}
-        {data.nik && <div className="flex justify-between"><span className="text-muted-foreground">NIK:</span><span>{data.nik}</span></div>}
-        {data.nomorPaspor && <div className="flex justify-between"><span className="text-muted-foreground">No. Paspor:</span><span className="font-mono font-semibold">{data.nomorPaspor}</span></div>}
-        {data.tempatTerbitPaspor && <div className="flex justify-between"><span className="text-muted-foreground">Tempat Terbit:</span><span>{data.tempatTerbitPaspor}</span></div>}
-        {data.tanggalTerbitPaspor && <div className="flex justify-between"><span className="text-muted-foreground">Tgl. Terbit:</span><span>{data.tanggalTerbitPaspor}</span></div>}
-        {data.tanggalKadaluarsa && (
-          <div className="flex justify-between">
-            <span className="text-muted-foreground">Tgl. Kadaluarsa:</span>
-            <span className={(new Date(data.tanggalKadaluarsa).getTime() - Date.now()) < 180 * 24 * 60 * 60 * 1000 ? "text-destructive font-semibold" : ""}>{data.tanggalKadaluarsa}</span>
-          </div>
-        )}
-        {data.tanggalLahir && <div className="flex justify-between"><span className="text-muted-foreground">Tgl. Lahir:</span><span>{data.tanggalLahir}</span></div>}
-        {data.tempatLahir && <div className="flex justify-between"><span className="text-muted-foreground">Tempat Lahir:</span><span>{data.tempatLahir}</span></div>}
-      </div>
-    </div>
-  );
-}
-
 // ============================================================
 // MAIN PAGE
 // ============================================================
@@ -187,6 +157,7 @@ export default function DokumenPage() {
   const [extractingOcr, setExtractingOcr] = useState<string | null>(null);
   const [ocrResults, setOcrResults] = useState<Record<string, any>>({});
   const [submitting, setSubmitting] = useState(false);
+  const [activeDocType, setActiveDocType] = useState<DokumenJenis>("paspor");
 
   // --- Passport Endorsement State ---
   // null = belum dipilih, false = standar (1 halaman), true = ada endorsement (2 halaman)
@@ -198,6 +169,7 @@ export default function DokumenPage() {
   const [extractingEndorsement, setExtractingEndorsement] = useState(false);
   // Hasil OCR halaman 2 endorsement (hanya namaLengkap)
   const [endorsementOcrResult, setEndorsementOcrResult] = useState<any>(null);
+  const [pasporPageTab, setPasporPageTab] = useState<"hal1" | "hal2">("hal1");
 
   // Load initial data
   useEffect(() => {
@@ -457,12 +429,21 @@ export default function DokumenPage() {
     setUploadDocuments([]);
     setUploadPreviews({});
     setOcrResults({});
+    setActiveDocType("paspor");
 
     try {
       const docRes = await fetch(`/api/jamaah/${member.id}/dokumen`);
       if (docRes.ok) {
         const docJson = await docRes.json();
-        setUploadDocuments(docJson.data ?? []);
+        const docs = docJson.data ?? [];
+        setUploadDocuments(docs);
+        const initialOcr: Record<string, any> = {};
+        docs.forEach((d: any) => {
+          if (d.manualData || d.ocrData) {
+            initialOcr[d.jenis] = d.manualData || d.ocrData;
+          }
+        });
+        setOcrResults(initialOcr);
       }
     } catch { /* graceful */ }
   }
@@ -477,6 +458,7 @@ export default function DokumenPage() {
     setUploadDocuments([]);
     setUploadPreviews({});
     setOcrResults({});
+    setActiveDocType("paspor");
 
     try {
       const res = await fetch(`/api/jamaah?search=${encodeURIComponent(q)}&limit=50`);
@@ -526,6 +508,7 @@ export default function DokumenPage() {
     setOcrResults({});
     setUploadSearchId("");
     setUploadError("");
+    setActiveDocType("paspor");
     // Reset endorsement state
     setPasporHasEndorsement(null);
     setEndorsementPreview("");
@@ -536,6 +519,8 @@ export default function DokumenPage() {
   function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>, jenis: string) {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    setActiveDocType(jenis as DokumenJenis);
 
     // Create preview URL
     const previewUrl = URL.createObjectURL(file);
@@ -1359,312 +1344,336 @@ export default function DokumenPage() {
                   </Card>
                 )}
 
-                {/* Document Upload Grid */}
+                {/* Document Upload & OCR Master-Detail (2 Columns) */}
                 {selectedJamaah && (
-                  <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                    {ALL_DOC_JENIS.map((jenis) => {
-                      const existingDoc = uploadDocuments.find((d) => d.jenis === jenis);
-                      const isUploaded = existingDoc?.fileUrl;
-                      const previewUrl = uploadPreviews[jenis] || existingDoc?.fileUrl;
+                  <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
+                    {/* ── LEFT COLUMN (lg:col-span-5): Master Document List & Dropzones ── */}
+                    <div className="lg:col-span-5 space-y-3">
+                      <div className="flex items-center justify-between px-1">
+                        <h4 className="text-xs font-bold uppercase tracking-wider text-stone-600 dark:text-stone-400">
+                          Daftar Dokumen ({ALL_DOC_JENIS.length})
+                        </h4>
+                        <span className="text-[11px] text-muted-foreground">Klik 👁️ / baris untuk detail</span>
+                      </div>
 
-                      return (
-                        <Card key={jenis}>
-                          <CardContent className="pt-4">
-                            {/* ────────────── PASPOR: Endorsement-aware flow ────────────── */}
-                            {jenis === "paspor" ? (
-                              <div className="space-y-4">
-                                {/* Header + Mode Badge */}
-                                <div className="flex items-center justify-between">
-                                  <h4 className="text-sm font-medium">Paspor</h4>
-                                  {pasporHasEndorsement !== null && (
-                                    <button
-                                      type="button"
-                                      className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
-                                      onClick={() => {
-                                        setPasporHasEndorsement(null);
-                                        setEndorsementPreview("");
-                                        setEndorsementDoc(null);
-                                        setEndorsementOcrResult(null);
-                                        setOcrResults((prev) => { const n = { ...prev }; delete n.paspor; return n; });
-                                      }}
-                                    >
-                                      Ganti Mode
-                                    </button>
-                                  )}
+                      {ALL_DOC_JENIS.map((jenis) => {
+                        const existingDoc = uploadDocuments.find((d) => d.jenis === jenis);
+                        const isUploaded = !!existingDoc?.fileUrl;
+                        const isSelected = activeDocType === jenis;
+
+                        return (
+                          <div
+                            key={jenis}
+                            onClick={() => setActiveDocType(jenis)}
+                            className={cn(
+                              "p-3 rounded-xl border transition-all cursor-pointer space-y-2.5",
+                              isSelected
+                                ? "border-primary bg-primary/5 shadow-sm ring-1 ring-primary"
+                                : "border-stone-200 dark:border-stone-800 bg-card hover:border-stone-400 dark:hover:border-stone-700"
+                            )}
+                          >
+                            {/* Header Item */}
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <FileText className={cn("h-4 w-4", isSelected ? "text-primary" : "text-stone-500")} />
+                                <span className="text-xs font-bold text-stone-900 dark:text-white">
+                                  {LABEL_DOKUMEN[jenis]}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-1.5">
+                                {extractingOcr === jenis ? (
+                                  <Badge variant="info" size="sm" className="text-[10px] h-5">
+                                    <RefreshCw className="h-2.5 w-2.5 mr-1 animate-spin" />
+                                    OCR...
+                                  </Badge>
+                                ) : isUploaded ? (
+                                  <Badge variant="success" size="sm" className="text-[10px] h-5">
+                                    <CheckCircle className="h-2.5 w-2.5 mr-1" />
+                                    Terupload
+                                  </Badge>
+                                ) : (
+                                  <Badge variant="muted" size="sm" className="text-[10px] h-5">Belum</Badge>
+                                )}
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant={isSelected ? "default" : "ghost"}
+                                  className="h-6 w-6 p-0 rounded-full"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setActiveDocType(jenis);
+                                  }}
+                                  title="Lihat Detail & OCR"
+                                >
+                                  <Eye className="h-3.5 w-3.5" />
+                                </Button>
+                              </div>
+                            </div>
+
+                            {/* Option Endorsement khusus Paspor (Jika Belum Terupload) */}
+                            {jenis === "paspor" && !isUploaded && (
+                              <div className="p-2 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 space-y-1.5" onClick={(e) => e.stopPropagation()}>
+                                <p className="text-[11px] font-semibold text-amber-900 dark:text-amber-300">
+                                  Endorsement Nama?
+                                </p>
+                                <div className="flex gap-1.5">
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant={pasporHasEndorsement === false ? "default" : "outline"}
+                                    className="h-6 text-[10px] flex-1"
+                                    onClick={() => setPasporHasEndorsement(false)}
+                                  >
+                                    Tidak Ada
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant={pasporHasEndorsement === true ? "default" : "outline"}
+                                    className={cn("h-6 text-[10px] flex-1", pasporHasEndorsement === true && "bg-amber-600 hover:bg-amber-700")}
+                                    onClick={() => setPasporHasEndorsement(true)}
+                                  >
+                                    Ada Endorsement (2 Hal)
+                                  </Button>
                                 </div>
+                              </div>
+                            )}
 
-                                {/* ── Step 1: Endorsement Question (Hanya jika paspor BELUM terupload) ── */}
-                                {!isUploaded && pasporHasEndorsement === null && (
-                                  <div className="rounded-lg border-2 border-dashed border-amber-400/60 bg-amber-50/50 dark:bg-amber-950/20 p-4 space-y-3">
-                                    <p className="text-sm font-semibold text-amber-900 dark:text-amber-300">
-                                      Identifikasi Paspor
-                                    </p>
-                                    <p className="text-xs text-amber-800 dark:text-amber-400 leading-relaxed">
-                                      Apakah paspor ini memiliki <strong>endorsement nama</strong>?
-                                      (Halaman tambahan berisi perubahan/penambahan nama pemegang)
-                                    </p>
-                                    <div className="flex gap-2">
-                                      <Button
-                                        size="sm"
-                                        variant="outline"
-                                        className="flex-1 border-amber-400 text-amber-800 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900"
-                                        onClick={() => setPasporHasEndorsement(false)}
-                                      >
-                                        Tidak Ada Endorsement
-                                      </Button>
-                                      <Button
-                                        size="sm"
-                                        className="flex-1 bg-amber-600 hover:bg-amber-700 text-white"
-                                        onClick={() => setPasporHasEndorsement(true)}
-                                      >
-                                        Ada Endorsement Nama
-                                      </Button>
-                                    </div>
+                            {/* Dropzone Upload Input */}
+                            {jenis === "paspor" && pasporHasEndorsement === true ? (
+                              <div className="grid grid-cols-2 gap-2" onClick={(e) => e.stopPropagation()}>
+                                <div className="relative border border-dashed rounded-lg p-2 text-center hover:bg-stone-100 dark:hover:bg-stone-800 transition-colors">
+                                  <input
+                                    type="file"
+                                    accept="image/jpeg,image/jpg"
+                                    className="absolute inset-0 cursor-pointer opacity-0"
+                                    onChange={(e) => {
+                                      setActiveDocType("paspor");
+                                      handleFileSelect(e, "paspor");
+                                    }}
+                                    disabled={uploading}
+                                  />
+                                  <p className="text-[10px] font-semibold text-stone-700 dark:text-stone-300">Hal.1 (Data)</p>
+                                  <p className="text-[9px] text-muted-foreground">{isUploaded ? "Ganti" : "Upload"}</p>
+                                </div>
+                                <div className="relative border border-dashed rounded-lg p-2 text-center hover:bg-amber-100/50 dark:hover:bg-amber-950/40 transition-colors border-amber-300">
+                                  <input
+                                    type="file"
+                                    accept="image/jpeg,image/jpg"
+                                    className="absolute inset-0 cursor-pointer opacity-0"
+                                    onChange={(e) => {
+                                      setActiveDocType("paspor");
+                                      handleEndorsementFileSelect(e);
+                                    }}
+                                    disabled={uploadingEndorsement}
+                                  />
+                                  <p className="text-[10px] font-semibold text-amber-800 dark:text-amber-300">Hal.2 (Nama)</p>
+                                  <p className="text-[9px] text-muted-foreground">{endorsementDoc ? "Ganti" : "Upload"}</p>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="relative border border-dashed border-stone-300 dark:border-stone-700 rounded-lg p-2 text-center hover:border-primary hover:bg-primary/5 transition-all">
+                                <input
+                                  type="file"
+                                  accept="image/jpeg,image/jpg"
+                                  className="absolute inset-0 cursor-pointer opacity-0 z-10"
+                                  onChange={(e) => {
+                                    setActiveDocType(jenis);
+                                    handleFileSelect(e, jenis);
+                                  }}
+                                  disabled={uploading}
+                                />
+                                <div className="flex items-center justify-center gap-1.5 text-stone-600 dark:text-stone-400">
+                                  <FileImage className="h-3.5 w-3.5 text-stone-400" />
+                                  <span className="text-[11px] font-medium">
+                                    {isUploaded ? "Klik / Drag file untuk mengganti" : `Upload foto ${LABEL_DOKUMEN[jenis]}`}
+                                  </span>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* ── RIGHT COLUMN (lg:col-span-7): Detail Preview & Extracted OCR Data ── */}
+                    <div className="lg:col-span-7">
+                      <Card className="sticky top-6 shadow-sm border-stone-200 dark:border-stone-800">
+                        <CardContent className="pt-4 space-y-4">
+                          {/* Header Panel Kanan */}
+                          <div className="flex items-center justify-between pb-3 border-b border-stone-200 dark:border-stone-800">
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <h3 className="text-base font-bold text-stone-900 dark:text-white">
+                                  Detail: {LABEL_DOKUMEN[activeDocType]}
+                                </h3>
+                                {uploadDocuments.some((d) => d.jenis === activeDocType) && (
+                                  <Badge variant="success" size="sm">Terupload</Badge>
+                                )}
+                              </div>
+                              <p className="text-xs text-muted-foreground mt-0.5">
+                                Preview foto dan hasil ekstraksi OCR otomatis
+                              </p>
+                            </div>
+                            {uploadDocuments.some((d) => d.jenis === activeDocType) && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-8 text-xs"
+                                onClick={() => handleExtractOcr(activeDocType)}
+                                disabled={extractingOcr === activeDocType}
+                              >
+                                <RefreshCw className={cn("mr-1.5 h-3.5 w-3.5", extractingOcr === activeDocType && "animate-spin")} />
+                                {extractingOcr === activeDocType ? "Mengekstrak..." : "Ekstrak Ulang"}
+                              </Button>
+                            )}
+                          </div>
+
+                          {/* Foto Dokumen Preview */}
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                              <h4 className="text-xs font-semibold text-stone-700 dark:text-stone-300">Foto Dokumen:</h4>
+                              {activeDocType === "paspor" && pasporHasEndorsement === true && (
+                                <div className="flex gap-1">
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant={pasporPageTab === "hal1" ? "default" : "outline"}
+                                    className="h-6 text-[10px] px-2"
+                                    onClick={() => setPasporPageTab("hal1")}
+                                  >
+                                    Hal.1 (Data)
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant={pasporPageTab === "hal2" ? "default" : "outline"}
+                                    className="h-6 text-[10px] px-2"
+                                    onClick={() => setPasporPageTab("hal2")}
+                                  >
+                                    Hal.2 (Endorsement)
+                                  </Button>
+                                </div>
+                              )}
+                            </div>
+
+                            <div className="relative aspect-[4/3] rounded-xl border border-stone-200 dark:border-stone-800 bg-stone-100/50 dark:bg-stone-900 flex items-center justify-center overflow-hidden">
+                              {(activeDocType === "paspor" && pasporHasEndorsement === true && pasporPageTab === "hal2" ? (endorsementPreview || endorsementDoc?.fileUrl) : (uploadPreviews[activeDocType] || uploadDocuments.find((d) => d.jenis === activeDocType)?.fileUrl)) ? (
+                                <img
+                                  src={(activeDocType === "paspor" && pasporHasEndorsement === true && pasporPageTab === "hal2" ? (endorsementPreview || endorsementDoc?.fileUrl) : (uploadPreviews[activeDocType] || uploadDocuments.find((d) => d.jenis === activeDocType)?.fileUrl)) || ""}
+                                  alt={LABEL_DOKUMEN[activeDocType]}
+                                  className="max-h-full max-w-full object-contain rounded-md"
+                                />
+                              ) : (
+                                <div className="text-center p-6 space-y-2">
+                                  <FileImage className="mx-auto h-16 w-16 text-stone-300 dark:text-stone-700" />
+                                  <p className="text-xs text-muted-foreground">
+                                    Belum ada foto <strong>{LABEL_DOKUMEN[activeDocType]}</strong> {activeDocType === "paspor" && pasporHasEndorsement === true && pasporPageTab === "hal2" ? "(Halaman Endorsement)" : ""}.
+                                  </p>
+                                  <p className="text-[11px] text-stone-400">
+                                    Upload file pada daftar di sebelah kiri untuk melihat preview & hasil ekstraksi.
+                                  </p>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Hasil Ekstraksi OCR */}
+                          <div className="space-y-2 pt-2 border-t border-stone-200 dark:border-stone-800">
+                            <div className="flex items-center justify-between">
+                              <h4 className="text-xs font-semibold text-stone-700 dark:text-stone-300">Hasil Ekstraksi OCR:</h4>
+                              {ocrResults[activeDocType]?.confidence && (
+                                <Badge variant={ocrResults[activeDocType].confidence >= 0.7 ? "success" : "warning"} size="sm">
+                                  Confidence: {Math.round(ocrResults[activeDocType].confidence * 100)}%
+                                </Badge>
+                              )}
+                            </div>
+
+                            {extractingOcr === activeDocType || (extractingEndorsement && activeDocType === "paspor") ? (
+                              <div className="p-4 rounded-lg bg-stone-100 dark:bg-stone-800/50 text-center space-y-2">
+                                <RefreshCw className="mx-auto h-5 w-5 animate-spin text-primary" />
+                                <p className="text-xs text-muted-foreground font-medium">
+                                  {extractingEndorsement ? "Mengekstrak nama dari halaman endorsement..." : "Mengekstrak data otomatis menggunakan OCR AI Studio..."}
+                                </p>
+                              </div>
+                            ) : (ocrResults[activeDocType] || endorsementOcrResult) ? (
+                              <div className="rounded-lg border border-stone-200 dark:border-stone-800 p-3 bg-stone-50/50 dark:bg-stone-900/50 space-y-2 text-xs">
+                                {endorsementOcrResult?.namaLengkap && activeDocType === "paspor" && (
+                                  <div className="flex justify-between py-1 border-b border-amber-200 dark:border-amber-900 text-amber-900 dark:text-amber-300 bg-amber-50/60 dark:bg-amber-950/40 px-2 rounded">
+                                    <span className="font-semibold">Nama (Endorsement Hal.2):</span>
+                                    <span className="font-bold">{endorsementOcrResult.namaLengkap}</span>
                                   </div>
                                 )}
-
-                                {/* ── Step 2a: Mode Standar (no endorsement) ── */}
-                                {(pasporHasEndorsement === false || (isUploaded && pasporHasEndorsement !== true)) && (
-                                  <div className="flex items-start gap-4">
-                                    {/* Upload halaman tunggal */}
-                                    <div className="flex-1">
-                                      <div className={cn(
-                                        "relative flex aspect-[3/4] items-center justify-center rounded-lg border-2 border-dashed transition-colors",
-                                        isUploaded ? "border-success/50 bg-success/5" : "border-muted-foreground/25 bg-muted/20",
-                                        "hover:border-primary/50 hover:bg-primary/5"
-                                      )}>
-                                        {previewUrl ? (
-                                          <img src={previewUrl} alt="Paspor" className="h-full w-full object-cover rounded-md" />
-                                        ) : (
-                                          <div className="text-center">
-                                            <FileImage className="mx-auto h-12 w-12 text-muted-foreground/30" />
-                                            <p className="mt-2 text-xs text-muted-foreground">Upload Paspor</p>
-                                          </div>
-                                        )}
-                                        <input type="file" accept="image/jpeg,image/jpg" className="absolute inset-0 cursor-pointer opacity-0"
-                                          onChange={(e) => handleFileSelect(e, jenis)} disabled={uploading} />
-                                      </div>
-                                      {isUploaded && (
-                                        <div className="mt-2 flex items-center gap-1 text-xs text-success">
-                                          <CheckCircle className="h-3 w-3" />Sudah terupload
-                                        </div>
-                                      )}
-                                    </div>
-                                    {/* OCR result standar */}
-                                    <div className="flex-1 space-y-3">
-                                      <span className="inline-block px-2 py-0.5 text-[10px] font-bold rounded bg-stone-100 dark:bg-stone-800 text-stone-600 dark:text-stone-400">Mode: Standar</span>
-                                      {extractingOcr === jenis ? (
-                                        <p className="text-xs text-muted-foreground flex items-center gap-1.5"><RefreshCw className="h-3 w-3 animate-spin" />Mengekstrak...</p>
-                                      ) : ocrResults[jenis] ? (
-                                        <p className="text-xs text-success flex items-center gap-1.5"><CheckCircle className="h-3 w-3" />Data berhasil diekstrak</p>
-                                      ) : (
-                                        <p className="text-xs text-muted-foreground">{isUploaded ? "Mengekstrak data otomatis..." : "Upload paspor untuk memulai ekstraksi."}</p>
-                                      )}
-                                      {isUploaded && (
-                                        <Button variant="outline" size="sm" onClick={() => handleExtractOcr(jenis)} disabled={extractingOcr === jenis} className="w-full">
-                                          <RefreshCw className={cn("mr-1.5 h-3.5 w-3.5", extractingOcr === jenis && "animate-spin")} />
-                                          {extractingOcr === jenis ? "Mengekstrak..." : "Ekstrak Ulang"}
-                                        </Button>
-                                      )}
-                                      {ocrResults[jenis] && <OcrResultCard data={ocrResults[jenis]} />}
-                                    </div>
+                                {ocrResults[activeDocType]?.namaLengkap && (
+                                  <div className="flex justify-between py-1 border-b border-stone-200/50 dark:border-stone-800/50">
+                                    <span className="text-muted-foreground">Nama Lengkap:</span>
+                                    <span className="font-semibold text-stone-900 dark:text-white max-w-[65%] text-right">
+                                      {ocrResults[activeDocType].namaLengkap}
+                                    </span>
                                   </div>
                                 )}
-
-                                {/* ── Step 2b: Mode Endorsement (2 halaman) ── */}
-                                {pasporHasEndorsement === true && (
-                                  <div className="space-y-4">
-                                    <div className="inline-block px-2 py-0.5 text-[10px] font-bold rounded bg-amber-100 dark:bg-amber-900 text-amber-800 dark:text-amber-300">
-                                      Mode: Endorsement Nama
-                                    </div>
-
-                                    {/* Halaman 1 — Data Utama */}
-                                    <div className="rounded-lg border p-3 space-y-3">
-                                      <div className="flex items-center gap-2">
-                                        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">1</span>
-                                        <p className="text-xs font-semibold">Halaman 1 — Data Utama Paspor</p>
-                                        <span className="text-[10px] text-muted-foreground">(No. Paspor, Tempat & Tgl Terbit, Kadaluarsa)</span>
-                                      </div>
-                                      <div className="flex items-start gap-3">
-                                        <div className="w-24 flex-shrink-0">
-                                          <div className={cn(
-                                            "relative flex aspect-[3/4] items-center justify-center rounded-md border-2 border-dashed transition-colors",
-                                            isUploaded ? "border-success/50 bg-success/5" : "border-muted-foreground/25 bg-muted/20"
-                                          )}>
-                                            {previewUrl ? (
-                                              <img src={previewUrl} alt="Hal.1" className="h-full w-full object-cover rounded-sm" />
-                                            ) : (
-                                              <FileImage className="h-6 w-6 text-muted-foreground/30" />
-                                            )}
-                                            <input type="file" accept="image/jpeg,image/jpg" className="absolute inset-0 cursor-pointer opacity-0"
-                                              onChange={(e) => handleFileSelect(e, jenis)} disabled={uploading} />
-                                          </div>
-                                          {isUploaded && <p className="mt-1 text-[10px] text-success text-center flex items-center gap-0.5 justify-center"><CheckCircle className="h-2.5 w-2.5" />Terupload</p>}
-                                        </div>
-                                        <div className="flex-1 space-y-2">
-                                          {extractingOcr === jenis ? (
-                                            <p className="text-xs text-muted-foreground flex items-center gap-1"><RefreshCw className="h-3 w-3 animate-spin" />Mengekstrak data dokumen (tanpa nama)...</p>
-                                          ) : ocrResults[jenis] ? (
-                                            <div className="space-y-1 text-xs">
-                                              {ocrResults[jenis].nomorPaspor && <div className="flex justify-between"><span className="text-muted-foreground">No. Paspor:</span><span className="font-mono font-semibold">{ocrResults[jenis].nomorPaspor}</span></div>}
-                                              {ocrResults[jenis].tempatTerbitPaspor && <div className="flex justify-between"><span className="text-muted-foreground">Tempat Terbit:</span><span>{ocrResults[jenis].tempatTerbitPaspor}</span></div>}
-                                              {ocrResults[jenis].tanggalTerbitPaspor && <div className="flex justify-between"><span className="text-muted-foreground">Tgl. Terbit:</span><span>{ocrResults[jenis].tanggalTerbitPaspor}</span></div>}
-                                              {ocrResults[jenis].tanggalKadaluarsa && (
-                                                <div className="flex justify-between">
-                                                  <span className="text-muted-foreground">Kadaluarsa:</span>
-                                                  <span className={(new Date(ocrResults[jenis].tanggalKadaluarsa).getTime() - Date.now()) < 180 * 24 * 60 * 60 * 1000 ? "text-destructive font-semibold" : ""}>
-                                                    {ocrResults[jenis].tanggalKadaluarsa}
-                                                  </span>
-                                                </div>
-                                              )}
-                                            </div>
-                                          ) : (
-                                            <p className="text-xs text-muted-foreground">{isUploaded ? "Mengekstrak data (tanpa nama)..." : "Upload halaman 1 paspor"}</p>
-                                          )}
-                                          {isUploaded && (
-                                            <Button variant="outline" size="sm" className="w-full h-6 text-[10px]"
-                                              onClick={() => handleExtractOcr(jenis, undefined, "paspor_tanpa_nama")} disabled={extractingOcr === jenis}>
-                                              <RefreshCw className={cn("mr-1 h-2.5 w-2.5", extractingOcr === jenis && "animate-spin")} />Ekstrak Ulang
-                                            </Button>
-                                          )}
-                                        </div>
-                                      </div>
-                                    </div>
-
-                                    {/* Halaman 2 — Endorsement Nama */}
-                                    <div className="rounded-lg border border-amber-300/60 p-3 space-y-3 bg-amber-50/30 dark:bg-amber-950/10">
-                                      <div className="flex items-center gap-2">
-                                        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-amber-600 text-[10px] font-bold text-white">2</span>
-                                        <p className="text-xs font-semibold">Halaman 2 — Endorsement Nama</p>
-                                        <span className="text-[10px] text-muted-foreground">(Nama resmi dari lembar endorsement)</span>
-                                      </div>
-                                      <div className="flex items-start gap-3">
-                                        <div className="w-24 flex-shrink-0">
-                                          <div className={cn(
-                                            "relative flex aspect-[3/4] items-center justify-center rounded-md border-2 border-dashed transition-colors",
-                                            endorsementDoc ? "border-amber-400/50 bg-amber-50/20" : "border-muted-foreground/25 bg-muted/20"
-                                          )}>
-                                            {endorsementPreview ? (
-                                              <img src={endorsementPreview} alt="Endorsement" className="h-full w-full object-cover rounded-sm" />
-                                            ) : (
-                                              uploadingEndorsement ? <RefreshCw className="h-5 w-5 animate-spin text-muted-foreground" /> : <FileImage className="h-6 w-6 text-muted-foreground/30" />
-                                            )}
-                                            <input type="file" accept="image/jpeg,image/jpg" className="absolute inset-0 cursor-pointer opacity-0"
-                                              onChange={handleEndorsementFileSelect} disabled={uploadingEndorsement} />
-                                          </div>
-                                          {endorsementDoc && <p className="mt-1 text-[10px] text-amber-700 dark:text-amber-300 text-center flex items-center gap-0.5 justify-center"><CheckCircle className="h-2.5 w-2.5" />Terupload</p>}
-                                        </div>
-                                        <div className="flex-1 space-y-2">
-                                          {extractingEndorsement ? (
-                                            <p className="text-xs text-muted-foreground flex items-center gap-1"><RefreshCw className="h-3 w-3 animate-spin" />Mengekstrak nama endorsement...</p>
-                                          ) : endorsementOcrResult ? (
-                                            <div className="space-y-1 text-xs">
-                                              <div className="flex justify-between">
-                                                <span className="text-muted-foreground">Nama (Endorsement):</span>
-                                                <span className="text-right max-w-[55%] font-semibold text-amber-800 dark:text-amber-300">
-                                                  {endorsementOcrResult.namaLengkap || "-"}
-                                                </span>
-                                              </div>
-                                            </div>
-                                          ) : (
-                                            <p className="text-xs text-muted-foreground">{endorsementDoc ? "Mengekstrak nama endorsement..." : "Upload halaman 2 (endorsement nama)"}</p>
-                                          )}
-                                          {endorsementDoc && (
-                                            <Button variant="outline" size="sm" className="w-full h-6 text-[10px] border-amber-400"
-                                              onClick={() => handleExtractEndorsementOcr()} disabled={extractingEndorsement}>
-                                              <RefreshCw className={cn("mr-1 h-2.5 w-2.5", extractingEndorsement && "animate-spin")} />Ekstrak Ulang Nama
-                                            </Button>
-                                          )}
-                                        </div>
-                                      </div>
-                                    </div>
-
-                                    {/* Gabungan Hasil Akhir */}
-                                    {(ocrResults[jenis] || endorsementOcrResult) && (
-                                      <div className="rounded-md border border-primary/30 bg-primary/5 p-3 space-y-2">
-                                        <h5 className="text-xs font-semibold text-primary">Hasil Gabungan</h5>
-                                        <div className="space-y-1 text-xs">
-                                          {ocrResults[jenis]?.namaLengkap && (
-                                            <div className="flex justify-between">
-                                              <span className="text-muted-foreground">Nama:</span>
-                                              <span className="font-semibold text-right max-w-[60%]">{ocrResults[jenis].namaLengkap}</span>
-                                            </div>
-                                          )}
-                                          {ocrResults[jenis]?.nomorPaspor && (
-                                            <div className="flex justify-between">
-                                              <span className="text-muted-foreground">No. Paspor:</span>
-                                              <span className="font-mono font-semibold">{ocrResults[jenis].nomorPaspor}</span>
-                                            </div>
-                                          )}
-                                          {ocrResults[jenis]?.tanggalKadaluarsa && (
-                                            <div className="flex justify-between">
-                                              <span className="text-muted-foreground">Kadaluarsa:</span>
-                                              <span className={(new Date(ocrResults[jenis].tanggalKadaluarsa).getTime() - Date.now()) < 180 * 24 * 60 * 60 * 1000 ? "text-destructive font-semibold" : ""}>
-                                                {ocrResults[jenis].tanggalKadaluarsa}
-                                              </span>
-                                            </div>
-                                          )}
-                                        </div>
-                                      </div>
-                                    )}
+                                {ocrResults[activeDocType]?.nomorPaspor && (
+                                  <div className="flex justify-between py-1 border-b border-stone-200/50 dark:border-stone-800/50">
+                                    <span className="text-muted-foreground">Nomor Paspor:</span>
+                                    <span className="font-mono font-bold text-primary">
+                                      {ocrResults[activeDocType].nomorPaspor}
+                                    </span>
+                                  </div>
+                                )}
+                                {ocrResults[activeDocType]?.tempatTerbitPaspor && (
+                                  <div className="flex justify-between py-1 border-b border-stone-200/50 dark:border-stone-800/50">
+                                    <span className="text-muted-foreground">Tempat Terbit Paspor:</span>
+                                    <span className="font-medium text-stone-900 dark:text-white">
+                                      {ocrResults[activeDocType].tempatTerbitPaspor}
+                                    </span>
+                                  </div>
+                                )}
+                                {ocrResults[activeDocType]?.tanggalTerbitPaspor && (
+                                  <div className="flex justify-between py-1 border-b border-stone-200/50 dark:border-stone-800/50">
+                                    <span className="text-muted-foreground">Tanggal Terbit Paspor:</span>
+                                    <span className="font-medium text-stone-900 dark:text-white">
+                                      {ocrResults[activeDocType].tanggalTerbitPaspor}
+                                    </span>
+                                  </div>
+                                )}
+                                {ocrResults[activeDocType]?.tanggalKadaluarsa && (
+                                  <div className="flex justify-between py-1 border-b border-stone-200/50 dark:border-stone-800/50">
+                                    <span className="text-muted-foreground">Tanggal Kadaluarsa:</span>
+                                    <span className={cn(
+                                      "font-semibold",
+                                      (new Date(ocrResults[activeDocType].tanggalKadaluarsa).getTime() - Date.now()) < 180 * 24 * 60 * 60 * 1000
+                                        ? "text-destructive"
+                                        : "text-stone-900 dark:text-white"
+                                    )}>
+                                      {ocrResults[activeDocType].tanggalKadaluarsa}
+                                      {(new Date(ocrResults[activeDocType].tanggalKadaluarsa).getTime() - Date.now()) < 180 * 24 * 60 * 60 * 1000 && (
+                                        <span className="ml-1.5 text-[10px] font-bold text-destructive">(&lt; 6 Bulan)</span>
+                                      )}
+                                    </span>
+                                  </div>
+                                )}
+                                {ocrResults[activeDocType].nik && (
+                                  <div className="flex justify-between py-1 border-b border-stone-200/50 dark:border-stone-800/50">
+                                    <span className="text-muted-foreground">NIK:</span>
+                                    <span className="font-mono font-medium">{ocrResults[activeDocType].nik}</span>
+                                  </div>
+                                )}
+                                {ocrResults[activeDocType].tanggalLahir && (
+                                  <div className="flex justify-between py-1">
+                                    <span className="text-muted-foreground">Tanggal Lahir:</span>
+                                    <span className="font-medium">{ocrResults[activeDocType].tanggalLahir}</span>
                                   </div>
                                 )}
                               </div>
                             ) : (
-                              /* ────────────── NON-PASPOR: Tampilan standar ────────────── */
-                              <div className="flex items-start gap-4">
-                                {/* Left: Upload Area */}
-                                <div className="flex-1">
-                                  <h4 className="text-sm font-medium mb-2">{LABEL_DOKUMEN[jenis]}</h4>
-                                  <div className={cn(
-                                    "relative flex aspect-[3/4] items-center justify-center rounded-lg border-2 border-dashed transition-colors",
-                                    isUploaded ? "border-success/50 bg-success/5" : "border-muted-foreground/25 bg-muted/20",
-                                    "hover:border-primary/50 hover:bg-primary/5"
-                                  )}>
-                                    {previewUrl ? (
-                                      <img src={previewUrl} alt={LABEL_DOKUMEN[jenis]} className="h-full w-full object-cover rounded-md" />
-                                    ) : (
-                                      <div className="text-center">
-                                        <FileImage className="mx-auto h-12 w-12 text-muted-foreground/30" />
-                                        <p className="mt-2 text-xs text-muted-foreground">Belum ada foto</p>
-                                      </div>
-                                    )}
-                                    <input type="file" accept="image/jpeg,image/jpg" className="absolute inset-0 cursor-pointer opacity-0"
-                                      onChange={(e) => handleFileSelect(e, jenis)} disabled={uploading} />
-                                  </div>
-                                  {isUploaded && (
-                                    <div className="mt-2 flex items-center gap-1 text-xs text-success">
-                                      <CheckCircle className="h-3 w-3" />Sudah terupload
-                                    </div>
-                                  )}
-                                </div>
-
-                                {/* Right: Extract Data */}
-                                <div className="flex-1 space-y-3">
-                                  <h4 className="text-sm font-medium">Ekstrak Data</h4>
-                                  {extractingOcr === jenis ? (
-                                    <p className="text-xs text-muted-foreground flex items-center gap-1.5"><RefreshCw className="h-3 w-3 animate-spin" />Mengekstrak data otomatis...</p>
-                                  ) : ocrResults[jenis] ? (
-                                    <p className="text-xs text-success flex items-center gap-1.5"><CheckCircle className="h-3 w-3" />Data berhasil diekstrak</p>
-                                  ) : (
-                                    <p className="text-xs text-muted-foreground">
-                                      {isUploaded ? "Mengekstrak data otomatis setelah upload..." : "Upload dokumen untuk memulai ekstraksi otomatis."}
-                                    </p>
-                                  )}
-                                  {isUploaded && (
-                                    <Button variant="outline" size="sm" onClick={() => handleExtractOcr(jenis)} disabled={extractingOcr === jenis} className="w-full">
-                                      <RefreshCw className={cn("mr-1.5 h-3.5 w-3.5", extractingOcr === jenis && "animate-spin")} />
-                                      {extractingOcr === jenis ? "Mengekstrak..." : "Ekstrak Ulang"}
-                                    </Button>
-                                  )}
-                                  {ocrResults[jenis] && <OcrResultCard data={ocrResults[jenis]} />}
-                                </div>
-                              </div>
+                              <p className="text-xs text-muted-foreground italic">
+                                Belum ada data OCR untuk {LABEL_DOKUMEN[activeDocType]}. Upload dokumen untuk ekstraksi otomatis.
+                              </p>
                             )}
-                          </CardContent>
-                        </Card>
-                      );
-                    })}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </div>
                   </div>
                 )}
 
