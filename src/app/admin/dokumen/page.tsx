@@ -548,13 +548,13 @@ export default function DokumenPage() {
         body: JSON.stringify({ dokumenId: doc.id, fileUrl: doc.fileUrl, jenis }),
       });
 
-      if (!res.ok) throw new Error("Gagal mengekstrak data");
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.message || "Gagal mengekstrak data");
 
-      const json = await res.json();
       setOcrResults((prev) => ({ ...prev, [jenis]: json.data }));
     } catch (err) {
       console.error("OCR error:", err);
-      alert("Gagal mengekstrak data");
+      alert(`Gagal mengekstrak data: ${(err as Error).message}`);
     } finally {
       setExtractingOcr(null);
     }

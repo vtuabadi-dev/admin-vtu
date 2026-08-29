@@ -485,7 +485,12 @@ export function createGoogleDriveAdapter(): StorageAdapter {
     },
 
     async download(fileId: string): Promise<Buffer> {
-      const res = await apiFetch(`${DRIVE_API}/files/${fileId}?alt=media`);
+      let cleanId = fileId;
+      if (cleanId.includes("id=")) {
+        cleanId = cleanId.split("id=")[1]?.split("&")[0] || cleanId;
+      }
+      cleanId = cleanId.replace(/^https?:\/\/[^\/]+\//, "").replace(/^\//, "");
+      const res = await apiFetch(`${DRIVE_API}/files/${cleanId}?alt=media`);
       const arrayBuffer = await res.arrayBuffer();
       return Buffer.from(arrayBuffer);
     },

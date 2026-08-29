@@ -115,6 +115,17 @@ export class GoogleAiStudioOcrProvider implements OcrProvider {
       const apiKey = getNextApiKey(keys)!;
 
       try {
+        const promptText = `Analisis gambar dokumen ${jenis} ini dan ekstrak data terstruktur berikut dalam format JSON:
+{
+  "namaLengkap": "Nama lengkap pemegang paspor / dokumen",
+  "nomorPaspor": "Nomor paspor jika dokumen paspor",
+  "nik": "NIK jika KTP/KK/Akta",
+  "tanggalLahir": "YYYY-MM-DD",
+  "tempatLahir": "Tempat lahir",
+  "masaBerlaku": "YYYY-MM-DD",
+  "rawText": "Teks mentah"
+}`;
+
         const res = await fetch(
           `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
           {
@@ -123,7 +134,7 @@ export class GoogleAiStudioOcrProvider implements OcrProvider {
             body: JSON.stringify({
               contents: [{
                 parts: [
-                  { text: `Extract all plain text from this ${jenis} document image exactly as written.` },
+                  { text: promptText },
                   { inline_data: { mime_type: mimeType, data: base64 } }
                 ]
               }]
@@ -149,20 +160,32 @@ export class GoogleAiStudioOcrProvider implements OcrProvider {
           };
         }
 
-        const data = await res.json();
-        const fullText: string = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+        const gData = await res.json();
+        const fullText = gData?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+
+        let parsedJson: Record<string, any> | null = null;
+        try {
+          const jsonMatch = fullText.match(/\{[\s\S]*\}/);
+          if (jsonMatch) parsedJson = JSON.parse(jsonMatch[0]);
+        } catch { /* fallback */ }
 
         const expectedFields = getExpectedFields(jenis);
         const fields = expectedFields.map((field) => {
-          const value = extractField(fullText, field);
-          return { field, value, confidence: value ? 0.9 : 0 };
+          let value = "";
+          if (parsedJson && parsedJson[field]) {
+            value = String(parsedJson[field]).trim();
+          }
+          if (!value) {
+            value = extractField(fullText, field);
+          }
+          return { field, value, confidence: value ? 0.95 : 0 };
         });
 
         return {
           success: true,
           fields,
           rawText: fullText,
-          overallConfidence: fullText ? 0.9 : 0,
+          overallConfidence: fullText ? 0.95 : 0,
           processingTimeMs: Date.now() - start,
           retryCount,
         };

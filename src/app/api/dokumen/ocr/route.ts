@@ -24,8 +24,14 @@ export async function POST(request: NextRequest) {
     }
 
     // Download file dari storage ke memory buffer — tanpa filesystem
+    let cleanFileId = fileUrl;
+    if (cleanFileId.includes("id=")) {
+      cleanFileId = cleanFileId.split("id=")[1]?.split("&")[0] || cleanFileId;
+    }
+    cleanFileId = cleanFileId.replace(/^https?:\/\/[^\/]+\//, "").replace(/^\//, "");
+
     const storage = getStorageAdapter();
-    const buffer = await storage.download(fileUrl);
+    const buffer = await storage.download(cleanFileId);
 
     // OCR langsung dari buffer — tanpa write/read/delete temp file
     const ocrResult = await processDocument(buffer, jenis);

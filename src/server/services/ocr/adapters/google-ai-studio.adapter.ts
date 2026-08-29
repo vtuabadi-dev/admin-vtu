@@ -56,6 +56,54 @@ function extractField(text: string, field: string): string {
   return "";
 }
 
+function getPromptForJenis(jenis: DokumenJenis): string {
+  switch (jenis) {
+    case "paspor":
+      return `Analisis gambar Paspor ini dan ekstrak data terstruktur berikut dalam format JSON (tanpa markdown wrapper):
+{
+  "namaLengkap": "Nama lengkap pemegang paspor (Given Names & Surname)",
+  "nomorPaspor": "Nomor paspor (contoh: C1234567 / X1234567)",
+  "tanggalLahir": "YYYY-MM-DD",
+  "tempatLahir": "Tempat lahir",
+  "masaBerlaku": "YYYY-MM-DD",
+  "rawText": "Teks mentah paspor"
+}`;
+    case "ktp":
+      return `Analisis gambar KTP (Kartu Tanda Penduduk) ini dan ekstrak data terstruktur berikut dalam format JSON:
+{
+  "namaLengkap": "Nama lengkap",
+  "nik": "NIK 16 digit",
+  "tanggalLahir": "YYYY-MM-DD",
+  "tempatLahir": "Tempat lahir",
+  "rawText": "Teks mentah KTP"
+}`;
+    case "kk":
+      return `Analisis gambar Kartu Keluarga ini dan ekstrak data terstruktur berikut dalam format JSON:
+{
+  "namaLengkap": "Nama kepala keluarga / anggota",
+  "nik": "NIK 16 digit",
+  "rawText": "Teks mentah KK"
+}`;
+    case "akta":
+      return `Analisis gambar Akta Lahir ini dan ekstrak data terstruktur berikut dalam format JSON:
+{
+  "namaLengkap": "Nama lengkap",
+  "nik": "NIK jika ada",
+  "tanggalLahir": "YYYY-MM-DD",
+  "tempatLahir": "Tempat lahir",
+  "rawText": "Teks mentah Akta"
+}`;
+    case "vaksin":
+      return `Analisis gambar Sertifikat Vaksin ini dan ekstrak data terstruktur berikut dalam format JSON:
+{
+  "namaLengkap": "Nama lengkap pemegang sertifikat",
+  "rawText": "Teks mentah sertifikat"
+}`;
+    default:
+      return `Extract all plain text, names, dates, document numbers, and details from this image accurately.`;
+  }
+}
+
 // ── Adapter Implementation ───────────────────────────────
 
 export const googleAiStudioAdapter: OcrAdapter = {
@@ -85,6 +133,8 @@ export const googleAiStudioAdapter: OcrAdapter = {
       `[AI Studio Adapter] ▶ CALL API | model=${modelName} | key=***${keySuffix} | jenis=${jenis} | imgSize=${imgSizeKB}KB | retry=#${retryCount}`
     );
 
+    const promptText = getPromptForJenis(jenis);
+
     try {
       const fetchStart = Date.now();
       const geminiRes = await fetch(
@@ -95,7 +145,7 @@ export const googleAiStudioAdapter: OcrAdapter = {
           body: JSON.stringify({
             contents: [{
               parts: [
-                { text: "Extract all plain text, prices, dates, hotel names, and details from this image exactly as written, word for word." },
+                { text: promptText },
                 { inline_data: { mime_type: mimeType, data: base64 } }
               ]
             }]
@@ -113,10 +163,28 @@ export const googleAiStudioAdapter: OcrAdapter = {
         const gData = await geminiRes.json();
         const fullText = gData?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
         const textLen = fullText.length;
+
+        // Try parsing JSON response from Gemini
+        let parsedJson: Record<string, any> | null = null;
+        try {
+          const jsonMatch = fullText.match(/\{[\s\S]*\}/);
+          if (jsonMatch) {
+            parsedJson = JSON.parse(jsonMatch[0]);
+          }
+        } catch {
+          /* non-blocking — fallback to regex extractField */
+        }
+
         const expectedFields = getExpectedFields(jenis);
         const fields = expectedFields.map((field) => {
-          const value = extractField(fullText, field);
-          return { field, value, confidence: value ? 0.9 : 0 };
+          let value = "";
+          if (parsedJson && parsedJson[field]) {
+            value = String(parsedJson[field]).trim();
+          }
+          if (!value) {
+            value = extractField(fullText, field);
+          }
+          return { field, value, confidence: value ? 0.95 : 0 };
         });
 
         console.log(
@@ -127,7 +195,7 @@ export const googleAiStudioAdapter: OcrAdapter = {
           success: true,
           fields,
           rawText: fullText,
-          overallConfidence: fullText ? 0.9 : 0,
+          overallConfidence: fullText ? 0.95 : 0,
           processingTimeMs: Date.now() - start,
           retryCount,
         };
