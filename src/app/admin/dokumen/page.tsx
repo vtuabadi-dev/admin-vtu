@@ -1393,8 +1393,8 @@ export default function DokumenPage() {
                                   )}
                                 </div>
 
-                                {/* ── Step 1: Endorsement Question ── */}
-                                {pasporHasEndorsement === null && (
+                                {/* ── Step 1: Endorsement Question (Hanya jika paspor BELUM terupload) ── */}
+                                {!isUploaded && pasporHasEndorsement === null && (
                                   <div className="rounded-lg border-2 border-dashed border-amber-400/60 bg-amber-50/50 dark:bg-amber-950/20 p-4 space-y-3">
                                     <p className="text-sm font-semibold text-amber-900 dark:text-amber-300">
                                       Identifikasi Paspor
@@ -1424,7 +1424,7 @@ export default function DokumenPage() {
                                 )}
 
                                 {/* ── Step 2a: Mode Standar (no endorsement) ── */}
-                                {pasporHasEndorsement === false && (
+                                {(pasporHasEndorsement === false || (isUploaded && pasporHasEndorsement !== true)) && (
                                   <div className="flex items-start gap-4">
                                     {/* Upload halaman tunggal */}
                                     <div className="flex-1">
