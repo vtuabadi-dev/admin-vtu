@@ -73,7 +73,10 @@ function generateOcrFields(dokumen: DokumenItem): OcrFieldEdit[] {
   if (base.nik) fields.push({ key: "nik", label: "NIK", ocrValue: base.nik });
   if (base.tanggalLahir) fields.push({ key: "tanggalLahir", label: "Tanggal Lahir", ocrValue: base.tanggalLahir });
   if (base.tempatLahir) fields.push({ key: "tempatLahir", label: "Tempat Lahir", ocrValue: base.tempatLahir });
-  if (base.masaBerlaku) fields.push({ key: "masaBerlaku", label: "Masa Berlaku", ocrValue: base.masaBerlaku });
+  if (base.tempatTerbitPaspor) fields.push({ key: "tempatTerbitPaspor", label: "Tempat Terbit", ocrValue: base.tempatTerbitPaspor });
+  if (base.tanggalTerbitPaspor) fields.push({ key: "tanggalTerbitPaspor", label: "Tgl. Terbit", ocrValue: base.tanggalTerbitPaspor });
+  if (base.tanggalKadaluarsa) fields.push({ key: "tanggalKadaluarsa", label: "Tanggal Kadaluarsa", ocrValue: base.tanggalKadaluarsa });
+  else if (base.masaBerlaku) fields.push({ key: "masaBerlaku", label: "Masa Berlaku", ocrValue: base.masaBerlaku });
 
   return fields.map((f) => ({
     ...f,
@@ -1726,7 +1729,7 @@ export default function DokumenPage() {
                                             value={ocrResults[activeDocType]?.tempatTerbitPaspor || ""}
                                             onChange={(e) => handleOcrFieldChange(activeDocType, "tempatTerbitPaspor", e.target.value)}
                                             disabled={savedOcrDocs[activeDocType] && !editingOcrDocs[activeDocType]}
-                                            placeholder="JAKARTA"
+                                            placeholder="Kota / Kantor Penerbit"
                                             className="h-8 text-xs"
                                           />
                                         </div>

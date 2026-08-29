@@ -9,15 +9,26 @@
 import type { DokumenJenis } from "@/shared/types";
 import type { OcrProvider, OcrResult, ImageMetaCheck } from "./provider";
 import { getExpectedFields } from "./provider";
+import { parsePassport } from "./passport-parser";
 
 const FIELD_PATTERNS: Record<string, RegExp[]> = {
   namaLengkap: [
+    /(?:NAMA\s*LENGKAP(?:\s*\/\s*FULL\s*NAME)?|FULL\s*NAME|SURNAME|NAMA|NAME)\s*[:=]?\s*([A-Z\s.,'-]+?)(?:\r?\n|Kewarganegaraan|Nationality|IDN|$)/i,
     /Nama\s*:\s*(.+)/i, /NAME\s*:\s*(.+)/i,
-    /Surname\s*:\s*(.+)/i, /Given\s*Names?\s*:\s*(.+)/i,
   ],
   nomorPaspor: [
-    /Paspor\s*(?:No|Number)?\s*:\s*([A-Z0-9]+)/i,
-    /Passport\s*(?:No|Number)?\s*:\s*([A-Z0-9]+)/i,
+    /(?:NO\.?\s*PASPOR(?:\s*\/\s*PASSPORT\s*NO\.?)?|PASSPORT\s*(?:NO|NUMBER)\.?|PASPOR\s*(?:NO|NUMBER)\.?|NOMOR\s*PASPOR|PASSPORT\s*:|PASPOR\s*:)\s*[:=]?\s*([A-Z0-9]+)/i,
+    /\b([A-Z]\d{7,8})\b/i,
+  ],
+  tempatTerbitPaspor: [
+    /(?:KANTOR\s*(?:YANG\s*)?MENGELUARKAN(?:\s*\/\s*ISSUING\s*AUTHORITY)?|ISSUING\s*AUTHORITY|KANTOR\s*IMIGRASI|ISSUING\s*OFFICE|DITERBITKAN\s*DI(?:\s*\/\s*PLACE\s*OF\s*ISSUE)?|PLACE\s*OF\s*ISSUE)\s*[:=]?\s*([A-Z\s.,'-]+?)(?:\r?\n|$)/i,
+    /1A[0-9A-Z]{10,}\s*\r?\n?\s*([A-Z\s]+?)(?:\r?\n|$)/i,
+  ],
+  tanggalTerbitPaspor: [
+    /(?:TGL\.?\s*PENGELUARAN(?:\s*\/\s*DATE\s*OF\s*ISSUE)?|DATE\s*OF\s*ISSUE|TANGGAL\s*PENGELUARAN|TANGGAL\s*TERBIT|TGL\.?\s*TERBIT|ISSUE\s*DATE)\s*[:=]?\s*(\d{1,2}[ \-/]+[A-Za-z]+[ \-/]+\d{4}|\d{1,2}[-/\.]\d{1,2}[-/\.]\d{4}|\d{4}[-/\.]\d{1,2}[-/\.]\d{1,2}|[^\r\n]+)/i,
+  ],
+  tanggalKadaluarsa: [
+    /(?:BERLAKU\s*S\/?D\.?(?:\s*\/\s*DATE\s*OF\s*EXPIRY)?|DATE\s*OF\s*EXPIRY|TANGGAL\s*KADALUARSA|EXPIRY\s*DATE|BERLAKU\s*(?:HINGGA|SAMPAI)|MASA\s*BERLAKU)\s*[:=]?\s*(\d{1,2}[ \-/]+[A-Za-z]+[ \-/]+\d{4}|\d{1,2}[-/\.]\d{1,2}[-/\.]\d{4}|\d{4}[-/\.]\d{1,2}[-/\.]\d{1,2}|[^\r\n]+)/i,
   ],
   nik: [
     /NIK\s*:\s*(\d+)/i, /KTP\s*(?:No|Number)?\s*:\s*(\d+)/i,
@@ -115,7 +126,19 @@ export class GoogleAiStudioOcrProvider implements OcrProvider {
       const apiKey = getNextApiKey(keys)!;
 
       try {
-        const promptText = `Analisis gambar dokumen ${jenis} ini dan ekstrak data terstruktur berikut dalam format JSON:
+        const promptText = jenis === "paspor"
+          ? `Analisis gambar Paspor Indonesia ini dan ekstrak data terstruktur berikut dalam format JSON valid:
+{
+  "namaLengkap": "Nama lengkap pemegang paspor (contoh: MUCHAMAD ZAMRONI)",
+  "nomorPaspor": "Nomor paspor (contoh: X4573266)",
+  "tempatTerbitPaspor": "Kantor/kota penerbitan paspor dari kolom 'KANTOR YANG MENGELUARKAN / ISSUING AUTHORITY' atau 'KANTOR IMIGRASI' (BUKAN tempat lahir, contoh: MALANG)",
+  "tanggalTerbitPaspor": "Tanggal penerbitan dari 'TGL. PENGELUARAN / DATE OF ISSUE' dalam format YYYY-MM-DD (contoh: 2024-12-10)",
+  "tanggalKadaluarsa": "Tanggal habis masa berlaku dari 'BERLAKU S/D / DATE OF EXPIRY' atau baris MRZ dalam format YYYY-MM-DD (contoh: 2034-12-10)",
+  "tempatLahir": "Tempat lahir dari 'TEMPAT LAHIR / PLACE OF BIRTH'",
+  "tanggalLahir": "Tanggal lahir dari 'TGL. LAHIR / DATE OF BIRTH' dalam format YYYY-MM-DD",
+  "rawText": "Teks mentah paspor termasuk 2 baris MRZ di bagian bawah"
+}`
+          : `Analisis gambar dokumen ${jenis} ini dan ekstrak data terstruktur berikut dalam format JSON:
 {
   "namaLengkap": "Nama lengkap pemegang paspor / dokumen",
   "nomorPaspor": "Nomor paspor jika dokumen paspor",
@@ -169,10 +192,17 @@ export class GoogleAiStudioOcrProvider implements OcrProvider {
           if (jsonMatch) parsedJson = JSON.parse(jsonMatch[0]);
         } catch { /* fallback */ }
 
+        let passportParsed: ReturnType<typeof parsePassport> | null = null;
+        if (jenis === "paspor") {
+          passportParsed = parsePassport(fullText, parsedJson);
+        }
+
         const expectedFields = getExpectedFields(jenis);
         const fields = expectedFields.map((field) => {
           let value = "";
-          if (parsedJson && parsedJson[field]) {
+          if (passportParsed && field in passportParsed) {
+            value = String((passportParsed as any)[field] || "").trim();
+          } else if (parsedJson && parsedJson[field]) {
             value = String(parsedJson[field]).trim();
           }
           if (!value) {

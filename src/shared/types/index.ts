@@ -174,6 +174,11 @@ export interface DokumenItem {
     nik?: string;
     nomorPaspor?: string;
     tanggalLahir?: string;
+    tempatLahir?: string;
+    tempatTerbitPaspor?: string;
+    tanggalTerbitPaspor?: string;
+    tanggalKadaluarsa?: string;
+    masaBerlaku?: string;
   };
   /** Number of times this document has been re-uploaded / re-OCRed */
   ocrRetryCount?: number;
@@ -191,6 +196,9 @@ export interface OcrData {
   nomorPaspor?: string;
   tanggalLahir?: string;
   tempatLahir?: string;
+  tempatTerbitPaspor?: string;
+  tanggalTerbitPaspor?: string;
+  tanggalKadaluarsa?: string;
   masaBerlaku?: string;
   confidence: number;
   rawText?: string;

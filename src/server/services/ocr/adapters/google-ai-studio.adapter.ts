@@ -10,17 +10,28 @@ import type { DokumenJenis } from "@/shared/types";
 import type { OcrAdapter, OcrAdapterConfig } from "./adapter.interface";
 import type { OcrResult, ImageMetaCheck } from "../provider";
 import { getExpectedFields } from "../provider";
+import { parsePassport } from "../passport-parser";
 
 // ── Field Extraction Patterns ────────────────────────────
 
 const FIELD_PATTERNS: Record<string, RegExp[]> = {
   namaLengkap: [
+    /(?:NAMA\s*LENGKAP(?:\s*\/\s*FULL\s*NAME)?|FULL\s*NAME|SURNAME|NAMA|NAME)\s*[:=]?\s*([A-Z\s.,'-]+?)(?:\r?\n|Kewarganegaraan|Nationality|IDN|$)/i,
     /Nama\s*:\s*(.+)/i, /NAME\s*:\s*(.+)/i,
-    /Surname\s*:\s*(.+)/i, /Given\s*Names?\s*:\s*(.+)/i,
   ],
   nomorPaspor: [
-    /Paspor\s*(?:No|Number)?\s*:\s*([A-Z0-9]+)/i,
-    /Passport\s*(?:No|Number)?\s*:\s*([A-Z0-9]+)/i,
+    /(?:NO\.?\s*PASPOR(?:\s*\/\s*PASSPORT\s*NO\.?)?|PASSPORT\s*(?:NO|NUMBER)\.?|PASPOR\s*(?:NO|NUMBER)\.?|NOMOR\s*PASPOR|PASSPORT\s*:|PASPOR\s*:)\s*[:=]?\s*([A-Z0-9]+)/i,
+    /\b([A-Z]\d{7,8})\b/i,
+  ],
+  tempatTerbitPaspor: [
+    /(?:KANTOR\s*(?:YANG\s*)?MENGELUARKAN(?:\s*\/\s*ISSUING\s*AUTHORITY)?|ISSUING\s*AUTHORITY|KANTOR\s*IMIGRASI|ISSUING\s*OFFICE|DITERBITKAN\s*DI(?:\s*\/\s*PLACE\s*OF\s*ISSUE)?|PLACE\s*OF\s*ISSUE)\s*[:=]?\s*([A-Z\s.,'-]+?)(?:\r?\n|$)/i,
+    /1A[0-9A-Z]{10,}\s*\r?\n?\s*([A-Z\s]+?)(?:\r?\n|$)/i,
+  ],
+  tanggalTerbitPaspor: [
+    /(?:TGL\.?\s*PENGELUARAN(?:\s*\/\s*DATE\s*OF\s*ISSUE)?|DATE\s*OF\s*ISSUE|TANGGAL\s*PENGELUARAN|TANGGAL\s*TERBIT|TGL\.?\s*TERBIT|ISSUE\s*DATE)\s*[:=]?\s*(\d{1,2}[ \-/]+[A-Za-z]+[ \-/]+\d{4}|\d{1,2}[-/\.]\d{1,2}[-/\.]\d{4}|\d{4}[-/\.]\d{1,2}[-/\.]\d{1,2}|[^\r\n]+)/i,
+  ],
+  tanggalKadaluarsa: [
+    /(?:BERLAKU\s*S\/?D\.?(?:\s*\/\s*DATE\s*OF\s*EXPIRY)?|DATE\s*OF\s*EXPIRY|TANGGAL\s*KADALUARSA|EXPIRY\s*DATE|BERLAKU\s*(?:HINGGA|SAMPAI)|MASA\s*BERLAKU)\s*[:=]?\s*(\d{1,2}[ \-/]+[A-Za-z]+[ \-/]+\d{4}|\d{1,2}[-/\.]\d{1,2}[-/\.]\d{4}|\d{4}[-/\.]\d{1,2}[-/\.]\d{1,2}|[^\r\n]+)/i,
   ],
   nik: [
     /NIK\s*:\s*(\d+)/i, /KTP\s*(?:No|Number)?\s*:\s*(\d+)/i,
@@ -67,10 +78,10 @@ function getPromptPasporTanpaNama(): string {
 Ekstrak HANYA data berikut dalam format JSON valid (tanpa markdown wrapper):
 {
   "nomorPaspor": "Nomor paspor (1 huruf + 7 digit, contoh: X4573266)",
-  "tempatTerbitPaspor": "Kota/tempat penerbitan paspor — cari kolom 'Place of issue' atau 'Diterbitkan di' (BUKAN tempat lahir)",
-  "tanggalTerbitPaspor": "Tanggal penerbitan dalam format YYYY-MM-DD — cari 'Date of issue' atau 'Tanggal pengeluaran'",
-  "tanggalKadaluarsa": "Tanggal habis berlaku dalam format YYYY-MM-DD — cari 'Date of expiry' atau 'Berlaku hingga'",
-  "rawText": "Teks mentah paspor"
+  "tempatTerbitPaspor": "Kantor/kota penerbitan paspor dari kolom 'KANTOR YANG MENGELUARKAN / ISSUING AUTHORITY' atau 'KANTOR IMIGRASI' (BUKAN tempat lahir, contoh: MALANG, JAKARTA PUSAT)",
+  "tanggalTerbitPaspor": "Tanggal penerbitan dari 'TGL. PENGELUARAN / DATE OF ISSUE' dalam format YYYY-MM-DD (contoh: 2024-12-10)",
+  "tanggalKadaluarsa": "Tanggal habis masa berlaku dari 'BERLAKU S/D / DATE OF EXPIRY' atau baris MRZ dalam format YYYY-MM-DD (contoh: 2034-12-10)",
+  "rawText": "Teks mentah paspor termasuk 2 baris MRZ di bagian bawah"
 }`;
 }
 
@@ -113,11 +124,13 @@ function getPromptForJenis(jenis: DokumenJenis): string {
       return `Analisis gambar Paspor Indonesia ini dan ekstrak data terstruktur berikut dalam format JSON valid (tanpa markdown wrapper):
 {
   "namaLengkap": "Nama lengkap pemegang paspor (contoh: MUCHAMAD ZAMRONI)",
-  "nomorPaspor": "Nomor paspor (misal: X4573266 atau C1234567 — biasanya 1 huruf + 7 digit)",
-  "tempatTerbitPaspor": "Kota/tempat penerbitan paspor (bukan tempat lahir), cari kolom 'Place of issue' atau 'Diterbitkan di'",
-  "tanggalTerbitPaspor": "Tanggal penerbitan paspor dalam format YYYY-MM-DD (cari 'Date of issue' atau 'Tanggal pengeluaran')",
-  "tanggalKadaluarsa": "Tanggal habis masa berlaku paspor dalam format YYYY-MM-DD (cari 'Date of expiry' atau 'Berlaku hingga')",
-  "rawText": "Teks mentah paspor"
+  "nomorPaspor": "Nomor paspor (contoh: X4573266 atau C1234567 — biasanya 1 huruf + 7 digit)",
+  "tempatTerbitPaspor": "Kantor/kota penerbitan paspor dari kolom 'KANTOR YANG MENGELUARKAN / ISSUING AUTHORITY' atau 'KANTOR IMIGRASI' (BUKAN tempat lahir, contoh: MALANG, JAKARTA PUSAT)",
+  "tanggalTerbitPaspor": "Tanggal penerbitan/pengeluaran paspor dari 'TGL. PENGELUARAN / DATE OF ISSUE' dalam format YYYY-MM-DD (contoh: 2024-12-10)",
+  "tanggalKadaluarsa": "Tanggal habis masa berlaku paspor dari 'BERLAKU S/D / DATE OF EXPIRY' atau baris MRZ dalam format YYYY-MM-DD (contoh: 2034-12-10)",
+  "tempatLahir": "Tempat lahir dari 'TEMPAT LAHIR / PLACE OF BIRTH'",
+  "tanggalLahir": "Tanggal lahir dari 'TGL. LAHIR / DATE OF BIRTH' dalam format YYYY-MM-DD",
+  "rawText": "Teks mentah paspor termasuk 2 baris MRZ di bagian bawah"
 }`;
     case "ktp":
       return `Analisis gambar KTP (Kartu Tanda Penduduk) ini dan ekstrak data terstruktur berikut dalam format JSON:
@@ -227,10 +240,18 @@ export const googleAiStudioAdapter: OcrAdapter = {
           /* non-blocking — fallback to regex extractField */
         }
 
+        // Jika paspor, gunakan parser paspor untuk normalisasi tanggal, MRZ, dan resolusi alias key
+        let passportParsed: ReturnType<typeof parsePassport> | null = null;
+        if (jenis === "paspor" || mode?.startsWith("paspor")) {
+          passportParsed = parsePassport(fullText, parsedJson);
+        }
+
         const expectedFields = getFieldsForMode(jenis, mode);
         const fields = expectedFields.map((field) => {
           let value = "";
-          if (parsedJson && parsedJson[field]) {
+          if (passportParsed && field in passportParsed) {
+            value = String((passportParsed as any)[field] || "").trim();
+          } else if (parsedJson && parsedJson[field]) {
             value = String(parsedJson[field]).trim();
           }
           if (!value) {
