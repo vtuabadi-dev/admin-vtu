@@ -34,4 +34,11 @@ export interface OcrAdapterConfig {
   apiHeaderName?: string;
   apiHeaderPrefix?: string;
   timeout?: number;
+  /**
+   * Optional OCR mode — digunakan untuk skenario khusus seperti endorsement paspor.
+   * Nilai yang didukung:
+   * - "paspor_tanpa_nama"        → halaman 1 endorsement, ekstrak semua kecuali nama
+   * - "paspor_endorsement_nama"  → halaman 2 endorsement, ekstrak hanya nama
+   */
+  mode?: string;
 }

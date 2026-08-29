@@ -41,6 +41,7 @@ export async function process(
   imageBuffer: Buffer,
   jenis: DokumenJenis,
   retryCount: number = 0,
+  mode?: string,
 ): Promise<OcrResult> {
   const startTime = Date.now();
   const imageHash = gatewayConfig.cacheEnabled ? hashImage(imageBuffer) : undefined;
@@ -163,12 +164,12 @@ export async function process(
       };
     }
     // Use alternative provider
-    return await attemptWithProvider(alt, imageBuffer, jenis, imageHash, imageSize, startTime, retryCount, providers);
+    return await attemptWithProvider(alt, imageBuffer, jenis, imageHash, imageSize, startTime, retryCount, providers, mode);
   }
 
   // ── 8. Attempt OCR with selected provider ──────────
   return await attemptWithProvider(
-    selection.provider, imageBuffer, jenis, imageHash, imageSize, startTime, retryCount, providers,
+    selection.provider, imageBuffer, jenis, imageHash, imageSize, startTime, retryCount, providers, mode,
   );
 }
 
@@ -183,6 +184,7 @@ async function attemptWithProvider(
   startTime: number,
   retryCount: number,
   allProviders: OcrProviderRecord[],
+  mode?: string,
 ): Promise<OcrResult> {
   const adapter = getAdapter(provider.providerType);
   if (!adapter) {
@@ -198,6 +200,7 @@ async function attemptWithProvider(
   }
 
   const config = buildAdapterConfig(provider);
+  if (mode) config.mode = mode;
   const retryState = initRetry(allProviders, provider.id, gatewayConfig.maxRetries);
 
   let currentProvider = provider;

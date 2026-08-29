@@ -107,6 +107,36 @@ function getDocCellBadge(docInfo: { status: string } | undefined) {
   return { variant: "muted" as const, label: docInfo.status, dotClass: "bg-muted-foreground/30" };
 }
 
+/** Komponen tampilan hasil OCR generik — dipakai untuk dokumen non-paspor */
+function OcrResultCard({ data }: { data: Record<string, any> }) {
+  if (!data) return null;
+  return (
+    <div className="space-y-2 rounded-md border p-3">
+      <div className="flex items-center justify-between">
+        <h5 className="text-xs font-medium">Hasil Ekstraksi</h5>
+        <Badge variant={data.confidence >= 0.7 ? "success" : "warning"} size="sm">
+          {Math.round((data.confidence ?? 0) * 100)}%
+        </Badge>
+      </div>
+      <div className="space-y-1 text-xs">
+        {data.namaLengkap && <div className="flex justify-between"><span className="text-muted-foreground">Nama:</span><span className="text-right max-w-[60%]">{data.namaLengkap}</span></div>}
+        {data.nik && <div className="flex justify-between"><span className="text-muted-foreground">NIK:</span><span>{data.nik}</span></div>}
+        {data.nomorPaspor && <div className="flex justify-between"><span className="text-muted-foreground">No. Paspor:</span><span className="font-mono font-semibold">{data.nomorPaspor}</span></div>}
+        {data.tempatTerbitPaspor && <div className="flex justify-between"><span className="text-muted-foreground">Tempat Terbit:</span><span>{data.tempatTerbitPaspor}</span></div>}
+        {data.tanggalTerbitPaspor && <div className="flex justify-between"><span className="text-muted-foreground">Tgl. Terbit:</span><span>{data.tanggalTerbitPaspor}</span></div>}
+        {data.tanggalKadaluarsa && (
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">Tgl. Kadaluarsa:</span>
+            <span className={(new Date(data.tanggalKadaluarsa).getTime() - Date.now()) < 180 * 24 * 60 * 60 * 1000 ? "text-destructive font-semibold" : ""}>{data.tanggalKadaluarsa}</span>
+          </div>
+        )}
+        {data.tanggalLahir && <div className="flex justify-between"><span className="text-muted-foreground">Tgl. Lahir:</span><span>{data.tanggalLahir}</span></div>}
+        {data.tempatLahir && <div className="flex justify-between"><span className="text-muted-foreground">Tempat Lahir:</span><span>{data.tempatLahir}</span></div>}
+      </div>
+    </div>
+  );
+}
+
 // ============================================================
 // MAIN PAGE
 // ============================================================
@@ -157,6 +187,17 @@ export default function DokumenPage() {
   const [extractingOcr, setExtractingOcr] = useState<string | null>(null);
   const [ocrResults, setOcrResults] = useState<Record<string, any>>({});
   const [submitting, setSubmitting] = useState(false);
+
+  // --- Passport Endorsement State ---
+  // null = belum dipilih, false = standar (1 halaman), true = ada endorsement (2 halaman)
+  const [pasporHasEndorsement, setPasporHasEndorsement] = useState<boolean | null>(null);
+  // Upload & preview untuk halaman endorsement (halaman 2)
+  const [endorsementPreview, setEndorsementPreview] = useState<string>("");
+  const [endorsementDoc, setEndorsementDoc] = useState<{ id: string; fileUrl: string } | null>(null);
+  const [uploadingEndorsement, setUploadingEndorsement] = useState(false);
+  const [extractingEndorsement, setExtractingEndorsement] = useState(false);
+  // Hasil OCR halaman 2 endorsement (hanya namaLengkap)
+  const [endorsementOcrResult, setEndorsementOcrResult] = useState<any>(null);
 
   // Load initial data
   useEffect(() => {
@@ -485,6 +526,11 @@ export default function DokumenPage() {
     setOcrResults({});
     setUploadSearchId("");
     setUploadError("");
+    // Reset endorsement state
+    setPasporHasEndorsement(null);
+    setEndorsementPreview("");
+    setEndorsementDoc(null);
+    setEndorsementOcrResult(null);
   }
 
   function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>, jenis: string) {
@@ -536,7 +582,11 @@ export default function DokumenPage() {
       const dokumenId: string = uploadedDoc?.id ?? "";
       if (fileUrl && dokumenId) {
         // Jalankan OCR di background tanpa block UI upload
-        handleExtractOcr(jenis, { fileUrl, id: dokumenId });
+        // Jika endorsement mode: gunakan prompt tanpa nama untuk hal.1
+        const ocrMode = (jenis === "paspor" && pasporHasEndorsement === true)
+          ? "paspor_tanpa_nama"
+          : undefined;
+        handleExtractOcr(jenis, { fileUrl, id: dokumenId }, ocrMode);
       }
     } catch (err) {
       console.error("Upload error:", err);
@@ -548,10 +598,15 @@ export default function DokumenPage() {
 
   /**
    * Ekstrak data OCR untuk dokumen tertentu.
-   * @param jenis     - Jenis dokumen
+   * @param jenis       - Jenis dokumen
    * @param overrideDoc - Opsional: pass dokumen langsung (digunakan saat auto-OCR setelah upload)
+   * @param mode        - Opsional: OCR mode khusus (misal paspor_tanpa_nama)
    */
-  async function handleExtractOcr(jenis: string, overrideDoc?: { id: string; fileUrl: string }) {
+  async function handleExtractOcr(
+    jenis: string,
+    overrideDoc?: { id: string; fileUrl: string },
+    mode?: string,
+  ) {
     const doc = overrideDoc ?? uploadDocuments.find((d) => d.jenis === jenis);
     if (!doc?.fileUrl) return;
 
@@ -560,12 +615,14 @@ export default function DokumenPage() {
       const res = await fetch("/api/dokumen/ocr", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ dokumenId: doc.id, fileUrl: doc.fileUrl, jenis }),
+        body: JSON.stringify({ dokumenId: doc.id, fileUrl: doc.fileUrl, jenis, mode }),
       });
 
       const json = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(json.message || "Gagal mengekstrak data");
 
+      // Jika mode endorsement halaman 1 — simpan di ocrResults[jenis] tanpa nama
+      // Nama akan digabung dari endorsementOcrResult saat submit
       setOcrResults((prev) => ({ ...prev, [jenis]: json.data }));
     } catch (err) {
       console.error("OCR error:", err);
@@ -575,6 +632,98 @@ export default function DokumenPage() {
       }
     } finally {
       setExtractingOcr(null);
+    }
+  }
+
+  /**
+   * Upload halaman kedua paspor endorsement nama.
+   * File diupload menggunakan endpoint yang sama, kemudian OCR dijalankan
+   * dengan mode paspor_endorsement_nama untuk mengambil hanya namaLengkap.
+   */
+  async function handleEndorsementFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file || !selectedJamaah) return;
+
+    const previewUrl = URL.createObjectURL(file);
+    setEndorsementPreview(previewUrl);
+    setUploadingEndorsement(true);
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("jamaahId", selectedJamaah.id);
+      // Upload sebagai jenis paspor juga (hanya 1 dokumen paspor per jamaah)
+      // Namun di sini kita gunakan API terpisah dengan suffix _endorsement jika perlu
+      // Untuk sederhananya, upload dengan jenis paspor (file yang sudah upload tidak di-overwrite karena endpoint check)
+      formData.append("jenisDokumen", "paspor");
+
+      const res = await fetch("/api/dokumen/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      const json = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(json?.message || "Gagal mengupload halaman endorsement");
+
+      const uploadedDoc = json.data.dokumen ?? { id: json.data.id, fileUrl: json.data.fileUrl };
+      const fileUrl: string = json.data.fileUrl ?? uploadedDoc?.fileUrl ?? "";
+      const dokumenId: string = uploadedDoc?.id ?? "";
+
+      setEndorsementDoc({ id: dokumenId, fileUrl });
+
+      // Auto-OCR halaman endorsement — hanya ekstrak nama
+      if (fileUrl && dokumenId) {
+        await handleExtractEndorsementOcr({ id: dokumenId, fileUrl });
+      }
+    } catch (err) {
+      console.error("Endorsement upload error:", err);
+      alert(`Gagal mengupload halaman endorsement: ${(err as Error).message}`);
+    } finally {
+      setUploadingEndorsement(false);
+    }
+  }
+
+  /**
+   * OCR khusus halaman endorsement nama (halaman 2).
+   * Menggunakan mode paspor_endorsement_nama → ekstrak hanya namaLengkap.
+   */
+  async function handleExtractEndorsementOcr(overrideDoc?: { id: string; fileUrl: string }) {
+    const doc = overrideDoc ?? endorsementDoc;
+    if (!doc?.fileUrl) return;
+
+    setExtractingEndorsement(true);
+    try {
+      const res = await fetch("/api/dokumen/ocr", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          dokumenId: doc.id,
+          fileUrl: doc.fileUrl,
+          jenis: "paspor",
+          mode: "paspor_endorsement_nama",
+        }),
+      });
+
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.message || "Gagal mengekstrak nama endorsement");
+
+      setEndorsementOcrResult(json.data);
+
+      // Gabungkan nama dari endorsement ke ocrResults paspor
+      setOcrResults((prev) => ({
+        ...prev,
+        paspor: {
+          ...(prev.paspor ?? {}),
+          namaLengkap: json.data?.namaLengkap ?? prev.paspor?.namaLengkap ?? "",
+        },
+      }));
+    } catch (err) {
+      console.error("Endorsement OCR error:", err);
+      if (!overrideDoc) {
+        alert(`Gagal mengekstrak nama endorsement: ${(err as Error).message}`);
+      }
+    } finally {
+      setExtractingEndorsement(false);
     }
   }
 
@@ -1221,163 +1370,297 @@ export default function DokumenPage() {
                       return (
                         <Card key={jenis}>
                           <CardContent className="pt-4">
-                            <div className="flex items-start gap-4">
-                              {/* Left: Upload Area */}
-                              <div className="flex-1">
-                                <h4 className="text-sm font-medium mb-2">{LABEL_DOKUMEN[jenis]}</h4>
-                                <div
-                                  className={cn(
+                            {/* ────────────── PASPOR: Endorsement-aware flow ────────────── */}
+                            {jenis === "paspor" ? (
+                              <div className="space-y-4">
+                                {/* Header + Mode Badge */}
+                                <div className="flex items-center justify-between">
+                                  <h4 className="text-sm font-medium">Paspor</h4>
+                                  {pasporHasEndorsement !== null && (
+                                    <button
+                                      type="button"
+                                      className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
+                                      onClick={() => {
+                                        setPasporHasEndorsement(null);
+                                        setEndorsementPreview("");
+                                        setEndorsementDoc(null);
+                                        setEndorsementOcrResult(null);
+                                        setOcrResults((prev) => { const n = { ...prev }; delete n.paspor; return n; });
+                                      }}
+                                    >
+                                      Ganti Mode
+                                    </button>
+                                  )}
+                                </div>
+
+                                {/* ── Step 1: Endorsement Question ── */}
+                                {pasporHasEndorsement === null && (
+                                  <div className="rounded-lg border-2 border-dashed border-amber-400/60 bg-amber-50/50 dark:bg-amber-950/20 p-4 space-y-3">
+                                    <p className="text-sm font-semibold text-amber-900 dark:text-amber-300">
+                                      Identifikasi Paspor
+                                    </p>
+                                    <p className="text-xs text-amber-800 dark:text-amber-400 leading-relaxed">
+                                      Apakah paspor ini memiliki <strong>endorsement nama</strong>?
+                                      (Halaman tambahan berisi perubahan/penambahan nama pemegang)
+                                    </p>
+                                    <div className="flex gap-2">
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="flex-1 border-amber-400 text-amber-800 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900"
+                                        onClick={() => setPasporHasEndorsement(false)}
+                                      >
+                                        Tidak Ada Endorsement
+                                      </Button>
+                                      <Button
+                                        size="sm"
+                                        className="flex-1 bg-amber-600 hover:bg-amber-700 text-white"
+                                        onClick={() => setPasporHasEndorsement(true)}
+                                      >
+                                        Ada Endorsement Nama
+                                      </Button>
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* ── Step 2a: Mode Standar (no endorsement) ── */}
+                                {pasporHasEndorsement === false && (
+                                  <div className="flex items-start gap-4">
+                                    {/* Upload halaman tunggal */}
+                                    <div className="flex-1">
+                                      <div className={cn(
+                                        "relative flex aspect-[3/4] items-center justify-center rounded-lg border-2 border-dashed transition-colors",
+                                        isUploaded ? "border-success/50 bg-success/5" : "border-muted-foreground/25 bg-muted/20",
+                                        "hover:border-primary/50 hover:bg-primary/5"
+                                      )}>
+                                        {previewUrl ? (
+                                          <img src={previewUrl} alt="Paspor" className="h-full w-full object-cover rounded-md" />
+                                        ) : (
+                                          <div className="text-center">
+                                            <FileImage className="mx-auto h-12 w-12 text-muted-foreground/30" />
+                                            <p className="mt-2 text-xs text-muted-foreground">Upload Paspor</p>
+                                          </div>
+                                        )}
+                                        <input type="file" accept="image/jpeg,image/jpg" className="absolute inset-0 cursor-pointer opacity-0"
+                                          onChange={(e) => handleFileSelect(e, jenis)} disabled={uploading} />
+                                      </div>
+                                      {isUploaded && (
+                                        <div className="mt-2 flex items-center gap-1 text-xs text-success">
+                                          <CheckCircle className="h-3 w-3" />Sudah terupload
+                                        </div>
+                                      )}
+                                    </div>
+                                    {/* OCR result standar */}
+                                    <div className="flex-1 space-y-3">
+                                      <span className="inline-block px-2 py-0.5 text-[10px] font-bold rounded bg-stone-100 dark:bg-stone-800 text-stone-600 dark:text-stone-400">Mode: Standar</span>
+                                      {extractingOcr === jenis ? (
+                                        <p className="text-xs text-muted-foreground flex items-center gap-1.5"><RefreshCw className="h-3 w-3 animate-spin" />Mengekstrak...</p>
+                                      ) : ocrResults[jenis] ? (
+                                        <p className="text-xs text-success flex items-center gap-1.5"><CheckCircle className="h-3 w-3" />Data berhasil diekstrak</p>
+                                      ) : (
+                                        <p className="text-xs text-muted-foreground">{isUploaded ? "Mengekstrak data otomatis..." : "Upload paspor untuk memulai ekstraksi."}</p>
+                                      )}
+                                      {isUploaded && (
+                                        <Button variant="outline" size="sm" onClick={() => handleExtractOcr(jenis)} disabled={extractingOcr === jenis} className="w-full">
+                                          <RefreshCw className={cn("mr-1.5 h-3.5 w-3.5", extractingOcr === jenis && "animate-spin")} />
+                                          {extractingOcr === jenis ? "Mengekstrak..." : "Ekstrak Ulang"}
+                                        </Button>
+                                      )}
+                                      {ocrResults[jenis] && <OcrResultCard data={ocrResults[jenis]} />}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* ── Step 2b: Mode Endorsement (2 halaman) ── */}
+                                {pasporHasEndorsement === true && (
+                                  <div className="space-y-4">
+                                    <div className="inline-block px-2 py-0.5 text-[10px] font-bold rounded bg-amber-100 dark:bg-amber-900 text-amber-800 dark:text-amber-300">
+                                      Mode: Endorsement Nama
+                                    </div>
+
+                                    {/* Halaman 1 — Data Utama */}
+                                    <div className="rounded-lg border p-3 space-y-3">
+                                      <div className="flex items-center gap-2">
+                                        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">1</span>
+                                        <p className="text-xs font-semibold">Halaman 1 — Data Utama Paspor</p>
+                                        <span className="text-[10px] text-muted-foreground">(No. Paspor, Tempat & Tgl Terbit, Kadaluarsa)</span>
+                                      </div>
+                                      <div className="flex items-start gap-3">
+                                        <div className="w-24 flex-shrink-0">
+                                          <div className={cn(
+                                            "relative flex aspect-[3/4] items-center justify-center rounded-md border-2 border-dashed transition-colors",
+                                            isUploaded ? "border-success/50 bg-success/5" : "border-muted-foreground/25 bg-muted/20"
+                                          )}>
+                                            {previewUrl ? (
+                                              <img src={previewUrl} alt="Hal.1" className="h-full w-full object-cover rounded-sm" />
+                                            ) : (
+                                              <FileImage className="h-6 w-6 text-muted-foreground/30" />
+                                            )}
+                                            <input type="file" accept="image/jpeg,image/jpg" className="absolute inset-0 cursor-pointer opacity-0"
+                                              onChange={(e) => handleFileSelect(e, jenis)} disabled={uploading} />
+                                          </div>
+                                          {isUploaded && <p className="mt-1 text-[10px] text-success text-center flex items-center gap-0.5 justify-center"><CheckCircle className="h-2.5 w-2.5" />Terupload</p>}
+                                        </div>
+                                        <div className="flex-1 space-y-2">
+                                          {extractingOcr === jenis ? (
+                                            <p className="text-xs text-muted-foreground flex items-center gap-1"><RefreshCw className="h-3 w-3 animate-spin" />Mengekstrak data dokumen (tanpa nama)...</p>
+                                          ) : ocrResults[jenis] ? (
+                                            <div className="space-y-1 text-xs">
+                                              {ocrResults[jenis].nomorPaspor && <div className="flex justify-between"><span className="text-muted-foreground">No. Paspor:</span><span className="font-mono font-semibold">{ocrResults[jenis].nomorPaspor}</span></div>}
+                                              {ocrResults[jenis].tempatTerbitPaspor && <div className="flex justify-between"><span className="text-muted-foreground">Tempat Terbit:</span><span>{ocrResults[jenis].tempatTerbitPaspor}</span></div>}
+                                              {ocrResults[jenis].tanggalTerbitPaspor && <div className="flex justify-between"><span className="text-muted-foreground">Tgl. Terbit:</span><span>{ocrResults[jenis].tanggalTerbitPaspor}</span></div>}
+                                              {ocrResults[jenis].tanggalKadaluarsa && (
+                                                <div className="flex justify-between">
+                                                  <span className="text-muted-foreground">Kadaluarsa:</span>
+                                                  <span className={(new Date(ocrResults[jenis].tanggalKadaluarsa).getTime() - Date.now()) < 180 * 24 * 60 * 60 * 1000 ? "text-destructive font-semibold" : ""}>
+                                                    {ocrResults[jenis].tanggalKadaluarsa}
+                                                  </span>
+                                                </div>
+                                              )}
+                                            </div>
+                                          ) : (
+                                            <p className="text-xs text-muted-foreground">{isUploaded ? "Mengekstrak data (tanpa nama)..." : "Upload halaman 1 paspor"}</p>
+                                          )}
+                                          {isUploaded && (
+                                            <Button variant="outline" size="sm" className="w-full h-6 text-[10px]"
+                                              onClick={() => handleExtractOcr(jenis, undefined, "paspor_tanpa_nama")} disabled={extractingOcr === jenis}>
+                                              <RefreshCw className={cn("mr-1 h-2.5 w-2.5", extractingOcr === jenis && "animate-spin")} />Ekstrak Ulang
+                                            </Button>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </div>
+
+                                    {/* Halaman 2 — Endorsement Nama */}
+                                    <div className="rounded-lg border border-amber-300/60 p-3 space-y-3 bg-amber-50/30 dark:bg-amber-950/10">
+                                      <div className="flex items-center gap-2">
+                                        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-amber-600 text-[10px] font-bold text-white">2</span>
+                                        <p className="text-xs font-semibold">Halaman 2 — Endorsement Nama</p>
+                                        <span className="text-[10px] text-muted-foreground">(Nama resmi dari lembar endorsement)</span>
+                                      </div>
+                                      <div className="flex items-start gap-3">
+                                        <div className="w-24 flex-shrink-0">
+                                          <div className={cn(
+                                            "relative flex aspect-[3/4] items-center justify-center rounded-md border-2 border-dashed transition-colors",
+                                            endorsementDoc ? "border-amber-400/50 bg-amber-50/20" : "border-muted-foreground/25 bg-muted/20"
+                                          )}>
+                                            {endorsementPreview ? (
+                                              <img src={endorsementPreview} alt="Endorsement" className="h-full w-full object-cover rounded-sm" />
+                                            ) : (
+                                              uploadingEndorsement ? <RefreshCw className="h-5 w-5 animate-spin text-muted-foreground" /> : <FileImage className="h-6 w-6 text-muted-foreground/30" />
+                                            )}
+                                            <input type="file" accept="image/jpeg,image/jpg" className="absolute inset-0 cursor-pointer opacity-0"
+                                              onChange={handleEndorsementFileSelect} disabled={uploadingEndorsement} />
+                                          </div>
+                                          {endorsementDoc && <p className="mt-1 text-[10px] text-amber-700 dark:text-amber-300 text-center flex items-center gap-0.5 justify-center"><CheckCircle className="h-2.5 w-2.5" />Terupload</p>}
+                                        </div>
+                                        <div className="flex-1 space-y-2">
+                                          {extractingEndorsement ? (
+                                            <p className="text-xs text-muted-foreground flex items-center gap-1"><RefreshCw className="h-3 w-3 animate-spin" />Mengekstrak nama endorsement...</p>
+                                          ) : endorsementOcrResult ? (
+                                            <div className="space-y-1 text-xs">
+                                              <div className="flex justify-between">
+                                                <span className="text-muted-foreground">Nama (Endorsement):</span>
+                                                <span className="text-right max-w-[55%] font-semibold text-amber-800 dark:text-amber-300">
+                                                  {endorsementOcrResult.namaLengkap || "-"}
+                                                </span>
+                                              </div>
+                                            </div>
+                                          ) : (
+                                            <p className="text-xs text-muted-foreground">{endorsementDoc ? "Mengekstrak nama endorsement..." : "Upload halaman 2 (endorsement nama)"}</p>
+                                          )}
+                                          {endorsementDoc && (
+                                            <Button variant="outline" size="sm" className="w-full h-6 text-[10px] border-amber-400"
+                                              onClick={() => handleExtractEndorsementOcr()} disabled={extractingEndorsement}>
+                                              <RefreshCw className={cn("mr-1 h-2.5 w-2.5", extractingEndorsement && "animate-spin")} />Ekstrak Ulang Nama
+                                            </Button>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </div>
+
+                                    {/* Gabungan Hasil Akhir */}
+                                    {(ocrResults[jenis] || endorsementOcrResult) && (
+                                      <div className="rounded-md border border-primary/30 bg-primary/5 p-3 space-y-2">
+                                        <h5 className="text-xs font-semibold text-primary">Hasil Gabungan</h5>
+                                        <div className="space-y-1 text-xs">
+                                          {ocrResults[jenis]?.namaLengkap && (
+                                            <div className="flex justify-between">
+                                              <span className="text-muted-foreground">Nama:</span>
+                                              <span className="font-semibold text-right max-w-[60%]">{ocrResults[jenis].namaLengkap}</span>
+                                            </div>
+                                          )}
+                                          {ocrResults[jenis]?.nomorPaspor && (
+                                            <div className="flex justify-between">
+                                              <span className="text-muted-foreground">No. Paspor:</span>
+                                              <span className="font-mono font-semibold">{ocrResults[jenis].nomorPaspor}</span>
+                                            </div>
+                                          )}
+                                          {ocrResults[jenis]?.tanggalKadaluarsa && (
+                                            <div className="flex justify-between">
+                                              <span className="text-muted-foreground">Kadaluarsa:</span>
+                                              <span className={(new Date(ocrResults[jenis].tanggalKadaluarsa).getTime() - Date.now()) < 180 * 24 * 60 * 60 * 1000 ? "text-destructive font-semibold" : ""}>
+                                                {ocrResults[jenis].tanggalKadaluarsa}
+                                              </span>
+                                            </div>
+                                          )}
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            ) : (
+                              /* ────────────── NON-PASPOR: Tampilan standar ────────────── */
+                              <div className="flex items-start gap-4">
+                                {/* Left: Upload Area */}
+                                <div className="flex-1">
+                                  <h4 className="text-sm font-medium mb-2">{LABEL_DOKUMEN[jenis]}</h4>
+                                  <div className={cn(
                                     "relative flex aspect-[3/4] items-center justify-center rounded-lg border-2 border-dashed transition-colors",
                                     isUploaded ? "border-success/50 bg-success/5" : "border-muted-foreground/25 bg-muted/20",
                                     "hover:border-primary/50 hover:bg-primary/5"
-                                  )}
-                                >
-                                  {previewUrl ? (
-                                    <img
-                                      src={previewUrl}
-                                      alt={LABEL_DOKUMEN[jenis]}
-                                      className="h-full w-full object-cover rounded-md"
-                                    />
-                                  ) : (
-                                    <div className="text-center">
-                                      <FileImage className="mx-auto h-12 w-12 text-muted-foreground/30" />
-                                      <p className="mt-2 text-xs text-muted-foreground">Belum ada foto</p>
-                                    </div>
-                                  )}
-                                  <input
-                                    type="file"
-                                    accept="image/jpeg,image/jpg"
-                                    className="absolute inset-0 cursor-pointer opacity-0"
-                                    onChange={(e) => handleFileSelect(e, jenis)}
-                                    disabled={uploading}
-                                  />
-                                </div>
-                                {isUploaded && (
-                                  <div className="mt-2 flex items-center gap-1 text-xs text-success">
-                                    <CheckCircle className="h-3 w-3" />
-                                    Sudah terupload
-                                  </div>
-                                )}
-                              </div>
-
-                              {/* Right: Extract Data */}
-                              <div className="flex-1 space-y-3">
-                                <h4 className="text-sm font-medium">Ekstrak Data</h4>
-                                {extractingOcr === jenis ? (
-                                  <p className="text-xs text-muted-foreground flex items-center gap-1.5">
-                                    <RefreshCw className="h-3 w-3 animate-spin" />
-                                    Mengekstrak data otomatis...
-                                  </p>
-                                ) : ocrResults[jenis] ? (
-                                  <p className="text-xs text-success flex items-center gap-1.5">
-                                    <CheckCircle className="h-3 w-3" />
-                                    Data berhasil diekstrak
-                                  </p>
-                                ) : (
-                                  <p className="text-xs text-muted-foreground">
-                                    {isUploaded
-                                      ? "Mengekstrak data otomatis setelah upload..."
-                                      : "Upload dokumen untuk memulai ekstraksi otomatis."}
-                                  </p>
-                                )}
-
-                                {/* Tombol re-ekstrak manual jika sudah ada file */}
-                                {isUploaded && (
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => handleExtractOcr(jenis)}
-                                    disabled={extractingOcr === jenis}
-                                    className="w-full"
-                                  >
-                                    {extractingOcr === jenis ? (
-                                      <>
-                                        <RefreshCw className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-                                        Mengekstrak...
-                                      </>
+                                  )}>
+                                    {previewUrl ? (
+                                      <img src={previewUrl} alt={LABEL_DOKUMEN[jenis]} className="h-full w-full object-cover rounded-md" />
                                     ) : (
-                                      <>
-                                        <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
-                                        Ekstrak Ulang
-                                      </>
+                                      <div className="text-center">
+                                        <FileImage className="mx-auto h-12 w-12 text-muted-foreground/30" />
+                                        <p className="mt-2 text-xs text-muted-foreground">Belum ada foto</p>
+                                      </div>
                                     )}
-                                  </Button>
-                                )}
-
-                                {/* OCR Results */}
-                                {ocrResults[jenis] && (
-                                  <div className="space-y-2 rounded-md border p-3">
-                                    <div className="flex items-center justify-between">
-                                      <h5 className="text-xs font-medium">Hasil Ekstraksi</h5>
-                                      <Badge
-                                        variant={ocrResults[jenis].confidence >= 0.7 ? "success" : "warning"}
-                                        size="sm"
-                                      >
-                                        {Math.round(ocrResults[jenis].confidence * 100)}%
-                                      </Badge>
-                                    </div>
-                                    <div className="space-y-1 text-xs">
-                                      {ocrResults[jenis].namaLengkap && (
-                                        <div className="flex justify-between">
-                                          <span className="text-muted-foreground">Nama:</span>
-                                          <span className="text-right max-w-[60%]">{ocrResults[jenis].namaLengkap}</span>
-                                        </div>
-                                      )}
-                                      {ocrResults[jenis].nik && (
-                                        <div className="flex justify-between">
-                                          <span className="text-muted-foreground">NIK:</span>
-                                          <span>{ocrResults[jenis].nik}</span>
-                                        </div>
-                                      )}
-                                      {/* ── Paspor-specific fields ── */}
-                                      {ocrResults[jenis].nomorPaspor && (
-                                        <div className="flex justify-between">
-                                          <span className="text-muted-foreground">No. Paspor:</span>
-                                          <span className="font-mono font-semibold">{ocrResults[jenis].nomorPaspor}</span>
-                                        </div>
-                                      )}
-                                      {ocrResults[jenis].tempatTerbitPaspor && (
-                                        <div className="flex justify-between">
-                                          <span className="text-muted-foreground">Tempat Terbit:</span>
-                                          <span>{ocrResults[jenis].tempatTerbitPaspor}</span>
-                                        </div>
-                                      )}
-                                      {ocrResults[jenis].tanggalTerbitPaspor && (
-                                        <div className="flex justify-between">
-                                          <span className="text-muted-foreground">Tgl. Terbit:</span>
-                                          <span>{ocrResults[jenis].tanggalTerbitPaspor}</span>
-                                        </div>
-                                      )}
-                                      {ocrResults[jenis].tanggalKadaluarsa && (
-                                        <div className="flex justify-between">
-                                          <span className="text-muted-foreground">Tgl. Kadaluarsa:</span>
-                                          <span
-                                            className={(
-                                              new Date(ocrResults[jenis].tanggalKadaluarsa).getTime() - Date.now()
-                                            ) < 180 * 24 * 60 * 60 * 1000 ? "text-destructive font-semibold" : ""}
-                                          >
-                                            {ocrResults[jenis].tanggalKadaluarsa}
-                                          </span>
-                                        </div>
-                                      )}
-                                      {/* Legacy compat — tampilkan jika ada field lama */}
-                                      {ocrResults[jenis].tanggalLahir && (
-                                        <div className="flex justify-between">
-                                          <span className="text-muted-foreground">Tgl. Lahir:</span>
-                                          <span>{ocrResults[jenis].tanggalLahir}</span>
-                                        </div>
-                                      )}
-                                      {ocrResults[jenis].tempatLahir && (
-                                        <div className="flex justify-between">
-                                          <span className="text-muted-foreground">Tempat Lahir:</span>
-                                          <span>{ocrResults[jenis].tempatLahir}</span>
-                                        </div>
-                                      )}
-                                    </div>
+                                    <input type="file" accept="image/jpeg,image/jpg" className="absolute inset-0 cursor-pointer opacity-0"
+                                      onChange={(e) => handleFileSelect(e, jenis)} disabled={uploading} />
                                   </div>
-                                )}
+                                  {isUploaded && (
+                                    <div className="mt-2 flex items-center gap-1 text-xs text-success">
+                                      <CheckCircle className="h-3 w-3" />Sudah terupload
+                                    </div>
+                                  )}
+                                </div>
+
+                                {/* Right: Extract Data */}
+                                <div className="flex-1 space-y-3">
+                                  <h4 className="text-sm font-medium">Ekstrak Data</h4>
+                                  {extractingOcr === jenis ? (
+                                    <p className="text-xs text-muted-foreground flex items-center gap-1.5"><RefreshCw className="h-3 w-3 animate-spin" />Mengekstrak data otomatis...</p>
+                                  ) : ocrResults[jenis] ? (
+                                    <p className="text-xs text-success flex items-center gap-1.5"><CheckCircle className="h-3 w-3" />Data berhasil diekstrak</p>
+                                  ) : (
+                                    <p className="text-xs text-muted-foreground">
+                                      {isUploaded ? "Mengekstrak data otomatis setelah upload..." : "Upload dokumen untuk memulai ekstraksi otomatis."}
+                                    </p>
+                                  )}
+                                  {isUploaded && (
+                                    <Button variant="outline" size="sm" onClick={() => handleExtractOcr(jenis)} disabled={extractingOcr === jenis} className="w-full">
+                                      <RefreshCw className={cn("mr-1.5 h-3.5 w-3.5", extractingOcr === jenis && "animate-spin")} />
+                                      {extractingOcr === jenis ? "Mengekstrak..." : "Ekstrak Ulang"}
+                                    </Button>
+                                  )}
+                                  {ocrResults[jenis] && <OcrResultCard data={ocrResults[jenis]} />}
+                                </div>
                               </div>
-                            </div>
+                            )}
                           </CardContent>
                         </Card>
                       );

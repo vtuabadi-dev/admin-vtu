@@ -56,6 +56,57 @@ function extractField(text: string, field: string): string {
   return "";
 }
 
+// ── Endorsement-specific prompts ─────────────────────────
+
+/**
+ * Prompt untuk halaman pertama paspor endorsement.
+ * Mengambil data dokumen TANPA nama — nama diambil dari halaman endorsement.
+ */
+function getPromptPasporTanpaNama(): string {
+  return `Analisis gambar Paspor Indonesia ini. JANGAN masukkan nama pemegang paspor.
+Ekstrak HANYA data berikut dalam format JSON valid (tanpa markdown wrapper):
+{
+  "nomorPaspor": "Nomor paspor (1 huruf + 7 digit, contoh: X4573266)",
+  "tempatTerbitPaspor": "Kota/tempat penerbitan paspor — cari kolom 'Place of issue' atau 'Diterbitkan di' (BUKAN tempat lahir)",
+  "tanggalTerbitPaspor": "Tanggal penerbitan dalam format YYYY-MM-DD — cari 'Date of issue' atau 'Tanggal pengeluaran'",
+  "tanggalKadaluarsa": "Tanggal habis berlaku dalam format YYYY-MM-DD — cari 'Date of expiry' atau 'Berlaku hingga'",
+  "rawText": "Teks mentah paspor"
+}`;
+}
+
+/**
+ * Prompt untuk halaman kedua paspor — lembar endorsement nama.
+ * Mengambil HANYA nama yang tertera di halaman endorsement.
+ */
+function getPromptPasporEndorsementNama(): string {
+  return `Ini adalah halaman endorsement (halaman kedua) paspor Indonesia.
+Halaman ini berisi perubahan atau penambahan nama pemegang paspor.
+Ekstrak HANYA nama lengkap yang tercantum dalam format JSON valid (tanpa markdown wrapper):
+{
+  "namaLengkap": "Nama lengkap sesuai endorsement yang tertera di halaman ini",
+  "rawText": "Teks mentah halaman endorsement"
+}`;
+}
+
+// ── Main prompt selector ──────────────────────────────────
+
+function getPromptForMode(jenis: DokumenJenis, mode?: string): string {
+  if (mode === "paspor_tanpa_nama") return getPromptPasporTanpaNama();
+  if (mode === "paspor_endorsement_nama") return getPromptPasporEndorsementNama();
+  return getPromptForJenis(jenis);
+}
+
+/** Fields yang diekstrak berdasarkan mode */
+function getFieldsForMode(jenis: DokumenJenis, mode?: string): string[] {
+  if (mode === "paspor_tanpa_nama") {
+    return ["nomorPaspor", "tempatTerbitPaspor", "tanggalTerbitPaspor", "tanggalKadaluarsa"];
+  }
+  if (mode === "paspor_endorsement_nama") {
+    return ["namaLengkap"];
+  }
+  return getExpectedFields(jenis);
+}
+
 function getPromptForJenis(jenis: DokumenJenis): string {
   switch (jenis) {
     case "paspor":
@@ -129,11 +180,12 @@ export const googleAiStudioAdapter: OcrAdapter = {
     // Trying multiple models with the same key wastes quota!
     const modelName = "gemini-2.5-flash";
 
+    const mode = config.mode;
     console.log(
-      `[AI Studio Adapter] ▶ CALL API | model=${modelName} | key=***${keySuffix} | jenis=${jenis} | imgSize=${imgSizeKB}KB | retry=#${retryCount}`
+      `[AI Studio Adapter] ▶ CALL API | model=${modelName} | key=***${keySuffix} | jenis=${jenis}${mode ? ` | mode=${mode}` : ""} | imgSize=${imgSizeKB}KB | retry=#${retryCount}`
     );
 
-    const promptText = getPromptForJenis(jenis);
+    const promptText = getPromptForMode(jenis, mode);
 
     try {
       const fetchStart = Date.now();
@@ -175,7 +227,7 @@ export const googleAiStudioAdapter: OcrAdapter = {
           /* non-blocking — fallback to regex extractField */
         }
 
-        const expectedFields = getExpectedFields(jenis);
+        const expectedFields = getFieldsForMode(jenis, mode);
         const fields = expectedFields.map((field) => {
           let value = "";
           if (parsedJson && parsedJson[field]) {

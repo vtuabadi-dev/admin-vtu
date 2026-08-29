@@ -13,10 +13,11 @@ export async function POST(request: NextRequest) {
   if (!perm.allowed) return NextResponse.json({ success: false, message: perm.reason }, { status: 403 });
 
   try {
-    const { dokumenId, fileUrl, jenis } = await request.json() as {
+    const { dokumenId, fileUrl, jenis, mode } = await request.json() as {
       dokumenId: string;
       fileUrl: string;
       jenis: DokumenJenis;
+      mode?: string;
     };
 
     if (!dokumenId || !fileUrl || !jenis) {
@@ -34,7 +35,7 @@ export async function POST(request: NextRequest) {
     const buffer = await storage.download(cleanFileId);
 
     // OCR langsung dari buffer — tanpa write/read/delete temp file
-    const ocrResult = await processDocument(buffer, jenis);
+    const ocrResult = await processDocument(buffer, jenis, 0, mode);
 
     if (!ocrResult.success) {
       return NextResponse.json({ success: false, message: "OCR processing failed", details: ocrResult.rawText }, { status: 500 });
