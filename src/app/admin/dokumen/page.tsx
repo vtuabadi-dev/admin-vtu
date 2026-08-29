@@ -158,6 +158,8 @@ export default function DokumenPage() {
   const [ocrResults, setOcrResults] = useState<Record<string, any>>({});
   const [submitting, setSubmitting] = useState(false);
   const [activeDocType, setActiveDocType] = useState<DokumenJenis>("paspor");
+  const [savedOcrDocs, setSavedOcrDocs] = useState<Record<string, boolean>>({});
+  const [editingOcrDocs, setEditingOcrDocs] = useState<Record<string, boolean>>({});
 
   // --- Passport Endorsement State ---
   // null = belum dipilih, false = standar (1 halaman), true = ada endorsement (2 halaman)
@@ -429,6 +431,8 @@ export default function DokumenPage() {
     setUploadDocuments([]);
     setUploadPreviews({});
     setOcrResults({});
+    setSavedOcrDocs({});
+    setEditingOcrDocs({});
     setActiveDocType("paspor");
 
     try {
@@ -438,12 +442,17 @@ export default function DokumenPage() {
         const docs = docJson.data ?? [];
         setUploadDocuments(docs);
         const initialOcr: Record<string, any> = {};
+        const savedStatus: Record<string, boolean> = {};
         docs.forEach((d: any) => {
           if (d.manualData || d.ocrData) {
             initialOcr[d.jenis] = d.manualData || d.ocrData;
           }
+          if (d.manualData || d.dataStatus === "valid" || d.status === "verified") {
+            savedStatus[d.jenis] = true;
+          }
         });
         setOcrResults(initialOcr);
+        setSavedOcrDocs(savedStatus);
       }
     } catch { /* graceful */ }
   }
@@ -458,6 +467,8 @@ export default function DokumenPage() {
     setUploadDocuments([]);
     setUploadPreviews({});
     setOcrResults({});
+    setSavedOcrDocs({});
+    setEditingOcrDocs({});
     setActiveDocType("paspor");
 
     try {
@@ -506,6 +517,8 @@ export default function DokumenPage() {
     setUploadDocuments([]);
     setUploadPreviews({});
     setOcrResults({});
+    setSavedOcrDocs({});
+    setEditingOcrDocs({});
     setUploadSearchId("");
     setUploadError("");
     setActiveDocType("paspor");
@@ -514,6 +527,61 @@ export default function DokumenPage() {
     setEndorsementPreview("");
     setEndorsementDoc(null);
     setEndorsementOcrResult(null);
+  }
+
+  function handleOcrFieldChange(jenis: string, fieldKey: string, val: string) {
+    setOcrResults((prev) => ({
+      ...prev,
+      [jenis]: {
+        ...(prev[jenis] ?? {}),
+        [fieldKey]: val,
+      },
+    }));
+  }
+
+  async function handleSaveSingleOcr(jenis: string) {
+    if (!selectedJamaah) return;
+    const doc = uploadDocuments.find((d) => d.jenis === jenis);
+    const ocrData = ocrResults[jenis];
+    if (!ocrData) return;
+
+    setSubmitting(true);
+    try {
+      const res = await fetch("/api/dokumen/review", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          dokumenId: doc?.id,
+          manualData: ocrData,
+          dataStatus: "valid",
+        }),
+      });
+
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}));
+        throw new Error(json.message || "Gagal menyimpan data ke manifest");
+      }
+
+      setSavedOcrDocs((prev) => ({ ...prev, [jenis]: true }));
+      setEditingOcrDocs((prev) => ({ ...prev, [jenis]: false }));
+      alert(`Data ${LABEL_DOKUMEN[jenis as DokumenJenis] ?? jenis} berhasil disimpan dan disinkronkan ke Manifest Jamaah!`);
+    } catch (err) {
+      console.error("Save single OCR error:", err);
+      alert((err as Error).message || "Gagal menyimpan data");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  function handleCancelEditOcr(jenis: string) {
+    setEditingOcrDocs((prev) => ({ ...prev, [jenis]: false }));
+    const doc = uploadDocuments.find((d) => d.jenis === jenis);
+    if (doc?.manualData || doc?.ocrData) {
+      setOcrResults((prev) => ({
+        ...prev,
+        [jenis]: doc.manualData || doc.ocrData,
+      }));
+    }
   }
 
   function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>, jenis: string) {
@@ -1344,29 +1412,30 @@ export default function DokumenPage() {
                   </Card>
                 )}
 
-                {/* Document Upload & OCR Master-Detail (2 Columns) */}
+                {/* Document Upload & OCR Master-Detail Side-by-Side (2 Columns Main, 2 Sub-Columns Right) */}
                 {selectedJamaah && (
                   <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
-                    {/* ── LEFT COLUMN (lg:col-span-5): Master Document List & Dropzones ── */}
-                    <div className="lg:col-span-5 space-y-3">
+                    {/* ── LEFT COLUMN (lg:col-span-4): Narrow Document List & Dropzones ── */}
+                    <div className="lg:col-span-4 space-y-3">
                       <div className="flex items-center justify-between px-1">
                         <h4 className="text-xs font-bold uppercase tracking-wider text-stone-600 dark:text-stone-400">
                           Daftar Dokumen ({ALL_DOC_JENIS.length})
                         </h4>
-                        <span className="text-[11px] text-muted-foreground">Klik 👁️ / baris untuk detail</span>
+                        <span className="text-[11px] text-muted-foreground">Klik 👁️ / baris</span>
                       </div>
 
                       {ALL_DOC_JENIS.map((jenis) => {
                         const existingDoc = uploadDocuments.find((d) => d.jenis === jenis);
                         const isUploaded = !!existingDoc?.fileUrl;
                         const isSelected = activeDocType === jenis;
+                        const isSaved = savedOcrDocs[jenis];
 
                         return (
                           <div
                             key={jenis}
                             onClick={() => setActiveDocType(jenis)}
                             className={cn(
-                              "p-3 rounded-xl border transition-all cursor-pointer space-y-2.5",
+                              "p-2.5 rounded-xl border transition-all cursor-pointer space-y-2",
                               isSelected
                                 ? "border-primary bg-primary/5 shadow-sm ring-1 ring-primary"
                                 : "border-stone-200 dark:border-stone-800 bg-card hover:border-stone-400 dark:hover:border-stone-700"
@@ -1386,9 +1455,13 @@ export default function DokumenPage() {
                                     <RefreshCw className="h-2.5 w-2.5 mr-1 animate-spin" />
                                     OCR...
                                   </Badge>
-                                ) : isUploaded ? (
+                                ) : isSaved ? (
                                   <Badge variant="success" size="sm" className="text-[10px] h-5">
                                     <CheckCircle className="h-2.5 w-2.5 mr-1" />
+                                    Tersimpan
+                                  </Badge>
+                                ) : isUploaded ? (
+                                  <Badge variant="warning" size="sm" className="text-[10px] h-5">
                                     Terupload
                                   </Badge>
                                 ) : (
@@ -1403,7 +1476,7 @@ export default function DokumenPage() {
                                     e.stopPropagation();
                                     setActiveDocType(jenis);
                                   }}
-                                  title="Lihat Detail & OCR"
+                                  title="Lihat Detail & Form OCR"
                                 >
                                   <Eye className="h-3.5 w-3.5" />
                                 </Button>
@@ -1424,7 +1497,7 @@ export default function DokumenPage() {
                                     className="h-6 text-[10px] flex-1"
                                     onClick={() => setPasporHasEndorsement(false)}
                                   >
-                                    Tidak Ada
+                                    Tidak
                                   </Button>
                                   <Button
                                     type="button"
@@ -1433,7 +1506,7 @@ export default function DokumenPage() {
                                     className={cn("h-6 text-[10px] flex-1", pasporHasEndorsement === true && "bg-amber-600 hover:bg-amber-700")}
                                     onClick={() => setPasporHasEndorsement(true)}
                                   >
-                                    Ada Endorsement (2 Hal)
+                                    Ada (2 Hal)
                                   </Button>
                                 </div>
                               </div>
@@ -1486,7 +1559,7 @@ export default function DokumenPage() {
                                 <div className="flex items-center justify-center gap-1.5 text-stone-600 dark:text-stone-400">
                                   <FileImage className="h-3.5 w-3.5 text-stone-400" />
                                   <span className="text-[11px] font-medium">
-                                    {isUploaded ? "Klik / Drag file untuk mengganti" : `Upload foto ${LABEL_DOKUMEN[jenis]}`}
+                                    {isUploaded ? "Klik / Drag file baru" : `Upload ${LABEL_DOKUMEN[jenis]}`}
                                   </span>
                                 </div>
                               </div>
@@ -1496,23 +1569,27 @@ export default function DokumenPage() {
                       })}
                     </div>
 
-                    {/* ── RIGHT COLUMN (lg:col-span-7): Detail Preview & Extracted OCR Data ── */}
-                    <div className="lg:col-span-7">
+                    {/* ── RIGHT COLUMN (lg:col-span-8): Wide Detail Master Card ── */}
+                    <div className="lg:col-span-8">
                       <Card className="sticky top-6 shadow-sm border-stone-200 dark:border-stone-800">
                         <CardContent className="pt-4 space-y-4">
-                          {/* Header Panel Kanan */}
+                          {/* Card Header */}
                           <div className="flex items-center justify-between pb-3 border-b border-stone-200 dark:border-stone-800">
                             <div>
                               <div className="flex items-center gap-2">
                                 <h3 className="text-base font-bold text-stone-900 dark:text-white">
-                                  Detail: {LABEL_DOKUMEN[activeDocType]}
+                                  Detail & Form: {LABEL_DOKUMEN[activeDocType]}
                                 </h3>
-                                {uploadDocuments.some((d) => d.jenis === activeDocType) && (
-                                  <Badge variant="success" size="sm">Terupload</Badge>
+                                {savedOcrDocs[activeDocType] ? (
+                                  <Badge variant="success" size="sm">✓ Tersimpan di Manifest</Badge>
+                                ) : uploadDocuments.some((d) => d.jenis === activeDocType) ? (
+                                  <Badge variant="warning" size="sm">Belum Disimpan</Badge>
+                                ) : (
+                                  <Badge variant="muted" size="sm">Belum Upload</Badge>
                                 )}
                               </div>
                               <p className="text-xs text-muted-foreground mt-0.5">
-                                Preview foto dan hasil ekstraksi OCR otomatis
+                                Pemeriksaan foto dokumen bersandingan dengan formulir data manifest
                               </p>
                             </div>
                             {uploadDocuments.some((d) => d.jenis === activeDocType) && (
@@ -1529,147 +1606,302 @@ export default function DokumenPage() {
                             )}
                           </div>
 
-                          {/* Foto Dokumen Preview */}
-                          <div className="space-y-2">
-                            <div className="flex items-center justify-between">
-                              <h4 className="text-xs font-semibold text-stone-700 dark:text-stone-300">Foto Dokumen:</h4>
-                              {activeDocType === "paspor" && pasporHasEndorsement === true && (
-                                <div className="flex gap-1">
-                                  <Button
-                                    type="button"
-                                    size="sm"
-                                    variant={pasporPageTab === "hal1" ? "default" : "outline"}
-                                    className="h-6 text-[10px] px-2"
-                                    onClick={() => setPasporPageTab("hal1")}
-                                  >
-                                    Hal.1 (Data)
-                                  </Button>
-                                  <Button
-                                    type="button"
-                                    size="sm"
-                                    variant={pasporPageTab === "hal2" ? "default" : "outline"}
-                                    className="h-6 text-[10px] px-2"
-                                    onClick={() => setPasporPageTab("hal2")}
-                                  >
-                                    Hal.2 (Endorsement)
-                                  </Button>
-                                </div>
-                              )}
+                          {/* ── Side-by-Side Grid (Preview Left, Form Right) ── */}
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-5 items-start">
+                            {/* ── SUB-COLUMN 1 (LEFT): Document Image Preview ── */}
+                            <div className="space-y-2">
+                              <div className="flex items-center justify-between">
+                                <h4 className="text-xs font-bold text-stone-700 dark:text-stone-300">Foto Dokumen:</h4>
+                                {activeDocType === "paspor" && pasporHasEndorsement === true && (
+                                  <div className="flex gap-1">
+                                    <Button
+                                      type="button"
+                                      size="sm"
+                                      variant={pasporPageTab === "hal1" ? "default" : "outline"}
+                                      className="h-6 text-[10px] px-2"
+                                      onClick={() => setPasporPageTab("hal1")}
+                                    >
+                                      Hal.1 (Data)
+                                    </Button>
+                                    <Button
+                                      type="button"
+                                      size="sm"
+                                      variant={pasporPageTab === "hal2" ? "default" : "outline"}
+                                      className="h-6 text-[10px] px-2"
+                                      onClick={() => setPasporPageTab("hal2")}
+                                    >
+                                      Hal.2 (Nama)
+                                    </Button>
+                                  </div>
+                                )}
+                              </div>
+
+                              <div className="relative aspect-[3/4] rounded-xl border border-stone-200 dark:border-stone-800 bg-stone-100/50 dark:bg-stone-900 flex items-center justify-center overflow-hidden">
+                                {(activeDocType === "paspor" && pasporHasEndorsement === true && pasporPageTab === "hal2" ? (endorsementPreview || endorsementDoc?.fileUrl) : (uploadPreviews[activeDocType] || uploadDocuments.find((d) => d.jenis === activeDocType)?.fileUrl)) ? (
+                                  <img
+                                    src={(activeDocType === "paspor" && pasporHasEndorsement === true && pasporPageTab === "hal2" ? (endorsementPreview || endorsementDoc?.fileUrl) : (uploadPreviews[activeDocType] || uploadDocuments.find((d) => d.jenis === activeDocType)?.fileUrl)) || ""}
+                                    alt={LABEL_DOKUMEN[activeDocType]}
+                                    className="max-h-full max-w-full object-contain rounded-md"
+                                  />
+                                ) : (
+                                  <div className="text-center p-6 space-y-2">
+                                    <FileImage className="mx-auto h-16 w-16 text-stone-300 dark:text-stone-700" />
+                                    <p className="text-xs text-muted-foreground">
+                                      Belum ada foto <strong>{LABEL_DOKUMEN[activeDocType]}</strong>.
+                                    </p>
+                                    <p className="text-[11px] text-stone-400">
+                                      Upload file pada daftar di sebelah kiri untuk menampilkan preview.
+                                    </p>
+                                  </div>
+                                )}
+                              </div>
                             </div>
 
-                            <div className="relative aspect-[4/3] rounded-xl border border-stone-200 dark:border-stone-800 bg-stone-100/50 dark:bg-stone-900 flex items-center justify-center overflow-hidden">
-                              {(activeDocType === "paspor" && pasporHasEndorsement === true && pasporPageTab === "hal2" ? (endorsementPreview || endorsementDoc?.fileUrl) : (uploadPreviews[activeDocType] || uploadDocuments.find((d) => d.jenis === activeDocType)?.fileUrl)) ? (
-                                <img
-                                  src={(activeDocType === "paspor" && pasporHasEndorsement === true && pasporPageTab === "hal2" ? (endorsementPreview || endorsementDoc?.fileUrl) : (uploadPreviews[activeDocType] || uploadDocuments.find((d) => d.jenis === activeDocType)?.fileUrl)) || ""}
-                                  alt={LABEL_DOKUMEN[activeDocType]}
-                                  className="max-h-full max-w-full object-contain rounded-md"
-                                />
+                            {/* ── SUB-COLUMN 2 (RIGHT): Interactive OCR Form ── */}
+                            <div className="space-y-4 rounded-xl border border-stone-200 dark:border-stone-800 p-4 bg-stone-50/50 dark:bg-stone-900/50">
+                              <div className="flex items-center justify-between pb-2 border-b border-stone-200 dark:border-stone-800">
+                                <h4 className="text-xs font-bold text-stone-800 dark:text-stone-200">
+                                  Form Hasil Ekstraksi OCR
+                                </h4>
+                                {ocrResults[activeDocType]?.confidence && (
+                                  <Badge variant={ocrResults[activeDocType].confidence >= 0.7 ? "success" : "warning"} size="sm">
+                                    {Math.round(ocrResults[activeDocType].confidence * 100)}% Confidence
+                                  </Badge>
+                                )}
+                              </div>
+
+                              {extractingOcr === activeDocType || (extractingEndorsement && activeDocType === "paspor") ? (
+                                <div className="p-6 text-center space-y-3">
+                                  <RefreshCw className="mx-auto h-6 w-6 animate-spin text-primary" />
+                                  <p className="text-xs text-muted-foreground font-medium">
+                                    {extractingEndorsement ? "Mengekstrak nama dari halaman endorsement..." : "Mengekstrak data otomatis menggunakan Gemini AI Studio..."}
+                                  </p>
+                                </div>
+                              ) : ocrResults[activeDocType] || endorsementOcrResult ? (
+                                <div className="space-y-3">
+                                  {/* Info Endorsement jika ada */}
+                                  {endorsementOcrResult?.namaLengkap && activeDocType === "paspor" && (
+                                    <div className="p-2 rounded bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900 text-xs">
+                                      <span className="font-semibold text-amber-900 dark:text-amber-300">Nama (Endorsement Hal.2): </span>
+                                      <span className="font-bold text-amber-950 dark:text-amber-200">{endorsementOcrResult.namaLengkap}</span>
+                                    </div>
+                                  )}
+
+                                  {/* Field: Nama Lengkap */}
+                                  <div className="space-y-1">
+                                    <label className="text-[11px] font-semibold text-stone-600 dark:text-stone-400">
+                                      Nama Lengkap:
+                                    </label>
+                                    <Input
+                                      value={ocrResults[activeDocType]?.namaLengkap || ""}
+                                      onChange={(e) => handleOcrFieldChange(activeDocType, "namaLengkap", e.target.value)}
+                                      disabled={savedOcrDocs[activeDocType] && !editingOcrDocs[activeDocType]}
+                                      placeholder="NAMA LENGKAP PADA DOKUMEN"
+                                      className="h-8 text-xs font-semibold"
+                                    />
+                                  </div>
+
+                                  {/* Paspor Fields */}
+                                  {activeDocType === "paspor" && (
+                                    <>
+                                      <div className="space-y-1">
+                                        <label className="text-[11px] font-semibold text-stone-600 dark:text-stone-400">
+                                          Nomor Paspor:
+                                        </label>
+                                        <Input
+                                          value={ocrResults[activeDocType]?.nomorPaspor || ""}
+                                          onChange={(e) => handleOcrFieldChange(activeDocType, "nomorPaspor", e.target.value.toUpperCase())}
+                                          disabled={savedOcrDocs[activeDocType] && !editingOcrDocs[activeDocType]}
+                                          placeholder="X1234567"
+                                          className="h-8 text-xs font-mono font-bold text-primary"
+                                        />
+                                      </div>
+
+                                      <div className="grid grid-cols-2 gap-2">
+                                        <div className="space-y-1">
+                                          <label className="text-[11px] font-semibold text-stone-600 dark:text-stone-400">
+                                            Tempat Terbit:
+                                          </label>
+                                          <Input
+                                            value={ocrResults[activeDocType]?.tempatTerbitPaspor || ""}
+                                            onChange={(e) => handleOcrFieldChange(activeDocType, "tempatTerbitPaspor", e.target.value)}
+                                            disabled={savedOcrDocs[activeDocType] && !editingOcrDocs[activeDocType]}
+                                            placeholder="JAKARTA"
+                                            className="h-8 text-xs"
+                                          />
+                                        </div>
+                                        <div className="space-y-1">
+                                          <label className="text-[11px] font-semibold text-stone-600 dark:text-stone-400">
+                                            Tgl. Terbit:
+                                          </label>
+                                          <Input
+                                            type="text"
+                                            value={ocrResults[activeDocType]?.tanggalTerbitPaspor || ""}
+                                            onChange={(e) => handleOcrFieldChange(activeDocType, "tanggalTerbitPaspor", e.target.value)}
+                                            disabled={savedOcrDocs[activeDocType] && !editingOcrDocs[activeDocType]}
+                                            placeholder="YYYY-MM-DD"
+                                            className="h-8 text-xs font-mono"
+                                          />
+                                        </div>
+                                      </div>
+
+                                      <div className="space-y-1">
+                                        <label className="text-[11px] font-semibold text-stone-600 dark:text-stone-400">
+                                          Tanggal Kadaluarsa:
+                                        </label>
+                                        <Input
+                                          type="text"
+                                          value={ocrResults[activeDocType]?.tanggalKadaluarsa || ""}
+                                          onChange={(e) => handleOcrFieldChange(activeDocType, "tanggalKadaluarsa", e.target.value)}
+                                          disabled={savedOcrDocs[activeDocType] && !editingOcrDocs[activeDocType]}
+                                          placeholder="YYYY-MM-DD"
+                                          className={cn(
+                                            "h-8 text-xs font-mono font-semibold",
+                                            ocrResults[activeDocType]?.tanggalKadaluarsa && (new Date(ocrResults[activeDocType].tanggalKadaluarsa).getTime() - Date.now()) < 180 * 24 * 60 * 60 * 1000 && "text-destructive border-destructive"
+                                          )}
+                                        />
+                                        {ocrResults[activeDocType]?.tanggalKadaluarsa && (new Date(ocrResults[activeDocType].tanggalKadaluarsa).getTime() - Date.now()) < 180 * 24 * 60 * 60 * 1000 && (
+                                          <p className="text-[10px] text-destructive font-medium flex items-center gap-1">
+                                            <AlertTriangle className="h-3 w-3" /> Paspor kadaluarsa dalam &lt; 6 bulan
+                                          </p>
+                                        )}
+                                      </div>
+                                    </>
+                                  )}
+
+                                  {/* KTP / KK / Akta Fields */}
+                                  {(activeDocType === "ktp" || activeDocType === "kk" || activeDocType === "akta") && (
+                                    <>
+                                      <div className="space-y-1">
+                                        <label className="text-[11px] font-semibold text-stone-600 dark:text-stone-400">
+                                          NIK (Nomor Induk Kependudukan):
+                                        </label>
+                                        <Input
+                                          value={ocrResults[activeDocType]?.nik || ""}
+                                          onChange={(e) => handleOcrFieldChange(activeDocType, "nik", e.target.value)}
+                                          disabled={savedOcrDocs[activeDocType] && !editingOcrDocs[activeDocType]}
+                                          placeholder="16 digit NIK"
+                                          className="h-8 text-xs font-mono font-medium"
+                                        />
+                                      </div>
+                                      <div className="grid grid-cols-2 gap-2">
+                                        <div className="space-y-1">
+                                          <label className="text-[11px] font-semibold text-stone-600 dark:text-stone-400">
+                                            Tempat Lahir:
+                                          </label>
+                                          <Input
+                                            value={ocrResults[activeDocType]?.tempatLahir || ""}
+                                            onChange={(e) => handleOcrFieldChange(activeDocType, "tempatLahir", e.target.value)}
+                                            disabled={savedOcrDocs[activeDocType] && !editingOcrDocs[activeDocType]}
+                                            placeholder="Kota Lahir"
+                                            className="h-8 text-xs"
+                                          />
+                                        </div>
+                                        <div className="space-y-1">
+                                          <label className="text-[11px] font-semibold text-stone-600 dark:text-stone-400">
+                                            Tanggal Lahir:
+                                          </label>
+                                          <Input
+                                            value={ocrResults[activeDocType]?.tanggalLahir || ""}
+                                            onChange={(e) => handleOcrFieldChange(activeDocType, "tanggalLahir", e.target.value)}
+                                            disabled={savedOcrDocs[activeDocType] && !editingOcrDocs[activeDocType]}
+                                            placeholder="YYYY-MM-DD"
+                                            className="h-8 text-xs font-mono"
+                                          />
+                                        </div>
+                                      </div>
+                                    </>
+                                  )}
+
+                                  {/* Action Buttons Section */}
+                                  <div className="pt-3 border-t border-stone-200 dark:border-stone-800">
+                                    {!savedOcrDocs[activeDocType] ? (
+                                      /* Kondisi A: Unsaved Baru Terekstrak */
+                                      <Button
+                                        type="button"
+                                        size="sm"
+                                        className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold h-9"
+                                        onClick={() => handleSaveSingleOcr(activeDocType)}
+                                        disabled={submitting}
+                                      >
+                                        {submitting ? (
+                                          <>
+                                            <RefreshCw className="mr-1.5 h-4 w-4 animate-spin" />
+                                            Menyimpan ke Manifest...
+                                          </>
+                                        ) : (
+                                          <>
+                                            <CheckCircle className="mr-1.5 h-4 w-4" />
+                                            Simpan Data ke Manifest
+                                          </>
+                                        )}
+                                      </Button>
+                                    ) : !editingOcrDocs[activeDocType] ? (
+                                      /* Kondisi B: Saved Read-only View */
+                                      <div className="flex items-center justify-between gap-2">
+                                        <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1">
+                                          <CheckCircle className="h-3.5 w-3.5" /> Tersimpan di Manifest
+                                        </span>
+                                        <Button
+                                          type="button"
+                                          size="sm"
+                                          variant="outline"
+                                          className="h-8 text-xs font-semibold"
+                                          onClick={() => setEditingOcrDocs((prev) => ({ ...prev, [activeDocType]: true }))}
+                                        >
+                                          <Edit3 className="mr-1.5 h-3.5 w-3.5 text-primary" />
+                                          Edit / Koreksi Data
+                                        </Button>
+                                      </div>
+                                    ) : (
+                                      /* Kondisi C: Editing Mode */
+                                      <div className="flex items-center gap-2">
+                                        <Button
+                                          type="button"
+                                          size="sm"
+                                          className="flex-1 bg-primary text-primary-foreground font-bold h-8 text-xs"
+                                          onClick={() => handleSaveSingleOcr(activeDocType)}
+                                          disabled={submitting}
+                                        >
+                                          {submitting ? (
+                                            <>
+                                              <RefreshCw className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                                              Menyimpan...
+                                            </>
+                                          ) : (
+                                            <>
+                                              <Save className="mr-1.5 h-3.5 w-3.5" />
+                                              Simpan Perubahan
+                                            </>
+                                          )}
+                                        </Button>
+                                        <Button
+                                          type="button"
+                                          size="sm"
+                                          variant="outline"
+                                          className="h-8 text-xs"
+                                          onClick={() => handleCancelEditOcr(activeDocType)}
+                                          disabled={submitting}
+                                        >
+                                          <XCircle className="mr-1 h-3.5 w-3.5 text-stone-500" />
+                                          Batal
+                                        </Button>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
                               ) : (
-                                <div className="text-center p-6 space-y-2">
-                                  <FileImage className="mx-auto h-16 w-16 text-stone-300 dark:text-stone-700" />
-                                  <p className="text-xs text-muted-foreground">
-                                    Belum ada foto <strong>{LABEL_DOKUMEN[activeDocType]}</strong> {activeDocType === "paspor" && pasporHasEndorsement === true && pasporPageTab === "hal2" ? "(Halaman Endorsement)" : ""}.
+                                <div className="p-6 text-center space-y-2">
+                                  <FileText className="mx-auto h-12 w-12 text-stone-300 dark:text-stone-700" />
+                                  <p className="text-xs text-muted-foreground italic">
+                                    Belum ada data OCR untuk <strong>{LABEL_DOKUMEN[activeDocType]}</strong>.
                                   </p>
                                   <p className="text-[11px] text-stone-400">
-                                    Upload file pada daftar di sebelah kiri untuk melihat preview & hasil ekstraksi.
+                                    Upload file pada daftar di sebelah kiri untuk memulai ekstraksi otomatis.
                                   </p>
                                 </div>
                               )}
                             </div>
-                          </div>
-
-                          {/* Hasil Ekstraksi OCR */}
-                          <div className="space-y-2 pt-2 border-t border-stone-200 dark:border-stone-800">
-                            <div className="flex items-center justify-between">
-                              <h4 className="text-xs font-semibold text-stone-700 dark:text-stone-300">Hasil Ekstraksi OCR:</h4>
-                              {ocrResults[activeDocType]?.confidence && (
-                                <Badge variant={ocrResults[activeDocType].confidence >= 0.7 ? "success" : "warning"} size="sm">
-                                  Confidence: {Math.round(ocrResults[activeDocType].confidence * 100)}%
-                                </Badge>
-                              )}
-                            </div>
-
-                            {extractingOcr === activeDocType || (extractingEndorsement && activeDocType === "paspor") ? (
-                              <div className="p-4 rounded-lg bg-stone-100 dark:bg-stone-800/50 text-center space-y-2">
-                                <RefreshCw className="mx-auto h-5 w-5 animate-spin text-primary" />
-                                <p className="text-xs text-muted-foreground font-medium">
-                                  {extractingEndorsement ? "Mengekstrak nama dari halaman endorsement..." : "Mengekstrak data otomatis menggunakan OCR AI Studio..."}
-                                </p>
-                              </div>
-                            ) : (ocrResults[activeDocType] || endorsementOcrResult) ? (
-                              <div className="rounded-lg border border-stone-200 dark:border-stone-800 p-3 bg-stone-50/50 dark:bg-stone-900/50 space-y-2 text-xs">
-                                {endorsementOcrResult?.namaLengkap && activeDocType === "paspor" && (
-                                  <div className="flex justify-between py-1 border-b border-amber-200 dark:border-amber-900 text-amber-900 dark:text-amber-300 bg-amber-50/60 dark:bg-amber-950/40 px-2 rounded">
-                                    <span className="font-semibold">Nama (Endorsement Hal.2):</span>
-                                    <span className="font-bold">{endorsementOcrResult.namaLengkap}</span>
-                                  </div>
-                                )}
-                                {ocrResults[activeDocType]?.namaLengkap && (
-                                  <div className="flex justify-between py-1 border-b border-stone-200/50 dark:border-stone-800/50">
-                                    <span className="text-muted-foreground">Nama Lengkap:</span>
-                                    <span className="font-semibold text-stone-900 dark:text-white max-w-[65%] text-right">
-                                      {ocrResults[activeDocType].namaLengkap}
-                                    </span>
-                                  </div>
-                                )}
-                                {ocrResults[activeDocType]?.nomorPaspor && (
-                                  <div className="flex justify-between py-1 border-b border-stone-200/50 dark:border-stone-800/50">
-                                    <span className="text-muted-foreground">Nomor Paspor:</span>
-                                    <span className="font-mono font-bold text-primary">
-                                      {ocrResults[activeDocType].nomorPaspor}
-                                    </span>
-                                  </div>
-                                )}
-                                {ocrResults[activeDocType]?.tempatTerbitPaspor && (
-                                  <div className="flex justify-between py-1 border-b border-stone-200/50 dark:border-stone-800/50">
-                                    <span className="text-muted-foreground">Tempat Terbit Paspor:</span>
-                                    <span className="font-medium text-stone-900 dark:text-white">
-                                      {ocrResults[activeDocType].tempatTerbitPaspor}
-                                    </span>
-                                  </div>
-                                )}
-                                {ocrResults[activeDocType]?.tanggalTerbitPaspor && (
-                                  <div className="flex justify-between py-1 border-b border-stone-200/50 dark:border-stone-800/50">
-                                    <span className="text-muted-foreground">Tanggal Terbit Paspor:</span>
-                                    <span className="font-medium text-stone-900 dark:text-white">
-                                      {ocrResults[activeDocType].tanggalTerbitPaspor}
-                                    </span>
-                                  </div>
-                                )}
-                                {ocrResults[activeDocType]?.tanggalKadaluarsa && (
-                                  <div className="flex justify-between py-1 border-b border-stone-200/50 dark:border-stone-800/50">
-                                    <span className="text-muted-foreground">Tanggal Kadaluarsa:</span>
-                                    <span className={cn(
-                                      "font-semibold",
-                                      (new Date(ocrResults[activeDocType].tanggalKadaluarsa).getTime() - Date.now()) < 180 * 24 * 60 * 60 * 1000
-                                        ? "text-destructive"
-                                        : "text-stone-900 dark:text-white"
-                                    )}>
-                                      {ocrResults[activeDocType].tanggalKadaluarsa}
-                                      {(new Date(ocrResults[activeDocType].tanggalKadaluarsa).getTime() - Date.now()) < 180 * 24 * 60 * 60 * 1000 && (
-                                        <span className="ml-1.5 text-[10px] font-bold text-destructive">(&lt; 6 Bulan)</span>
-                                      )}
-                                    </span>
-                                  </div>
-                                )}
-                                {ocrResults[activeDocType].nik && (
-                                  <div className="flex justify-between py-1 border-b border-stone-200/50 dark:border-stone-800/50">
-                                    <span className="text-muted-foreground">NIK:</span>
-                                    <span className="font-mono font-medium">{ocrResults[activeDocType].nik}</span>
-                                  </div>
-                                )}
-                                {ocrResults[activeDocType].tanggalLahir && (
-                                  <div className="flex justify-between py-1">
-                                    <span className="text-muted-foreground">Tanggal Lahir:</span>
-                                    <span className="font-medium">{ocrResults[activeDocType].tanggalLahir}</span>
-                                  </div>
-                                )}
-                              </div>
-                            ) : (
-                              <p className="text-xs text-muted-foreground italic">
-                                Belum ada data OCR untuk {LABEL_DOKUMEN[activeDocType]}. Upload dokumen untuk ekstraksi otomatis.
-                              </p>
-                            )}
                           </div>
                         </CardContent>
                       </Card>
