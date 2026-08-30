@@ -142,7 +142,7 @@ export default function DokumenPage() {
   });
 
   // --- Rekap Tab State ---
-  const [selectedPackage, setSelectedPackage] = useState(storeKbrList.length > 0 ? storeKbrList[0].id : "");
+  const [selectedPackage, setSelectedPackage] = useState(storeKbrList?.[0]?.id ?? "");
   const [statusFilter, setStatusFilter] = useState("");
   const [completionMatrix, setCompletionMatrix] = useState<any[]>([]);
   const [matrixLoading, setMatrixLoading] = useState(false);
@@ -194,9 +194,9 @@ export default function DokumenPage() {
 
   // Sync with store if store updates
   useEffect(() => {
-    if (storeKbrList.length > 0 && keberangkatanList.length === 0) {
+    if (storeKbrList && storeKbrList.length > 0 && keberangkatanList.length === 0) {
       setKeberangkatanList(storeKbrList);
-      if (!selectedPackage) setSelectedPackage(storeKbrList[0].id);
+      if (!selectedPackage && storeKbrList[0]?.id) setSelectedPackage(storeKbrList[0].id);
     }
   }, [storeKbrList, keberangkatanList.length, selectedPackage]);
 
@@ -212,7 +212,9 @@ export default function DokumenPage() {
           const json = await kbrRes.json();
           const kbrList = json.data ?? [];
           setKeberangkatanList(kbrList);
-          if (kbrList.length > 0 && !selectedPackage) setSelectedPackage(kbrList[0].id);
+          if (kbrList.length > 0 && !selectedPackage && kbrList[0]?.id) {
+            setSelectedPackage(kbrList[0].id);
+          }
         }
         if (groupsRes.ok) {
           const json = await groupsRes.json();
