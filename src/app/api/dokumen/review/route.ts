@@ -3,6 +3,7 @@ import type { NextRequest } from "next/server";
 import { auth } from "@/server/auth";
 import { checkServerPermission } from "@/shared/lib/rbac-utils";
 import { dokumenRepo, auditRepo } from "@/server/repositories";
+import type { DokumenJenis } from "@/shared/types";
 
 export async function GET() {
   const session = await auth();
@@ -28,7 +29,7 @@ export async function PUT(request: NextRequest) {
     const { dokumenId, jamaahId, jenis, manualData, dataStatus } = await request.json() as {
       dokumenId?: string;
       jamaahId?: string;
-      jenis?: string;
+      jenis?: DokumenJenis;
       manualData: Record<string, any>;
       dataStatus?: "valid" | "pending" | "manual_edit" | "ocr_error";
     };

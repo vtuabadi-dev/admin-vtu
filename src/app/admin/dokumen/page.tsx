@@ -18,6 +18,7 @@ import {
   Users,
   Edit3,
   Loader2,
+  Sparkles,
 } from "lucide-react";
 import { Card, CardContent } from "@/shared/components/ui/Card";
 import { StatusBadge, Badge } from "@/shared/components/ui/Badge";

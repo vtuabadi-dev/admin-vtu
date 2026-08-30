@@ -1,5 +1,5 @@
 import { prisma } from "@/server/db/client";
-import type { DokumenItem, OcrData, StatusDokumen } from "@/shared/types";
+import type { DokumenItem, DokumenJenis, OcrData, StatusDokumen } from "@/shared/types";
 
 function mapDokumen(doc: any): DokumenItem {
   return {
@@ -177,7 +177,7 @@ export const dokumenRepo = {
     return mapDokumen(row);
   },
 
-  async saveManualOcrDataByJamaah(jamaahId: string, jenis: string, manualData: Record<string, any>, dataStatus: DokumenItem["dataStatus"] = "manual_edit") {
+  async saveManualOcrDataByJamaah(jamaahId: string, jenis: DokumenJenis, manualData: Record<string, any>, dataStatus: DokumenItem["dataStatus"] = "manual_edit") {
     let doc = await prisma.dokumenItem.findFirst({
       where: { jamaahId, jenis },
     });
@@ -192,10 +192,7 @@ export const dokumenRepo = {
         data: {
           jamaahId,
           jenis,
-          namaDokumen: jenis,
-          fileUrl: "",
-          fileSize: 0,
-          mimeType: "image/jpeg",
+          wajib: jenis === "paspor" || jenis === "ktp",
           status: "pending",
           dataStatus,
           manualData: manualData as any,
