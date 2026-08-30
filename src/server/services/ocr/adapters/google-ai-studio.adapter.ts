@@ -129,7 +129,8 @@ function getPromptForJenis(jenis: DokumenJenis): string {
 5. "tanggalTerbitPaspor": Tanggal penerbitan paspor yang terletak DI SEBELAH KIRI tanggal kadaluarsa pada kolom 'TGL. PENGELUARAN / DATE OF ISSUE', format YYYY-MM-DD (contoh: 2024-12-10).
 6. "tempatLahir": Tempat lahir pada 'TEMPAT LAHIR / PLACE OF BIRTH' (contoh: MALANG)
 7. "tanggalLahir": Tanggal lahir pada 'TGL. LAHIR / DATE OF BIRTH', format YYYY-MM-DD (contoh: 1992-08-12)
-8. "rawText": Teks mentah lengkap termasuk 2 baris MRZ di bagian bawah paspor
+8. "nik": NIK 16 digit yang direkonstruksi dari 16 digit paling belakang MRZ line 2 disisipkan YY tahun kelahiran (contoh: 3573021208920002)
+9. "rawText": Teks mentah lengkap termasuk persis 2 baris teks kode MRZ di bagian bawah paspor
 
 Ekstrak seluruh data di atas dalam format JSON valid (tanpa markdown wrapper):
 {
@@ -140,6 +141,7 @@ Ekstrak seluruh data di atas dalam format JSON valid (tanpa markdown wrapper):
   "tanggalKadaluarsa": "YYYY-MM-DD",
   "tempatLahir": "...",
   "tanggalLahir": "YYYY-MM-DD",
+  "nik": "...",
   "rawText": "..."
 }`;
     case "ktp":

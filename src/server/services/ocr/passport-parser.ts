@@ -106,6 +106,55 @@ export interface MrzParsed {
 }
 
 /**
+ * Rekonstruksi NIK 16 digit dari 16 digit paling belakang pada baris MRZ paspor Indonesia (Line 2).
+ * Sesuai instruksi:
+ * 1. Ambil 16 digit paling belakang dari MRZ Line 2 (contoh: 3573021208000218)
+ * 2. 8 digit dari belakang (08000218), sisipkan sebelum 8 digit tersebut angka tahun kelahiran format YY (contoh: 92) -> menjadi 18 digit
+ * 3. Hapus 2 digit terakhir -> menghasilkan 16 digit NIK yang valid (contoh: 3573021208920002 atau 3573021292080002)
+ */
+export function reconstructNikFromPassportMrz(mrzLine2OrSuffix: string, birthYearYY?: string): string {
+  if (!mrzLine2OrSuffix) return "";
+  const cleanStr = mrzLine2OrSuffix.toUpperCase().replace(/<+/g, "").replace(/\s+/g, "");
+  
+  // Ambil 16 digit terakhir
+  const digitsOnly = cleanStr.replace(/\D/g, "");
+  let suffix16 = "";
+  if (digitsOnly.length >= 16) {
+    suffix16 = digitsOnly.slice(-16);
+  } else if (digitsOnly.length >= 14) {
+    suffix16 = digitsOnly.slice(-14);
+  } else {
+    return "";
+  }
+
+  // Tentukan tahun lahir 2 digit (YY)
+  let yy = (birthYearYY || "").replace(/\D/g, "");
+  if (yy.length === 4) yy = yy.slice(2, 4);
+  if (!yy && cleanStr.length >= 20) {
+    // Coba ekstrak dari posisi tanggal lahir di line 2 (chars 13-19 = YYMMDD)
+    const dobMatch = cleanStr.match(/[A-Z]{3}(\d{2})\d{4}/);
+    if (dobMatch?.[1]) yy = dobMatch[1];
+  }
+
+  if (!yy || yy.length !== 2) return "";
+
+  if (suffix16.length === 16) {
+    const prefix8 = suffix16.slice(0, 8); // 35730212
+    const last8 = suffix16.slice(8, 16);   // 08000218
+    const combined18 = `${prefix8}${yy}${last8}`; // 357302129208000218
+    return combined18.slice(0, 16); // 3573021292080002 (16 digit)
+  }
+
+  if (suffix16.length === 14) {
+    const prefix8 = suffix16.slice(0, 8);
+    const last6 = suffix16.slice(8, 14);
+    return `${prefix8}${yy}${last6}`;
+  }
+
+  return "";
+}
+
+/**
  * Ekstrak data dari Machine Readable Zone (MRZ) di bagian bawah paspor.
  * Line 1: P<IDNZAMRONI<<MUCHAMAD<<<<<<<<<<<<<<<<<<<<<<
  * Line 2: X4573266<8IDN9208120M34121013573021208000218
@@ -208,12 +257,17 @@ export function parseMrzLines(text: string): MrzParsed | null {
       parsed.expiryDate = `${year}-${mm}-${dd}`;
     }
 
-    // 5. NIK / Personal Number (chars 28-42)
+    // 5. NIK / Personal Number (chars 28-44) - Rekonstruksi NIK 16 digit
     const nikMatch = cleanL2.match(/[A-Z]{3}\d{7}[MF<]\d{7}([0-9A-Z<]{14,16})/);
-    if (nikMatch?.[1]) {
-      const cleanNik = nikMatch[1].replace(/<+/g, "").replace(/\D/g, "");
-      if (cleanNik.length >= 10) {
-        parsed.personalNumber = cleanNik;
+    const rawSuffix = nikMatch?.[1] ? nikMatch[1].replace(/<+/g, "").replace(/\D/g, "") : cleanL2.slice(-16).replace(/\D/g, "");
+    
+    if (rawSuffix.length >= 14) {
+      const birthYY = parsed.dateOfBirth ? parsed.dateOfBirth.slice(2, 4) : "";
+      const reconstructedNik = reconstructNikFromPassportMrz(rawSuffix, birthYY);
+      if (reconstructedNik && reconstructedNik.length === 16) {
+        parsed.personalNumber = reconstructedNik;
+      } else if (rawSuffix.length >= 10) {
+        parsed.personalNumber = rawSuffix;
       }
     }
   }
@@ -465,11 +519,27 @@ export function parsePassport(
   ).toString().trim().toUpperCase();
 
   // 10. NIK
-  const nik = (
+  let nik = (
     json.nik ||
     mrz?.personalNumber ||
     ""
   ).toString().trim();
+
+  if (!nik || nik.length < 16) {
+    const birthYY = tanggalLahir ? tanggalLahir.slice(2, 4) : (mrz?.dateOfBirth ? mrz.dateOfBirth.slice(2, 4) : "");
+    if (birthYY) {
+      const candidateLines = rawText.split(/\r?\n/).map((l) => l.trim().replace(/\s+/g, "").toUpperCase());
+      for (const line of candidateLines) {
+        if (line.length >= 30 && (line.includes("IDN") || line.startsWith("X") || line.startsWith("C") || line.startsWith("A") || line.startsWith("B"))) {
+          const reconstructed = reconstructNikFromPassportMrz(line, birthYY);
+          if (reconstructed && reconstructed.length === 16) {
+            nik = reconstructed;
+            break;
+          }
+        }
+      }
+    }
+  }
 
   // Hitung confidence
   let confidence = 0.5;

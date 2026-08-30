@@ -5,9 +5,28 @@ import {
   parseMrzLines,
   parsePassport,
   cleanTempatTerbit,
+  reconstructNikFromPassportMrz,
 } from "../passport-parser";
 
 describe("Passport Parser Unit Tests", () => {
+  describe("reconstructNikFromPassportMrz", () => {
+    it("reconstructs 16-digit NIK from 16-digit MRZ suffix with birth year YY", () => {
+      // Muchamad Zamroni: MRZ line 2 last 16 digits: 3573021208000218, Birth: 1992 (YY: 92)
+      // 1. 16 digits: 3573021208000218
+      // 2. 8 digits from back (08000218), insert 92 before last 8 digits -> 35730212 + 92 + 08000218 = 357302129208000218 (18 digits)
+      // 3. Remove last 2 digits -> 3573021292080002 (16 digits)
+      const nik = reconstructNikFromPassportMrz("3573021208000218", "92");
+      expect(nik).toBe("3573021292080002");
+      expect(nik.length).toBe(16);
+    });
+
+    it("reconstructs NIK directly from full MRZ line 2", () => {
+      const line2 = "X4573266<8IDN9208120M34121013573021208000218";
+      const nik = reconstructNikFromPassportMrz(line2, "1992");
+      expect(nik).toBe("3573021292080002");
+    });
+  });
+
   describe("normalizePassportDate", () => {
     it("normalizes English month abbreviation (e.g. 10 DEC 2024)", () => {
       expect(normalizePassportDate("10 DEC 2024")).toBe("2024-12-10");
@@ -40,7 +59,7 @@ describe("Passport Parser Unit Tests", () => {
   });
 
   describe("parseMrzLines", () => {
-    it("parses user's passport MRZ (Muchamad Zamroni)", () => {
+    it("parses user's passport MRZ (Muchamad Zamroni) and reconstructs NIK", () => {
       const mrzText = `
 REPUBLIK INDONESIA / REPUBLIC OF INDONESIA
 P<IDNZAMRONI<<MUCHAMAD<<<<<<<<<<<<<<<<<<<<<<
@@ -54,7 +73,7 @@ X4573266<8IDN9208120M34121013573021208000218
       expect(result?.dateOfBirth).toBe("1992-08-12");
       expect(result?.sex).toBe("Laki-laki");
       expect(result?.expiryDate).toBe("2034-12-10");
-      expect(result?.personalNumber).toContain("3573021208");
+      expect(result?.personalNumber).toBe("3573021292080002");
     });
 
     it("parses MRZ with standard 10-year validity", () => {
@@ -111,6 +130,7 @@ X4573266<8IDN9208120M34121013573021208000218
       expect(result.tanggalKadaluarsa).toBe("2034-12-10");
       expect(result.tempatLahir).toBe("MALANG");
       expect(result.tanggalLahir).toBe("1992-08-12");
+      expect(result.nik).toBe("3573021292080002");
       expect(result.confidence).toBeGreaterThan(0.8);
     });
 
@@ -156,6 +176,7 @@ X4573266<8IDN9208120M34121013573021208000218
       expect(result.tanggalKadaluarsa).toBe("2034-12-10");
       expect(result.tempatLahir).toBe("MALANG");
       expect(result.tanggalLahir).toBe("1992-08-12");
+      expect(result.nik).toBe("3573021292080002");
     });
   });
 });

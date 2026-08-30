@@ -137,7 +137,8 @@ export class GoogleAiStudioOcrProvider implements OcrProvider {
   "tanggalKadaluarsa": "Tanggal habis masa berlaku dari 'BERLAKU S/D / DATE OF EXPIRY' atau baris MRZ dalam format YYYY-MM-DD (contoh: 2034-12-10)",
   "tempatLahir": "Tempat lahir dari 'TEMPAT LAHIR / PLACE OF BIRTH'",
   "tanggalLahir": "Tanggal lahir dari 'TGL. LAHIR / DATE OF BIRTH' dalam format YYYY-MM-DD",
-  "rawText": "Teks mentah paspor termasuk 2 baris MRZ di bagian bawah"
+  "nik": "NIK 16 digit yang direkonstruksi dari 16 digit paling belakang MRZ line 2 disisipkan YY tahun kelahiran (contoh: 3573021208920002)",
+  "rawText": "Teks mentah paspor termasuk persis 2 baris MRZ di bagian bawah"
 }`
           : `Analisis gambar dokumen ${jenis} ini dan ekstrak data terstruktur berikut dalam format JSON:
 {

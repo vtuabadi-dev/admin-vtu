@@ -891,6 +891,54 @@ export default function DokumenPage() {
     }
   }
 
+  async function handleSaveSingleOcr(jenis: string) {
+    if (!selectedJamaah) return;
+    const doc = uploadDocuments.find((d) => d.jenis === jenis);
+    const ocrData = ocrResults[jenis];
+    if (!doc || !ocrData) return;
+
+    setSubmitting(true);
+    try {
+      const res = await fetch("/api/dokumen/review", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          dokumenId: doc.id,
+          manualData: ocrData,
+          dataStatus: "valid",
+        }),
+      });
+
+      if (!res.ok) throw new Error("Gagal menyimpan data");
+
+      setSavedOcrDocs((prev) => ({ ...prev, [jenis]: true }));
+      setEditingOcrDocs((prev) => ({ ...prev, [jenis]: false }));
+
+      // Update store jamaah state
+      if (storeJamaah) {
+        const updated = storeJamaah.map((j: any) => {
+          if (j.id === selectedJamaah.id) {
+            return {
+              ...j,
+              ...(ocrData.namaLengkap ? { namaLengkap: ocrData.namaLengkap } : {}),
+              ...(ocrData.nik ? { nik: ocrData.nik } : {}),
+              ...(ocrData.nomorPaspor ? { nomorPaspor: ocrData.nomorPaspor } : {}),
+              ...(ocrData.tanggalLahir ? { tanggalLahir: ocrData.tanggalLahir } : {}),
+              ...(ocrData.tempatLahir ? { tempatLahir: ocrData.tempatLahir } : {}),
+            };
+          }
+          return j;
+        });
+        setStoreJamaah(updated);
+      }
+    } catch (err) {
+      console.error("Save single OCR error:", err);
+      alert(`Gagal menyimpan data: ${(err as Error).message}`);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
   async function handleSubmitOcrResults() {
     if (!selectedJamaah || Object.keys(ocrResults).length === 0) return;
     setSubmitting(true);
@@ -1879,6 +1927,26 @@ export default function DokumenPage() {
                                       </div>
 
                                       <div className="space-y-1">
+                                        <div className="flex items-center justify-between">
+                                          <label className="text-[11px] font-semibold text-stone-600 dark:text-stone-400">
+                                            NIK (Hasil Ekstraksi Paspor / MRZ):
+                                          </label>
+                                          {ocrResults[activeDocType]?.nik && (
+                                            <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1">
+                                              ✓ Otomatis dari MRZ
+                                            </span>
+                                          )}
+                                        </div>
+                                        <Input
+                                          value={ocrResults[activeDocType]?.nik || ""}
+                                          onChange={(e) => handleOcrFieldChange(activeDocType, "nik", e.target.value)}
+                                          disabled={savedOcrDocs[activeDocType] && !editingOcrDocs[activeDocType]}
+                                          placeholder="16 digit NIK hasil rekonstruksi paspor"
+                                          className="h-8 text-xs font-mono font-bold text-emerald-600 dark:text-emerald-400"
+                                        />
+                                      </div>
+
+                                      <div className="space-y-1">
                                         <label className="text-[11px] font-semibold text-stone-600 dark:text-stone-400">
                                           Tanggal Kadaluarsa:
                                         </label>
@@ -1898,6 +1966,34 @@ export default function DokumenPage() {
                                             <AlertTriangle className="h-3 w-3" /> Paspor kadaluarsa dalam &lt; 6 bulan
                                           </p>
                                         )}
+                                      </div>
+
+                                      <div className="grid grid-cols-2 gap-2">
+                                        <div className="space-y-1">
+                                          <label className="text-[11px] font-semibold text-stone-600 dark:text-stone-400">
+                                            Tempat Lahir:
+                                          </label>
+                                          <Input
+                                            value={ocrResults[activeDocType]?.tempatLahir || ""}
+                                            onChange={(e) => handleOcrFieldChange(activeDocType, "tempatLahir", e.target.value)}
+                                            disabled={savedOcrDocs[activeDocType] && !editingOcrDocs[activeDocType]}
+                                            placeholder="Tempat Lahir"
+                                            className="h-8 text-xs"
+                                          />
+                                        </div>
+                                        <div className="space-y-1">
+                                          <label className="text-[11px] font-semibold text-stone-600 dark:text-stone-400">
+                                            Tanggal Lahir:
+                                          </label>
+                                          <Input
+                                            type="text"
+                                            value={ocrResults[activeDocType]?.tanggalLahir || ""}
+                                            onChange={(e) => handleOcrFieldChange(activeDocType, "tanggalLahir", e.target.value)}
+                                            disabled={savedOcrDocs[activeDocType] && !editingOcrDocs[activeDocType]}
+                                            placeholder="YYYY-MM-DD"
+                                            className="h-8 text-xs font-mono"
+                                          />
+                                        </div>
                                       </div>
                                     </>
                                   )}
