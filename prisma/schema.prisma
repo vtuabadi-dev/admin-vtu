@@ -51,6 +51,8 @@ enum DokumenJenis {
   ktp
   kk
   akta
+  surat_lansia
+  buku_nikah
 }
 
 enum StatusDokumen {
