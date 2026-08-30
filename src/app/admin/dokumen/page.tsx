@@ -124,9 +124,9 @@ function getDocCellBadge(
 
   if (jenis === "surat_lansia") {
     if (dynamicReq && !dynamicReq.isLansiaRequired) {
-      return { variant: "muted" as const, label: "N/A (≤60 Thn)", dotClass: "bg-muted-foreground/30" };
+      return { variant: "muted" as const, label: "—", dotClass: "bg-transparent", isDash: true };
     }
-    return { variant: "warning" as const, label: "Wajib (>60)", dotClass: "bg-warning" };
+    return { variant: "warning" as const, label: "Wajib (>60)", dotClass: "bg-warning", isDash: false };
   }
 
   if (jenis === "kk") {
@@ -1230,6 +1230,13 @@ export default function DokumenPage() {
                                 {ALL_DOC_JENIS.map((jenis) => {
                                   const doc = row.dokumen[jenis];
                                   const badge = getDocCellBadge(doc, jenis, row.dynamicReq);
+                                  if (badge.isDash) {
+                                    return (
+                                      <td key={jenis} className="px-2 py-2.5 text-center">
+                                        <span className="text-stone-300 dark:text-stone-700 font-bold select-none text-xs">—</span>
+                                      </td>
+                                    );
+                                  }
                                   return (
                                     <td key={jenis} className="px-2 py-2.5 text-center">
                                       <span
