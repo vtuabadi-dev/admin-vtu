@@ -151,7 +151,7 @@ export class GoogleAiStudioOcrProvider implements OcrProvider {
   "rawText": "Teks mentah"
 }`;
 
-        const candidateModels = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-2.0-flash-lite"];
+        const candidateModels = ["gemini-2.0-flash", "gemini-2.5-flash-lite", "gemini-1.5-flash", "gemini-1.5-pro"];
         const genAI = new GoogleGenerativeAI(apiKey);
         let fullText = "";
 
