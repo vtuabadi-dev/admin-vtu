@@ -571,6 +571,49 @@ export default function DokumenPage() {
             savedStatus[d.jenis] = true;
           }
         });
+
+        // Initialize baseline fields for paspor, ktp, kk, akta if not already populated from database
+        if (!initialOcr["paspor"]) {
+          initialOcr["paspor"] = {
+            namaLengkap: member.namaLengkap || "",
+            nomorPaspor: member.nomorPaspor && member.nomorPaspor !== "-" ? member.nomorPaspor : "",
+            tempatTerbitPaspor: member.tempatTerbitPaspor || member.tempatTerbit || member.kotaPaspor || "",
+            tanggalTerbitPaspor: member.tanggalTerbitPaspor ? new Date(member.tanggalTerbitPaspor).toISOString().split("T")[0] : "",
+            tanggalKadaluarsa: member.masaBerlakuPaspor ? new Date(member.masaBerlakuPaspor).toISOString().split("T")[0] : "",
+            tempatLahir: member.tempatLahir || "",
+            tanggalLahir: member.tanggalLahir ? new Date(member.tanggalLahir).toISOString().split("T")[0] : "",
+            nik: member.nik && member.nik !== "-" ? member.nik : "",
+          };
+        }
+        if (!initialOcr["ktp"]) {
+          initialOcr["ktp"] = {
+            namaLengkap: member.namaLengkap || "",
+            nik: member.nik && member.nik !== "-" ? member.nik : "",
+            statusPerkawinan: member.statusMenikah || "",
+            tempatLahir: member.tempatLahir || "",
+            tanggalLahir: member.tanggalLahir ? new Date(member.tanggalLahir).toISOString().split("T")[0] : "",
+            provinsi: member.provinsi || "",
+            kota: member.kota || "",
+            kecamatan: member.kecamatan || "",
+            kelurahan: member.kelurahan || "",
+            alamatLengkap: member.alamat || "",
+          };
+        }
+        if (!initialOcr["kk"]) {
+          initialOcr["kk"] = {
+            namaLengkap: member.namaLengkap || "",
+            nik: member.nik && member.nik !== "-" ? member.nik : "",
+          };
+        }
+        if (!initialOcr["akta"]) {
+          initialOcr["akta"] = {
+            namaLengkap: member.namaLengkap || "",
+            nik: member.nik && member.nik !== "-" ? member.nik : "",
+            tempatLahir: member.tempatLahir || "",
+            tanggalLahir: member.tanggalLahir ? new Date(member.tanggalLahir).toISOString().split("T")[0] : "",
+          };
+        }
+
         setOcrResults(initialOcr);
         setSavedOcrDocs(savedStatus);
       }
@@ -672,6 +715,8 @@ export default function DokumenPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           dokumenId: doc?.id,
+          jamaahId: selectedJamaah.id,
+          jenis,
           manualData: ocrData,
           dataStatus: "valid",
         }),
@@ -1862,8 +1907,19 @@ export default function DokumenPage() {
                                     {extractingEndorsement ? "Mengekstrak nama dari halaman endorsement..." : "Mengekstrak data otomatis menggunakan Gemini AI Studio..."}
                                   </p>
                                 </div>
-                              ) : ocrResults[activeDocType] || endorsementOcrResult ? (
-<div className="space-y-3">
+                              ) : (
+                                <div className="space-y-3">
+                                  {/* Banner info upload jika file foto belum ada */}
+                                  {!(activeDocType === "paspor" && pasporHasEndorsement === true && pasporPageTab === "hal2" ? (endorsementPreview || endorsementDoc?.fileUrl) : (uploadPreviews[activeDocType] || uploadDocuments.find((d) => d.jenis === activeDocType)?.fileUrl)) && (
+                                    <div className="p-2.5 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200/80 dark:border-amber-900/50 text-[11px] text-amber-900 dark:text-amber-300 flex items-start gap-2">
+                                      <Sparkles className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400 mt-0.5" />
+                                      <div className="leading-tight">
+                                        <p className="font-semibold">Foto dokumen belum diunggah</p>
+                                        <p className="text-[10px] text-stone-500 dark:text-stone-400">Kolom di bawah ini siap diisi manual, atau akan otomatis terisi tatkala foto diunggah.</p>
+                                      </div>
+                                    </div>
+                                  )}
+
                                   {/* Info Endorsement jika ada */}
                                   {endorsementOcrResult?.namaLengkap && activeDocType === "paspor" && (
                                     <div className="p-2 rounded bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900 text-xs">
@@ -2287,16 +2343,6 @@ export default function DokumenPage() {
                                       </div>
                                     )}
                                   </div>
-                                </div>
-                              ) : (
-                                <div className="p-6 text-center space-y-2">
-                                  <FileText className="mx-auto h-12 w-12 text-stone-300 dark:text-stone-700" />
-                                  <p className="text-xs text-muted-foreground italic">
-                                    Belum ada data OCR untuk <strong>{LABEL_DOKUMEN[activeDocType]}</strong>.
-                                  </p>
-                                  <p className="text-[11px] text-stone-400">
-                                    Upload file pada daftar di sebelah kiri untuk memulai ekstraksi otomatis.
-                                  </p>
                                 </div>
                               )}
                             </div>

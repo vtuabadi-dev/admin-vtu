@@ -25,17 +25,24 @@ export async function PUT(request: NextRequest) {
   if (!perm.allowed) return NextResponse.json({ success: false, message: perm.reason }, { status: 403 });
 
   try {
-    const { dokumenId, manualData, dataStatus } = await request.json() as {
-      dokumenId: string;
+    const { dokumenId, jamaahId, jenis, manualData, dataStatus } = await request.json() as {
+      dokumenId?: string;
+      jamaahId?: string;
+      jenis?: string;
       manualData: Record<string, any>;
       dataStatus?: "valid" | "pending" | "manual_edit" | "ocr_error";
     };
 
-    if (!dokumenId || !manualData) {
-      return NextResponse.json({ success: false, message: "dokumenId and manualData are required" }, { status: 400 });
+    if (!dokumenId && (!jamaahId || !jenis)) {
+      return NextResponse.json({ success: false, message: "dokumenId or (jamaahId and jenis) are required" }, { status: 400 });
     }
 
-    const data = await dokumenRepo.saveManualOcrData(dokumenId, manualData, dataStatus ?? "manual_edit");
+    let data;
+    if (dokumenId) {
+      data = await dokumenRepo.saveManualOcrData(dokumenId, manualData, dataStatus ?? "manual_edit");
+    } else if (jamaahId && jenis) {
+      data = await dokumenRepo.saveManualOcrDataByJamaah(jamaahId, jenis, manualData, dataStatus ?? "manual_edit");
+    }
 
     // Audit the OCR edit
     try {
@@ -45,8 +52,8 @@ export async function PUT(request: NextRequest) {
         role: session.user.role ?? "admin_operasional",
         module: "dokumen",
         action: "dokumen.ocr_edit",
-        detail: `Manual OCR edit on document ${dokumenId} — fields: ${Object.keys(manualData).join(", ")}`,
-        entityId: dokumenId,
+        detail: `Manual OCR edit on document ${dokumenId || `${jamaahId}:${jenis}`} — fields: ${Object.keys(manualData || {}).join(", ")}`,
+        entityId: dokumenId || (data as any)?.id || `${jamaahId}:${jenis}`,
         entityType: "DokumenItem",
       });
     } catch { /* Non-critical */ }

@@ -177,6 +177,38 @@ export const dokumenRepo = {
     return mapDokumen(row);
   },
 
+  async saveManualOcrDataByJamaah(jamaahId: string, jenis: string, manualData: Record<string, any>, dataStatus: DokumenItem["dataStatus"] = "manual_edit") {
+    let doc = await prisma.dokumenItem.findFirst({
+      where: { jamaahId, jenis },
+    });
+
+    if (doc) {
+      doc = await prisma.dokumenItem.update({
+        where: { id: doc.id },
+        data: { manualData: manualData as any, dataStatus },
+      });
+    } else {
+      doc = await prisma.dokumenItem.create({
+        data: {
+          jamaahId,
+          jenis,
+          namaDokumen: jenis,
+          fileUrl: "",
+          fileSize: 0,
+          mimeType: "image/jpeg",
+          status: "pending",
+          dataStatus,
+          manualData: manualData as any,
+        },
+      });
+    }
+
+    if (jamaahId && manualData) {
+      await syncJamaahAndManifestFromDocData(jamaahId, manualData);
+    }
+    return mapDokumen(doc);
+  },
+
   async saveOcrResult(id: string, ocrData: OcrData) {
     const row = await prisma.dokumenItem.update({
       where: { id },
