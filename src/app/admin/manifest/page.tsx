@@ -204,6 +204,35 @@ function getNikDetails(j: any): string {
   return "-";
 }
 
+function getAlamatLengkapDetails(j: any): string {
+  let ktpDoc: any = null;
+  if (j.dokumen && Array.isArray(j.dokumen)) {
+    ktpDoc = j.dokumen.find((d: any) => d.jenis === "ktp");
+  }
+
+  const manual = ktpDoc?.manualData;
+  const ocr = ktpDoc?.ocrData;
+
+  const docAlamat =
+    manual?.alamatLengkap ||
+    ocr?.alamatLengkap ||
+    manual?.alamat ||
+    ocr?.alamat;
+
+  if (docAlamat && docAlamat !== "-") return docAlamat;
+
+  if (j.alamat && j.alamat !== "-") {
+    if (/RT|RW|Kel|Kec/i.test(j.alamat)) return j.alamat;
+    const parts: string[] = [j.alamat];
+    if (j.kelurahan) parts.push(`Kel. ${j.kelurahan.replace(/^Kel(?:urahan|\.)?\s*/i, "")}`);
+    if (j.kecamatan) parts.push(`Kec. ${j.kecamatan.replace(/^Kec(?:amatan|\.)?\s*/i, "")}`);
+    if (j.kota) parts.push(j.kota);
+    return parts.join(", ");
+  }
+
+  return "-";
+}
+
 function calculateAge(birthDateInput?: string | Date): string {
   if (!birthDateInput) return "-";
   const birthDate = new Date(birthDateInput);
@@ -1275,19 +1304,35 @@ function ManifestPageContent() {
                               : "border-b border-stone-200/60 dark:border-stone-800/60";
                             const cellBorder = `border-r border-stone-200/50 dark:border-stone-800/50 ${rowBorderClass}`;
 
-                            // Single Source of Truth Name, Paspor & NIK Resolution
+                            // Single Source of Truth Name, Paspor, NIK & Alamat Resolution
                             const namaSot = getSingleSourceOfTruthName(j);
                             const pasporInfo = getPasporDetails(j);
                             const nikVal = getNikDetails(j);
+                            const alamatLengkapVal = getAlamatLengkapDetails(j);
+
+                            let ktpDoc: any = null;
+                            if (j.dokumen && Array.isArray(j.dokumen)) {
+                              ktpDoc = j.dokumen.find((d: any) => d.jenis === "ktp");
+                            }
 
                             // ID Register Format
                             const baseCode = group.groupObj?.kodeRegistrasi || j.registrationId || j.groupId || "2980";
                             const idRegister = formatIdRegister(baseCode, memberIdx, totalInGroup);
 
                             const tipeKamarDisplay = j.tipeKamar || (group.groupObj as any)?.roomUpgrade || "Upgrade Double";
-                            const statusMenikahDisplay = j.statusMenikah || "Belum Menikah";
-                            const kotaDisplay = j.kota || "JAKARTA SELATAN";
-                            const provinsiDisplay = j.provinsi && j.provinsi !== "-" ? j.provinsi : deriveProvinsi(j.provinsi, j.kota);
+                            const statusMenikahDisplay =
+                              (j.statusMenikah && j.statusMenikah !== "-")
+                                ? j.statusMenikah
+                                : ktpDoc?.manualData?.statusPerkawinan || ktpDoc?.ocrData?.statusPerkawinan || "Belum Menikah";
+                            const kotaDisplay =
+                              (j.kota && j.kota !== "-")
+                                ? j.kota
+                                : ktpDoc?.manualData?.kota || ktpDoc?.ocrData?.kota || ktpDoc?.manualData?.kotaKabupaten || ktpDoc?.ocrData?.kotaKabupaten || "-";
+                            const provRaw =
+                              (j.provinsi && j.provinsi !== "-")
+                                ? j.provinsi
+                                : ktpDoc?.manualData?.provinsi || ktpDoc?.ocrData?.provinsi || "";
+                            const provinsiDisplay = provRaw ? provRaw : deriveProvinsi(provRaw, kotaDisplay);
 
                             return (
                               <tr
@@ -1454,11 +1499,12 @@ function ManifestPageContent() {
                                   {provinsiDisplay}
                                 </td>
 
+                                {/* ALAMAT LENGKAP */}
                                 <td
                                   className={`px-3 py-2.5 text-stone-600 dark:text-stone-400 max-w-[240px] truncate ${cellBorder}`}
-                                  title={j.alamat}
+                                  title={alamatLengkapVal}
                                 >
-                                  {j.alamat || "-"}
+                                  {alamatLengkapVal}
                                 </td>
 
                                 {/* AKSI */}

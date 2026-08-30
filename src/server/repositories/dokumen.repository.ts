@@ -32,10 +32,26 @@ async function syncJamaahAndManifestFromDocData(jamaahId: string, data: Record<s
   const jamaahUpdates: Record<string, any> = {};
   const manifestUpdates: Record<string, any> = {};
 
+  // Check if jamaah already has passport name (Single Source of Truth)
+  const currentJamaah = await prisma.jamaah.findUnique({
+    where: { id: jamaahId },
+    include: { dokumen: { where: { jenis: "paspor" } } },
+  }).catch(() => null);
+
+  const hasPassportName = Boolean(
+    (currentJamaah?.nomorPaspor && currentJamaah.nomorPaspor !== "-") ||
+    currentJamaah?.dokumen?.some((d: any) => d.manualData?.namaLengkap || d.ocrData?.namaLengkap)
+  );
+
+  const isPassportData = Boolean(data.nomorPaspor || data.tempatTerbitPaspor);
+
   if (typeof data.namaLengkap === "string" && data.namaLengkap.trim()) {
     const cleanedName = data.namaLengkap.trim().toUpperCase();
-    jamaahUpdates.namaLengkap = cleanedName;
-    manifestUpdates.namaLengkap = cleanedName;
+    // Only update name if it's passport data OR if jamaah has no passport name yet
+    if (isPassportData || !hasPassportName) {
+      jamaahUpdates.namaLengkap = cleanedName;
+      manifestUpdates.namaLengkap = cleanedName;
+    }
   }
 
   if (typeof data.nomorPaspor === "string" && data.nomorPaspor.trim()) {
@@ -71,6 +87,35 @@ async function syncJamaahAndManifestFromDocData(jamaahId: string, data: Record<s
 
   if (typeof data.nik === "string" && data.nik.trim()) {
     jamaahUpdates.nik = data.nik.trim();
+  }
+
+  if (typeof data.statusPerkawinan === "string" && data.statusPerkawinan.trim()) {
+    const s = data.statusPerkawinan.trim().toUpperCase();
+    jamaahUpdates.statusMenikah = s.includes("BELUM") ? "Belum Menikah" : s.includes("KAWIN") || s.includes("MENIKAH") ? "Menikah" : s;
+  }
+
+  if (typeof data.provinsi === "string" && data.provinsi.trim()) {
+    jamaahUpdates.provinsi = data.provinsi.trim();
+  }
+
+  if (typeof data.kota === "string" && data.kota.trim()) {
+    jamaahUpdates.kota = data.kota.trim();
+  } else if (typeof data.kotaKabupaten === "string" && data.kotaKabupaten.trim()) {
+    jamaahUpdates.kota = data.kotaKabupaten.trim();
+  }
+
+  if (typeof data.kecamatan === "string" && data.kecamatan.trim()) {
+    jamaahUpdates.kecamatan = data.kecamatan.trim();
+  }
+
+  if (typeof data.kelurahan === "string" && data.kelurahan.trim()) {
+    jamaahUpdates.kelurahan = data.kelurahan.trim();
+  }
+
+  if (typeof data.alamatLengkap === "string" && data.alamatLengkap.trim()) {
+    jamaahUpdates.alamat = data.alamatLengkap.trim();
+  } else if (typeof data.alamat === "string" && data.alamat.trim()) {
+    jamaahUpdates.alamat = data.alamat.trim();
   }
 
   // Update Jamaah if there are updates

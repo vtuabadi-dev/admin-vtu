@@ -687,15 +687,26 @@ export default function DokumenPage() {
 
       // Update store jamaah state
       if (storeJamaah) {
+        const hasPassport = Boolean(
+          (selectedJamaah.nomorPaspor && selectedJamaah.nomorPaspor !== "-") ||
+          uploadDocuments.some((d: any) => d.jenis === "paspor" && (d.manualData?.namaLengkap || d.ocrData?.namaLengkap))
+        );
+
         const updated = storeJamaah.map((j: any) => {
           if (j.id === selectedJamaah.id) {
             return {
               ...j,
-              ...(ocrData.namaLengkap ? { namaLengkap: ocrData.namaLengkap } : {}),
+              ...(ocrData.namaLengkap && (jenis === "paspor" || !hasPassport) ? { namaLengkap: ocrData.namaLengkap } : {}),
               ...(ocrData.nik ? { nik: ocrData.nik } : {}),
               ...(ocrData.nomorPaspor ? { nomorPaspor: ocrData.nomorPaspor } : {}),
               ...(ocrData.tanggalLahir ? { tanggalLahir: ocrData.tanggalLahir } : {}),
               ...(ocrData.tempatLahir ? { tempatLahir: ocrData.tempatLahir } : {}),
+              ...(ocrData.statusPerkawinan ? { statusMenikah: ocrData.statusPerkawinan.includes("BELUM") ? "Belum Menikah" : "Menikah" } : {}),
+              ...(ocrData.provinsi ? { provinsi: ocrData.provinsi } : {}),
+              ...(ocrData.kota || ocrData.kotaKabupaten ? { kota: ocrData.kota || ocrData.kotaKabupaten } : {}),
+              ...(ocrData.kecamatan ? { kecamatan: ocrData.kecamatan } : {}),
+              ...(ocrData.kelurahan ? { kelurahan: ocrData.kelurahan } : {}),
+              ...(ocrData.alamatLengkap || ocrData.alamat ? { alamat: ocrData.alamatLengkap || ocrData.alamat } : {}),
             };
           }
           return j;
@@ -1852,7 +1863,7 @@ export default function DokumenPage() {
                                   </p>
                                 </div>
                               ) : ocrResults[activeDocType] || endorsementOcrResult ? (
-                                <div className="space-y-3">
+<div className="space-y-3">
                                   {/* Info Endorsement jika ada */}
                                   {endorsementOcrResult?.namaLengkap && activeDocType === "paspor" && (
                                     <div className="p-2 rounded bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900 text-xs">
@@ -1862,18 +1873,49 @@ export default function DokumenPage() {
                                   )}
 
                                   {/* Field: Nama Lengkap */}
-                                  <div className="space-y-1">
-                                    <label className="text-[11px] font-semibold text-stone-600 dark:text-stone-400">
-                                      Nama Lengkap:
-                                    </label>
-                                    <Input
-                                      value={ocrResults[activeDocType]?.namaLengkap || ""}
-                                      onChange={(e) => handleOcrFieldChange(activeDocType, "namaLengkap", e.target.value)}
-                                      disabled={savedOcrDocs[activeDocType] && !editingOcrDocs[activeDocType]}
-                                      placeholder="NAMA LENGKAP PADA DOKUMEN"
-                                      className="h-8 text-xs font-semibold"
-                                    />
-                                  </div>
+                                  {(() => {
+                                    const hasPassportName = Boolean(
+                                      uploadDocuments.find((d) => d.jenis === "paspor")?.manualData?.namaLengkap ||
+                                      uploadDocuments.find((d) => d.jenis === "paspor")?.ocrData?.namaLengkap ||
+                                      (selectedJamaah?.nomorPaspor && selectedJamaah.nomorPaspor !== "-" && selectedJamaah?.namaLengkap)
+                                    );
+                                    const passportNamaLengkap =
+                                      uploadDocuments.find((d) => d.jenis === "paspor")?.manualData?.namaLengkap ||
+                                      uploadDocuments.find((d) => d.jenis === "paspor")?.ocrData?.namaLengkap ||
+                                      selectedJamaah?.namaLengkap ||
+                                      "";
+
+                                    return (
+                                      <div className="space-y-1">
+                                        <div className="flex items-center justify-between">
+                                          <label className="text-[11px] font-semibold text-stone-600 dark:text-stone-400">
+                                            Nama Lengkap:
+                                          </label>
+                                          {activeDocType === "ktp" && hasPassportName && (
+                                            <span className="text-[10px] text-amber-600 dark:text-amber-400 font-bold bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/30">
+                                              (Nama Paspor)
+                                            </span>
+                                          )}
+                                        </div>
+                                        <Input
+                                          value={
+                                            activeDocType === "ktp" && hasPassportName
+                                              ? (ocrResults[activeDocType]?.namaLengkap || passportNamaLengkap)
+                                              : (ocrResults[activeDocType]?.namaLengkap || "")
+                                          }
+                                          onChange={(e) => handleOcrFieldChange(activeDocType, "namaLengkap", e.target.value)}
+                                          disabled={savedOcrDocs[activeDocType] && !editingOcrDocs[activeDocType]}
+                                          placeholder="NAMA LENGKAP PADA DOKUMEN"
+                                          className="h-8 text-xs font-semibold"
+                                        />
+                                        {activeDocType === "ktp" && hasPassportName && (
+                                          <p className="text-[10px] text-muted-foreground">
+                                            * Nama di manifest menggunakan nama Paspor (Single Source of Truth)
+                                          </p>
+                                        )}
+                                      </div>
+                                    );
+                                  })()}
 
                                   {/* Paspor Fields */}
                                   {activeDocType === "paspor" && (
@@ -1991,8 +2033,143 @@ export default function DokumenPage() {
                                     </>
                                   )}
 
-                                  {/* KTP / KK / Akta Fields */}
-                                  {(activeDocType === "ktp" || activeDocType === "kk" || activeDocType === "akta") && (
+                                  {/* KTP Specific Fields */}
+                                  {activeDocType === "ktp" && (
+                                    <>
+                                      <div className="grid grid-cols-2 gap-2">
+                                        <div className="space-y-1">
+                                          <label className="text-[11px] font-semibold text-stone-600 dark:text-stone-400">
+                                            NIK (16 Digit):
+                                          </label>
+                                          <Input
+                                            value={ocrResults[activeDocType]?.nik || ""}
+                                            onChange={(e) => handleOcrFieldChange(activeDocType, "nik", e.target.value)}
+                                            disabled={savedOcrDocs[activeDocType] && !editingOcrDocs[activeDocType]}
+                                            placeholder="16 digit NIK"
+                                            className="h-8 text-xs font-mono font-bold text-primary"
+                                          />
+                                        </div>
+                                        <div className="space-y-1">
+                                          <label className="text-[11px] font-semibold text-stone-600 dark:text-stone-400">
+                                            Status Perkawinan:
+                                          </label>
+                                          <Input
+                                            value={ocrResults[activeDocType]?.statusPerkawinan || ""}
+                                            onChange={(e) => handleOcrFieldChange(activeDocType, "statusPerkawinan", e.target.value)}
+                                            disabled={savedOcrDocs[activeDocType] && !editingOcrDocs[activeDocType]}
+                                            placeholder="KAWIN / BELUM KAWIN"
+                                            className="h-8 text-xs font-semibold"
+                                          />
+                                        </div>
+                                      </div>
+
+                                      <div className="grid grid-cols-2 gap-2">
+                                        <div className="space-y-1">
+                                          <label className="text-[11px] font-semibold text-stone-600 dark:text-stone-400">
+                                            Tempat Lahir:
+                                          </label>
+                                          <Input
+                                            value={ocrResults[activeDocType]?.tempatLahir || ""}
+                                            onChange={(e) => handleOcrFieldChange(activeDocType, "tempatLahir", e.target.value)}
+                                            disabled={savedOcrDocs[activeDocType] && !editingOcrDocs[activeDocType]}
+                                            placeholder="Kota Lahir"
+                                            className="h-8 text-xs"
+                                          />
+                                        </div>
+                                        <div className="space-y-1">
+                                          <label className="text-[11px] font-semibold text-stone-600 dark:text-stone-400">
+                                            Tanggal Lahir:
+                                          </label>
+                                          <Input
+                                            type="text"
+                                            value={ocrResults[activeDocType]?.tanggalLahir || ""}
+                                            onChange={(e) => handleOcrFieldChange(activeDocType, "tanggalLahir", e.target.value)}
+                                            disabled={savedOcrDocs[activeDocType] && !editingOcrDocs[activeDocType]}
+                                            placeholder="YYYY-MM-DD"
+                                            className="h-8 text-xs font-mono"
+                                          />
+                                        </div>
+                                      </div>
+
+                                      <div className="grid grid-cols-2 gap-2">
+                                        <div className="space-y-1">
+                                          <label className="text-[11px] font-semibold text-stone-600 dark:text-stone-400">
+                                            Provinsi:
+                                          </label>
+                                          <Input
+                                            value={ocrResults[activeDocType]?.provinsi || ""}
+                                            onChange={(e) => handleOcrFieldChange(activeDocType, "provinsi", e.target.value)}
+                                            disabled={savedOcrDocs[activeDocType] && !editingOcrDocs[activeDocType]}
+                                            placeholder="PROVINSI"
+                                            className="h-8 text-xs font-semibold"
+                                          />
+                                        </div>
+                                        <div className="space-y-1">
+                                          <label className="text-[11px] font-semibold text-stone-600 dark:text-stone-400">
+                                            Kota / Kabupaten:
+                                          </label>
+                                          <Input
+                                            value={ocrResults[activeDocType]?.kota || ocrResults[activeDocType]?.kotaKabupaten || ""}
+                                            onChange={(e) => {
+                                              handleOcrFieldChange(activeDocType, "kota", e.target.value);
+                                              handleOcrFieldChange(activeDocType, "kotaKabupaten", e.target.value);
+                                            }}
+                                            disabled={savedOcrDocs[activeDocType] && !editingOcrDocs[activeDocType]}
+                                            placeholder="KOTA / KABUPATEN"
+                                            className="h-8 text-xs font-semibold"
+                                          />
+                                        </div>
+                                      </div>
+
+                                      <div className="grid grid-cols-2 gap-2">
+                                        <div className="space-y-1">
+                                          <label className="text-[11px] font-semibold text-stone-600 dark:text-stone-400">
+                                            Kecamatan:
+                                          </label>
+                                          <Input
+                                            value={ocrResults[activeDocType]?.kecamatan || ""}
+                                            onChange={(e) => handleOcrFieldChange(activeDocType, "kecamatan", e.target.value)}
+                                            disabled={savedOcrDocs[activeDocType] && !editingOcrDocs[activeDocType]}
+                                            placeholder="Kecamatan"
+                                            className="h-8 text-xs"
+                                          />
+                                        </div>
+                                        <div className="space-y-1">
+                                          <label className="text-[11px] font-semibold text-stone-600 dark:text-stone-400">
+                                            Kelurahan / Desa:
+                                          </label>
+                                          <Input
+                                            value={ocrResults[activeDocType]?.kelurahan || ""}
+                                            onChange={(e) => handleOcrFieldChange(activeDocType, "kelurahan", e.target.value)}
+                                            disabled={savedOcrDocs[activeDocType] && !editingOcrDocs[activeDocType]}
+                                            placeholder="Kelurahan / Desa"
+                                            className="h-8 text-xs"
+                                          />
+                                        </div>
+                                      </div>
+
+                                      <div className="space-y-1">
+                                        <div className="flex items-center justify-between">
+                                          <label className="text-[11px] font-semibold text-stone-600 dark:text-stone-400">
+                                            Alamat Lengkap:
+                                          </label>
+                                          <span className="text-[9px] text-muted-foreground">
+                                            (Alamat, RT/RW, Kel, Kec, Kota)
+                                          </span>
+                                        </div>
+                                        <Input
+                                          value={ocrResults[activeDocType]?.alamatLengkap || ""}
+                                          onChange={(e) => handleOcrFieldChange(activeDocType, "alamatLengkap", e.target.value)}
+                                          disabled={savedOcrDocs[activeDocType] && !editingOcrDocs[activeDocType]}
+                                          placeholder="JL. ... RT.000/RW.000 Kel. ... Kec. ... Kota ..."
+                                          className="h-8 text-xs font-medium"
+                                        />
+                                      </div>
+                                    </>
+                                  )}
+
+                                  {/* KK / Akta Fields */}
+                                  {(activeDocType === "kk" || activeDocType === "akta") && (
                                     <>
                                       <div className="space-y-1">
                                         <label className="text-[11px] font-semibold text-stone-600 dark:text-stone-400">
@@ -2035,7 +2212,6 @@ export default function DokumenPage() {
                                     </>
                                   )}
 
-                                  {/* Action Buttons Section */}
                                   <div className="pt-3 border-t border-stone-200 dark:border-stone-800">
                                     {!savedOcrDocs[activeDocType] ? (
                                       /* Kondisi A: Unsaved Baru Terekstrak */

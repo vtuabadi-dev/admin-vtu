@@ -4,13 +4,20 @@
 // Hardened for real-world OCR errors (v2.1)
 
 export interface KtpData {
+  nik?: string;
   namaLengkap: string;
   tempatLahir: string;
   tanggalLahir: string;       // YYYY-MM-DD
-  alamatLengkap: string;      // auto-assembled
+  jenisKelamin?: string;
+  statusPerkawinan?: string;  // status perkawinan/perkawinan: KAWIN, BELUM KAWIN, etc.
+  alamatLengkap: string;      // auto-assembled: {Alamat} RT.{rt}/RW.{rw} Kel. {kelurahan} Kec. {kecamatan} {kota}
+  alamatJalan?: string;
+  rt?: string;
+  rw?: string;
   kelurahan: string;
   kecamatan: string;
   kotaKabupaten: string;
+  kota?: string;
   provinsi: string;
   rawOcrText: string;
   confidence: number;
@@ -222,8 +229,18 @@ function extractRegionFromAddress(text: string): { provinsi: string; kotaKabupat
 
 // ── Main Parser ─────────────────────────────────────────────────
 
-export function parseKtp(ocrText: string): KtpData {
+export function parseKtp(ocrText: string, parsedJson?: any): KtpData {
   const lines = ocrText.split("\n").map((l) => l.trim()).filter(Boolean);
+
+  // --- 0. NIK ---
+  let nik = "";
+  const nikMatch = ocrText.match(/NIK\s*[:=]?\s*(\d{16})/i) || ocrText.match(/\b(\d{16})\b/);
+  if (nikMatch?.[1]) {
+    nik = nikMatch[1];
+  } else {
+    const rawNik = extractLine(ocrText, "NIK");
+    nik = rawNik.replace(/\D/g, "");
+  }
 
   // --- 1. Nama ---
   let namaLengkap = extractLine(ocrText, "Nama");
@@ -259,6 +276,29 @@ export function parseKtp(ocrText: string): KtpData {
   } else {
     tempatLahir = extractLine(ocrText, "Tempat Lahir");
     tanggalLahir = normalizeDate(extractLine(ocrText, "Tanggal Lahir", "Tgl Lahir"));
+  }
+
+  // --- 2b. Jenis Kelamin ---
+  let jenisKelamin = "";
+  const jkMatch = ocrText.match(/(?:Jenis\s+Kelamin|JK)\s*[:=]?\s*(LAKI-LAKI|PEREMPUAN|PRIA|WANITA)/i);
+  if (jkMatch?.[1]) {
+    jenisKelamin = jkMatch[1].toUpperCase().includes("LAKI") || jkMatch[1].toUpperCase() === "PRIA" ? "LAKI-LAKI" : "PEREMPUAN";
+  }
+
+  // --- 2c. Status Perkawinan ---
+  let statusPerkawinan = extractLine(ocrText, "Status Perkawinan", "Status Perkawinan/Perkawinan", "Status", "Perkawinan");
+  if (!statusPerkawinan) {
+    const statMatch = ocrText.match(/(?:Status\s+Perkawinan|Perkawinan|Status)\s*[:=]?\s*(BELUM\s+KAWIN|BELUM\s+MENIKAH|KAWIN|MENIKAH|CERAI\s+HIDUP|CERAI\s+MATI)/i);
+    if (statMatch?.[1]) {
+      statusPerkawinan = statMatch[1].trim().toUpperCase();
+    }
+  }
+  if (statusPerkawinan) {
+    statusPerkawinan = statusPerkawinan.toUpperCase().trim();
+    if (statusPerkawinan.includes("BELUM")) statusPerkawinan = "BELUM KAWIN";
+    else if (statusPerkawinan.includes("CERAI HIDUP")) statusPerkawinan = "CERAI HIDUP";
+    else if (statusPerkawinan.includes("CERAI MATI")) statusPerkawinan = "CERAI MATI";
+    else if (statusPerkawinan.includes("KAWIN") || statusPerkawinan.includes("MENIKAH")) statusPerkawinan = "KAWIN";
   }
 
   // --- 3. Province + City from header ---
@@ -316,15 +356,44 @@ export function parseKtp(ocrText: string): KtpData {
     rw = rtRwMatch[2].padStart(3, "0");
   }
 
-  // --- 8. Assemble alamatLengkap ---
-  const parts: string[] = [];
-  if (alamatJalan) parts.push(alamatJalan);
-  if (rt || rw) parts.push(`RT.${rt || "000"}/RW.${rw || "000"}`);
-  if (kelurahan) parts.push(`Kel. ${kelurahan}`);
-  if (kecamatan) parts.push(`Kec. ${kecamatan}`);
-  if (kotaKabupaten) parts.push(kotaKabupaten);
+  // Override / Merge from structured parsedJson if provided
+  if (parsedJson) {
+    if (parsedJson.nik) nik = String(parsedJson.nik).trim();
+    if (parsedJson.namaLengkap) namaLengkap = String(parsedJson.namaLengkap).trim().toUpperCase();
+    if (parsedJson.tempatLahir) tempatLahir = String(parsedJson.tempatLahir).trim();
+    if (parsedJson.tanggalLahir) tanggalLahir = normalizeDate(String(parsedJson.tanggalLahir));
+    if (parsedJson.jenisKelamin) jenisKelamin = String(parsedJson.jenisKelamin).trim();
+    if (parsedJson.statusPerkawinan) {
+      const s = String(parsedJson.statusPerkawinan).trim().toUpperCase();
+      if (s.includes("BELUM")) statusPerkawinan = "BELUM KAWIN";
+      else if (s.includes("CERAI HIDUP")) statusPerkawinan = "CERAI HIDUP";
+      else if (s.includes("CERAI MATI")) statusPerkawinan = "CERAI MATI";
+      else if (s.includes("KAWIN") || s.includes("MENIKAH")) statusPerkawinan = "KAWIN";
+      else statusPerkawinan = s;
+    }
+    if (parsedJson.provinsi) provinsi = String(parsedJson.provinsi).trim();
+    if (parsedJson.kota || parsedJson.kotaKabupaten) kotaKabupaten = String(parsedJson.kota || parsedJson.kotaKabupaten).trim();
+    if (parsedJson.kecamatan) kecamatan = String(parsedJson.kecamatan).trim();
+    if (parsedJson.kelurahan) kelurahan = String(parsedJson.kelurahan).trim();
+    if (parsedJson.alamat || parsedJson.alamatJalan) alamatJalan = String(parsedJson.alamat || parsedJson.alamatJalan).trim();
+    if (parsedJson.rt) rt = String(parsedJson.rt).trim().padStart(3, "0");
+    if (parsedJson.rw) rw = String(parsedJson.rw).trim().padStart(3, "0");
+  }
 
-  const alamatLengkap = parts.join(", ");
+  // --- 8. Assemble alamatLengkap ---
+  // Format: ({Alamat} RT.{nomorRT}/RW.{nomorRW} Kel. {Kelurahan} Kec. {Kecamatan} {Kabupaten/Kota})
+  let alamatLengkap = "";
+  if (parsedJson?.alamatLengkap && String(parsedJson.alamatLengkap).trim().length > 10) {
+    alamatLengkap = String(parsedJson.alamatLengkap).trim();
+  } else {
+    const parts: string[] = [];
+    if (alamatJalan) parts.push(alamatJalan);
+    if (rt || rw) parts.push(`RT.${rt || "000"}/RW.${rw || "000"}`);
+    if (kelurahan) parts.push(`Kel. ${kelurahan.replace(/^Kel(?:urahan|\.)?\s*/i, "")}`);
+    if (kecamatan) parts.push(`Kec. ${kecamatan.replace(/^Kec(?:amatan|\.)?\s*/i, "")}`);
+    if (kotaKabupaten) parts.push(kotaKabupaten);
+    alamatLengkap = parts.join(", ");
+  }
 
   // --- 9. Confidence ---
   const extractedCount = [
@@ -334,13 +403,20 @@ export function parseKtp(ocrText: string): KtpData {
   const confidence = Math.round((extractedCount / 8) * 100) / 100;
 
   return {
+    nik: nik || undefined,
     namaLengkap,
     tempatLahir,
     tanggalLahir,
+    jenisKelamin: jenisKelamin || undefined,
+    statusPerkawinan: statusPerkawinan || undefined,
     alamatLengkap: alamatLengkap || ocrText.slice(0, 200).replace(/\n/g, " "),
+    alamatJalan: alamatJalan || undefined,
+    rt: rt || undefined,
+    rw: rw || undefined,
     kelurahan,
     kecamatan,
     kotaKabupaten,
+    kota: kotaKabupaten,
     provinsi,
     rawOcrText: ocrText,
     confidence,

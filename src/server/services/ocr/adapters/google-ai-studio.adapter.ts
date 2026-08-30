@@ -11,6 +11,7 @@ import type { OcrAdapter, OcrAdapterConfig } from "./adapter.interface";
 import type { OcrResult, ImageMetaCheck } from "../provider";
 import { getExpectedFields } from "../provider";
 import { parsePassport } from "../passport-parser";
+import { parseKtp } from "../ktp-parser";
 
 // ── Field Extraction Patterns ────────────────────────────
 
@@ -145,13 +146,23 @@ Ekstrak seluruh data di atas dalam format JSON valid (tanpa markdown wrapper):
   "rawText": "..."
 }`;
     case "ktp":
-      return `Analisis gambar KTP (Kartu Tanda Penduduk) ini dan ekstrak data terstruktur berikut dalam format JSON:
+      return `Analisis gambar KTP (Kartu Tanda Penduduk) Indonesia ini dan ekstrak data terstruktur berikut dalam format JSON valid (tanpa markdown wrapper):
 {
-  "namaLengkap": "Nama lengkap",
-  "nik": "NIK 16 digit",
-  "tanggalLahir": "YYYY-MM-DD",
+  "nik": "16 digit NIK (contoh: 3174051207800001)",
+  "namaLengkap": "Nama lengkap pada KTP",
   "tempatLahir": "Tempat lahir",
-  "rawText": "Teks mentah KTP"
+  "tanggalLahir": "Tanggal lahir format YYYY-MM-DD",
+  "jenisKelamin": "LAKI-LAKI atau PEREMPUAN",
+  "statusPerkawinan": "Status perkawinan pada KTP (contoh: KAWIN, BELUM KAWIN, CERAI HIDUP, CERAI MATI)",
+  "alamat": "Alamat / nama jalan (tanpa RT/RW)",
+  "rt": "Nomor RT (contoh: 002)",
+  "rw": "Nomor RW (contoh: 005)",
+  "kelurahan": "Nama kelurahan / desa",
+  "kecamatan": "Nama kecamatan",
+  "kota": "Nama kota atau kabupaten (contoh: KOTA SURABAYA atau KABUPATEN MALANG)",
+  "provinsi": "Nama provinsi (contoh: JAWA TIMUR)",
+  "alamatLengkap": "Gabungan lengkap: {Alamat}, RT.{RT}/RW.{RW}, Kel. {Kelurahan}, Kec. {Kecamatan}, {Kota}",
+  "rawText": "Teks mentah lengkap KTP"
 }`;
     case "kk":
       return `Analisis gambar Kartu Keluarga ini dan ekstrak data terstruktur berikut dalam format JSON:
@@ -311,13 +322,25 @@ export const googleAiStudioAdapter: OcrAdapter = {
             passportParsed = parsePassport(fullText, parsedJson);
           }
 
+          // Jika KTP, gunakan parser KTP untuk auto-assembly alamatLengkap dan normalisasi
+          let ktpParsed: ReturnType<typeof parseKtp> | null = null;
+          if (jenis === "ktp") {
+            ktpParsed = parseKtp(fullText, parsedJson);
+          }
+
           const expectedFields = getFieldsForMode(jenis, mode);
           const fields = expectedFields.map((field) => {
             let value = "";
             if (passportParsed && field in passportParsed) {
               value = String((passportParsed as any)[field] || "").trim();
+            } else if (ktpParsed && field in ktpParsed) {
+              value = String((ktpParsed as any)[field] || "").trim();
             } else if (parsedJson && parsedJson[field]) {
               value = String(parsedJson[field]).trim();
+            }
+            if (!value && ktpParsed) {
+              if (field === "kota") value = ktpParsed.kotaKabupaten || ktpParsed.kota || "";
+              else if (field === "alamat") value = ktpParsed.alamatJalan || "";
             }
             if (!value) {
               value = extractField(fullText, field);

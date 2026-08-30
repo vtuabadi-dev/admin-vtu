@@ -10,6 +10,7 @@ import type { DokumenJenis } from "@/shared/types";
 import type { OcrProvider, OcrResult, ImageMetaCheck } from "./provider";
 import { getExpectedFields } from "./provider";
 import { parsePassport } from "./passport-parser";
+import { parseKtp } from "./ktp-parser";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
 const FIELD_PATTERNS: Record<string, RegExp[]> = {
@@ -163,6 +164,25 @@ export class GoogleAiStudioOcrProvider implements OcrProvider {
   "nik": "NIK 16 digit yang direkonstruksi dari 16 digit paling belakang MRZ line 2 disisipkan YY tahun kelahiran (contoh: 3573021208920002)",
   "rawText": "Teks mentah paspor termasuk persis 2 baris MRZ di bagian bawah"
 }`
+          : jenis === "ktp"
+          ? `Analisis gambar KTP (Kartu Tanda Penduduk) Indonesia ini dan ekstrak data terstruktur berikut dalam format JSON valid:
+{
+  "nik": "16 digit NIK (contoh: 3174051207800001)",
+  "namaLengkap": "Nama lengkap pada KTP",
+  "tempatLahir": "Tempat lahir",
+  "tanggalLahir": "Tanggal lahir format YYYY-MM-DD",
+  "jenisKelamin": "LAKI-LAKI atau PEREMPUAN",
+  "statusPerkawinan": "Status perkawinan pada KTP (contoh: KAWIN, BELUM KAWIN, CERAI HIDUP, CERAI MATI)",
+  "alamat": "Alamat / nama jalan (tanpa RT/RW)",
+  "rt": "Nomor RT (contoh: 002)",
+  "rw": "Nomor RW (contoh: 005)",
+  "kelurahan": "Nama kelurahan / desa",
+  "kecamatan": "Nama kecamatan",
+  "kota": "Nama kota atau kabupaten (contoh: KOTA SURABAYA atau KABUPATEN MALANG)",
+  "provinsi": "Nama provinsi (contoh: JAWA TIMUR)",
+  "alamatLengkap": "Gabungan lengkap: {Alamat}, RT.{RT}/RW.{RW}, Kel. {Kelurahan}, Kec. {Kecamatan}, {Kota}",
+  "rawText": "Teks mentah lengkap KTP"
+}`
           : `Analisis gambar dokumen ${jenis} ini dan ekstrak data terstruktur berikut dalam format JSON:
 {
   "namaLengkap": "Nama lengkap pemegang paspor / dokumen",
@@ -226,13 +246,24 @@ export class GoogleAiStudioOcrProvider implements OcrProvider {
           passportParsed = parsePassport(fullText, parsedJson);
         }
 
+        let ktpParsed: ReturnType<typeof parseKtp> | null = null;
+        if (jenis === "ktp") {
+          ktpParsed = parseKtp(fullText, parsedJson);
+        }
+
         const expectedFields = getExpectedFields(jenis);
         const fields = expectedFields.map((field) => {
           let value = "";
           if (passportParsed && field in passportParsed) {
             value = String((passportParsed as any)[field] || "").trim();
+          } else if (ktpParsed && field in ktpParsed) {
+            value = String((ktpParsed as any)[field] || "").trim();
           } else if (parsedJson && parsedJson[field]) {
             value = String(parsedJson[field]).trim();
+          }
+          if (!value && ktpParsed) {
+            if (field === "kota") value = ktpParsed.kotaKabupaten || ktpParsed.kota || "";
+            else if (field === "alamat") value = ktpParsed.alamatJalan || "";
           }
           if (!value) {
             value = extractField(fullText, field);
