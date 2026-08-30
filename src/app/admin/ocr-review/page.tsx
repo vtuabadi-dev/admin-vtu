@@ -260,8 +260,25 @@ export default function OcrReviewPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <p className="text-muted-foreground">Memuat data OCR...</p>
+      <div className="space-y-6 animate-in fade-in duration-200">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">OCR Review</h1>
+            <p className="text-sm text-muted-foreground mt-1">
+              Review hasil ekstraksi data dokumen
+            </p>
+          </div>
+          <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/40 px-3 py-1.5 rounded-lg border border-border/40">
+            <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
+            <span>Memuat data dokumen...</span>
+          </div>
+        </div>
+        <div className="flex h-64 items-center justify-center rounded-xl border border-border/40 bg-card/40 backdrop-blur-sm">
+          <div className="flex flex-col items-center gap-3 text-center">
+            <Loader2 className="h-8 w-8 animate-spin text-emerald-500" />
+            <p className="text-sm font-medium text-muted-foreground">Menyiapkan data review OCR...</p>
+          </div>
+        </div>
       </div>
     );
   }
