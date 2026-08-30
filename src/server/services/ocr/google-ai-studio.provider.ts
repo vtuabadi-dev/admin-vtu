@@ -65,12 +65,35 @@ export function extractField(text: string, field: string): string {
   return "";
 }
 
-function parseApiKeys(): string[] {
+async function getAllAvailableApiKeys(): Promise<string[]> {
   const keys: string[] = [];
 
-  const main = process.env.GEMINI_API_KEY || process.env.GOOGLE_VISION_API_KEY || "";
-  if (main) {
-    keys.push(...main.split(",").map((k) => k.trim()).filter(Boolean));
+  try {
+    const { loadProviders } = await import("./registry");
+    const { reactivateExpiredCooldowns, isInCooldown } = await import("./cooldown-manager");
+    const providers = await loadProviders();
+    await reactivateExpiredCooldowns(providers);
+
+    const active = providers.filter((p) => p.isActive && p.apiKey?.trim());
+    active.sort((a, b) => {
+      const inCoolA = isInCooldown(a) ? 1 : 0;
+      const inCoolB = isInCooldown(b) ? 1 : 0;
+      if (inCoolA !== inCoolB) return inCoolA - inCoolB;
+      const tA = a.cooldownUntil ? new Date(a.cooldownUntil).getTime() : 0;
+      const tB = b.cooldownUntil ? new Date(b.cooldownUntil).getTime() : 0;
+      return tA - tB;
+    });
+
+    for (const p of active) {
+      if (p.apiKey?.trim()) keys.push(p.apiKey.trim());
+    }
+  } catch (e) {
+    // Graceful fallback to env vars
+  }
+
+  const envMain = process.env.GEMINI_API_KEY || process.env.GOOGLE_VISION_API_KEY || "";
+  if (envMain) {
+    keys.push(...envMain.split(",").map((k) => k.trim()).filter(Boolean));
   }
 
   for (let i = 2; i <= 20; i++) {
@@ -78,16 +101,16 @@ function parseApiKeys(): string[] {
     if (extra?.trim()) keys.push(extra.trim());
   }
 
-  return keys;
-}
+  const uniqueKeys: string[] = [];
+  const seen = new Set<string>();
+  for (const k of keys) {
+    if (k && !seen.has(k)) {
+      seen.add(k);
+      uniqueKeys.push(k);
+    }
+  }
 
-let keyIndex = 0;
-
-function getNextApiKey(keys: string[]): string | null {
-  if (keys.length === 0) return null;
-  const key = keys[keyIndex % keys.length]!;
-  keyIndex++;
-  return key;
+  return uniqueKeys;
 }
 
 export class GoogleAiStudioOcrProvider implements OcrProvider {
@@ -102,20 +125,20 @@ export class GoogleAiStudioOcrProvider implements OcrProvider {
     jenis: DokumenJenis,
     retryCount = 0,
   ): Promise<OcrResult> {
-    const keys = parseApiKeys();
+    const start = Date.now();
+    const keys = await getAllAvailableApiKeys();
 
     if (keys.length === 0) {
       return {
         success: false,
         fields: [],
-        rawText: "GEMINI_API_KEY / Google AI Studio Key not set",
+        rawText: "GEMINI_API_KEY / GOOGLE_VISION_API_KEY tidak dikonfigurasi.",
         overallConfidence: 0,
-        processingTimeMs: 0,
+        processingTimeMs: Date.now() - start,
         retryCount,
       };
     }
 
-    const start = Date.now();
     const base64 = imageBuffer.toString("base64");
 
     let mimeType = "image/jpeg";
@@ -124,7 +147,7 @@ export class GoogleAiStudioOcrProvider implements OcrProvider {
 
     let lastError = "";
     for (let attempt = 0; attempt < keys.length; attempt++) {
-      const apiKey = getNextApiKey(keys)!;
+      const apiKey = keys[attempt]!;
 
       try {
         const promptText = jenis === "paspor"

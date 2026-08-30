@@ -182,6 +182,57 @@ Ekstrak seluruh data di atas dalam format JSON valid (tanpa markdown wrapper):
 
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
+async function getAllAvailableApiKeys(primaryKey?: string): Promise<string[]> {
+  const keys: string[] = [];
+  if (primaryKey?.trim()) {
+    keys.push(primaryKey.trim());
+  }
+
+  try {
+    const { loadProviders } = await import("../registry");
+    const { reactivateExpiredCooldowns, isInCooldown } = await import("../cooldown-manager");
+    const providers = await loadProviders();
+    await reactivateExpiredCooldowns(providers);
+
+    const active = providers.filter((p) => p.isActive && p.apiKey?.trim());
+    active.sort((a, b) => {
+      const inCoolA = isInCooldown(a) ? 1 : 0;
+      const inCoolB = isInCooldown(b) ? 1 : 0;
+      if (inCoolA !== inCoolB) return inCoolA - inCoolB;
+      const tA = a.cooldownUntil ? new Date(a.cooldownUntil).getTime() : 0;
+      const tB = b.cooldownUntil ? new Date(b.cooldownUntil).getTime() : 0;
+      return tA - tB;
+    });
+
+    for (const p of active) {
+      if (p.apiKey?.trim()) keys.push(p.apiKey.trim());
+    }
+  } catch (e) {
+    // Graceful fallback to env vars
+  }
+
+  const envMain = process.env.GEMINI_API_KEY || process.env.GOOGLE_VISION_API_KEY || "";
+  if (envMain) {
+    keys.push(...envMain.split(",").map((k) => k.trim()).filter(Boolean));
+  }
+
+  for (let i = 2; i <= 20; i++) {
+    const extra = process.env[`GEMINI_API_KEY_${i}`] || process.env[`GOOGLE_VISION_API_KEY_${i}`];
+    if (extra?.trim()) keys.push(extra.trim());
+  }
+
+  const uniqueKeys: string[] = [];
+  const seen = new Set<string>();
+  for (const k of keys) {
+    if (k && !seen.has(k)) {
+      seen.add(k);
+      uniqueKeys.push(k);
+    }
+  }
+
+  return uniqueKeys;
+}
+
 // ── Adapter Implementation ───────────────────────────────
 
 export const googleAiStudioAdapter: OcrAdapter = {
@@ -194,8 +245,11 @@ export const googleAiStudioAdapter: OcrAdapter = {
     retryCount = 0,
   ): Promise<OcrResult> {
     const start = Date.now();
-    const apiKey = config.apiKey;
-    const keySuffix = apiKey.slice(-6); // Last 6 chars for logging (safe)
+    const allKeys = await getAllAvailableApiKeys(config.apiKey);
+    if (allKeys.length === 0) {
+      throw { statusCode: 500, message: "Tidak ada Kunci API Google AI Studio yang tersedia." };
+    }
+
     const base64 = imageBuffer.toString("base64");
     const imgSizeKB = Math.round(imageBuffer.length / 1024);
 
@@ -207,89 +261,96 @@ export const googleAiStudioAdapter: OcrAdapter = {
     const mode = config.mode;
     const promptText = getPromptForMode(jenis, mode);
 
-    const genAI = new GoogleGenerativeAI(apiKey);
     let lastError: any = null;
 
-    for (const modelName of candidateModels) {
-      console.log(
-        `[AI Studio Adapter] ▶ CALL SDK | model=${modelName} | key=***${keySuffix} | jenis=${jenis}${mode ? ` | mode=${mode}` : ""} | imgSize=${imgSizeKB}KB | retry=#${retryCount}`
-      );
+    // Dual-tier Multi-Key API Router & Model Failover (Mirip OCR Flyer)
+    for (let keyIdx = 0; keyIdx < allKeys.length; keyIdx++) {
+      const apiKey = allKeys[keyIdx]!;
+      const keySuffix = apiKey.slice(-6);
+      const genAI = new GoogleGenerativeAI(apiKey);
 
-      try {
-        const model = genAI.getGenerativeModel({
-          model: modelName,
-          generationConfig: {
-            responseMimeType: "application/json",
-          },
-        });
-
-        const result = await model.generateContent([
-          promptText,
-          {
-            inlineData: {
-              data: base64,
-              mimeType,
-            },
-          },
-        ]);
-
-        const fullText = result.response.text() || "";
-        const cleanText = fullText.replace(/```json/gi, "").replace(/```/g, "").trim();
-
-        let parsedJson: Record<string, any> | null = null;
-        try {
-          parsedJson = JSON.parse(cleanText);
-        } catch {
-          const jsonMatch = cleanText.match(/\{[\s\S]*\}/);
-          if (jsonMatch) {
-            try { parsedJson = JSON.parse(jsonMatch[0]); } catch {}
-          }
-        }
-
-        // Jika paspor, gunakan parser paspor untuk normalisasi tanggal, MRZ, dan resolusi alias key
-        let passportParsed: ReturnType<typeof parsePassport> | null = null;
-        if (jenis === "paspor" || mode?.startsWith("paspor")) {
-          passportParsed = parsePassport(fullText, parsedJson);
-        }
-
-        const expectedFields = getFieldsForMode(jenis, mode);
-        const fields = expectedFields.map((field) => {
-          let value = "";
-          if (passportParsed && field in passportParsed) {
-            value = String((passportParsed as any)[field] || "").trim();
-          } else if (parsedJson && parsedJson[field]) {
-            value = String(parsedJson[field]).trim();
-          }
-          if (!value) {
-            value = extractField(fullText, field);
-          }
-          return { field, value, confidence: value ? 0.95 : 0 };
-        });
-
+      for (const modelName of candidateModels) {
         console.log(
-          `[AI Studio Adapter] ✅ SUCCESS SDK | model=${modelName} | key=***${keySuffix} | totalMs=${Date.now() - start}ms`
+          `[AI Studio Adapter] ▶ CALL SDK | key[${keyIdx + 1}/${allKeys.length}]=***${keySuffix} | model=${modelName} | jenis=${jenis}${mode ? ` | mode=${mode}` : ""} | imgSize=${imgSizeKB}KB | retry=#${retryCount}`
         );
 
-        return {
-          success: true,
-          fields,
-          rawText: fullText,
-          overallConfidence: 0.95,
-          processingTimeMs: Date.now() - start,
-          retryCount,
-        };
-      } catch (err: any) {
-        lastError = err;
-        const msg = err?.message || String(err);
-        const isQuota = msg.includes("429") || msg.includes("quota") || msg.includes("ResourceExhausted");
-        console.warn(`[AI Studio Adapter] ⚠️ Model ${modelName} error: ${msg.slice(0, 150)}`);
-        if (isQuota) {
-          break; // Quota habis pada key ini, break ke gateway key rotation
+        try {
+          const model = genAI.getGenerativeModel({
+            model: modelName,
+            generationConfig: {
+              responseMimeType: "application/json",
+            },
+          });
+
+          const result = await model.generateContent([
+            promptText,
+            {
+              inlineData: {
+                data: base64,
+                mimeType,
+              },
+            },
+          ]);
+
+          const fullText = result.response.text() || "";
+          const cleanText = fullText.replace(/```json/gi, "").replace(/```/g, "").trim();
+
+          let parsedJson: Record<string, any> | null = null;
+          try {
+            parsedJson = JSON.parse(cleanText);
+          } catch {
+            const jsonMatch = cleanText.match(/\{[\s\S]*\}/);
+            if (jsonMatch) {
+              try { parsedJson = JSON.parse(jsonMatch[0]); } catch {}
+            }
+          }
+
+          // Jika paspor, gunakan parser paspor untuk normalisasi tanggal, MRZ, dan resolusi alias key
+          let passportParsed: ReturnType<typeof parsePassport> | null = null;
+          if (jenis === "paspor" || mode?.startsWith("paspor")) {
+            passportParsed = parsePassport(fullText, parsedJson);
+          }
+
+          const expectedFields = getFieldsForMode(jenis, mode);
+          const fields = expectedFields.map((field) => {
+            let value = "";
+            if (passportParsed && field in passportParsed) {
+              value = String((passportParsed as any)[field] || "").trim();
+            } else if (parsedJson && parsedJson[field]) {
+              value = String(parsedJson[field]).trim();
+            }
+            if (!value) {
+              value = extractField(fullText, field);
+            }
+            return { field, value, confidence: value ? 0.95 : 0 };
+          });
+
+          console.log(
+            `[AI Studio Adapter] ✅ SUCCESS SDK | key=***${keySuffix} | model=${modelName} | totalMs=${Date.now() - start}ms`
+          );
+
+          return {
+            success: true,
+            fields,
+            rawText: fullText,
+            overallConfidence: 0.95,
+            processingTimeMs: Date.now() - start,
+            retryCount,
+          };
+        } catch (err: any) {
+          lastError = err;
+          const msg = err?.message || String(err);
+          const isQuota = msg.includes("429") || msg.includes("quota") || msg.includes("ResourceExhausted");
+          console.warn(`[AI Studio Adapter] ⚠️ Key ***${keySuffix} | Model ${modelName} error: ${msg.slice(0, 150)}`);
+          if (isQuota) {
+            // Quota habis pada key ini, langsung rotasi ke API key berikutnya!
+            break;
+          }
         }
       }
     }
 
-    const errMsg = lastError?.message || "Semua model Gemini gagal merespons";
+    const errMsg = lastError?.message || "Semua Kunci API dan model Gemini gagal merespons";
     const statusCode = lastError?.status || (errMsg.includes("429") ? 429 : 500);
     throw { statusCode, message: errMsg };
   },
