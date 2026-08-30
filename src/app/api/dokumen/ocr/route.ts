@@ -41,7 +41,11 @@ export async function POST(request: NextRequest) {
     const ocrResult = await processDocument(buffer, jenis, 0, mode, forceFresh);
 
     if (!ocrResult.success) {
-      return NextResponse.json({ success: false, message: "OCR processing failed", details: ocrResult.rawText }, { status: 500 });
+      return NextResponse.json({
+        success: false,
+        message: ocrResult.rawText || "OCR processing failed",
+        details: ocrResult.rawText,
+      }, { status: 500 });
     }
 
     // Convert OCR result to OcrData format

@@ -199,42 +199,54 @@ export const googleAiStudioAdapter: OcrAdapter = {
     if (imageBuffer[0] === 0x89 && imageBuffer[1] === 0x50) mimeType = "image/png";
     else if (imageBuffer[0] === 0x52 && imageBuffer[1] === 0x49) mimeType = "image/webp";
 
-    // ── Single model call — quota is per-KEY, not per-model ──
-    // Trying multiple models with the same key wastes quota!
-    const modelName = "gemini-2.5-flash";
-
+    // ── Model Selection (try gemini-2.0-flash, fallback to gemini-1.5-flash) ──
+    const candidateModels = ["gemini-2.0-flash", "gemini-1.5-flash"];
     const mode = config.mode;
-    console.log(
-      `[AI Studio Adapter] ▶ CALL API | model=${modelName} | key=***${keySuffix} | jenis=${jenis}${mode ? ` | mode=${mode}` : ""} | imgSize=${imgSizeKB}KB | retry=#${retryCount}`
-    );
-
     const promptText = getPromptForMode(jenis, mode);
 
-    try {
-      const fetchStart = Date.now();
-      const geminiRes = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            contents: [{
-              parts: [
-                { text: promptText },
-                { inline_data: { mime_type: mimeType, data: base64 } }
-              ]
-            }]
-          }),
-          signal: AbortSignal.timeout(config.timeout ?? 30000),
-        }
-      );
-      const fetchMs = Date.now() - fetchStart;
+    let lastError: { statusCode?: number; message: string } | null = null;
 
+    for (const modelName of candidateModels) {
       console.log(
-        `[AI Studio Adapter] ◀ RESPONSE | model=${modelName} | key=***${keySuffix} | HTTP ${geminiRes.status} | ${fetchMs}ms`
+        `[AI Studio Adapter] ▶ CALL API | model=${modelName} | key=***${keySuffix} | jenis=${jenis}${mode ? ` | mode=${mode}` : ""} | imgSize=${imgSizeKB}KB | retry=#${retryCount}`
       );
 
-      if (geminiRes.ok) {
+      try {
+        const fetchStart = Date.now();
+        const geminiRes = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              contents: [{
+                parts: [
+                  { text: promptText },
+                  { inline_data: { mime_type: mimeType, data: base64 } }
+                ]
+              }]
+            }),
+            signal: AbortSignal.timeout(config.timeout ?? 30000),
+          }
+        );
+        const fetchMs = Date.now() - fetchStart;
+
+        console.log(
+          `[AI Studio Adapter] ◀ RESPONSE | model=${modelName} | key=***${keySuffix} | HTTP ${geminiRes.status} | ${fetchMs}ms`
+        );
+
+        if (!geminiRes.ok) {
+          const errBody = await geminiRes.text().catch(() => "");
+          const errMsg = `Model ${modelName} HTTP ${geminiRes.status}: ${errBody.slice(0, 200)}`;
+          console.warn(`[AI Studio Adapter] ⚠️ ${errMsg}`);
+          lastError = { statusCode: geminiRes.status, message: errMsg };
+          // If rate limit 429 or quota, don't waste time with other models on same key
+          if (geminiRes.status === 429) {
+            break;
+          }
+          continue;
+        }
+
         const gData = await geminiRes.json();
         const fullText = gData?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
         const textLen = fullText.length;
@@ -271,7 +283,7 @@ export const googleAiStudioAdapter: OcrAdapter = {
         });
 
         console.log(
-          `[AI Studio Adapter] ✅ SUCCESS | key=***${keySuffix} | textLength=${textLen} chars | totalMs=${Date.now() - start}ms`
+          `[AI Studio Adapter] ✅ SUCCESS | model=${modelName} | key=***${keySuffix} | textLength=${textLen} chars | totalMs=${Date.now() - start}ms`
         );
 
         return {
@@ -282,32 +294,18 @@ export const googleAiStudioAdapter: OcrAdapter = {
           processingTimeMs: Date.now() - start,
           retryCount,
         };
+      } catch (err: any) {
+        const msg = err?.message || String(err);
+        const isTimeout = msg.includes("timeout") || msg.includes("abort");
+        console.error(
+          `[AI Studio Adapter] ❌ ${isTimeout ? "TIMEOUT" : "NETWORK ERROR"} | model=${modelName} | key=***${keySuffix} | ${msg.slice(0, 150)}`
+        );
+        lastError = { statusCode: undefined, message: msg };
       }
-
-      // NOT ok — capture real status code
-      const errBody = await geminiRes.text().catch(() => "");
-      const errMsg = `Model ${modelName} HTTP ${geminiRes.status}: ${errBody.slice(0, 300)}`;
-
-      console.error(
-        `[AI Studio Adapter] ❌ FAIL | key=***${keySuffix} | HTTP ${geminiRes.status} | ${errMsg.slice(0, 150)}`
-      );
-
-      // Throw with REAL status code — let gateway handle retry with different KEY
-      throw { statusCode: geminiRes.status, message: errMsg };
-
-    } catch (err: any) {
-      // If it already has statusCode, re-throw as-is
-      if (err?.statusCode) {
-        throw err;
-      }
-      // Network/timeout error
-      const msg = err?.message || String(err);
-      const isTimeout = msg.includes("timeout") || msg.includes("abort");
-      console.error(
-        `[AI Studio Adapter] ❌ ${isTimeout ? "TIMEOUT" : "NETWORK ERROR"} | key=***${keySuffix} | ${msg.slice(0, 150)}`
-      );
-      throw { statusCode: undefined, message: msg };
     }
+
+    // If all models failed, throw lastError to trigger rotation/retry in gateway
+    throw lastError || { statusCode: undefined, message: "All candidate Gemini models failed" };
   },
 
   validateImage(buffer: Buffer): ImageMetaCheck {
