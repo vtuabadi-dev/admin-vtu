@@ -10,7 +10,6 @@ import type { DokumenJenis } from "@/shared/types";
 import type { OcrProvider, OcrResult, ImageMetaCheck } from "./provider";
 import { getExpectedFields } from "./provider";
 import { parsePassport } from "./passport-parser";
-import { GoogleGenerativeAI } from "@google/generative-ai";
 
 const FIELD_PATTERNS: Record<string, RegExp[]> = {
   namaLengkap: [

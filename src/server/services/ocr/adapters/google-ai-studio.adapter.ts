@@ -11,7 +11,6 @@ import type { OcrAdapter, OcrAdapterConfig } from "./adapter.interface";
 import type { OcrResult, ImageMetaCheck } from "../provider";
 import { getExpectedFields } from "../provider";
 import { parsePassport } from "../passport-parser";
-import { GoogleGenerativeAI } from "@google/generative-ai";
 
 // ── Field Extraction Patterns ────────────────────────────
 
@@ -223,7 +222,6 @@ export const googleAiStudioAdapter: OcrAdapter = {
       );
 
       try {
-        const fetchStart = Date.now();
         const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
         const res = await fetch(url, {
           method: "POST",
@@ -232,7 +230,6 @@ export const googleAiStudioAdapter: OcrAdapter = {
           signal: AbortSignal.timeout(config.timeout ?? 30000),
         });
 
-        const fetchMs = Date.now() - fetchStart;
         const resJson = await res.json().catch(() => null);
 
         if (resJson?.candidates?.[0]?.content?.parts?.[0]?.text) {
