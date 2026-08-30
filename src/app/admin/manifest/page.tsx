@@ -132,6 +132,22 @@ function getPasporDetails(j: any) {
   return { noPaspor, tglDikeluarkan, tglHabis, kotaPaspor };
 }
 
+function getNikDetails(j: any): string {
+  if (j.nik && j.nik !== "-") return j.nik;
+  if (j.dokumen && Array.isArray(j.dokumen)) {
+    const pasporDoc = j.dokumen.find((d: any) => d.jenis === "paspor");
+    if (pasporDoc?.manualData?.nik) return pasporDoc.manualData.nik;
+    if (pasporDoc?.ocrData?.nik) return pasporDoc.ocrData.nik;
+    const ktpDoc = j.dokumen.find((d: any) => d.jenis === "ktp");
+    if (ktpDoc?.manualData?.nik) return ktpDoc.manualData.nik;
+    if (ktpDoc?.ocrData?.nik) return ktpDoc.ocrData.nik;
+    const kkDoc = j.dokumen.find((d: any) => d.jenis === "kk");
+    if (kkDoc?.manualData?.nik) return kkDoc.manualData.nik;
+    if (kkDoc?.ocrData?.nik) return kkDoc.ocrData.nik;
+  }
+  return "-";
+}
+
 function calculateAge(birthDateInput?: string | Date): string {
   if (!birthDateInput) return "-";
   const birthDate = new Date(birthDateInput);
@@ -1104,14 +1120,11 @@ function ManifestPageContent() {
                         <th className="px-3 py-3 font-extrabold uppercase tracking-wider text-[10px] text-stone-800 dark:text-stone-100 border-r border-stone-300/80 dark:border-stone-700/80 min-w-[100px] shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
                           ID REGISTER
                         </th>
-                        <th className="px-3 py-3 font-extrabold uppercase tracking-wider text-[10px] text-stone-800 dark:text-stone-100 border-r border-stone-300/80 dark:border-stone-700/80 min-w-[130px] shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
-                          NO ID (*)
-                        </th>
-                        <th className="px-3 py-3 font-extrabold uppercase tracking-wider text-[10px] text-stone-800 dark:text-stone-100 border-r border-stone-300/80 dark:border-stone-700/80 w-24 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
-                          JENIS IDENTITAS (*)
-                        </th>
                         <th className="px-3 py-3 font-extrabold uppercase tracking-wider text-[10px] text-stone-800 dark:text-stone-100 border-r border-stone-300/80 dark:border-stone-700/80 min-w-[170px] shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
                           NAMA
+                        </th>
+                        <th className="px-3 py-3 font-extrabold uppercase tracking-wider text-[10px] text-stone-800 dark:text-stone-100 border-r border-stone-300/80 dark:border-stone-700/80 min-w-[140px] shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
+                          NIK
                         </th>
                         <th className="px-3 py-3 font-extrabold uppercase tracking-wider text-[10px] text-stone-800 dark:text-stone-100 border-r border-stone-300/80 dark:border-stone-700/80 min-w-[130px] shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
                           NO PASPOR
@@ -1172,7 +1185,7 @@ function ManifestPageContent() {
                     <tbody className="bg-white dark:bg-stone-900">
                       {filteredActiveJamaah.length === 0 ? (
                         <tr>
-                          <td colSpan={isSelectMode ? 24 : 23} className="px-4 py-12 text-center text-stone-500">
+                          <td colSpan={isSelectMode ? 23 : 22} className="px-4 py-12 text-center text-stone-500">
                             <div className="space-y-3">
                               <p>Belum ada data jamaah terdaftar pada paket ini.</p>
                               <Button
@@ -1206,14 +1219,10 @@ function ManifestPageContent() {
                               : "border-b border-stone-200/60 dark:border-stone-800/60";
                             const cellBorder = `border-r border-stone-200/50 dark:border-stone-800/50 ${rowBorderClass}`;
 
-                            // Single Source of Truth Name & Paspor Resolution
+                            // Single Source of Truth Name, Paspor & NIK Resolution
                             const namaSot = getSingleSourceOfTruthName(j);
                             const pasporInfo = getPasporDetails(j);
-
-                            // Flexible ID Resolution
-                            const hasPaspor = Boolean(pasporInfo.noPaspor && pasporInfo.noPaspor !== "-");
-                            const noId = hasPaspor ? pasporInfo.noPaspor : j.nik || "-";
-                            const jenisIdentitas = hasPaspor ? "PASPOR" : j.nik ? "KTP" : "-";
+                            const nikVal = getNikDetails(j);
 
                             // ID Register Format
                             const baseCode = group.groupObj?.kodeRegistrasi || j.registrationId || j.groupId || "2980";
@@ -1264,32 +1273,23 @@ function ManifestPageContent() {
                                   {idRegister}
                                 </td>
 
-                                {/* NO ID */}
-                                <td className={`px-3 py-2.5 font-mono text-stone-700 dark:text-stone-300 ${cellBorder}`}>
-                                  {noId}
-                                </td>
-
-                                {/* JENIS IDENTITAS */}
-                                <td className={`px-3 py-2.5 ${cellBorder}`}>
-                                  <span
-                                    className={`inline-block px-2 py-0.5 text-[10px] font-bold rounded ${
-                                      jenisIdentitas === "PASPOR"
-                                        ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
-                                        : "bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-300"
-                                    }`}
-                                  >
-                                    {jenisIdentitas}
-                                  </span>
-                                </td>
-
                                 {/* NAMA */}
                                 <td className={`px-3 py-2.5 font-bold text-stone-900 dark:text-white ${cellBorder}`}>
                                   {namaSot}
                                 </td>
 
+                                {/* NIK */}
+                                <td className={`px-3 py-2.5 font-mono text-stone-800 dark:text-stone-200 ${cellBorder}`}>
+                                  {nikVal && nikVal !== "-" ? (
+                                    <span className="font-semibold">{nikVal}</span>
+                                  ) : (
+                                    <span className="text-stone-400 dark:text-stone-600">-</span>
+                                  )}
+                                </td>
+
                                 {/* NO PASPOR */}
                                 <td className={`px-3 py-2.5 font-mono font-semibold text-stone-800 dark:text-stone-200 ${cellBorder}`}>
-                                  {pasporInfo.noPaspor}
+                                  {pasporInfo.noPaspor && pasporInfo.noPaspor !== "-" ? pasporInfo.noPaspor : "-"}
                                 </td>
 
                                 {/* TGL DIKELUARKAN */}
