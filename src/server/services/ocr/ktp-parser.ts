@@ -331,12 +331,12 @@ export function parseKtp(ocrText: string, parsedJson?: any): KtpData {
   }
 
   // --- 4. Kelurahan ---
-  const kelurahan = upperWords(
+  let kelurahan = upperWords(
     extractLine(ocrText, "Kel\\s*/\\s*Desa", "Kel/Desa", "Kelurahan", "Kel"),
   );
 
   // --- 5. Kecamatan ---
-  const kecamatan = upperWords(
+  let kecamatan = upperWords(
     extractLine(ocrText, "Kecamatan", "Kec"),
   );
 
