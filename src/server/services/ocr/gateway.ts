@@ -59,12 +59,23 @@ export async function process(
       if ((jenis === "paspor" || mode?.startsWith("paspor")) && cached.rawText) {
         const { parsePassport } = await import("./passport-parser");
         const parsed = parsePassport(cached.rawText);
-        const hasMissingFields = !cached.fields.some((f) => f.field === "tempatTerbitPaspor" && f.value) ||
+        const hasMissingFields = !cached.fields.some((f) => f.field === "nik" && f.value) ||
+                                 !cached.fields.some((f) => f.field === "tempatTerbitPaspor" && f.value) ||
                                  !cached.fields.some((f) => f.field === "tanggalKadaluarsa" && f.value) ||
-                                 !cached.fields.some((f) => f.field === "tanggalTerbitPaspor" && f.value);
+                                 !cached.fields.some((f) => f.field === "tempatLahir" && f.value) ||
+                                 !cached.fields.some((f) => f.field === "tanggalLahir" && f.value);
 
-        if (hasMissingFields && (parsed.tempatTerbitPaspor || parsed.tanggalKadaluarsa || parsed.tanggalTerbitPaspor)) {
-          const expectedFields = ["namaLengkap", "nomorPaspor", "tempatTerbitPaspor", "tanggalTerbitPaspor", "tanggalKadaluarsa"];
+        if (hasMissingFields) {
+          const expectedFields = [
+            "namaLengkap",
+            "nomorPaspor",
+            "tempatTerbitPaspor",
+            "tanggalTerbitPaspor",
+            "tanggalKadaluarsa",
+            "tempatLahir",
+            "tanggalLahir",
+            "nik",
+          ];
           cached.fields = expectedFields.map((field) => {
             const val = (parsed as any)[field] || cached.fields.find((f) => f.field === field)?.value || "";
             return { field, value: val, confidence: val ? 0.95 : 0 };

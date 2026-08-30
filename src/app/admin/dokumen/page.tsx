@@ -549,8 +549,18 @@ export default function DokumenPage() {
         const initialOcr: Record<string, any> = {};
         const savedStatus: Record<string, boolean> = {};
         docs.forEach((d: any) => {
-          if (d.manualData || d.ocrData) {
-            initialOcr[d.jenis] = d.manualData || d.ocrData;
+          let data = d.manualData || d.ocrData;
+          if (data) {
+            if (d.jenis === "paspor" && !data.nik && member.nik) {
+              data = { ...data, nik: member.nik };
+            }
+            if (d.jenis === "paspor" && !data.tempatLahir && member.tempatLahir) {
+              data = { ...data, tempatLahir: member.tempatLahir };
+            }
+            if (d.jenis === "paspor" && !data.tanggalLahir && member.tanggalLahir) {
+              data = { ...data, tanggalLahir: member.tanggalLahir };
+            }
+            initialOcr[d.jenis] = data;
           }
           if (d.manualData || d.dataStatus === "valid" || d.status === "verified") {
             savedStatus[d.jenis] = true;
