@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/shared/lib/utils";
 import { Button } from "@/shared/components/ui/Button";
+import { extractFilesFromEvent } from "@/shared/lib/file-drop-utils";
 import type { UploadResult } from "@/shared/types";
 
 // ─── Types ───────────────────────────────────────────────────────────
@@ -171,7 +172,7 @@ export default function DocumentUpload({
     [validateFile, previewUrl]
   );
 
-  // ── Drag handlers ──
+  // ── Drag & Drop handlers with Universal WhatsApp & File Support ──
 
   const handleDragEnter = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -192,14 +193,27 @@ export default function DocumentUpload({
   }, []);
 
   const handleDrop = useCallback(
-    (e: React.DragEvent) => {
+    async (e: React.DragEvent) => {
       e.preventDefault();
       e.stopPropagation();
-      const file = e.dataTransfer.files?.[0];
+      const files = await extractFilesFromEvent(e);
+      const file = files[0];
       if (file) {
         handleFileSelect(file);
       } else {
         setState("idle");
+      }
+    },
+    [handleFileSelect]
+  );
+
+  const handlePaste = useCallback(
+    async (e: React.ClipboardEvent) => {
+      const files = await extractFilesFromEvent(e);
+      const file = files[0];
+      if (file) {
+        e.preventDefault();
+        handleFileSelect(file);
       }
     },
     [handleFileSelect]
@@ -253,11 +267,11 @@ export default function DocumentUpload({
             <UploadCloud className="h-8 w-8 text-muted-foreground" />
             <p className="text-sm text-muted-foreground">
               {existingFile
-                ? "Klik untuk mengganti file"
-                : "Seret file ke sini atau klik untuk upload"}
+                ? "Klik / drag file untuk mengganti"
+                : "Seret file ke sini, klik, atau paste (Ctrl+V)"}
             </p>
             <p className="text-xs text-muted-foreground/70">
-              {label} &mdash; {acceptedFormats.join(", ").toUpperCase()} (maks. {maxSizeMB}MB)
+              Mendukung file dari komputer atau seret dari WhatsApp &mdash; {acceptedFormats.join(", ").toUpperCase()} (maks. {maxSizeMB}MB)
             </p>
             {existingFile && (
               <div className="mt-2 flex items-center gap-2 rounded-md border bg-muted/50 px-3 py-1.5">
@@ -272,10 +286,13 @@ export default function DocumentUpload({
 
       case "dragging":
         return (
-          <div className="flex flex-col items-center gap-2">
-            <UploadCloud className="h-8 w-8 text-primary/60" />
-            <p className="text-sm font-medium text-primary">
-              Lepaskan file di sini
+          <div className="flex flex-col items-center gap-2 animate-pulse">
+            <UploadCloud className="h-8 w-8 text-primary" />
+            <p className="text-sm font-semibold text-primary">
+              Lepaskan file foto/dokumen di sini
+            </p>
+            <p className="text-xs text-primary/70">
+              File langsung diproses & siap diekstrak
             </p>
           </div>
         );
@@ -419,6 +436,8 @@ export default function DocumentUpload({
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
+        onPaste={handlePaste}
+        tabIndex={0}
         onClick={state === "idle" || state === "error" ? handleDropZoneClick : undefined}
       >
         {renderDropZoneContent()}

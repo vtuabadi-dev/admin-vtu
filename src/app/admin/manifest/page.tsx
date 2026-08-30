@@ -27,9 +27,10 @@ import { Select } from "@/shared/components/ui/Select";
 import { StatusBadge } from "@/shared/components/ui/Badge";
 import { Modal } from "@/shared/components/ui/Modal";
 import { ErrorState } from "@/shared/components/ui/ErrorState";
-import { formatDateShort, formatDate } from "@/shared/lib/utils";
+import { formatDateShort, formatDate, cn } from "@/shared/lib/utils";
 import type { Manifest, Keberangkatan, Jamaah, RegistrationGroup } from "@/shared/types";
 import { useOperationalStore } from "@/stores/operational-store";
+import { extractFilesFromEvent } from "@/shared/lib/file-drop-utils";
 
 // ── Helper Utilities ─────────────────────────────────────────
 
@@ -331,6 +332,7 @@ function ManifestPageContent() {
   const [excelPreviewRows, setExcelPreviewRows] = useState<any[]>([]);
   const [parsingExcel, setParsingExcel] = useState(false);
   const [submittingImport, setSubmittingImport] = useState(false);
+  const [excelDragging, setExcelDragging] = useState(false);
 
   // Actions Modal State
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
@@ -1841,7 +1843,34 @@ function ManifestPageContent() {
           </div>
 
           {/* Upload Area */}
-          <div className="border-2 border-dashed border-stone-300 dark:border-stone-700 rounded-xl p-6 text-center bg-stone-50/50 dark:bg-stone-900/50 hover:bg-stone-100/50 transition-colors">
+          <div
+            onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); setExcelDragging(true); }}
+            onDragEnter={(e) => { e.preventDefault(); e.stopPropagation(); setExcelDragging(true); }}
+            onDragLeave={(e) => { e.preventDefault(); e.stopPropagation(); setExcelDragging(false); }}
+            onDrop={async (e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setExcelDragging(false);
+              const files = await extractFilesFromEvent(e);
+              const file = files[0];
+              if (file) handleExcelFileChange(file);
+            }}
+            onPaste={async (e) => {
+              const files = await extractFilesFromEvent(e);
+              const file = files[0];
+              if (file) {
+                e.preventDefault();
+                handleExcelFileChange(file);
+              }
+            }}
+            tabIndex={0}
+            className={cn(
+              "border-2 border-dashed rounded-xl p-6 text-center transition-all cursor-pointer",
+              excelDragging
+                ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-950/40 ring-2 ring-emerald-500/40 scale-[1.01]"
+                : "border-stone-300 dark:border-stone-700 bg-stone-50/50 dark:bg-stone-900/50 hover:bg-stone-100/50"
+            )}
+          >
             <input
               type="file"
               accept=".xlsx, .xls, .csv"
@@ -1858,10 +1887,10 @@ function ManifestPageContent() {
               </div>
               <div>
                 <p className="text-sm font-bold text-stone-800 dark:text-stone-200">
-                  {excelFile ? excelFile.name : "Klik atau seret file Excel ke sini"}
+                  {excelFile ? excelFile.name : "Klik, seret (drag & drop), atau paste file Excel di sini"}
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  Format didukung: .XLSX, .XLS, .CSV
+                  Mendukung file dari Komputer atau seret dari WhatsApp (.XLSX, .XLS, .CSV)
                 </p>
               </div>
             </label>

@@ -19,6 +19,7 @@ import {
   Edit3,
   Loader2,
   Sparkles,
+  UploadCloud,
 } from "lucide-react";
 import { Card, CardContent } from "@/shared/components/ui/Card";
 import { StatusBadge, Badge } from "@/shared/components/ui/Badge";
@@ -39,6 +40,7 @@ import {
 } from "@/shared/lib/document-utils";
 import type { DokumenItem, DokumenJenis, Keberangkatan } from "@/shared/types";
 import { formatDate, formatDateShort, cn } from "@/shared/lib/utils";
+import { extractFilesFromEvent } from "@/shared/lib/file-drop-utils";
 
 // ============================================================
 // CONSTANTS
@@ -221,6 +223,7 @@ export default function DokumenPage() {
   const [activeDocType, setActiveDocType] = useState<DokumenJenis>("paspor");
   const [savedOcrDocs, setSavedOcrDocs] = useState<Record<string, boolean>>({});
   const [editingOcrDocs, setEditingOcrDocs] = useState<Record<string, boolean>>({});
+  const [dragOverDocType, setDragOverDocType] = useState<string | null>(null);
 
   // --- Passport Endorsement State ---
   const [pasporHasEndorsement, setPasporHasEndorsement] = useState<boolean | null>(null);
@@ -895,9 +898,8 @@ export default function DokumenPage() {
    * File diupload menggunakan endpoint yang sama, kemudian OCR dijalankan
    * dengan mode paspor_endorsement_nama untuk mengambil hanya namaLengkap.
    */
-  async function handleEndorsementFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file || !selectedJamaah) return;
+  async function uploadEndorsementFile(file: File) {
+    if (!selectedJamaah) return;
 
     const previewUrl = URL.createObjectURL(file);
     setEndorsementPreview(previewUrl);
@@ -907,9 +909,6 @@ export default function DokumenPage() {
       const formData = new FormData();
       formData.append("file", file);
       formData.append("jamaahId", selectedJamaah.id);
-      // Upload sebagai jenis paspor juga (hanya 1 dokumen paspor per jamaah)
-      // Namun di sini kita gunakan API terpisah dengan suffix _endorsement jika perlu
-      // Untuk sederhananya, upload dengan jenis paspor (file yang sudah upload tidak di-overwrite karena endpoint check)
       formData.append("jenisDokumen", "paspor");
 
       const res = await fetch("/api/dokumen/upload", {
@@ -937,6 +936,65 @@ export default function DokumenPage() {
       setUploadingEndorsement(false);
     }
   }
+
+  async function handleEndorsementFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    await uploadEndorsementFile(file);
+  }
+
+  /**
+   * Universal Drop Handler for single document cards and preview container.
+   * Supports files from File Explorer, WhatsApp Web/Desktop drag, and web tabs.
+   */
+  async function handleDropOnDoc(e: React.DragEvent, jenis: string, isEndorsement: boolean = false) {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragOverDocType(null);
+
+    const files = await extractFilesFromEvent(e);
+    const file = files[0];
+    if (!file) return;
+
+    setActiveDocType(jenis as DokumenJenis);
+
+    if (isEndorsement) {
+      setPasporPageTab("hal2");
+      await uploadEndorsementFile(file);
+    } else {
+      const previewUrl = URL.createObjectURL(file);
+      setUploadPreviews((prev) => ({ ...prev, [jenis]: previewUrl }));
+      await uploadFile(file, jenis);
+    }
+  }
+
+  // Universal clipboard paste (Ctrl+V) listener (e.g. from WhatsApp or Screenshot)
+  useEffect(() => {
+    if (!selectedJamaah) return;
+
+    const handlePaste = async (e: ClipboardEvent) => {
+      const activeEl = document.activeElement;
+      if (activeEl && (activeEl.tagName === "INPUT" || activeEl.tagName === "TEXTAREA")) {
+        return;
+      }
+
+      const files = await extractFilesFromEvent(e);
+      const file = files[0];
+      if (file && activeDocType) {
+        e.preventDefault();
+        if (activeDocType === "paspor" && pasporHasEndorsement === true && pasporPageTab === "hal2") {
+          await uploadEndorsementFile(file);
+        } else {
+          const previewUrl = URL.createObjectURL(file);
+          setUploadPreviews((prev) => ({ ...prev, [activeDocType]: previewUrl }));
+          await uploadFile(file, activeDocType);
+        }
+      }
+    };
+
+    window.addEventListener("paste", handlePaste);
+    return () => window.removeEventListener("paste", handlePaste);
+  }, [selectedJamaah, activeDocType, pasporHasEndorsement, pasporPageTab]);
 
   /**
    * OCR khusus halaman endorsement nama (halaman 2).
@@ -1651,27 +1709,53 @@ export default function DokumenPage() {
                       <div className="flex items-center justify-between px-1">
                         <h4 className="text-xs font-bold uppercase tracking-wider text-stone-600 dark:text-stone-400">
                           Daftar Dokumen ({ALL_DOC_JENIS.length})
-                        </h4>
+</h4>
                         <span className="text-[11px] text-muted-foreground">Klik 👁️ / baris</span>
                       </div>
 
                       {ALL_DOC_JENIS.map((jenis) => {
-                        const existingDoc = uploadDocuments.find((d) => d.jenis === jenis);
-                        const isUploaded = !!existingDoc?.fileUrl;
+                        const isUploaded = uploadDocuments.some((d) => d.jenis === jenis) || uploadPreviews[jenis];
                         const isSelected = activeDocType === jenis;
                         const isSaved = savedOcrDocs[jenis];
+                        const isDraggingOverThis = dragOverDocType === jenis;
 
                         return (
                           <div
                             key={jenis}
                             onClick={() => setActiveDocType(jenis)}
+                            onDragOver={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setDragOverDocType(jenis);
+                            }}
+                            onDragEnter={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setDragOverDocType(jenis);
+                            }}
+                            onDragLeave={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setDragOverDocType((prev) => (prev === jenis ? null : prev));
+                            }}
+                            onDrop={(e) => handleDropOnDoc(e, jenis)}
                             className={cn(
-                              "p-2.5 rounded-xl border transition-all cursor-pointer space-y-2",
-                              isSelected
+                              "p-2.5 rounded-xl border transition-all cursor-pointer space-y-2 relative overflow-hidden",
+                              isDraggingOverThis
+                                ? "border-primary ring-2 ring-primary/60 bg-primary/10 scale-[1.01]"
+                                : isSelected
                                 ? "border-primary bg-primary/5 shadow-sm ring-1 ring-primary"
                                 : "border-stone-200 dark:border-stone-800 bg-card hover:border-stone-400 dark:hover:border-stone-700"
                             )}
                           >
+                            {/* Dragging Highlight Overlay */}
+                            {isDraggingOverThis && (
+                              <div className="absolute inset-0 z-20 bg-primary/15 backdrop-blur-[1px] flex items-center justify-center gap-1.5 pointer-events-none animate-in fade-in duration-150">
+                                <UploadCloud className="h-4 w-4 text-primary animate-bounce" />
+                                <span className="text-[11px] font-bold text-primary">Lepaskan File / WA</span>
+                              </div>
+                            )}
+
                             {/* Header Item */}
                             <div className="flex items-center justify-between">
                               <div className="flex items-center gap-2">
@@ -1746,11 +1830,16 @@ export default function DokumenPage() {
                             {/* Dropzone Upload Input */}
                             {jenis === "paspor" && pasporHasEndorsement === true ? (
                               <div className="grid grid-cols-2 gap-2" onClick={(e) => e.stopPropagation()}>
-                                <div className="relative border border-dashed rounded-lg p-2 text-center hover:bg-stone-100 dark:hover:bg-stone-800 transition-colors">
+                                <div
+                                  className="relative border border-dashed rounded-lg p-2 text-center hover:bg-stone-100 dark:hover:bg-stone-800 transition-colors"
+                                  onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); setDragOverDocType("paspor_hal1"); }}
+                                  onDragLeave={(e) => { e.preventDefault(); e.stopPropagation(); setDragOverDocType(null); }}
+                                  onDrop={(e) => handleDropOnDoc(e, "paspor", false)}
+                                >
                                   <input
                                     type="file"
                                     accept="image/jpeg,image/jpg"
-                                    className="absolute inset-0 cursor-pointer opacity-0"
+                                    className="absolute inset-0 cursor-pointer opacity-0 z-10"
                                     onChange={(e) => {
                                       setActiveDocType("paspor");
                                       handleFileSelect(e, "paspor");
@@ -1758,13 +1847,18 @@ export default function DokumenPage() {
                                     disabled={uploading}
                                   />
                                   <p className="text-[10px] font-semibold text-stone-700 dark:text-stone-300">Hal.1 (Data)</p>
-                                  <p className="text-[9px] text-muted-foreground">{isUploaded ? "Ganti" : "Upload"}</p>
+                                  <p className="text-[9px] text-muted-foreground">{isUploaded ? "Ganti / Drop" : "Upload / Drop"}</p>
                                 </div>
-                                <div className="relative border border-dashed rounded-lg p-2 text-center hover:bg-amber-100/50 dark:hover:bg-amber-950/40 transition-colors border-amber-300">
+                                <div
+                                  className="relative border border-dashed rounded-lg p-2 text-center hover:bg-amber-100/50 dark:hover:bg-amber-950/40 transition-colors border-amber-300"
+                                  onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); setDragOverDocType("paspor_hal2"); }}
+                                  onDragLeave={(e) => { e.preventDefault(); e.stopPropagation(); setDragOverDocType(null); }}
+                                  onDrop={(e) => handleDropOnDoc(e, "paspor", true)}
+                                >
                                   <input
                                     type="file"
                                     accept="image/jpeg,image/jpg"
-                                    className="absolute inset-0 cursor-pointer opacity-0"
+                                    className="absolute inset-0 cursor-pointer opacity-0 z-10"
                                     onChange={(e) => {
                                       setActiveDocType("paspor");
                                       handleEndorsementFileSelect(e);
@@ -1772,11 +1866,16 @@ export default function DokumenPage() {
                                     disabled={uploadingEndorsement}
                                   />
                                   <p className="text-[10px] font-semibold text-amber-800 dark:text-amber-300">Hal.2 (Nama)</p>
-                                  <p className="text-[9px] text-muted-foreground">{endorsementDoc ? "Ganti" : "Upload"}</p>
+                                  <p className="text-[9px] text-muted-foreground">{endorsementDoc ? "Ganti / Drop" : "Upload / Drop"}</p>
                                 </div>
                               </div>
                             ) : (
-                              <div className="relative border border-dashed border-stone-300 dark:border-stone-700 rounded-lg p-2 text-center hover:border-primary hover:bg-primary/5 transition-all">
+                              <div
+                                className="relative border border-dashed border-stone-300 dark:border-stone-700 rounded-lg p-2 text-center hover:border-primary hover:bg-primary/5 transition-all"
+                                onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); setDragOverDocType(jenis); }}
+                                onDragLeave={(e) => { e.preventDefault(); e.stopPropagation(); setDragOverDocType(null); }}
+                                onDrop={(e) => handleDropOnDoc(e, jenis)}
+                              >
                                 <input
                                   type="file"
                                   accept="image/jpeg,image/jpg"
@@ -1790,7 +1889,7 @@ export default function DokumenPage() {
                                 <div className="flex items-center justify-center gap-1.5 text-stone-600 dark:text-stone-400">
                                   <FileImage className="h-3.5 w-3.5 text-stone-400" />
                                   <span className="text-[11px] font-medium">
-                                    {isUploaded ? "Klik / Drag file baru" : `Upload ${LABEL_DOKUMEN[jenis]}`}
+                                    {isUploaded ? "Klik / Drag file baru / WA" : `Upload / Drag ${LABEL_DOKUMEN[jenis]}`}
                                   </span>
                                 </div>
                               </div>
@@ -1867,10 +1966,56 @@ export default function DokumenPage() {
                                 )}
                               </div>
 
-                              <div className="relative aspect-[3/4] rounded-xl border border-stone-200 dark:border-stone-800 bg-stone-100/50 dark:bg-stone-900 flex items-center justify-center overflow-hidden">
-                                {(activeDocType === "paspor" && pasporHasEndorsement === true && pasporPageTab === "hal2" ? (endorsementPreview || endorsementDoc?.fileUrl) : (uploadPreviews[activeDocType] || uploadDocuments.find((d) => d.jenis === activeDocType)?.fileUrl)) ? (
+                              <div
+                                className={cn(
+                                  "relative aspect-[3/4] rounded-xl border transition-all flex items-center justify-center overflow-hidden group",
+                                  dragOverDocType === "preview"
+                                    ? "border-primary ring-4 ring-primary/30 bg-primary/10 scale-[1.01]"
+                                    : "border-stone-200 dark:border-stone-800 bg-stone-100/50 dark:bg-stone-900 hover:border-stone-400"
+                                )}
+                                onDragOver={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  setDragOverDocType("preview");
+                                }}
+                                onDragEnter={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  setDragOverDocType("preview");
+                                }}
+                                onDragLeave={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  setDragOverDocType((prev) => (prev === "preview" ? null : prev));
+                                }}
+                                onDrop={(e) =>
+                                  handleDropOnDoc(
+                                    e,
+                                    activeDocType,
+                                    activeDocType === "paspor" && pasporHasEndorsement === true && pasporPageTab === "hal2"
+                                  )
+                                }
+                              >
+                                {/* Dragging Feedback Overlay */}
+                                {dragOverDocType === "preview" && (
+                                  <div className="absolute inset-0 z-30 bg-primary/20 backdrop-blur-sm flex flex-col items-center justify-center p-4 text-center animate-in fade-in duration-150">
+                                    <UploadCloud className="h-12 w-12 text-primary animate-bounce mb-2" />
+                                    <p className="text-xs font-bold text-primary">Lepaskan file di sini</p>
+                                    <p className="text-[10px] text-stone-700 dark:text-stone-200">
+                                      File foto dari komputer atau seret langsung dari WhatsApp
+                                    </p>
+                                  </div>
+                                )}
+
+                                {(activeDocType === "paspor" && pasporHasEndorsement === true && pasporPageTab === "hal2"
+                                  ? endorsementPreview || endorsementDoc?.fileUrl
+                                  : uploadPreviews[activeDocType] || uploadDocuments.find((d) => d.jenis === activeDocType)?.fileUrl) ? (
                                   <img
-                                    src={(activeDocType === "paspor" && pasporHasEndorsement === true && pasporPageTab === "hal2" ? (endorsementPreview || endorsementDoc?.fileUrl) : (uploadPreviews[activeDocType] || uploadDocuments.find((d) => d.jenis === activeDocType)?.fileUrl)) || ""}
+                                    src={
+                                      (activeDocType === "paspor" && pasporHasEndorsement === true && pasporPageTab === "hal2"
+                                        ? endorsementPreview || endorsementDoc?.fileUrl
+                                        : uploadPreviews[activeDocType] || uploadDocuments.find((d) => d.jenis === activeDocType)?.fileUrl) || ""
+                                    }
                                     alt={LABEL_DOKUMEN[activeDocType]}
                                     className="max-h-full max-w-full object-contain rounded-md"
                                   />
@@ -1881,7 +2026,7 @@ export default function DokumenPage() {
                                       Belum ada foto <strong>{LABEL_DOKUMEN[activeDocType]}</strong>.
                                     </p>
                                     <p className="text-[11px] text-stone-400">
-                                      Upload file pada daftar di sebelah kiri untuk menampilkan preview.
+                                      Seret file / foto WhatsApp ke sini, atau tekan <strong>Ctrl+V</strong> untuk paste gambar.
                                     </p>
                                   </div>
                                 )}

@@ -1,11 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { Upload, Loader2, CheckCircle, AlertTriangle, Save, FileText } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/components/ui/Card";
 import { Button } from "@/shared/components/ui/Button";
 import { Input } from "@/shared/components/ui/Input";
 import { Badge } from "@/shared/components/ui/Badge";
+import { extractFilesFromEvent } from "@/shared/lib/file-drop-utils";
+import { cn } from "@/shared/lib/utils";
 
 interface ExtractedFields {
   namaPaket?: string;
@@ -35,6 +37,25 @@ export default function OcrPackagePage() {
   const [warning, setWarning] = useState("");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+
+  const handleDrop = useCallback(async (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    const files = await extractFilesFromEvent(e);
+    const file = files[0];
+    if (file) setFlyerFile(file);
+  }, []);
+
+  const handlePaste = useCallback(async (e: React.ClipboardEvent) => {
+    const files = await extractFilesFromEvent(e);
+    const file = files[0];
+    if (file) {
+      e.preventDefault();
+      setFlyerFile(file);
+    }
+  }, []);
 
   async function handleUpload() {
     if (!flyerFile) return;
@@ -44,25 +65,22 @@ export default function OcrPackagePage() {
 
     try {
       const formData = new FormData();
-      formData.append("flyer", flyerFile);
-      formData.append("caption", caption);
+      formData.append("file", flyerFile);
+      if (caption) formData.append("caption", caption);
 
-      const res = await fetch("/api/admin/packages/ai-import", {
+      const res = await fetch("/api/admin/ocr-package", {
         method: "POST",
         body: formData,
       });
 
-      if (res.ok) {
-        const json = await res.json();
-        setExtracted(json.data?.extractionResult ?? {});
-        setDraftId(json.data?.draft?.id ?? null);
-        if (json.data?.warning) setWarning(json.data.warning);
-      } else {
-        const err = await res.json();
-        setWarning(err.message || "Gagal memproses flyer");
-      }
-    } catch {
-      setWarning("Gagal menghubungi server");
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.message || "Gagal memproses flyer");
+
+      setExtracted(json.data.extracted);
+      setDraftId(json.data.draftId);
+      if (json.data.warning) setWarning(json.data.warning);
+    } catch (err: any) {
+      setWarning(err.message || "Terjadi kesalahan");
     } finally {
       setUploading(false);
     }
@@ -71,19 +89,26 @@ export default function OcrPackagePage() {
   async function handleSave() {
     if (!draftId || !extracted) return;
     setSaving(true);
+
     try {
-      const res = await fetch(`/api/admin/packages/ai-import/${draftId}`, {
+      const res = await fetch(`/api/admin/ocr-package/${draftId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(extracted),
       });
-      if (res.ok) setSaved(true);
-    } catch { /* graceful */ }
-    setSaving(false);
+
+      if (!res.ok) throw new Error("Gagal menyimpan paket");
+      setSaved(true);
+    } catch (err: any) {
+      setWarning(err.message || "Gagal menyimpan");
+    } finally {
+      setSaving(false);
+    }
   }
 
-  function updateField(key: keyof ExtractedFields, value: string | number) {
-    setExtracted((prev) => (prev ? { ...prev, [key]: value } : prev));
+  function updateField(key: keyof ExtractedFields, value: any) {
+    if (!extracted) return;
+    setExtracted({ ...extracted, [key]: value });
   }
 
   const FIELD_LABELS: Record<keyof ExtractedFields, string> = {
@@ -110,10 +135,30 @@ export default function OcrPackagePage() {
         <CardHeader><CardTitle className="text-base">Upload Flyer</CardTitle></CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-center gap-4">
-            <label className="flex cursor-pointer items-center gap-2 rounded-lg border-2 border-dashed px-6 py-4 hover:border-primary transition-colors">
+            <label
+              onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); setIsDragging(true); }}
+              onDragEnter={(e) => { e.preventDefault(); e.stopPropagation(); setIsDragging(true); }}
+              onDragLeave={(e) => { e.preventDefault(); e.stopPropagation(); setIsDragging(false); }}
+              onDrop={handleDrop}
+              onPaste={handlePaste}
+              tabIndex={0}
+              className={cn(
+                "flex cursor-pointer items-center gap-2 rounded-lg border-2 border-dashed px-6 py-4 transition-all w-full max-w-md justify-center",
+                isDragging
+                  ? "border-primary bg-primary/10 ring-2 ring-primary/40 scale-[1.01]"
+                  : "border-stone-300 dark:border-stone-700 hover:border-primary hover:bg-primary/5"
+              )}
+            >
               <Upload className="h-5 w-5 text-muted-foreground" />
-              <span className="text-sm">{flyerFile ? flyerFile.name : "Pilih file flyer (JPG)"}</span>
-              <input type="file" accept=".jpg,.jpeg" className="hidden"
+              <div className="text-center">
+                <span className="text-sm font-medium block">
+                  {flyerFile ? flyerFile.name : "Pilih / Drag Flyer (Komputer atau WhatsApp)"}
+                </span>
+                <span className="text-[11px] text-muted-foreground block">
+                  Mendukung JPG, PNG, drag-and-drop & paste Ctrl+V
+                </span>
+              </div>
+              <input type="file" accept=".jpg,.jpeg,.png" className="hidden"
                 onChange={(e) => setFlyerFile(e.target.files?.[0] ?? null)} />
             </label>
           </div>
