@@ -211,5 +211,35 @@ html.intro-pending body {
   overflow: hidden !important;
 }
 
+/* ── OFFICIAL DOCUMENT PRINT STYLES ── */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 12mm 15mm 12mm 15mm;
+  }
+  
+  body, html {
+    background: white !important;
+    color: black !important;
+  }
 
+  aside, nav, header, [role="navigation"], .print\:hidden {
+    display: none !important;
+  }
 
+  main {
+    margin: 0 !important;
+    padding: 0 !important;
+    max-width: 100% !important;
+    width: 100% !important;
+  }
+
+  #printable-surat-sheet {
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+    min-height: 0 !important;
+  }
+}

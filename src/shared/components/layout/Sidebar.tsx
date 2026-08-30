@@ -155,6 +155,23 @@ const adminNav: NavSection[] = [
     ],
   },
   {
+    title: "SURAT OPERASIONAL",
+    items: [
+      {
+        label: "Generate Surat",
+        icon: ScrollText,
+        children: [
+          { label: "Surat Rekom", href: "/admin/surat?type=rekom" },
+          { label: "Surat Cuti Pekerja", href: "/admin/surat?type=cuti-pekerja" },
+          { label: "Surat Cuti Sekolah", href: "/admin/surat?type=cuti-sekolah" },
+          { label: "Surat Keterangan", href: "/admin/surat?type=keterangan" },
+          { label: "Surat Tugas", href: "/admin/surat?type=tugas" },
+          { label: "Surat Klaim Asuransi", href: "/admin/surat?type=klaim-asuransi" },
+        ],
+      },
+    ],
+  },
+  {
     title: "LAINNYA",
     items: [
       { label: "Manajemen User", href: "/admin/users", icon: Users },
@@ -214,9 +231,10 @@ export function Sidebar({ role, mobileOpen = false, onMobileClose }: SidebarProp
     for (const section of sections) {
       for (const item of section.items) {
         if (item.children) {
-          const hasActiveChild = item.children.some(
-            (child) => pathname === child.href || pathname.startsWith(child.href + "/")
-          );
+          const hasActiveChild = item.children.some((child) => {
+            const [childPath] = child.href.split("?");
+            return pathname === childPath || pathname.startsWith(childPath + "/");
+          });
           if (hasActiveChild) {
             next.add(item.label);
           }
@@ -242,15 +260,17 @@ export function Sidebar({ role, mobileOpen = false, onMobileClose }: SidebarProp
   function isParentActive(item: NavItem): boolean {
     if (item.href) return pathname === item.href || pathname.startsWith(item.href + "/");
     if (item.children) {
-      return item.children.some(
-        (child) => pathname === child.href || pathname.startsWith(child.href + "/")
-      );
+      return item.children.some((child) => {
+        const [childPath] = child.href.split("?");
+        return pathname === childPath || pathname.startsWith(childPath + "/");
+      });
     }
     return false;
   }
 
   function isChildActive(href: string): boolean {
-    return pathname === href || pathname.startsWith(href + "/");
+    const [childPath] = href.split("?");
+    return pathname === childPath || pathname === href || pathname.startsWith(childPath + "/");
   }
 
   const displayName = user?.name ?? "Admin VTU";
