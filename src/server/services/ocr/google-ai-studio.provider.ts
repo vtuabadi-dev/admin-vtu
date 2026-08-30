@@ -10,6 +10,7 @@ import type { DokumenJenis } from "@/shared/types";
 import type { OcrProvider, OcrResult, ImageMetaCheck } from "./provider";
 import { getExpectedFields } from "./provider";
 import { parsePassport } from "./passport-parser";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
 const FIELD_PATTERNS: Record<string, RegExp[]> = {
   namaLengkap: [
@@ -149,38 +150,35 @@ export class GoogleAiStudioOcrProvider implements OcrProvider {
   "rawText": "Teks mentah"
 }`;
 
-        const candidateModels = ["gemini-2.0-flash", "gemini-2.0-flash-lite", "gemini-1.5-flash-latest"];
-        const payload = {
-          contents: [{
-            parts: [
-              { text: promptText },
-              { inline_data: { mime_type: mimeType, data: base64 } }
-            ]
-          }]
-        };
-
+        const candidateModels = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-2.0-flash-lite"];
+        const genAI = new GoogleGenerativeAI(apiKey);
         let fullText = "";
+
         for (const modelName of candidateModels) {
           try {
-            const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
-            const res = await fetch(url, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(payload),
-              signal: AbortSignal.timeout(30000),
+            const model = genAI.getGenerativeModel({
+              model: modelName,
+              generationConfig: {
+                responseMimeType: "application/json",
+              },
             });
 
-            const resJson = await res.json().catch(() => null);
+            const result = await model.generateContent([
+              promptText,
+              {
+                inlineData: {
+                  data: base64,
+                  mimeType,
+                },
+              },
+            ]);
 
-            if (resJson?.candidates?.[0]?.content?.parts?.[0]?.text) {
-              fullText = resJson.candidates[0].content.parts[0].text;
-              break;
-            } else if (resJson?.error) {
-              lastError = resJson.error.message;
-              if (res.status === 429) break;
-            }
+            fullText = result.response.text() || "";
+            if (fullText) break;
           } catch (e: any) {
-            lastError = e?.message || String(e);
+            const msg = e?.message || String(e);
+            lastError = msg;
+            if (msg.includes("429") || msg.includes("quota")) break;
           }
         }
 
