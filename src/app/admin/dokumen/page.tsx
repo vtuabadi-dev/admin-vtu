@@ -17,6 +17,7 @@ import {
   Send,
   Users,
   Edit3,
+  Loader2,
 } from "lucide-react";
 import { Card, CardContent } from "@/shared/components/ui/Card";
 import { StatusBadge, Badge } from "@/shared/components/ui/Badge";
@@ -110,20 +111,38 @@ function getDocCellBadge(docInfo: { status: string } | undefined) {
   return { variant: "muted" as const, label: docInfo.status, dotClass: "bg-muted-foreground/30" };
 }
 
+import { useOperationalStore } from "@/stores/operational-store";
+
 // ============================================================
 // MAIN PAGE
 // ============================================================
 
 export default function DokumenPage() {
-  const [activeTab, setActiveTab] = useState("rekap");
-  const [loading, setLoading] = useState(true);
+  const storeKbrList = useOperationalStore((s) => s.keberangkatanList);
+  const storeGroupList = useOperationalStore((s) => s.groupList);
+  const storeIsLoaded = useOperationalStore((s) => s.isLoaded);
 
-  // Shared data
-  const [keberangkatanList, setKeberangkatanList] = useState<Keberangkatan[]>([]);
-  const [groups, setGroups] = useState<Record<string, { namaGroup: string; kodeRegistrasi: string; paketId: string; createdAt?: string; updatedAt?: string }>>({});
+  const [activeTab, setActiveTab] = useState("rekap");
+  const [loading, setLoading] = useState(!storeIsLoaded && storeKbrList.length === 0);
+
+  // Shared data - initialized from store if available for 0ms instant display
+  const [keberangkatanList, setKeberangkatanList] = useState<Keberangkatan[]>(storeKbrList);
+  const [groups, setGroups] = useState<Record<string, { namaGroup: string; kodeRegistrasi: string; paketId: string; createdAt?: string; updatedAt?: string }>>(() => {
+    const groupMap: Record<string, { namaGroup: string; kodeRegistrasi: string; paketId: string; createdAt?: string; updatedAt?: string }> = {};
+    (storeGroupList ?? []).forEach((g: any) => {
+      groupMap[g.id] = {
+        namaGroup: g.namaGroup,
+        kodeRegistrasi: g.kodeRegistrasi,
+        paketId: g.paketKeberangkatanId,
+        createdAt: g.createdAt,
+        updatedAt: g.updatedAt,
+      };
+    });
+    return groupMap;
+  });
 
   // --- Rekap Tab State ---
-  const [selectedPackage, setSelectedPackage] = useState("");
+  const [selectedPackage, setSelectedPackage] = useState(storeKbrList.length > 0 ? storeKbrList[0].id : "");
   const [statusFilter, setStatusFilter] = useState("");
   const [completionMatrix, setCompletionMatrix] = useState<any[]>([]);
   const [matrixLoading, setMatrixLoading] = useState(false);
@@ -165,18 +184,23 @@ export default function DokumenPage() {
   const [editingOcrDocs, setEditingOcrDocs] = useState<Record<string, boolean>>({});
 
   // --- Passport Endorsement State ---
-  // null = belum dipilih, false = standar (1 halaman), true = ada endorsement (2 halaman)
   const [pasporHasEndorsement, setPasporHasEndorsement] = useState<boolean | null>(null);
-  // Upload & preview untuk halaman endorsement (halaman 2)
   const [endorsementPreview, setEndorsementPreview] = useState<string>("");
   const [endorsementDoc, setEndorsementDoc] = useState<{ id: string; fileUrl: string } | null>(null);
   const [uploadingEndorsement, setUploadingEndorsement] = useState(false);
   const [extractingEndorsement, setExtractingEndorsement] = useState(false);
-  // Hasil OCR halaman 2 endorsement (hanya namaLengkap)
   const [endorsementOcrResult, setEndorsementOcrResult] = useState<any>(null);
   const [pasporPageTab, setPasporPageTab] = useState<"hal1" | "hal2">("hal1");
 
-  // Load initial data
+  // Sync with store if store updates
+  useEffect(() => {
+    if (storeKbrList.length > 0 && keberangkatanList.length === 0) {
+      setKeberangkatanList(storeKbrList);
+      if (!selectedPackage) setSelectedPackage(storeKbrList[0].id);
+    }
+  }, [storeKbrList, keberangkatanList.length, selectedPackage]);
+
+  // Load fresh initial data in background
   useEffect(() => {
     async function load() {
       try {
@@ -188,7 +212,7 @@ export default function DokumenPage() {
           const json = await kbrRes.json();
           const kbrList = json.data ?? [];
           setKeberangkatanList(kbrList);
-          if (kbrList.length > 0) setSelectedPackage(kbrList[0].id);
+          if (kbrList.length > 0 && !selectedPackage) setSelectedPackage(kbrList[0].id);
         }
         if (groupsRes.ok) {
           const json = await groupsRes.json();
@@ -907,18 +931,9 @@ export default function DokumenPage() {
     }
   }
 
-  // --- Render: Loading ---
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <p className="text-muted-foreground">Memuat data dokumen...</p>
-      </div>
-    );
-  }
-
   // --- Render ---
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-in fade-in duration-200">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -927,6 +942,12 @@ export default function DokumenPage() {
             Monitoring & review kelengkapan dokumen seluruh jamaah
           </p>
         </div>
+        {loading && (
+          <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/40 px-3 py-1.5 rounded-lg border border-border/40">
+            <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
+            <span>Sinkronisasi data paket...</span>
+          </div>
+        )}
       </div>
 
       {/* Tabs */}
