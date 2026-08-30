@@ -669,6 +669,25 @@ export default function DokumenPage() {
 
       setSavedOcrDocs((prev) => ({ ...prev, [jenis]: true }));
       setEditingOcrDocs((prev) => ({ ...prev, [jenis]: false }));
+
+      // Update store jamaah state
+      if (storeJamaah) {
+        const updated = storeJamaah.map((j: any) => {
+          if (j.id === selectedJamaah.id) {
+            return {
+              ...j,
+              ...(ocrData.namaLengkap ? { namaLengkap: ocrData.namaLengkap } : {}),
+              ...(ocrData.nik ? { nik: ocrData.nik } : {}),
+              ...(ocrData.nomorPaspor ? { nomorPaspor: ocrData.nomorPaspor } : {}),
+              ...(ocrData.tanggalLahir ? { tanggalLahir: ocrData.tanggalLahir } : {}),
+              ...(ocrData.tempatLahir ? { tempatLahir: ocrData.tempatLahir } : {}),
+            };
+          }
+          return j;
+        });
+        setStoreJamaah(updated);
+      }
+
       alert(`Data ${LABEL_DOKUMEN[jenis as DokumenJenis] ?? jenis} berhasil disimpan dan disinkronkan ke Manifest Jamaah!`);
     } catch (err) {
       console.error("Save single OCR error:", err);
@@ -888,54 +907,6 @@ export default function DokumenPage() {
       }
     } finally {
       setExtractingEndorsement(false);
-    }
-  }
-
-  async function handleSaveSingleOcr(jenis: string) {
-    if (!selectedJamaah) return;
-    const doc = uploadDocuments.find((d) => d.jenis === jenis);
-    const ocrData = ocrResults[jenis];
-    if (!doc || !ocrData) return;
-
-    setSubmitting(true);
-    try {
-      const res = await fetch("/api/dokumen/review", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          dokumenId: doc.id,
-          manualData: ocrData,
-          dataStatus: "valid",
-        }),
-      });
-
-      if (!res.ok) throw new Error("Gagal menyimpan data");
-
-      setSavedOcrDocs((prev) => ({ ...prev, [jenis]: true }));
-      setEditingOcrDocs((prev) => ({ ...prev, [jenis]: false }));
-
-      // Update store jamaah state
-      if (storeJamaah) {
-        const updated = storeJamaah.map((j: any) => {
-          if (j.id === selectedJamaah.id) {
-            return {
-              ...j,
-              ...(ocrData.namaLengkap ? { namaLengkap: ocrData.namaLengkap } : {}),
-              ...(ocrData.nik ? { nik: ocrData.nik } : {}),
-              ...(ocrData.nomorPaspor ? { nomorPaspor: ocrData.nomorPaspor } : {}),
-              ...(ocrData.tanggalLahir ? { tanggalLahir: ocrData.tanggalLahir } : {}),
-              ...(ocrData.tempatLahir ? { tempatLahir: ocrData.tempatLahir } : {}),
-            };
-          }
-          return j;
-        });
-        setStoreJamaah(updated);
-      }
-    } catch (err) {
-      console.error("Save single OCR error:", err);
-      alert(`Gagal menyimpan data: ${(err as Error).message}`);
-    } finally {
-      setSubmitting(false);
     }
   }
 
