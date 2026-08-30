@@ -99,12 +99,20 @@ function confidenceIcon(c: number) {
 }
 
 function getDocCellBadge(
-  docInfo: { status: string } | undefined,
+  docInfo: { status?: string; fileUrl?: string; dataStatus?: string; ocrData?: any; manualData?: any } | undefined,
   jenis: string,
   dynamicReq?: DynamicDocRequirement
 ) {
-  // If doc is verified / lengkap
-  if (docInfo && (docInfo.status === "verified" || docInfo.status === "lengkap")) {
+  // If doc is verified / lengkap or dataStatus is valid or manualData exists
+  if (
+    docInfo &&
+    (docInfo.status === "verified" ||
+      docInfo.status === "lengkap" ||
+      docInfo.dataStatus === "valid" ||
+      Boolean(docInfo.manualData) ||
+      (docInfo.ocrData && (docInfo.ocrData.confidence === undefined || docInfo.ocrData.confidence >= 0.6)) ||
+      (docInfo.fileUrl && docInfo.status !== "processing" && docInfo.status !== "revisi" && docInfo.status !== "rejected"))
+  ) {
     return { variant: "success" as const, label: "Lengkap", dotClass: "bg-success" };
   }
   if (docInfo && docInfo.status === "revisi") {
@@ -114,7 +122,13 @@ function getDocCellBadge(
     return { variant: "destructive" as const, label: "Ditolak", dotClass: "bg-destructive" };
   }
   if (docInfo && docInfo.status === "processing") {
+    if (docInfo.ocrData || docInfo.manualData) {
+      return { variant: "success" as const, label: "Lengkap", dotClass: "bg-success" };
+    }
     return { variant: "info" as const, label: "OCR Proses", dotClass: "bg-info" };
+  }
+  if (docInfo && docInfo.fileUrl) {
+    return { variant: "success" as const, label: "Lengkap", dotClass: "bg-success" };
   }
 
   // If not uploaded yet, determine contextual requirement
@@ -362,21 +376,25 @@ export default function DokumenPage() {
     });
   }, []);
 
-  // Load completion matrix when package changes
+  // Re-sync matrix whenever storeJamaah, selectedPackage, or groups change
   useEffect(() => {
     if (!selectedPackage) return;
 
-    // Jika data jamaah sudah ada di memory store, render matriks langsung 0ms!
     if (storeJamaah && storeJamaah.length > 0) {
       const matrix = buildMatrixFromJamaah(storeJamaah, selectedPackage, groups);
       setCompletionMatrix(matrix);
       setMatrixLoading(false);
-      return;
     }
+  }, [selectedPackage, storeJamaah, groups, buildMatrixFromJamaah]);
 
-    // Hanya unduh jika store belum memiliki data
+  // Load completion matrix initially and on tab change (background refresh)
+  useEffect(() => {
+    if (!selectedPackage) return;
+
     async function load() {
-      setMatrixLoading(true);
+      if (!storeJamaah || storeJamaah.length === 0) {
+        setMatrixLoading(true);
+      }
       try {
         const res = await fetch(`/api/jamaah?groupId=&limit=200`);
         if (res.ok) {
@@ -390,7 +408,7 @@ export default function DokumenPage() {
       setMatrixLoading(false);
     }
     load();
-  }, [selectedPackage, storeJamaah, groups, buildMatrixFromJamaah, setStoreJamaah]);
+  }, [selectedPackage, activeTab, groups, buildMatrixFromJamaah, setStoreJamaah]);
 
   // Load review queue
   const loadReviewQueue = useCallback(async (_filter?: string) => {
@@ -734,7 +752,7 @@ export default function DokumenPage() {
       setSavedOcrDocs((prev) => ({ ...prev, [jenis]: true }));
       setEditingOcrDocs((prev) => ({ ...prev, [jenis]: false }));
 
-      // Update store jamaah state
+      // Update store jamaah state & completion matrix
       if (storeJamaah) {
         const hasPassport = Boolean(
           (selectedJamaah.nomorPaspor && selectedJamaah.nomorPaspor !== "-") ||
@@ -743,8 +761,25 @@ export default function DokumenPage() {
 
         const updated = storeJamaah.map((j: any) => {
           if (j.id === selectedJamaah.id) {
+            const existingDocs = j.dokumen ?? [];
+            const docIndex = existingDocs.findIndex((d: any) => d.jenis === jenis);
+            const newDocItem = {
+              id: doc?.id || `${j.id}_${jenis}`,
+              jamaahId: j.id,
+              jenis,
+              fileUrl: doc?.fileUrl || uploadPreviews[jenis],
+              manualData: ocrData,
+              status: "verified",
+              dataStatus: "valid",
+              uploadedAt: new Date().toISOString(),
+            };
+            const updatedDocs = docIndex >= 0
+              ? existingDocs.map((d: any, idx: number) => (idx === docIndex ? { ...d, ...newDocItem } : d))
+              : [...existingDocs, newDocItem];
+
             return {
               ...j,
+              dokumen: updatedDocs,
               ...(ocrData.namaLengkap && (jenis === "paspor" || !hasPassport) ? { namaLengkap: ocrData.namaLengkap } : {}),
               ...(ocrData.nik ? { nik: ocrData.nik } : {}),
               ...(ocrData.nomorPaspor ? { nomorPaspor: ocrData.nomorPaspor } : {}),
@@ -761,6 +796,9 @@ export default function DokumenPage() {
           return j;
         });
         setStoreJamaah(updated);
+        if (selectedPackage) {
+          setCompletionMatrix(buildMatrixFromJamaah(updated, selectedPackage, groups));
+        }
       }
 
       alert(`Data ${LABEL_DOKUMEN[jenis as DokumenJenis] ?? jenis} berhasil disimpan dan disinkronkan ke Manifest Jamaah!`);
@@ -817,28 +855,60 @@ export default function DokumenPage() {
         throw new Error(json?.message || "Gagal mengupload file");
       }
 
-      // Update documents list
+      // Update documents list in upload tab
       const uploadedDoc = json.data.dokumen;
+      const finalFileUrl = json.data.fileUrl ?? uploadedDoc?.fileUrl ?? "";
+      const docId = uploadedDoc?.id ?? `${selectedJamaah.id}_${jenis}`;
+
       setUploadDocuments((prev) => {
         const existing = prev.find((d) => d.jenis === jenis);
         if (existing) {
-          return prev.map((d) => d.jenis === jenis ? { ...d, fileUrl: json.data.fileUrl, status: "processing" } : d);
+          return prev.map((d) => (d.jenis === jenis ? { ...d, fileUrl: finalFileUrl, status: "verified", dataStatus: "valid" } : d));
         } else {
-          return [...prev, uploadedDoc];
+          return [...prev, { ...(uploadedDoc || {}), id: docId, jenis, fileUrl: finalFileUrl, status: "verified", dataStatus: "valid" }];
         }
       });
 
+      // Spontaneous sync: Update storeJamaah and completion matrix immediately
+      if (storeJamaah) {
+        const updated = storeJamaah.map((j: any) => {
+          if (j.id === selectedJamaah.id) {
+            const existingDocs = j.dokumen ?? [];
+            const docIndex = existingDocs.findIndex((d: any) => d.jenis === jenis);
+            const newDocItem = {
+              id: docId,
+              jamaahId: j.id,
+              jenis,
+              fileUrl: finalFileUrl,
+              status: "verified",
+              dataStatus: "valid",
+              uploadedAt: new Date().toISOString(),
+            };
+            const updatedDocs = docIndex >= 0
+              ? existingDocs.map((d: any, idx: number) => (idx === docIndex ? { ...d, ...newDocItem } : d))
+              : [...existingDocs, newDocItem];
+            return {
+              ...j,
+              dokumen: updatedDocs,
+            };
+          }
+          return j;
+        });
+        setStoreJamaah(updated);
+        if (selectedPackage) {
+          setCompletionMatrix(buildMatrixFromJamaah(updated, selectedPackage, groups));
+        }
+      }
+
       // ── Auto-OCR setelah upload berhasil ──────────────────
       // Trigger ekstraksi otomatis tanpa harus klik tombol
-      const fileUrl: string = json.data.fileUrl ?? uploadedDoc?.fileUrl ?? "";
-      const dokumenId: string = uploadedDoc?.id ?? "";
-      if (fileUrl && dokumenId) {
+      if (finalFileUrl && docId) {
         // Jalankan OCR di background tanpa block UI upload
         // Jika endorsement mode: gunakan prompt tanpa nama untuk hal.1
         const ocrMode = (jenis === "paspor" && pasporHasEndorsement === true)
           ? "paspor_tanpa_nama"
           : undefined;
-        handleExtractOcr(jenis, { fileUrl, id: dokumenId }, ocrMode);
+        handleExtractOcr(jenis, { fileUrl: finalFileUrl, id: docId }, ocrMode);
       }
     } catch (err) {
       console.error("Upload error:", err);
@@ -882,6 +952,48 @@ export default function DokumenPage() {
       // Jika mode endorsement halaman 1 — simpan di ocrResults[jenis] tanpa nama
       // Nama akan digabung dari endorsementOcrResult saat submit
       setOcrResults((prev) => ({ ...prev, [jenis]: json.data }));
+
+      // Spontaneously sync OCR results to storeJamaah & completion matrix
+      if (storeJamaah && selectedJamaah) {
+        const hasPassport = Boolean(
+          (selectedJamaah.nomorPaspor && selectedJamaah.nomorPaspor !== "-") ||
+          uploadDocuments.some((d: any) => d.jenis === "paspor" && (d.manualData?.namaLengkap || d.ocrData?.namaLengkap))
+        );
+
+        const updated = storeJamaah.map((j: any) => {
+          if (j.id === selectedJamaah.id) {
+            const existingDocs = j.dokumen ?? [];
+            const docIndex = existingDocs.findIndex((d: any) => d.jenis === jenis);
+            const newDocItem = {
+              id: doc.id,
+              jamaahId: j.id,
+              jenis,
+              fileUrl: doc.fileUrl,
+              ocrData: json.data,
+              status: "verified",
+              dataStatus: "valid",
+              uploadedAt: new Date().toISOString(),
+            };
+            const updatedDocs = docIndex >= 0
+              ? existingDocs.map((d: any, idx: number) => (idx === docIndex ? { ...d, ...newDocItem } : d))
+              : [...existingDocs, newDocItem];
+            return {
+              ...j,
+              dokumen: updatedDocs,
+              ...(json.data.namaLengkap && (jenis === "paspor" || !hasPassport) ? { namaLengkap: json.data.namaLengkap } : {}),
+              ...(json.data.nik ? { nik: json.data.nik } : {}),
+              ...(json.data.nomorPaspor ? { nomorPaspor: json.data.nomorPaspor } : {}),
+              ...(json.data.tanggalLahir ? { tanggalLahir: json.data.tanggalLahir } : {}),
+              ...(json.data.tempatLahir ? { tempatLahir: json.data.tempatLahir } : {}),
+            };
+          }
+          return j;
+        });
+        setStoreJamaah(updated);
+        if (selectedPackage) {
+          setCompletionMatrix(buildMatrixFromJamaah(updated, selectedPackage, groups));
+        }
+      }
     } catch (err) {
       console.error("OCR error:", err);
       // Tidak alert saat auto-OCR, hanya log — user bisa klik manual jika gagal

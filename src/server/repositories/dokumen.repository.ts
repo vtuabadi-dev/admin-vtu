@@ -167,9 +167,14 @@ export const dokumenRepo = {
   },
 
   async saveManualOcrData(id: string, manualData: DokumenItem["manualData"], dataStatus: DokumenItem["dataStatus"] = "manual_edit") {
+    const isVerified = dataStatus === "valid" || dataStatus === "manual_edit";
     const row = await prisma.dokumenItem.update({
       where: { id },
-      data: { manualData: manualData as any, dataStatus },
+      data: {
+        manualData: manualData as any,
+        dataStatus,
+        status: isVerified ? "verified" : "pending",
+      },
     });
     if (row.jamaahId && manualData) {
       await syncJamaahAndManifestFromDocData(row.jamaahId, manualData as Record<string, any>);
@@ -178,6 +183,7 @@ export const dokumenRepo = {
   },
 
   async saveManualOcrDataByJamaah(jamaahId: string, jenis: DokumenJenis, manualData: Record<string, any>, dataStatus: DokumenItem["dataStatus"] = "manual_edit") {
+    const isVerified = dataStatus === "valid" || dataStatus === "manual_edit";
     let doc = await prisma.dokumenItem.findFirst({
       where: { jamaahId, jenis },
     });
@@ -185,7 +191,11 @@ export const dokumenRepo = {
     if (doc) {
       doc = await prisma.dokumenItem.update({
         where: { id: doc.id },
-        data: { manualData: manualData as any, dataStatus },
+        data: {
+          manualData: manualData as any,
+          dataStatus,
+          status: isVerified ? "verified" : "pending",
+        },
       });
     } else {
       doc = await prisma.dokumenItem.create({
@@ -193,7 +203,7 @@ export const dokumenRepo = {
           jamaahId,
           jenis,
           wajib: jenis === "paspor" || jenis === "ktp",
-          status: "pending",
+          status: isVerified ? "verified" : "pending",
           dataStatus,
           manualData: manualData as any,
         },
@@ -207,11 +217,13 @@ export const dokumenRepo = {
   },
 
   async saveOcrResult(id: string, ocrData: OcrData) {
+    const isValid = ocrData.confidence >= 0.7;
     const row = await prisma.dokumenItem.update({
       where: { id },
       data: {
         ocrData: ocrData as any,
-        dataStatus: ocrData.confidence >= 0.7 ? "valid" : "pending",
+        dataStatus: isValid ? "valid" : "pending",
+        status: isValid ? "verified" : "pending",
         ocrRetryCount: { increment: 0 },
       },
     });

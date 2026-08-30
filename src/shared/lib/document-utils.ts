@@ -215,7 +215,17 @@ export function computeDynamicDocumentRequirements(
   }
 
   const isDocValid = (d: any): boolean => {
-    return d && (d.status === "verified" || d.status === "lengkap");
+    if (!d) return false;
+    if (d.status === "rejected" || d.status === "revisi") return false;
+    return Boolean(
+      d.status === "verified" ||
+      d.status === "lengkap" ||
+      d.dataStatus === "valid" ||
+      d.manualData ||
+      (d.ocrData && (d.ocrData.confidence === undefined || d.ocrData.confidence >= 0.6)) ||
+      (d.fileUrl && d.status !== "processing") ||
+      (d.fileUrl && (d.ocrData || d.manualData))
+    );
   };
 
   const age = calculateAge(jamaah.tanggalLahir);
