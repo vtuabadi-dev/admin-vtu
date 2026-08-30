@@ -15,8 +15,7 @@
 //   Audit log entries
 // ============================================================
 
-import { PrismaClient } from "@prisma/client";
-import type { DokumenJenis } from "@/shared/types";
+import { PrismaClient, DokumenJenis } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
