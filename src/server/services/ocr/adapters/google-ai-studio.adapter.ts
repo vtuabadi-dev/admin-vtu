@@ -199,8 +199,8 @@ export const googleAiStudioAdapter: OcrAdapter = {
     if (imageBuffer[0] === 0x89 && imageBuffer[1] === 0x50) mimeType = "image/png";
     else if (imageBuffer[0] === 0x52 && imageBuffer[1] === 0x49) mimeType = "image/webp";
 
-    // ── Model Selection (try gemini-2.5-flash, gemini-2.0-flash, gemini-1.5-flash) ──
-    const candidateModels = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"];
+    // ── Model: gemini-2.5-flash ──
+    const modelName = "gemini-2.5-flash";
     const mode = config.mode;
     const promptText = getPromptForMode(jenis, mode);
 
@@ -213,90 +213,71 @@ export const googleAiStudioAdapter: OcrAdapter = {
       }]
     };
 
-    let alasanErrorGoogle = "";
-    let lastStatusCode: number | undefined = undefined;
+    console.log(
+      `[AI Studio Adapter] ▶ CALL | model=${modelName} | key=***${keySuffix} | jenis=${jenis}${mode ? ` | mode=${mode}` : ""} | imgSize=${imgSizeKB}KB | retry=#${retryCount}`
+    );
 
-    for (const modelName of candidateModels) {
-      console.log(
-        `[AI Studio Adapter] ▶ CALL | model=${modelName} | key=***${keySuffix} | jenis=${jenis}${mode ? ` | mode=${mode}` : ""} | imgSize=${imgSizeKB}KB | retry=#${retryCount}`
-      );
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(config.timeout ?? 30000),
+    });
 
+    const resJson = await res.json().catch(() => null);
+
+    if (resJson?.candidates?.[0]?.content?.parts?.[0]?.text) {
+      const rawText = resJson.candidates[0].content.parts[0].text;
+      const cleanText = rawText.replace(/```json/gi, "").replace(/```/g, "").trim();
+
+      let parsedJson: Record<string, any> | null = null;
       try {
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
-        const res = await fetch(url, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-          signal: AbortSignal.timeout(config.timeout ?? 30000),
-        });
-
-        const resJson = await res.json().catch(() => null);
-
-        if (resJson?.candidates?.[0]?.content?.parts?.[0]?.text) {
-          const rawText = resJson.candidates[0].content.parts[0].text;
-          const cleanText = rawText.replace(/```json/gi, "").replace(/```/g, "").trim();
-
-          let parsedJson: Record<string, any> | null = null;
-          try {
-            parsedJson = JSON.parse(cleanText);
-          } catch {
-            const jsonMatch = cleanText.match(/\{[\s\S]*\}/);
-            if (jsonMatch) {
-              try { parsedJson = JSON.parse(jsonMatch[0]); } catch {}
-            }
-          }
-
-          // Jika paspor, gunakan parser paspor untuk normalisasi tanggal, MRZ, dan resolusi alias key
-          let passportParsed: ReturnType<typeof parsePassport> | null = null;
-          if (jenis === "paspor" || mode?.startsWith("paspor")) {
-            passportParsed = parsePassport(rawText, parsedJson);
-          }
-
-          const expectedFields = getFieldsForMode(jenis, mode);
-          const fields = expectedFields.map((field) => {
-            let value = "";
-            if (passportParsed && field in passportParsed) {
-              value = String((passportParsed as any)[field] || "").trim();
-            } else if (parsedJson && parsedJson[field]) {
-              value = String(parsedJson[field]).trim();
-            }
-            if (!value) {
-              value = extractField(rawText, field);
-            }
-            return { field, value, confidence: value ? 0.95 : 0 };
-          });
-
-          console.log(
-            `[AI Studio Adapter] ✅ SUCCESS | model=${modelName} | key=***${keySuffix} | totalMs=${Date.now() - start}ms`
-          );
-
-          return {
-            success: true,
-            fields,
-            rawText,
-            overallConfidence: 0.95,
-            processingTimeMs: Date.now() - start,
-            retryCount,
-          };
-        } else if (resJson?.error) {
-          alasanErrorGoogle = resJson.error.message || `HTTP ${res.status}`;
-          lastStatusCode = res.status;
-          console.warn(`[AI Studio Adapter] ⚠️ Model ${modelName} HTTP ${res.status}: ${alasanErrorGoogle}`);
-          if (res.status === 429) {
-            break; // Quota habis pada key ini, rotasikan ke key berikutnya
-          }
-        }
-      } catch (err: any) {
-        alasanErrorGoogle = err?.message || String(err);
-        const isQuota = alasanErrorGoogle.includes("429") || alasanErrorGoogle.includes("quota");
-        if (isQuota) {
-          lastStatusCode = 429;
-          break;
+        parsedJson = JSON.parse(cleanText);
+      } catch {
+        const jsonMatch = cleanText.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          try { parsedJson = JSON.parse(jsonMatch[0]); } catch {}
         }
       }
+
+      // Jika paspor, gunakan parser paspor untuk normalisasi tanggal, MRZ, dan resolusi alias key
+      let passportParsed: ReturnType<typeof parsePassport> | null = null;
+      if (jenis === "paspor" || mode?.startsWith("paspor")) {
+        passportParsed = parsePassport(rawText, parsedJson);
+      }
+
+      const expectedFields = getFieldsForMode(jenis, mode);
+      const fields = expectedFields.map((field) => {
+        let value = "";
+        if (passportParsed && field in passportParsed) {
+          value = String((passportParsed as any)[field] || "").trim();
+        } else if (parsedJson && parsedJson[field]) {
+          value = String(parsedJson[field]).trim();
+        }
+        if (!value) {
+          value = extractField(rawText, field);
+        }
+        return { field, value, confidence: value ? 0.95 : 0 };
+      });
+
+      console.log(
+        `[AI Studio Adapter] ✅ SUCCESS | model=${modelName} | key=***${keySuffix} | totalMs=${Date.now() - start}ms`
+      );
+
+      return {
+        success: true,
+        fields,
+        rawText,
+        overallConfidence: 0.95,
+        processingTimeMs: Date.now() - start,
+        retryCount,
+      };
     }
 
-    throw { statusCode: lastStatusCode, message: alasanErrorGoogle || "Semua model Gemini gagal merespons" };
+    const alasanErrorGoogle = resJson?.error?.message || `HTTP ${res.status}`;
+    console.warn(`[AI Studio Adapter] ⚠️ Model ${modelName} HTTP ${res.status}: ${alasanErrorGoogle}`);
+    throw { statusCode: res.status, message: alasanErrorGoogle };
   },
 
   validateImage(buffer: Buffer): ImageMetaCheck {
