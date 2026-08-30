@@ -53,7 +53,7 @@ const LABEL_DOKUMEN: Record<string, string> = {
   surat_lansia: "Surat Lansia",
 };
 
-const ALL_DOC_JENIS = ["paspor", "pas_foto", "vaksin", "ktp", "kk", "akta", "surat_lansia"] as const;
+const ALL_DOC_JENIS: DokumenJenis[] = ["paspor", "pas_foto", "vaksin", "ktp", "kk", "akta", "surat_lansia"];
 
 // ============================================================
 // HELPERS

@@ -5,11 +5,11 @@
 
 // --- Base Enums & Literals ---
 
-/** Mandatory: Paspor, Pas Foto, Vaksin, KTP. Optional: KK, Akta */
-export type DokumenJenis = "paspor" | "pas_foto" | "vaksin" | "ktp" | "kk" | "akta";
+/** Mandatory: Paspor, Pas Foto, Vaksin, KTP. Optional/Conditional: KK, Akta, Surat Lansia, Buku Nikah */
+export type DokumenJenis = "paspor" | "pas_foto" | "vaksin" | "ktp" | "kk" | "akta" | "surat_lansia" | "buku_nikah";
 
 export const DOKUMEN_WAJIB: DokumenJenis[] = ["paspor", "pas_foto", "vaksin", "ktp"];
-export const DOKUMEN_OPSIONAL: DokumenJenis[] = ["kk", "akta"];
+export const DOKUMEN_OPSIONAL: DokumenJenis[] = ["kk", "akta", "surat_lansia", "buku_nikah"];
 
 export type ValidationPriority = "strict" | "flexible";
 
@@ -20,6 +20,8 @@ export const VALIDATION_LEVEL: Record<DokumenJenis, ValidationPriority> = {
   ktp: "flexible",
   kk: "flexible",
   akta: "flexible",
+  surat_lansia: "flexible",
+  buku_nikah: "flexible",
 };
 
 export type StatusDokumen = "lengkap" | "kurang" | "revisi" | "pending" | "processing" | "verified" | "rejected";
