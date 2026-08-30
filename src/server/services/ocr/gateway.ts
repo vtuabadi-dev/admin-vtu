@@ -42,18 +42,35 @@ export async function process(
   jenis: DokumenJenis,
   retryCount: number = 0,
   mode?: string,
+  forceFresh: boolean = false,
 ): Promise<OcrResult> {
   const startTime = Date.now();
   const imageHash = gatewayConfig.cacheEnabled ? hashImage(imageBuffer) : undefined;
   const imageSize = imageBuffer.length;
 
   // ── 1. Cache check ──────────────────────────────────
-  if (gatewayConfig.cacheEnabled) {
+  if (gatewayConfig.cacheEnabled && !forceFresh) {
     const cached = await lookupCache(imageBuffer, jenis, {
       enabled: true,
       ttlHours: gatewayConfig.cacheTtlHours,
     });
     if (cached) {
+      // Re-hydrate missing fields for paspor if rawText is present
+      if ((jenis === "paspor" || mode?.startsWith("paspor")) && cached.rawText) {
+        const { parsePassport } = await import("./passport-parser");
+        const parsed = parsePassport(cached.rawText);
+        const hasMissingFields = !cached.fields.some((f) => f.field === "tempatTerbitPaspor" && f.value) ||
+                                 !cached.fields.some((f) => f.field === "tanggalKadaluarsa" && f.value) ||
+                                 !cached.fields.some((f) => f.field === "tanggalTerbitPaspor" && f.value);
+
+        if (hasMissingFields && (parsed.tempatTerbitPaspor || parsed.tanggalKadaluarsa || parsed.tanggalTerbitPaspor)) {
+          const expectedFields = ["namaLengkap", "nomorPaspor", "tempatTerbitPaspor", "tanggalTerbitPaspor", "tanggalKadaluarsa"];
+          cached.fields = expectedFields.map((field) => {
+            const val = (parsed as any)[field] || cached.fields.find((f) => f.field === field)?.value || "";
+            return { field, value: val, confidence: val ? 0.95 : 0 };
+          });
+        }
+      }
       return { ...cached, retryCount, processingTimeMs: Date.now() - startTime };
     }
   }

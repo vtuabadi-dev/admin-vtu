@@ -232,21 +232,21 @@ const PASSPORT_PATTERNS = {
     /(?:NAMA\s*LENGKAP(?:\s*\/\s*FULL\s*NAME)?|FULL\s*NAME|SURNAME|NAMA|NAME)\s*[:=]?\s*([A-Z\s.,'-]+?)(?:\r?\n|Kewarganegaraan|Nationality|IDN|$)/i,
   ],
   tempatTerbitPaspor: [
-    /(?:KANTOR\s*(?:YANG\s*)?MENGELUARKAN(?:\s*\/\s*ISSUING\s*AUTHORITY)?|ISSUING\s*AUTHORITY|KANTOR\s*IMIGRASI|ISSUING\s*OFFICE|DITERBITKAN\s*DI(?:\s*\/\s*PLACE\s*OF\s*ISSUE)?|PLACE\s*OF\s*ISSUE)\s*[:=]?\s*([A-Z\s.,'-]+?)(?:\r?\n|$)/i,
+    /(?:KANTOR\s*(?:YANG\s*)?MENGELUARKAN(?:\s*\/\s*ISSUING\s*(?:OFFICE|AUTHORITY))?|ISSUING\s*(?:OFFICE|AUTHORITY)|KANTOR\s*IMIGRASI|ISSUING\s*OFFICE|DITERBITKAN\s*DI(?:\s*\/\s*PLACE\s*OF\s*ISSUE)?|PLACE\s*OF\s*ISSUE)\s*[:=]?\s*([A-Z\s.,'-]+?)(?:\r?\n|$)/i,
     /1A[0-9A-Z]{10,}\s*\r?\n?\s*([A-Z\s]+?)(?:\r?\n|$)/i,
   ],
   tanggalTerbitPaspor: [
-    /(?:TGL\.?\s*PENGELUARAN(?:\s*\/\s*DATE\s*OF\s*ISSUE)?|DATE\s*OF\s*ISSUE|TANGGAL\s*PENGELUARAN|TANGGAL\s*TERBIT|TGL\.?\s*TERBIT|ISSUE\s*DATE)\s*[:=]?\s*(\d{1,2}[ \-/]+[A-Za-z]+[ \-/]+\d{4}|\d{1,2}[-/\.]\d{1,2}[-/\.]\d{4}|\d{4}[-/\.]\d{1,2}[-/\.]\d{1,2}|[^\r\n]+)/i,
+    /(?:TGL\.?\s*PENGELUARAN(?:\s*\/\s*DATE\s*OF\s*ISSUE)?|DATE\s*OF\s*ISSUE|TANGGAL\s*PENGELUARAN|TANGGAL\s*TERBIT|TGL\.?\s*TERBIT|ISSUE\s*DATE)\s*[:=]?\s*(\d{1,2}[ \-/]+[A-Za-z]+[ \-/]+\d{4}|\d{1,2}[-/\.]\d{1,2}[-/\.]\d{4}|\d{4}[-/\.]\d{1,2}[-/\.]\d{4}|[^\r\n]+)/i,
   ],
   tanggalKadaluarsa: [
-    /(?:BERLAKU\s*S\/?D\.?(?:\s*\/\s*DATE\s*OF\s*EXPIRY)?|DATE\s*OF\s*EXPIRY|TANGGAL\s*KADALUARSA|EXPIRY\s*DATE|BERLAKU\s*(?:HINGGA|SAMPAI)|MASA\s*BERLAKU)\s*[:=]?\s*(\d{1,2}[ \-/]+[A-Za-z]+[ \-/]+\d{4}|\d{1,2}[-/\.]\d{1,2}[-/\.]\d{4}|\d{4}[-/\.]\d{1,2}[-/\.]\d{1,2}|[^\r\n]+)/i,
+    /(?:TGL\.?\s*HABIS\s*BERLAKU(?:\s*\/\s*DATE\s*OF\s*EXPIRY)?|BERLAKU\s*S\/?D\.?(?:\s*\/\s*DATE\s*OF\s*EXPIRY)?|DATE\s*OF\s*EXPIRY|TANGGAL\s*KADALUARSA|TGL\.?\s*KADALUARSA|EXPIRY\s*DATE|HABIS\s*BERLAKU|BERLAKU\s*(?:HINGGA|SAMPAI)|MASA\s*BERLAKU)\s*[:=]?\s*(\d{1,2}[ \-/]+[A-Za-z]+[ \-/]+\d{4}|\d{1,2}[-/\.]\d{1,2}[-/\.]\d{4}|\d{4}[-/\.]\d{1,2}[-/\.]\d{4}|[^\r\n]+)/i,
   ],
   tempatLahir: [
     /(?:TEMPAT\s*LAHIR(?:\s*\/\s*PLACE\s*OF\s*BIRTH)?|PLACE\s*OF\s*BIRTH)\s*[:=]?\s*([A-Z\s.,'-]+?)(?:\r?\n|Tgl|Date|Jenis|Sex|$)/i,
     /(?:TEMPAT\s*\/?\s*TGL?\s*\.?\s*LAHIR)\s*[:=]?\s*([^,\r\n]+)/i,
   ],
   tanggalLahir: [
-    /(?:TGL\.?\s*LAHIR(?:\s*\/\s*DATE\s*OF\s*BIRTH)?|DATE\s*OF\s*BIRTH|TANGGAL\s*LAHIR)\s*[:=]?\s*(\d{1,2}[ \-/]+[A-Za-z]+[ \-/]+\d{4}|\d{1,2}[-/\.]\d{1,2}[-/\.]\d{4}|\d{4}[-/\.]\d{1,2}[-/\.]\d{1,2}|[^\r\n]+)/i,
+    /(?:TGL\.?\s*LAHIR(?:\s*\/\s*DATE\s*OF\s*BIRTH)?|DATE\s*OF\s*BIRTH|TANGGAL\s*LAHIR)\s*[:=]?\s*(\d{1,2}[ \-/]+[A-Za-z]+[ \-/]+\d{4}|\d{1,2}[-/\.]\d{1,2}[-/\.]\d{4}|\d{4}[-/\.]\d{1,2}[-/\.]\d{4}|[^\r\n]+)/i,
     /(?:TEMPAT\s*\/?\s*TGL?\s*\.?\s*LAHIR)\s*[:=]?\s*.+?,\s*([^\r\n]+)/i,
   ],
   jenisKelamin: [
@@ -257,7 +257,11 @@ const PASSPORT_PATTERNS = {
   ],
 };
 
-function extractByRegex(text: string, patterns: RegExp[]): string {
+/**
+ * Ekstrak nilai field baik pada baris yang sama maupun baris berikutnya (multi-line OCR)
+ */
+function extractByRegexOrNextLine(text: string, patterns: RegExp[]): string {
+  // 1. Same-line match
   for (const regex of patterns) {
     const match = text.match(regex);
     if (match?.[1]) {
@@ -265,6 +269,23 @@ function extractByRegex(text: string, patterns: RegExp[]): string {
       if (val && val !== "-" && val !== ":") return val;
     }
   }
+
+  // 2. Multi-line match: Label on line i, Value on line i+1
+  const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]!;
+    for (const regex of patterns) {
+      if (regex.test(line)) {
+        if (i + 1 < lines.length) {
+          const nextLine = lines[i + 1]!;
+          if (!nextLine.startsWith("P<") && !nextLine.includes("REPUBLIK") && !nextLine.includes("PASPOR")) {
+            return nextLine.trim();
+          }
+        }
+      }
+    }
+  }
+
   return "";
 }
 
@@ -274,15 +295,48 @@ function extractByRegex(text: string, patterns: RegExp[]): string {
 export function cleanTempatTerbit(raw: string): string {
   if (!raw) return "";
   let val = raw.trim().toUpperCase();
-  // Hilangkan prefix umum seperti "KANIM KELAS I TPI ", "KANTOR IMIGRASI ", dsb jika ingin nama kota murni
   val = val
     .replace(/^KANIM\s+(?:KELAS\s+[I|V|X\d]+\s+)?(?:TPI\s+)?/i, "")
     .replace(/^KANTOR\s+IMIGRASI\s+(?:KELAS\s+[I|V|X\d]+\s+)?(?:TPI\s+)?/i, "")
-    .replace(/^KANTOR\s+YANG\s+MENGELUARKAN\s*[:=]?\s*/i, "")
-    .replace(/^ISSUING\s+AUTHORITY\s*[:=]?\s*/i, "")
-    .replace(/^[0-9A-Z]{10,}\s+/i, "") // hapus no reg jika ikut terbawa
+    .replace(/^KANTOR\s+YANG\s+MENGELUARKAN(?:\s*\/\s*ISSUING\s*(?:OFFICE|AUTHORITY))?\s*[:=]?\s*/i, "")
+    .replace(/^ISSUING\s+(?:OFFICE|AUTHORITY)\s*[:=]?\s*/i, "")
+    .replace(/^[0-9A-Z]{10,}\s+/i, "")
+    .replace(/^[:\-\s]+/, "")
     .trim();
   return val;
+}
+
+// Daftar kota besar / kantor imigrasi Indonesia untuk pencarian fallback
+const INDONESIAN_KANIM_CITIES = [
+  "MALANG", "JAKARTA", "JAKARTA PUSAT", "JAKARTA SELATAN", "JAKARTA BARAT", "JAKARTA UTARA", "JAKARTA TIMUR",
+  "SURABAYA", "BANDUNG", "MEDAN", "SEMARANG", "MAKASSAR", "DENPASAR", "YOGYAKARTA", "SURAKARTA", "SOLO",
+  "TANGERANG", "BEKASI", "BOGOR", "DEPOK", "BATAM", "PEKANBARU", "PALEMBANG", "PONTIANAK", "BANJARMASIN",
+  "MANADO", "MATARAM", "KUPANG", "AMBON", "JAYAPURA", "SERANG", "CIREBON", "TASIKMALAYA", "KEDIRI", "JEMBER",
+  "MADIUN", "BLITAR", "PROBOLINGGO", "PASURUAN", "BANYUWANGI", "CILACAP", "PATI", "PEMALANG", "PURWOKERTO",
+  "MAGELANG", "SALATIGA", "TEGAL", "PEKALONGAN", "SUKABUMI", "KARAWANG", "CIANJUR", "BANDA ACEH", "JAMBI",
+  "SAMARINDA", "BALIKPAPAN", "TARAKAN", "PALANGKARAYA", "KENDARI", "PALU", "GORONTALO", "SORONG", "TIMIKA",
+];
+
+function findCityNearIssuingOffice(text: string): string {
+  const lines = text.split(/\r?\n/).map((l) => l.trim().toUpperCase());
+  // Cari baris yang mengandung ISSUING atau MENGELUARKAN atau 1A...
+  for (let i = 0; i < lines.length; i++) {
+    const l = lines[i]!;
+    if (l.includes("ISSUING") || l.includes("MENGELUARKAN") || l.includes("IMIGRASI") || /^1A[0-9A-Z]{8,}/.test(l)) {
+      // Cek baris yang sama
+      for (const city of INDONESIAN_KANIM_CITIES) {
+        if (l.includes(city)) return city;
+      }
+      // Cek baris berikutnya (i+1, i+2)
+      for (let offset = 1; offset <= 2 && i + offset < lines.length; offset++) {
+        const nextLine = lines[i + offset]!;
+        for (const city of INDONESIAN_KANIM_CITIES) {
+          if (nextLine === city || nextLine.includes(city)) return city;
+        }
+      }
+    }
+  }
+  return "";
 }
 
 // ── Parser Utama Paspor ───────────────────────────────────────
@@ -304,7 +358,7 @@ export function parsePassport(
     json.passportNumber ||
     json.passportNo ||
     mrz?.passportNumber ||
-    extractByRegex(rawText, PASSPORT_PATTERNS.nomorPaspor) ||
+    extractByRegexOrNextLine(rawText, PASSPORT_PATTERNS.nomorPaspor) ||
     ""
   ).toString().trim().toUpperCase().replace(/\s+/g, "");
 
@@ -313,12 +367,12 @@ export function parsePassport(
     json.namaLengkap ||
     json.fullName ||
     json.name ||
-    extractByRegex(rawText, PASSPORT_PATTERNS.namaLengkap) ||
+    extractByRegexOrNextLine(rawText, PASSPORT_PATTERNS.namaLengkap) ||
     mrz?.fullName ||
     ""
   ).toString().trim().toUpperCase();
 
-  // 3. Tempat Terbit Paspor (Tempat/Kantor yang mengeluarkan)
+  // 3. Tempat Terbit Paspor (Tempat/Kantor yang mengeluarkan di kanan bawah)
   let tempatTerbitPaspor = (
     json.tempatTerbitPaspor ||
     json.tempatTerbit ||
@@ -328,12 +382,16 @@ export function parsePassport(
     json.kantorImigrasi ||
     json.placeOfIssue ||
     json.issuingOffice ||
-    extractByRegex(rawText, PASSPORT_PATTERNS.tempatTerbitPaspor) ||
+    extractByRegexOrNextLine(rawText, PASSPORT_PATTERNS.tempatTerbitPaspor) ||
+    findCityNearIssuingOffice(rawText) ||
     ""
   ).toString().trim();
   tempatTerbitPaspor = cleanTempatTerbit(tempatTerbitPaspor);
+  if (!tempatTerbitPaspor) {
+    tempatTerbitPaspor = findCityNearIssuingOffice(rawText);
+  }
 
-  // 4. Tanggal Terbit Paspor
+  // 4. Tanggal Terbit Paspor (Tgl. Pengeluaran di kiri tgl habis berlaku)
   const rawTanggalTerbit = (
     json.tanggalTerbitPaspor ||
     json.tanggalTerbit ||
@@ -342,12 +400,12 @@ export function parsePassport(
     json.dateOfIssue ||
     json.tglTerbit ||
     json.issueDate ||
-    extractByRegex(rawText, PASSPORT_PATTERNS.tanggalTerbitPaspor) ||
+    extractByRegexOrNextLine(rawText, PASSPORT_PATTERNS.tanggalTerbitPaspor) ||
     ""
   ).toString().trim();
   const tanggalTerbitPaspor = normalizePassportDate(rawTanggalTerbit);
 
-  // 5. Tanggal Kadaluarsa Paspor
+  // 5. Tanggal Kadaluarsa Paspor (Tgl. Habis Berlaku di atas kantor penerbit / MRZ line 2)
   const rawTanggalKadaluarsa = (
     json.tanggalKadaluarsa ||
     json.masaBerlaku ||
@@ -356,8 +414,9 @@ export function parsePassport(
     json.berlakuHingga ||
     json.berlakuSampai ||
     json.tglKadaluarsa ||
+    json.tglHabisBerlaku ||
     mrz?.expiryDate ||
-    extractByRegex(rawText, PASSPORT_PATTERNS.tanggalKadaluarsa) ||
+    extractByRegexOrNextLine(rawText, PASSPORT_PATTERNS.tanggalKadaluarsa) ||
     ""
   ).toString().trim();
   let tanggalKadaluarsa = normalizePassportDate(rawTanggalKadaluarsa);
@@ -369,7 +428,7 @@ export function parsePassport(
   let tempatLahir = (
     json.tempatLahir ||
     json.placeOfBirth ||
-    extractByRegex(rawText, PASSPORT_PATTERNS.tempatLahir) ||
+    extractByRegexOrNextLine(rawText, PASSPORT_PATTERNS.tempatLahir) ||
     ""
   ).toString().trim().toUpperCase();
 
@@ -379,7 +438,7 @@ export function parsePassport(
     json.dateOfBirth ||
     json.tglLahir ||
     mrz?.dateOfBirth ||
-    extractByRegex(rawText, PASSPORT_PATTERNS.tanggalLahir) ||
+    extractByRegexOrNextLine(rawText, PASSPORT_PATTERNS.tanggalLahir) ||
     ""
   ).toString().trim();
   let tanggalLahir = normalizePassportDate(rawTanggalLahir);
@@ -392,7 +451,7 @@ export function parsePassport(
     json.jenisKelamin ||
     json.sex ||
     mrz?.sex ||
-    extractByRegex(rawText, PASSPORT_PATTERNS.jenisKelamin) ||
+    extractByRegexOrNextLine(rawText, PASSPORT_PATTERNS.jenisKelamin) ||
     ""
   ).toString().trim();
 
@@ -401,7 +460,7 @@ export function parsePassport(
     json.kewarganegaraan ||
     json.nationality ||
     mrz?.nationality ||
-    extractByRegex(rawText, PASSPORT_PATTERNS.kewarganegaraan) ||
+    extractByRegexOrNextLine(rawText, PASSPORT_PATTERNS.kewarganegaraan) ||
     "INDONESIA"
   ).toString().trim().toUpperCase();
 

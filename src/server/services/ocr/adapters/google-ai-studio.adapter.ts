@@ -77,10 +77,10 @@ function getPromptPasporTanpaNama(): string {
   return `Analisis gambar Paspor Indonesia ini. JANGAN masukkan nama pemegang paspor.
 Ekstrak HANYA data berikut dalam format JSON valid (tanpa markdown wrapper):
 {
-  "nomorPaspor": "Nomor paspor (1 huruf + 7 digit, contoh: X4573266)",
-  "tempatTerbitPaspor": "Kantor/kota penerbitan paspor dari kolom 'KANTOR YANG MENGELUARKAN / ISSUING AUTHORITY' atau 'KANTOR IMIGRASI' (BUKAN tempat lahir, contoh: MALANG, JAKARTA PUSAT)",
-  "tanggalTerbitPaspor": "Tanggal penerbitan dari 'TGL. PENGELUARAN / DATE OF ISSUE' dalam format YYYY-MM-DD (contoh: 2024-12-10)",
-  "tanggalKadaluarsa": "Tanggal habis masa berlaku dari 'BERLAKU S/D / DATE OF EXPIRY' atau baris MRZ dalam format YYYY-MM-DD (contoh: 2034-12-10)",
+  "nomorPaspor": "Nomor paspor pada kanan atas (contoh: X4573266)",
+  "tempatTerbitPaspor": "Kota penerbitan paspor di PALING BAWAH SEBELAH KANAN pada 'KANTOR YANG MENGELUARKAN / ISSUING OFFICE' atau 'ISSUING AUTHORITY' (contoh: MALANG) — BUKAN tempat lahir",
+  "tanggalKadaluarsa": "Tanggal habis masa berlaku TEPAT DI ATAS kota penerbitan pada 'TGL. HABIS BERLAKU / DATE OF EXPIRY' atau dari baris MRZ, format YYYY-MM-DD (contoh: 2034-12-10)",
+  "tanggalTerbitPaspor": "Tanggal penerbitan DI SEBELAH KIRI tanggal kadaluarsa pada 'TGL. PENGELUARAN / DATE OF ISSUE', format YYYY-MM-DD (contoh: 2024-12-10)",
   "rawText": "Teks mentah paspor termasuk 2 baris MRZ di bagian bawah"
 }`;
 }
@@ -121,16 +121,26 @@ function getFieldsForMode(jenis: DokumenJenis, mode?: string): string[] {
 function getPromptForJenis(jenis: DokumenJenis): string {
   switch (jenis) {
     case "paspor":
-      return `Analisis gambar Paspor Indonesia ini dan ekstrak data terstruktur berikut dalam format JSON valid (tanpa markdown wrapper):
+      return `Analisis gambar Paspor Indonesia ini. Paspor Indonesia memiliki tata letak halaman data sebagai berikut:
+1. "nomorPaspor": Nomor paspor pada kanan atas di kolom 'NO. PASPOR / PASSPORT NO.' (contoh: X4573266)
+2. "namaLengkap": Nama pemegang paspor pada 'NAMA LENGKAP / FULL NAME' (contoh: MUCHAMAD ZAMRONI)
+3. "tempatTerbitPaspor": Kota tempat penerbitan paspor yang terletak di PALING BAWAH SEBELAH KANAN pada kolom 'KANTOR YANG MENGELUARKAN / ISSUING OFFICE' atau 'ISSUING AUTHORITY' (contoh: MALANG, JAKARTA) — BUKAN tempat lahir.
+4. "tanggalKadaluarsa": Tanggal habis masa berlaku paspor yang terletak TEPAT DI ATAS kota penerbitan paspor pada kolom 'TGL. HABIS BERLAKU / DATE OF EXPIRY' atau 'BERLAKU S/D' atau dari baris MRZ, format YYYY-MM-DD (contoh: 2034-12-10).
+5. "tanggalTerbitPaspor": Tanggal penerbitan paspor yang terletak DI SEBELAH KIRI tanggal kadaluarsa pada kolom 'TGL. PENGELUARAN / DATE OF ISSUE', format YYYY-MM-DD (contoh: 2024-12-10).
+6. "tempatLahir": Tempat lahir pada 'TEMPAT LAHIR / PLACE OF BIRTH' (contoh: MALANG)
+7. "tanggalLahir": Tanggal lahir pada 'TGL. LAHIR / DATE OF BIRTH', format YYYY-MM-DD (contoh: 1992-08-12)
+8. "rawText": Teks mentah lengkap termasuk 2 baris MRZ di bagian bawah paspor
+
+Ekstrak seluruh data di atas dalam format JSON valid (tanpa markdown wrapper):
 {
-  "namaLengkap": "Nama lengkap pemegang paspor (contoh: MUCHAMAD ZAMRONI)",
-  "nomorPaspor": "Nomor paspor (contoh: X4573266 atau C1234567 — biasanya 1 huruf + 7 digit)",
-  "tempatTerbitPaspor": "Kantor/kota penerbitan paspor dari kolom 'KANTOR YANG MENGELUARKAN / ISSUING AUTHORITY' atau 'KANTOR IMIGRASI' (BUKAN tempat lahir, contoh: MALANG, JAKARTA PUSAT)",
-  "tanggalTerbitPaspor": "Tanggal penerbitan/pengeluaran paspor dari 'TGL. PENGELUARAN / DATE OF ISSUE' dalam format YYYY-MM-DD (contoh: 2024-12-10)",
-  "tanggalKadaluarsa": "Tanggal habis masa berlaku paspor dari 'BERLAKU S/D / DATE OF EXPIRY' atau baris MRZ dalam format YYYY-MM-DD (contoh: 2034-12-10)",
-  "tempatLahir": "Tempat lahir dari 'TEMPAT LAHIR / PLACE OF BIRTH'",
-  "tanggalLahir": "Tanggal lahir dari 'TGL. LAHIR / DATE OF BIRTH' dalam format YYYY-MM-DD",
-  "rawText": "Teks mentah paspor termasuk 2 baris MRZ di bagian bawah"
+  "namaLengkap": "...",
+  "nomorPaspor": "...",
+  "tempatTerbitPaspor": "...",
+  "tanggalTerbitPaspor": "YYYY-MM-DD",
+  "tanggalKadaluarsa": "YYYY-MM-DD",
+  "tempatLahir": "...",
+  "tanggalLahir": "YYYY-MM-DD",
+  "rawText": "..."
 }`;
     case "ktp":
       return `Analisis gambar KTP (Kartu Tanda Penduduk) ini dan ekstrak data terstruktur berikut dalam format JSON:

@@ -671,7 +671,13 @@ export default function DokumenPage() {
       const res = await fetch("/api/dokumen/ocr", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ dokumenId: doc.id, fileUrl: doc.fileUrl, jenis, mode }),
+        body: JSON.stringify({
+          dokumenId: doc.id,
+          fileUrl: doc.fileUrl,
+          jenis,
+          mode,
+          forceFresh: !overrideDoc, // User manual click "Ekstrak Ulang" always forces fresh OCR
+        }),
       });
 
       const json = await res.json().catch(() => ({}));

@@ -114,18 +114,40 @@ X4573266<8IDN9208120M34121013573021208000218
       expect(result.confidence).toBeGreaterThan(0.8);
     });
 
-    it("handles AI JSON output with various alias keys", () => {
-      const jsonResponse = {
-        name: "Muchamad Zamroni",
-        passportNo: "X4573266",
-        issuingAuthority: "MALANG",
-        dateOfIssue: "10 DEC 2024",
-        dateOfExpiry: "10 DEC 2034",
-        placeOfBirth: "MALANG",
-        dateOfBirth: "12 AUG 1992",
-      };
+    it("handles multiline OCR text with ISSUING OFFICE and TGL. HABIS BERLAKU without colons", () => {
+      const rawText = `
+REPUBLIK INDONESIA
+REPUBLIC OF INDONESIA
+PASPOR
+PASSPORT
+JENIS / TYPE
+P
+KODE NEGARA / COUNTRY CODE
+IDN
+NO. PASPOR / PASSPORT NO.
+X4573266
+NAMA LENGKAP / FULL NAME
+MUCHAMAD ZAMRONI
+KEWARGANEGARAAN / NATIONALITY
+INDONESIA
+TGL. LAHIR / DATE OF BIRTH
+12 AUG 1992
+TEMPAT LAHIR / PLACE OF BIRTH
+MALANG
+TGL. PENGELUARAN / DATE OF ISSUE
+10 DEC 2024
+TGL. HABIS BERLAKU / DATE OF EXPIRY
+10 DEC 2034
+NO. REG.
+1A51CC8508DAPW
+KANTOR YANG MENGELUARKAN / ISSUING OFFICE
+MALANG
 
-      const result = parsePassport("", jsonResponse);
+P<IDNZAMRONI<<MUCHAMAD<<<<<<<<<<<<<<<<<<<<<<
+X4573266<8IDN9208120M34121013573021208000218
+`;
+
+      const result = parsePassport(rawText, null);
 
       expect(result.nomorPaspor).toBe("X4573266");
       expect(result.namaLengkap).toBe("MUCHAMAD ZAMRONI");

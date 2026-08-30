@@ -126,12 +126,13 @@ export async function processDocument(
   jenis: DokumenJenis,
   retryCount = 0,
   mode?: string,
+  forceFresh = false,
 ): Promise<OcrResult> {
   // ── DB-Driven OCR Gateway (adaptive, multi-provider) ──
   if (process.env.OCR_DB_DRIVEN !== "false") {
     const { process: gatewayProcess } = await import("./ocr/gateway");
     console.log("[OCR] Using DB-driven gateway mode");
-    return gatewayProcess(imageBuffer, jenis, retryCount, mode);
+    return gatewayProcess(imageBuffer, jenis, retryCount, mode, forceFresh);
   }
 
   // ── Legacy env-var path ──
