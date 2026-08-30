@@ -33,6 +33,8 @@ const DOKUMEN_LABEL: Record<DokumenJenis, string> = {
   ktp: "KTP",
   kk: "Kartu Keluarga",
   akta: "Akta Lahir",
+  surat_lansia: "Surat Pernyataan Lansia",
+  buku_nikah: "Buku Nikah",
 };
 
 function getStatusIcon(status: string) {
