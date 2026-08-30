@@ -192,6 +192,11 @@ export default function DokumenPage() {
   const [endorsementOcrResult, setEndorsementOcrResult] = useState<any>(null);
   const [pasporPageTab, setPasporPageTab] = useState<"hal1" | "hal2">("hal1");
 
+  const storeJamaah = useOperationalStore((s) => s.jamaahList);
+  const setStoreJamaah = useOperationalStore((s) => s.setJamaahList);
+  const setStoreKbrList = useOperationalStore((s) => s.setKeberangkatanList);
+  const setStoreGroupList = useOperationalStore((s) => s.setGroupList);
+
   // Sync with store if store updates
   useEffect(() => {
     if (storeKbrList && storeKbrList.length > 0 && keberangkatanList.length === 0) {
@@ -200,8 +205,13 @@ export default function DokumenPage() {
     }
   }, [storeKbrList, keberangkatanList.length, selectedPackage]);
 
-  // Load fresh initial data in background
+  // Load initial data ONLY IF store is not loaded yet
   useEffect(() => {
+    if (storeIsLoaded && storeKbrList.length > 0) {
+      setLoading(false);
+      return; // Sudah ada di memori, tidak perlu unduh ulang ke database!
+    }
+
     async function load() {
       try {
         const [kbrRes, groupsRes] = await Promise.all([
@@ -212,6 +222,7 @@ export default function DokumenPage() {
           const json = await kbrRes.json();
           const kbrList = json.data ?? [];
           setKeberangkatanList(kbrList);
+          setStoreKbrList(kbrList);
           if (kbrList.length > 0 && !selectedPackage && kbrList[0]?.id) {
             setSelectedPackage(kbrList[0].id);
           }
@@ -219,6 +230,7 @@ export default function DokumenPage() {
         if (groupsRes.ok) {
           const json = await groupsRes.json();
           const groupList = json.data ?? [];
+          setStoreGroupList(groupList);
           const groupMap: Record<string, { namaGroup: string; kodeRegistrasi: string; paketId: string; createdAt?: string; updatedAt?: string }> = {};
           groupList.forEach((g: any) => {
             groupMap[g.id] = {
@@ -235,11 +247,87 @@ export default function DokumenPage() {
       setLoading(false);
     }
     load();
+  }, [storeIsLoaded, storeKbrList.length, setStoreGroupList, setStoreKbrList]);
+
+  // Build matrix: use memory store when available, only fetch if store is empty
+  const buildMatrixFromJamaah = useCallback((allJamaah: any[], pkgId: string, currentGroups: Record<string, any>) => {
+    const pkgJamaah = allJamaah.filter((j: any) => {
+      const g = currentGroups[j.groupId];
+      return g?.paketId === pkgId;
+    });
+
+    const sortedJamaah = [...pkgJamaah].sort((a: any, b: any) => {
+      const groupA = currentGroups[a.groupId];
+      const groupB = currentGroups[b.groupId];
+
+      const timeA = groupA ? new Date(groupA.updatedAt || groupA.createdAt || 0).getTime() : new Date(a.createdAt).getTime();
+      const timeB = groupB ? new Date(groupB.updatedAt || groupB.createdAt || 0).getTime() : new Date(b.createdAt).getTime();
+
+      if (timeA !== timeB) return timeA - timeB;
+
+      const numA = parseInt((a.nomorPeserta || a.registrationId || "0").replace(/\D/g, ""), 10) || 0;
+      const numB = parseInt((b.nomorPeserta || b.registrationId || "0").replace(/\D/g, ""), 10) || 0;
+      if (numA !== numB) return numA - numB;
+
+      const regA = a.registrationId || "";
+      const regB = b.registrationId || "";
+      if (regA !== regB) return regA.localeCompare(regB);
+
+      return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+    });
+
+    return sortedJamaah.map((j: any) => {
+      const g = currentGroups[j.groupId];
+      const mappedDocs: Record<string, any> = {};
+      (j.dokumen ?? []).forEach((d: any) => {
+        mappedDocs[d.jenis] = d;
+      });
+
+      const requiredTypes: DokumenJenis[] = ["paspor", "pas_foto", "vaksin", "ktp", "kk", "akta"];
+      let completeCount = 0;
+      requiredTypes.forEach((t) => {
+        const d = mappedDocs[t];
+        if (d && (d.status === "verified" || d.status === "lengkap")) {
+          completeCount++;
+        }
+      });
+
+      return {
+        jamaahId: j.id,
+        namaLengkap: j.namaLengkap,
+        nomorPeserta: j.nomorPeserta,
+        registrationId: j.registrationId,
+        groupId: j.groupId,
+        groupName: g?.namaGroup || "-",
+        kodeRegistrasi: g?.kodeRegistrasi || "-",
+        gender: j.gender,
+        dokumen: mappedDocs,
+        progressPercent: Math.round((completeCount / requiredTypes.length) * 100),
+        completeCount,
+        totalCount: requiredTypes.length,
+        statusKeseluruhan:
+          completeCount === requiredTypes.length
+            ? "lengkap"
+            : completeCount > 0
+            ? "sebagian"
+            : "kosong",
+      };
+    });
   }, []);
 
-  // Load completion matrix when package changes (fetch jamaah + documents for package)
+  // Load completion matrix when package changes
   useEffect(() => {
     if (!selectedPackage) return;
+
+    // Jika data jamaah sudah ada di memory store, render matriks langsung 0ms!
+    if (storeJamaah && storeJamaah.length > 0) {
+      const matrix = buildMatrixFromJamaah(storeJamaah, selectedPackage, groups);
+      setCompletionMatrix(matrix);
+      setMatrixLoading(false);
+      return;
+    }
+
+    // Hanya unduh jika store belum memiliki data
     async function load() {
       setMatrixLoading(true);
       try {
@@ -247,70 +335,15 @@ export default function DokumenPage() {
         if (res.ok) {
           const json = await res.json();
           const allJamaah = json.data ?? [];
-          const pkgJamaah = allJamaah.filter((j: any) => {
-            const g = groups[j.groupId];
-            return g?.paketId === selectedPackage;
-          });
-
-          // Sort jamaah chronologically:
-          // 1. Groups sorted by package entry timestamp (old groups first, new arrivals / transfers last)
-          // 2. Members within the same group sorted by registrationId / nomorPeserta (1: Zamroni, 2: Safina, 3: Faqih)
-          const sortedJamaah = [...pkgJamaah].sort((a: any, b: any) => {
-            const groupA = groups[a.groupId];
-            const groupB = groups[b.groupId];
-
-            const timeA = groupA ? new Date(groupA.updatedAt || groupA.createdAt || 0).getTime() : new Date(a.createdAt).getTime();
-            const timeB = groupB ? new Date(groupB.updatedAt || groupB.createdAt || 0).getTime() : new Date(b.createdAt).getTime();
-
-            if (timeA !== timeB) return timeA - timeB;
-
-            const numA = parseInt((a.nomorPeserta || a.registrationId || "0").replace(/\D/g, ""), 10) || 0;
-            const numB = parseInt((b.nomorPeserta || b.registrationId || "0").replace(/\D/g, ""), 10) || 0;
-            if (numA !== numB) return numA - numB;
-
-            const regA = a.registrationId || "";
-            const regB = b.registrationId || "";
-            if (regA !== regB) return regA.localeCompare(regB);
-
-            return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
-          });
-
-          // Build matrix from sorted jamaah
-          const matrix = sortedJamaah.map((j: any) => {
-            const g = groups[j.groupId];
-            const mappedDocs: Record<string, any> = {};
-            (j.dokumen ?? []).forEach((d: any) => {
-              mappedDocs[d.jenis] = d;
-            });
-
-            // Calculate progress & completeness
-            const mandatoryCount = ALL_DOC_JENIS.length;
-            const completedCount = ALL_DOC_JENIS.filter((jenis) => {
-              const doc = mappedDocs[jenis];
-              return doc && (doc.status === "verified" || doc.status === "lengkap");
-            }).length;
-
-            const completionPercentage = Math.round((completedCount / mandatoryCount) * 100);
-            const allMandatoryComplete = completedCount === mandatoryCount;
-
-            return {
-              jamaahId: j.id,
-              namaLengkap: j.namaLengkap,
-              nomorPeserta: j.nomorPeserta,
-              groupId: j.groupId,
-              kodeRegistrasi: g?.kodeRegistrasi || j.registrationId || "-",
-              dokumen: mappedDocs,
-              completionPercentage,
-              allMandatoryComplete,
-            };
-          });
+          setStoreJamaah(allJamaah);
+          const matrix = buildMatrixFromJamaah(allJamaah, selectedPackage, groups);
           setCompletionMatrix(matrix);
         }
       } catch { /* graceful */ }
       setMatrixLoading(false);
     }
     load();
-  }, [selectedPackage, groups]);
+  }, [selectedPackage, storeJamaah, groups, buildMatrixFromJamaah, setStoreJamaah]);
 
   // Load review queue
   const loadReviewQueue = useCallback(async (_filter?: string) => {
