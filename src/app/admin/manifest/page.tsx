@@ -110,24 +110,80 @@ function getPasporDetails(j: any) {
     pasporDoc = j.dokumen.find((d: any) => d.jenis === "paspor");
   }
 
-  const noPaspor = j.nomorPaspor && j.nomorPaspor !== "-"
-    ? j.nomorPaspor
-    : pasporDoc?.manualData?.nomorPaspor || pasporDoc?.ocrData?.nomorPaspor || "-";
+  const manual = pasporDoc?.manualData;
+  const ocr = pasporDoc?.ocrData;
 
-  const tglDikeluarkan = j.tglDikeluarkanPaspor
-    || pasporDoc?.manualData?.tanggalDikeluarkan
-    || pasporDoc?.ocrData?.tanggalDikeluarkan
-    || "-";
+  const noPaspor =
+    (j.nomorPaspor && j.nomorPaspor !== "-")
+      ? j.nomorPaspor
+      : manual?.nomorPaspor || manual?.noPaspor || ocr?.nomorPaspor || ocr?.noPaspor || "-";
 
-  const tglHabis = j.masaBerlakuPaspor
-    || pasporDoc?.manualData?.tanggalHabis
-    || pasporDoc?.ocrData?.tanggalHabis
-    || "-";
+  const tglDikeluarkan =
+    (j.tglDikeluarkanPaspor && j.tglDikeluarkanPaspor !== "-")
+      ? j.tglDikeluarkanPaspor
+      : (j.tanggalTerbitPaspor && j.tanggalTerbitPaspor !== "-")
+      ? j.tanggalTerbitPaspor
+      : manual?.tanggalTerbitPaspor
+      || manual?.tanggalTerbit
+      || manual?.tanggalDikeluarkan
+      || manual?.tglDikeluarkan
+      || manual?.tglTerbit
+      || ocr?.tanggalTerbitPaspor
+      || ocr?.tanggalTerbit
+      || ocr?.tanggalDikeluarkan
+      || ocr?.tglDikeluarkan
+      || ocr?.tglTerbit
+      || "-";
 
-  const kotaPaspor = j.kotaPaspor
-    || pasporDoc?.manualData?.kotaPaspor
-    || pasporDoc?.ocrData?.kotaPaspor
-    || "-";
+  const tglHabis =
+    (j.masaBerlakuPaspor && j.masaBerlakuPaspor !== "-")
+      ? j.masaBerlakuPaspor
+      : (j.tanggalKadaluarsa && j.tanggalKadaluarsa !== "-")
+      ? j.tanggalKadaluarsa
+      : manual?.tanggalKadaluarsa
+      || manual?.tanggalHabis
+      || manual?.masaBerlaku
+      || manual?.tglKadaluarsa
+      || manual?.tglHabis
+      || ocr?.tanggalKadaluarsa
+      || ocr?.tanggalHabis
+      || ocr?.masaBerlaku
+      || ocr?.tglKadaluarsa
+      || ocr?.tglHabis
+      || "-";
+
+  let kotaPaspor =
+    (j.kotaPaspor && j.kotaPaspor !== "-")
+      ? j.kotaPaspor
+      : (j.tempatTerbitPaspor && j.tempatTerbitPaspor !== "-")
+      ? j.tempatTerbitPaspor
+      : (j.tempatTerbit && j.tempatTerbit !== "-")
+      ? j.tempatTerbit
+      : (j.tempatPenerbit && j.tempatPenerbit !== "-")
+      ? j.tempatPenerbit
+      : manual?.tempatTerbitPaspor
+      || manual?.tempatTerbit
+      || manual?.kotaPaspor
+      || manual?.tempatPenerbit
+      || manual?.kantorPenerbit
+      || manual?.kotaTerbit
+      || manual?.kantorPaspor
+      || ocr?.tempatTerbitPaspor
+      || ocr?.tempatTerbit
+      || ocr?.kotaPaspor
+      || ocr?.tempatPenerbit
+      || ocr?.kantorPenerbit
+      || ocr?.kotaTerbit
+      || ocr?.kantorPaspor
+      || "-";
+
+  if (kotaPaspor === "-" && (manual?.rawText || ocr?.rawText || pasporDoc?.rawText)) {
+    const text = manual?.rawText || ocr?.rawText || pasporDoc?.rawText || "";
+    const match = text.match(/(?:KANTOR\s+(?:YANG\s+MENGELUARKAN|IMIGRASI)|ISSUING\s+OFFICE|ISSUING\s+AUTHORITY)[^\n\r]*[\r\n]+([A-Z\s]{3,30})/i);
+    if (match && match[1]) {
+      kotaPaspor = match[1].trim().toUpperCase();
+    }
+  }
 
   return { noPaspor, tglDikeluarkan, tglHabis, kotaPaspor };
 }

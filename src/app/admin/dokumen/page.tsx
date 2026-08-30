@@ -551,14 +551,19 @@ export default function DokumenPage() {
         docs.forEach((d: any) => {
           let data = d.manualData || d.ocrData;
           if (data) {
-            if (d.jenis === "paspor" && !data.nik && member.nik) {
-              data = { ...data, nik: member.nik };
-            }
-            if (d.jenis === "paspor" && !data.tempatLahir && member.tempatLahir) {
-              data = { ...data, tempatLahir: member.tempatLahir };
-            }
-            if (d.jenis === "paspor" && !data.tanggalLahir && member.tanggalLahir) {
-              data = { ...data, tanggalLahir: member.tanggalLahir };
+            if (d.jenis === "paspor") {
+              if (!data.nik && member.nik) data = { ...data, nik: member.nik };
+              if (!data.tempatLahir && member.tempatLahir) data = { ...data, tempatLahir: member.tempatLahir };
+              if (!data.tanggalLahir && member.tanggalLahir) data = { ...data, tanggalLahir: member.tanggalLahir };
+              if (!data.tempatTerbitPaspor && (data.kotaPaspor || data.tempatTerbit || data.tempatPenerbit)) {
+                data = { ...data, tempatTerbitPaspor: data.tempatTerbitPaspor || data.kotaPaspor || data.tempatTerbit || data.tempatPenerbit };
+              }
+              if (!data.tanggalTerbitPaspor && (data.tanggalDikeluarkan || data.tglDikeluarkan || data.tanggalTerbit)) {
+                data = { ...data, tanggalTerbitPaspor: data.tanggalTerbitPaspor || data.tanggalDikeluarkan || data.tglDikeluarkan || data.tanggalTerbit };
+              }
+              if (!data.tanggalKadaluarsa && (data.tanggalHabis || data.masaBerlaku)) {
+                data = { ...data, tanggalKadaluarsa: data.tanggalKadaluarsa || data.tanggalHabis || data.masaBerlaku };
+              }
             }
             initialOcr[d.jenis] = data;
           }
