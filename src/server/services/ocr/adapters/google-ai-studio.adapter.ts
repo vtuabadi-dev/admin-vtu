@@ -257,7 +257,7 @@ export const googleAiStudioAdapter: OcrAdapter = {
     if (imageBuffer[0] === 0x89 && imageBuffer[1] === 0x50) mimeType = "image/png";
     else if (imageBuffer[0] === 0x52 && imageBuffer[1] === 0x49) mimeType = "image/webp";
 
-    const candidateModels = ["gemini-2.0-flash", "gemini-2.5-flash-lite", "gemini-1.5-flash", "gemini-1.5-pro"];
+    const candidateModels = ["gemini-flash-lite-latest", "gemini-3.5-flash-lite", "gemini-3.5-flash", "gemini-flash-latest", "gemini-pro-latest"];
     const mode = config.mode;
     const promptText = getPromptForMode(jenis, mode);
 
