@@ -11,6 +11,7 @@ import type { OcrAdapter, OcrAdapterConfig } from "./adapter.interface";
 import type { OcrResult, ImageMetaCheck } from "../provider";
 import { getExpectedFields } from "../provider";
 import { parsePassport } from "../passport-parser";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
 // ── Field Extraction Patterns ────────────────────────────
 
@@ -204,52 +205,40 @@ export const googleAiStudioAdapter: OcrAdapter = {
     const mode = config.mode;
     const promptText = getPromptForMode(jenis, mode);
 
+    const genAI = new GoogleGenerativeAI(apiKey);
     let lastError: { statusCode?: number; message: string } | null = null;
 
     for (const modelName of candidateModels) {
       console.log(
-        `[AI Studio Adapter] ▶ CALL API | model=${modelName} | key=***${keySuffix} | jenis=${jenis}${mode ? ` | mode=${mode}` : ""} | imgSize=${imgSizeKB}KB | retry=#${retryCount}`
+        `[AI Studio Adapter] ▶ CALL SDK | model=${modelName} | key=***${keySuffix} | jenis=${jenis}${mode ? ` | mode=${mode}` : ""} | imgSize=${imgSizeKB}KB | retry=#${retryCount}`
       );
 
       try {
         const fetchStart = Date.now();
-        const geminiRes = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`,
+        const model = genAI.getGenerativeModel({
+          model: modelName,
+          generationConfig: {
+            responseMimeType: "application/json",
+          },
+        });
+
+        const result = await model.generateContent([
+          promptText,
           {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              contents: [{
-                parts: [
-                  { text: promptText },
-                  { inline_data: { mime_type: mimeType, data: base64 } }
-                ]
-              }]
-            }),
-            signal: AbortSignal.timeout(config.timeout ?? 30000),
-          }
-        );
+            inlineData: {
+              data: base64,
+              mimeType,
+            },
+          },
+        ]);
+
         const fetchMs = Date.now() - fetchStart;
+        const fullText = result.response.text() || "";
+        const textLen = fullText.length;
 
         console.log(
-          `[AI Studio Adapter] ◀ RESPONSE | model=${modelName} | key=***${keySuffix} | HTTP ${geminiRes.status} | ${fetchMs}ms`
+          `[AI Studio Adapter] ◀ RESPONSE SDK | model=${modelName} | key=***${keySuffix} | textLength=${textLen} chars | ${fetchMs}ms`
         );
-
-        if (!geminiRes.ok) {
-          const errBody = await geminiRes.text().catch(() => "");
-          const errMsg = `Model ${modelName} HTTP ${geminiRes.status}: ${errBody.slice(0, 200)}`;
-          console.warn(`[AI Studio Adapter] ⚠️ ${errMsg}`);
-          lastError = { statusCode: geminiRes.status, message: errMsg };
-          // If rate limit 429 or quota, don't waste time with other models on same key
-          if (geminiRes.status === 429) {
-            break;
-          }
-          continue;
-        }
-
-        const gData = await geminiRes.json();
-        const fullText = gData?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
-        const textLen = fullText.length;
 
         // Try parsing JSON response from Gemini
         let parsedJson: Record<string, any> | null = null;
@@ -283,7 +272,7 @@ export const googleAiStudioAdapter: OcrAdapter = {
         });
 
         console.log(
-          `[AI Studio Adapter] ✅ SUCCESS | model=${modelName} | key=***${keySuffix} | textLength=${textLen} chars | totalMs=${Date.now() - start}ms`
+          `[AI Studio Adapter] ✅ SUCCESS | model=${modelName} | key=***${keySuffix} | totalMs=${Date.now() - start}ms`
         );
 
         return {
@@ -296,11 +285,19 @@ export const googleAiStudioAdapter: OcrAdapter = {
         };
       } catch (err: any) {
         const msg = err?.message || String(err);
+        const statusCode = err?.status || err?.statusCode;
+        const isQuota = msg.includes("429") || msg.includes("quota") || msg.includes("ResourceExhausted");
         const isTimeout = msg.includes("timeout") || msg.includes("abort");
+
         console.error(
-          `[AI Studio Adapter] ❌ ${isTimeout ? "TIMEOUT" : "NETWORK ERROR"} | model=${modelName} | key=***${keySuffix} | ${msg.slice(0, 150)}`
+          `[AI Studio Adapter] ❌ ${isQuota ? "QUOTA/429" : isTimeout ? "TIMEOUT" : "ERROR"} | model=${modelName} | key=***${keySuffix} | ${msg.slice(0, 150)}`
         );
-        lastError = { statusCode: undefined, message: msg };
+
+        lastError = { statusCode: isQuota ? 429 : statusCode, message: msg };
+        if (isQuota) {
+          // If quota exhausted on this key, break to allow gateway rotation to NEXT key
+          break;
+        }
       }
     }
 

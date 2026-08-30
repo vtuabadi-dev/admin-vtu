@@ -10,6 +10,7 @@ import type { DokumenJenis } from "@/shared/types";
 import type { OcrProvider, OcrResult, ImageMetaCheck } from "./provider";
 import { getExpectedFields } from "./provider";
 import { parsePassport } from "./passport-parser";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
 const FIELD_PATTERNS: Record<string, RegExp[]> = {
   namaLengkap: [
@@ -149,42 +150,41 @@ export class GoogleAiStudioOcrProvider implements OcrProvider {
   "rawText": "Teks mentah"
 }`;
 
-        const res = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              contents: [{
-                parts: [
-                  { text: promptText },
-                  { inline_data: { mime_type: mimeType, data: base64 } }
-                ]
-              }]
-            }),
-            signal: AbortSignal.timeout(30000),
+        const genAI = new GoogleGenerativeAI(apiKey);
+        const model = genAI.getGenerativeModel({
+          model: "gemini-2.0-flash",
+          generationConfig: {
+            responseMimeType: "application/json",
           },
-        );
+        });
 
-        if (res.status === 429) {
-          lastError = `Rate limited on key #${(keyIndex - 1) % keys.length + 1}`;
-          continue;
-        }
-
-        if (!res.ok) {
-          const text = await res.text().catch(() => "");
+        let fullText = "";
+        try {
+          const result = await model.generateContent([
+            promptText,
+            {
+              inlineData: {
+                data: base64,
+                mimeType,
+              },
+            },
+          ]);
+          fullText = result.response.text() || "";
+        } catch (genErr: any) {
+          const msg = genErr?.message || String(genErr);
+          if (msg.includes("429") || msg.includes("quota") || msg.includes("ResourceExhausted")) {
+            lastError = `Rate limited on key #${(keyIndex - 1) % keys.length + 1}`;
+            continue;
+          }
           return {
             success: false,
             fields: [],
-            rawText: `Google AI Studio API error (HTTP ${res.status}): ${text.slice(0, 200)}`,
+            rawText: `Google AI Studio API error: ${msg.slice(0, 200)}`,
             overallConfidence: 0,
             processingTimeMs: Date.now() - start,
             retryCount,
           };
         }
-
-        const gData = await res.json();
-        const fullText = gData?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
 
         let parsedJson: Record<string, any> | null = null;
         try {
