@@ -150,47 +150,59 @@ export class GoogleAiStudioOcrProvider implements OcrProvider {
   "rawText": "Teks mentah"
 }`;
 
-        const genAI = new GoogleGenerativeAI(apiKey);
-        const model = genAI.getGenerativeModel({
-          model: "gemini-2.0-flash",
-          generationConfig: {
-            responseMimeType: "application/json",
-          },
-        });
+        const candidateModels = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"];
+        const payload = {
+          contents: [{
+            parts: [
+              { text: promptText },
+              { inline_data: { mime_type: mimeType, data: base64 } }
+            ]
+          }]
+        };
 
         let fullText = "";
-        try {
-          const result = await model.generateContent([
-            promptText,
-            {
-              inlineData: {
-                data: base64,
-                mimeType,
-              },
-            },
-          ]);
-          fullText = result.response.text() || "";
-        } catch (genErr: any) {
-          const msg = genErr?.message || String(genErr);
-          if (msg.includes("429") || msg.includes("quota") || msg.includes("ResourceExhausted")) {
-            lastError = `Rate limited on key #${(keyIndex - 1) % keys.length + 1}`;
-            continue;
+        let modelSuccess = false;
+
+        for (const modelName of candidateModels) {
+          try {
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
+            const res = await fetch(url, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(payload),
+              signal: AbortSignal.timeout(30000),
+            });
+
+            const resJson = await res.json().catch(() => null);
+
+            if (resJson?.candidates?.[0]?.content?.parts?.[0]?.text) {
+              const rawText = resJson.candidates[0].content.parts[0].text;
+              fullText = rawText;
+              modelSuccess = true;
+              break;
+            } else if (resJson?.error) {
+              lastError = resJson.error.message;
+              if (res.status === 429) break;
+            }
+          } catch (e: any) {
+            lastError = e?.message || String(e);
           }
-          return {
-            success: false,
-            fields: [],
-            rawText: `Google AI Studio API error: ${msg.slice(0, 200)}`,
-            overallConfidence: 0,
-            processingTimeMs: Date.now() - start,
-            retryCount,
-          };
         }
 
+        if (!modelSuccess) {
+          continue; // Coba key berikutnya
+        }
+
+        const cleanText = fullText.replace(/```json/gi, "").replace(/```/g, "").trim();
         let parsedJson: Record<string, any> | null = null;
         try {
-          const jsonMatch = fullText.match(/\{[\s\S]*\}/);
-          if (jsonMatch) parsedJson = JSON.parse(jsonMatch[0]);
-        } catch { /* fallback */ }
+          parsedJson = JSON.parse(cleanText);
+        } catch {
+          const jsonMatch = cleanText.match(/\{[\s\S]*\}/);
+          if (jsonMatch) {
+            try { parsedJson = JSON.parse(jsonMatch[0]); } catch {}
+          }
+        }
 
         let passportParsed: ReturnType<typeof parsePassport> | null = null;
         if (jenis === "paspor") {
