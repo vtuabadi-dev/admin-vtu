@@ -149,7 +149,7 @@ export class GoogleAiStudioOcrProvider implements OcrProvider {
   "rawText": "Teks mentah"
 }`;
 
-        const modelName = "gemini-2.5-flash";
+        const candidateModels = ["gemini-2.0-flash", "gemini-2.0-flash-lite", "gemini-1.5-flash-latest"];
         const payload = {
           contents: [{
             parts: [
@@ -160,25 +160,28 @@ export class GoogleAiStudioOcrProvider implements OcrProvider {
         };
 
         let fullText = "";
-        try {
-          const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
-          const res = await fetch(url, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
-            signal: AbortSignal.timeout(30000),
-          });
+        for (const modelName of candidateModels) {
+          try {
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
+            const res = await fetch(url, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(payload),
+              signal: AbortSignal.timeout(30000),
+            });
 
-          const resJson = await res.json().catch(() => null);
+            const resJson = await res.json().catch(() => null);
 
-          if (resJson?.candidates?.[0]?.content?.parts?.[0]?.text) {
-            fullText = resJson.candidates[0].content.parts[0].text;
-          } else if (resJson?.error) {
-            lastError = resJson.error.message;
-            if (res.status === 429) continue;
+            if (resJson?.candidates?.[0]?.content?.parts?.[0]?.text) {
+              fullText = resJson.candidates[0].content.parts[0].text;
+              break;
+            } else if (resJson?.error) {
+              lastError = resJson.error.message;
+              if (res.status === 429) break;
+            }
+          } catch (e: any) {
+            lastError = e?.message || String(e);
           }
-        } catch (e: any) {
-          lastError = e?.message || String(e);
         }
 
         if (!fullText) {
