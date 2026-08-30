@@ -20,6 +20,7 @@ import {
   Loader2,
   Sparkles,
   UploadCloud,
+  ExternalLink,
 } from "lucide-react";
 import { Card, CardContent } from "@/shared/components/ui/Card";
 import { StatusBadge, Badge } from "@/shared/components/ui/Badge";
@@ -61,6 +62,20 @@ const ALL_DOC_JENIS: DokumenJenis[] = ["paspor", "pas_foto", "vaksin", "ktp", "k
 // ============================================================
 // HELPERS
 // ============================================================
+
+function resolveDocumentImageUrl(url?: string | null): string {
+  if (!url) return "";
+  if (
+    url.startsWith("http://") ||
+    url.startsWith("https://") ||
+    url.startsWith("/") ||
+    url.startsWith("data:") ||
+    url.startsWith("blob:")
+  ) {
+    return url;
+  }
+  return `/api/storage/download?id=${encodeURIComponent(url)}`;
+}
 
 interface OcrFieldEdit {
   key: string;
@@ -550,6 +565,58 @@ export default function DokumenPage() {
     setManualEditMode(false);
     setUpdating(false);
     loadReviewQueue(reviewFilter);
+  }
+
+  // --- Modal Upload State in Review ---
+  const [modalUploading, setModalUploading] = useState(false);
+  const [modalDragOver, setModalDragOver] = useState(false);
+
+  async function handleUploadInReviewModal(file: File) {
+    if (!selectedReview) return;
+    setModalUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("jamaahId", selectedReview.jamaah.id);
+      formData.append("jenis", selectedReview.dokumen.jenis);
+      formData.append("jenisDokumen", selectedReview.dokumen.jenis);
+
+      const res = await fetch("/api/dokumen/upload", {
+        method: "POST",
+        body: formData,
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.message || "Gagal mengupload dokumen");
+
+      const uploadedDoc = json.data?.dokumen || json.data;
+      const fileUrl = json.data?.fileUrl || uploadedDoc?.fileUrl || URL.createObjectURL(file);
+
+      // Update selectedReview state
+      setSelectedReview((prev: any) => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          dokumen: {
+            ...prev.dokumen,
+            id: uploadedDoc?.id || prev.dokumen.id,
+            fileUrl,
+            status: "processing",
+          },
+        };
+      });
+
+      // Run OCR automatically
+      const docId = uploadedDoc?.id || selectedReview.dokumen.id;
+      if (docId && fileUrl) {
+        handleExtractOcr(selectedReview.dokumen.jenis, { id: docId, fileUrl });
+      }
+
+      loadReviewQueue(reviewFilter);
+    } catch (err) {
+      alert(`Gagal mengunggah foto: ${(err as Error).message}`);
+    } finally {
+      setModalUploading(false);
+    }
   }
 
   // --- Upload Dokumen Tab Functions ---
@@ -2123,11 +2190,11 @@ export default function DokumenPage() {
                                   ? endorsementPreview || endorsementDoc?.fileUrl
                                   : uploadPreviews[activeDocType] || uploadDocuments.find((d) => d.jenis === activeDocType)?.fileUrl) ? (
                                   <img
-                                    src={
+                                    src={resolveDocumentImageUrl(
                                       (activeDocType === "paspor" && pasporHasEndorsement === true && pasporPageTab === "hal2"
                                         ? endorsementPreview || endorsementDoc?.fileUrl
                                         : uploadPreviews[activeDocType] || uploadDocuments.find((d) => d.jenis === activeDocType)?.fileUrl) || ""
-                                    }
+                                    )}
                                     alt={LABEL_DOKUMEN[activeDocType]}
                                     className="max-h-full max-w-full object-contain rounded-md"
                                   />
@@ -2735,19 +2802,121 @@ export default function DokumenPage() {
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                 {/* LEFT: Document Preview */}
                 <div>
-                  <h4 className="text-sm font-semibold mb-2">Foto Dokumen</h4>
-                  <div className="flex aspect-[3/4] items-center justify-center rounded-lg border-2 border-dashed bg-muted/20">
-                    <div className="text-center">
-                      <FileImage className="mx-auto h-14 w-14 text-muted-foreground/30" />
-                      <p className="mt-2 text-sm font-medium text-muted-foreground">
-                        {LABEL_DOKUMEN[doc.jenis] ?? doc.jenis}
-                      </p>
-                      <p className="text-xs text-muted-foreground/60 mt-1">{jamaah.namaLengkap}</p>
-                      <Button variant="outline" size="sm" className="mt-3" disabled>
-                        <FileText className="mr-1.5 h-3.5 w-3.5" />
-                        Lihat Full
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className="text-sm font-semibold">Foto Dokumen</h4>
+                    {doc.fileUrl && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-7 text-xs px-2"
+                        onClick={() => window.open(resolveDocumentImageUrl(doc.fileUrl), "_blank")}
+                      >
+                        <ExternalLink className="mr-1 h-3 w-3" />
+                        Buka Gambar Penuh
                       </Button>
-                    </div>
+                    )}
+                  </div>
+
+                  <div
+                    className={cn(
+                      "relative flex aspect-[3/4] items-center justify-center rounded-xl border-2 transition-all overflow-hidden group bg-stone-900/5 dark:bg-stone-950/40",
+                      modalDragOver
+                        ? "border-primary ring-4 ring-primary/30 bg-primary/10"
+                        : "border-dashed border-stone-300 dark:border-stone-700"
+                    )}
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setModalDragOver(true);
+                    }}
+                    onDragEnter={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setModalDragOver(true);
+                    }}
+                    onDragLeave={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setModalDragOver(false);
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setModalDragOver(false);
+                      const files = e.dataTransfer.files;
+                      if (files && files.length > 0 && files[0]) {
+                        handleUploadInReviewModal(files[0]);
+                      }
+                    }}
+                  >
+                    {/* Dragging Feedback Overlay */}
+                    {modalDragOver && (
+                      <div className="absolute inset-0 z-30 bg-primary/20 backdrop-blur-sm flex flex-col items-center justify-center p-4 text-center animate-in fade-in duration-150">
+                        <UploadCloud className="h-10 w-10 text-primary animate-bounce mb-2" />
+                        <p className="text-xs font-bold text-primary">Lepaskan foto di sini</p>
+                        <p className="text-[10px] text-stone-700 dark:text-stone-200">
+                          Foto dari WA atau komputer akan langsung tersimpan & diekstrak OCR
+                        </p>
+                      </div>
+                    )}
+
+                    {modalUploading ? (
+                      <div className="text-center p-6 space-y-3">
+                        <Loader2 className="mx-auto h-8 w-8 animate-spin text-primary" />
+                        <p className="text-xs font-medium text-muted-foreground">Mengunggah & memproses dokumen...</p>
+                      </div>
+                    ) : doc.fileUrl ? (
+                      <div className="relative w-full h-full flex items-center justify-center p-2">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={resolveDocumentImageUrl(doc.fileUrl)}
+                          alt={LABEL_DOKUMEN[doc.jenis] ?? doc.jenis}
+                          className="max-h-full max-w-full object-contain rounded-lg shadow-sm transition-transform duration-200 group-hover:scale-[1.02]"
+                        />
+                        <div className="absolute bottom-3 right-3 flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            size="sm"
+                            className="h-7 text-xs shadow-md bg-background/90 backdrop-blur-sm"
+                            onClick={() => window.open(resolveDocumentImageUrl(doc.fileUrl), "_blank")}
+                          >
+                            <ExternalLink className="mr-1 h-3 w-3" />
+                            Lihat Full
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-center p-6 space-y-3">
+                        <FileImage className="mx-auto h-14 w-14 text-muted-foreground/30" />
+                        <div>
+                          <p className="text-sm font-medium text-foreground">
+                            {LABEL_DOKUMEN[doc.jenis] ?? doc.jenis}
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-0.5">{jamaah.namaLengkap}</p>
+                          <p className="text-[11px] text-amber-600 dark:text-amber-400 mt-1">
+                            Foto dokumen belum ada di penyimpanan server.
+                          </p>
+                        </div>
+                        <div className="pt-2">
+                          <label className="inline-flex items-center gap-1.5 cursor-pointer rounded-lg border border-dashed border-primary/50 bg-primary/5 px-3 py-2 text-xs font-semibold text-primary hover:bg-primary/10 transition-colors">
+                            <UploadCloud className="h-4 w-4" />
+                            <span>Upload / Drag Foto Sekarang</span>
+                            <input
+                              type="file"
+                              accept="image/jpeg,image/png,image/jpg"
+                              className="hidden"
+                              onChange={(e) => {
+                                if (e.target.files && e.target.files[0]) {
+                                  handleUploadInReviewModal(e.target.files[0]);
+                                }
+                              }}
+                            />
+                          </label>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
 

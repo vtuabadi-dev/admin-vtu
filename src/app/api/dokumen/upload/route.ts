@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
     const formData = await request.formData();
     const file = formData.get("file") as File | null;
     const jamaahId = formData.get("jamaahId") as string | null;
-    const rawJenis = formData.get("jenisDokumen") as string | null;
+    const rawJenis = (formData.get("jenisDokumen") || formData.get("jenis")) as string | null;
 
     if (!file || !jamaahId || !rawJenis) {
       return NextResponse.json({ success: false, message: "file, jamaahId, and jenisDokumen are required" }, { status: 400 });

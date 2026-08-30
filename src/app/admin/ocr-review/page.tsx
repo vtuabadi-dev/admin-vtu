@@ -3,13 +3,13 @@
 import { useEffect, useState, useCallback } from "react";
 import {
   Shield,
-  FileText,
   CheckCircle,
   Save,
   Image,
   AlertTriangle,
   Loader2,
   RefreshCw,
+  ExternalLink,
 } from "lucide-react";
 import {
   Card,
@@ -37,6 +37,20 @@ const LABEL_DOKUMEN: Record<string, string> = {
 
 function labelJenis(jenis: string): string {
   return LABEL_DOKUMEN[jenis] ?? jenis;
+}
+
+function resolveDocumentImageUrl(url?: string | null): string {
+  if (!url) return "";
+  if (
+    url.startsWith("http://") ||
+    url.startsWith("https://") ||
+    url.startsWith("/") ||
+    url.startsWith("data:") ||
+    url.startsWith("blob:")
+  ) {
+    return url;
+  }
+  return `/api/storage/download?id=${encodeURIComponent(url)}`;
 }
 
 // --- Helpers: generate mock OCR data ---
@@ -369,30 +383,47 @@ export default function OcrReviewPage() {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="flex aspect-[3/4] items-center justify-center rounded-lg border-2 border-dashed bg-muted/30">
-                <div className="text-center">
-                  <Image className="mx-auto h-12 w-12 text-muted-foreground/40" aria-hidden="true" />
-                  <p className="mt-3 text-sm font-medium text-muted-foreground">
-                    {labelJenis(currentDoc.dokumen.jenis)}
-                  </p>
-                  <p className="text-xs text-muted-foreground/60 mt-1">
-                    {currentDoc.jamaah.namaLengkap}
-                  </p>
-                  {currentDoc.dokumen.uploadedAt && (
-                    <p className="text-xs text-muted-foreground/60 mt-0.5">
-                      Upload: {formatDateShort(currentDoc.dokumen.uploadedAt)}
+              <div className="relative flex aspect-[3/4] items-center justify-center rounded-xl border-2 border-dashed border-stone-200 dark:border-stone-800 bg-muted/20 overflow-hidden group">
+                {currentDoc.dokumen.fileUrl ? (
+                  <div className="relative w-full h-full flex items-center justify-center p-2">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={resolveDocumentImageUrl(currentDoc.dokumen.fileUrl)}
+                      alt={labelJenis(currentDoc.dokumen.jenis)}
+                      className="max-h-full max-w-full object-contain rounded-lg shadow-sm transition-transform duration-200 group-hover:scale-[1.02]"
+                    />
+                    <div className="absolute bottom-3 right-3 flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        className="h-7 text-xs shadow-md bg-background/90 backdrop-blur-sm"
+                        onClick={() => window.open(resolveDocumentImageUrl(currentDoc.dokumen.fileUrl), "_blank")}
+                      >
+                        <ExternalLink className="mr-1 h-3 w-3" />
+                        Buka Penuh
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center p-6 space-y-2">
+                    <Image className="mx-auto h-12 w-12 text-muted-foreground/40" aria-hidden="true" />
+                    <p className="mt-3 text-sm font-medium text-muted-foreground">
+                      {labelJenis(currentDoc.dokumen.jenis)}
                     </p>
-                  )}
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="mt-4"
-                    disabled
-                  >
-                    <FileText className="mr-1.5 h-3.5 w-3.5" />
-                    Lihat Dokumen
-                  </Button>
-                </div>
+                    <p className="text-xs text-muted-foreground/60 mt-1">
+                      {currentDoc.jamaah.namaLengkap}
+                    </p>
+                    {currentDoc.dokumen.uploadedAt && (
+                      <p className="text-xs text-muted-foreground/60 mt-0.5">
+                        Upload: {formatDateShort(currentDoc.dokumen.uploadedAt)}
+                      </p>
+                    )}
+                    <p className="text-[11px] text-amber-600 dark:text-amber-400 mt-2">
+                      File foto belum tersimpan di server
+                    </p>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
