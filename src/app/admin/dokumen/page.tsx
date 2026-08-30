@@ -33,6 +33,8 @@ import {
   getDocumentStatusBadge,
   getOcrStatusLabel,
   getOcrConfidenceVariant,
+  computeDynamicDocumentRequirements,
+  type DynamicDocRequirement,
 } from "@/shared/lib/document-utils";
 import type { DokumenItem, DokumenJenis, Keberangkatan } from "@/shared/types";
 import { formatDate, formatDateShort, cn } from "@/shared/lib/utils";
@@ -46,11 +48,12 @@ const LABEL_DOKUMEN: Record<string, string> = {
   pas_foto: "Pas Foto",
   vaksin: "Sertifikat Vaksin",
   ktp: "KTP",
-  kk: "Kartu Keluarga",
+  kk: "KK / Buku Nikah",
   akta: "Akta Lahir",
+  surat_lansia: "Surat Lansia",
 };
 
-const ALL_DOC_JENIS: DokumenJenis[] = ["paspor", "pas_foto", "vaksin", "ktp", "kk", "akta"];
+const ALL_DOC_JENIS = ["paspor", "pas_foto", "vaksin", "ktp", "kk", "akta", "surat_lansia"] as const;
 
 // ============================================================
 // HELPERS
@@ -92,23 +95,58 @@ function confidenceIcon(c: number) {
   return ShieldAlert;
 }
 
-function getDocCellBadge(docInfo: { status: string } | undefined) {
-  if (!docInfo || docInfo.status === "pending" || docInfo.status === "kurang") {
-    return { variant: "muted" as const, label: "Belum", dotClass: "bg-muted-foreground/30" };
-  }
-  if (docInfo.status === "verified" || docInfo.status === "lengkap") {
+function getDocCellBadge(
+  docInfo: { status: string } | undefined,
+  jenis: string,
+  dynamicReq?: DynamicDocRequirement
+) {
+  // If doc is verified / lengkap
+  if (docInfo && (docInfo.status === "verified" || docInfo.status === "lengkap")) {
     return { variant: "success" as const, label: "Lengkap", dotClass: "bg-success" };
   }
-  if (docInfo.status === "revisi") {
+  if (docInfo && docInfo.status === "revisi") {
     return { variant: "warning" as const, label: "Revisi", dotClass: "bg-warning" };
   }
-  if (docInfo.status === "rejected") {
+  if (docInfo && docInfo.status === "rejected") {
     return { variant: "destructive" as const, label: "Ditolak", dotClass: "bg-destructive" };
   }
-  if (docInfo.status === "processing") {
+  if (docInfo && docInfo.status === "processing") {
     return { variant: "info" as const, label: "OCR Proses", dotClass: "bg-info" };
   }
-  return { variant: "muted" as const, label: docInfo.status, dotClass: "bg-muted-foreground/30" };
+
+  // If not uploaded yet, determine contextual requirement
+  if (jenis === "ktp") {
+    if (dynamicReq && !dynamicReq.isKtpRequired) {
+      return { variant: "muted" as const, label: "N/A (<17 Thn)", dotClass: "bg-muted-foreground/30" };
+    }
+    return { variant: "muted" as const, label: "Belum", dotClass: "bg-muted-foreground/30" };
+  }
+
+  if (jenis === "surat_lansia") {
+    if (dynamicReq && !dynamicReq.isLansiaRequired) {
+      return { variant: "muted" as const, label: "N/A (≤60 Thn)", dotClass: "bg-muted-foreground/30" };
+    }
+    return { variant: "warning" as const, label: "Wajib (>60)", dotClass: "bg-warning" };
+  }
+
+  if (jenis === "kk") {
+    if (dynamicReq?.isDoubleUpgradeRequired) {
+      return { variant: "warning" as const, label: "Wajib (Double)", dotClass: "bg-warning" };
+    }
+    if (dynamicReq?.isSingleWordRequired) {
+      return { variant: "warning" as const, label: "Wajib (1 Kata)", dotClass: "bg-warning" };
+    }
+    return { variant: "muted" as const, label: "Opsional", dotClass: "bg-muted-foreground/30" };
+  }
+
+  if (jenis === "akta") {
+    if (dynamicReq?.isSingleWordRequired && !dynamicReq?.singleWordDocValid) {
+      return { variant: "warning" as const, label: "Pilihan 1 Kata", dotClass: "bg-warning" };
+    }
+    return { variant: "muted" as const, label: "Opsional", dotClass: "bg-muted-foreground/30" };
+  }
+
+  return { variant: "muted" as const, label: "Belum", dotClass: "bg-muted-foreground/30" };
 }
 
 import { useOperationalStore } from "@/stores/operational-store";
@@ -256,6 +294,11 @@ export default function DokumenPage() {
       return g?.paketId === pkgId;
     });
 
+    const groupPaxCounts: Record<string, number> = {};
+    pkgJamaah.forEach((j: any) => {
+      groupPaxCounts[j.groupId] = (groupPaxCounts[j.groupId] || 0) + 1;
+    });
+
     const sortedJamaah = [...pkgJamaah].sort((a: any, b: any) => {
       const groupA = currentGroups[a.groupId];
       const groupB = currentGroups[b.groupId];
@@ -283,13 +326,10 @@ export default function DokumenPage() {
         mappedDocs[d.jenis] = d;
       });
 
-      const requiredTypes: DokumenJenis[] = ["paspor", "pas_foto", "vaksin", "ktp", "kk", "akta"];
-      let completeCount = 0;
-      requiredTypes.forEach((t) => {
-        const d = mappedDocs[t];
-        if (d && (d.status === "verified" || d.status === "lengkap")) {
-          completeCount++;
-        }
+      const groupPaxCount = groupPaxCounts[j.groupId] || 1;
+      const dynamicReq = computeDynamicDocumentRequirements(j, {
+        groupPaxCount,
+        roomType: j.roomType || j.tipeKamar,
       });
 
       return {
@@ -301,16 +341,19 @@ export default function DokumenPage() {
         groupName: g?.namaGroup || "-",
         kodeRegistrasi: g?.kodeRegistrasi || "-",
         gender: j.gender,
+        tanggalLahir: j.tanggalLahir,
         dokumen: mappedDocs,
-        progressPercent: Math.round((completeCount / requiredTypes.length) * 100),
-        completeCount,
-        totalCount: requiredTypes.length,
-        statusKeseluruhan:
-          completeCount === requiredTypes.length
-            ? "lengkap"
-            : completeCount > 0
-            ? "sebagian"
-            : "kosong",
+        dynamicReq,
+        completionPercentage: dynamicReq.percentage,
+        progressPercent: dynamicReq.percentage,
+        completeCount: dynamicReq.totalCompleted,
+        totalCount: dynamicReq.totalRequired,
+        allMandatoryComplete: dynamicReq.allMandatoryComplete,
+        statusKeseluruhan: dynamicReq.allMandatoryComplete
+          ? "lengkap"
+          : dynamicReq.totalCompleted > 0
+          ? "sebagian"
+          : "kosong",
       };
     });
   }, []);
@@ -1124,16 +1167,40 @@ export default function DokumenPage() {
                           </thead>
                           <tbody>
                             {filteredMatrix.map((row) => (
-                              <tr key={row.jamaahId} className="border-b hover:bg-muted/50">
+                              <tr key={row.jamaahId} className="border-b hover:bg-muted/50 transition-colors">
                                 <td className="px-3 py-2.5">
-                                  <p className="text-xs font-medium">{row.namaLengkap}</p>
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <p className="text-xs font-semibold text-foreground">{row.namaLengkap}</p>
+                                    {row.dynamicReq?.isSingleWordRequired && (
+                                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30">
+                                        1 Kata
+                                      </span>
+                                    )}
+                                    {row.dynamicReq?.isDoubleUpgradeRequired && (
+                                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 border border-indigo-500/30">
+                                        Double (2 Pax)
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="flex items-center gap-2 text-[10px] text-muted-foreground mt-0.5">
+                                    {row.dynamicReq?.age !== null ? (
+                                      row.dynamicReq?.isLansiaRequired ? (
+                                        <span className="text-amber-600 dark:text-amber-400 font-medium">Usia: {row.dynamicReq.age} thn (Lansia)</span>
+                                      ) : row.dynamicReq?.age < 17 ? (
+                                        <span className="text-blue-600 dark:text-blue-400 font-medium">Usia: {row.dynamicReq.age} thn (Anak)</span>
+                                      ) : (
+                                        <span>Usia: {row.dynamicReq.age} thn</span>
+                                      )
+                                    ) : null}
+                                    <span>• {row.groupName}</span>
+                                  </div>
                                 </td>
                                 <td className="px-3 py-2.5">
                                   <span className="font-mono text-[10px] text-muted-foreground">{row.kodeRegistrasi}</span>
                                 </td>
                                 {ALL_DOC_JENIS.map((jenis) => {
                                   const doc = row.dokumen[jenis];
-                                  const badge = getDocCellBadge(doc);
+                                  const badge = getDocCellBadge(doc, jenis, row.dynamicReq);
                                   return (
                                     <td key={jenis} className="px-2 py-2.5 text-center">
                                       <span
@@ -1153,19 +1220,20 @@ export default function DokumenPage() {
                                   );
                                 })}
                                 <td className="px-3 py-2.5">
-                                  <div className="flex items-center gap-2 min-w-[100px]">
-                                    <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
+                                  <div className="flex flex-col gap-1 min-w-[110px]">
+                                    <div className="flex items-center justify-between text-[10px]">
+                                      <span className="font-semibold text-foreground">{row.completionPercentage}%</span>
+                                      <span className="text-muted-foreground font-mono">({row.completeCount}/{row.totalCount})</span>
+                                    </div>
+                                    <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
                                       <div
                                         className={cn(
                                           "h-full rounded-full transition-all",
-                                          row.completionPercentage >= 80 ? "bg-success" : row.completionPercentage >= 50 ? "bg-warning" : "bg-destructive"
+                                          row.completionPercentage >= 100 ? "bg-success" : row.completionPercentage >= 50 ? "bg-warning" : "bg-destructive"
                                         )}
                                         style={{ width: `${row.completionPercentage}%` }}
                                       />
                                     </div>
-                                    <span className="text-[10px] font-medium text-muted-foreground w-8 text-right">
-                                      {row.completionPercentage}%
-                                    </span>
                                   </div>
                                 </td>
                                 <td className="px-3 py-2.5 text-center">

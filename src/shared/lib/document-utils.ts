@@ -113,8 +113,11 @@ const DOC_STATUS_LABELS: Record<string, string> = {
   rejected: "Ditolak",
 };
 
-export function getDocumentStatusBadge(doc: DokumenItem): { variant: string; label: string; dotClass: string } {
-  const status = doc.status;
+export function getDocumentStatusBadge(doc?: DokumenItem | null): { variant: string; label: string; dotClass: string } {
+  if (!doc) {
+    return { variant: "pending", label: "Belum", dotClass: "bg-muted-foreground/30" };
+  }
+  const status = doc.status || "pending";
   return {
     variant: status,
     label: DOC_STATUS_LABELS[status] ?? status,
@@ -122,7 +125,8 @@ export function getDocumentStatusBadge(doc: DokumenItem): { variant: string; lab
   };
 }
 
-export function getOcrStatusLabel(doc: DokumenItem): string {
+export function getOcrStatusLabel(doc?: DokumenItem | null): string {
+  if (!doc) return "Belum Ada";
   if (doc.dataStatus === "manual_edit") return "Manual";
   if (doc.dataStatus === "pending") return "Pending External";
   if (!doc.ocrData) return "External OCR";
@@ -137,3 +141,162 @@ export function getOcrConfidenceVariant(confidence?: number): "success" | "warni
   if (confidence >= 0.6) return "warning";
   return "destructive";
 }
+
+// ============================================================
+// DYNAMIC DOCUMENT MAPPING & CONDITIONAL RULES
+// ============================================================
+
+export function calculateAge(birthDate: string | Date | null | undefined): number | null {
+  if (!birthDate) return null;
+  try {
+    const d = typeof birthDate === "string" ? new Date(birthDate) : birthDate;
+    if (isNaN(d.getTime())) return null;
+    const today = new Date();
+    let age = today.getFullYear() - d.getFullYear();
+    const m = today.getMonth() - d.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < d.getDate())) {
+      age--;
+    }
+    return age >= 0 ? age : null;
+  } catch {
+    return null;
+  }
+}
+
+export function isSingleWordName(name: string | null | undefined): boolean {
+  if (!name) return false;
+  const words = name.trim().split(/\s+/).filter(Boolean);
+  return words.length <= 1;
+}
+
+export interface DynamicDocRequirement {
+  age: number | null;
+  isKtpRequired: boolean;
+  isLansiaRequired: boolean;
+  isDoubleUpgradeRequired: boolean;
+  isSingleWordRequired: boolean;
+  
+  // Status check per category
+  pasporValid: boolean;
+  pasFotoValid: boolean;
+  vaksinValid: boolean;
+  ktpValid: boolean;
+  lansiaValid: boolean;
+  mahramValid: boolean;
+  singleWordDocValid: boolean;
+
+  // Counts & percentage
+  totalRequired: number;
+  totalCompleted: number;
+  percentage: number;
+  allMandatoryComplete: boolean;
+  missingRequirements: string[];
+}
+
+export function computeDynamicDocumentRequirements(
+  jamaah: {
+    namaLengkap?: string;
+    tanggalLahir?: string | Date | null;
+    dokumen?: Record<string, any> | any[];
+  },
+  context?: {
+    groupPaxCount?: number;
+    roomType?: string;
+  }
+): DynamicDocRequirement {
+  // Normalize docs map: mappedDocs[jenis] = DokumenItem
+  const mappedDocs: Record<string, any> = {};
+  if (Array.isArray(jamaah.dokumen)) {
+    jamaah.dokumen.forEach((d: any) => {
+      if (d?.jenis) mappedDocs[d.jenis] = d;
+    });
+  } else if (jamaah.dokumen && typeof jamaah.dokumen === "object") {
+    Object.assign(mappedDocs, jamaah.dokumen);
+  }
+
+  const isDocValid = (d: any): boolean => {
+    return d && (d.status === "verified" || d.status === "lengkap");
+  };
+
+  const age = calculateAge(jamaah.tanggalLahir);
+  const isKtpRequired = age === null || age >= 17; // Umur >= 17 wajib KTP
+  const isLansiaRequired = age !== null && age > 60; // Umur > 60 wajib Surat Lansia
+  const isDoubleUpgradeRequired = (context?.groupPaxCount === 2) || (context?.roomType === "double");
+  const isSingleWordRequired = isSingleWordName(jamaah.namaLengkap);
+
+  // Status validity
+  const pasporValid = isDocValid(mappedDocs.paspor);
+  const pasFotoValid = isDocValid(mappedDocs.pas_foto);
+  const vaksinValid = isDocValid(mappedDocs.vaksin);
+  const ktpValid = !isKtpRequired || isDocValid(mappedDocs.ktp);
+  const lansiaValid = !isLansiaRequired || isDocValid(mappedDocs.surat_lansia) || isDocValid(mappedDocs.surat_pernyataan);
+  
+  // Mahram (KK / Buku Nikah / Akta)
+  const hasSupportingDoc = isDocValid(mappedDocs.kk) || isDocValid(mappedDocs.buku_nikah) || isDocValid(mappedDocs.akta);
+  const mahramValid = !isDoubleUpgradeRequired || hasSupportingDoc;
+  const singleWordDocValid = !isSingleWordRequired || hasSupportingDoc;
+
+  // Build requirements tally
+  let totalRequired = 3; // Paspor, Pas Foto, Vaksin selalu wajib
+  let totalCompleted = 0;
+  const missingRequirements: string[] = [];
+
+  if (pasporValid) totalCompleted++; else missingRequirements.push("Paspor");
+  if (pasFotoValid) totalCompleted++; else missingRequirements.push("Pas Foto");
+  if (vaksinValid) totalCompleted++; else missingRequirements.push("Sertifikat Vaksin");
+
+  if (isKtpRequired) {
+    totalRequired++;
+    if (isDocValid(mappedDocs.ktp)) totalCompleted++; else missingRequirements.push("KTP");
+  }
+
+  if (isLansiaRequired) {
+    totalRequired++;
+    if (isDocValid(mappedDocs.surat_lansia) || isDocValid(mappedDocs.surat_pernyataan)) {
+      totalCompleted++;
+    } else {
+      missingRequirements.push("Surat Pernyataan Lansia");
+    }
+  }
+
+  if (isDoubleUpgradeRequired) {
+    totalRequired++;
+    if (hasSupportingDoc) {
+      totalCompleted++;
+    } else {
+      missingRequirements.push("Bukti Mahram (KK / Buku Nikah)");
+    }
+  } else if (isSingleWordRequired) {
+    // Jika bukan kamar double tetapi nama 1 suku kata, butuh 1 dokumen tambahan untuk endorsement
+    totalRequired++;
+    if (hasSupportingDoc) {
+      totalCompleted++;
+    } else {
+      missingRequirements.push("Dokumen Endorsement 1 Kata (KK / Buku Nikah / Akta)");
+    }
+  }
+
+  const percentage = totalRequired > 0 ? Math.round((totalCompleted / totalRequired) * 100) : 0;
+  const allMandatoryComplete = totalCompleted >= totalRequired;
+
+  return {
+    age,
+    isKtpRequired,
+    isLansiaRequired,
+    isDoubleUpgradeRequired,
+    isSingleWordRequired,
+    pasporValid,
+    pasFotoValid,
+    vaksinValid,
+    ktpValid,
+    lansiaValid,
+    mahramValid,
+    singleWordDocValid,
+    totalRequired,
+    totalCompleted,
+    percentage,
+    allMandatoryComplete,
+    missingRequirements,
+  };
+}
+
