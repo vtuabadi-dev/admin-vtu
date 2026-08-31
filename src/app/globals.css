@@ -245,11 +245,11 @@ html.intro-pending body {
 }
 
 /* ══════════════════════════════════════════════════════════════════════════════
-   PORTAL THEME (LUXURY ISLAMIC POSTER — IDENTICAL TO LOGIN PAGE)
+   PORTAL THEME (BRIGHT LUXURY ISLAMIC DAYLIGHT AESTHETIC)
    ══════════════════════════════════════════════════════════════════════════════ */
 .portal-theme {
-  background-color: #07120f !important;
-  color: #f7f4ea !important;
+  background-color: #f7f9f7 !important;
+  color: #1e293b !important;
   font-family: Inter, system-ui, -apple-system, sans-serif;
   min-height: 100dvh;
 }
@@ -258,14 +258,15 @@ html.intro-pending body {
 .portal-theme h2,
 .portal-theme h3 {
   font-family: Georgia, serif !important;
-  color: #f7f4ea !important;
+  color: #064e3b !important;
+  font-weight: 800 !important;
 }
 
 .portal-theme h1 em,
 .portal-theme h2 em,
 .portal-theme h3 em,
 .portal-theme .text-gold {
-  color: #f0d99a !important;
+  color: #b4821a !important;
   font-style: normal;
 }
 
@@ -278,10 +279,11 @@ html.intro-pending body {
 .portal-theme .bg-muted\/20,
 .portal-theme .bg-muted\/40,
 .portal-theme .bg-muted {
-  background: linear-gradient(180deg, rgba(6, 30, 22, 0.75) 0%, rgba(4, 18, 13, 0.88) 100%) !important;
-  border-color: rgba(216, 177, 91, 0.3) !important;
-  color: #f7f4ea !important;
-  backdrop-filter: blur(14px) !important;
+  background: rgba(255, 255, 255, 0.94) !important;
+  border: 1px solid rgba(212, 175, 55, 0.35) !important;
+  color: #1e293b !important;
+  backdrop-filter: blur(12px) !important;
+  box-shadow: 0 10px 30px -10px rgba(6, 78, 59, 0.08), 0 4px 12px rgba(0, 0, 0, 0.03) !important;
 }
 
 .portal-theme .text-slate-950,
@@ -289,7 +291,7 @@ html.intro-pending body {
 .portal-theme .text-gray-900,
 .portal-theme .text-stone-900,
 .portal-theme .text-foreground {
-  color: #f7f4ea !important;
+  color: #064e3b !important;
 }
 
 .portal-theme .text-slate-700,
@@ -298,9 +300,12 @@ html.intro-pending body {
 .portal-theme .text-gray-600,
 .portal-theme .text-gray-500,
 .portal-theme .text-stone-600,
-.portal-theme .text-stone-500,
+.portal-theme .text-stone-500 {
+  color: #334155 !important;
+}
+
 .portal-theme .text-muted-foreground {
-  color: rgba(247, 244, 234, 0.72) !important;
+  color: #64748b !important;
 }
 
 /* Form Inputs, Selects, Textareas */
@@ -312,9 +317,9 @@ html.intro-pending body {
 .portal-theme input[type="password"],
 .portal-theme textarea,
 .portal-theme select {
-  background-color: rgba(3, 15, 11, 0.65) !important;
-  border: 1px solid rgba(247, 244, 234, 0.24) !important;
-  color: #ffffff !important;
+  background-color: #ffffff !important;
+  border: 1.5px solid #cbd5e1 !important;
+  color: #0f172a !important;
   border-radius: 12px !important;
   backdrop-filter: blur(8px) !important;
 }
@@ -322,15 +327,15 @@ html.intro-pending body {
 .portal-theme input:focus,
 .portal-theme textarea:focus,
 .portal-theme select:focus {
-  border-color: rgba(216, 177, 91, 0.85) !important;
-  box-shadow: 0 0 0 3px rgba(216, 177, 91, 0.18) !important;
-  background-color: rgba(4, 20, 15, 0.85) !important;
+  border-color: #059669 !important;
+  box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.15) !important;
+  background-color: #ffffff !important;
   outline: none !important;
 }
 
 .portal-theme input::placeholder,
 .portal-theme textarea::placeholder {
-  color: rgba(247, 244, 234, 0.42) !important;
+  color: #94a3b8 !important;
 }
 
 /* Primary CTA Buttons */
@@ -338,11 +343,11 @@ html.intro-pending body {
 .portal-theme button.bg-emerald-600,
 .portal-theme button.bg-emerald-700,
 .portal-theme button.bg-primary {
-  background: linear-gradient(100deg, #f1d894, #c99a3d) !important;
-  color: #172015 !important;
+  background: linear-gradient(100deg, #e5b23e, #c28c1d) !important;
+  color: #ffffff !important;
   font-weight: 700 !important;
   border: 0 !important;
-  box-shadow: 0 10px 30px rgba(216, 177, 91, 0.22) !important;
+  box-shadow: 0 8px 25px rgba(194, 140, 29, 0.28) !important;
   transition: all 0.2s ease !important;
 }
 
@@ -351,7 +356,7 @@ html.intro-pending body {
 .portal-theme button.bg-emerald-700:hover,
 .portal-theme button.bg-primary:hover {
   transform: translateY(-1px) !important;
-  box-shadow: 0 14px 35px rgba(216, 177, 91, 0.32) !important;
+  box-shadow: 0 12px 30px rgba(194, 140, 29, 0.38) !important;
 }
 
 /* Secondary Buttons */
@@ -359,9 +364,9 @@ html.intro-pending body {
 .portal-theme button.bg-gray-100,
 .portal-theme button.bg-stone-100,
 .portal-theme button.bg-gray-200 {
-  background: rgba(4, 18, 13, 0.55) !important;
-  border: 1px solid rgba(216, 177, 91, 0.38) !important;
-  color: #f0d99a !important;
+  background: #ffffff !important;
+  border: 1px solid rgba(212, 175, 55, 0.45) !important;
+  color: #926b17 !important;
 }
 
 /* Border overrides */
@@ -369,5 +374,5 @@ html.intro-pending body {
 .portal-theme .border-stone-200,
 .portal-theme .border-slate-200,
 .portal-theme .border-border {
-  border-color: rgba(216, 177, 91, 0.24) !important;
+  border-color: rgba(212, 175, 55, 0.3) !important;
 }
