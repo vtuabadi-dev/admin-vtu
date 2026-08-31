@@ -49,6 +49,7 @@ import type {
   SuratTemplate,
   SuratKategori,
   SuratPlaceholderMapping,
+  SuratInputType,
 } from "@/shared/types/surat";
 import { KOP_SURAT_BASE64 } from "@/server/assets/kop-surat";
 
@@ -63,8 +64,9 @@ export default function MasterSuratPage() {
   // Editor Modal State
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<SuratTemplate | null>(null);
-  const [editorActiveTab, setEditorActiveTab] = useState<"desain" | "mapping" | "preview">("desain");
+  const [editorActiveTab, setEditorActiveTab] = useState<"konfigurasi" | "editor" | "preview">("konfigurasi");
   const [savingTemplate, setSavingTemplate] = useState(false);
+  const [showFormatHelper, setShowFormatHelper] = useState(false);
 
   // Upload Wizard Modal State
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
@@ -134,17 +136,23 @@ export default function MasterSuratPage() {
 
   // Handle create new template
   const handleCreateNew = () => {
+    const newId = `tpl-custom-${Date.now()}`;
     const newTpl: SuratTemplate = {
-      id: `tpl-custom-${Date.now()}`,
-      slug: `custom-surat-${Date.now()}`,
-      nama: "Template Surat Baru",
-      kategori: "custom",
-      deskripsi: "Template surat kustom dengan format placeholder {tag}",
-      kodeNomorDefault: "SK-CUSTOM",
-      perihalDefault: "Perihal Surat Resmi",
+      id: newId,
+      slug: `custom-surat-${Date.now().toString(36)}`,
+      nama: "Surat Tugas",
+      kategori: "internal",
+      deskripsi: "Template surat operasional kustom PT. Vauza Trikarsa Utama",
+      kodeNomorDefault: "ST",
+      formatNomor: "[NOMOR]/ST/[BULAN]/[TAHUN]",
+      jumlahTemplateTerlampir: 1,
+      kebutuhanNomorPerSurat: 1,
+      formatNamaFile: "SK_{{Nama Pegawai}}",
+      fileNameUploaded: "",
+      perihalDefault: "Surat Tugas Pelaksanaan Kegiatan Operasional",
       kopSuratType: "ppiu_vtu",
       lampiranDefault: "-",
-      tujuanDefault: "Yth. Pimpinan Instansi / Bapak/Ibu",
+      tujuanDefault: "Kepada Pihak yang Berkepentingan",
       kotaTujuanDefault: "Di Tempat",
       penandatangan: {
         nama: "H. Fauzan Adzim, S.E.",
@@ -152,50 +160,173 @@ export default function MasterSuratPage() {
         showStempel: true,
         showBarcode: true,
       },
-      templateContent: `Assalamu'alaikum Warahmatullahi Wabarakatuh,
+      templateContent: `Yang bertanda tangan di bawah ini menerangkan bahwa:
 
-Yang bertanda tangan di bawah ini menerangkan bahwa:
+Nama Pegawai        : {Nama Pegawai}
+Nomor Induk Pegawai : {NIP}
+Jabatan Pegawai     : {Jabatan Pegawai}
+Instansi / Cabang   : {Kantor Cabang}
+Kota Penugasan      : {Kota Tujuan}
+Tanggal Tugas       : {Tanggal Penugasan}
 
-Nama Lengkap      : {nama_lengkap}
-Nomor NIK / KTP   : {nik}
-Nomor Paspor      : {nomor_paspor}
-Tempat/Tgl Lahir  : {tempat_lahir}, {tanggal_lahir}
-Alamat Lengkap    : {alamat}
+Untuk melaksanakan tugas operasional pendampingan dan pelayanan jamaah PT. Vauza Trikarsa Utama.
 
-Adalah benar-benar calon jamaah Umroh PT. Vauza Trikarsa Utama pada program keberangkatan:
-
-Paket Umroh       : {nama_paket}
-Tanggal Berangkat : {tanggal_berangkat}
-Tanggal Kembali   : {tanggal_pulang}
-
-Demikian surat ini kami buat dengan sebenarnya agar dapat dipergunakan sebagaimana mestinya.
-
-Wassalamu'alaikum Warahmatullahi Wabarakatuh.`,
+Demikian Surat Tugas ini dibuat dengan sebenarnya agar dapat dipergunakan sebagaimana mestinya.`,
       placeholders: [
-        { key: "nama_lengkap", label: "Nama Lengkap", sourceType: "manifest", manifestField: "jamaah.namaLengkap", required: true },
-        { key: "nik", label: "NIK (KTP)", sourceType: "manifest", manifestField: "jamaah.nik", required: true },
-        { key: "nomor_paspor", label: "Nomor Paspor", sourceType: "manifest", manifestField: "jamaah.nomorPaspor" },
-        { key: "tempat_lahir", label: "Tempat Lahir", sourceType: "manifest", manifestField: "jamaah.tempatLahir" },
-        { key: "tanggal_lahir", label: "Tanggal Lahir", sourceType: "manifest", manifestField: "jamaah.tanggalLahir" },
-        { key: "alamat", label: "Alamat Lengkap", sourceType: "manifest", manifestField: "jamaah.alamat" },
-        { key: "nama_paket", label: "Nama Paket", sourceType: "manifest", manifestField: "keberangkatan.namaPaket" },
-        { key: "tanggal_berangkat", label: "Tanggal Berangkat", sourceType: "manifest", manifestField: "keberangkatan.tanggalBerangkat" },
-        { key: "tanggal_pulang", label: "Tanggal Pulang", sourceType: "manifest", manifestField: "keberangkatan.tanggalPulang" },
+        { key: "Nama Pegawai", label: "Nama Pegawai", sourceType: "manual", inputType: "text", defaultValue: "", required: true },
+        { key: "NIP", label: "Nomor Induk Pegawai (NIP)", sourceType: "manual", inputType: "text", defaultValue: "", required: false },
+        { key: "Jabatan Pegawai", label: "Jabatan Pegawai", sourceType: "manual", inputType: "text", defaultValue: "Staf Operasional Lapangan", required: true },
+        { key: "Kantor Cabang", label: "Kantor Cabang", sourceType: "manual", inputType: "city", defaultValue: "Surabaya", required: true },
+        { key: "Kota Tujuan", label: "Kota Penugasan", sourceType: "manual", inputType: "city", defaultValue: "Sidoarjo", required: true },
+        { key: "Tanggal Penugasan", label: "Tanggal Tugas", sourceType: "manual", inputType: "date", defaultValue: "", required: true },
       ],
       isDefault: false,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
     setEditingTemplate(newTpl);
-    setEditorActiveTab("desain");
+    setEditorActiveTab("konfigurasi");
+    setShowFormatHelper(false);
     setIsEditorOpen(true);
   };
 
   // Handle edit existing template
   const handleEditTemplate = (tpl: SuratTemplate) => {
-    setEditingTemplate(JSON.parse(JSON.stringify(tpl)));
-    setEditorActiveTab("desain");
+    const cloned: SuratTemplate = JSON.parse(JSON.stringify(tpl));
+    if (!cloned.formatNomor) {
+      cloned.formatNomor = `[NOMOR]/${cloned.kodeNomorDefault}/[BULAN]/[TAHUN]`;
+    }
+    if (cloned.jumlahTemplateTerlampir === undefined) cloned.jumlahTemplateTerlampir = 1;
+    if (cloned.kebutuhanNomorPerSurat === undefined) cloned.kebutuhanNomorPerSurat = 1;
+    if (!cloned.formatNamaFile) {
+      const firstKey = cloned.placeholders?.[0]?.key || "Nama Pegawai";
+      cloned.formatNamaFile = `SK_{{${firstKey}}}`;
+    }
+    setEditingTemplate(cloned);
+    setEditorActiveTab("konfigurasi");
+    setShowFormatHelper(false);
     setIsEditorOpen(true);
+  };
+
+  // Handle Add New Column in Konfigurasi Isian Data
+  const handleAddNewColumn = () => {
+    if (!editingTemplate) return;
+    const nextIdx = editingTemplate.placeholders.length + 1;
+    const newKey = `Variabel ${nextIdx}`;
+    const newMapping: SuratPlaceholderMapping = {
+      key: newKey,
+      label: `Kolom Isian ${nextIdx}`,
+      sourceType: "manual",
+      inputType: "text",
+      defaultValue: "",
+      required: true,
+    };
+    setEditingTemplate({
+      ...editingTemplate,
+      placeholders: [...editingTemplate.placeholders, newMapping],
+    });
+    showToast(`Kolom isian baru "{{${newKey}}}" berhasil ditambahkan`);
+  };
+
+  // Handle Remove Column in Konfigurasi Isian Data
+  const handleRemoveColumn = (idx: number) => {
+    if (!editingTemplate) return;
+    const removed = editingTemplate.placeholders[idx];
+    const filtered = editingTemplate.placeholders.filter((_, i) => i !== idx);
+    setEditingTemplate({
+      ...editingTemplate,
+      placeholders: filtered,
+    });
+    if (removed) {
+      showToast(`Kolom "${removed.label || removed.key}" dihapus`);
+    }
+  };
+
+  // Handle File Upload directly in the Modal Card
+  const handleModalFileUpload = (file: File) => {
+    if (!editingTemplate) return;
+    const fileName = file.name;
+    const isDocx = fileName.endsWith(".docx") || fileName.endsWith(".doc");
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const content = (e.target?.result as string) || "";
+      const detectedTags = extractPlaceholdersFromText(content);
+      const currentMappings = [...editingTemplate.placeholders];
+
+      detectedTags.forEach((tag) => {
+        const exists = currentMappings.some(
+          (m) => m.key.toLowerCase() === tag.toLowerCase()
+        );
+        if (!exists) {
+          const matchedManifest = MANIFEST_FIELD_OPTIONS.find(
+            (opt) =>
+              opt.key.toLowerCase().includes(tag.toLowerCase()) ||
+              tag.toLowerCase().includes(opt.key.split(".")[1]?.toLowerCase() || "")
+          );
+
+          let detectedType: SuratInputType = "text";
+          const tagLower = tag.toLowerCase();
+          if (
+            tagLower.includes("tanggal") ||
+            tagLower.includes("tgl") ||
+            tagLower.includes("date") ||
+            tagLower.includes("lahir") ||
+            tagLower.includes("berangkat") ||
+            tagLower.includes("pulang")
+          ) {
+            detectedType = "date";
+          } else if (
+            tagLower.includes("kota") ||
+            tagLower.includes("tempat") ||
+            tagLower.includes("cabang") ||
+            tagLower.includes("city") ||
+            tagLower.includes("wilayah")
+          ) {
+            detectedType = "city";
+          } else if (
+            tagLower.includes("jumlah") ||
+            tagLower.includes("hari") ||
+            tagLower.includes("nominal") ||
+            tagLower.includes("biaya") ||
+            tagLower.includes("umur")
+          ) {
+            detectedType = "number";
+          } else if (
+            tagLower.includes("deskripsi") ||
+            tagLower.includes("keterangan") ||
+            tagLower.includes("alamat") ||
+            tagLower.includes("kronologi")
+          ) {
+            detectedType = "textarea";
+          }
+
+          currentMappings.push({
+            key: tag,
+            label: tag.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
+            sourceType: matchedManifest ? "manifest" : "manual",
+            manifestField: matchedManifest ? matchedManifest.key : undefined,
+            inputType: detectedType,
+            defaultValue: "",
+            required: true,
+          });
+        }
+      });
+
+      setEditingTemplate((prev) => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          fileNameUploaded: fileName,
+          templateContent: isDocx && prev.templateContent ? prev.templateContent : (content || prev.templateContent),
+          placeholders: currentMappings,
+        };
+      });
+
+      showToast(`File ${fileName} diunggah! Terdeteksi ${detectedTags.length} variabel.`);
+    };
+
+    reader.readAsText(file);
   };
 
   // Handle duplicate template
@@ -450,7 +581,7 @@ Wassalamu'alaikum Warahmatullahi Wabarakatuh.`,
 
     // Open editor immediately to review mappings
     setEditingTemplate(newTemplate);
-    setEditorActiveTab("mapping");
+    setEditorActiveTab("konfigurasi");
     setIsEditorOpen(true);
   };
 
@@ -845,80 +976,475 @@ Wassalamu'alaikum Warahmatullahi Wabarakatuh.`,
         <Modal
           open={isEditorOpen}
           onClose={() => setIsEditorOpen(false)}
-          title={`Konfigurasi Template: ${editingTemplate.nama}`}
+          title="Konfigurasi Template"
           size="xl"
         >
-          <div className="space-y-4">
-            {/* Tab Navigation */}
+          <div className="space-y-5">
+            {/* Navigation Tabs */}
             <div className="flex items-center justify-between border-b pb-2">
               <div className="flex items-center gap-2">
                 <button
-                  onClick={() => setEditorActiveTab("desain")}
+                  type="button"
+                  onClick={() => setEditorActiveTab("konfigurasi")}
                   className={cn(
-                    "px-3 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5",
-                    editorActiveTab === "desain"
+                    "px-3.5 py-2 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5",
+                    editorActiveTab === "konfigurasi"
+                      ? "bg-primary text-primary-foreground shadow-sm"
+                      : "text-muted-foreground hover:bg-muted"
+                  )}
+                >
+                  <Sliders className="h-3.5 w-3.5" />
+                  1. Konfigurasi Template
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setEditorActiveTab("editor")}
+                  className={cn(
+                    "px-3.5 py-2 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5",
+                    editorActiveTab === "editor"
                       ? "bg-primary text-primary-foreground shadow-sm"
                       : "text-muted-foreground hover:bg-muted"
                   )}
                 >
                   <FileText className="h-3.5 w-3.5" />
-                  1. Desain & Konten Surat
+                  2. Isi Konten & Editor Teks
                 </button>
 
                 <button
-                  onClick={() => setEditorActiveTab("mapping")}
-                  className={cn(
-                    "px-3 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5",
-                    editorActiveTab === "mapping"
-                      ? "bg-primary text-primary-foreground shadow-sm"
-                      : "text-muted-foreground hover:bg-muted"
-                  )}
-                >
-                  <Sparkles className="h-3.5 w-3.5" />
-                  2. Pemetaan Tag (Autocrat Mapping)
-                  <Badge variant="warning" size="sm" className="ml-1 text-[10px]">
-                    {editingTemplate.placeholders.length}
-                  </Badge>
-                </button>
-
-                <button
+                  type="button"
                   onClick={() => setEditorActiveTab("preview")}
                   className={cn(
-                    "px-3 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5",
+                    "px-3.5 py-2 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5",
                     editorActiveTab === "preview"
                       ? "bg-primary text-primary-foreground shadow-sm"
                       : "text-muted-foreground hover:bg-muted"
                   )}
                 >
                   <Eye className="h-3.5 w-3.5" />
-                  3. Uji Coba Pratinjau A4
+                  3. Pratinjau Lembar A4
                 </button>
               </div>
 
-              <Badge variant="outline" size="sm" className="font-mono text-xs">
-                {editingTemplate.kodeNomorDefault}
+              <Badge variant="outline" size="sm" className="font-mono text-xs hidden sm:inline-flex">
+                {editingTemplate.kodeNomorDefault || "ST"}
               </Badge>
             </div>
 
-            {/* TAB 1: DESAIN & KONTEN SURAT */}
-            {editorActiveTab === "desain" && (
-              <div className="space-y-4 max-h-[65vh] overflow-y-auto pr-1">
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div>
-                    <label className="text-xs font-semibold">Nama Template Surat</label>
+            {/* ── TAB 1: KONFIGURASI TEMPLATE (MATCHING USER SCREENSHOT) ── */}
+            {editorActiveTab === "konfigurasi" && (
+              <div className="space-y-6 max-h-[72vh] overflow-y-auto pr-1">
+                {/* Row 1: Nama Jenis Surat & Jumlah Template */}
+                <div className="grid grid-cols-1 sm:grid-cols-12 gap-4">
+                  <div className="sm:col-span-8 space-y-1.5">
+                    <label className="text-xs font-bold text-foreground">Nama Jenis Surat</label>
                     <Input
                       value={editingTemplate.nama}
                       onChange={(e) => setEditingTemplate({ ...editingTemplate, nama: e.target.value })}
-                      placeholder="Contoh: Surat Rekomendasi Paspor"
-                      className="text-xs mt-1"
+                      placeholder="Cth: Surat Tugas"
+                      className="text-xs h-10 bg-background"
                     />
                   </div>
 
+                  <div className="sm:col-span-4 space-y-1.5">
+                    <label className="text-xs font-bold text-foreground">Jumlah Template Terlampir</label>
+                    <Input
+                      type="number"
+                      min={1}
+                      value={editingTemplate.jumlahTemplateTerlampir ?? 1}
+                      onChange={(e) =>
+                        setEditingTemplate({
+                          ...editingTemplate,
+                          jumlahTemplateTerlampir: parseInt(e.target.value) || 1,
+                        })
+                      }
+                      className="text-xs h-10 bg-background font-mono"
+                    />
+                  </div>
+                </div>
+
+                {/* Row 2: Konfigurasi Penomoran Otomatis */}
+                <div className="space-y-2">
+                  <h4 className="text-xs font-bold text-foreground">Konfigurasi Penomoran Otomatis</h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-12 gap-4">
+                    <div className="sm:col-span-8 space-y-1.5">
+                      <label className="text-[11px] font-semibold text-muted-foreground">Format Nomor</label>
+                      <div className="relative flex items-center">
+                        <Input
+                          value={editingTemplate.formatNomor || ""}
+                          onChange={(e) => setEditingTemplate({ ...editingTemplate, formatNomor: e.target.value })}
+                          placeholder="[NOMOR]/ST/[BULAN]/[TAHUN]"
+                          className="text-xs h-10 pr-10 font-mono bg-background"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowFormatHelper(!showFormatHelper)}
+                          className="absolute right-2 px-2 py-1 rounded bg-stone-200 dark:bg-stone-700 text-stone-800 dark:text-stone-200 text-xs font-bold hover:bg-stone-300 transition-colors"
+                          title="Petunjuk Variabel Format Nomor"
+                        >
+                          !
+                        </button>
+                      </div>
+                      {showFormatHelper && (
+                        <div className="p-2.5 rounded-lg bg-blue-500/10 border border-blue-500/30 text-[11px] text-blue-900 dark:text-blue-200 space-y-1 animate-in fade-in duration-150">
+                          <p className="font-bold">Variabel Format Penomoran yang Tersedia:</p>
+                          <div className="grid grid-cols-2 gap-1 text-[10px] font-mono">
+                            <span><code>[NOMOR]</code> : Nomor Urut Surat (001, 002, dst)</span>
+                            <span><code>[BULAN]</code> : Bulan Romawi (VIII, IX, dst)</span>
+                            <span><code>[TAHUN]</code> : Tahun 4 Digit (2026)</span>
+                            <span><code>[HARI]</code> : Tanggal Hari Ini (31)</span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="sm:col-span-4 space-y-1.5">
+                      <label className="text-[11px] font-semibold text-muted-foreground">Kebutuhan Nomor per Surat</label>
+                      <Input
+                        type="number"
+                        min={1}
+                        value={editingTemplate.kebutuhanNomorPerSurat ?? 1}
+                        onChange={(e) =>
+                          setEditingTemplate({
+                            ...editingTemplate,
+                            kebutuhanNomorPerSurat: parseInt(e.target.value) || 1,
+                          })
+                        }
+                        className="text-xs h-10 bg-background font-mono"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Row 3: File Template Dokumen Ke-1 */}
+                <div className="p-4 rounded-xl border border-stone-200 dark:border-stone-800 bg-stone-50/60 dark:bg-stone-900/30 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-xs font-bold text-foreground">
+                      File Template Dokumen Ke-1{" "}
+                      <span className="text-emerald-600 dark:text-emerald-400 font-semibold">
+                        (Upload File mendeteksi variabel otomatis!)
+                      </span>
+                    </h4>
+                    {editingTemplate.fileNameUploaded && (
+                      <Badge variant="success" size="sm" className="text-[10px]">
+                        {editingTemplate.fileNameUploaded}
+                      </Badge>
+                    )}
+                  </div>
+
+                  {/* File Input Selector */}
+                  <div className="flex items-center gap-3 p-2 rounded-lg bg-background border border-stone-200 dark:border-stone-800">
+                    <label className="px-3 py-1.5 rounded-md bg-stone-100 dark:bg-stone-800 border text-xs font-semibold text-foreground cursor-pointer hover:bg-stone-200 dark:hover:bg-stone-700 transition-colors shrink-0">
+                      Pilih File
+                      <input
+                        type="file"
+                        accept=".docx,.doc,.txt,.html,.json"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) handleModalFileUpload(file);
+                        }}
+                      />
+                    </label>
+                    <span className="text-xs text-muted-foreground truncate">
+                      {editingTemplate.fileNameUploaded || "Tidak ada file yang dipilih"}
+                    </span>
+                  </div>
+
+                  {/* Format Nama File Hasil Generate */}
+                  <div className="space-y-1.5 pt-1">
+                    <label className="text-[11px] font-semibold text-muted-foreground">
+                      Format Nama File Hasil Generate
+                    </label>
+                    <Input
+                      value={editingTemplate.formatNamaFile || ""}
+                      onChange={(e) => setEditingTemplate({ ...editingTemplate, formatNamaFile: e.target.value })}
+                      placeholder="Cth: SK_{{Nama Pegawai}}"
+                      className="text-xs h-10 bg-background font-mono"
+                    />
+                  </div>
+                </div>
+
+                {/* QR Code & Stempel Quick Toggles */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {/* Switch QR Code */}
+                  <div className="p-3 rounded-xl border border-emerald-500/30 bg-emerald-500/5 dark:bg-emerald-950/20 flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2.5">
+                      <QrCode className="h-4 w-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                      <div>
+                        <p className="text-xs font-bold text-foreground">Tampilkan QR Code Verifikasi</p>
+                        <p className="text-[10px] text-muted-foreground">Scan verifikasi online di /track/surat</p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={editingTemplate.penandatangan.showBarcode}
+                      onClick={() =>
+                        setEditingTemplate({
+                          ...editingTemplate,
+                          penandatangan: {
+                            ...editingTemplate.penandatangan,
+                            showBarcode: !editingTemplate.penandatangan.showBarcode,
+                          },
+                        })
+                      }
+                      className={cn(
+                        "relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none",
+                        editingTemplate.penandatangan.showBarcode ? "bg-emerald-500" : "bg-stone-300 dark:bg-stone-700"
+                      )}
+                    >
+                      <span
+                        aria-hidden="true"
+                        className={cn(
+                          "pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out",
+                          editingTemplate.penandatangan.showBarcode ? "translate-x-4" : "translate-x-0"
+                        )}
+                      />
+                    </button>
+                  </div>
+
+                  {/* Switch Stempel */}
+                  <div className="p-3 rounded-xl border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-900/40 flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2.5">
+                      <Building2 className="h-4 w-4 text-primary shrink-0" />
+                      <div>
+                        <p className="text-xs font-bold text-foreground">Tampilkan Stempel Resmi VTU</p>
+                        <p className="text-[10px] text-muted-foreground">Stempel PPIU resmi di atas tanda tangan</p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={editingTemplate.penandatangan.showStempel}
+                      onClick={() =>
+                        setEditingTemplate({
+                          ...editingTemplate,
+                          penandatangan: {
+                            ...editingTemplate.penandatangan,
+                            showStempel: !editingTemplate.penandatangan.showStempel,
+                          },
+                        })
+                      }
+                      className={cn(
+                        "relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none",
+                        editingTemplate.penandatangan.showStempel ? "bg-primary" : "bg-stone-300 dark:bg-stone-700"
+                      )}
+                    >
+                      <span
+                        aria-hidden="true"
+                        className={cn(
+                          "pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out",
+                          editingTemplate.penandatangan.showStempel ? "translate-x-4" : "translate-x-0"
+                        )}
+                      />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Row 4: Konfigurasi Isian Data */}
+                <div className="space-y-3 pt-2">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-sm font-bold text-foreground">Konfigurasi Isian Data</h4>
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={handleAddNewColumn}
+                      className="text-xs bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow-sm"
+                    >
+                      <Plus className="mr-1.5 h-3.5 w-3.5" />
+                      + Tambah Kolom
+                    </Button>
+                  </div>
+
+                  {editingTemplate.placeholders.length === 0 ? (
+                    <div className="p-8 text-center border-2 border-dashed rounded-xl text-muted-foreground space-y-2">
+                      <p className="text-xs font-semibold">Belum ada kolom isian data terkonfigurasi</p>
+                      <p className="text-[11px]">
+                        Unggah file template di atas atau klik &quot;+ Tambah Kolom&quot; untuk membuat kolom baru.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {editingTemplate.placeholders.map((mapping, idx) => {
+                        return (
+                          <div
+                            key={`${mapping.key}-${idx}`}
+                            className="p-4 rounded-xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900/90 shadow-sm space-y-3"
+                          >
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                              {/* Left Column: Nama Variabel & Tag Word Hint */}
+                              <div className="flex-1 space-y-1">
+                                <Input
+                                  value={mapping.label}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    setEditingTemplate((prev) => {
+                                      if (!prev) return null;
+                                      const updated = [...prev.placeholders];
+                                      const cur = updated[idx];
+                                      if (cur) updated[idx] = { ...cur, label: val };
+                                      return { ...prev, placeholders: updated };
+                                    });
+                                  }}
+                                  placeholder="Nama Variabel"
+                                  className="text-xs h-9 bg-slate-50 dark:bg-stone-950 font-medium"
+                                />
+                                <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground pt-0.5">
+                                  <span>Tag Word:</span>
+                                  <span className="font-mono text-blue-600 dark:text-blue-400 font-bold">
+                                    &#123;&#123;{mapping.key}&#125;&#125;
+                                  </span>
+                                </div>
+                              </div>
+
+                              {/* Middle Column: Jenis Kolom Isian Dropdown */}
+                              <div className="flex items-center gap-3">
+                                <div className="w-48 sm:w-56">
+                                  <Select
+                                    value={
+                                      mapping.sourceType === "manifest"
+                                        ? "manifest"
+                                        : mapping.inputType || "text"
+                                    }
+                                    onChange={(e) => {
+                                      const val = e.target.value;
+                                      setEditingTemplate((prev) => {
+                                        if (!prev) return null;
+                                        const updated = [...prev.placeholders];
+                                        const cur = updated[idx];
+                                        if (cur) {
+                                          if (val === "manifest") {
+                                            updated[idx] = {
+                                              ...cur,
+                                              sourceType: "manifest",
+                                              manifestField: cur.manifestField || MANIFEST_FIELD_OPTIONS[0]?.key,
+                                            };
+                                          } else {
+                                            updated[idx] = {
+                                              ...cur,
+                                              sourceType: "manual",
+                                              inputType: val as SuratInputType,
+                                            };
+                                          }
+                                        }
+                                        return { ...prev, placeholders: updated };
+                                      });
+                                    }}
+                                    options={[
+                                      { value: "text", label: "Teks Singkat" },
+                                      { value: "date", label: "Tanggal" },
+                                      { value: "city", label: "Kota / Tempat" },
+                                      { value: "number", label: "Angka / Nomor" },
+                                      { value: "textarea", label: "Teks Panjang / Paragraf" },
+                                      { value: "select", label: "Pilihan (Dropdown)" },
+                                      { value: "manifest", label: "Ambil dari Manifest (Otomatis)" },
+                                    ]}
+                                    className="text-xs h-9"
+                                  />
+                                </div>
+
+                                {/* Far Right: Hapus link */}
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveColumn(idx)}
+                                  className="text-xs font-bold text-red-600 dark:text-red-400 hover:text-red-700 hover:underline shrink-0 px-2"
+                                >
+                                  Hapus
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* Sub-row if manifest or select */}
+                            {mapping.sourceType === "manifest" && (
+                              <div className="flex items-center gap-2 pt-1 p-2 rounded-lg bg-emerald-500/5 border border-emerald-500/20 text-xs">
+                                <span className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-300 shrink-0">
+                                  Field Manifest:
+                                </span>
+                                <Select
+                                  value={mapping.manifestField || MANIFEST_FIELD_OPTIONS[0]?.key || ""}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    setEditingTemplate((prev) => {
+                                      if (!prev) return null;
+                                      const updated = [...prev.placeholders];
+                                      const cur = updated[idx];
+                                      if (cur) updated[idx] = { ...cur, manifestField: val };
+                                      return { ...prev, placeholders: updated };
+                                    });
+                                  }}
+                                  options={MANIFEST_FIELD_OPTIONS.map((opt) => ({
+                                    value: opt.key,
+                                    label: `${opt.label} (${opt.group})`,
+                                  }))}
+                                  className="text-xs h-8 flex-1"
+                                />
+                              </div>
+                            )}
+
+                            {mapping.inputType === "select" && mapping.sourceType !== "manifest" && (
+                              <div className="flex items-center gap-2 pt-1 p-2 rounded-lg bg-blue-500/5 border border-blue-500/20 text-xs">
+                                <span className="text-[11px] font-semibold text-blue-700 dark:text-blue-300 shrink-0">
+                                  Opsi Pilihan (Koma):
+                                </span>
+                                <Input
+                                  value={(mapping.options || []).join(", ")}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    const opts = val
+                                      .split(",")
+                                      .map((s) => s.trim())
+                                      .filter(Boolean);
+                                    setEditingTemplate((prev) => {
+                                      if (!prev) return null;
+                                      const updated = [...prev.placeholders];
+                                      const cur = updated[idx];
+                                      if (cur) updated[idx] = { ...cur, options: opts };
+                                      return { ...prev, placeholders: updated };
+                                    });
+                                  }}
+                                  placeholder="Cth: Pria, Wanita"
+                                  className="text-xs h-8 flex-1"
+                                />
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                {/* Bottom Save Button Container */}
+                <div className="flex justify-end pt-4 border-t">
+                  <Button
+                    type="button"
+                    size="lg"
+                    onClick={handleSaveEditor}
+                    disabled={savingTemplate}
+                    className="text-sm font-bold bg-emerald-600 hover:bg-emerald-700 text-white px-8 shadow-md"
+                  >
+                    <Save className="mr-2 h-4 w-4" />
+                    {savingTemplate ? "Menyimpan..." : "Simpan Konfigurasi"}
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* ── TAB 2: ISI KONTEN & EDITOR TEKS ── */}
+            {editorActiveTab === "editor" && (
+              <div className="space-y-4 max-h-[72vh] overflow-y-auto pr-1">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div>
                     <label className="text-xs font-semibold">Kategori Surat</label>
                     <Select
                       value={editingTemplate.kategori}
-                      onChange={(e) => setEditingTemplate({ ...editingTemplate, kategori: e.target.value as SuratKategori })}
+                      onChange={(e) =>
+                        setEditingTemplate({
+                          ...editingTemplate,
+                          kategori: e.target.value as SuratKategori,
+                        })
+                      }
                       options={[
                         { value: "imigrasi", label: "Imigrasi / Kemenag" },
                         { value: "instansi", label: "Instansi / Perusahaan" },
@@ -932,33 +1458,31 @@ Wassalamu'alaikum Warahmatullahi Wabarakatuh.`,
                   </div>
 
                   <div>
-                    <label className="text-xs font-semibold">Kode Prefix Nomor Surat</label>
+                    <label className="text-xs font-semibold">Kode Prefix Default</label>
                     <Input
                       value={editingTemplate.kodeNomorDefault}
-                      onChange={(e) => setEditingTemplate({ ...editingTemplate, kodeNomorDefault: e.target.value })}
-                      placeholder="Contoh: SR-PASPOR"
+                      onChange={(e) =>
+                        setEditingTemplate({
+                          ...editingTemplate,
+                          kodeNomorDefault: e.target.value,
+                        })
+                      }
+                      placeholder="Contoh: ST"
                       className="text-xs mt-1 font-mono uppercase"
                     />
                   </div>
-                </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="text-xs font-semibold">Perihal Surat Default</label>
+                    <label className="text-xs font-semibold">Perihal Surat</label>
                     <Input
                       value={editingTemplate.perihalDefault}
-                      onChange={(e) => setEditingTemplate({ ...editingTemplate, perihalDefault: e.target.value })}
-                      placeholder="Contoh: Rekomendasi Pembuatan Paspor"
-                      className="text-xs mt-1"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-xs font-semibold">Tujuan Surat Default</label>
-                    <Input
-                      value={editingTemplate.tujuanDefault || ""}
-                      onChange={(e) => setEditingTemplate({ ...editingTemplate, tujuanDefault: e.target.value })}
-                      placeholder="Contoh: Yth. Kepala Kantor Imigrasi"
+                      onChange={(e) =>
+                        setEditingTemplate({
+                          ...editingTemplate,
+                          perihalDefault: e.target.value,
+                        })
+                      }
+                      placeholder="Contoh: Surat Tugas Operasional"
                       className="text-xs mt-1"
                     />
                   </div>
@@ -969,39 +1493,32 @@ Wassalamu'alaikum Warahmatullahi Wabarakatuh.`,
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-bold text-primary flex items-center gap-1.5">
                       <Sparkles className="h-3.5 w-3.5" />
-                      Sisipkan Tag Placeholder Otomatis ke Isi Surat
+                      Sisipkan Tag Placeholder ke Kursor
                     </span>
-                    <span className="text-[11px] text-muted-foreground">Klik tag untuk menyisipkan ke kursor</span>
+                    <span className="text-[11px] text-muted-foreground">Klik tag untuk menyisipkan ke isi surat</span>
                   </div>
 
                   <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto">
                     {[
+                      ...editingTemplate.placeholders.map((p) => ({ key: p.key, label: `+ {${p.key}}` })),
                       { key: "nama_lengkap", label: "+ {nama_lengkap}" },
                       { key: "nik", label: "+ {nik}" },
                       { key: "nomor_paspor", label: "+ {nomor_paspor}" },
-                      { key: "tempat_lahir", label: "+ {tempat_lahir}" },
-                      { key: "tanggal_lahir", label: "+ {tanggal_lahir}" },
-                      { key: "jenis_kelamin", label: "+ {jenis_kelamin}" },
-                      { key: "alamat", label: "+ {alamat}" },
-                      { key: "nomor_telepon", label: "+ {nomor_telepon}" },
                       { key: "nama_paket", label: "+ {nama_paket}" },
-                      { key: "kode_paket", label: "+ {kode_paket}" },
                       { key: "tanggal_berangkat", label: "+ {tanggal_berangkat}" },
                       { key: "tanggal_pulang", label: "+ {tanggal_pulang}" },
-                      { key: "maskapai", label: "+ {maskapai}" },
-                      { key: "hotel_mekkah", label: "+ {hotel_mekkah}" },
-                      { key: "hotel_madinah", label: "+ {hotel_madinah}" },
-                      { key: "program_hari", label: "+ {program_hari}" },
-                    ].map((t) => (
-                      <button
-                        key={t.key}
-                        type="button"
-                        onClick={() => handleInsertTag(t.key)}
-                        className="px-2 py-1 rounded bg-background hover:bg-primary/10 hover:text-primary border text-[10px] font-mono text-foreground transition-all shadow-sm"
-                      >
-                        {t.label}
-                      </button>
-                    ))}
+                    ]
+                      .filter((v, idx, arr) => arr.findIndex((t) => t.key === v.key) === idx)
+                      .map((t) => (
+                        <button
+                          key={t.key}
+                          type="button"
+                          onClick={() => handleInsertTag(t.key)}
+                          className="px-2 py-1 rounded bg-background hover:bg-primary/10 hover:text-primary border text-[10px] font-mono text-foreground transition-all shadow-sm"
+                        >
+                          {t.label}
+                        </button>
+                      ))}
                   </div>
                 </div>
 
@@ -1010,19 +1527,21 @@ Wassalamu'alaikum Warahmatullahi Wabarakatuh.`,
                   <div className="flex items-center justify-between mb-1.5">
                     <label className="text-xs font-semibold">Isi / Body Konten Surat</label>
                     <span className="text-[11px] text-muted-foreground">
-                      Gunakan tanda kurung kurawal &#123;nama_tag&#125; untuk data dinamis
+                      Gunakan tanda kurung kurawal &#123;nama_tag&#125; atau &#123;&#123;nama_tag&#125;&#125;
                     </span>
                   </div>
                   <textarea
                     rows={12}
                     value={editingTemplate.templateContent}
-                    onChange={(e) => setEditingTemplate({ ...editingTemplate, templateContent: e.target.value })}
+                    onChange={(e) =>
+                      setEditingTemplate({ ...editingTemplate, templateContent: e.target.value })
+                    }
                     className="w-full p-3 font-mono text-xs rounded-xl border bg-background focus:ring-2 focus:ring-primary focus:outline-none leading-relaxed"
                     placeholder="Tuliskan format isi surat di sini..."
                   />
                 </div>
 
-                {/* Penandatangan & Kop Surat Settings */}
+                {/* Penandatangan Settings */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 rounded-xl border bg-muted/20">
                   <div>
                     <label className="text-xs font-semibold">Nama Penandatangan</label>
@@ -1051,259 +1570,30 @@ Wassalamu'alaikum Warahmatullahi Wabarakatuh.`,
                       className="text-xs mt-1"
                     />
                   </div>
+                </div>
 
-                  {/* Modern Toggle Switch: QR Code Verifikasi Keaslian Surat */}
-                  <div className="p-4 rounded-xl border border-emerald-500/30 bg-emerald-500/5 dark:bg-emerald-950/20 sm:col-span-2 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                    <div className="flex items-start gap-3">
-                      <div
-                        className={cn(
-                          "p-2 rounded-lg mt-0.5 transition-colors",
-                          editingTemplate.penandatangan.showBarcode
-                            ? "bg-emerald-500/20 text-emerald-600 dark:text-emerald-400"
-                            : "bg-stone-200 dark:bg-stone-800 text-muted-foreground"
-                        )}
-                      >
-                        <QrCode className="h-5 w-5" />
-                      </div>
-                      <div className="space-y-0.5">
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-bold text-foreground">
-                            Tampilkan QR Code Verifikasi Keaslian Surat
-                          </span>
-                          <Badge
-                            variant={editingTemplate.penandatangan.showBarcode ? "success" : "muted"}
-                            size="sm"
-                            className="text-[9px]"
-                          >
-                            {editingTemplate.penandatangan.showBarcode ? "AKTIF [✓]" : "NONAKTIF [✕]"}
-                          </Badge>
-                        </div>
-                        <p className="text-[11px] text-muted-foreground leading-relaxed">
-                          Mencetak barcode digital QR Code di bagian bawah surat yang dapat discan oleh instansi (Imigrasi, Maskapai, Perusahaan) untuk memverifikasi keaslian dokumen secara online di portal <span className="font-mono text-emerald-600 dark:text-emerald-400">/track/surat</span>.
-                        </p>
-                      </div>
-                    </div>
-
-                    <button
-                      type="button"
-                      role="switch"
-                      aria-checked={editingTemplate.penandatangan.showBarcode}
-                      onClick={() =>
-                        setEditingTemplate({
-                          ...editingTemplate,
-                          penandatangan: {
-                            ...editingTemplate.penandatangan,
-                            showBarcode: !editingTemplate.penandatangan.showBarcode,
-                          },
-                        })
-                      }
-                      className={cn(
-                        "relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none self-end sm:self-center",
-                        editingTemplate.penandatangan.showBarcode ? "bg-emerald-500" : "bg-stone-300 dark:bg-stone-700"
-                      )}
-                      title="Klik untuk mengaktifkan / menonaktifkan QR Code"
-                    >
-                      <span
-                        aria-hidden="true"
-                        className={cn(
-                          "pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out",
-                          editingTemplate.penandatangan.showBarcode ? "translate-x-5" : "translate-x-0"
-                        )}
-                      />
-                    </button>
-                  </div>
-
-                  {/* Modern Toggle Switch: Stempel Resmi */}
-                  <div className="p-4 rounded-xl border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-900/40 sm:col-span-2 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                    <div className="flex items-start gap-3">
-                      <div className="p-2 rounded-lg bg-primary/10 text-primary mt-0.5">
-                        <Building2 className="h-5 w-5" />
-                      </div>
-                      <div className="space-y-0.5">
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-bold text-foreground">
-                            Tampilkan Stempel Resmi VTU Abadi
-                          </span>
-                          <Badge
-                            variant={editingTemplate.penandatangan.showStempel ? "info" : "muted"}
-                            size="sm"
-                            className="text-[9px]"
-                          >
-                            {editingTemplate.penandatangan.showStempel ? "AKTIF [✓]" : "NONAKTIF [✕]"}
-                          </Badge>
-                        </div>
-                        <p className="text-[11px] text-muted-foreground leading-relaxed">
-                          Mencantumkan stempel digital resmi PPIU PT Vauza Trikarsa Utama di atas tanda tangan pimpinan.
-                        </p>
-                      </div>
-                    </div>
-
-                    <button
-                      type="button"
-                      role="switch"
-                      aria-checked={editingTemplate.penandatangan.showStempel}
-                      onClick={() =>
-                        setEditingTemplate({
-                          ...editingTemplate,
-                          penandatangan: {
-                            ...editingTemplate.penandatangan,
-                            showStempel: !editingTemplate.penandatangan.showStempel,
-                          },
-                        })
-                      }
-                      className={cn(
-                        "relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none self-end sm:self-center",
-                        editingTemplate.penandatangan.showStempel ? "bg-primary" : "bg-stone-300 dark:bg-stone-700"
-                      )}
-                      title="Klik untuk mengaktifkan / menonaktifkan Stempel Resmi"
-                    >
-                      <span
-                        aria-hidden="true"
-                        className={cn(
-                          "pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out",
-                          editingTemplate.penandatangan.showStempel ? "translate-x-5" : "translate-x-0"
-                        )}
-                      />
-                    </button>
-                  </div>
+                {/* Modal Footer in Editor Tab */}
+                <div className="flex justify-end pt-3 border-t">
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={handleSaveEditor}
+                    disabled={savingTemplate}
+                    className="text-xs bg-primary text-primary-foreground font-semibold"
+                  >
+                    <Save className="mr-1.5 h-3.5 w-3.5" />
+                    {savingTemplate ? "Menyimpan..." : "Simpan Perubahan Konten"}
+                  </Button>
                 </div>
               </div>
             )}
 
-            {/* TAB 2: AUTOCRAT FIELD MAPPING */}
-            {editorActiveTab === "mapping" && (
-              <div className="space-y-4 max-h-[65vh] overflow-y-auto pr-1">
-                <div className="p-3.5 rounded-xl bg-blue-500/10 border border-blue-500/30 text-xs text-blue-900 dark:text-blue-200">
-                  <strong>Cara Kerja Autocrat Mapping:</strong> Sistem mendeteksi seluruh tag dalam kurung kurawal &#123;...&#125; dari template. Tentukan apakah tag tersebut diambil <strong>otomatis dari data Manifest</strong> jamaah atau dijadikan <strong>kolom isian form manual</strong> saat generate surat.
-                </div>
-
-                <div className="space-y-3">
-                  {editingTemplate.placeholders.map((mapping, idx) => (
-                    <Card key={mapping.key} className="p-3.5 border-stone-200 dark:border-stone-800">
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                        <div className="flex items-center gap-2.5">
-                          <span className="font-mono text-xs font-bold text-primary px-2 py-1 rounded bg-primary/10">
-                            &#123;{mapping.key}&#125;
-                          </span>
-                          <div>
-                            <Input
-                              value={mapping.label}
-                              onChange={(e) => {
-                                const val = e.target.value;
-                                setEditingTemplate((prev) => {
-                                  if (!prev) return null;
-                                  const updated = [...prev.placeholders];
-                                  const cur = updated[idx];
-                                  if (cur) updated[idx] = { ...cur, label: val };
-                                  return { ...prev, placeholders: updated };
-                                });
-                              }}
-                              className="text-xs h-7 w-48 font-semibold"
-                              placeholder="Label Field Form"
-                            />
-                          </div>
-                        </div>
-
-                        {/* Source Type Selector */}
-                        <div className="flex items-center gap-2">
-                          <Select
-                            value={mapping.sourceType}
-                            onChange={(e) => {
-                              const val = e.target.value as "manifest" | "manual";
-                              setEditingTemplate((prev) => {
-                                if (!prev) return null;
-                                const updated = [...prev.placeholders];
-                                const cur = updated[idx];
-                                if (cur) {
-                                  updated[idx] = {
-                                    ...cur,
-                                    sourceType: val,
-                                    manifestField: val === "manifest" ? MANIFEST_FIELD_OPTIONS[0]?.key : undefined,
-                                  };
-                                }
-                                return { ...prev, placeholders: updated };
-                              });
-                            }}
-                            options={[
-                              { value: "manifest", label: "✓ Otomatis Manifest" },
-                              { value: "manual", label: "✍️ Form Input Manual" },
-                            ]}
-                            className="text-xs h-8 w-44 font-medium"
-                          />
-
-                          {/* Detail Mapping */}
-                          {mapping.sourceType === "manifest" ? (
-                            <Select
-                              value={mapping.manifestField || ""}
-                              onChange={(e) => {
-                                const val = e.target.value;
-                                setEditingTemplate((prev) => {
-                                  if (!prev) return null;
-                                  const updated = [...prev.placeholders];
-                                  const cur = updated[idx];
-                                  if (cur) updated[idx] = { ...cur, manifestField: val };
-                                  return { ...prev, placeholders: updated };
-                                });
-                              }}
-                              options={MANIFEST_FIELD_OPTIONS.map((opt) => ({
-                                value: opt.key,
-                                label: `${opt.label} (${opt.group})`,
-                              }))}
-                              className="text-xs h-8 w-60"
-                            />
-                          ) : (
-                            <div className="flex items-center gap-2">
-                              <Select
-                                value={mapping.inputType || "text"}
-                                onChange={(e) => {
-                                  const val = e.target.value as any;
-                                  setEditingTemplate((prev) => {
-                                    if (!prev) return null;
-                                    const updated = [...prev.placeholders];
-                                    const cur = updated[idx];
-                                    if (cur) updated[idx] = { ...cur, inputType: val };
-                                    return { ...prev, placeholders: updated };
-                                  });
-                                }}
-                                options={[
-                                  { value: "text", label: "Teks Singkat" },
-                                  { value: "date", label: "Tanggal" },
-                                  { value: "number", label: "Angka" },
-                                  { value: "textarea", label: "Paragraf" },
-                                ]}
-                                className="text-xs h-8 w-32"
-                              />
-                              <Input
-                                value={mapping.defaultValue || ""}
-                                onChange={(e) => {
-                                  const val = e.target.value;
-                                  setEditingTemplate((prev) => {
-                                    if (!prev) return null;
-                                    const updated = [...prev.placeholders];
-                                    const cur = updated[idx];
-                                    if (cur) updated[idx] = { ...cur, defaultValue: val };
-                                    return { ...prev, placeholders: updated };
-                                  });
-                                }}
-                                className="text-xs h-8 w-36"
-                                placeholder="Nilai default..."
-                              />
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </Card>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* TAB 3: LIVE PREVIEW */}
+            {/* ── TAB 3: PRATINJAU LEMBAR A4 ── */}
             {editorActiveTab === "preview" && (
-              <div className="space-y-4 max-h-[65vh] overflow-y-auto pr-1">
+              <div className="space-y-4 max-h-[72vh] overflow-y-auto pr-1">
                 <div className="p-3 rounded-xl bg-muted/40 border text-xs flex items-center justify-between">
                   <span className="font-semibold text-muted-foreground">
-                    Pratinjau Lembar Surat A4 (Menggunakan Dummy Data Manifest)
+                    Pratinjau Lembar Surat A4 (Menggunakan Dummy Data Resolusi Autocrat)
                   </span>
                   <Badge variant="success" size="sm">
                     Autocrat Live Renderer
@@ -1339,7 +1629,16 @@ Wassalamu'alaikum Warahmatullahi Wabarakatuh.`,
                   {/* Header Meta */}
                   <div className="flex items-start justify-between text-xs font-sans">
                     <div className="space-y-0.5">
-                      <p><strong>Nomor</strong> : {editingTemplate.kodeNomorDefault}/001/VTU/VIII/2026</p>
+                      <p>
+                        <strong>Nomor</strong> :{" "}
+                        {editingTemplate.formatNomor
+                          ? editingTemplate.formatNomor
+                              .replace(/\[NOMOR\]/gi, "001")
+                              .replace(/\[BULAN\]/gi, getTodayDateInfo().romanMonth)
+                              .replace(/\[TAHUN\]/gi, String(getTodayDateInfo().year))
+                              .replace(/\[HARI\]/gi, "31")
+                          : `${editingTemplate.kodeNomorDefault}/001/VTU/${getTodayDateInfo().romanMonth}/${getTodayDateInfo().year}`}
+                      </p>
                       <p><strong>Lamp</strong>  : {editingTemplate.lampiranDefault || "-"}</p>
                       <p><strong>Perihal</strong>: <strong>{editingTemplate.perihalDefault}</strong></p>
                     </div>
@@ -1415,33 +1714,21 @@ Wassalamu'alaikum Warahmatullahi Wabarakatuh.`,
                     </div>
                   </div>
                 </div>
+
+                <div className="flex justify-end pt-3 border-t">
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={handleSaveEditor}
+                    disabled={savingTemplate}
+                    className="text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-semibold"
+                  >
+                    <Save className="mr-1.5 h-3.5 w-3.5" />
+                    {savingTemplate ? "Menyimpan..." : "Simpan Konfigurasi"}
+                  </Button>
+                </div>
               </div>
             )}
-
-            {/* Modal Actions */}
-            <div className="flex items-center justify-between border-t pt-3">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="text-xs"
-                onClick={() => setIsEditorOpen(false)}
-                disabled={savingTemplate}
-              >
-                Tutup
-              </Button>
-
-              <div className="flex items-center gap-2">
-                <Button
-                  size="sm"
-                  className="text-xs bg-primary text-primary-foreground"
-                  onClick={handleSaveEditor}
-                  disabled={savingTemplate}
-                >
-                  <Save className="mr-1.5 h-3.5 w-3.5" />
-                  {savingTemplate ? "Menyimpan..." : "Simpan Template Surat"}
-                </Button>
-              </div>
-            </div>
           </div>
         </Modal>
       )}

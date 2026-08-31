@@ -227,6 +227,14 @@ function GenerateSuratPageContent() {
   // Computed Nomored Letter String
   const todayInfo = useMemo(() => getTodayDateInfo(), []);
   const computedNomorSurat = useMemo(() => {
+    if (!activeTemplate) return `SR-PASPOR/${nomorUrutSurat}/VTU/${todayInfo.romanMonth}/${todayInfo.year}`;
+    if (activeTemplate.formatNomor && activeTemplate.formatNomor.trim()) {
+      return activeTemplate.formatNomor
+        .replace(/\[NOMOR\]/gi, nomorUrutSurat)
+        .replace(/\[BULAN\]/gi, todayInfo.romanMonth)
+        .replace(/\[TAHUN\]/gi, String(todayInfo.year))
+        .replace(/\[HARI\]/gi, String(new Date().getDate()).padStart(2, "0"));
+    }
     const prefix = activeTemplate?.kodeNomorDefault || "SR-PASPOR";
     return `${prefix}/${nomorUrutSurat}/VTU/${todayInfo.romanMonth}/${todayInfo.year}`;
   }, [activeTemplate, nomorUrutSurat, todayInfo]);
@@ -447,7 +455,14 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `${computedNomorSurat.replace(/[/\\?%*:|"<>]/g, "-")}_${activeTemplate.nama}.html`;
+    let fileName = `${computedNomorSurat.replace(/[/\\?%*:|"<>]/g, "-")}_${activeTemplate.nama}.html`;
+    if (activeTemplate.formatNamaFile && activeTemplate.formatNamaFile.trim()) {
+      const mergedName = renderAutocratMergedText(activeTemplate.formatNamaFile, resolvedFieldValues)
+        .replace(/[/\\?%*:|"<>]/g, "_")
+        .trim();
+      if (mergedName) fileName = `${mergedName}.html`;
+    }
+    a.download = fileName;
     a.click();
     URL.revokeObjectURL(url);
     showToast("File dokumen surat berhasil diunduh!");

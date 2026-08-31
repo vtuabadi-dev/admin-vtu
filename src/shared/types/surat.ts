@@ -8,14 +8,14 @@ export type SuratKategori =
 
 export type SuratFieldSourceType = "manifest" | "manual";
 
-export type SuratInputType = "text" | "date" | "number" | "select" | "textarea";
+export type SuratInputType = "text" | "date" | "city" | "number" | "select" | "textarea";
 
 export interface SuratPlaceholderMapping {
-  key: string;               // e.g. "nama_lengkap"
+  key: string;               // e.g. "nama_lengkap" or "Nama Pegawai"
   label: string;             // e.g. "Nama Lengkap Jamaah"
   sourceType: SuratFieldSourceType; // "manifest" (auto-filled from manifest) or "manual" (form prompt)
   manifestField?: string;    // e.g. "jamaah.namaLengkap", "jamaah.nik", "jamaah.nomorPaspor", etc.
-  inputType?: SuratInputType;
+  inputType?: SuratInputType; // "text" (Teks Singkat), "date" (Tanggal), "city" (Kota / Tempat), "number" (Angka), "textarea" (Teks Panjang), "select" (Pilihan Dropdown)
   defaultValue?: string;
   placeholderHint?: string;
   options?: string[];        // for select options
@@ -25,11 +25,16 @@ export interface SuratPlaceholderMapping {
 export interface SuratTemplate {
   id: string;
   slug: string;              // e.g. "rekom-paspor", "cuti-pekerja", "cuti-sekolah", "keterangan", "tugas", "klaim-asuransi"
-  nama: string;              // e.g. "Surat Rekomendasi Paspor"
+  nama: string;              // e.g. "Surat Tugas", "Surat Rekomendasi Paspor"
   kategori: SuratKategori;
   deskripsi: string;
-  kodeNomorDefault: string;  // e.g. "SR-PASPOR"
-  perihalDefault: string;    // e.g. "Rekomendasi Pembuatan / Penggantian Paspor Umroh"
+  kodeNomorDefault: string;  // e.g. "ST", "SR-PASPOR"
+  formatNomor?: string;      // e.g. "[NOMOR]/ST/[BULAN]/[TAHUN]"
+  kebutuhanNomorPerSurat?: number; // e.g. 1
+  jumlahTemplateTerlampir?: number; // e.g. 1
+  formatNamaFile?: string;   // e.g. "SK_{{Nama Pegawai}}" or "Surat_{{nama_lengkap}}"
+  fileNameUploaded?: string; // e.g. "Template_Surat_Tugas.docx"
+  perihalDefault: string;    // e.g. "Surat Tugas Keberangkatan Umroh"
   kopSuratType: "ppiu_vtu" | "custom" | "none";
   lampiranDefault?: string;  // e.g. "1 (Satu) Berkas"
   tujuanDefault?: string;    // e.g. "Yth. Kepala Kantor Imigrasi"

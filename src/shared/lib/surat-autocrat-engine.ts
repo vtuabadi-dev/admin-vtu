@@ -69,12 +69,13 @@ export const MANIFEST_FIELD_OPTIONS: ManifestFieldOption[] = [
 
 export function extractPlaceholdersFromText(text: string): string[] {
   if (!text) return [];
-  const regex = /\{+([a-zA-Z0-9_-]+)\}+/g;
+  const regex = /\{+([a-zA-Z0-9_\-\.\s]+?)\}+/g;
   const tags = new Set<string>();
   let match: RegExpExecArray | null;
   while ((match = regex.exec(text)) !== null) {
-    if (match[1]) {
-      tags.add(match[1].toLowerCase());
+    const raw = match[1]?.trim();
+    if (raw && raw.length > 0 && !raw.startsWith("/*") && !raw.startsWith("http")) {
+      tags.add(raw);
     }
   }
   return Array.from(tags);
@@ -92,6 +93,11 @@ export const DEFAULT_SURAT_TEMPLATES: SuratTemplate[] = [
     kategori: "imigrasi",
     deskripsi: "Rekomendasi resmi penerbitan / penggantian paspor umroh ke Kantor Imigrasi / Kemenag",
     kodeNomorDefault: "SR-PASPOR",
+    formatNomor: "[NOMOR]/SR-PASPOR/VTU/[BULAN]/[TAHUN]",
+    jumlahTemplateTerlampir: 1,
+    kebutuhanNomorPerSurat: 1,
+    formatNamaFile: "Surat_Rekomendasi_{{nama_lengkap}}",
+    fileNameUploaded: "Template_Surat_Rekomendasi_Paspor.docx",
     perihalDefault: "Rekomendasi Pembuatan / Penggantian Paspor Umroh",
     kopSuratType: "ppiu_vtu",
     lampiranDefault: "1 (Satu) Berkas",
@@ -129,20 +135,20 @@ Demikian surat rekomendasi ini kami buat dengan sebenarnya agar dapat dipergunak
 
 Wassalamu'alaikum Warahmatullahi Wabarakatuh.`,
     placeholders: [
-      { key: "nama_lengkap", label: "Nama Lengkap Jamaah", sourceType: "manifest", manifestField: "jamaah.namaLengkap", required: true },
-      { key: "nik", label: "NIK (KTP)", sourceType: "manifest", manifestField: "jamaah.nik", required: true },
-      { key: "tempat_lahir", label: "Tempat Lahir", sourceType: "manifest", manifestField: "jamaah.tempatLahir", required: true },
-      { key: "tanggal_lahir", label: "Tanggal Lahir", sourceType: "manifest", manifestField: "jamaah.tanggalLahir", required: true },
-      { key: "jenis_kelamin", label: "Jenis Kelamin", sourceType: "manifest", manifestField: "jamaah.jenisKelamin", required: true },
-      { key: "alamat", label: "Alamat Lengkap", sourceType: "manifest", manifestField: "jamaah.alamat", required: true },
-      { key: "nomor_telepon", label: "Nomor Telepon", sourceType: "manifest", manifestField: "jamaah.nomorTelepon", required: true },
-      { key: "nama_paket", label: "Nama Paket", sourceType: "manifest", manifestField: "keberangkatan.namaPaket", required: true },
-      { key: "program_hari", label: "Program Hari", sourceType: "manifest", manifestField: "keberangkatan.programHari", defaultValue: "9 Hari" },
-      { key: "tanggal_berangkat", label: "Tanggal Berangkat", sourceType: "manifest", manifestField: "keberangkatan.tanggalBerangkat", required: true },
-      { key: "tanggal_pulang", label: "Tanggal Pulang", sourceType: "manifest", manifestField: "keberangkatan.tanggalPulang", required: true },
-      { key: "maskapai", label: "Maskapai Penerbangan", sourceType: "manifest", manifestField: "keberangkatan.maskapai" },
-      { key: "hotel_mekkah", label: "Hotel Mekkah", sourceType: "manifest", manifestField: "keberangkatan.hotelMekkah" },
-      { key: "hotel_madinah", label: "Hotel Madinah", sourceType: "manifest", manifestField: "keberangkatan.hotelMadinah" },
+      { key: "nama_lengkap", label: "Nama Lengkap Jamaah", sourceType: "manifest", manifestField: "jamaah.namaLengkap", inputType: "text", required: true },
+      { key: "nik", label: "NIK (KTP)", sourceType: "manifest", manifestField: "jamaah.nik", inputType: "text", required: true },
+      { key: "tempat_lahir", label: "Tempat Lahir", sourceType: "manifest", manifestField: "jamaah.tempatLahir", inputType: "city", required: true },
+      { key: "tanggal_lahir", label: "Tanggal Lahir", sourceType: "manifest", manifestField: "jamaah.tanggalLahir", inputType: "date", required: true },
+      { key: "jenis_kelamin", label: "Jenis Kelamin", sourceType: "manifest", manifestField: "jamaah.jenisKelamin", inputType: "select", options: ["LAKI-LAKI", "PEREMPUAN"], required: true },
+      { key: "alamat", label: "Alamat Lengkap", sourceType: "manifest", manifestField: "jamaah.alamat", inputType: "textarea", required: true },
+      { key: "nomor_telepon", label: "Nomor Telepon", sourceType: "manifest", manifestField: "jamaah.nomorTelepon", inputType: "text", required: true },
+      { key: "nama_paket", label: "Nama Paket", sourceType: "manifest", manifestField: "keberangkatan.namaPaket", inputType: "text", required: true },
+      { key: "program_hari", label: "Program Hari", sourceType: "manifest", manifestField: "keberangkatan.programHari", inputType: "text", defaultValue: "9 Hari" },
+      { key: "tanggal_berangkat", label: "Tanggal Berangkat", sourceType: "manifest", manifestField: "keberangkatan.tanggalBerangkat", inputType: "date", required: true },
+      { key: "tanggal_pulang", label: "Tanggal Pulang", sourceType: "manifest", manifestField: "keberangkatan.tanggalPulang", inputType: "date", required: true },
+      { key: "maskapai", label: "Maskapai Penerbangan", sourceType: "manifest", manifestField: "keberangkatan.maskapai", inputType: "text" },
+      { key: "hotel_mekkah", label: "Hotel Mekkah", sourceType: "manifest", manifestField: "keberangkatan.hotelMekkah", inputType: "text" },
+      { key: "hotel_madinah", label: "Hotel Madinah", sourceType: "manifest", manifestField: "keberangkatan.hotelMadinah", inputType: "text" },
     ],
     isDefault: true,
     createdAt: new Date().toISOString(),
@@ -155,6 +161,11 @@ Wassalamu'alaikum Warahmatullahi Wabarakatuh.`,
     kategori: "instansi",
     deskripsi: "Permohonan dispensasi izin dan cuti kerja karyawan untuk menunaikan ibadah umroh",
     kodeNomorDefault: "SC-KERJA",
+    formatNomor: "[NOMOR]/SC-KERJA/VTU/[BULAN]/[TAHUN]",
+    jumlahTemplateTerlampir: 1,
+    kebutuhanNomorPerSurat: 1,
+    formatNamaFile: "Surat_Cuti_Kerja_{{nama_lengkap}}",
+    fileNameUploaded: "Template_Surat_Cuti_Pekerja.docx",
     perihalDefault: "Permohonan Izin / Cuti Ibadah Umroh",
     kopSuratType: "ppiu_vtu",
     lampiranDefault: "1 (Satu) Lembar Itinerary",
@@ -188,16 +199,16 @@ Mengingat pentingnya rangkaian ibadah tersebut, kami memohon kesediaan Bapak/Ibu
 
 Demikian surat permohonan ini kami sampaikan. Atas perhatian, kebijaksanaan, dan kerjasama Bapak/Ibu, kami ucapkan terima kasih.`,
     placeholders: [
-      { key: "nama_lengkap", label: "Nama Lengkap", sourceType: "manifest", manifestField: "jamaah.namaLengkap", required: true },
-      { key: "nik", label: "NIK Karyawan", sourceType: "manifest", manifestField: "jamaah.nik", required: true },
-      { key: "nomor_paspor", label: "Nomor Paspor", sourceType: "manifest", manifestField: "jamaah.nomorPaspor" },
+      { key: "nama_lengkap", label: "Nama Lengkap", sourceType: "manifest", manifestField: "jamaah.namaLengkap", inputType: "text", required: true },
+      { key: "nik", label: "NIK Karyawan", sourceType: "manifest", manifestField: "jamaah.nik", inputType: "text", required: true },
+      { key: "nomor_paspor", label: "Nomor Paspor", sourceType: "manifest", manifestField: "jamaah.nomorPaspor", inputType: "text" },
       { key: "nama_perusahaan", label: "Nama Perusahaan / Instansi", sourceType: "manual", inputType: "text", defaultValue: "PT. Maju Bersama", placeholderHint: "Nama kantor/perusahaan" },
-      { key: "kota_kantor", label: "Kota Kantor / Instansi", sourceType: "manual", inputType: "text", defaultValue: "Jakarta", placeholderHint: "Kota tempat bekerja" },
+      { key: "kota_kantor", label: "Kota Kantor / Instansi", sourceType: "manual", inputType: "city", defaultValue: "Jakarta", placeholderHint: "Kota tempat bekerja" },
       { key: "jabatan_karyawan", label: "Jabatan Karyawan", sourceType: "manual", inputType: "text", defaultValue: "Staff Operasional", placeholderHint: "Jabatan/posisi" },
       { key: "departemen", label: "Departemen / Divisi", sourceType: "manual", inputType: "text", defaultValue: "Divisi Operasional" },
-      { key: "nama_paket", label: "Nama Paket", sourceType: "manifest", manifestField: "keberangkatan.namaPaket" },
-      { key: "tanggal_berangkat", label: "Tanggal Berangkat", sourceType: "manifest", manifestField: "keberangkatan.tanggalBerangkat" },
-      { key: "tanggal_pulang", label: "Tanggal Pulang", sourceType: "manifest", manifestField: "keberangkatan.tanggalPulang" },
+      { key: "nama_paket", label: "Nama Paket", sourceType: "manifest", manifestField: "keberangkatan.namaPaket", inputType: "text" },
+      { key: "tanggal_berangkat", label: "Tanggal Berangkat", sourceType: "manifest", manifestField: "keberangkatan.tanggalBerangkat", inputType: "date" },
+      { key: "tanggal_pulang", label: "Tanggal Pulang", sourceType: "manifest", manifestField: "keberangkatan.tanggalPulang", inputType: "date" },
       { key: "lama_cuti_hari", label: "Lama Cuti (Hari)", sourceType: "manual", inputType: "number", defaultValue: "10", placeholderHint: "Jumlah hari cuti" },
     ],
     isDefault: true,
@@ -211,6 +222,11 @@ Demikian surat permohonan ini kami sampaikan. Atas perhatian, kebijaksanaan, dan
     kategori: "sekolah",
     deskripsi: "Permohonan dispensasi izin tidak masuk sekolah / kampus selama menunaikan ibadah umroh",
     kodeNomorDefault: "SC-SEKOLAH",
+    formatNomor: "[NOMOR]/SC-SEKOLAH/VTU/[BULAN]/[TAHUN]",
+    jumlahTemplateTerlampir: 1,
+    kebutuhanNomorPerSurat: 1,
+    formatNamaFile: "Surat_Izin_Sekolah_{{nama_lengkap}}",
+    fileNameUploaded: "Template_Surat_Izin_Sekolah.docx",
     perihalDefault: "Permohonan Dispensasi Izin Tidak Masuk Sekolah / Kuliah",
     kopSuratType: "ppiu_vtu",
     lampiranDefault: "1 (Satu) Berkas",
@@ -243,15 +259,15 @@ Sehubungan dengan hal tersebut, kami memohon kiranya Bapak/Ibu Kepala Sekolah / 
 
 Demikian permohonan ini kami ajukan. Atas perhatian, dukungan, dan izin yang diberikan, kami haturkan terima kasih.`,
     placeholders: [
-      { key: "nama_lengkap", label: "Nama Lengkap Siswa", sourceType: "manifest", manifestField: "jamaah.namaLengkap", required: true },
+      { key: "nama_lengkap", label: "Nama Lengkap Siswa", sourceType: "manifest", manifestField: "jamaah.namaLengkap", inputType: "text", required: true },
       { key: "nisn_nim", label: "NISN / NIM / No. Induk", sourceType: "manual", inputType: "text", defaultValue: "20241001", placeholderHint: "Nomor Induk Siswa/Mahasiswa" },
       { key: "kelas_jurusan", label: "Kelas / Jurusan", sourceType: "manual", inputType: "text", defaultValue: "Kelas XI IPA 2", placeholderHint: "Tingkat kelas atau jurusan" },
       { key: "nama_sekolah", label: "Nama Sekolah / Universitas", sourceType: "manual", inputType: "text", defaultValue: "SMA Negeri 1", placeholderHint: "Nama institusi pendidikan" },
-      { key: "kota_sekolah", label: "Kota Sekolah", sourceType: "manual", inputType: "text", defaultValue: "Sidoarjo" },
-      { key: "nama_orang_tua", label: "Nama Orang Tua / Ayah", sourceType: "manifest", manifestField: "jamaah.namaAyah" },
-      { key: "nama_paket", label: "Nama Paket", sourceType: "manifest", manifestField: "keberangkatan.namaPaket" },
-      { key: "tanggal_berangkat", label: "Tanggal Berangkat", sourceType: "manifest", manifestField: "keberangkatan.tanggalBerangkat" },
-      { key: "tanggal_pulang", label: "Tanggal Pulang", sourceType: "manifest", manifestField: "keberangkatan.tanggalPulang" },
+      { key: "kota_sekolah", label: "Kota Sekolah", sourceType: "manual", inputType: "city", defaultValue: "Sidoarjo" },
+      { key: "nama_orang_tua", label: "Nama Orang Tua / Ayah", sourceType: "manifest", manifestField: "jamaah.namaAyah", inputType: "text" },
+      { key: "nama_paket", label: "Nama Paket", sourceType: "manifest", manifestField: "keberangkatan.namaPaket", inputType: "text" },
+      { key: "tanggal_berangkat", label: "Tanggal Berangkat", sourceType: "manifest", manifestField: "keberangkatan.tanggalBerangkat", inputType: "date" },
+      { key: "tanggal_pulang", label: "Tanggal Pulang", sourceType: "manifest", manifestField: "keberangkatan.tanggalPulang", inputType: "date" },
       { key: "tanggal_masuk_kembali", label: "Tanggal Kembali Masuk Sekolah", sourceType: "manual", inputType: "date", defaultValue: "" },
     ],
     isDefault: true,
@@ -265,6 +281,11 @@ Demikian permohonan ini kami ajukan. Atas perhatian, dukungan, dan izin yang dib
     kategori: "internal",
     deskripsi: "Keterangan resmi status calon jamaah umroh aktif terdaftar di sistem PT. VTU Abadi",
     kodeNomorDefault: "SK-JAMAAH",
+    formatNomor: "[NOMOR]/SK-JAMAAH/VTU/[BULAN]/[TAHUN]",
+    jumlahTemplateTerlampir: 1,
+    kebutuhanNomorPerSurat: 1,
+    formatNamaFile: "Surat_Keterangan_{{nama_lengkap}}",
+    fileNameUploaded: "Template_Surat_Keterangan_Jamaah.docx",
     perihalDefault: "Surat Keterangan Terdaftar Calon Jamaah Umroh",
     kopSuratType: "ppiu_vtu",
     lampiranDefault: "-",
@@ -296,16 +317,16 @@ Surat keterangan ini diterbitkan atas permintaan yang bersangkutan untuk keperlu
 
 Demikian surat keterangan ini kami berikan untuk dapat dipergunakan sebagaimana mestinya.`,
     placeholders: [
-      { key: "nama_lengkap", label: "Nama Lengkap", sourceType: "manifest", manifestField: "jamaah.namaLengkap", required: true },
-      { key: "nik", label: "NIK", sourceType: "manifest", manifestField: "jamaah.nik", required: true },
-      { key: "nomor_paspor", label: "Nomor Paspor", sourceType: "manifest", manifestField: "jamaah.nomorPaspor" },
-      { key: "tempat_lahir", label: "Tempat Lahir", sourceType: "manifest", manifestField: "jamaah.tempatLahir" },
-      { key: "tanggal_lahir", label: "Tanggal Lahir", sourceType: "manifest", manifestField: "jamaah.tanggalLahir" },
-      { key: "alamat", label: "Alamat", sourceType: "manifest", manifestField: "jamaah.alamat" },
-      { key: "nomor_registrasi", label: "No Registrasi", sourceType: "manifest", manifestField: "jamaah.registrationId" },
-      { key: "nama_paket", label: "Nama Paket", sourceType: "manifest", manifestField: "keberangkatan.namaPaket" },
-      { key: "kode_paket", label: "Kode Manifest", sourceType: "manifest", manifestField: "keberangkatan.kode" },
-      { key: "tanggal_berangkat", label: "Tanggal Berangkat", sourceType: "manifest", manifestField: "keberangkatan.tanggalBerangkat" },
+      { key: "nama_lengkap", label: "Nama Lengkap", sourceType: "manifest", manifestField: "jamaah.namaLengkap", inputType: "text", required: true },
+      { key: "nik", label: "NIK", sourceType: "manifest", manifestField: "jamaah.nik", inputType: "text", required: true },
+      { key: "nomor_paspor", label: "Nomor Paspor", sourceType: "manifest", manifestField: "jamaah.nomorPaspor", inputType: "text" },
+      { key: "tempat_lahir", label: "Tempat Lahir", sourceType: "manifest", manifestField: "jamaah.tempatLahir", inputType: "city" },
+      { key: "tanggal_lahir", label: "Tanggal Lahir", sourceType: "manifest", manifestField: "jamaah.tanggalLahir", inputType: "date" },
+      { key: "alamat", label: "Alamat", sourceType: "manifest", manifestField: "jamaah.alamat", inputType: "textarea" },
+      { key: "nomor_registrasi", label: "No Registrasi", sourceType: "manifest", manifestField: "jamaah.registrationId", inputType: "text" },
+      { key: "nama_paket", label: "Nama Paket", sourceType: "manifest", manifestField: "keberangkatan.namaPaket", inputType: "text" },
+      { key: "kode_paket", label: "Kode Manifest", sourceType: "manifest", manifestField: "keberangkatan.kode", inputType: "text" },
+      { key: "tanggal_berangkat", label: "Tanggal Berangkat", sourceType: "manifest", manifestField: "keberangkatan.tanggalBerangkat", inputType: "date" },
       { key: "status_registrasi", label: "Status Jamaah", sourceType: "manual", inputType: "text", defaultValue: "Terdaftar Resmi (Lengkap)" },
       { key: "keperluan_surat", label: "Keperluan Pembuatan Surat", sourceType: "manual", inputType: "text", defaultValue: "Kelengkapan Administrasi & Verifikasi Keberangkatan" },
     ],
@@ -320,6 +341,11 @@ Demikian surat keterangan ini kami berikan untuk dapat dipergunakan sebagaimana 
     kategori: "internal",
     deskripsi: "Surat penugasan operasional resmi Tour Leader, Muthawwif, Medis, & Tim Handling",
     kodeNomorDefault: "ST-PETUGAS",
+    formatNomor: "[NOMOR]/ST/[BULAN]/[TAHUN]",
+    jumlahTemplateTerlampir: 1,
+    kebutuhanNomorPerSurat: 1,
+    formatNamaFile: "SK_{{Nama Pegawai}}",
+    fileNameUploaded: "Template_Surat_Tugas.docx",
     perihalDefault: "Surat Perintah Tugas Operasional Ibadah Umroh",
     kopSuratType: "ppiu_vtu",
     lampiranDefault: "1 (Satu) Lembar Manifest",
@@ -335,8 +361,8 @@ Demikian surat keterangan ini kami berikan untuk dapat dipergunakan sebagaimana 
 
 Pimpinan PT. Vauza Trikarsa Utama dengan ini memberikan tugas dan tanggung jawab kepada:
 
-Nama Petugas      : {nama_petugas}
-ID / NIP Petugas  : {nip_petugas}
+Nama Petugas      : {Nama Pegawai}
+ID / NIP Petugas  : {NIP}
 Jabatan Tugas     : {peran_tugas}
 Nomor Kontak      : {kontak_petugas}
 
@@ -355,14 +381,14 @@ Rincian Tanggung Jawab Operasional:
 
 Demikian surat tugas ini diterbitkan untuk dilaksanakan dengan penuh amanah dan tanggung jawab.`,
     placeholders: [
-      { key: "nama_petugas", label: "Nama Petugas / Muthawwif", sourceType: "manual", inputType: "text", defaultValue: "Ust. Ahmad Zaki, Lc.", placeholderHint: "Nama lengkap petugas" },
-      { key: "nip_petugas", label: "ID / NIP Petugas", sourceType: "manual", inputType: "text", defaultValue: "PTG-2026-004" },
+      { key: "Nama Pegawai", label: "Nama Pegawai", sourceType: "manual", inputType: "text", defaultValue: "Ust. Ahmad Zaki, Lc.", placeholderHint: "Nama lengkap petugas" },
+      { key: "NIP", label: "Nomor Induk Pegawai (NIP)", sourceType: "manual", inputType: "text", defaultValue: "PTG-2026-004" },
       { key: "peran_tugas", label: "Peran / Jabatan Tugas", sourceType: "manual", inputType: "select", options: ["Tour Leader (TL)", "Muthawwif Utama", "Pembimbing Ibadah", "Petugas Medis", "Handling Bandara"], defaultValue: "Tour Leader (TL)" },
       { key: "kontak_petugas", label: "Nomor Kontak Petugas", sourceType: "manual", inputType: "text", defaultValue: "081122334455" },
-      { key: "nama_paket", label: "Nama Paket", sourceType: "manifest", manifestField: "keberangkatan.namaPaket" },
-      { key: "kode_paket", label: "Kode Manifest", sourceType: "manifest", manifestField: "keberangkatan.kode" },
-      { key: "tanggal_berangkat", label: "Tanggal Berangkat", sourceType: "manifest", manifestField: "keberangkatan.tanggalBerangkat" },
-      { key: "tanggal_pulang", label: "Tanggal Pulang", sourceType: "manifest", manifestField: "keberangkatan.tanggalPulang" },
+      { key: "nama_paket", label: "Nama Paket", sourceType: "manifest", manifestField: "keberangkatan.namaPaket", inputType: "text" },
+      { key: "kode_paket", label: "Kode Manifest", sourceType: "manifest", manifestField: "keberangkatan.kode", inputType: "text" },
+      { key: "tanggal_berangkat", label: "Tanggal Berangkat", sourceType: "manifest", manifestField: "keberangkatan.tanggalBerangkat", inputType: "date" },
+      { key: "tanggal_pulang", label: "Tanggal Pulang", sourceType: "manifest", manifestField: "keberangkatan.tanggalPulang", inputType: "date" },
       { key: "jumlah_jamaah", label: "Jumlah Jamaah Rombongan", sourceType: "manual", inputType: "number", defaultValue: "45" },
     ],
     isDefault: true,
@@ -376,6 +402,11 @@ Demikian surat tugas ini diterbitkan untuk dilaksanakan dengan penuh amanah dan 
     kategori: "asuransi",
     deskripsi: "Pengantar klaim penggantian biaya medis, pembatalan, atau penanganan darurat asuransi",
     kodeNomorDefault: "SKA-ASURANSI",
+    formatNomor: "[NOMOR]/SKA-ASURANSI/VTU/[BULAN]/[TAHUN]",
+    jumlahTemplateTerlampir: 1,
+    kebutuhanNomorPerSurat: 1,
+    formatNamaFile: "Surat_Klaim_Asuransi_{{nama_lengkap}}",
+    fileNameUploaded: "Template_Klaim_Asuransi.docx",
     perihalDefault: "Permohonan Pengajuan Klaim Asuransi Perjalanan Umroh",
     kopSuratType: "ppiu_vtu",
     lampiranDefault: "1 (Satu) Berkas Medis & Tagihan",
@@ -409,17 +440,17 @@ Bersama surat ini kami lampirkan dokumen pendukung berupa tagihan rumah sakit, r
 Besar harapan kami kiranya permohonan klaim ini dapat segera diproses sesuai ketentuan polis yang berlaku. Atas perhatian dan kerjasamanya kami ucapkan terima kasih.`,
     placeholders: [
       { key: "nama_perusahaan_asuransi", label: "Nama Asuransi", sourceType: "manual", inputType: "text", defaultValue: "Asuransi Syariah Al-Amin / Zurich" },
-      { key: "nama_lengkap", label: "Nama Jamaah", sourceType: "manifest", manifestField: "jamaah.namaLengkap", required: true },
-      { key: "nomor_paspor", label: "Nomor Paspor", sourceType: "manifest", manifestField: "jamaah.nomorPaspor" },
-      { key: "nik", label: "NIK", sourceType: "manifest", manifestField: "jamaah.nik" },
+      { key: "nama_lengkap", label: "Nama Jamaah", sourceType: "manifest", manifestField: "jamaah.namaLengkap", inputType: "text", required: true },
+      { key: "nomor_paspor", label: "Nomor Paspor", sourceType: "manifest", manifestField: "jamaah.nomorPaspor", inputType: "text" },
+      { key: "nik", label: "NIK", sourceType: "manifest", manifestField: "jamaah.nik", inputType: "text" },
       { key: "nomor_polis", label: "Nomor Polis Asuransi", sourceType: "manual", inputType: "text", defaultValue: "POLIS-UMR-2026-8821" },
-      { key: "nama_paket", label: "Nama Paket", sourceType: "manifest", manifestField: "keberangkatan.namaPaket" },
-      { key: "tanggal_berangkat", label: "Tanggal Berangkat", sourceType: "manifest", manifestField: "keberangkatan.tanggalBerangkat" },
+      { key: "nama_paket", label: "Nama Paket", sourceType: "manifest", manifestField: "keberangkatan.namaPaket", inputType: "text" },
+      { key: "tanggal_berangkat", label: "Tanggal Berangkat", sourceType: "manifest", manifestField: "keberangkatan.tanggalBerangkat", inputType: "date" },
       { key: "jenis_klaim", label: "Jenis Klaim", sourceType: "manual", inputType: "select", options: ["Biaya Pengobatan / Rawat Inap", "Keterlambatan Penerbangan", "Kehilangan Bagasi", "Pembatalan Akibat Sakit Kritis"], defaultValue: "Biaya Pengobatan / Rawat Inap" },
       { key: "tanggal_kejadian", label: "Tanggal Kejadian", sourceType: "manual", inputType: "date", defaultValue: "" },
-      { key: "lokasi_kejadian", label: "Lokasi Kejadian", sourceType: "manual", inputType: "text", defaultValue: "RS Al-Noor Makkah Al-Mukarramah" },
-      { key: "nominal_klaim", label: "Estimasi Nominal Klaim (Rp)", sourceType: "manual", inputType: "text", defaultValue: "15.000.000" },
-      { key: "kronologi_singkat", label: "Kronologi Singkat", sourceType: "manual", inputType: "textarea", defaultValue: "Jamaah mengalami dehidrasi dan infeksi saluran pernafasan saat pelaksanaan ibadah di Makkah." },
+      { key: "lokasi_kejadian", label: "Lokasi Kejadian", sourceType: "manual", inputType: "city", defaultValue: "Mekkah Al-Mukarramah" },
+      { key: "nominal_klaim", label: "Nominal Estimasi Klaim", sourceType: "manual", inputType: "number", defaultValue: "5000000" },
+      { key: "kronologi_singkat", label: "Kronologi Singkat Kejadian", sourceType: "manual", inputType: "textarea", defaultValue: "Jamaah mengalami kelelahan dan dehidrasi saat pelaksanaan ibadah sehingga dirawat di RS Jiad Makkah." },
     ],
     isDefault: true,
     createdAt: new Date().toISOString(),
@@ -651,14 +682,19 @@ function autoDetectManifestValue(
 // MERGE TEMPLATE TEXT WITH RESOLVED VALUES
 // ────────────────────────────────────────────────────────────
 
+function escapeRegExp(string: string) {
+  return string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 export function renderAutocratMergedText(templateText: string, resolvedValues: Record<string, string>): string {
   if (!templateText) return "";
 
   let result = templateText;
   Object.keys(resolvedValues).forEach((key) => {
-    const val = resolvedValues[key] || "";
-    // Replace {key} and {{key}} (case-insensitive)
-    const pattern = new RegExp(`\\{+${key}\\}+`, "gi");
+    const val = resolvedValues[key] !== undefined ? String(resolvedValues[key]) : "";
+    const escapedKey = escapeRegExp(key);
+    // Replace {key}, {{key}}, { key }, {{ key }} (case-insensitive)
+    const pattern = new RegExp(`\\{+\\s*${escapedKey}\\s*\\}+`, "gi");
     result = result.replace(pattern, val);
   });
 
