@@ -30,7 +30,6 @@ import {
   ShieldCheck,
   Sparkles,
 } from "lucide-react";
-import PortalSwitcherNav from "@/shared/components/PortalSwitcherNav";
 import { SearchableSelect } from "@/shared/components/ui/SearchableSelect";
 import type { JenisKelamin, Keberangkatan } from "@/shared/types";
 
@@ -994,9 +993,6 @@ export default function RegisterPage() {
   return (
     <div className="w-full max-w-4xl mx-auto relative">
       <div className="relative z-10">
-        {/* ── Floating Unified Portal Switcher Bar ── */}
-        <PortalSwitcherNav />
-
         {/* Top Notice Banner if draft was restored */}
         {isRestoredDraft && step < 8 && !paymentProofSubmitted && (
         <div className="mb-4 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-xs text-amber-900 flex items-center justify-between shadow-sm">
