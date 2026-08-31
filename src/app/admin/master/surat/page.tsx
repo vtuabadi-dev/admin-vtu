@@ -27,6 +27,7 @@ import {
   ExternalLink,
   Layers,
   FileCode,
+  ArrowLeft,
 } from "lucide-react";
 import { Card, CardContent } from "@/shared/components/ui/Card";
 import { Button } from "@/shared/components/ui/Button";
@@ -603,6 +604,888 @@ Demikian Surat Tugas ini dibuat dengan sebenarnya agar dapat dipergunakan sebaga
     }
   };
 
+  if (editingTemplate) {
+    return (
+      <div className="space-y-6 pb-20">
+        {/* Toast Notification */}
+        {toastMessage && (
+          <div className="fixed bottom-6 right-6 z-50 animate-in fade-in slide-in-from-bottom-3 duration-200">
+            <div className="flex items-center gap-2.5 bg-emerald-900/90 border border-emerald-500 text-white text-xs font-semibold px-4 py-3 rounded-xl shadow-2xl backdrop-blur-md">
+              <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
+              <span>{toastMessage}</span>
+            </div>
+          </div>
+        )}
+
+        {/* ── BACK BUTTON & TOP HEADER ── */}
+        <div className="space-y-4">
+          <button
+            type="button"
+            onClick={() => {
+              setEditingTemplate(null);
+              setIsEditorOpen(false);
+            }}
+            className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-bold text-slate-700 dark:text-slate-200 bg-white dark:bg-stone-900 border border-stone-300 dark:border-stone-700 rounded-xl hover:bg-stone-100 dark:hover:bg-stone-800 transition-colors shadow-xs"
+          >
+            <ArrowLeft className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+            <span>Kembali ke Master Template Surat</span>
+          </button>
+
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-stone-900 p-5 rounded-2xl border border-stone-200 dark:border-stone-800 shadow-sm">
+            <div className="flex items-center gap-3.5">
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary shrink-0">
+                <Sliders className="h-6 w-6" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2.5">
+                  <h1 className="text-xl font-extrabold text-foreground tracking-tight">
+                    Konfigurasi Template: {editingTemplate.nama}
+                  </h1>
+                  <Badge variant="outline" className="font-mono text-xs">
+                    {editingTemplate.kodeNomorDefault || "ST"}
+                  </Badge>
+                </div>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Kelola penomoran otomatis, variabel placeholder, jenis kolom isian, QR code keaslian, dan pratinjau lembar A4.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setEditingTemplate(null);
+                  setIsEditorOpen(false);
+                }}
+                className="text-xs font-bold"
+              >
+                Batal / Kembali
+              </Button>
+              <Button
+                size="sm"
+                disabled={savingTemplate}
+                onClick={handleSaveEditor}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold gap-1.5 shadow-md px-4"
+              >
+                <Save className="h-4 w-4" />
+                {savingTemplate ? "Menyimpan..." : "Simpan Konfigurasi"}
+              </Button>
+            </div>
+          </div>
+        </div>
+
+        {/* ── MAIN CONFIGURATION CONTENT ── */}
+        <div className="bg-white dark:bg-stone-900 p-6 rounded-2xl border border-stone-200 dark:border-stone-800 shadow-sm space-y-6">
+          {/* Navigation Tabs */}
+          <div className="flex items-center justify-between border-b pb-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setEditorActiveTab("konfigurasi")}
+                className={cn(
+                  "px-4 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-2",
+                  editorActiveTab === "konfigurasi"
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "text-muted-foreground hover:bg-muted"
+                )}
+              >
+                <Sliders className="h-4 w-4" />
+                1. Konfigurasi Template
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setEditorActiveTab("editor")}
+                className={cn(
+                  "px-4 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-2",
+                  editorActiveTab === "editor"
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "text-muted-foreground hover:bg-muted"
+                )}
+              >
+                <FileText className="h-4 w-4" />
+                2. Isi Konten & Editor Teks
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setEditorActiveTab("preview")}
+                className={cn(
+                  "px-4 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-2",
+                  editorActiveTab === "preview"
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "text-muted-foreground hover:bg-muted"
+                )}
+              >
+                <Eye className="h-4 w-4" />
+                3. Pratinjau Lembar A4
+              </button>
+            </div>
+
+            <Badge variant="outline" size="sm" className="font-mono text-xs hidden sm:inline-flex">
+              {editingTemplate.kodeNomorDefault || "ST"}
+            </Badge>
+          </div>
+
+          {/* ── TAB 1: KONFIGURASI TEMPLATE ── */}
+          {editorActiveTab === "konfigurasi" && (
+            <div className="space-y-6">
+              {/* Row 1: Nama Jenis Surat & Jumlah Template */}
+              <div className="grid grid-cols-1 sm:grid-cols-12 gap-4">
+                <div className="sm:col-span-8 space-y-1.5">
+                  <label className="text-xs font-bold text-foreground">Nama Jenis Surat</label>
+                  <Input
+                    value={editingTemplate.nama}
+                    onChange={(e) => setEditingTemplate({ ...editingTemplate, nama: e.target.value })}
+                    placeholder="Cth: Surat Tugas"
+                    className="text-xs h-10 bg-background"
+                  />
+                </div>
+
+                <div className="sm:col-span-4 space-y-1.5">
+                  <label className="text-xs font-bold text-foreground">Jumlah Template Terlampir</label>
+                  <Input
+                    type="number"
+                    min={1}
+                    value={editingTemplate.jumlahTemplateTerlampir ?? 1}
+                    onChange={(e) =>
+                      setEditingTemplate({
+                        ...editingTemplate,
+                        jumlahTemplateTerlampir: parseInt(e.target.value, 10) || 1,
+                      })
+                    }
+                    className="text-xs h-10 bg-background"
+                  />
+                </div>
+              </div>
+
+              {/* Row 2: Konfigurasi Penomoran Otomatis */}
+              <div className="p-4 rounded-xl bg-stone-50 dark:bg-stone-900/60 border border-stone-200 dark:border-stone-800 space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                    Konfigurasi Penomoran Otomatis
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setShowFormatHelper(!showFormatHelper)}
+                    className="flex h-5 w-5 items-center justify-center rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400 font-extrabold text-[11px] hover:bg-blue-500/20"
+                    title="Bantuan Format Nomor"
+                  >
+                    !
+                  </button>
+                </div>
+
+                {showFormatHelper && (
+                  <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/30 text-xs space-y-1.5 animate-in fade-in">
+                    <p className="font-bold text-blue-900 dark:text-blue-300">Variabel Penomoran Yang Didukung:</p>
+                    <ul className="list-disc list-inside space-y-0.5 text-[11px] text-blue-800 dark:text-blue-300/90 font-mono">
+                      <li><code>[NOMOR]</code> : Nomor Urut Otomatis (Cth: 001)</li>
+                      <li><code>[BULAN]</code> : Bulan Romawi (Cth: VIII)</li>
+                      <li><code>[TAHUN]</code> : Tahun 4 Digit (Cth: 2026)</li>
+                      <li><code>[HARI]</code> : Tanggal Hari Ini (Cth: 31)</li>
+                    </ul>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
+                  <div className="sm:col-span-8 space-y-1">
+                    <label className="text-[11px] font-semibold text-muted-foreground">Format Nomor</label>
+                    <Input
+                      value={editingTemplate.formatNomor || `[NOMOR]/${editingTemplate.kodeNomorDefault}/[BULAN]/[TAHUN]`}
+                      onChange={(e) => setEditingTemplate({ ...editingTemplate, formatNomor: e.target.value })}
+                      placeholder="[NOMOR]/ST/[BULAN]/[TAHUN]"
+                      className="text-xs font-mono bg-background"
+                    />
+                  </div>
+
+                  <div className="sm:col-span-4 space-y-1">
+                    <label className="text-[11px] font-semibold text-muted-foreground">Kebutuhan Nomor per Surat</label>
+                    <Input
+                      type="number"
+                      min={1}
+                      value={editingTemplate.kebutuhanNomorPerSurat ?? 1}
+                      onChange={(e) =>
+                        setEditingTemplate({
+                          ...editingTemplate,
+                          kebutuhanNomorPerSurat: parseInt(e.target.value, 10) || 1,
+                        })
+                      }
+                      className="text-xs bg-background"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Row 3: File Template Dokumen Ke-1 */}
+              <div className="p-4 rounded-xl border border-dashed border-stone-300 dark:border-stone-700 bg-muted/20 space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div>
+                    <label className="text-xs font-bold text-foreground block">
+                      File Template Dokumen Ke-1
+                    </label>
+                    <span className="text-[11px] text-muted-foreground font-medium">
+                      (Upload File mendeteksi variabel otomatis!)
+                    </span>
+                  </div>
+
+                  <div className="relative inline-block">
+                    <input
+                      type="file"
+                      accept=".docx,.doc,.txt,.html,.json"
+                      onChange={handleModalFileUpload}
+                      className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                    />
+                    <Button type="button" size="sm" variant="outline" className="text-xs font-bold gap-1.5 pointer-events-none">
+                      <UploadCloud className="h-3.5 w-3.5 text-primary" />
+                      Pilih File Template
+                    </Button>
+                  </div>
+                </div>
+
+                {editingTemplate.fileNameUploaded && (
+                  <p className="text-xs font-mono text-emerald-600 dark:text-emerald-400 font-bold">
+                    ✓ File Terpilih: {editingTemplate.fileNameUploaded}
+                  </p>
+                )}
+
+                <div className="space-y-1 pt-1">
+                  <label className="text-[11px] font-semibold text-muted-foreground">
+                    Format Nama File Hasil Generate
+                  </label>
+                  <Input
+                    value={editingTemplate.formatNamaFile || `SK_{{${editingTemplate.placeholders[0]?.key || "Nama"}}}`}
+                    onChange={(e) => setEditingTemplate({ ...editingTemplate, formatNamaFile: e.target.value })}
+                    placeholder="SK_{{Nama Pegawai}}"
+                    className="text-xs font-mono bg-background"
+                  />
+                </div>
+              </div>
+
+              {/* Row 4: Quick Switch Cards (QR & Stempel) */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="flex items-center justify-between p-3.5 rounded-xl bg-stone-50 dark:bg-stone-900/60 border border-stone-200 dark:border-stone-800">
+                  <div className="flex items-center gap-2.5">
+                    <div
+                      className={cn(
+                        "p-2 rounded-lg transition-colors",
+                        editingTemplate.penandatangan.showBarcode
+                          ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                          : "bg-stone-200 dark:bg-stone-800 text-muted-foreground"
+                      )}
+                    >
+                      <QrCode className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-foreground">Tampilkan QR Code Verifikasi</p>
+                      <p className="text-[10px] text-muted-foreground">Verifikasi keaslian surat otomatis</p>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={editingTemplate.penandatangan.showBarcode}
+                    onClick={() =>
+                      setEditingTemplate({
+                        ...editingTemplate,
+                        penandatangan: {
+                          ...editingTemplate.penandatangan,
+                          showBarcode: !editingTemplate.penandatangan.showBarcode,
+                        },
+                      })
+                    }
+                    className={cn(
+                      "relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none",
+                      editingTemplate.penandatangan.showBarcode ? "bg-emerald-500" : "bg-stone-300 dark:bg-stone-700"
+                    )}
+                  >
+                    <span
+                      aria-hidden="true"
+                      className={cn(
+                        "pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out",
+                        editingTemplate.penandatangan.showBarcode ? "translate-x-4" : "translate-x-0"
+                      )}
+                    />
+                  </button>
+                </div>
+
+                <div className="flex items-center justify-between p-3.5 rounded-xl bg-stone-50 dark:bg-stone-900/60 border border-stone-200 dark:border-stone-800">
+                  <div className="flex items-center gap-2.5">
+                    <div
+                      className={cn(
+                        "p-2 rounded-lg transition-colors",
+                        editingTemplate.penandatangan.showStempel
+                          ? "bg-blue-500/10 text-blue-600 dark:text-blue-400"
+                          : "bg-stone-200 dark:bg-stone-800 text-muted-foreground"
+                      )}
+                    >
+                      <ShieldCheck className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-foreground">Tampilkan Stempel Resmi VTU</p>
+                      <p className="text-[10px] text-muted-foreground">Stempel basah digital di lembar surat</p>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={editingTemplate.penandatangan.showStempel}
+                    onClick={() =>
+                      setEditingTemplate({
+                        ...editingTemplate,
+                        penandatangan: {
+                          ...editingTemplate.penandatangan,
+                          showStempel: !editingTemplate.penandatangan.showStempel,
+                        },
+                      })
+                    }
+                    className={cn(
+                      "relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none",
+                      editingTemplate.penandatangan.showStempel ? "bg-emerald-500" : "bg-stone-300 dark:bg-stone-700"
+                    )}
+                  >
+                    <span
+                      aria-hidden="true"
+                      className={cn(
+                        "pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out",
+                        editingTemplate.penandatangan.showStempel ? "translate-x-4" : "translate-x-0"
+                      )}
+                    />
+                  </button>
+                </div>
+              </div>
+
+              {/* Row 5: Konfigurasi Isian Data (Dynamic Placeholder Columns) */}
+              <div className="space-y-3 pt-2">
+                <div className="flex items-center justify-between border-b pb-2">
+                  <div>
+                    <h3 className="text-xs font-extrabold text-foreground tracking-wide uppercase">
+                      Konfigurasi Isian Data
+                    </h3>
+                    <p className="text-[11px] text-muted-foreground">
+                      Tentukan nama kolom isian dan jenis input data untuk form Autocrat
+                    </p>
+                  </div>
+
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={handleAddNewColumn}
+                    className="text-xs bg-blue-600 hover:bg-blue-700 text-white font-bold gap-1 shadow-sm"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    + Tambah Kolom
+                  </Button>
+                </div>
+
+                {editingTemplate.placeholders.length === 0 ? (
+                  <div className="p-6 text-center border border-dashed rounded-xl text-xs text-muted-foreground">
+                    Belum ada kolom isian data. Klik <strong>"+ Tambah Kolom"</strong> di atas.
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {editingTemplate.placeholders.map((mapping, idx) => {
+                      const tagSyntax = `{{${mapping.key}}}`;
+                      return (
+                        <div
+                          key={`${mapping.key}-${idx}`}
+                          className="p-3.5 rounded-xl border bg-stone-50/70 dark:bg-stone-900/40 space-y-2.5"
+                        >
+                          <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-center">
+                            {/* Nama Variabel Input */}
+                            <div className="sm:col-span-6 space-y-1">
+                              <label className="text-[11px] font-bold text-foreground">
+                                Nama Variabel #{idx + 1}
+                              </label>
+                              <Input
+                                value={mapping.label || mapping.key}
+                                onChange={(e) => {
+                                  const newLabel = e.target.value;
+                                  setEditingTemplate((prev) => {
+                                    if (!prev) return null;
+                                    const updated = [...prev.placeholders];
+                                    const cur = updated[idx];
+                                    if (cur) {
+                                      updated[idx] = {
+                                        ...cur,
+                                        label: newLabel,
+                                        key: newLabel,
+                                      };
+                                    }
+                                    return { ...prev, placeholders: updated };
+                                  });
+                                }}
+                                placeholder="Cth: Nama Pegawai"
+                                className="text-xs h-9 bg-background font-semibold"
+                              />
+                              <p className="text-[10px] text-muted-foreground font-mono">
+                                Tag Word: <span className="text-primary font-bold">{tagSyntax}</span>
+                              </p>
+                            </div>
+
+                            {/* Jenis Kolom Isian Dropdown */}
+                            <div className="sm:col-span-4 space-y-1">
+                              <label className="text-[11px] font-bold text-foreground">
+                                Jenis Kolom Isian
+                              </label>
+                              <Select
+                                value={mapping.sourceType === "manifest" ? "manifest" : mapping.inputType || "text"}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setEditingTemplate((prev) => {
+                                    if (!prev) return null;
+                                    const updated = [...prev.placeholders];
+                                    const cur = updated[idx];
+                                    if (!cur) return prev;
+
+                                    if (val === "manifest") {
+                                      updated[idx] = {
+                                        ...cur,
+                                        sourceType: "manifest",
+                                        manifestField: cur.manifestField || MANIFEST_FIELD_OPTIONS[0]?.key,
+                                      };
+                                    } else {
+                                      updated[idx] = {
+                                        ...cur,
+                                        sourceType: "manual",
+                                        inputType: val as SuratInputType,
+                                      };
+                                    }
+                                    return { ...prev, placeholders: updated };
+                                  });
+                                }}
+                                options={[
+                                  { value: "text", label: "Teks Singkat" },
+                                  { value: "date", label: "Tanggal" },
+                                  { value: "city", label: "Kota / Tempat" },
+                                  { value: "number", label: "Angka / Nomor" },
+                                  { value: "textarea", label: "Teks Panjang / Paragraf" },
+                                  { value: "select", label: "Pilihan (Dropdown)" },
+                                  { value: "manifest", label: "Ambil dari Manifest (Otomatis)" },
+                                ]}
+                                className="text-xs h-9 bg-background"
+                              />
+                            </div>
+
+                            {/* Hapus Link */}
+                            <div className="sm:col-span-2 flex items-center justify-end pt-3 sm:pt-0">
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveColumn(idx)}
+                                className="text-xs font-bold text-red-600 dark:text-red-400 hover:text-red-700 hover:underline shrink-0 px-2"
+                              >
+                                Hapus
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Sub-row if manifest or select */}
+                          {mapping.sourceType === "manifest" && (
+                            <div className="flex items-center gap-2 pt-1 p-2 rounded-lg bg-emerald-500/5 border border-emerald-500/20 text-xs">
+                              <span className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-300 shrink-0">
+                                Field Manifest:
+                              </span>
+                              <Select
+                                value={mapping.manifestField || MANIFEST_FIELD_OPTIONS[0]?.key || ""}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setEditingTemplate((prev) => {
+                                    if (!prev) return null;
+                                    const updated = [...prev.placeholders];
+                                    const cur = updated[idx];
+                                    if (cur) updated[idx] = { ...cur, manifestField: val };
+                                    return { ...prev, placeholders: updated };
+                                  });
+                                }}
+                                options={MANIFEST_FIELD_OPTIONS.map((opt) => ({
+                                  value: opt.key,
+                                  label: `${opt.label} (${opt.group})`,
+                                }))}
+                                className="text-xs h-8 flex-1"
+                              />
+                            </div>
+                          )}
+
+                          {mapping.inputType === "select" && mapping.sourceType !== "manifest" && (
+                            <div className="flex items-center gap-2 pt-1 p-2 rounded-lg bg-blue-500/5 border border-blue-500/20 text-xs">
+                              <span className="text-[11px] font-semibold text-blue-700 dark:text-blue-300 shrink-0">
+                                Opsi Pilihan (Koma):
+                              </span>
+                              <Input
+                                value={(mapping.options || []).join(", ")}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  const opts = val
+                                    .split(",")
+                                    .map((s) => s.trim())
+                                    .filter(Boolean);
+                                  setEditingTemplate((prev) => {
+                                    if (!prev) return null;
+                                    const updated = [...prev.placeholders];
+                                    const cur = updated[idx];
+                                    if (cur) updated[idx] = { ...cur, options: opts };
+                                    return { ...prev, placeholders: updated };
+                                  });
+                                }}
+                                placeholder="Cth: Pria, Wanita"
+                                className="text-xs h-8 flex-1"
+                              />
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Bottom Save Button Container */}
+              <div className="flex justify-end pt-4 border-t">
+                <Button
+                  type="button"
+                  size="lg"
+                  onClick={handleSaveEditor}
+                  disabled={savingTemplate}
+                  className="text-sm font-bold bg-emerald-600 hover:bg-emerald-700 text-white px-8 shadow-md"
+                >
+                  <Save className="mr-2 h-4 w-4" />
+                  {savingTemplate ? "Menyimpan..." : "Simpan Konfigurasi"}
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* ── TAB 2: ISI KONTEN & EDITOR TEKS ── */}
+          {editorActiveTab === "editor" && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="text-xs font-semibold">Kategori Surat</label>
+                  <Select
+                    value={editingTemplate.kategori}
+                    onChange={(e) =>
+                      setEditingTemplate({
+                        ...editingTemplate,
+                        kategori: e.target.value as SuratKategori,
+                      })
+                    }
+                    options={[
+                      { value: "imigrasi", label: "Imigrasi / Kemenag" },
+                      { value: "instansi", label: "Instansi / Perusahaan" },
+                      { value: "sekolah", label: "Sekolah / Kampus" },
+                      { value: "internal", label: "Internal Operasional" },
+                      { value: "asuransi", label: "Klaim Asuransi" },
+                      { value: "custom", label: "Kustom Lainnya" },
+                    ]}
+                    className="text-xs mt-1"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold">Kode Prefix Default</label>
+                  <Input
+                    value={editingTemplate.kodeNomorDefault}
+                    onChange={(e) =>
+                      setEditingTemplate({
+                        ...editingTemplate,
+                        kodeNomorDefault: e.target.value,
+                      })
+                    }
+                    placeholder="Contoh: ST"
+                    className="text-xs mt-1 font-mono uppercase"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold">Perihal Surat</label>
+                  <Input
+                    value={editingTemplate.perihalDefault}
+                    onChange={(e) =>
+                      setEditingTemplate({
+                        ...editingTemplate,
+                        perihalDefault: e.target.value,
+                      })
+                    }
+                    placeholder="Contoh: Surat Tugas Operasional"
+                    className="text-xs mt-1"
+                  />
+                </div>
+              </div>
+
+              {/* Tag Quick Inserter Toolbar */}
+              <div className="p-3 rounded-xl bg-primary/5 border border-primary/20 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-primary flex items-center gap-1.5">
+                    <Sparkles className="h-3.5 w-3.5" />
+                    Sisipkan Tag Placeholder ke Kursor
+                  </span>
+                  <span className="text-[11px] text-muted-foreground">Klik tag untuk menyisipkan ke isi surat</span>
+                </div>
+
+                <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto">
+                  {[
+                    ...editingTemplate.placeholders.map((p) => ({ key: p.key, label: `+ {${p.key}}` })),
+                    { key: "nama_lengkap", label: "+ {nama_lengkap}" },
+                    { key: "nik", label: "+ {nik}" },
+                    { key: "nomor_paspor", label: "+ {nomor_paspor}" },
+                    { key: "nama_paket", label: "+ {nama_paket}" },
+                    { key: "tanggal_berangkat", label: "+ {tanggal_berangkat}" },
+                    { key: "tanggal_pulang", label: "+ {tanggal_pulang}" },
+                  ]
+                    .filter((v, idx, arr) => arr.findIndex((t) => t.key === v.key) === idx)
+                    .map((t) => (
+                      <button
+                        key={t.key}
+                        type="button"
+                        onClick={() => handleInsertTag(t.key)}
+                        className="px-2 py-1 rounded bg-background hover:bg-primary/10 hover:text-primary border text-[10px] font-mono text-foreground transition-all shadow-sm"
+                      >
+                        {t.label}
+                      </button>
+                    ))}
+                </div>
+              </div>
+
+              {/* Textarea Template Body */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-xs font-semibold">Isi / Body Konten Surat</label>
+                  <span className="text-[11px] text-muted-foreground">
+                    Gunakan tanda kurung kurawal &#123;nama_tag&#125; atau &#123;&#123;nama_tag&#125;&#125;
+                  </span>
+                </div>
+                <textarea
+                  rows={14}
+                  value={editingTemplate.templateContent}
+                  onChange={(e) =>
+                    setEditingTemplate({ ...editingTemplate, templateContent: e.target.value })
+                  }
+                  className="w-full p-3 font-mono text-xs rounded-xl border bg-background focus:ring-2 focus:ring-primary focus:outline-none leading-relaxed"
+                  placeholder="Tuliskan format isi surat di sini..."
+                />
+              </div>
+
+              {/* Penandatangan Settings */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 rounded-xl border bg-muted/20">
+                <div>
+                  <label className="text-xs font-semibold">Nama Penandatangan</label>
+                  <Input
+                    value={editingTemplate.penandatangan.nama}
+                    onChange={(e) =>
+                      setEditingTemplate({
+                        ...editingTemplate,
+                        penandatangan: { ...editingTemplate.penandatangan, nama: e.target.value },
+                      })
+                    }
+                    className="text-xs mt-1"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold">Jabatan Penandatangan</label>
+                  <Input
+                    value={editingTemplate.penandatangan.jabatan}
+                    onChange={(e) =>
+                      setEditingTemplate({
+                        ...editingTemplate,
+                        penandatangan: { ...editingTemplate.penandatangan, jabatan: e.target.value },
+                      })
+                    }
+                    className="text-xs mt-1"
+                  />
+                </div>
+              </div>
+
+              {/* Footer in Editor Tab */}
+              <div className="flex justify-end pt-3 border-t">
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={handleSaveEditor}
+                  disabled={savingTemplate}
+                  className="text-xs bg-primary text-primary-foreground font-semibold"
+                >
+                  <Save className="mr-1.5 h-3.5 w-3.5" />
+                  {savingTemplate ? "Menyimpan..." : "Simpan Perubahan Konten"}
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* ── TAB 3: PRATINJAU LEMBAR A4 ── */}
+          {editorActiveTab === "preview" && (
+            <div className="space-y-4">
+              <div className="p-3 rounded-xl bg-muted/40 border text-xs flex items-center justify-between">
+                <span className="font-semibold text-muted-foreground">
+                  Pratinjau Lembar Surat A4 (Menggunakan Dummy Data Resolusi Autocrat)
+                </span>
+                <Badge variant="success" size="sm">
+                  Autocrat Live Renderer
+                </Badge>
+              </div>
+
+              {/* Simulated A4 Letter Sheet */}
+              <div className="bg-white text-stone-900 p-8 rounded-xl shadow-md border font-serif text-[13px] leading-relaxed max-w-2xl mx-auto space-y-5">
+                {/* Kop Surat */}
+                {editingTemplate.kopSuratType === "ppiu_vtu" && (
+                  <div className="border-b-2 border-stone-900 pb-3 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <img
+                        src={KOP_SURAT_BASE64}
+                        alt="Kop Surat PT VTU Abadi"
+                        className="h-16 w-auto object-contain"
+                      />
+                      <div>
+                        <h2 className="text-base font-bold tracking-tight text-stone-950 font-sans">
+                          PT. VAUZA TRIKARSA UTAMA
+                        </h2>
+                        <p className="text-[10px] text-stone-600 font-sans font-medium">
+                          Penyelenggara Perjalanan Ibadah Umroh (PPIU) Kemenag RI No. U.400 Tahun 2021
+                        </p>
+                        <p className="text-[9px] text-stone-500 font-sans">
+                          Ruko Gateway Blok C-12, Waru, Sidoarjo &bull; Telp: (031) 854-4455 &bull; info@vtuabadi.com
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Header Meta */}
+                <div className="flex items-start justify-between text-xs font-sans">
+                  <div className="space-y-0.5">
+                    <p>
+                      <strong>Nomor</strong> :{" "}
+                      {editingTemplate.formatNomor
+                        ? editingTemplate.formatNomor
+                            .replace(/\[NOMOR\]/gi, "001")
+                            .replace(/\[BULAN\]/gi, getTodayDateInfo().romanMonth)
+                            .replace(/\[TAHUN\]/gi, String(getTodayDateInfo().year))
+                            .replace(/\[HARI\]/gi, "31")
+                        : `${editingTemplate.kodeNomorDefault}/001/VTU/${getTodayDateInfo().romanMonth}/${getTodayDateInfo().year}`}
+                    </p>
+                    <p><strong>Lamp</strong>  : {editingTemplate.lampiranDefault || "-"}</p>
+                    <p><strong>Perihal</strong>: <strong>{editingTemplate.perihalDefault}</strong></p>
+                  </div>
+                  <div className="text-right">
+                    <p>Sidoarjo, {getTodayDateInfo().masehi}</p>
+                  </div>
+                </div>
+
+                {/* Destination */}
+                <div className="text-xs font-sans space-y-0.5 pt-1">
+                  <p>{editingTemplate.tujuanDefault || "Kepada Pihak yang Berkepentingan"}</p>
+                  <p>{editingTemplate.kotaTujuanDefault || "Di Tempat"}</p>
+                </div>
+
+                {/* Body Content with Merged Data */}
+                <div className="whitespace-pre-line text-xs font-sans pt-2 leading-relaxed text-justify">
+                  {renderAutocratMergedText(
+                    editingTemplate.templateContent,
+                    resolveAutocratFieldValues(
+                      editingTemplate,
+                      {
+                        namaLengkap: "MUCHAMAD ZAMRONI",
+                        nik: "3515082103850001",
+                        nomorPaspor: "X1234567",
+                        tempatLahir: "Sidoarjo",
+                        tanggalLahir: "1985-03-21",
+                        jenisKelamin: "LAKI-LAKI",
+                        namaAyah: "H. AHMAD SOFWAN",
+                        alamat: "Jl. Raya Taman No. 45, Sidoarjo, Jawa Timur",
+                        nomorTelepon: "081234567890",
+                        registrationId: "REG-2026-0814",
+                      },
+                      {
+                        namaPaket: "Paket Umroh Reguler Awal Musim 1448 H",
+                        kode: "KBR-2026-08-A",
+                        tanggalBerangkat: "2026-09-15",
+                        tanggalPulang: "2026-09-24",
+                        programHari: 9,
+                        maskapai: "Saudia Airlines (SV)",
+                        hotelMekkah: "Pullman Zamzam Makkah",
+                        hotelMadinah: "Rove Al Madinah",
+                      }
+                    )
+                  )}
+                </div>
+
+                {/* Signature Section */}
+                <div className="pt-6 flex items-end justify-between font-sans text-xs">
+                  {editingTemplate.penandatangan.showBarcode && (
+                    <div className="p-2 border rounded-lg flex items-center gap-2 bg-stone-50">
+                      <QrCode className="h-10 w-10 text-stone-800" />
+                      <div className="text-[9px] text-stone-600">
+                        <p className="font-bold">VERIFIKASI RESMI</p>
+                        <p>Scan untuk cek keabsahan surat di portal VTU Abadi</p>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="text-center min-w-[200px] ml-auto space-y-1">
+                    <p className="font-semibold">PT. VAUZA TRIKARSA UTAMA</p>
+                    <div className="h-16 flex items-center justify-center relative">
+                      {editingTemplate.penandatangan.showStempel && (
+                        <div className="absolute inset-0 flex items-center justify-center opacity-60 pointer-events-none">
+                          <div className="w-16 h-16 rounded-full border-2 border-dashed border-red-600 flex items-center justify-center text-[9px] font-black text-red-600 rotate-[-15deg]">
+                            STEMPEL VTU
+                          </div>
+                        </div>
+                      )}
+                      <span className="italic text-stone-400 text-[10px]">(Tanda Tangan Digital)</span>
+                    </div>
+                    <p className="font-bold underline uppercase">{editingTemplate.penandatangan.nama}</p>
+                    <p className="text-[11px] text-stone-600">{editingTemplate.penandatangan.jabatan}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex justify-end pt-3 border-t">
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={handleSaveEditor}
+                  disabled={savingTemplate}
+                  className="text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-semibold"
+                >
+                  <Save className="mr-1.5 h-3.5 w-3.5" />
+                  {savingTemplate ? "Menyimpan..." : "Simpan Konfigurasi"}
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* Bottom Back & Save Row */}
+          <div className="flex items-center justify-between pt-4 border-t mt-6">
+            <button
+              type="button"
+              onClick={() => {
+                setEditingTemplate(null);
+                setIsEditorOpen(false);
+              }}
+              className="inline-flex items-center gap-1.5 text-xs font-bold text-muted-foreground hover:text-foreground"
+            >
+              <ArrowLeft className="h-3.5 w-3.5" />
+              Batal & Kembali ke Daftar
+            </button>
+            <Button
+              type="button"
+              size="sm"
+              onClick={handleSaveEditor}
+              disabled={savingTemplate}
+              className="text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-semibold gap-1.5 px-5 py-2"
+            >
+              <Save className="h-4 w-4" />
+              {savingTemplate ? "Menyimpan..." : "Simpan Konfigurasi"}
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6 pb-20">
       {/* Toast Notification */}
@@ -971,767 +1854,6 @@ Demikian Surat Tugas ini dibuat dengan sebenarnya agar dapat dipergunakan sebaga
         </div>
       )}
 
-      {/* ── AUTOCRAT TEMPLATE CONFIGURATOR & EDITOR MODAL ── */}
-      {editingTemplate && (
-        <Modal
-          open={isEditorOpen}
-          onClose={() => setIsEditorOpen(false)}
-          title="Konfigurasi Template"
-          size="xl"
-        >
-          <div className="space-y-5">
-            {/* Navigation Tabs */}
-            <div className="flex items-center justify-between border-b pb-2">
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setEditorActiveTab("konfigurasi")}
-                  className={cn(
-                    "px-3.5 py-2 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5",
-                    editorActiveTab === "konfigurasi"
-                      ? "bg-primary text-primary-foreground shadow-sm"
-                      : "text-muted-foreground hover:bg-muted"
-                  )}
-                >
-                  <Sliders className="h-3.5 w-3.5" />
-                  1. Konfigurasi Template
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setEditorActiveTab("editor")}
-                  className={cn(
-                    "px-3.5 py-2 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5",
-                    editorActiveTab === "editor"
-                      ? "bg-primary text-primary-foreground shadow-sm"
-                      : "text-muted-foreground hover:bg-muted"
-                  )}
-                >
-                  <FileText className="h-3.5 w-3.5" />
-                  2. Isi Konten & Editor Teks
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setEditorActiveTab("preview")}
-                  className={cn(
-                    "px-3.5 py-2 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5",
-                    editorActiveTab === "preview"
-                      ? "bg-primary text-primary-foreground shadow-sm"
-                      : "text-muted-foreground hover:bg-muted"
-                  )}
-                >
-                  <Eye className="h-3.5 w-3.5" />
-                  3. Pratinjau Lembar A4
-                </button>
-              </div>
-
-              <Badge variant="outline" size="sm" className="font-mono text-xs hidden sm:inline-flex">
-                {editingTemplate.kodeNomorDefault || "ST"}
-              </Badge>
-            </div>
-
-            {/* ── TAB 1: KONFIGURASI TEMPLATE (MATCHING USER SCREENSHOT) ── */}
-            {editorActiveTab === "konfigurasi" && (
-              <div className="space-y-6 max-h-[72vh] overflow-y-auto pr-1">
-                {/* Row 1: Nama Jenis Surat & Jumlah Template */}
-                <div className="grid grid-cols-1 sm:grid-cols-12 gap-4">
-                  <div className="sm:col-span-8 space-y-1.5">
-                    <label className="text-xs font-bold text-foreground">Nama Jenis Surat</label>
-                    <Input
-                      value={editingTemplate.nama}
-                      onChange={(e) => setEditingTemplate({ ...editingTemplate, nama: e.target.value })}
-                      placeholder="Cth: Surat Tugas"
-                      className="text-xs h-10 bg-background"
-                    />
-                  </div>
-
-                  <div className="sm:col-span-4 space-y-1.5">
-                    <label className="text-xs font-bold text-foreground">Jumlah Template Terlampir</label>
-                    <Input
-                      type="number"
-                      min={1}
-                      value={editingTemplate.jumlahTemplateTerlampir ?? 1}
-                      onChange={(e) =>
-                        setEditingTemplate({
-                          ...editingTemplate,
-                          jumlahTemplateTerlampir: parseInt(e.target.value) || 1,
-                        })
-                      }
-                      className="text-xs h-10 bg-background font-mono"
-                    />
-                  </div>
-                </div>
-
-                {/* Row 2: Konfigurasi Penomoran Otomatis */}
-                <div className="space-y-2">
-                  <h4 className="text-xs font-bold text-foreground">Konfigurasi Penomoran Otomatis</h4>
-                  <div className="grid grid-cols-1 sm:grid-cols-12 gap-4">
-                    <div className="sm:col-span-8 space-y-1.5">
-                      <label className="text-[11px] font-semibold text-muted-foreground">Format Nomor</label>
-                      <div className="relative flex items-center">
-                        <Input
-                          value={editingTemplate.formatNomor || ""}
-                          onChange={(e) => setEditingTemplate({ ...editingTemplate, formatNomor: e.target.value })}
-                          placeholder="[NOMOR]/ST/[BULAN]/[TAHUN]"
-                          className="text-xs h-10 pr-10 font-mono bg-background"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowFormatHelper(!showFormatHelper)}
-                          className="absolute right-2 px-2 py-1 rounded bg-stone-200 dark:bg-stone-700 text-stone-800 dark:text-stone-200 text-xs font-bold hover:bg-stone-300 transition-colors"
-                          title="Petunjuk Variabel Format Nomor"
-                        >
-                          !
-                        </button>
-                      </div>
-                      {showFormatHelper && (
-                        <div className="p-2.5 rounded-lg bg-blue-500/10 border border-blue-500/30 text-[11px] text-blue-900 dark:text-blue-200 space-y-1 animate-in fade-in duration-150">
-                          <p className="font-bold">Variabel Format Penomoran yang Tersedia:</p>
-                          <div className="grid grid-cols-2 gap-1 text-[10px] font-mono">
-                            <span><code>[NOMOR]</code> : Nomor Urut Surat (001, 002, dst)</span>
-                            <span><code>[BULAN]</code> : Bulan Romawi (VIII, IX, dst)</span>
-                            <span><code>[TAHUN]</code> : Tahun 4 Digit (2026)</span>
-                            <span><code>[HARI]</code> : Tanggal Hari Ini (31)</span>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="sm:col-span-4 space-y-1.5">
-                      <label className="text-[11px] font-semibold text-muted-foreground">Kebutuhan Nomor per Surat</label>
-                      <Input
-                        type="number"
-                        min={1}
-                        value={editingTemplate.kebutuhanNomorPerSurat ?? 1}
-                        onChange={(e) =>
-                          setEditingTemplate({
-                            ...editingTemplate,
-                            kebutuhanNomorPerSurat: parseInt(e.target.value) || 1,
-                          })
-                        }
-                        className="text-xs h-10 bg-background font-mono"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Row 3: File Template Dokumen Ke-1 */}
-                <div className="p-4 rounded-xl border border-stone-200 dark:border-stone-800 bg-stone-50/60 dark:bg-stone-900/30 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <h4 className="text-xs font-bold text-foreground">
-                      File Template Dokumen Ke-1{" "}
-                      <span className="text-emerald-600 dark:text-emerald-400 font-semibold">
-                        (Upload File mendeteksi variabel otomatis!)
-                      </span>
-                    </h4>
-                    {editingTemplate.fileNameUploaded && (
-                      <Badge variant="success" size="sm" className="text-[10px]">
-                        {editingTemplate.fileNameUploaded}
-                      </Badge>
-                    )}
-                  </div>
-
-                  {/* File Input Selector */}
-                  <div className="flex items-center gap-3 p-2 rounded-lg bg-background border border-stone-200 dark:border-stone-800">
-                    <label className="px-3 py-1.5 rounded-md bg-stone-100 dark:bg-stone-800 border text-xs font-semibold text-foreground cursor-pointer hover:bg-stone-200 dark:hover:bg-stone-700 transition-colors shrink-0">
-                      Pilih File
-                      <input
-                        type="file"
-                        accept=".docx,.doc,.txt,.html,.json"
-                        className="hidden"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (file) handleModalFileUpload(file);
-                        }}
-                      />
-                    </label>
-                    <span className="text-xs text-muted-foreground truncate">
-                      {editingTemplate.fileNameUploaded || "Tidak ada file yang dipilih"}
-                    </span>
-                  </div>
-
-                  {/* Format Nama File Hasil Generate */}
-                  <div className="space-y-1.5 pt-1">
-                    <label className="text-[11px] font-semibold text-muted-foreground">
-                      Format Nama File Hasil Generate
-                    </label>
-                    <Input
-                      value={editingTemplate.formatNamaFile || ""}
-                      onChange={(e) => setEditingTemplate({ ...editingTemplate, formatNamaFile: e.target.value })}
-                      placeholder="Cth: SK_{{Nama Pegawai}}"
-                      className="text-xs h-10 bg-background font-mono"
-                    />
-                  </div>
-                </div>
-
-                {/* QR Code & Stempel Quick Toggles */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {/* Switch QR Code */}
-                  <div className="p-3 rounded-xl border border-emerald-500/30 bg-emerald-500/5 dark:bg-emerald-950/20 flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-2.5">
-                      <QrCode className="h-4 w-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                      <div>
-                        <p className="text-xs font-bold text-foreground">Tampilkan QR Code Verifikasi</p>
-                        <p className="text-[10px] text-muted-foreground">Scan verifikasi online di /track/surat</p>
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      role="switch"
-                      aria-checked={editingTemplate.penandatangan.showBarcode}
-                      onClick={() =>
-                        setEditingTemplate({
-                          ...editingTemplate,
-                          penandatangan: {
-                            ...editingTemplate.penandatangan,
-                            showBarcode: !editingTemplate.penandatangan.showBarcode,
-                          },
-                        })
-                      }
-                      className={cn(
-                        "relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none",
-                        editingTemplate.penandatangan.showBarcode ? "bg-emerald-500" : "bg-stone-300 dark:bg-stone-700"
-                      )}
-                    >
-                      <span
-                        aria-hidden="true"
-                        className={cn(
-                          "pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out",
-                          editingTemplate.penandatangan.showBarcode ? "translate-x-4" : "translate-x-0"
-                        )}
-                      />
-                    </button>
-                  </div>
-
-                  {/* Switch Stempel */}
-                  <div className="p-3 rounded-xl border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-900/40 flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-2.5">
-                      <Building2 className="h-4 w-4 text-primary shrink-0" />
-                      <div>
-                        <p className="text-xs font-bold text-foreground">Tampilkan Stempel Resmi VTU</p>
-                        <p className="text-[10px] text-muted-foreground">Stempel PPIU resmi di atas tanda tangan</p>
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      role="switch"
-                      aria-checked={editingTemplate.penandatangan.showStempel}
-                      onClick={() =>
-                        setEditingTemplate({
-                          ...editingTemplate,
-                          penandatangan: {
-                            ...editingTemplate.penandatangan,
-                            showStempel: !editingTemplate.penandatangan.showStempel,
-                          },
-                        })
-                      }
-                      className={cn(
-                        "relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none",
-                        editingTemplate.penandatangan.showStempel ? "bg-primary" : "bg-stone-300 dark:bg-stone-700"
-                      )}
-                    >
-                      <span
-                        aria-hidden="true"
-                        className={cn(
-                          "pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out",
-                          editingTemplate.penandatangan.showStempel ? "translate-x-4" : "translate-x-0"
-                        )}
-                      />
-                    </button>
-                  </div>
-                </div>
-
-                {/* Row 4: Konfigurasi Isian Data */}
-                <div className="space-y-3 pt-2">
-                  <div className="flex items-center justify-between">
-                    <h4 className="text-sm font-bold text-foreground">Konfigurasi Isian Data</h4>
-                    <Button
-                      type="button"
-                      size="sm"
-                      onClick={handleAddNewColumn}
-                      className="text-xs bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow-sm"
-                    >
-                      <Plus className="mr-1.5 h-3.5 w-3.5" />
-                      + Tambah Kolom
-                    </Button>
-                  </div>
-
-                  {editingTemplate.placeholders.length === 0 ? (
-                    <div className="p-8 text-center border-2 border-dashed rounded-xl text-muted-foreground space-y-2">
-                      <p className="text-xs font-semibold">Belum ada kolom isian data terkonfigurasi</p>
-                      <p className="text-[11px]">
-                        Unggah file template di atas atau klik &quot;+ Tambah Kolom&quot; untuk membuat kolom baru.
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="space-y-3">
-                      {editingTemplate.placeholders.map((mapping, idx) => {
-                        return (
-                          <div
-                            key={`${mapping.key}-${idx}`}
-                            className="p-4 rounded-xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900/90 shadow-sm space-y-3"
-                          >
-                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                              {/* Left Column: Nama Variabel & Tag Word Hint */}
-                              <div className="flex-1 space-y-1">
-                                <Input
-                                  value={mapping.label}
-                                  onChange={(e) => {
-                                    const val = e.target.value;
-                                    setEditingTemplate((prev) => {
-                                      if (!prev) return null;
-                                      const updated = [...prev.placeholders];
-                                      const cur = updated[idx];
-                                      if (cur) updated[idx] = { ...cur, label: val };
-                                      return { ...prev, placeholders: updated };
-                                    });
-                                  }}
-                                  placeholder="Nama Variabel"
-                                  className="text-xs h-9 bg-slate-50 dark:bg-stone-950 font-medium"
-                                />
-                                <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground pt-0.5">
-                                  <span>Tag Word:</span>
-                                  <span className="font-mono text-blue-600 dark:text-blue-400 font-bold">
-                                    &#123;&#123;{mapping.key}&#125;&#125;
-                                  </span>
-                                </div>
-                              </div>
-
-                              {/* Middle Column: Jenis Kolom Isian Dropdown */}
-                              <div className="flex items-center gap-3">
-                                <div className="w-48 sm:w-56">
-                                  <Select
-                                    value={
-                                      mapping.sourceType === "manifest"
-                                        ? "manifest"
-                                        : mapping.inputType || "text"
-                                    }
-                                    onChange={(e) => {
-                                      const val = e.target.value;
-                                      setEditingTemplate((prev) => {
-                                        if (!prev) return null;
-                                        const updated = [...prev.placeholders];
-                                        const cur = updated[idx];
-                                        if (cur) {
-                                          if (val === "manifest") {
-                                            updated[idx] = {
-                                              ...cur,
-                                              sourceType: "manifest",
-                                              manifestField: cur.manifestField || MANIFEST_FIELD_OPTIONS[0]?.key,
-                                            };
-                                          } else {
-                                            updated[idx] = {
-                                              ...cur,
-                                              sourceType: "manual",
-                                              inputType: val as SuratInputType,
-                                            };
-                                          }
-                                        }
-                                        return { ...prev, placeholders: updated };
-                                      });
-                                    }}
-                                    options={[
-                                      { value: "text", label: "Teks Singkat" },
-                                      { value: "date", label: "Tanggal" },
-                                      { value: "city", label: "Kota / Tempat" },
-                                      { value: "number", label: "Angka / Nomor" },
-                                      { value: "textarea", label: "Teks Panjang / Paragraf" },
-                                      { value: "select", label: "Pilihan (Dropdown)" },
-                                      { value: "manifest", label: "Ambil dari Manifest (Otomatis)" },
-                                    ]}
-                                    className="text-xs h-9"
-                                  />
-                                </div>
-
-                                {/* Far Right: Hapus link */}
-                                <button
-                                  type="button"
-                                  onClick={() => handleRemoveColumn(idx)}
-                                  className="text-xs font-bold text-red-600 dark:text-red-400 hover:text-red-700 hover:underline shrink-0 px-2"
-                                >
-                                  Hapus
-                                </button>
-                              </div>
-                            </div>
-
-                            {/* Sub-row if manifest or select */}
-                            {mapping.sourceType === "manifest" && (
-                              <div className="flex items-center gap-2 pt-1 p-2 rounded-lg bg-emerald-500/5 border border-emerald-500/20 text-xs">
-                                <span className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-300 shrink-0">
-                                  Field Manifest:
-                                </span>
-                                <Select
-                                  value={mapping.manifestField || MANIFEST_FIELD_OPTIONS[0]?.key || ""}
-                                  onChange={(e) => {
-                                    const val = e.target.value;
-                                    setEditingTemplate((prev) => {
-                                      if (!prev) return null;
-                                      const updated = [...prev.placeholders];
-                                      const cur = updated[idx];
-                                      if (cur) updated[idx] = { ...cur, manifestField: val };
-                                      return { ...prev, placeholders: updated };
-                                    });
-                                  }}
-                                  options={MANIFEST_FIELD_OPTIONS.map((opt) => ({
-                                    value: opt.key,
-                                    label: `${opt.label} (${opt.group})`,
-                                  }))}
-                                  className="text-xs h-8 flex-1"
-                                />
-                              </div>
-                            )}
-
-                            {mapping.inputType === "select" && mapping.sourceType !== "manifest" && (
-                              <div className="flex items-center gap-2 pt-1 p-2 rounded-lg bg-blue-500/5 border border-blue-500/20 text-xs">
-                                <span className="text-[11px] font-semibold text-blue-700 dark:text-blue-300 shrink-0">
-                                  Opsi Pilihan (Koma):
-                                </span>
-                                <Input
-                                  value={(mapping.options || []).join(", ")}
-                                  onChange={(e) => {
-                                    const val = e.target.value;
-                                    const opts = val
-                                      .split(",")
-                                      .map((s) => s.trim())
-                                      .filter(Boolean);
-                                    setEditingTemplate((prev) => {
-                                      if (!prev) return null;
-                                      const updated = [...prev.placeholders];
-                                      const cur = updated[idx];
-                                      if (cur) updated[idx] = { ...cur, options: opts };
-                                      return { ...prev, placeholders: updated };
-                                    });
-                                  }}
-                                  placeholder="Cth: Pria, Wanita"
-                                  className="text-xs h-8 flex-1"
-                                />
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-
-                {/* Bottom Save Button Container */}
-                <div className="flex justify-end pt-4 border-t">
-                  <Button
-                    type="button"
-                    size="lg"
-                    onClick={handleSaveEditor}
-                    disabled={savingTemplate}
-                    className="text-sm font-bold bg-emerald-600 hover:bg-emerald-700 text-white px-8 shadow-md"
-                  >
-                    <Save className="mr-2 h-4 w-4" />
-                    {savingTemplate ? "Menyimpan..." : "Simpan Konfigurasi"}
-                  </Button>
-                </div>
-              </div>
-            )}
-
-            {/* ── TAB 2: ISI KONTEN & EDITOR TEKS ── */}
-            {editorActiveTab === "editor" && (
-              <div className="space-y-4 max-h-[72vh] overflow-y-auto pr-1">
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div>
-                    <label className="text-xs font-semibold">Kategori Surat</label>
-                    <Select
-                      value={editingTemplate.kategori}
-                      onChange={(e) =>
-                        setEditingTemplate({
-                          ...editingTemplate,
-                          kategori: e.target.value as SuratKategori,
-                        })
-                      }
-                      options={[
-                        { value: "imigrasi", label: "Imigrasi / Kemenag" },
-                        { value: "instansi", label: "Instansi / Perusahaan" },
-                        { value: "sekolah", label: "Sekolah / Kampus" },
-                        { value: "internal", label: "Internal Operasional" },
-                        { value: "asuransi", label: "Klaim Asuransi" },
-                        { value: "custom", label: "Kustom Lainnya" },
-                      ]}
-                      className="text-xs mt-1"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-xs font-semibold">Kode Prefix Default</label>
-                    <Input
-                      value={editingTemplate.kodeNomorDefault}
-                      onChange={(e) =>
-                        setEditingTemplate({
-                          ...editingTemplate,
-                          kodeNomorDefault: e.target.value,
-                        })
-                      }
-                      placeholder="Contoh: ST"
-                      className="text-xs mt-1 font-mono uppercase"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-xs font-semibold">Perihal Surat</label>
-                    <Input
-                      value={editingTemplate.perihalDefault}
-                      onChange={(e) =>
-                        setEditingTemplate({
-                          ...editingTemplate,
-                          perihalDefault: e.target.value,
-                        })
-                      }
-                      placeholder="Contoh: Surat Tugas Operasional"
-                      className="text-xs mt-1"
-                    />
-                  </div>
-                </div>
-
-                {/* Tag Quick Inserter Toolbar */}
-                <div className="p-3 rounded-xl bg-primary/5 border border-primary/20 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-primary flex items-center gap-1.5">
-                      <Sparkles className="h-3.5 w-3.5" />
-                      Sisipkan Tag Placeholder ke Kursor
-                    </span>
-                    <span className="text-[11px] text-muted-foreground">Klik tag untuk menyisipkan ke isi surat</span>
-                  </div>
-
-                  <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto">
-                    {[
-                      ...editingTemplate.placeholders.map((p) => ({ key: p.key, label: `+ {${p.key}}` })),
-                      { key: "nama_lengkap", label: "+ {nama_lengkap}" },
-                      { key: "nik", label: "+ {nik}" },
-                      { key: "nomor_paspor", label: "+ {nomor_paspor}" },
-                      { key: "nama_paket", label: "+ {nama_paket}" },
-                      { key: "tanggal_berangkat", label: "+ {tanggal_berangkat}" },
-                      { key: "tanggal_pulang", label: "+ {tanggal_pulang}" },
-                    ]
-                      .filter((v, idx, arr) => arr.findIndex((t) => t.key === v.key) === idx)
-                      .map((t) => (
-                        <button
-                          key={t.key}
-                          type="button"
-                          onClick={() => handleInsertTag(t.key)}
-                          className="px-2 py-1 rounded bg-background hover:bg-primary/10 hover:text-primary border text-[10px] font-mono text-foreground transition-all shadow-sm"
-                        >
-                          {t.label}
-                        </button>
-                      ))}
-                  </div>
-                </div>
-
-                {/* Textarea Template Body */}
-                <div>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <label className="text-xs font-semibold">Isi / Body Konten Surat</label>
-                    <span className="text-[11px] text-muted-foreground">
-                      Gunakan tanda kurung kurawal &#123;nama_tag&#125; atau &#123;&#123;nama_tag&#125;&#125;
-                    </span>
-                  </div>
-                  <textarea
-                    rows={12}
-                    value={editingTemplate.templateContent}
-                    onChange={(e) =>
-                      setEditingTemplate({ ...editingTemplate, templateContent: e.target.value })
-                    }
-                    className="w-full p-3 font-mono text-xs rounded-xl border bg-background focus:ring-2 focus:ring-primary focus:outline-none leading-relaxed"
-                    placeholder="Tuliskan format isi surat di sini..."
-                  />
-                </div>
-
-                {/* Penandatangan Settings */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 rounded-xl border bg-muted/20">
-                  <div>
-                    <label className="text-xs font-semibold">Nama Penandatangan</label>
-                    <Input
-                      value={editingTemplate.penandatangan.nama}
-                      onChange={(e) =>
-                        setEditingTemplate({
-                          ...editingTemplate,
-                          penandatangan: { ...editingTemplate.penandatangan, nama: e.target.value },
-                        })
-                      }
-                      className="text-xs mt-1"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-xs font-semibold">Jabatan Penandatangan</label>
-                    <Input
-                      value={editingTemplate.penandatangan.jabatan}
-                      onChange={(e) =>
-                        setEditingTemplate({
-                          ...editingTemplate,
-                          penandatangan: { ...editingTemplate.penandatangan, jabatan: e.target.value },
-                        })
-                      }
-                      className="text-xs mt-1"
-                    />
-                  </div>
-                </div>
-
-                {/* Modal Footer in Editor Tab */}
-                <div className="flex justify-end pt-3 border-t">
-                  <Button
-                    type="button"
-                    size="sm"
-                    onClick={handleSaveEditor}
-                    disabled={savingTemplate}
-                    className="text-xs bg-primary text-primary-foreground font-semibold"
-                  >
-                    <Save className="mr-1.5 h-3.5 w-3.5" />
-                    {savingTemplate ? "Menyimpan..." : "Simpan Perubahan Konten"}
-                  </Button>
-                </div>
-              </div>
-            )}
-
-            {/* ── TAB 3: PRATINJAU LEMBAR A4 ── */}
-            {editorActiveTab === "preview" && (
-              <div className="space-y-4 max-h-[72vh] overflow-y-auto pr-1">
-                <div className="p-3 rounded-xl bg-muted/40 border text-xs flex items-center justify-between">
-                  <span className="font-semibold text-muted-foreground">
-                    Pratinjau Lembar Surat A4 (Menggunakan Dummy Data Resolusi Autocrat)
-                  </span>
-                  <Badge variant="success" size="sm">
-                    Autocrat Live Renderer
-                  </Badge>
-                </div>
-
-                {/* Simulated A4 Letter Sheet */}
-                <div className="bg-white text-stone-900 p-8 rounded-xl shadow-md border font-serif text-[13px] leading-relaxed max-w-2xl mx-auto space-y-5">
-                  {/* Kop Surat */}
-                  {editingTemplate.kopSuratType === "ppiu_vtu" && (
-                    <div className="border-b-2 border-stone-900 pb-3 flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <img
-                          src={KOP_SURAT_BASE64}
-                          alt="Kop Surat PT VTU Abadi"
-                          className="h-16 w-auto object-contain"
-                        />
-                        <div>
-                          <h2 className="text-base font-bold tracking-tight text-stone-950 font-sans">
-                            PT. VAUZA TRIKARSA UTAMA
-                          </h2>
-                          <p className="text-[10px] text-stone-600 font-sans font-medium">
-                            Penyelenggara Perjalanan Ibadah Umroh (PPIU) Kemenag RI No. U.400 Tahun 2021
-                          </p>
-                          <p className="text-[9px] text-stone-500 font-sans">
-                            Ruko Gateway Blok C-12, Waru, Sidoarjo &bull; Telp: (031) 854-4455 &bull; info@vtuabadi.com
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Header Meta */}
-                  <div className="flex items-start justify-between text-xs font-sans">
-                    <div className="space-y-0.5">
-                      <p>
-                        <strong>Nomor</strong> :{" "}
-                        {editingTemplate.formatNomor
-                          ? editingTemplate.formatNomor
-                              .replace(/\[NOMOR\]/gi, "001")
-                              .replace(/\[BULAN\]/gi, getTodayDateInfo().romanMonth)
-                              .replace(/\[TAHUN\]/gi, String(getTodayDateInfo().year))
-                              .replace(/\[HARI\]/gi, "31")
-                          : `${editingTemplate.kodeNomorDefault}/001/VTU/${getTodayDateInfo().romanMonth}/${getTodayDateInfo().year}`}
-                      </p>
-                      <p><strong>Lamp</strong>  : {editingTemplate.lampiranDefault || "-"}</p>
-                      <p><strong>Perihal</strong>: <strong>{editingTemplate.perihalDefault}</strong></p>
-                    </div>
-                    <div className="text-right">
-                      <p>Sidoarjo, {getTodayDateInfo().masehi}</p>
-                    </div>
-                  </div>
-
-                  {/* Destination */}
-                  <div className="text-xs font-sans space-y-0.5 pt-1">
-                    <p>{editingTemplate.tujuanDefault || "Kepada Pihak yang Berkepentingan"}</p>
-                    <p>{editingTemplate.kotaTujuanDefault || "Di Tempat"}</p>
-                  </div>
-
-                  {/* Body Content with Merged Data */}
-                  <div className="whitespace-pre-line text-xs font-sans pt-2 leading-relaxed text-justify">
-                    {renderAutocratMergedText(
-                      editingTemplate.templateContent,
-                      resolveAutocratFieldValues(
-                        editingTemplate,
-                        {
-                          namaLengkap: "MUCHAMAD ZAMRONI",
-                          nik: "3515082103850001",
-                          nomorPaspor: "X1234567",
-                          tempatLahir: "Sidoarjo",
-                          tanggalLahir: "1985-03-21",
-                          jenisKelamin: "LAKI-LAKI",
-                          namaAyah: "H. AHMAD SOFWAN",
-                          alamat: "Jl. Raya Taman No. 45, Sidoarjo, Jawa Timur",
-                          nomorTelepon: "081234567890",
-                          registrationId: "REG-2026-0814",
-                        },
-                        {
-                          namaPaket: "Paket Umroh Reguler Awal Musim 1448 H",
-                          kode: "KBR-2026-08-A",
-                          tanggalBerangkat: "2026-09-15",
-                          tanggalPulang: "2026-09-24",
-                          programHari: 9,
-                          maskapai: "Saudia Airlines (SV)",
-                          hotelMekkah: "Pullman Zamzam Makkah",
-                          hotelMadinah: "Rove Al Madinah",
-                        }
-                      )
-                    )}
-                  </div>
-
-                  {/* Signature Section */}
-                  <div className="pt-6 flex items-end justify-between font-sans text-xs">
-                    {editingTemplate.penandatangan.showBarcode && (
-                      <div className="p-2 border rounded-lg flex items-center gap-2 bg-stone-50">
-                        <QrCode className="h-10 w-10 text-stone-800" />
-                        <div className="text-[9px] text-stone-600">
-                          <p className="font-bold">VERIFIKASI RESMI</p>
-                          <p>Scan untuk cek keabsahan surat di portal VTU Abadi</p>
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="text-center min-w-[200px] ml-auto space-y-1">
-                      <p className="font-semibold">PT. VAUZA TRIKARSA UTAMA</p>
-                      <div className="h-16 flex items-center justify-center relative">
-                        {editingTemplate.penandatangan.showStempel && (
-                          <div className="absolute inset-0 flex items-center justify-center opacity-60 pointer-events-none">
-                            <div className="w-16 h-16 rounded-full border-2 border-dashed border-red-600 flex items-center justify-center text-[9px] font-black text-red-600 rotate-[-15deg]">
-                              STEMPEL VTU
-                            </div>
-                          </div>
-                        )}
-                        <span className="italic text-stone-400 text-[10px]">(Tanda Tangan Digital)</span>
-                      </div>
-                      <p className="font-bold underline uppercase">{editingTemplate.penandatangan.nama}</p>
-                      <p className="text-[11px] text-stone-600">{editingTemplate.penandatangan.jabatan}</p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex justify-end pt-3 border-t">
-                  <Button
-                    type="button"
-                    size="sm"
-                    onClick={handleSaveEditor}
-                    disabled={savingTemplate}
-                    className="text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-semibold"
-                  >
-                    <Save className="mr-1.5 h-3.5 w-3.5" />
-                    {savingTemplate ? "Menyimpan..." : "Simpan Konfigurasi"}
-                  </Button>
-                </div>
-              </div>
-            )}
-          </div>
-        </Modal>
-      )}
 
       {/* ── UPLOAD TEMPLATE WIZARD MODAL ── */}
       <Modal
