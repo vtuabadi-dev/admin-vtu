@@ -255,11 +255,17 @@ html.intro-pending body {
 }
 
 .portal-theme h1,
-.portal-theme h2,
-.portal-theme h3 {
+.portal-theme h2 {
   font-family: Georgia, serif !important;
   color: #064e3b !important;
   font-weight: 800 !important;
+}
+
+.portal-theme h3,
+.portal-theme h4,
+.portal-theme h5 {
+  color: #0f172a !important;
+  font-weight: 700 !important;
 }
 
 .portal-theme h1 em,
@@ -272,8 +278,10 @@ html.intro-pending body {
 
 /* Glassmorphism Cards & Panels across all 4 portals */
 .portal-theme .bg-white,
+.portal-theme .bg-white\/70,
 .portal-theme .bg-white\/80,
 .portal-theme .bg-white\/90,
+.portal-theme .bg-white\/95,
 .portal-theme .bg-slate-50,
 .portal-theme .bg-stone-50,
 .portal-theme .bg-muted\/20,
@@ -291,19 +299,27 @@ html.intro-pending body {
 .portal-theme .text-gray-900,
 .portal-theme .text-stone-900,
 .portal-theme .text-foreground {
-  color: #064e3b !important;
+  color: #0f172a !important;
+}
+
+.portal-theme .text-slate-800,
+.portal-theme .text-stone-800,
+.portal-theme .text-gray-800 {
+  color: #1e293b !important;
 }
 
 .portal-theme .text-slate-700,
 .portal-theme .text-slate-600,
 .portal-theme .text-gray-700,
 .portal-theme .text-gray-600,
-.portal-theme .text-gray-500,
-.portal-theme .text-stone-600,
-.portal-theme .text-stone-500 {
+.portal-theme .text-stone-700,
+.portal-theme .text-stone-600 {
   color: #334155 !important;
 }
 
+.portal-theme .text-slate-500,
+.portal-theme .text-stone-500,
+.portal-theme .text-gray-500,
 .portal-theme .text-muted-foreground {
   color: #64748b !important;
 }
