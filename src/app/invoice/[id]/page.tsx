@@ -181,38 +181,38 @@ export default function PublicInvoicePage({ params }: { params: Promise<{ id: st
         {/* Main Printable Content Area */}
         <div className="px-6 pt-5 pb-1 flex-1 flex flex-col justify-between">
           
-          {/* ─── 1. HEADER (Logo Left + Invoice & Meta Right) ─── */}
-          <div className="flex justify-between items-start pb-2.5 border-b border-stone-800">
-            {/* Top-Left: Real Logo with 5 red dots */}
-            <div className="pt-0.5">
+          {/* ─── 1. HEADER (Logo Left + Vertical Stack Right) ─── */}
+          <div className="flex justify-between items-start pb-2 border-b border-stone-800">
+            {/* Top-Left: Real Logo anchored at top left */}
+            <div className="pt-0">
               <img
                 src="/assets/vauza-tamma-logo.png"
                 alt="Vauza Tamma Haji & Umroh"
-                className="h-[58px] w-auto object-contain"
+                className="h-[60px] w-auto object-contain"
                 onError={(e) => {
                   (e.target as HTMLElement).style.display = "none";
                 }}
               />
             </div>
 
-            {/* Top-Right: INVOICE Title & Metadata Table */}
-            <div className="text-right flex flex-col items-end">
+            {/* Top-Right: Strict Vertical Stack: INVOICE -> NOMOR INVOICE -> TANGGAL INVOICE + JATUH TEMPO */}
+            <div className="flex flex-col items-end w-[195px] shrink-0">
               <h1
-                className="text-[28px] leading-none font-black tracking-wider text-[#064e3b] font-serif"
+                className="text-[28px] leading-none font-black tracking-wider text-[#064e3b] font-serif pr-0.5"
                 style={{ fontFamily: "'Times New Roman', Georgia, serif" }}
               >
                 INVOICE
               </h1>
 
               {/* Green Bar Invoice Number */}
-              <div className="mt-1.5 bg-[#064e3b] text-white font-mono text-[11px] font-bold px-4 py-1 rounded-md text-center tracking-wide inline-block">
+              <div className="w-full mt-1 bg-[#064e3b] text-white font-mono text-[10.5px] font-bold py-1 rounded-md text-center tracking-wide">
                 {data?.invoiceNumber || "INV.VT/2026/VIII/00045"}
               </div>
 
               {/* Date Metadata Table */}
-              <div className="mt-1.5 border border-[#064e3b] rounded-md overflow-hidden text-[10px] w-[185px]">
+              <div className="w-full mt-1.5 border border-[#064e3b] rounded-md overflow-hidden text-[9.5px]">
                 <div className="flex border-b border-[#064e3b]/30">
-                  <div className="w-[85px] bg-[#064e3b] text-white font-bold px-2 py-0.5 text-left">
+                  <div className="w-[88px] bg-[#064e3b] text-white font-bold px-2 py-0.5 text-left shrink-0">
                     Tanggal Invoice
                   </div>
                   <div className="flex-1 bg-white text-stone-900 font-semibold px-2 py-0.5 text-left">
@@ -220,7 +220,7 @@ export default function PublicInvoicePage({ params }: { params: Promise<{ id: st
                   </div>
                 </div>
                 <div className="flex">
-                  <div className="w-[85px] bg-[#064e3b] text-white font-bold px-2 py-0.5 text-left">
+                  <div className="w-[88px] bg-[#064e3b] text-white font-bold px-2 py-0.5 text-left shrink-0">
                     Jatuh Tempo
                   </div>
                   <div className="flex-1 bg-white text-stone-900 font-semibold px-2 py-0.5 text-left">
@@ -332,21 +332,21 @@ export default function PublicInvoicePage({ params }: { params: Promise<{ id: st
             <div className="border border-stone-300 rounded-b-md rounded-tr-md overflow-hidden text-[10px]">
               <table className="w-full text-left border-collapse">
                 <thead>
-                  <tr className="bg-white border-b border-stone-300 text-stone-900 font-bold text-[10px]">
-                    <th className="py-1 px-2.5 text-center w-10 border-r border-stone-200">No.</th>
-                    <th className="py-1 px-3 border-r border-stone-200">Uraian</th>
-                    <th className="py-1 px-3 text-center w-[120px] border-r border-stone-200">Harga Satuan (Rp)</th>
-                    <th className="py-1 px-3 text-center w-[75px] border-r border-stone-200">Quantity</th>
-                    <th className="py-1 px-3 text-right w-[130px]">Jumlah (Rp)</th>
+                  <tr className="bg-white border-b border-stone-300 text-stone-900 font-bold text-[10px] h-[28px]">
+                    <th className="py-1 px-2.5 text-center w-10 border-r border-stone-200 align-middle">No.</th>
+                    <th className="py-1 px-3 border-r border-stone-200 align-middle">Uraian</th>
+                    <th className="py-1 px-3 text-center w-[120px] border-r border-stone-200 align-middle">Harga Satuan (Rp)</th>
+                    <th className="py-1 px-3 text-center w-[75px] border-r border-stone-200 align-middle">Quantity</th>
+                    <th className="py-1 px-3 text-right w-[130px] align-middle">Jumlah (Rp)</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-stone-200 text-stone-900">
-                  <tr>
-                    <td className="py-1.5 px-2.5 text-center border-r border-stone-200">1</td>
-                    <td className="py-1.5 px-3 font-semibold border-r border-stone-200">{data?.namaPaket || "Paket Umroh Plus 12 Hari"}</td>
-                    <td className="py-1.5 px-3 text-center border-r border-stone-200 font-mono">{formatRp(unitPrice)}</td>
-                    <td className="py-1.5 px-3 text-center border-r border-stone-200 font-mono">{paxCount} Pax</td>
-                    <td className="py-1.5 px-3 text-right font-mono font-bold">{formatRp(subtotalBase)}</td>
+                  <tr className="h-[30px]">
+                    <td className="py-1 px-2.5 text-center border-r border-stone-200 align-middle font-mono">1</td>
+                    <td className="py-1 px-3 font-semibold border-r border-stone-200 align-middle">{data?.namaPaket || "Paket Umroh Plus 12 Hari"}</td>
+                    <td className="py-1 px-3 text-center border-r border-stone-200 font-mono align-middle">{formatRp(unitPrice)}</td>
+                    <td className="py-1 px-3 text-center border-r border-stone-200 font-mono align-middle">{paxCount} Pax</td>
+                    <td className="py-1 px-3 text-right font-mono font-bold align-middle">{formatRp(subtotalBase)}</td>
                   </tr>
                 </tbody>
               </table>
@@ -365,32 +365,32 @@ export default function PublicInvoicePage({ params }: { params: Promise<{ id: st
             <div className="border border-stone-300 rounded-b-md rounded-tr-md overflow-hidden text-[10px]">
               <table className="w-full text-left border-collapse">
                 <thead>
-                  <tr className="bg-white border-b border-stone-300 text-stone-900 font-bold text-[10px]">
-                    <th className="py-1 px-2.5 text-center w-10 border-r border-stone-200">No.</th>
-                    <th className="py-1 px-3 w-[110px] border-r border-stone-200">Tanggal</th>
-                    <th className="py-1 px-3 border-r border-stone-200">Metode Pembayaran</th>
-                    <th className="py-1 px-3 text-center w-[120px] border-r border-stone-200">Nominal (Rp)</th>
-                    <th className="py-1 px-3 text-left w-[130px]">Keterangan</th>
+                  <tr className="bg-white border-b border-stone-300 text-stone-900 font-bold text-[10px] h-[28px]">
+                    <th className="py-1 px-2.5 text-center w-10 border-r border-stone-200 align-middle">No.</th>
+                    <th className="py-1 px-3 w-[110px] border-r border-stone-200 align-middle">Tanggal</th>
+                    <th className="py-1 px-3 border-r border-stone-200 align-middle">Metode Pembayaran</th>
+                    <th className="py-1 px-3 text-center w-[120px] border-r border-stone-200 align-middle">Nominal (Rp)</th>
+                    <th className="py-1 px-3 text-left w-[130px] align-middle">Keterangan</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-stone-200 text-stone-900">
                   {data?.paymentHistory && data.paymentHistory.length > 0 ? (
                     data.paymentHistory.map((p, idx) => (
-                      <tr key={idx}>
-                        <td className="py-1 px-2.5 text-center border-r border-stone-200">{idx + 1}</td>
-                        <td className="py-1 px-3 border-r border-stone-200">{p.tanggal}</td>
-                        <td className="py-1 px-3 border-r border-stone-200">{p.metode}</td>
-                        <td className="py-1 px-3 text-center font-mono font-medium border-r border-stone-200">{formatRp(p.nominal)}</td>
-                        <td className="py-1 px-3 text-stone-800">{idx === 0 ? "DP Pendaftaran" : `Pelunasan Tahap ${idx}`}</td>
+                      <tr key={idx} className="h-[28px]">
+                        <td className="py-1 px-2.5 text-center border-r border-stone-200 align-middle font-mono">{idx + 1}</td>
+                        <td className="py-1 px-3 border-r border-stone-200 align-middle">{p.tanggal}</td>
+                        <td className="py-1 px-3 border-r border-stone-200 align-middle">{p.metode}</td>
+                        <td className="py-1 px-3 text-center font-mono font-medium border-r border-stone-200 align-middle">{formatRp(p.nominal)}</td>
+                        <td className="py-1 px-3 text-stone-800 align-middle">{idx === 0 ? "DP Pendaftaran" : `Pelunasan Tahap ${idx}`}</td>
                       </tr>
                     ))
                   ) : (
-                    <tr>
-                      <td className="py-1 px-2.5 text-center border-r border-stone-200">1</td>
-                      <td className="py-1 px-3 border-r border-stone-200">{data?.invoiceDate || "20 Juni 2026"}</td>
-                      <td className="py-1 px-3 border-r border-stone-200">{data?.bank ? `Transfer Bank ${data.bank}` : "Transfer Bank BCA"}</td>
-                      <td className="py-1 px-3 text-center font-mono font-medium border-r border-stone-200">{formatRp(data?.nominal || 20000000)}</td>
-                      <td className="py-1 px-3 text-stone-800">DP Pendaftaran</td>
+                    <tr className="h-[28px]">
+                      <td className="py-1 px-2.5 text-center border-r border-stone-200 align-middle font-mono">1</td>
+                      <td className="py-1 px-3 border-r border-stone-200 align-middle">{data?.invoiceDate || "20 Juni 2026"}</td>
+                      <td className="py-1 px-3 border-r border-stone-200 align-middle">{data?.bank ? `Transfer Bank ${data.bank}` : "Transfer Bank BCA"}</td>
+                      <td className="py-1 px-3 text-center font-mono font-medium border-r border-stone-200 align-middle">{formatRp(data?.nominal || 20000000)}</td>
+                      <td className="py-1 px-3 text-stone-800 align-middle">DP Pendaftaran</td>
                     </tr>
                   )}
                 </tbody>
