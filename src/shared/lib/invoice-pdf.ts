@@ -207,14 +207,22 @@ export function generateInvoicePdf(data: InvoicePdfData): jsPDF {
   const halfW = (contentWidth - 4) / 2;
 
   // Left: [ DATA PENDAFTAR ]━━━━━━━━━━━━━
-  const dpBadgeW = 34;
+  const dpBadgeW = 37;
   doc.setFillColor(...GREEN);
   doc.roundedRect(marginX, boxY, dpBadgeW, 4.5, 0.8, 0.8, "F");
   doc.rect(marginX, boxY + 2, dpBadgeW, 2.5, "F");
+
+  // User icon vector in white
+  doc.setFillColor(255, 255, 255);
+  doc.setDrawColor(255, 255, 255);
+  doc.circle(marginX + 3.2, boxY + 1.8, 0.8, "FD");
+  doc.setLineWidth(0.4);
+  doc.line(marginX + 2.1, boxY + 3.8, marginX + 4.3, boxY + 3.8);
+
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(7);
+  doc.setFontSize(6.8);
   doc.setTextColor(255, 255, 255);
-  doc.text("DATA PENDAFTAR", marginX + 3, boxY + 3.2);
+  doc.text("DATA PENDAFTAR", marginX + 5.5, boxY + 3.2);
 
   doc.setFillColor(...GREEN);
   doc.rect(marginX + dpBadgeW, boxY + 3.3, halfW - dpBadgeW, 1.2, "F");
@@ -265,15 +273,23 @@ export function generateInvoicePdf(data: InvoicePdfData): jsPDF {
 
   // Right: [ DETAIL PAKET UMROH ]━━━━━━━━━
   const rightX = marginX + halfW + 4;
-  const rpBadgeW = 38;
+  const rpBadgeW = 41;
 
   doc.setFillColor(...GREEN);
   doc.roundedRect(rightX, boxY, rpBadgeW, 4.5, 0.8, 0.8, "F");
   doc.rect(rightX, boxY + 2, rpBadgeW, 2.5, "F");
+
+  // Gift icon vector in white
+  doc.setDrawColor(255, 255, 255);
+  doc.setLineWidth(0.35);
+  doc.rect(rightX + 2.0, boxY + 1.8, 2.6, 2.2, "S");
+  doc.line(rightX + 3.3, boxY + 1.8, rightX + 3.3, boxY + 4.0);
+  doc.line(rightX + 2.0, boxY + 2.7, rightX + 4.6, boxY + 2.7);
+
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(7);
+  doc.setFontSize(6.8);
   doc.setTextColor(255, 255, 255);
-  doc.text("DETAIL PAKET UMROH", rightX + 3, boxY + 3.2);
+  doc.text("DETAIL PAKET UMROH", rightX + 5.6, boxY + 3.2);
 
   doc.setFillColor(...GREEN);
   doc.rect(rightX + rpBadgeW, boxY + 3.3, halfW - rpBadgeW, 1.2, "F");
