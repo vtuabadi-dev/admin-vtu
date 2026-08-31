@@ -232,6 +232,38 @@ Wassalamu'alaikum Warahmatullahi Wabarakatuh.`,
     showToast(`Template "${tpl.nama}" berhasil dihapus`);
   };
 
+  // Handle toggle QR Code verification per template
+  const handleToggleQrCode = async (tpl: SuratTemplate) => {
+    const updatedStatus = !tpl.penandatangan.showBarcode;
+    const updated = templates.map((t) =>
+      t.id === tpl.id
+        ? {
+            ...t,
+            penandatangan: {
+              ...t.penandatangan,
+              showBarcode: updatedStatus,
+            },
+            updatedAt: new Date().toISOString(),
+          }
+        : t
+    );
+    setTemplates(updated);
+    saveSuratTemplates(updated);
+    try {
+      const updatedTpl = updated.find((t) => t.id === tpl.id);
+      if (updatedTpl) {
+        await fetch("/api/master/surat-templates", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(updatedTpl),
+        });
+      }
+    } catch {}
+    showToast(
+      `QR Code verifikasi pada "${tpl.nama}" ${updatedStatus ? "diaktifkan [✓]" : "dinonaktifkan [✕]"}`
+    );
+  };
+
   // Handle reset to default templates
   const handleResetDefaults = () => {
     if (!window.confirm("Kembalikan seluruh template bawaan PPIU PT. VTU Abadi ke pengaturan awal?")) return;
@@ -704,6 +736,55 @@ Wassalamu'alaikum Warahmatullahi Wabarakatuh.`,
                       )}
                     </div>
                   </div>
+
+                  {/* QR Code Verification Per-Template Switch Row */}
+                  <div className="flex items-center justify-between p-2.5 rounded-lg bg-stone-50 dark:bg-stone-900/60 border border-stone-200/80 dark:border-stone-800/80">
+                    <div className="flex items-center gap-2">
+                      <div
+                        className={cn(
+                          "p-1.5 rounded-md transition-colors",
+                          tpl.penandatangan.showBarcode
+                            ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                            : "bg-stone-200/60 dark:bg-stone-800 text-muted-foreground"
+                        )}
+                      >
+                        <QrCode className="h-4 w-4" />
+                      </div>
+                      <div>
+                        <p className="text-[11px] font-semibold text-foreground">QR Code Verifikasi</p>
+                        <p className="text-[9px] text-muted-foreground">
+                          {tpl.penandatangan.showBarcode ? "Aktif di lembar surat" : "Dinonaktifkan"}
+                        </p>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={tpl.penandatangan.showBarcode}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleToggleQrCode(tpl);
+                      }}
+                      className={cn(
+                        "relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none",
+                        tpl.penandatangan.showBarcode ? "bg-emerald-500" : "bg-stone-300 dark:bg-stone-700"
+                      )}
+                      title={
+                        tpl.penandatangan.showBarcode
+                          ? "Klik untuk menonaktifkan QR Code verifikasi"
+                          : "Klik untuk mengaktifkan QR Code verifikasi"
+                      }
+                    >
+                      <span
+                        aria-hidden="true"
+                        className={cn(
+                          "pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out",
+                          tpl.penandatangan.showBarcode ? "translate-x-4" : "translate-x-0"
+                        )}
+                      />
+                    </button>
+                  </div>
                 </div>
 
                 {/* Card Footer Actions */}
@@ -971,36 +1052,119 @@ Wassalamu'alaikum Warahmatullahi Wabarakatuh.`,
                     />
                   </div>
 
-                  <div className="flex items-center gap-4 sm:col-span-2 pt-1">
-                    <label className="flex items-center gap-2 cursor-pointer text-xs font-medium">
-                      <input
-                        type="checkbox"
-                        checked={editingTemplate.penandatangan.showStempel}
-                        onChange={(e) =>
-                          setEditingTemplate({
-                            ...editingTemplate,
-                            penandatangan: { ...editingTemplate.penandatangan, showStempel: e.target.checked },
-                          })
-                        }
-                        className="rounded text-primary"
-                      />
-                      <span>Tampilkan Stempel Resmi VTU Abadi</span>
-                    </label>
+                  {/* Modern Toggle Switch: QR Code Verifikasi Keaslian Surat */}
+                  <div className="p-4 rounded-xl border border-emerald-500/30 bg-emerald-500/5 dark:bg-emerald-950/20 sm:col-span-2 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="flex items-start gap-3">
+                      <div
+                        className={cn(
+                          "p-2 rounded-lg mt-0.5 transition-colors",
+                          editingTemplate.penandatangan.showBarcode
+                            ? "bg-emerald-500/20 text-emerald-600 dark:text-emerald-400"
+                            : "bg-stone-200 dark:bg-stone-800 text-muted-foreground"
+                        )}
+                      >
+                        <QrCode className="h-5 w-5" />
+                      </div>
+                      <div className="space-y-0.5">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-bold text-foreground">
+                            Tampilkan QR Code Verifikasi Keaslian Surat
+                          </span>
+                          <Badge
+                            variant={editingTemplate.penandatangan.showBarcode ? "success" : "muted"}
+                            size="sm"
+                            className="text-[9px]"
+                          >
+                            {editingTemplate.penandatangan.showBarcode ? "AKTIF [✓]" : "NONAKTIF [✕]"}
+                          </Badge>
+                        </div>
+                        <p className="text-[11px] text-muted-foreground leading-relaxed">
+                          Mencetak barcode digital QR Code di bagian bawah surat yang dapat discan oleh instansi (Imigrasi, Maskapai, Perusahaan) untuk memverifikasi keaslian dokumen secara online di portal <span className="font-mono text-emerald-600 dark:text-emerald-400">/track/surat</span>.
+                        </p>
+                      </div>
+                    </div>
 
-                    <label className="flex items-center gap-2 cursor-pointer text-xs font-medium">
-                      <input
-                        type="checkbox"
-                        checked={editingTemplate.penandatangan.showBarcode}
-                        onChange={(e) =>
-                          setEditingTemplate({
-                            ...editingTemplate,
-                            penandatangan: { ...editingTemplate.penandatangan, showBarcode: e.target.checked },
-                          })
-                        }
-                        className="rounded text-primary"
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={editingTemplate.penandatangan.showBarcode}
+                      onClick={() =>
+                        setEditingTemplate({
+                          ...editingTemplate,
+                          penandatangan: {
+                            ...editingTemplate.penandatangan,
+                            showBarcode: !editingTemplate.penandatangan.showBarcode,
+                          },
+                        })
+                      }
+                      className={cn(
+                        "relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none self-end sm:self-center",
+                        editingTemplate.penandatangan.showBarcode ? "bg-emerald-500" : "bg-stone-300 dark:bg-stone-700"
+                      )}
+                      title="Klik untuk mengaktifkan / menonaktifkan QR Code"
+                    >
+                      <span
+                        aria-hidden="true"
+                        className={cn(
+                          "pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out",
+                          editingTemplate.penandatangan.showBarcode ? "translate-x-5" : "translate-x-0"
+                        )}
                       />
-                      <span>Tampilkan QR Code Verifikasi Keaslian Surat</span>
-                    </label>
+                    </button>
+                  </div>
+
+                  {/* Modern Toggle Switch: Stempel Resmi */}
+                  <div className="p-4 rounded-xl border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-900/40 sm:col-span-2 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="flex items-start gap-3">
+                      <div className="p-2 rounded-lg bg-primary/10 text-primary mt-0.5">
+                        <Building2 className="h-5 w-5" />
+                      </div>
+                      <div className="space-y-0.5">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-bold text-foreground">
+                            Tampilkan Stempel Resmi VTU Abadi
+                          </span>
+                          <Badge
+                            variant={editingTemplate.penandatangan.showStempel ? "info" : "muted"}
+                            size="sm"
+                            className="text-[9px]"
+                          >
+                            {editingTemplate.penandatangan.showStempel ? "AKTIF [✓]" : "NONAKTIF [✕]"}
+                          </Badge>
+                        </div>
+                        <p className="text-[11px] text-muted-foreground leading-relaxed">
+                          Mencantumkan stempel digital resmi PPIU PT Vauza Trikarsa Utama di atas tanda tangan pimpinan.
+                        </p>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={editingTemplate.penandatangan.showStempel}
+                      onClick={() =>
+                        setEditingTemplate({
+                          ...editingTemplate,
+                          penandatangan: {
+                            ...editingTemplate.penandatangan,
+                            showStempel: !editingTemplate.penandatangan.showStempel,
+                          },
+                        })
+                      }
+                      className={cn(
+                        "relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none self-end sm:self-center",
+                        editingTemplate.penandatangan.showStempel ? "bg-primary" : "bg-stone-300 dark:bg-stone-700"
+                      )}
+                      title="Klik untuk mengaktifkan / menonaktifkan Stempel Resmi"
+                    >
+                      <span
+                        aria-hidden="true"
+                        className={cn(
+                          "pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out",
+                          editingTemplate.penandatangan.showStempel ? "translate-x-5" : "translate-x-0"
+                        )}
+                      />
+                    </button>
                   </div>
                 </div>
               </div>

@@ -82,6 +82,7 @@ function GenerateSuratPageContent() {
   const [customTujuan, setCustomTujuan] = useState<string>("");
   const [customKotaTujuan, setCustomKotaTujuan] = useState<string>("");
   const [customLampiran, setCustomLampiran] = useState<string>("");
+  const [customShowBarcode, setCustomShowBarcode] = useState<boolean | null>(null);
 
   // History state
   const [historyLogs, setHistoryLogs] = useState<GeneratedSuratLog[]>([]);
@@ -206,10 +207,11 @@ function GenerateSuratPageContent() {
   // Reset form when template changes
   useEffect(() => {
     if (activeTemplate) {
-      setCustomPerihal(activeTemplate.perihalDefault);
-      setCustomTujuan(activeTemplate.tujuanDefault || "Kepada Pihak yang Berkepentingan");
-      setCustomKotaTujuan(activeTemplate.kotaTujuanDefault || "Di Tempat");
-      setCustomLampiran(activeTemplate.lampiranDefault || "-");
+      setCustomPerihal(activeTemplate.perihalDefault || "");
+      setCustomTujuan(activeTemplate.tujuanDefault || "");
+      setCustomKotaTujuan(activeTemplate.kotaTujuanDefault || "");
+      setCustomLampiran(activeTemplate.lampiranDefault || "");
+      setCustomShowBarcode(null);
 
       // Populate default manual values
       const initialManual: Record<string, string> = {};
@@ -228,6 +230,12 @@ function GenerateSuratPageContent() {
     const prefix = activeTemplate?.kodeNomorDefault || "SR-PASPOR";
     return `${prefix}/${nomorUrutSurat}/VTU/${todayInfo.romanMonth}/${todayInfo.year}`;
   }, [activeTemplate, nomorUrutSurat, todayInfo]);
+
+  // Effective QR Code visibility
+  const effectiveShowBarcode =
+    customShowBarcode !== null
+      ? customShowBarcode
+      : (activeTemplate?.penandatangan?.showBarcode ?? true);
 
   // Autocrat Merged Field Values
   const resolvedFieldValues = useMemo(() => {
@@ -857,6 +865,26 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
                   </div>
 
                   <div className="flex items-center gap-1.5">
+                    {/* Live QR Code Toggle Button */}
+                    <button
+                      type="button"
+                      onClick={() => setCustomShowBarcode(!effectiveShowBarcode)}
+                      className={cn(
+                        "inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold border transition-all cursor-pointer",
+                        effectiveShowBarcode
+                          ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20"
+                          : "bg-stone-100 dark:bg-stone-800 text-stone-500 border-stone-300 dark:border-stone-700 hover:bg-stone-200"
+                      )}
+                      title={
+                        effectiveShowBarcode
+                          ? "QR Code Verifikasi Aktif pada surat ini. Klik untuk mematikan."
+                          : "QR Code Verifikasi Dimatikan. Klik untuk mengaktifkan."
+                      }
+                    >
+                      <QrCode className="h-3.5 w-3.5" />
+                      <span>QR Code: {effectiveShowBarcode ? "Aktif [✓]" : "Nonaktif [✕]"}</span>
+                    </button>
+
                     <Button
                       variant="outline"
                       size="sm"
@@ -948,7 +976,7 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
                 {/* Signature & QR Code Verification */}
                 <div className="pt-8 flex items-end justify-between font-sans text-xs">
                   {/* QR Code Barcode Verification */}
-                  {activeTemplate.penandatangan.showBarcode && (
+                  {effectiveShowBarcode && (
                     <div className="p-2.5 border border-stone-300 rounded-xl flex items-center gap-2.5 bg-stone-50 max-w-[240px]">
                       <QrCode className="h-12 w-12 text-stone-900 shrink-0" />
                       <div className="text-[9px] text-stone-700 leading-tight">
