@@ -1,5 +1,6 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { VAUZA_TAMMA_LOGO_BASE64 } from "./invoice-logo";
 
 export interface InvoiceOrderItem {
   id: string;
@@ -18,29 +19,29 @@ export interface InvoicePaymentRecord {
 }
 
 export interface InvoicePdfData {
-  invoiceNumber: string; // e.g. "3987/INV.VT/VIII/2026"
-  invoiceDate?: string; // e.g. "24/08/2026"
+  invoiceNumber: string; // e.g. "INV.VT/2026/VIII/00045"
+  invoiceDate?: string; // e.g. "18 Juli 2026"
   idReg?: string; // e.g. "3575"
   kode?: string; // e.g. "104"
   noForm?: string;
-  namaGroup: string; // e.g. "FARIDATUL MAQFIROH"
-  alamat?: string; // e.g. "DSN KAUMAN, 010/006, KALIPARE, KEC. KALIPARE, KAB. MALANG / JAWA TIMUR"
-  telepon?: string; // e.g. "+62 812-3370-2021"
+  namaGroup: string; // e.g. "Bapak Ahmad Firdaus"
+  alamat?: string;
+  telepon?: string; // e.g. "0812-1234-5678"
   kodeRegistrasi: string;
-  namaPaket?: string; // e.g. "PAKET UMROH 10 H SBY ( JED.C ) - 16 Okt 2026 (SV)"
+  namaPaket?: string; // e.g. "Umroh Plus 12 Hari"
   tipePaket?: string; // e.g. "SILVER" | "GOLD"
-  jumlahPax?: number; // e.g. 2
-  hargaSatuanPaket?: number; // e.g. 37400000
+  jumlahPax?: number; // e.g. 4
+  hargaSatuanPaket?: number; // e.g. 25700000
   tanggalBerangkat?: string;
-  hotelMekkah?: string; // e.g. "GRAND AL MASSA"
-  hotelMadinah?: string; // e.g. "DURRAT AL EIMAN"
+  hotelMekkah?: string; // e.g. "Pullman ZamZam Makkah"
+  hotelMadinah?: string; // e.g. "Anwar Al Madinah Mövenpick"
   anggota?: string[]; // e.g. ["WINARJI", "FARIDATUL MAQFIROH"]
   orderItems?: InvoiceOrderItem[];
   paymentHistory?: InvoicePaymentRecord[];
   totalTagihan?: number;
   totalPembayaran?: number;
   sisaTagihan?: number;
-  maksimalPelunasan?: string; // e.g. "6 September 2026"
+  maksimalPelunasan?: string; // e.g. "17 Agustus 2026"
   picName?: string;
   picPhone?: string;
   picEmail?: string;
@@ -106,355 +107,498 @@ export function generateInvoicePdf(data: InvoicePdfData): jsPDF {
 
   const pageWidth = 210;
   const pageHeight = 297;
-  const marginX = 14;
-  const contentWidth = pageWidth - marginX * 2; // 182mm
+  const marginX = 12;
+  const contentWidth = pageWidth - marginX * 2; // 186mm
 
-  // ══════════════════════════════════════════════════════════════
-  // PAGE 1: KWITANSI RESMI VAUZA TAMMA
-  // ══════════════════════════════════════════════════════════════
+  const fmtRp = (n: number) => n.toLocaleString("id-ID");
 
-  // ── 1. Top Header: Logo & Company (Left) ─────────────────────
-  // Logo Circle Accent Graphic
-  doc.setDrawColor(220, 38, 38); // Red
-  doc.setLineWidth(0.8);
-  doc.circle(20, 16, 4.5, "S");
-  doc.setDrawColor(5, 150, 105); // Green
-  doc.circle(23, 17, 3.5, "S");
-  doc.setDrawColor(37, 99, 235); // Blue
-  doc.circle(18, 18, 3.5, "S");
-
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(13);
-  doc.setTextColor(15, 23, 42);
-  doc.text("Vauza Tamma", 30, 15);
-
-  doc.setFontSize(9.5);
-  doc.setTextColor(30, 41, 59);
-  doc.text("HAJI & UMROH", 30, 19.5);
-
-  doc.setFontSize(6.5);
-  doc.setTextColor(13, 148, 136); // Teal
-  doc.text("IZIN PPIU NO.U493 TAHUN 2021", 30, 23.5);
-
-  // ── Top Header: Kwitansi Box (Right) ─────────────────────────
-  const kwitansiX = 138;
-  const kwitansiWidth = 58;
-
-  doc.setFont("times", "bold");
-  doc.setFontSize(17);
-  doc.setTextColor(15, 23, 42);
-  doc.text("KWITANSI", kwitansiX + kwitansiWidth / 2, 13.5, { align: "center" });
-
-  // Green Invoice Number Box
-  doc.setFillColor(22, 101, 52); // Dark Green #166534
-  doc.rect(kwitansiX, 15.5, kwitansiWidth, 5.5, "F");
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(8.5);
-  doc.setTextColor(255, 255, 255);
-  doc.text(data.invoiceNumber || "3987/INV.VT/VIII/2026", kwitansiX + kwitansiWidth / 2, 19.3, {
-    align: "center",
-  });
-
-  // Metadata Table (TANGGAL, ID REG, KODE, NO. FORM)
-  const metaY = 21;
-  const metaH = 15;
-  doc.setDrawColor(180, 180, 180);
-  doc.setLineWidth(0.3);
-  doc.rect(kwitansiX, metaY, kwitansiWidth, metaH, "S");
-
-  // Grid lines
-  doc.line(kwitansiX, metaY + 3.8, kwitansiX + kwitansiWidth, metaY + 3.8);
-  doc.line(kwitansiX, metaY + 7.6, kwitansiX + kwitansiWidth, metaY + 7.6);
-  doc.line(kwitansiX, metaY + 11.4, kwitansiX + kwitansiWidth, metaY + 11.4);
-  doc.line(kwitansiX + 22, metaY, kwitansiX + 22, metaY + metaH);
-
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(7);
-  doc.setTextColor(50, 50, 50);
-
-  doc.text("TANGGAL", kwitansiX + 2, metaY + 2.8);
-  doc.text(":", kwitansiX + 20, metaY + 2.8);
-  doc.setFont("helvetica", "normal");
-  doc.text(data.invoiceDate || new Date().toLocaleDateString("id-ID"), kwitansiX + 24, metaY + 2.8);
-
-  doc.setFont("helvetica", "bold");
-  doc.text("ID REG", kwitansiX + 2, metaY + 6.6);
-  doc.text(":", kwitansiX + 20, metaY + 6.6);
-  doc.setFont("helvetica", "normal");
-  doc.text(data.idReg || data.kodeRegistrasi?.replace(/[^0-9]/g, "").slice(-4) || "3575", kwitansiX + 24, metaY + 6.6);
-
-  doc.setFont("helvetica", "bold");
-  doc.text("KODE", kwitansiX + 2, metaY + 10.4);
-  doc.text(":", kwitansiX + 20, metaY + 10.4);
-  doc.setFont("helvetica", "normal");
-  doc.text(data.kode || data.kodeRegistrasi?.slice(-3) || "104", kwitansiX + 24, metaY + 10.4);
-
-  doc.setFont("helvetica", "bold");
-  doc.text("NO. FORM", kwitansiX + 2, metaY + 14.2);
-  doc.text(":", kwitansiX + 20, metaY + 14.2);
-  doc.setFillColor(22, 101, 52);
-  doc.rect(kwitansiX + 23, metaY + 11.8, kwitansiWidth - 24, 2.8, "F");
-
-  // ── 2. Information Block: Kepada Yth Bapak/Ibu ──────────────
-  const infoY = 38;
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(8.5);
-  doc.setTextColor(20, 20, 20);
-
-  doc.text("Kepada", marginX, infoY);
-  doc.text("Yth Bapak/ Ibu", marginX, infoY + 4.5);
-
-  doc.text("Nama", marginX, infoY + 9.5);
-  doc.text(":", marginX + 26, infoY + 9.5);
-  doc.setFont("helvetica", "bold");
-  doc.text((data.namaGroup || data.picName || "BAPAK/IBU JAMAAH").toUpperCase(), marginX + 30, infoY + 9.5);
-
-  doc.setFont("helvetica", "normal");
-  doc.text("Alamat", marginX, infoY + 14);
-  doc.text(":", marginX + 26, infoY + 14);
-  const alamatStr = data.alamat || "DSN KAUMAN, 010/006, KALIPARE, KEC. KALIPARE, KAB. MALANG";
-  const telpStr = data.telepon || data.picPhone ? ` / ${data.telepon || data.picPhone}` : "";
-  doc.text(`${alamatStr}${telpStr}`, marginX + 30, infoY + 14);
-
-  doc.setFont("helvetica", "bold");
-  doc.text("Paket Umroh", marginX, infoY + 19.5);
-  doc.text(":", marginX + 26, infoY + 19.5);
-  const paketNama = (data.namaPaket || "PAKET UMROH VTU ABADI").toUpperCase();
-  const tipeStr = data.tipePaket ? `( ${data.tipePaket.toUpperCase()} )` : "( REGULER )";
-  doc.text(`${paketNama}`, marginX + 30, infoY + 19.5);
-  doc.text(tipeStr, pageWidth - marginX - 22, infoY + 19.5);
-
-  doc.text("Jumlah", marginX, infoY + 24.5);
-  doc.text(":", marginX + 26, infoY + 24.5);
+  // Derived values
   const paxCount = data.jumlahPax || data.anggota?.length || 2;
-  doc.text(`${paxCount} Pax`, marginX + 30, infoY + 24.5);
-
-  // ── 3. Table 1: Rincian Paket & Tagihan ──────────────────────
   const unitPrice = data.hargaSatuanPaket || Math.round((data.totalTagihan || 74800000) / paxCount);
   const subtotalBase = unitPrice * paxCount;
+  const finalTotalTagihan = data.totalTagihanDisesuaikan || data.totalTagihan || subtotalBase;
+  const finalTotalBayar = data.totalPembayaran || data.nominal || 0;
+  const finalSisaTagihan = data.sisaTagihan !== undefined ? data.sisaTagihan : Math.max(0, finalTotalTagihan - finalTotalBayar);
+  const isLunas = finalSisaTagihan <= 0;
 
+  const GREEN: [number, number, number] = [22, 101, 52]; // #166534
+
+  // ══════════════════════════════════════════════════════════════
+  // PAGE 1: INVOICE RESMI PT VAUZA TAMMA ABADI
+  // ══════════════════════════════════════════════════════════════
+
+  // ── 1. Header: Logo (Left) + INVOICE (Right) ────────────────
+  try {
+    doc.addImage(VAUZA_TAMMA_LOGO_BASE64, "PNG", marginX, 10, 52, 20);
+  } catch {
+    // Fallback if logo fails to load
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(14);
+    doc.setTextColor(15, 23, 42);
+    doc.text("Vauza Tamma", marginX, 18);
+    doc.setFontSize(9);
+    doc.text("HAJI & UMROH", marginX, 22);
+    doc.setFontSize(6.5);
+    doc.setTextColor(13, 148, 136);
+    doc.text("IZIN PPIU NO.U493 TAHUN 2021", marginX, 26);
+  }
+
+  // INVOICE title (right)
+  doc.setFont("times", "bold");
+  doc.setFontSize(22);
+  doc.setTextColor(15, 23, 42);
+  doc.text("INVOICE", pageWidth - marginX, 16, { align: "right" });
+
+  // Invoice Number Green Bar
+  const invBarX = pageWidth - marginX - 60;
+  const invBarW = 60;
+  doc.setFillColor(...GREEN);
+  doc.rect(invBarX, 19, invBarW, 5.5, "F");
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(9);
+  doc.setTextColor(255, 255, 255);
+  doc.text(data.invoiceNumber || "INV.VT/2026/VIII/00045", invBarX + invBarW / 2, 23, { align: "center" });
+
+  // Tanggal Invoice + Jatuh Tempo table
+  const metaX = invBarX;
+  const metaY = 25;
+  doc.setDrawColor(200, 200, 200);
+  doc.setLineWidth(0.3);
+
+  // Tanggal Invoice row
+  doc.setFillColor(240, 248, 240);
+  doc.rect(metaX, metaY, 28, 5, "F");
+  doc.rect(metaX + 28, metaY, invBarW - 28, 5, "S");
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(7);
+  doc.setTextColor(...GREEN);
+  doc.text("Tanggal Invoice", metaX + 2, metaY + 3.5);
+  doc.setTextColor(15, 23, 42);
+  doc.setFont("helvetica", "normal");
+  doc.text(data.invoiceDate || "-", metaX + 30, metaY + 3.5);
+
+  // Jatuh Tempo row
+  doc.setFillColor(240, 248, 240);
+  doc.rect(metaX, metaY + 5, 28, 5, "F");
+  doc.rect(metaX + 28, metaY + 5, invBarW - 28, 5, "S");
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(...GREEN);
+  doc.text("Jatuh Tempo", metaX + 2, metaY + 8.5);
+  doc.setTextColor(15, 23, 42);
+  doc.setFont("helvetica", "normal");
+  doc.text(data.maksimalPelunasan || data.dueDate || "-", metaX + 30, metaY + 8.5);
+
+  // ── 2. Two Info Boxes: Data Pendaftar + Detail Paket Umroh ──
+  const boxY = 38;
+  const boxH = 28;
+  const halfW = (contentWidth - 4) / 2;
+
+  // Left: DATA PENDAFTAR
+  doc.setFillColor(...GREEN);
+  doc.rect(marginX, boxY, halfW, 5, "F");
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(7.5);
+  doc.setTextColor(255, 255, 255);
+  doc.text("   DATA PENDAFTAR", marginX + 1, boxY + 3.5);
+
+  doc.setDrawColor(200, 200, 200);
+  doc.setLineWidth(0.3);
+  doc.rect(marginX, boxY + 5, halfW, boxH, "S");
+
+  doc.setFontSize(7);
+  doc.setTextColor(80, 80, 80);
+  const dpLeft = marginX + 2;
+  const dpValLeft = marginX + 32;
+  let dpY = boxY + 9;
+
+  doc.setFont("helvetica", "normal");
+  doc.text("Nama Pendaftar", dpLeft, dpY);
+  doc.text(":", dpValLeft - 2, dpY);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(15, 23, 42);
+  doc.text((data.namaGroup || "Bapak Ahmad Firdaus"), dpValLeft, dpY);
+
+  dpY += 5;
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(80, 80, 80);
+  doc.text("No. HP / WhatsApp", dpLeft, dpY);
+  doc.text(":", dpValLeft - 2, dpY);
+  doc.setTextColor(15, 23, 42);
+  doc.text(data.telepon || data.picPhone || "-", dpValLeft, dpY);
+
+  dpY += 5;
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(80, 80, 80);
+  doc.text("Kode Registrasi", dpLeft, dpY);
+  doc.text(":", dpValLeft - 2, dpY);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(15, 23, 42);
+  doc.text(data.kodeRegistrasi || "-", dpValLeft, dpY);
+
+  dpY += 5;
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(80, 80, 80);
+  doc.text("Alamat", dpLeft, dpY);
+  doc.text(":", dpValLeft - 2, dpY);
+  doc.setTextColor(15, 23, 42);
+  const alamatStr = data.alamat || "-";
+  const alamatLines = doc.splitTextToSize(alamatStr, halfW - 34);
+  doc.text(alamatLines, dpValLeft, dpY);
+
+  // Right: DETAIL PAKET UMROH
+  const rightX = marginX + halfW + 4;
+  doc.setFillColor(...GREEN);
+  doc.rect(rightX, boxY, halfW, 5, "F");
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(7.5);
+  doc.setTextColor(255, 255, 255);
+  doc.text("   DETAIL PAKET UMROH", rightX + 1, boxY + 3.5);
+
+  doc.setDrawColor(200, 200, 200);
+  doc.rect(rightX, boxY + 5, halfW, boxH, "S");
+
+  doc.setFontSize(7);
+  const rpLeft = rightX + 2;
+  const rpValLeft = rightX + 32;
+  let rpY = boxY + 9;
+
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(80, 80, 80);
+  doc.text("Paket Umroh", rpLeft, rpY);
+  doc.text(":", rpValLeft - 2, rpY);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(15, 23, 42);
+  doc.text(data.namaPaket || "Umroh Plus 12 Hari", rpValLeft, rpY);
+
+  rpY += 5;
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(80, 80, 80);
+  doc.text("Jumlah Pendaftar", rpLeft, rpY);
+  doc.text(":", rpValLeft - 2, rpY);
+  doc.setTextColor(15, 23, 42);
+  doc.text(`${paxCount} Pax`, rpValLeft, rpY);
+
+  rpY += 5;
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(80, 80, 80);
+  doc.text("Hotel Makkah", rpLeft, rpY);
+  doc.text(":", rpValLeft - 2, rpY);
+  doc.setTextColor(15, 23, 42);
+  doc.text(data.hotelMekkah || "-", rpValLeft, rpY);
+
+  rpY += 5;
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(80, 80, 80);
+  doc.text("Hotel Madinah", rpLeft, rpY);
+  doc.text(":", rpValLeft - 2, rpY);
+  doc.setTextColor(15, 23, 42);
+  doc.text(data.hotelMadinah || "-", rpValLeft, rpY);
+
+  // ── 3. Table: RINCIAN PEMBAYARAN ────────────────────────────
   const table1Rows: any[] = [
     [
-      `${paketNama} ${tipeStr}`,
-      `Rp  ${unitPrice.toLocaleString("id-ID")}`,
-      `${paxCount}`,
-      `Rp  ${subtotalBase.toLocaleString("id-ID")}`,
+      "1",
+      data.namaPaket || "Paket Umroh Plus 12 Hari",
+      fmtRp(unitPrice),
+      `${paxCount} Pax`,
+      fmtRp(subtotalBase),
     ],
   ];
 
-  // Additional Order Items / Adjustments (Upgrade Kamar, Diskon, dll)
   if (data.orderItems && data.orderItems.length > 0) {
-    data.orderItems.forEach((item) => {
+    data.orderItems.forEach((item, idx) => {
       const isAdd = item.tipe === "penambahan";
       const sign = isAdd ? "" : "-";
       const itemQty = item.qty || paxCount || 1;
       const itemUnit = item.hargaSatuan || Math.round(item.nominal / itemQty);
       table1Rows.push([
-        item.nama.toUpperCase(),
-        `${sign}Rp  ${itemUnit.toLocaleString("id-ID")}`,
+        `${idx + 2}`,
+        item.nama,
+        `${sign}${fmtRp(itemUnit)}`,
         `${itemQty}`,
-        `${sign}Rp  ${(item.nominal).toLocaleString("id-ID")}`,
+        `${sign}${fmtRp(item.nominal)}`,
       ]);
     });
   }
 
-  // Anggota Jamaah Section (A/N)
-  if (data.anggota && data.anggota.length > 0) {
-    table1Rows.push(["A/N", "", "", "Rp  -"]);
-    data.anggota.forEach((nama, idx) => {
-      table1Rows.push([`${idx + 1}. ${nama.toUpperCase()}`, "", "", "Rp  -"]);
-    });
-  }
-
-  // Hotel Makkah & Madinah Information
-  table1Rows.push(["", "", "", "Rp  -"]);
-  table1Rows.push([`HOTEL MAKKAH: ${data.hotelMekkah ? data.hotelMekkah.toUpperCase() : "GRAND AL MASSA"}`, "", "", "Rp  -"]);
-  table1Rows.push([`HOTEL MADINAH: ${data.hotelMadinah ? data.hotelMadinah.toUpperCase() : "DURRAT AL EIMAN"}`, "", "", "Rp  -"]);
-  table1Rows.push(["", "", "", "Rp  -"]);
-
-  const finalTotalTagihan = data.totalTagihanDisesuaikan || data.totalTagihan || subtotalBase;
-
   autoTable(doc, {
-    startY: infoY + 28,
+    startY: boxY + boxH + 8,
     margin: { left: marginX, right: marginX },
-    head: [["Keterangan", "Harga", "Qty", "Subtotal"]],
+    head: [
+      [
+        { content: "RINCIAN PEMBAYARAN", colSpan: 5, styles: { halign: "left", fillColor: GREEN, textColor: [255, 255, 255], fontSize: 8, fontStyle: "bold", cellPadding: 2 } },
+      ],
+      ["No.", "Uraian", "Harga Satuan (Rp)", "Quantity", "Jumlah (Rp)"],
+    ],
     body: table1Rows,
-    foot: [["Total Tagihan", "", "", `Rp  ${finalTotalTagihan.toLocaleString("id-ID")}`]],
     theme: "grid",
     headStyles: {
-      fillColor: [22, 101, 52], // Dark Green #166534
-      textColor: [255, 255, 255],
-      fontSize: 8,
+      fillColor: [240, 240, 240],
+      textColor: [50, 50, 50],
+      fontSize: 7,
       fontStyle: "bold",
-      halign: "center",
-      cellPadding: 2,
+      cellPadding: 1.5,
+      lineColor: [200, 200, 200],
     },
     columnStyles: {
-      0: { cellWidth: 104, halign: "left", fontStyle: "normal" },
-      1: { cellWidth: 32, halign: "right", fontStyle: "normal" },
-      2: { cellWidth: 14, halign: "center", fontStyle: "normal" },
-      3: { cellWidth: 32, halign: "right", fontStyle: "normal" },
-    },
-    footStyles: {
-      fillColor: [255, 255, 255],
-      textColor: [15, 23, 42],
-      fontSize: 8.5,
-      fontStyle: "bold",
-      halign: "center",
-      cellPadding: 2.2,
-      lineWidth: 0.3,
-      lineColor: [180, 180, 180],
+      0: { cellWidth: 12, halign: "center" },
+      1: { cellWidth: 72, halign: "left" },
+      2: { cellWidth: 34, halign: "right" },
+      3: { cellWidth: 24, halign: "center" },
+      4: { cellWidth: 44, halign: "right", fontStyle: "bold" },
     },
     bodyStyles: {
-      fontSize: 7.5,
+      fontSize: 7,
       textColor: [15, 23, 42],
-      cellPadding: 1.6,
-      lineColor: [180, 180, 180],
-    },
-    didParseCell: function (dataHook) {
-      if (dataHook.section === "foot" && dataHook.column.index === 0) {
-        dataHook.cell.styles.halign = "center";
-      }
-      if (dataHook.section === "foot" && dataHook.column.index === 3) {
-        dataHook.cell.styles.halign = "right";
-      }
+      cellPadding: 1.5,
+      lineColor: [200, 200, 200],
     },
   });
 
   const table1End = (doc as any).lastAutoTable.finalY;
 
-  // ── 4. Table 2: Rincian Pembayaran (History) ─────────────────
+  // ── 4. Table: RIWAYAT PEMBAYARAN ────────────────────────────
   const historyRows: any[] = [];
   if (data.paymentHistory && data.paymentHistory.length > 0) {
-    data.paymentHistory.forEach((p) => {
-      historyRows.push([`${p.tanggal} ${p.metode.toUpperCase()}`, `Rp  ${p.nominal.toLocaleString("id-ID")}`]);
+    data.paymentHistory.forEach((p, idx) => {
+      historyRows.push([
+        `${idx + 1}`,
+        p.tanggal,
+        p.metode,
+        fmtRp(p.nominal),
+        idx === 0 ? "DP Pendaftaran" : `Pelunasan Tahap ${idx}`,
+      ]);
     });
   } else {
-    // Default current verified payment
     const tglStr = data.invoiceDate || new Date().toLocaleDateString("id-ID");
-    const bankStr = data.bank ? `TF ${data.bank.toUpperCase()}` : "TF MANDIRI";
-    historyRows.push([`${tglStr} ${bankStr}`, `Rp  ${(data.nominal || 10000000).toLocaleString("id-ID")}`]);
+    const bankStr = data.bank ? `Transfer Bank ${data.bank}` : "Transfer Bank Mandiri";
+    historyRows.push([
+      "1",
+      tglStr,
+      bankStr,
+      fmtRp(data.nominal || 0),
+      "DP Pendaftaran",
+    ]);
   }
-
-  // Padding empty rows like original template
-  while (historyRows.length < 4) {
-    historyRows.push(["", ""]);
-  }
-
-  const finalTotalBayar = data.totalPembayaran || data.nominal || 10000000;
-  const finalKurangBayar = data.sisaTagihan !== undefined ? data.sisaTagihan : Math.max(0, finalTotalTagihan - finalTotalBayar);
 
   autoTable(doc, {
     startY: table1End + 3,
     margin: { left: marginX, right: marginX },
-    head: [[{ content: "Rincian Pembayaran", colSpan: 2, styles: { halign: "center" } }]],
-    body: historyRows,
-    foot: [
-      ["Total Bayar", `Rp ${finalTotalBayar.toLocaleString("id-ID")}`],
-      ["Kurang Bayar", `Rp  ${finalKurangBayar.toLocaleString("id-ID")}`],
+    head: [
+      [
+        { content: "RIWAYAT PEMBAYARAN", colSpan: 5, styles: { halign: "left", fillColor: GREEN, textColor: [255, 255, 255], fontSize: 8, fontStyle: "bold", cellPadding: 2 } },
+      ],
+      ["No.", "Tanggal", "Metode Pembayaran", "Nominal (Rp)", "Keterangan"],
     ],
+    body: historyRows,
     theme: "grid",
     headStyles: {
-      fillColor: [22, 101, 52],
-      textColor: [255, 255, 255],
-      fontSize: 8,
+      fillColor: [240, 240, 240],
+      textColor: [50, 50, 50],
+      fontSize: 7,
       fontStyle: "bold",
-      cellPadding: 2,
+      cellPadding: 1.5,
+      lineColor: [200, 200, 200],
     },
     columnStyles: {
-      0: { cellWidth: 150, halign: "left" },
-      1: { cellWidth: 32, halign: "right" },
-    },
-    footStyles: {
-      fillColor: [255, 255, 255],
-      textColor: [15, 23, 42],
-      fontSize: 8,
-      fontStyle: "bold",
-      cellPadding: 1.8,
-      lineWidth: 0.3,
-      lineColor: [180, 180, 180],
+      0: { cellWidth: 12, halign: "center" },
+      1: { cellWidth: 28, halign: "left" },
+      2: { cellWidth: 52, halign: "left" },
+      3: { cellWidth: 36, halign: "right", fontStyle: "bold" },
+      4: { cellWidth: 58, halign: "left" },
     },
     bodyStyles: {
-      fontSize: 7.5,
+      fontSize: 7,
       textColor: [15, 23, 42],
       cellPadding: 1.5,
-      lineColor: [180, 180, 180],
-    },
-    didParseCell: function (dataHook) {
-      if (dataHook.section === "foot" && dataHook.column.index === 0) {
-        dataHook.cell.styles.halign = "center";
-      }
-      if (dataHook.section === "foot" && dataHook.column.index === 1) {
-        dataHook.cell.styles.halign = "right";
-      }
+      lineColor: [200, 200, 200],
     },
   });
 
   const table2End = (doc as any).lastAutoTable.finalY;
 
-  // ── 5. NB: Maksimal Pelunasan ────────────────────────────────
-  const nbY = table2End + 4;
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(7.5);
-  doc.setTextColor(220, 38, 38); // Red
-  doc.text("NB :", marginX, nbY);
+  // ── 5. Summary Box (Left) + Catatan Penting (Right) ─────────
+  const summaryY = table2End + 4;
+  const summaryH = 24;
+  const summaryW = halfW;
 
+  // Left: Summary
+  doc.setDrawColor(200, 200, 200);
+  doc.setLineWidth(0.3);
+  doc.rect(marginX, summaryY, summaryW, summaryH, "S");
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(7);
+  doc.setTextColor(60, 60, 60);
+
+  let sumY = summaryY + 5;
+  doc.text("Total Tagihan", marginX + 3, sumY);
+  doc.text(":", marginX + 38, sumY);
   doc.setTextColor(15, 23, 42);
-  doc.text("MAKSIMAL PELUNASAN TANGGAL =", marginX + 7, nbY);
-  doc.text(data.maksimalPelunasan || data.dueDate || "6 September 2026", marginX + 68, nbY);
+  doc.text(`Rp  ${fmtRp(finalTotalTagihan)}`, marginX + 41, sumY);
 
-  // ── 6. Signatures (Issued Approve vs Accept) ─────────────────
-  const signY = nbY + 8;
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(8);
+  sumY += 4.5;
+  doc.setTextColor(60, 60, 60);
+  doc.text("Total Sudah Dibayar", marginX + 3, sumY);
+  doc.text(":", marginX + 38, sumY);
   doc.setTextColor(15, 23, 42);
+  doc.text(`Rp  ${fmtRp(finalTotalBayar)}`, marginX + 41, sumY);
 
-  doc.text("PT VAUZA TAMMA ABADI", marginX, signY);
-  doc.text("Issued Approve by", marginX, signY + 3.8);
-
-  doc.text("Accept by", pageWidth - marginX - 45, signY);
-
-  // Signature / Seal Stamp Representation
-  doc.setDrawColor(2, 132, 199); // Light Blue Signature Graphic
-  doc.setLineWidth(0.6);
-  doc.ellipse(marginX + 18, signY + 12, 16, 5, "S");
+  sumY += 4.5;
+  doc.setTextColor(60, 60, 60);
+  doc.text("Sisa Tagihan", marginX + 3, sumY);
+  doc.text(":", marginX + 38, sumY);
+  if (isLunas) {
+    doc.setTextColor(...GREEN);
+  } else {
+    doc.setTextColor(220, 38, 38);
+  }
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(8);
-  doc.setTextColor(2, 132, 199);
-  doc.text("VAUZA TAMMA", marginX + 7, signY + 13.5);
+  doc.text(`Rp  ${fmtRp(finalSisaTagihan)}`, marginX + 41, sumY);
 
+  sumY += 5;
+  doc.setTextColor(60, 60, 60);
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(8);
-  doc.setTextColor(15, 23, 42);
-  doc.text("H. FAISAL WAHYUDI", marginX, signY + 22);
+  doc.text("Status Pembayaran", marginX + 3, sumY);
+  doc.text(":", marginX + 38, sumY);
 
-  doc.text((data.namaGroup || data.picName || "MIA HERAWATI").toUpperCase(), pageWidth - marginX - 45, signY + 22);
+  // Status badge
+  if (isLunas) {
+    doc.setFillColor(220, 252, 231); // green-100
+    doc.roundedRect(marginX + 41, sumY - 3, 18, 4.5, 1, 1, "F");
+    doc.setTextColor(...GREEN);
+    doc.text("LUNAS", marginX + 42, sumY);
+  } else {
+    doc.setFillColor(254, 226, 226); // red-100
+    doc.roundedRect(marginX + 41, sumY - 3, 26, 4.5, 1, 1, "F");
+    doc.setTextColor(220, 38, 38);
+    doc.text("BELUM LUNAS", marginX + 42, sumY);
+  }
 
-  // ── 7. Green Bank Account Footer Box ─────────────────────────
-  const footBoxY = pageHeight - 24;
-  doc.setFillColor(22, 101, 52); // #166534
-  doc.rect(marginX, footBoxY, contentWidth, 18, "F");
-
+  // Right: CATATAN PENTING
+  doc.setFillColor(...GREEN);
+  doc.rect(rightX, summaryY, summaryW, 5, "F");
   doc.setFont("helvetica", "bold");
   doc.setFontSize(7.5);
   doc.setTextColor(255, 255, 255);
-  doc.text("Untuk pembayaran melalui rekening bank sebagai berikut :", pageWidth / 2, footBoxY + 4, {
-    align: "center",
-  });
+  doc.text("CATATAN PENTING", rightX + 2, summaryY + 3.5);
 
-  doc.setFontSize(7);
-  doc.text(
-    "Nomor Rekening 144-00-0018881-0, Bank MANDIRI a/n PT VAUZA TAMMA ABADI",
-    pageWidth / 2,
-    footBoxY + 8,
-    { align: "center" }
-  );
+  doc.setDrawColor(200, 200, 200);
+  doc.rect(rightX, summaryY + 5, summaryW, summaryH - 5, "S");
 
   doc.setFont("helvetica", "normal");
-  doc.text("Pelunasan biaya paket paling lambat H-40 sebelum tanggal keberangkatan", pageWidth / 2, footBoxY + 12, {
-    align: "center",
-  });
-  doc.text("Setelah melakukan pembayaran, harap menginformasikan dan mengirimkan bukti pembayaran", pageWidth / 2, footBoxY + 15.5, {
+  doc.setFontSize(6.5);
+  doc.setTextColor(50, 50, 50);
+
+  const catatanLines = [
+    "• Untuk pembayaran melalui Nomor Rekening",
+    "  144-00-0018881-0, Bank MANDIRI",
+    "  a/n PT VAUZA TAMMA ABADI.",
+    "",
+    "• Setelah melakukan pembayaran, harap",
+    "  menginformasikan dan mengirimkan",
+    "  bukti pembayaran.",
+  ];
+
+  let catY = summaryY + 9;
+  for (const line of catatanLines) {
+    if (line.includes("144-00") || line.includes("MANDIRI") || line.includes("VAUZA")) {
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(15, 23, 42);
+    } else {
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(50, 50, 50);
+    }
+    doc.text(line, rightX + 2, catY);
+    catY += 2.5;
+  }
+
+  // ── 6. Signature + QR Verification ──────────────────────────
+  const signY = summaryY + summaryH + 6;
+
+  // Line separator
+  doc.setDrawColor(200, 200, 200);
+  doc.setLineWidth(0.3);
+  doc.line(marginX, signY - 2, pageWidth - marginX, signY - 2);
+
+  // Left: Signature
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(7.5);
+  doc.setTextColor(15, 23, 42);
+  doc.text("PT VAUZA TAMMA ABADI", marginX, signY);
+
+  doc.setFont("helvetica", "italic");
+  doc.setFontSize(7);
+  doc.setTextColor(100, 100, 100);
+  doc.text("Issued / Approved by", marginX, signY + 4);
+
+  // Logo stamp
+  try {
+    doc.addImage(VAUZA_TAMMA_LOGO_BASE64, "PNG", marginX, signY + 6, 30, 12);
+  } catch {
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(8);
+    doc.setTextColor(2, 132, 199);
+    doc.text("VAUZA TAMMA", marginX + 5, signY + 13);
+  }
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(7.5);
+  doc.setTextColor(15, 23, 42);
+  doc.text("H. FAISAL WAHYUDI", marginX, signY + 22);
+
+  // Right: QR Code Verification
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(7.5);
+  doc.setTextColor(15, 23, 42);
+  doc.text("VERIFIKASI KEASLIAN", pageWidth - marginX - 55, signY);
+
+  // QR Placeholder Box
+  doc.setDrawColor(180, 180, 180);
+  doc.setLineWidth(0.3);
+  doc.rect(pageWidth - marginX - 55, signY + 2, 16, 16, "S");
+
+  // Simple QR-like pattern inside
+  doc.setFillColor(80, 80, 80);
+  doc.rect(pageWidth - marginX - 53, signY + 4, 5, 5, "F");
+  doc.rect(pageWidth - marginX - 45, signY + 4, 5, 5, "F");
+  doc.rect(pageWidth - marginX - 53, signY + 12, 5, 5, "F");
+  doc.rect(pageWidth - marginX - 49, signY + 8, 3, 3, "F");
+  doc.rect(pageWidth - marginX - 45, signY + 12, 2, 2, "F");
+  doc.rect(pageWidth - marginX - 42, signY + 14, 2, 3, "F");
+
+  // QR description
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(6);
+  doc.setTextColor(100, 100, 100);
+  const qrDescLines = doc.splitTextToSize(
+    "Scan untuk memverifikasi keaslian invoice. Invoice ini diterbitkan secara resmi oleh PT Vauza Tamma Abadi.",
+    34
+  );
+  doc.text(qrDescLines, pageWidth - marginX - 36, signY + 5);
+
+  // ── 7. Footer: Office Addresses ─────────────────────────────
+  const footBoxY = pageHeight - 18;
+  doc.setFillColor(...GREEN);
+  doc.rect(marginX, footBoxY, contentWidth, 14, "F");
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(6);
+  doc.setTextColor(255, 255, 255);
+
+  const footLines = [
+    "Jl. Kauman No. 21, Kauman, Klojen, Kota Malang",
+    "Jl. Kemang Timur Dalam No. 18B, Bangka, Mampang Prapatan, Kota Jakarta Selatan",
+    "Royal Residence Cluster Crown Hill B15 No. 61, Sumur Welut, Lakarsantri, Kota Surabaya",
+  ];
+  let footY = footBoxY + 3.5;
+  for (const fl of footLines) {
+    doc.text(fl, pageWidth / 2, footY, { align: "center" });
+    footY += 2.5;
+  }
+
+  doc.setFont("helvetica", "bold");
+  doc.text("(0341) 399059 / 081-776655-000            vauzatammapremium77@gmail.com", pageWidth / 2, footY + 0.5, {
     align: "center",
   });
 

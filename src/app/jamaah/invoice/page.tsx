@@ -299,8 +299,19 @@ function InvoiceCard({
         )}
       </CardContent>
 
-      {isUnpaid && (
-        <CardFooter>
+      <CardFooter className="flex items-center justify-between gap-2 border-t pt-3">
+        <Button
+          size="sm"
+          variant="outline"
+          className="text-xs"
+          onClick={() => {
+            window.open(`/invoice/${encodeURIComponent(invoice.nomorInvoice || invoice.id)}`, "_blank");
+          }}
+        >
+          <Receipt className="mr-1.5 h-3.5 w-3.5" />
+          Lihat Invoice Resmi
+        </Button>
+        {isUnpaid && (
           <Button
             size="sm"
             variant="default"
@@ -309,8 +320,8 @@ function InvoiceCard({
             <CircleDollarSign className="mr-1 h-3.5 w-3.5" />
             Bayar Sekarang
           </Button>
-        </CardFooter>
-      )}
+        )}
+      </CardFooter>
     </Card>
   );
 }

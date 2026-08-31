@@ -2098,6 +2098,18 @@ function PaymentReviewTabContent() {
                         <Button
                           variant="outline"
                           className="font-bold h-9 text-xs gap-1.5 border-emerald-600/30 text-emerald-700 hover:bg-emerald-50 dark:text-emerald-300"
+                          onClick={() => {
+                            const inv = selectedPayment.invoiceId || invoiceNumber;
+                            const kode = selectedPayment.kodeRegistrasi || selectedPayment.groupId || "";
+                            window.open(`/invoice/${encodeURIComponent(inv)}?kode=${encodeURIComponent(kode)}`, "_blank");
+                          }}
+                        >
+                          <Eye className="h-4 w-4" />
+                          Preview Invoice
+                        </Button>
+                        <Button
+                          variant="outline"
+                          className="font-bold h-9 text-xs gap-1.5 border-emerald-600/30 text-emerald-700 hover:bg-emerald-50 dark:text-emerald-300"
                           onClick={() => handleDownloadPdf(selectedPayment)}
                         >
                           <Download className="h-4 w-4" />
@@ -2122,6 +2134,18 @@ function PaymentReviewTabContent() {
                       >
                         <CheckCircle2 className="h-4 w-4 mr-1.5" />
                         {submittingInvoice ? "Menerbitkan..." : "Approve & Terbitkan Invoice"}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="font-bold h-9 text-xs gap-1.5 border-emerald-600/30 text-emerald-700 hover:bg-emerald-50 dark:text-emerald-300"
+                        onClick={() => {
+                          const inv = selectedPayment.invoiceId || invoiceNumber;
+                          const kode = selectedPayment.kodeRegistrasi || selectedPayment.groupId || "";
+                          window.open(`/invoice/${encodeURIComponent(inv)}?kode=${encodeURIComponent(kode)}`, "_blank");
+                        }}
+                      >
+                        <Eye className="h-4 w-4" />
+                        Preview Invoice
                       </Button>
                       <Button
                         variant="outline"
@@ -2290,6 +2314,18 @@ function PaymentReviewTabContent() {
               >
                 <Mail className="h-4 w-4" />
                 Kirim via Email
+              </Button>
+              <Button
+                variant="outline"
+                className="font-bold h-9 text-xs gap-1.5 border-emerald-500/30 text-emerald-700 hover:bg-emerald-50 dark:text-emerald-300"
+                onClick={() => {
+                  const inv = sendInvoiceTarget.invoiceId || invoiceNumber;
+                  const kode = sendInvoiceTarget.kodeRegistrasi || sendInvoiceTarget.groupId || "";
+                  window.open(`/invoice/${encodeURIComponent(inv)}?kode=${encodeURIComponent(kode)}`, "_blank");
+                }}
+              >
+                <Eye className="h-4 w-4" />
+                Preview Dokumen
               </Button>
               <Button
                 variant="outline"

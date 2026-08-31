@@ -387,13 +387,11 @@ function InvoiceDetailModal({
               variant="outline"
               size="sm"
               onClick={() => {
-                alert(
-                  `Print preview untuk ${invoice.nomorInvoice}`
-                );
+                window.open(`/invoice/${encodeURIComponent(invoice.nomorInvoice || invoice.id)}`, "_blank");
               }}
             >
               <Receipt className="mr-1.5 h-3.5 w-3.5" />
-              Cetak Invoice
+              Lihat & Cetak Invoice Resmi
             </Button>
             <Button size="sm" onClick={() => setShowCatatModal(true)}>
               <NotebookPen className="mr-1.5 h-3.5 w-3.5" />
