@@ -248,8 +248,7 @@ html.intro-pending body {
    PORTAL THEME (BRIGHT LUXURY ISLAMIC DAYLIGHT AESTHETIC)
    ══════════════════════════════════════════════════════════════════════════════ */
 .portal-theme {
-  background-color: #f7f9f7 !important;
-  color: #1e293b !important;
+  color: #1e293b;
   font-family: Inter, system-ui, -apple-system, sans-serif;
   min-height: 100dvh;
 }

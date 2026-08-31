@@ -10,29 +10,29 @@ interface PortalLayoutWrapperProps {
 
 export default function PortalLayoutWrapper({ children, className }: PortalLayoutWrapperProps) {
   return (
-    <div className="relative min-h-[100dvh] bg-[#f7f9f7] text-slate-850 font-sans overflow-x-hidden portal-theme">
-      {/* ── Fixed Islamic Luxury Poster Backdrop (Bright Daylight Aesthetic) ── */}
+    <div className="relative min-h-[100dvh] bg-[#07120f] font-sans overflow-x-hidden portal-theme">
+      {/* ── Fixed Crystal-Clear Kaaba Makkah Backdrop ── */}
       <div
         className="fixed inset-0 z-0 pointer-events-none bg-cover bg-center bg-no-repeat"
         style={{
-          backgroundImage: `linear-gradient(180deg, rgba(247, 249, 247, 0.94) 0%, rgba(240, 246, 242, 0.92) 50%, rgba(245, 248, 245, 0.96) 100%), url("/images/kaaba-makkah.jpg")`,
+          backgroundImage: `linear-gradient(180deg, rgba(0, 0, 0, 0.22) 0%, rgba(0, 0, 0, 0.08) 45%, rgba(0, 0, 0, 0.35) 100%), url("/images/kaaba-makkah.jpg")`,
         }}
         aria-hidden="true"
       />
 
       {/* ── Ambient Radial Warm Glows ── */}
       <div
-        className="fixed -right-16 top-10 w-[42vw] h-[42vw] rounded-full bg-amber-400/10 blur-[90px] pointer-events-none z-[1]"
+        className="fixed -right-16 top-10 w-[42vw] h-[42vw] rounded-full bg-amber-400/15 blur-[90px] pointer-events-none z-[1]"
         aria-hidden="true"
       />
       <div
-        className="fixed left-10 bottom-10 w-[35vw] h-[35vw] rounded-full bg-emerald-500/10 blur-[90px] pointer-events-none z-[1]"
+        className="fixed left-10 bottom-10 w-[35vw] h-[35vw] rounded-full bg-emerald-500/15 blur-[90px] pointer-events-none z-[1]"
         aria-hidden="true"
       />
 
       {/* ── Outer Golden Aesthetic Frame ── */}
       <div
-        className="fixed inset-3 sm:inset-4 rounded-[26px] sm:rounded-[30px] border border-[#d8b15b]/40 pointer-events-none z-[2]"
+        className="fixed inset-3 sm:inset-4 rounded-[26px] sm:rounded-[30px] border border-[#d8b15b]/45 pointer-events-none z-[2]"
         aria-hidden="true"
       />
 
@@ -42,10 +42,10 @@ export default function PortalLayoutWrapper({ children, className }: PortalLayou
 
         {/* ── Footer Blessing ── */}
         <footer className="mt-12 text-center pb-8 select-none">
-          <span className="text-[#967117] font-serif text-xl sm:text-2xl block tracking-wider drop-shadow-xs font-bold">
+          <span className="text-[#f5d061] font-serif text-xl sm:text-2xl block tracking-wider drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] font-bold">
             خَتَمَ اللهُ لَنَا وَلَكُمْ بِالْخَيْرِ
           </span>
-          <p className="text-xs text-slate-500 mt-1.5 font-medium tracking-wide">
+          <p className="text-xs text-white/85 mt-1.5 font-medium tracking-wide drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
             Semoga Allah menerima amal ibadah kita semua.
           </p>
         </footer>
