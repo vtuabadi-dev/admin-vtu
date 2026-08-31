@@ -1,1343 +1,1272 @@
 "use client";
 
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import {
-  FileText,
   Printer,
   Copy,
   Check,
   Building2,
-  GraduationCap,
   ScrollText,
-  ShieldCheck,
-  Award,
-  RefreshCw,
   User,
   Sparkles,
   FileSignature,
   Share2,
+  QrCode,
+  Download,
+  Search,
+  Sliders,
+  History,
+  Trash2,
+  Eye,
+  CheckCircle2,
+  ExternalLink,
+  Plus,
+  Plane,
+  Layers,
+  ArrowRight,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/components/ui/Card";
 import { Button } from "@/shared/components/ui/Button";
 import { Input } from "@/shared/components/ui/Input";
 import { Select } from "@/shared/components/ui/Select";
+import { Badge } from "@/shared/components/ui/Badge";
+import { Modal } from "@/shared/components/ui/Modal";
 import { formatDate, formatDateShort, cn } from "@/shared/lib/utils";
 import { useOperationalStore } from "@/stores/operational-store";
 import { KOP_SURAT_BASE64 } from "@/server/assets/kop-surat";
+import {
+  DEFAULT_SURAT_TEMPLATES,
+  loadSavedSuratTemplates,
+  loadGeneratedSuratLogs,
+  saveGeneratedSuratLog,
+  deleteGeneratedSuratLog,
+  resolveAutocratFieldValues,
+  renderAutocratMergedText,
+  getTodayDateInfo,
+} from "@/shared/lib/surat-autocrat-engine";
+import type {
+  SuratTemplate,
+  GeneratedSuratLog,
+} from "@/shared/types/surat";
 
-export type SuratType =
-  | "rekom"
-  | "cuti-pekerja"
-  | "cuti-sekolah"
-  | "keterangan"
-  | "tugas"
-  | "klaim-asuransi";
-
-interface SuratConfig {
-  type: SuratType;
-  title: string;
-  shortLabel: string;
-  subtitle: string;
-  icon: any;
-  badgeColor: string;
-  defaultPerihal: string;
-  defaultKodeNomor: string;
-}
-
-const SURAT_CONFIGS: Record<SuratType, SuratConfig> = {
-  rekom: {
-    type: "rekom",
-    title: "Surat Rekomendasi Paspor",
-    shortLabel: "Surat Rekom",
-    subtitle: "Rekomendasi penerbitan/penggantian paspor umroh ke Kantor Imigrasi / Kemenag",
-    icon: FileSignature,
-    badgeColor: "bg-blue-500/10 text-blue-600 border-blue-500/30",
-    defaultPerihal: "Rekomendasi Pembuatan / Penggantian Paspor Umroh",
-    defaultKodeNomor: "SR-PASPOR",
-  },
-  "cuti-pekerja": {
-    type: "cuti-pekerja",
-    title: "Surat Cuti Pekerja",
-    shortLabel: "Surat Cuti Pekerja",
-    subtitle: "Surat permohonan izin dispensasi dan cuti kerja ke instansi / perusahaan",
-    icon: Building2,
-    badgeColor: "bg-emerald-500/10 text-emerald-600 border-emerald-500/30",
-    defaultPerihal: "Permohonan Izin / Cuti Ibadah Umroh",
-    defaultKodeNomor: "SC-KERJA",
-  },
-  "cuti-sekolah": {
-    type: "cuti-sekolah",
-    title: "Surat Cuti Sekolah / Kuliah",
-    shortLabel: "Surat Cuti Sekolah",
-    subtitle: "Surat permohonan dispensasi izin tidak masuk sekolah / perkuliahan",
-    icon: GraduationCap,
-    badgeColor: "bg-amber-500/10 text-amber-600 border-amber-500/30",
-    defaultPerihal: "Permohonan Izin Tidak Masuk Sekolah / Kuliah (Ibadah Umroh)",
-    defaultKodeNomor: "SC-SEKOLAH",
-  },
-  keterangan: {
-    type: "keterangan",
-    title: "Surat Keterangan Jamaah",
-    shortLabel: "Surat Keterangan",
-    subtitle: "Surat keterangan resmi terdaftar sebagai calon jamaah umroh PT. VTU Abadi",
-    icon: ScrollText,
-    badgeColor: "bg-purple-500/10 text-purple-600 border-purple-500/30",
-    defaultPerihal: "Surat Keterangan Terdaftar Calon Jamaah Umroh",
-    defaultKodeNomor: "SK-JAMAAH",
-  },
-  tugas: {
-    type: "tugas",
-    title: "Surat Perintah Tugas Petugas",
-    shortLabel: "Surat Tugas",
-    subtitle: "Surat penugasan resmi Tour Leader, Muthawwif, Medis, & Tim Handling",
-    icon: Award,
-    badgeColor: "bg-indigo-500/10 text-indigo-600 border-indigo-500/30",
-    defaultPerihal: "Surat Perintah Tugas Operasional Ibadah Umroh",
-    defaultKodeNomor: "ST-PETUGAS",
-  },
-  "klaim-asuransi": {
-    type: "klaim-asuransi",
-    title: "Surat Pengantar Klaim Asuransi",
-    shortLabel: "Surat Klaim Asuransi",
-    subtitle: "Surat pengantar klaim biaya medis, keterlambatan, atau pembatalan asuransi",
-    icon: ShieldCheck,
-    badgeColor: "bg-rose-500/10 text-rose-600 border-rose-500/30",
-    defaultPerihal: "Permohonan Pengajuan Klaim Asuransi Perjalanan Umroh",
-    defaultKodeNomor: "SKA-ASURANSI",
-  },
-};
-
-const ROMAN_MONTHS = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI", "XII"];
-
-function getTodayFormatted(): { masehi: string; hijriyah: string; romanMonth: string; year: number } {
-  const today = new Date();
-  const options: Intl.DateTimeFormatOptions = { day: "numeric", month: "long", year: "numeric" };
-  const masehi = today.toLocaleDateString("id-ID", options);
-  const romanMonth = ROMAN_MONTHS[today.getMonth()] ?? "VIII";
-  const year = today.getFullYear();
-  return {
-    masehi,
-    hijriyah: "Safar 1448 H",
-    romanMonth,
-    year,
-  };
-}
-
-export default function GenerateSuratPage() {
+function GenerateSuratPageContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
 
-  // URL query type sync
-  const queryType = (searchParams.get("type") as SuratType) || "rekom";
-  const [activeType, setActiveType] = useState<SuratType>(
-    SURAT_CONFIGS[queryType] ? queryType : "rekom"
+  // URL query params
+  const initialTemplateParam = searchParams.get("template") || searchParams.get("type") || "";
+  const initialTabParam = searchParams.get("tab") || "generator";
+
+  // Main UI Tabs: "generator" | "history"
+  const [activeMainTab, setActiveMainTab] = useState<"generator" | "history">(
+    initialTabParam === "history" ? "history" : "generator"
   );
-
-  // Sync state when URL searchParam changes
-  useEffect(() => {
-    const t = searchParams.get("type") as SuratType;
-    if (t && SURAT_CONFIGS[t] && t !== activeType) {
-      setActiveType(t);
-    }
-  }, [searchParams, activeType]);
-
-  const handleTabChange = (type: SuratType) => {
-    setActiveType(type);
-    router.push(`/admin/surat?type=${type}`, { scroll: false });
-  };
 
   // Operational store
   const storeKbrList = useOperationalStore((s) => s.keberangkatanList);
-  const storeGroupList = useOperationalStore((s) => s.groupList);
   const storeJamaah = useOperationalStore((s) => s.jamaahList);
   const setStoreJamaah = useOperationalStore((s) => s.setJamaahList);
   const setStoreKbrList = useOperationalStore((s) => s.setKeberangkatanList);
-  const setStoreGroupList = useOperationalStore((s) => s.setGroupList);
 
-  const [loadingData, setLoadingData] = useState(false);
+  // Local state
+  const [templates, setTemplates] = useState<SuratTemplate[]>(DEFAULT_SURAT_TEMPLATES);
+  const [selectedTemplateSlug, setSelectedTemplateSlug] = useState<string>("rekom-paspor");
   const [selectedPackageId, setSelectedPackageId] = useState<string>("");
   const [selectedJamaahId, setSelectedJamaahId] = useState<string>("");
-  const [copiedText, setCopiedText] = useState(false);
 
-  // Load packages & jamaah if not loaded
+  // Dynamic Form Data (for placeholders)
+  const [manualFormData, setManualFormData] = useState<Record<string, string>>({});
+  const [nomorUrutSurat, setNomorUrutSurat] = useState<string>("001");
+  const [customPerihal, setCustomPerihal] = useState<string>("");
+  const [customTujuan, setCustomTujuan] = useState<string>("");
+  const [customKotaTujuan, setCustomKotaTujuan] = useState<string>("");
+  const [customLampiran, setCustomLampiran] = useState<string>("");
+
+  // History state
+  const [historyLogs, setHistoryLogs] = useState<GeneratedSuratLog[]>([]);
+  const [historySearch, setHistorySearch] = useState<string>("");
+  const [historyFilterTemplate, setHistoryFilterTemplate] = useState<string>("all");
+
+  // UI helpers
+  const [copiedText, setCopiedText] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [previewModalLog, setPreviewModalLog] = useState<GeneratedSuratLog | null>(null);
+
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 3500);
+  };
+
+  // Load Templates & History
   useEffect(() => {
-    async function initData() {
+    async function loadAll() {
+      // 1. Templates
+      try {
+        const res = await fetch("/api/master/surat-templates");
+        if (res.ok) {
+          const json = await res.json();
+          if (json.data && Array.isArray(json.data) && json.data.length > 0) {
+            setTemplates(json.data);
+          } else {
+            setTemplates(loadSavedSuratTemplates());
+          }
+        } else {
+          setTemplates(loadSavedSuratTemplates());
+        }
+      } catch {
+        setTemplates(loadSavedSuratTemplates());
+      }
+
+      // 2. History logs
+      try {
+        const hRes = await fetch("/api/surat/generated");
+        if (hRes.ok) {
+          const hJson = await hRes.json();
+          if (hJson.data && Array.isArray(hJson.data)) {
+            setHistoryLogs(hJson.data);
+          } else {
+            setHistoryLogs(loadGeneratedSuratLogs());
+          }
+        } else {
+          setHistoryLogs(loadGeneratedSuratLogs());
+        }
+      } catch {
+        setHistoryLogs(loadGeneratedSuratLogs());
+      }
+
+      // 3. Operational store data
       if (storeKbrList.length === 0 || !storeJamaah || storeJamaah.length === 0) {
-        setLoadingData(true);
         try {
-          const [kbrRes, grpRes, jamRes] = await Promise.all([
+          const [kbrRes, jamRes] = await Promise.all([
             fetch("/api/keberangkatan"),
-            fetch("/api/groups"),
             fetch("/api/jamaah?groupId=&limit=200"),
           ]);
           if (kbrRes.ok) {
             const kJson = await kbrRes.json();
             setStoreKbrList(kJson.data ?? []);
           }
-          if (grpRes.ok) {
-            const gJson = await grpRes.json();
-            setStoreGroupList(gJson.data ?? []);
-          }
           if (jamRes.ok) {
             const jJson = await jamRes.json();
             setStoreJamaah(jJson.data ?? []);
           }
         } catch (err) {
-          console.error("Failed to fetch initial data for surat:", err);
-        } finally {
-          setLoadingData(false);
+          console.error("Failed to load initial data for surat:", err);
         }
       }
     }
-    initData();
-  }, [storeKbrList.length, storeJamaah, setStoreKbrList, setStoreGroupList, setStoreJamaah]);
+    loadAll();
+  }, [storeKbrList.length, storeJamaah, setStoreKbrList, setStoreJamaah]);
 
-  // Packages map
-  const packageOptions = useMemo(() => {
-    return (storeKbrList || []).map((k: any) => ({
-      value: k.id,
-      label: `${k.kodePaket || k.id} — ${k.namaPaket || k.name || "Paket Umroh"} (${formatDateShort(k.tanggalKeberangkatan || k.departureDate)})`,
-      raw: k,
-    }));
-  }, [storeKbrList]);
-
-  // Set default package if none selected
+  // Sync template from URL param
   useEffect(() => {
-    if (!selectedPackageId && packageOptions.length > 0 && packageOptions[0]) {
-      setSelectedPackageId(packageOptions[0].value);
+    if (initialTemplateParam) {
+      const found = templates.find(
+        (t) => t.slug === initialTemplateParam || t.slug.includes(initialTemplateParam) || t.id === initialTemplateParam
+      );
+      if (found) {
+        setSelectedTemplateSlug(found.slug);
+      }
     }
-  }, [packageOptions, selectedPackageId]);
+  }, [initialTemplateParam, templates]);
 
-  // Filter jamaah by selected package
-  const groupMap = useMemo(() => {
-    const map: Record<string, any> = {};
-    (storeGroupList || []).forEach((g: any) => {
-      map[g.id] = g;
-    });
-    return map;
-  }, [storeGroupList]);
+  // Active Selected Template Object
+  const activeTemplate: SuratTemplate = useMemo(() => {
+    return (
+      templates.find((t) => t.slug === selectedTemplateSlug) ||
+      templates[0] ||
+      DEFAULT_SURAT_TEMPLATES[0]
+    ) as SuratTemplate;
+  }, [templates, selectedTemplateSlug]);
 
-  const packageJamaahList = useMemo(() => {
+  // Active Selected Keberangkatan Object
+  const activeKeberangkatan = useMemo(() => {
+    if (!selectedPackageId) return storeKbrList[0] || null;
+    return storeKbrList.find((k: any) => k.id === selectedPackageId) || storeKbrList[0] || null;
+  }, [storeKbrList, selectedPackageId]);
+
+  // Filtered Jamaah for selected package
+  const availableJamaahList = useMemo(() => {
     if (!storeJamaah || storeJamaah.length === 0) return [];
     if (!selectedPackageId) return storeJamaah;
     return storeJamaah.filter((j: any) => {
-      const g = groupMap[j.groupId];
-      return g?.paketId === selectedPackageId || g?.paketKeberangkatanId === selectedPackageId;
+      if (j.group?.keberangkatanId === selectedPackageId) return true;
+      if (j.keberangkatanId === selectedPackageId) return true;
+      if (j.packageId === selectedPackageId) return true;
+      return true; // fallback allow selection
     });
-  }, [storeJamaah, selectedPackageId, groupMap]);
+  }, [storeJamaah, selectedPackageId]);
 
-  // Selected package object
-  const currentPackage = useMemo(() => {
-    return (storeKbrList || []).find((k: any) => k.id === selectedPackageId);
-  }, [storeKbrList, selectedPackageId]);
+  // Active Selected Jamaah Object
+  const activeJamaah = useMemo(() => {
+    if (!selectedJamaahId) return availableJamaahList[0] || null;
+    return availableJamaahList.find((j: any) => j.id === selectedJamaahId) || availableJamaahList[0] || null;
+  }, [availableJamaahList, selectedJamaahId]);
 
-  // Current Date info
-  const dateInfo = useMemo(() => getTodayFormatted(), []);
-
-  // Form State
-  const [nomorSurat, setNomorSurat] = useState<string>("");
-  const [lampiran, setLampiran] = useState<string>("-");
-  const [perihal, setPerihal] = useState<string>("");
-  const [kotaTerbit, setKotaTerbit] = useState<string>("Surabaya");
-  const [tanggalSurat, setTanggalSurat] = useState<string>(dateInfo.masehi);
-  const [namaPenandatangan, setNamaPenandatangan] = useState<string>("H. Mohammad Ridwan, S.Pd.I");
-  const [jabatanPenandatangan, setJabatanPenandatangan] = useState<string>("Direktur Operasional");
-
-  // Specific Form Fields
-  const [namaLengkap, setNamaLengkap] = useState<string>("");
-  const [nik, setNik] = useState<string>("");
-  const [nomorPaspor, setNomorPaspor] = useState<string>("");
-  const [tempatLahir, setTempatLahir] = useState<string>("");
-  const [tanggalLahir, setTanggalLahir] = useState<string>("");
-  const [jenisKelamin, setJenisKelamin] = useState<string>("Laki-laki");
-  const [alamat, setAlamat] = useState<string>("");
-
-  // Package schedule fields
-  const [namaPaket, setNamaPaket] = useState<string>("");
-  const [durasiHari, setDurasiHari] = useState<string>("9 Hari");
-  const [tanggalBerangkat, setTanggalBerangkat] = useState<string>("");
-  const [tanggalPulang, setTanggalPulang] = useState<string>("");
-  const [maskapai, setMaskapai] = useState<string>("Saudi Arabian Airlines");
-  const [hotelMakkah, setHotelMakkah] = useState<string>("Pullman Zamzam Makkah");
-  const [hotelMadinah, setHotelMadinah] = useState<string>("Rove Al Madinah");
-
-  // Submenu specific extra fields
-  // 1. Rekom
-  const [kantorImigrasi, setKantorImigrasi] = useState<string>(
-    "Kepala Kantor Imigrasi Kelas I Khusus TPI Surabaya"
-  );
-  const [keperluanRekom, setKeperluanRekom] = useState<string>(
-    "Pembuatan Paspor Baru untuk Keberangkatan Ibadah Umroh"
-  );
-
-  // 2. Cuti Pekerja
-  const [namaInstansi, setNamaInstansi] = useState<string>("PT. Maju Sejahtera Abadi");
-  const [nipKaryawan, setNipKaryawan] = useState<string>("-");
-  const [jabatanKaryawan, setJabatanKaryawan] = useState<string>("Staff Operasional");
-  const [pimpinanTujuan, setPimpinanTujuan] = useState<string>("Pimpinan / HRD Department");
-
-  // 3. Cuti Sekolah
-  const [namaSekolah, setNamaSekolah] = useState<string>("SMA Negeri 1 Surabaya");
-  const [nisnSiswa, setNisnSiswa] = useState<string>("-");
-  const [kelasSiswa, setKelasSiswa] = useState<string>("Kelas XI IPA 2");
-  const [kepalaSekolahTujuan, setKepalaSekolahTujuan] = useState<string>(
-    "Bapak / Ibu Kepala Sekolah & Dewan Guru"
-  );
-  const [namaWali, setNamaWali] = useState<string>("");
-
-  // 4. Keterangan
-  const [keperluanKeterangan, setKeperluanKeterangan] = useState<string>(
-    "Kelengkapan Administrasi dan Pengurusan Dokumen Resmi"
-  );
-  const [statusBooking, setStatusBooking] = useState<string>("Telah Terdaftar Resmi & Terkonfirmasi Lunas");
-
-  // 5. Tugas
-  const [peranPetugas, setPeranPetugas] = useState<string>("Tour Leader & Pembimbing Ibadah");
-  const [noKontakPetugas, setNoKontakPetugas] = useState<string>("+62 812-3456-7890");
-  const [jumlahJamaah, setJumlahJamaah] = useState<string>("45 Jamaah");
-  const [lingkupTugas, setLingkupTugas] = useState<string>(
-    "Membimbing ibadah manasik dan pelaksanaan umroh di Tanah Suci, mengoordinasikan akomodasi dan ziarah Makkah-Madinah, serta mengawal keselamatan dan kenyamanan rombongan jamaah."
-  );
-
-  // 6. Asuransi
-  const [namaAsuransi, setNamaAsuransi] = useState<string>("PT Asuransi Zurich Syariah Indonesia");
-  const [nomorPolis, setNomorPolis] = useState<string>("POL-VTU-2026-08892");
-  const [jenisKlaim, setJenisKlaim] = useState<string>("Klaim Biaya Pengobatan Medis / Rawat Inap di Saudi Arabia");
-  const [nilaiKlaim, setNilaiKlaim] = useState<string>("SAR 3.500 (Tiga Ribu Lima Ratus Riyal)");
-  const [kronologiSingkat, setKronologiSingkat] = useState<string>(
-    "Jamaah mengalami demam tinggi dan dehidrasi saat berada di Madinah sehingga memerlukan penanganan darurat dan rawat inap di Rumah Sakit Al-Ansar Madinah pada tanggal pelaksanaan ibadah."
-  );
-
-  // Auto-generate Nomor Surat when type or date changes
-  const config = SURAT_CONFIGS[activeType];
-
+  // Reset form when template changes
   useEffect(() => {
-    const randomSeq = String(Math.floor(Math.random() * 80) + 10).padStart(3, "0");
-    setNomorSurat(`${randomSeq}/VTU-OPS/${config.defaultKodeNomor}/${dateInfo.romanMonth}/${dateInfo.year}`);
-    setPerihal(config.defaultPerihal);
-  }, [activeType, config.defaultKodeNomor, config.defaultPerihal, dateInfo.romanMonth, dateInfo.year]);
+    if (activeTemplate) {
+      setCustomPerihal(activeTemplate.perihalDefault);
+      setCustomTujuan(activeTemplate.tujuanDefault || "Kepada Pihak yang Berkepentingan");
+      setCustomKotaTujuan(activeTemplate.kotaTujuanDefault || "Di Tempat");
+      setCustomLampiran(activeTemplate.lampiranDefault || "-");
 
-  // Sync Package Info when selectedPackage changes
-  useEffect(() => {
-    if (currentPackage) {
-      const p = currentPackage as any;
-      setNamaPaket(p.namaPaket || p.name || "PAKET UMROH VTU");
-      if (p.tanggalKeberangkatan || p.departureDate) {
-        setTanggalBerangkat(formatDate(p.tanggalKeberangkatan || p.departureDate));
-      }
-      if (p.tanggalKepulangan || p.returnDate) {
-        setTanggalPulang(formatDate(p.tanggalKepulangan || p.returnDate));
-      }
-      if (p.programHari || p.durationDays) {
-        setDurasiHari(`${p.programHari || p.durationDays} Hari`);
-      }
-      if (p.maskapai || p.airline) {
-        setMaskapai(p.maskapai || p.airline);
-      }
-      if (p.hotelMakkah) {
-        setHotelMakkah(p.hotelMakkah);
-      }
-      if (p.hotelMadinah) {
-        setHotelMadinah(p.hotelMadinah);
-      }
+      // Populate default manual values
+      const initialManual: Record<string, string> = {};
+      activeTemplate.placeholders.forEach((p) => {
+        if (p.sourceType === "manual" && p.defaultValue) {
+          initialManual[p.key] = p.defaultValue;
+        }
+      });
+      setManualFormData(initialManual);
     }
-  }, [currentPackage]);
+  }, [activeTemplate]);
 
-  // Sync Jamaah Info when selectedJamaah changes
-  const handleSelectJamaah = useCallback(
-    (jId: string) => {
-      setSelectedJamaahId(jId);
-      const raw = (storeJamaah || []).find((item: any) => item.id === jId);
-      if (raw) {
-        const j = raw as any;
-        setNamaLengkap(j.namaLengkap || "");
-        setNik(j.nik || "");
-        setNomorPaspor(j.nomorPaspor && j.nomorPaspor !== "-" ? j.nomorPaspor : "");
-        setTempatLahir(j.tempatLahir || "Surabaya");
-        setTanggalLahir(j.tanggalLahir ? formatDate(j.tanggalLahir) : "");
-        setJenisKelamin(j.gender === "female" || j.jenisKelamin === "P" || j.jenisKelamin === "Perempuan" ? "Perempuan" : "Laki-laki");
-        setAlamat(j.alamat || j.alamatLengkap || "-");
-        setNamaWali(j.namaMahram || j.namaAyah || "-");
-      }
-    },
-    [storeJamaah]
-  );
+  // Computed Nomored Letter String
+  const todayInfo = useMemo(() => getTodayDateInfo(), []);
+  const computedNomorSurat = useMemo(() => {
+    const prefix = activeTemplate?.kodeNomorDefault || "SR-PASPOR";
+    return `${prefix}/${nomorUrutSurat}/VTU/${todayInfo.romanMonth}/${todayInfo.year}`;
+  }, [activeTemplate, nomorUrutSurat, todayInfo]);
 
-  // Auto-select first jamaah in package
-  useEffect(() => {
-    if (packageJamaahList.length > 0 && !selectedJamaahId && packageJamaahList[0]) {
-      handleSelectJamaah(packageJamaahList[0].id);
-    }
-  }, [packageJamaahList, selectedJamaahId, handleSelectJamaah]);
+  // Autocrat Merged Field Values
+  const resolvedFieldValues = useMemo(() => {
+    if (!activeTemplate) return {};
+    return resolveAutocratFieldValues(
+      activeTemplate,
+      activeJamaah,
+      activeKeberangkatan,
+      manualFormData
+    );
+  }, [activeTemplate, activeJamaah, activeKeberangkatan, manualFormData]);
 
-  // Clean Print action
+  // Rendered Body Text
+  const renderedLetterBody = useMemo(() => {
+    if (!activeTemplate) return "";
+    return renderAutocratMergedText(activeTemplate.templateContent, resolvedFieldValues);
+  }, [activeTemplate, resolvedFieldValues]);
+
+  // Rendered Tujuan & Perihal
+  const renderedPerihal = useMemo(() => {
+    return renderAutocratMergedText(customPerihal || activeTemplate?.perihalDefault || "", resolvedFieldValues);
+  }, [customPerihal, activeTemplate, resolvedFieldValues]);
+
+  const renderedTujuan = useMemo(() => {
+    return renderAutocratMergedText(customTujuan || activeTemplate?.tujuanDefault || "", resolvedFieldValues);
+  }, [customTujuan, activeTemplate, resolvedFieldValues]);
+
+  const renderedKotaTujuan = useMemo(() => {
+    return renderAutocratMergedText(customKotaTujuan || activeTemplate?.kotaTujuanDefault || "", resolvedFieldValues);
+  }, [customKotaTujuan, activeTemplate, resolvedFieldValues]);
+
+  // Verification URL for QR Code
+  const verificationUrl = useMemo(() => {
+    const baseUrl = typeof window !== "undefined" ? window.location.origin : "https://vtuabadi.com";
+    const regId = activeJamaah?.registrationId || activeJamaah?.id || "";
+    const jamNama = encodeURIComponent(activeJamaah?.namaLengkap || "");
+    const pkgNama = encodeURIComponent(activeKeberangkatan?.namaPaket || "");
+    return `${baseUrl}/track/surat?no=${encodeURIComponent(computedNomorSurat)}&reg=${regId}&nama=${jamNama}&paket=${pkgNama}`;
+  }, [computedNomorSurat, activeJamaah, activeKeberangkatan]);
+
+  // ────────────────────────────────────────────────────────────
+  // ACTIONS: SAVE TO LOG, PRINT, DOWNLOAD, SHARE WHATSAPP
+  // ────────────────────────────────────────────────────────────
+
+  const handleSaveToHistory = useCallback(() => {
+    if (!activeTemplate) return;
+
+    const logItem: GeneratedSuratLog = {
+      id: `srt-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      nomorSurat: computedNomorSurat,
+      templateId: activeTemplate.id,
+      templateSlug: activeTemplate.slug,
+      templateName: activeTemplate.nama,
+      kategori: activeTemplate.kategori,
+      jamaahId: activeJamaah?.id,
+      jamaahNama: (activeJamaah?.namaLengkap || "Jamaah").toUpperCase(),
+      jamaahPaspor: activeJamaah?.nomorPaspor || "-",
+      jamaahNik: activeJamaah?.nik || "-",
+      packageId: activeKeberangkatan?.id,
+      packageKode: activeKeberangkatan?.kode,
+      packageName: activeKeberangkatan?.namaPaket || "Paket Umroh",
+      departureDate: activeKeberangkatan?.tanggalBerangkat,
+      returnDate: activeKeberangkatan?.tanggalPulang,
+      perihal: renderedPerihal,
+      generatedDate: new Date().toISOString(),
+      createdBy: "Admin Operasional",
+      fieldsData: { ...resolvedFieldValues },
+      renderedText: renderedLetterBody,
+      status: "aktif",
+      verificationUrl,
+    };
+
+    const updated = saveGeneratedSuratLog(logItem);
+    setHistoryLogs(updated);
+
+    fetch("/api/surat/generated", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(logItem),
+    }).catch(() => {});
+
+    return logItem;
+  }, [
+    activeTemplate,
+    computedNomorSurat,
+    activeJamaah,
+    activeKeberangkatan,
+    renderedPerihal,
+    resolvedFieldValues,
+    renderedLetterBody,
+    verificationUrl,
+  ]);
+
+  // Action: Print A4
   const handlePrint = () => {
+    if (!activeTemplate) return;
+    handleSaveToHistory();
     window.print();
   };
 
-  // Plain Text generator for WhatsApp
-  const generatePlainText = () => {
-    return `*${config.title.toUpperCase()}*\nPT. VISI TOUR UTAMA (VTU ABADI)\nNo: ${nomorSurat}\nPerihal: ${perihal}\n\nAssalamu'alaikum Wr. Wb.\n\nMenerangkan bahwa calon jamaah:\n• Nama: *${namaLengkap || "..."}*\n• NIK: ${nik || "-"}\n• No. Paspor: ${nomorPaspor || "-"}\n• Paket: ${namaPaket} (${durasiHari})\n• Tgl Berangkat: ${tanggalBerangkat} s/d ${tanggalPulang}\n• Maskapai: ${maskapai}\n\nDemikian surat ini dikeluarkan resmi oleh PT. Visi Tour Utama untuk dipergunakan sebagaimana mestinya.\n\nWassalamu'alaikum Wr. Wb.\n\n*H. Mohammad Ridwan, S.Pd.I*\nDirektur Operasional`;
-  };
+  // Action: Copy Text
+  const handleCopy = () => {
+    if (!activeTemplate) return;
+    const fullText = `
+NOMOR   : ${computedNomorSurat}
+LAMP    : ${customLampiran || "-"}
+PERIHAL : ${renderedPerihal}
 
-  const handleCopyText = () => {
-    navigator.clipboard.writeText(generatePlainText());
+${renderedTujuan}
+${renderedKotaTujuan}
+
+${renderedLetterBody}
+
+Sidoarjo, ${todayInfo.masehi}
+PT. VAUZA TRIKARSA UTAMA
+
+${activeTemplate.penandatangan.nama}
+${activeTemplate.penandatangan.jabatan}
+    `.trim();
+
+    navigator.clipboard.writeText(fullText);
     setCopiedText(true);
+    showToast("Teks surat berhasil disalin ke clipboard!");
     setTimeout(() => setCopiedText(false), 2000);
   };
 
+  // Action: Share WhatsApp
   const handleShareWhatsApp = () => {
-    const text = encodeURIComponent(generatePlainText());
-    window.open(`https://api.whatsapp.com/send?text=${text}`, "_blank");
+    if (!activeTemplate) return;
+    handleSaveToHistory();
+    const phone = activeJamaah?.nomorTelepon || "";
+    const cleanPhone = phone.replace(/[^0-9]/g, "").replace(/^0/, "62");
+    const msg = `*PT. VAUZA TRIKARSA UTAMA (VTU ABADI)*
+_Penyelenggara Ibadah Umroh Kemenag RI No. U.400/2021_
+
+Yth. Bapak/Ibu *${activeJamaah?.namaLengkap || "Jamaah"}*,
+
+Berikut adalah informasi penerbitan *${activeTemplate.nama}*:
+📄 *Nomor Surat*: ${computedNomorSurat}
+📌 *Perihal*: ${renderedPerihal}
+✈️ *Paket*: ${activeKeberangkatan?.namaPaket || "-"}
+
+🔗 *Verifikasi Keabsahan Surat Digital*:
+${verificationUrl}
+
+Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Terima kasih.`.trim();
+
+    const waUrl = cleanPhone
+      ? `https://wa.me/${cleanPhone}?text=${encodeURIComponent(msg)}`
+      : `https://wa.me/?text=${encodeURIComponent(msg)}`;
+    window.open(waUrl, "_blank");
   };
 
+  // Action: Download HTML / Text File
+  const handleDownloadDoc = () => {
+    if (!activeTemplate) return;
+    handleSaveToHistory();
+    const blob = new Blob(
+      [
+        `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>${computedNomorSurat} - ${activeTemplate.nama}</title>
+  <style>
+    body { font-family: 'Times New Roman', serif; margin: 40px; line-height: 1.6; color: #111; }
+    .header { border-bottom: 2px solid #000; padding-bottom: 12px; margin-bottom: 20px; display: flex; align-items: center; }
+    .meta { display: flex; justify-content: space-between; margin-bottom: 20px; font-family: sans-serif; font-size: 13px; }
+    .content { white-space: pre-line; text-align: justify; font-size: 14px; }
+    .footer { margin-top: 40px; display: flex; justify-content: space-between; align-items: flex-end; font-family: sans-serif; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div style="font-family: sans-serif;">
+      <h2 style="margin: 0; font-size: 18px;">PT. VAUZA TRIKARSA UTAMA</h2>
+      <p style="margin: 2px 0; font-size: 11px; color: #555;">Penyelenggara Perjalanan Ibadah Umroh (PPIU) Kemenag RI No. U.400 Tahun 2021</p>
+      <p style="margin: 0; font-size: 10px; color: #777;">Ruko Gateway Blok C-12, Waru, Sidoarjo &bull; Telp: (031) 854-4455</p>
+    </div>
+  </div>
+  <div class="meta">
+    <div>
+      <p><strong>Nomor</strong> : ${computedNomorSurat}</p>
+      <p><strong>Lamp</strong>  : ${customLampiran || "-"}</p>
+      <p><strong>Perihal</strong>: <strong>${renderedPerihal}</strong></p>
+    </div>
+    <div style="text-align: right;">
+      <p>Sidoarjo, ${todayInfo.masehi}</p>
+    </div>
+  </div>
+  <p style="font-family: sans-serif; font-size: 13px;">${renderedTujuan}<br>${renderedKotaTujuan}</p>
+  <div class="content">${renderedLetterBody}</div>
+  <div class="footer">
+    <div style="font-size: 10px; border: 1px solid #ccc; padding: 6px 10px; border-radius: 6px;">
+      <strong>VERIFIKASI KEABSAHAN SISTEM:</strong><br>${verificationUrl}
+    </div>
+    <div style="text-align: center; min-width: 200px;">
+      <p style="margin: 0; font-weight: bold;">PT. VAUZA TRIKARSA UTAMA</p>
+      <div style="height: 60px;"></div>
+      <p style="margin: 0; font-weight: bold; text-decoration: underline;">${activeTemplate.penandatangan.nama}</p>
+      <p style="margin: 0; font-size: 12px; color: #555;">${activeTemplate.penandatangan.jabatan}</p>
+    </div>
+  </div>
+</body>
+</html>`,
+      ],
+      { type: "text/html" }
+    );
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${computedNomorSurat.replace(/[/\\?%*:|"<>]/g, "-")}_${activeTemplate.nama}.html`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast("File dokumen surat berhasil diunduh!");
+  };
+
+  // Delete History Item
+  const handleDeleteHistory = (id: string) => {
+    if (!window.confirm("Hapus riwayat surat ini?")) return;
+    const updated = deleteGeneratedSuratLog(id);
+    setHistoryLogs(updated);
+    fetch(`/api/surat/generated?id=${id}`, { method: "DELETE" }).catch(() => {});
+    showToast("Riwayat surat berhasil dihapus");
+  };
+
+  // Filtered History
+  const filteredHistory = useMemo(() => {
+    return historyLogs.filter((log) => {
+      const matchSearch =
+        log.nomorSurat.toLowerCase().includes(historySearch.toLowerCase()) ||
+        log.jamaahNama.toLowerCase().includes(historySearch.toLowerCase()) ||
+        (log.jamaahPaspor && log.jamaahPaspor.toLowerCase().includes(historySearch.toLowerCase())) ||
+        log.packageName.toLowerCase().includes(historySearch.toLowerCase()) ||
+        log.perihal.toLowerCase().includes(historySearch.toLowerCase());
+      const matchTemplate =
+        historyFilterTemplate === "all" ||
+        log.templateSlug === historyFilterTemplate ||
+        log.templateId === historyFilterTemplate;
+      return matchSearch && matchTemplate;
+    });
+  }, [historyLogs, historySearch, historyFilterTemplate]);
+
   return (
-    <div className="space-y-6 animate-in fade-in duration-200">
-      {/* Header Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 print:hidden">
-        <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-bold tracking-tight text-foreground">Generate Surat Operasional</h1>
-            <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">
-              <Sparkles className="h-3 w-3" />
-              Template Resmi PPIU
-            </span>
+    <div className="space-y-6 pb-24">
+      {/* Toast Notification */}
+      {toastMessage && (
+        <div className="fixed bottom-6 right-6 z-50 animate-in fade-in slide-in-from-bottom-3 duration-200">
+          <div className="flex items-center gap-2.5 bg-emerald-900/90 border border-emerald-500 text-white text-xs font-semibold px-4 py-3 rounded-xl shadow-2xl backdrop-blur-md">
+            <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
+            <span>{toastMessage}</span>
           </div>
-          <p className="text-sm text-muted-foreground mt-1">
-            Cetak dan ekspor surat rekomendasi, dispensasi cuti, surat tugas, dan klaim asuransi resmi ber-kop surat.
-          </p>
+        </div>
+      )}
+
+      {/* ── HEADER ── */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <div className="flex items-center gap-2.5">
+            <div className="p-2 rounded-xl bg-primary/10 text-primary">
+              <ScrollText className="h-6 w-6" />
+            </div>
+            <div>
+              <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground">
+                Generate Surat Operasional & Rekomendasi
+              </h1>
+              <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
+                Pembuatan surat otomatis dengan <strong>Autocrat Merge Engine</strong>, auto-fill data manifest, cetak A4, dan riwayat terintegrasi.
+              </p>
+            </div>
+          </div>
         </div>
 
-        {/* Action Buttons */}
+        {/* Top Actions & Master Surat Link */}
         <div className="flex items-center gap-2">
           <Button
             variant="outline"
             size="sm"
-            onClick={handleCopyText}
-            className="border-stone-300 dark:border-stone-700"
+            className="text-xs"
+            onClick={() => router.push("/admin/master/surat")}
           >
-            {copiedText ? <Check className="mr-1.5 h-4 w-4 text-success" /> : <Copy className="mr-1.5 h-4 w-4" />}
-            {copiedText ? "Tersalin!" : "Salin Teks"}
-          </Button>
-
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleShareWhatsApp}
-            className="border-emerald-500/40 text-emerald-600 hover:bg-emerald-500/10"
-          >
-            <Share2 className="mr-1.5 h-4 w-4" />
-            Kirim WhatsApp
-          </Button>
-
-          <Button
-            variant="default"
-            size="sm"
-            onClick={handlePrint}
-            className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold shadow"
-          >
-            <Printer className="mr-1.5 h-4 w-4" />
-            Cetak / Print Surat
+            <Sliders className="mr-1.5 h-3.5 w-3.5 text-primary" />
+            Konfigurasi Master Template Surat
           </Button>
         </div>
       </div>
 
-      {/* Submenu Tabs Navigation */}
-      <div className="print:hidden border-b border-border/60 pb-px">
-        <div className="flex items-center gap-1.5 overflow-x-auto py-1 scrollbar-none">
-          {(Object.keys(SURAT_CONFIGS) as SuratType[]).map((key) => {
-            const item = SURAT_CONFIGS[key];
-            const Icon = item.icon;
-            const isActive = activeType === key;
-            return (
-              <button
-                key={key}
-                type="button"
-                onClick={() => handleTabChange(key)}
-                className={cn(
-                  "flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all duration-150",
-                  isActive
-                    ? "bg-primary text-primary-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
-                )}
-              >
-                <Icon className={cn("h-4 w-4", isActive ? "text-primary-foreground" : "text-muted-foreground")} />
-                <span>{item.shortLabel}</span>
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Main Content Layout: Left Form + Right Live Letter Sheet */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* LEFT COLUMN: Input Configuration Form (Col 5) */}
-        <div className="lg:col-span-5 space-y-4 print:hidden">
-          {/* Quick Auto-Fill Selector Card */}
-          <Card className="border-border/60 shadow-sm">
-            <CardHeader className="py-3 px-4 bg-muted/20 border-b border-border/40">
-              <CardTitle className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center justify-between">
-                <span className="flex items-center gap-1.5">
-                  <User className="h-3.5 w-3.5 text-primary" />
-                  Sumber Data & Auto-Fill Jamaah
-                </span>
-                {loadingData && (
-                  <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
-                    <RefreshCw className="h-3 w-3 animate-spin" /> Memuat...
-                  </span>
-                )}
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-4 space-y-3">
-              {/* Package Select */}
-              <div className="space-y-1">
-                <label className="text-xs font-medium text-foreground">1. Pilih Paket Keberangkatan</label>
-                <Select
-                  value={selectedPackageId}
-                  onChange={(e) => {
-                    setSelectedPackageId(e.target.value);
-                    setSelectedJamaahId("");
-                  }}
-                  options={packageOptions}
-                  placeholder="-- Pilih Paket Keberangkatan --"
-                />
-              </div>
-
-              {/* Jamaah Select */}
-              {activeType !== "tugas" && (
-                <div className="space-y-1">
-                  <label className="text-xs font-medium text-foreground">2. Pilih Jamaah Terdaftar ({packageJamaahList.length} Pax)</label>
-                  <Select
-                    value={selectedJamaahId}
-                    onChange={(e) => handleSelectJamaah(e.target.value)}
-                    options={[
-                      { value: "", label: "-- Input Manual / Pilih Jamaah --" },
-                      ...packageJamaahList.map((j: any) => ({
-                        value: j.id,
-                        label: `${j.nomorPeserta || j.registrationId || "JM"} — ${j.namaLengkap} (${j.nik || "No NIK"})`,
-                      })),
-                    ]}
-                    placeholder="-- Pilih Jamaah --"
-                  />
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Detailed Form Configuration Card */}
-          <Card className="border-border/60 shadow-sm">
-            <CardHeader className="py-3 px-4 bg-muted/20 border-b border-border/40">
-              <CardTitle className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                <FileText className="h-3.5 w-3.5 text-primary" />
-                Parameter & Isi Surat
-              </CardTitle>
-            </CardHeader>
-
-            <CardContent className="p-4 space-y-4 text-xs">
-              {/* Header Info */}
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="font-medium text-muted-foreground">Nomor Surat</label>
-                  <Input
-                    value={nomorSurat}
-                    onChange={(e) => setNomorSurat(e.target.value)}
-                    className="h-8 text-xs font-mono"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="font-medium text-muted-foreground">Lampiran</label>
-                  <Input
-                    value={lampiran}
-                    onChange={(e) => setLampiran(e.target.value)}
-                    className="h-8 text-xs"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-1">
-                <label className="font-medium text-muted-foreground">Perihal Surat</label>
-                <Input
-                  value={perihal}
-                  onChange={(e) => setPerihal(e.target.value)}
-                  className="h-8 text-xs font-semibold"
-                />
-              </div>
-
-              {/* Dynamic Submenu Inputs */}
-              {activeType === "rekom" && (
-                <div className="space-y-3 pt-2 border-t border-border/40">
-                  <h4 className="text-[11px] font-bold text-primary uppercase tracking-wider">Spesifik Surat Rekom Paspor</h4>
-                  <div className="space-y-1">
-                    <label className="font-medium text-muted-foreground">Tujuan Kantor Imigrasi</label>
-                    <Input
-                      value={kantorImigrasi}
-                      onChange={(e) => setKantorImigrasi(e.target.value)}
-                      placeholder="e.g. Kepala Kantor Imigrasi Kelas I Khusus TPI Surabaya"
-                      className="h-8 text-xs"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="font-medium text-muted-foreground">Keperluan Rekomendasi</label>
-                    <Input
-                      value={keperluanRekom}
-                      onChange={(e) => setKeperluanRekom(e.target.value)}
-                      placeholder="e.g. Pembuatan Paspor Baru untuk Ibadah Umroh"
-                      className="h-8 text-xs"
-                    />
-                  </div>
-                </div>
-              )}
-
-              {activeType === "cuti-pekerja" && (
-                <div className="space-y-3 pt-2 border-t border-border/40">
-                  <h4 className="text-[11px] font-bold text-emerald-600 uppercase tracking-wider">Spesifik Cuti Pekerja</h4>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1">
-                      <label className="font-medium text-muted-foreground">Nama Instansi / Kantor</label>
-                      <Input
-                        value={namaInstansi}
-                        onChange={(e) => setNamaInstansi(e.target.value)}
-                        placeholder="Nama Perusahaan"
-                        className="h-8 text-xs"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="font-medium text-muted-foreground">Tujuan Pimpinan / HRD</label>
-                      <Input
-                        value={pimpinanTujuan}
-                        onChange={(e) => setPimpinanTujuan(e.target.value)}
-                        placeholder="Pimpinan HRD"
-                        className="h-8 text-xs"
-                      />
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1">
-                      <label className="font-medium text-muted-foreground">NIP / NIK Karyawan</label>
-                      <Input
-                        value={nipKaryawan}
-                        onChange={(e) => setNipKaryawan(e.target.value)}
-                        placeholder="NIP Karyawan"
-                        className="h-8 text-xs font-mono"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="font-medium text-muted-foreground">Jabatan Karyawan</label>
-                      <Input
-                        value={jabatanKaryawan}
-                        onChange={(e) => setJabatanKaryawan(e.target.value)}
-                        placeholder="Jabatan"
-                        className="h-8 text-xs"
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {activeType === "cuti-sekolah" && (
-                <div className="space-y-3 pt-2 border-t border-border/40">
-                  <h4 className="text-[11px] font-bold text-amber-600 uppercase tracking-wider">Spesifik Cuti Sekolah / Kuliah</h4>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1">
-                      <label className="font-medium text-muted-foreground">Nama Sekolah / Kampus</label>
-                      <Input
-                        value={namaSekolah}
-                        onChange={(e) => setNamaSekolah(e.target.value)}
-                        placeholder="e.g. SMA Negeri 1 Surabaya"
-                        className="h-8 text-xs"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="font-medium text-muted-foreground">Tujuan Pimpinan</label>
-                      <Input
-                        value={kepalaSekolahTujuan}
-                        onChange={(e) => setKepalaSekolahTujuan(e.target.value)}
-                        placeholder="Kepala Sekolah"
-                        className="h-8 text-xs"
-                      />
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1">
-                      <label className="font-medium text-muted-foreground">NISN / NIM Siswa</label>
-                      <Input
-                        value={nisnSiswa}
-                        onChange={(e) => setNisnSiswa(e.target.value)}
-                        placeholder="NISN"
-                        className="h-8 text-xs font-mono"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="font-medium text-muted-foreground">Kelas / Jurusan</label>
-                      <Input
-                        value={kelasSiswa}
-                        onChange={(e) => setKelasSiswa(e.target.value)}
-                        placeholder="Kelas XI IPA"
-                        className="h-8 text-xs"
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-1">
-                    <label className="font-medium text-muted-foreground">Nama Orang Tua / Pendamping</label>
-                    <Input
-                      value={namaWali}
-                      onChange={(e) => setNamaWali(e.target.value)}
-                      placeholder="Nama Wali / Orang Tua"
-                      className="h-8 text-xs"
-                    />
-                  </div>
-                </div>
-              )}
-
-              {activeType === "keterangan" && (
-                <div className="space-y-3 pt-2 border-t border-border/40">
-                  <h4 className="text-[11px] font-bold text-purple-600 uppercase tracking-wider">Spesifik Surat Keterangan</h4>
-                  <div className="space-y-1">
-                    <label className="font-medium text-muted-foreground">Keperluan Surat Keterangan</label>
-                    <Input
-                      value={keperluanKeterangan}
-                      onChange={(e) => setKeperluanKeterangan(e.target.value)}
-                      placeholder="e.g. Kelengkapan Administrasi Perbankan"
-                      className="h-8 text-xs"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="font-medium text-muted-foreground">Status Pendaftaran</label>
-                    <Input
-                      value={statusBooking}
-                      onChange={(e) => setStatusBooking(e.target.value)}
-                      placeholder="Status Booking"
-                      className="h-8 text-xs"
-                    />
-                  </div>
-                </div>
-              )}
-
-              {activeType === "tugas" && (
-                <div className="space-y-3 pt-2 border-t border-border/40">
-                  <h4 className="text-[11px] font-bold text-indigo-600 uppercase tracking-wider">Spesifik Surat Perintah Tugas</h4>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1">
-                      <label className="font-medium text-muted-foreground">Peran / Penugasan</label>
-                      <Input
-                        value={peranPetugas}
-                        onChange={(e) => setPeranPetugas(e.target.value)}
-                        placeholder="Tour Leader & Muthawwif"
-                        className="h-8 text-xs"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="font-medium text-muted-foreground">Kontak Petugas</label>
-                      <Input
-                        value={noKontakPetugas}
-                        onChange={(e) => setNoKontakPetugas(e.target.value)}
-                        placeholder="+62 812-..."
-                        className="h-8 text-xs"
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-1">
-                    <label className="font-medium text-muted-foreground">Jumlah Jamaah Rombongan</label>
-                    <Input
-                      value={jumlahJamaah}
-                      onChange={(e) => setJumlahJamaah(e.target.value)}
-                      placeholder="45 Jamaah"
-                      className="h-8 text-xs"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="font-medium text-muted-foreground">Lingkup Tanggung Jawab & Tugas</label>
-                    <textarea
-                      value={lingkupTugas}
-                      onChange={(e) => setLingkupTugas(e.target.value)}
-                      rows={3}
-                      className="w-full text-xs rounded-md border border-input bg-background px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-primary"
-                    />
-                  </div>
-                </div>
-              )}
-
-              {activeType === "klaim-asuransi" && (
-                <div className="space-y-3 pt-2 border-t border-border/40">
-                  <h4 className="text-[11px] font-bold text-rose-600 uppercase tracking-wider">Spesifik Klaim Asuransi</h4>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1">
-                      <label className="font-medium text-muted-foreground">Perusahaan Asuransi</label>
-                      <Input
-                        value={namaAsuransi}
-                        onChange={(e) => setNamaAsuransi(e.target.value)}
-                        placeholder="Nama Asuransi"
-                        className="h-8 text-xs"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="font-medium text-muted-foreground">Nomor Polis / Sertifikat</label>
-                      <Input
-                        value={nomorPolis}
-                        onChange={(e) => setNomorPolis(e.target.value)}
-                        placeholder="POL-VTU-..."
-                        className="h-8 text-xs font-mono"
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-1">
-                    <label className="font-medium text-muted-foreground">Jenis Pengajuan Klaim</label>
-                    <Input
-                      value={jenisKlaim}
-                      onChange={(e) => setJenisKlaim(e.target.value)}
-                      placeholder="e.g. Biaya Rawat Inap di Saudi"
-                      className="h-8 text-xs"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="font-medium text-muted-foreground">Estimasi Nilai Klaim</label>
-                    <Input
-                      value={nilaiKlaim}
-                      onChange={(e) => setNilaiKlaim(e.target.value)}
-                      placeholder="SAR 3.500"
-                      className="h-8 text-xs font-semibold"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="font-medium text-muted-foreground">Kronologi Singkat Kejadian</label>
-                    <textarea
-                      value={kronologiSingkat}
-                      onChange={(e) => setKronologiSingkat(e.target.value)}
-                      rows={3}
-                      className="w-full text-xs rounded-md border border-input bg-background px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-primary"
-                    />
-                  </div>
-                </div>
-              )}
-
-              {/* Biodata Jamaah / Petugas Details */}
-              <div className="space-y-3 pt-2 border-t border-border/40">
-                <h4 className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
-                  {activeType === "tugas" ? "Data Petugas Bertugas" : "Data Jamaah"}
-                </h4>
-                <div className="space-y-1">
-                  <label className="font-medium text-muted-foreground">Nama Lengkap</label>
-                  <Input
-                    value={namaLengkap}
-                    onChange={(e) => setNamaLengkap(e.target.value)}
-                    placeholder="Nama Lengkap"
-                    className="h-8 text-xs font-semibold"
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <label className="font-medium text-muted-foreground">NIK</label>
-                    <Input
-                      value={nik}
-                      onChange={(e) => setNik(e.target.value)}
-                      placeholder="3515..."
-                      className="h-8 text-xs font-mono"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="font-medium text-muted-foreground">Nomor Paspor</label>
-                    <Input
-                      value={nomorPaspor}
-                      onChange={(e) => setNomorPaspor(e.target.value)}
-                      placeholder="B 1234567"
-                      className="h-8 text-xs font-mono"
-                    />
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <label className="font-medium text-muted-foreground">Tempat Lahir</label>
-                    <Input
-                      value={tempatLahir}
-                      onChange={(e) => setTempatLahir(e.target.value)}
-                      className="h-8 text-xs"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="font-medium text-muted-foreground">Tanggal Lahir</label>
-                    <Input
-                      value={tanggalLahir}
-                      onChange={(e) => setTanggalLahir(e.target.value)}
-                      className="h-8 text-xs"
-                    />
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <label className="font-medium text-muted-foreground">Jenis Kelamin</label>
-                    <Select
-                      value={jenisKelamin}
-                      onChange={(e) => setJenisKelamin(e.target.value)}
-                      options={[
-                        { value: "Laki-laki", label: "Laki-laki" },
-                        { value: "Perempuan", label: "Perempuan" },
-                      ]}
-                      className="h-8 text-xs"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="font-medium text-muted-foreground">Alamat Lengkap</label>
-                    <Input
-                      value={alamat}
-                      onChange={(e) => setAlamat(e.target.value)}
-                      className="h-8 text-xs"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Package & Flight Details */}
-              <div className="space-y-3 pt-2 border-t border-border/40">
-                <h4 className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Jadwal & Akomodasi Paket</h4>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <label className="font-medium text-muted-foreground">Nama Paket</label>
-                    <Input
-                      value={namaPaket}
-                      onChange={(e) => setNamaPaket(e.target.value)}
-                      className="h-8 text-xs"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="font-medium text-muted-foreground">Durasi Program</label>
-                    <Input
-                      value={durasiHari}
-                      onChange={(e) => setDurasiHari(e.target.value)}
-                      className="h-8 text-xs"
-                    />
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <label className="font-medium text-muted-foreground">Tanggal Berangkat</label>
-                    <Input
-                      value={tanggalBerangkat}
-                      onChange={(e) => setTanggalBerangkat(e.target.value)}
-                      className="h-8 text-xs"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="font-medium text-muted-foreground">Tanggal Pulang</label>
-                    <Input
-                      value={tanggalPulang}
-                      onChange={(e) => setTanggalPulang(e.target.value)}
-                      className="h-8 text-xs"
-                    />
-                  </div>
-                </div>
-                <div className="space-y-1">
-                  <label className="font-medium text-muted-foreground">Maskapai Penerbangan</label>
-                  <Input
-                    value={maskapai}
-                    onChange={(e) => setMaskapai(e.target.value)}
-                    className="h-8 text-xs"
-                  />
-                </div>
-              </div>
-
-              {/* Signer Info */}
-              <div className="space-y-3 pt-2 border-t border-border/40">
-                <h4 className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Pengesahan Surat</h4>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <label className="font-medium text-muted-foreground">Kota Terbit</label>
-                    <Input
-                      value={kotaTerbit}
-                      onChange={(e) => setKotaTerbit(e.target.value)}
-                      className="h-8 text-xs"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="font-medium text-muted-foreground">Tanggal Terbit</label>
-                    <Input
-                      value={tanggalSurat}
-                      onChange={(e) => setTanggalSurat(e.target.value)}
-                      className="h-8 text-xs"
-                    />
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <label className="font-medium text-muted-foreground">Penandatangan</label>
-                    <Input
-                      value={namaPenandatangan}
-                      onChange={(e) => setNamaPenandatangan(e.target.value)}
-                      className="h-8 text-xs"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="font-medium text-muted-foreground">Jabatan</label>
-                    <Input
-                      value={jabatanPenandatangan}
-                      onChange={(e) => setJabatanPenandatangan(e.target.value)}
-                      className="h-8 text-xs"
-                    />
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* RIGHT COLUMN: Live Interactive Letter Sheet (Col 7 / Full on Print) */}
-        <div className="lg:col-span-7 w-full">
-          {/* Printable Sheet Container */}
-          <div
-            id="printable-surat-sheet"
+      {/* ── MAIN TAB NAVIGATION (GENERATOR vs RIWAYAT) ── */}
+      <div className="flex items-center justify-between border-b pb-2">
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setActiveMainTab("generator")}
             className={cn(
-              "bg-white text-black p-8 sm:p-12 rounded-xl shadow-md border border-stone-200 min-h-[950px] font-serif text-[13px] leading-relaxed relative",
-              "print:shadow-none print:border-none print:p-0 print:m-0 print:min-h-0 print:w-full print:rounded-none"
+              "px-4 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-2",
+              activeMainTab === "generator"
+                ? "bg-primary text-primary-foreground shadow-sm"
+                : "text-muted-foreground hover:bg-muted"
             )}
           >
-            {/* ── KOP SURAT HEADER ──────────────────────────── */}
-            <div className="border-b-2 border-stone-900 pb-3 mb-6">
-              {KOP_SURAT_BASE64 ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={KOP_SURAT_BASE64}
-                  alt="Kop Surat PT. Visi Tour Utama"
-                  className="w-full object-contain max-h-32 mb-1"
-                />
-              ) : (
-                <div className="flex items-center justify-between gap-4">
+            <Sparkles className="h-4 w-4" />
+            Generator Surat (Autocrat Engine)
+          </button>
+
+          <button
+            onClick={() => setActiveMainTab("history")}
+            className={cn(
+              "px-4 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-2",
+              activeMainTab === "history"
+                ? "bg-primary text-primary-foreground shadow-sm"
+                : "text-muted-foreground hover:bg-muted"
+            )}
+          >
+            <History className="h-4 w-4" />
+            Dashboard & Riwayat Surat Tergenerate
+            <Badge variant="secondary" size="sm" className="ml-1 text-[10px]">
+              {historyLogs.length}
+            </Badge>
+          </button>
+        </div>
+
+        <div className="hidden sm:flex items-center gap-2 text-xs text-muted-foreground">
+          <span>Format: A4 Letterhead</span>
+          <span>&bull;</span>
+          <span>PPIU No. U.400/2021</span>
+        </div>
+      </div>
+
+      {/* ══════════════════════════════════════════════════════════ */}
+      {/* TAB 1: GENERATOR SURAT (AUTOCRAT ENGINE) */}
+      {/* ══════════════════════════════════════════════════════════ */}
+      {activeMainTab === "generator" && (
+        <div className="space-y-6">
+          {/* Template Selector Pills */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                <Layers className="h-3.5 w-3.5 text-primary" />
+                Pilih Template Surat:
+              </label>
+              <button
+                onClick={() => router.push("/admin/master/surat")}
+                className="text-[11px] font-semibold text-primary hover:underline flex items-center gap-1"
+              >
+                + Kelola / Tambah Template di Master Surat
+                <ArrowRight className="h-3 w-3" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+              {templates.map((tpl) => {
+                const isSelected = tpl.slug === activeTemplate?.slug;
+                return (
+                  <button
+                    key={tpl.id}
+                    onClick={() => setSelectedTemplateSlug(tpl.slug)}
+                    className={cn(
+                      "p-3 rounded-xl border text-left transition-all relative flex flex-col justify-between",
+                      isSelected
+                        ? "bg-primary/10 border-primary text-primary shadow-sm ring-1 ring-primary"
+                        : "bg-card hover:bg-muted/60 border-stone-200 dark:border-stone-800 text-foreground"
+                    )}
+                  >
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between">
+                        <Badge variant="outline" size="sm" className="text-[9px] font-mono">
+                          {tpl.kodeNomorDefault}
+                        </Badge>
+                        {isSelected && <Check className="h-3.5 w-3.5 text-primary" />}
+                      </div>
+                      <p className="text-xs font-bold line-clamp-1 mt-1">{tpl.nama}</p>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground mt-2 line-clamp-1">
+                      {tpl.placeholders.length} Tag Placeholder
+                    </p>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* TWO COLUMN WORKSPACE: CONFIG & MANIFEST AUTO-FILL (LEFT) + A4 PREVIEW (RIGHT) */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+            {/* ── LEFT COLUMN (5 COLS): CONTROLS & DYNAMIC AUTOCRAT FORM ── */}
+            <div className="lg:col-span-5 space-y-4">
+              {/* Card 1: Data Source Selector (Manifest & Jamaah) */}
+              <Card className="border-stone-200 dark:border-stone-800">
+                <CardHeader className="pb-3 border-b border-stone-200 dark:border-stone-800">
+                  <CardTitle className="text-xs font-bold flex items-center justify-between">
+                    <span className="flex items-center gap-1.5 text-foreground">
+                      <Plane className="h-4 w-4 text-primary" />
+                      1. Pilih Paket & Jamaah dari Manifest
+                    </span>
+                    <Badge variant="success" size="sm" className="text-[10px]">
+                      Auto-Fill Active
+                    </Badge>
+                  </CardTitle>
+                </CardHeader>
+
+                <CardContent className="pt-4 space-y-3.5">
+                  {/* Select Keberangkatan */}
                   <div>
-                    <h2 className="text-xl font-bold tracking-tight text-emerald-950 font-sans">
-                      PT. VISI TOUR UTAMA (VTU ABADI)
-                    </h2>
-                    <p className="text-[11px] font-sans text-stone-600">
-                      Penyelenggara Perjalanan Ibadah Umrah (PPIU) Resmi Kemenag RI No. U.404 / Akreditasi A
-                    </p>
-                    <p className="text-[10px] font-sans text-stone-500">
-                      Jl. Raya Sedati Agung No. 58, Sidoarjo, Jawa Timur 61253 • Telp: (031) 8688-999 • Email: operasional@vtuabadi.com
-                    </p>
+                    <label className="text-xs font-semibold text-foreground flex items-center gap-1">
+                      Paket Keberangkatan
+                    </label>
+                    <Select
+                      value={selectedPackageId}
+                      onChange={(e) => setSelectedPackageId(e.target.value)}
+                      options={[
+                        { value: "", label: "-- Pilih Paket Keberangkatan --" },
+                        ...storeKbrList.map((k: any) => ({
+                          value: k.id,
+                          label: `${k.kode || k.kodePaket || "KBR"} — ${k.namaPaket || k.name} (${formatDateShort(k.tanggalBerangkat || k.departureDate)})`,
+                        })),
+                      ]}
+                      className="text-xs mt-1"
+                    />
                   </div>
-                </div>
-              )}
-            </div>
 
-            {/* ── METADATA HEADER: Nomor, Lampiran, Tanggal ───── */}
-            <div className="flex justify-between items-start mb-6 text-[12px] font-sans">
-              <div className="space-y-0.5">
-                <p>
-                  <span className="inline-block w-20">Nomor</span>: <span className="font-mono font-semibold">{nomorSurat}</span>
-                </p>
-                <p>
-                  <span className="inline-block w-20">Lampiran</span>: {lampiran}
-                </p>
-                <p>
-                  <span className="inline-block w-20">Perihal</span>: <strong className="underline">{perihal}</strong>
-                </p>
-              </div>
-              <div className="text-right">
-                <p>
-                  {kotaTerbit}, {tanggalSurat}
-                </p>
-              </div>
-            </div>
+                  {/* Select Jamaah */}
+                  <div>
+                    <label className="text-xs font-semibold text-foreground flex items-center justify-between">
+                      <span>Pilih Jamaah Penerima Surat</span>
+                      <span className="text-[11px] text-muted-foreground">
+                        {availableJamaahList.length} Jamaah Tersedia
+                      </span>
+                    </label>
+                    <Select
+                      value={selectedJamaahId}
+                      onChange={(e) => setSelectedJamaahId(e.target.value)}
+                      options={[
+                        { value: "", label: "-- Pilih Jamaah dari Manifest --" },
+                        ...availableJamaahList.map((j: any) => ({
+                          value: j.id,
+                          label: `${(j.namaLengkap || j.name || "").toUpperCase()} (Paspor: ${j.nomorPaspor || j.passportNumber || "-"}) — NIK: ${j.nik || "-"}`,
+                        })),
+                      ]}
+                      className="text-xs mt-1"
+                    />
+                  </div>
 
-            {/* ── TUJUAN SURAT ──────────────────────────────── */}
-            <div className="mb-5 font-sans text-[12px]">
-              <p>Kepada Yth.</p>
-              {activeType === "rekom" && (
-                <>
-                  <p className="font-bold">{kantorImigrasi}</p>
-                  <p>Di Tempat</p>
-                </>
-              )}
-              {activeType === "cuti-pekerja" && (
-                <>
-                  <p className="font-bold">{pimpinanTujuan}</p>
-                  <p className="font-semibold">{namaInstansi}</p>
-                  <p>Di Tempat</p>
-                </>
-              )}
-              {activeType === "cuti-sekolah" && (
-                <>
-                  <p className="font-bold">{kepalaSekolahTujuan}</p>
-                  <p className="font-semibold">{namaSekolah}</p>
-                  <p>Di Tempat</p>
-                </>
-              )}
-              {activeType === "keterangan" && (
-                <>
-                  <p className="font-bold">Pihak Terkait / Yang Berkepentingan</p>
-                  <p>Di Tempat</p>
-                </>
-              )}
-              {activeType === "tugas" && (
-                <>
-                  <p className="font-bold">Seluruh Instansi & Pihak Terkait (Bandara, Imigrasi, Hotel & Maskapai)</p>
-                  <p>Di Tempat</p>
-                </>
-              )}
-              {activeType === "klaim-asuransi" && (
-                <>
-                  <p className="font-bold">Departemen Klaim Asuransi Perjalanan</p>
-                  <p className="font-semibold">{namaAsuransi}</p>
-                  <p>Di Tempat</p>
-                </>
-              )}
-            </div>
-
-            {/* ── SALAM PEMBUKA ─────────────────────────────── */}
-            <div className="mb-3">
-              <p className="italic font-medium">Assalamu&apos;alaikum Warahmatullahi Wabarakatuh,</p>
-            </div>
-
-            {/* ── PARAGRAF PENGANTAR ────────────────────────── */}
-            <div className="mb-4 text-justify">
-              {activeType === "rekom" && (
-                <p>
-                  Bersama surat ini, kami dari PT. Visi Tour Utama (VTU Abadi) selaku Penyelenggara Perjalanan Ibadah Umrah (PPIU) dengan Izin Resmi Kementerian Agama Republik Indonesia, menerangkan dengan sebenarnya bahwa:
-                </p>
-              )}
-              {activeType === "cuti-pekerja" && (
-                <p>
-                  Dengan hormat, kami dari PT. Visi Tour Utama (VTU Abadi) selaku biro perjalanan ibadah umrah resmi menerangkan bahwa karyawan dari instansi/perusahaan Bapak/Ibu berikut ini:
-                </p>
-              )}
-              {activeType === "cuti-sekolah" && (
-                <p>
-                  Dengan hormat, kami dari PT. Visi Tour Utama (VTU Abadi) mengonfirmasikan bahwa siswa/mahasiswa yang terdaftar di lembaga pendidikan Bapak/Ibu:
-                </p>
-              )}
-              {activeType === "keterangan" && (
-                <p>
-                  Yang bertanda tangan di bawah ini, Direktur Operasional PT. Visi Tour Utama (VTU Abadi) menerangkan dengan sesungguhnya bahwa nama di bawah ini:
-                </p>
-              )}
-              {activeType === "tugas" && (
-                <p>
-                  Guna memastikan kelancaran, keamanan, dan kekhusyukan pelayanan ibadah jamaah rombongan umroh PT. Visi Tour Utama (VTU Abadi), dengan ini Direksi memberikan mandat dan tugas kepada:
-                </p>
-              )}
-              {activeType === "klaim-asuransi" && (
-                <p>
-                  Dengan hormat, bersama ini kami dari PT. Visi Tour Utama (VTU Abadi) mengajukan permohonan pengantar klaim asuransi perjalanan ibadah umroh atas nama jamaah kami:
-                </p>
-              )}
-            </div>
-
-            {/* ── TABEL BIODATA INDENTED ────────────────────── */}
-            <div className="my-4 ml-6 mr-4 bg-stone-50/60 p-3 rounded-lg border border-stone-200/80 font-sans text-[12px]">
-              <table className="w-full text-left">
-                <tbody>
-                  <tr>
-                    <td className="py-1 w-44 font-medium text-stone-700">Nama Lengkap</td>
-                    <td className="py-1 w-4">:</td>
-                    <td className="py-1 font-bold text-stone-950 uppercase">{namaLengkap || "..................................................."}</td>
-                  </tr>
-                  <tr>
-                    <td className="py-1 font-medium text-stone-700">NIK (No. KTP)</td>
-                    <td className="py-1">:</td>
-                    <td className="py-1 font-mono">{nik || "-"}</td>
-                  </tr>
-                  {nomorPaspor && (
-                    <tr>
-                      <td className="py-1 font-medium text-stone-700">Nomor Paspor</td>
-                      <td className="py-1">:</td>
-                      <td className="py-1 font-mono font-bold text-stone-900">{nomorPaspor}</td>
-                    </tr>
+                  {/* Summary of Active Jamaah Manifest Data */}
+                  {activeJamaah && (
+                    <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-xs space-y-1.5">
+                      <div className="flex items-center justify-between font-bold text-emerald-900 dark:text-emerald-300">
+                        <span className="flex items-center gap-1.5">
+                          <User className="h-3.5 w-3.5" />
+                          {activeJamaah.namaLengkap}
+                        </span>
+                        <span className="font-mono text-[10px]">{activeJamaah.registrationId || "Terdaftar"}</span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 text-[11px] text-emerald-800 dark:text-emerald-400">
+                        <div>NIK: <strong>{activeJamaah.nik || "-"}</strong></div>
+                        <div>Paspor: <strong>{activeJamaah.nomorPaspor || "-"}</strong></div>
+                        <div>Lahir: <strong>{activeJamaah.tempatLahir || "-"}, {activeJamaah.tanggalLahir ? formatDateShort(activeJamaah.tanggalLahir) : "-"}</strong></div>
+                        <div>Paket: <strong>{activeKeberangkatan?.namaPaket || "-"}</strong></div>
+                      </div>
+                    </div>
                   )}
-                  {tempatLahir && (
-                    <tr>
-                      <td className="py-1 font-medium text-stone-700">Tempat, Tanggal Lahir</td>
-                      <td className="py-1">:</td>
-                      <td className="py-1">{tempatLahir}, {tanggalLahir}</td>
-                    </tr>
-                  )}
-                  {jenisKelamin && activeType !== "tugas" && (
-                    <tr>
-                      <td className="py-1 font-medium text-stone-700">Jenis Kelamin</td>
-                      <td className="py-1">:</td>
-                      <td className="py-1">{jenisKelamin}</td>
-                    </tr>
-                  )}
-                  {activeType === "cuti-pekerja" && (
-                    <>
-                      <tr>
-                        <td className="py-1 font-medium text-stone-700">NIP / ID Karyawan</td>
-                        <td className="py-1">:</td>
-                        <td className="py-1 font-mono">{nipKaryawan}</td>
-                      </tr>
-                      <tr>
-                        <td className="py-1 font-medium text-stone-700">Jabatan / Posisi</td>
-                        <td className="py-1">:</td>
-                        <td className="py-1 font-semibold">{jabatanKaryawan}</td>
-                      </tr>
-                    </>
-                  )}
-                  {activeType === "cuti-sekolah" && (
-                    <>
-                      <tr>
-                        <td className="py-1 font-medium text-stone-700">NISN / NIM</td>
-                        <td className="py-1">:</td>
-                        <td className="py-1 font-mono">{nisnSiswa}</td>
-                      </tr>
-                      <tr>
-                        <td className="py-1 font-medium text-stone-700">Kelas / Jurusan</td>
-                        <td className="py-1">:</td>
-                        <td className="py-1 font-semibold">{kelasSiswa}</td>
-                      </tr>
-                      {namaWali && (
-                        <tr>
-                          <td className="py-1 font-medium text-stone-700">Nama Orang Tua / Wali</td>
-                          <td className="py-1">:</td>
-                          <td className="py-1">{namaWali}</td>
-                        </tr>
+                </CardContent>
+              </Card>
+
+              {/* Card 2: Header & Nomor Surat Configuration */}
+              <Card className="border-stone-200 dark:border-stone-800">
+                <CardHeader className="pb-3 border-b border-stone-200 dark:border-stone-800">
+                  <CardTitle className="text-xs font-bold flex items-center gap-1.5">
+                    <FileSignature className="h-4 w-4 text-primary" />
+                    2. Nomor Surat & Tujuan
+                  </CardTitle>
+                </CardHeader>
+
+                <CardContent className="pt-4 space-y-3">
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="col-span-1">
+                      <label className="text-xs font-semibold">No. Urut</label>
+                      <Input
+                        value={nomorUrutSurat}
+                        onChange={(e) => setNomorUrutSurat(e.target.value)}
+                        placeholder="001"
+                        className="text-xs mt-1 font-mono text-center"
+                      />
+                    </div>
+                    <div className="col-span-2">
+                      <label className="text-xs font-semibold">Nomor Surat Final</label>
+                      <Input
+                        value={computedNomorSurat}
+                        readOnly
+                        className="text-xs mt-1 font-mono bg-muted font-bold text-primary"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-semibold">Perihal Surat</label>
+                    <Input
+                      value={customPerihal}
+                      onChange={(e) => setCustomPerihal(e.target.value)}
+                      className="text-xs mt-1"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-xs font-semibold">Tujuan (Kepada)</label>
+                      <Input
+                        value={customTujuan}
+                        onChange={(e) => setCustomTujuan(e.target.value)}
+                        className="text-xs mt-1"
+                        placeholder="Yth. Kepala Kantor..."
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-semibold">Kota Tujuan</label>
+                      <Input
+                        value={customKotaTujuan}
+                        onChange={(e) => setCustomKotaTujuan(e.target.value)}
+                        className="text-xs mt-1"
+                        placeholder="Di Tempat"
+                      />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Card 3: Dynamic Autocrat Placeholders Form */}
+              <Card className="border-stone-200 dark:border-stone-800">
+                <CardHeader className="pb-3 border-b border-stone-200 dark:border-stone-800">
+                  <CardTitle className="text-xs font-bold flex items-center justify-between">
+                    <span className="flex items-center gap-1.5">
+                      <Sparkles className="h-4 w-4 text-primary" />
+                      3. Kolom Isian Data Surat (Autocrat Tags)
+                    </span>
+                    <span className="text-[10px] text-muted-foreground">
+                      {activeTemplate.placeholders.length} Tag Terkonfigurasi
+                    </span>
+                  </CardTitle>
+                </CardHeader>
+
+                <CardContent className="pt-4 space-y-3 max-h-[45vh] overflow-y-auto pr-1">
+                  {activeTemplate.placeholders.map((p) => {
+                    const isManifest = p.sourceType === "manifest";
+                    const resolvedVal = resolvedFieldValues[p.key] || "";
+
+                    return (
+                      <div key={p.key} className="space-y-1">
+                        <div className="flex items-center justify-between">
+                          <label className="text-xs font-medium text-foreground flex items-center gap-1.5">
+                            <span className="font-mono text-[10px] text-muted-foreground">&#123;{p.key}&#125;</span>
+                            <span>{p.label}</span>
+                          </label>
+
+                          {isManifest ? (
+                            <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded flex items-center gap-1">
+                              <CheckCircle2 className="h-3 w-3" />
+                              Otomatis Manifest
+                            </span>
+                          ) : (
+                            <span className="text-[10px] font-semibold text-blue-600 dark:text-blue-400 bg-blue-500/10 px-1.5 py-0.5 rounded">
+                              Input Form
+                            </span>
+                          )}
+                        </div>
+
+                        {p.inputType === "textarea" ? (
+                          <textarea
+                            rows={3}
+                            value={resolvedVal}
+                            onChange={(e) =>
+                              setManualFormData({ ...manualFormData, [p.key]: e.target.value })
+                            }
+                            className="w-full p-2 text-xs rounded-lg border bg-background focus:ring-1 focus:ring-primary focus:outline-none"
+                            placeholder={p.placeholderHint || `Masukkan ${p.label}...`}
+                          />
+                        ) : p.inputType === "select" && p.options ? (
+                          <Select
+                            value={resolvedVal}
+                            onChange={(e) =>
+                              setManualFormData({ ...manualFormData, [p.key]: e.target.value })
+                            }
+                            options={p.options.map((opt) => ({ value: opt, label: opt }))}
+                            className="text-xs"
+                          />
+                        ) : (
+                          <Input
+                            type={p.inputType === "date" ? "date" : p.inputType === "number" ? "number" : "text"}
+                            value={resolvedVal}
+                            onChange={(e) =>
+                              setManualFormData({ ...manualFormData, [p.key]: e.target.value })
+                            }
+                            placeholder={p.placeholderHint || `Masukkan ${p.label}...`}
+                            className={cn(
+                              "text-xs h-8",
+                              isManifest && "bg-muted/40 font-medium text-foreground"
+                            )}
+                          />
+                        )}
+                      </div>
+                    );
+                  })}
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* ── RIGHT COLUMN (7 COLS): LIVE A4 WYSIWYG PREVIEW & ACTIONS ── */}
+            <div className="lg:col-span-7 space-y-4">
+              {/* Action Toolbar */}
+              <Card className="border-stone-200 dark:border-stone-800 bg-card shadow-sm sticky top-4 z-10">
+                <CardContent className="py-3 px-4 flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-1.5">
+                    <Button
+                      size="sm"
+                      className="text-xs bg-primary text-primary-foreground font-bold shadow-sm"
+                      onClick={handlePrint}
+                    >
+                      <Printer className="mr-1.5 h-3.5 w-3.5" />
+                      Cetak Surat (A4)
+                    </Button>
+
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-xs"
+                      onClick={handleDownloadDoc}
+                    >
+                      <Download className="mr-1.5 h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
+                      Download Dokumen
+                    </Button>
+                  </div>
+
+                  <div className="flex items-center gap-1.5">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-xs text-emerald-600 dark:text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/10"
+                      onClick={handleShareWhatsApp}
+                    >
+                      <Share2 className="mr-1.5 h-3.5 w-3.5" />
+                      Kirim WhatsApp
+                    </Button>
+
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-xs"
+                      onClick={handleCopy}
+                    >
+                      {copiedText ? (
+                        <>
+                          <Check className="mr-1.5 h-3.5 w-3.5 text-emerald-500" />
+                          Tersalin
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="mr-1.5 h-3.5 w-3.5" />
+                          Salin Teks
+                        </>
                       )}
-                    </>
-                  )}
-                  {activeType === "tugas" && (
-                    <>
-                      <tr>
-                        <td className="py-1 font-medium text-stone-700">Penugasan / Jabatan</td>
-                        <td className="py-1">:</td>
-                        <td className="py-1 font-bold text-emerald-800">{peranPetugas}</td>
-                      </tr>
-                      <tr>
-                        <td className="py-1 font-medium text-stone-700">Kontak WhatsApp</td>
-                        <td className="py-1">:</td>
-                        <td className="py-1 font-mono">{noKontakPetugas}</td>
-                      </tr>
-                    </>
-                  )}
-                  {activeType === "klaim-asuransi" && (
-                    <>
-                      <tr>
-                        <td className="py-1 font-medium text-stone-700">Nomor Polis Asuransi</td>
-                        <td className="py-1">:</td>
-                        <td className="py-1 font-mono font-bold">{nomorPolis}</td>
-                      </tr>
-                      <tr>
-                        <td className="py-1 font-medium text-stone-700">Jenis Klaim Diajukan</td>
-                        <td className="py-1">:</td>
-                        <td className="py-1 font-semibold text-rose-800">{jenisKlaim}</td>
-                      </tr>
-                      <tr>
-                        <td className="py-1 font-medium text-stone-700">Estimasi Nilai Klaim</td>
-                        <td className="py-1">:</td>
-                        <td className="py-1 font-bold text-stone-900">{nilaiKlaim}</td>
-                      </tr>
-                    </>
-                  )}
-                  <tr>
-                    <td className="py-1 font-medium text-stone-700">Alamat Lengkap</td>
-                    <td className="py-1">:</td>
-                    <td className="py-1">{alamat || "-"}</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
 
-            {/* ── DETAIL KEBERANGKATAN / TUJUAN ─────────────── */}
-            <div className="mb-4 text-justify">
-              {activeType === "rekom" && (
-                <p>
-                  Adalah benar calon jamaah kami yang telah terdaftar resmi pada program keberangkatan <strong>{namaPaket}</strong> ({durasiHari}) dengan jadwal keberangkatan Insya Allah pada tanggal <strong>{tanggalBerangkat}</strong> sampai dengan <strong>{tanggalPulang}</strong> menggunakan maskapai <strong>{maskapai}</strong>.
-                </p>
-              )}
-              {activeType === "cuti-pekerja" && (
-                <p>
-                  Akan melaksanakan rangkaian ibadah Umroh ke Tanah Suci (Makkah dan Madinah) bersama rombongan PT. Visi Tour Utama pada tanggal <strong>{tanggalBerangkat}</strong> sampai dengan <strong>{tanggalPulang}</strong> ({durasiHari}).
-                </p>
-              )}
-              {activeType === "cuti-sekolah" && (
-                <p>
-                  Akan melaksanakan Ibadah Umroh ke Tanah Suci mendampingi orang tua/keluarga pada tanggal <strong>{tanggalBerangkat}</strong> sampai dengan <strong>{tanggalPulang}</strong> ({durasiHari}) bersama PT. Visi Tour Utama.
-                </p>
-              )}
-              {activeType === "keterangan" && (
-                <p>
-                  Telah terdaftar resmi dan terverifikasi secara sah pada paket ibadah <strong>{namaPaket}</strong> dengan status <em>{statusBooking}</em>, dijadwalkan terbang pada <strong>{tanggalBerangkat}</strong> s.d. <strong>{tanggalPulang}</strong> dengan akomodasi Hotel Makkah: <strong>{hotelMakkah}</strong> dan Hotel Madinah: <strong>{hotelMadinah}</strong>.
-                </p>
-              )}
-              {activeType === "tugas" && (
-                <div className="space-y-2">
-                  <p>
-                    Ditugaskan untuk mendampingi dan memimpin rombongan <strong>{jumlahJamaah}</strong> pada paket <strong>{namaPaket}</strong>, tanggal <strong>{tanggalBerangkat}</strong> s.d. <strong>{tanggalPulang}</strong>.
-                  </p>
-                  <p className="text-[12px] bg-stone-50 p-2.5 rounded border border-stone-200">
-                    <strong>Lingkup Tanggung Jawab & Tugas:</strong> {lingkupTugas}
-                  </p>
-                </div>
-              )}
-              {activeType === "klaim-asuransi" && (
-                <div className="space-y-2">
-                  <p>
-                    Mengalami insiden/gangguan kesehatan saat mengikuti rangkaian program ibadah umroh paket <strong>{namaPaket}</strong> di Tanah Suci dengan kronologi sebagai berikut:
-                  </p>
-                  <p className="text-[12px] bg-stone-50 p-2.5 rounded border border-stone-200">
-                    <strong>Kronologi Kejadian:</strong> {kronologiSingkat}
-                  </p>
-                </div>
-              )}
-            </div>
+              {/* ── REALISTIC A4 LETTER SHEET PREVIEW ── */}
+              <div className="bg-white text-stone-950 p-8 sm:p-12 rounded-2xl shadow-xl border border-stone-300 font-serif text-[13px] leading-relaxed max-w-2xl mx-auto space-y-6 print:m-0 print:p-0 print:border-none print:shadow-none">
+                {/* Official Letterhead */}
+                {activeTemplate.kopSuratType === "ppiu_vtu" && (
+                  <div className="border-b-[3px] border-double border-stone-900 pb-3 flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      <img
+                        src={KOP_SURAT_BASE64}
+                        alt="Logo Resmi PT Vauza Trikarsa Utama"
+                        className="h-20 w-auto object-contain"
+                      />
+                      <div>
+                        <h2 className="text-lg font-black tracking-tight text-stone-950 font-sans">
+                          PT. VAUZA TRIKARSA UTAMA
+                        </h2>
+                        <p className="text-[11px] font-bold text-stone-700 font-sans">
+                          Penyelenggara Perjalanan Ibadah Umroh (PPIU) Kemenag RI No. U.400 Tahun 2021
+                        </p>
+                        <p className="text-[10px] text-stone-600 font-sans mt-0.5">
+                          Kantor Pusat: Ruko Gateway Blok C-12, Waru, Sidoarjo &bull; Telp: (031) 854-4455 &bull; Email: operasional@vtuabadi.com
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
-            {/* ── PARAGRAF PERMOHONAN & PENUTUP ─────────────── */}
-            <div className="mb-6 text-justify">
-              {activeType === "rekom" && (
-                <p>
-                  Sehubungan dengan hal tersebut di atas, kami memohon kiranya Bapak/Ibu Kepala Kantor Imigrasi berkenan memberikan bantuan dan rekomendasi dalam proses pembuatan/penggantian paspor RI atas nama yang bersangkutan guna kelengkapan dokumen ibadah ke Arab Saudi.
-                </p>
-              )}
-              {activeType === "cuti-pekerja" && (
-                <p>
-                  Sehubungan dengan pelaksanaan ibadah tersebut, kami memohon kebijakan Bapak/Ibu Pimpinan untuk dapat memberikan izin / cuti dinas/kerja selama periode tanggal tersebut di atas.
-                </p>
-              )}
-              {activeType === "cuti-sekolah" && (
-                <p>
-                  Sehubungan dengan hal tersebut, kami memohon kiranya Bapak/Ibu Kepala Sekolah / Dewan Guru berkenan memberikan izin dispensasi belajar bagi siswa/mahasiswa tersebut selama periode ibadah berlangsung.
-                </p>
-              )}
-              {activeType === "keterangan" && (
-                <p>
-                  Surat keterangan ini dibuat dengan sebenarnya atas permohonan yang bersangkutan untuk keperluan <strong>{keperluanKeterangan}</strong> dan agar dapat dipergunakan sebagaimana mestinya.
-                </p>
-              )}
-              {activeType === "tugas" && (
-                <p>
-                  Demikian surat perintah tugas ini dibuat agar dapat dilaksanakan dengan sebaik-baiknya dan penuh rasa amanah, serta mohon kepada pihak-pihak terkait dapat memberikan bantuan demi kelancaran tugas tersebut.
-                </p>
-              )}
-              {activeType === "klaim-asuransi" && (
-                <p>
-                  Bersama surat ini kami lampirkan dokumen pendukung (Resume Medis RS, Kwitansi Pembayaran, Boarding Pass, dan Salinan Paspor & Visa) untuk diproses pencairannya sesuai ketentuan polis yang berlaku.
-                </p>
-              )}
-
-              <p className="mt-3">
-                Demikian surat ini kami sampaikan. Atas perhatian, kerja sama, dan bantuan yang diberikan, kami ucapkan terima kasih.
-              </p>
-            </div>
-
-            <div className="mb-8">
-              <p className="italic font-medium">Wassalamu&apos;alaikum Warahmatullahi Wabarakatuh,</p>
-            </div>
-
-            {/* ── TANDA TANGAN & STEMPEL RESMI ─────────────── */}
-            <div className="flex justify-end font-sans text-[12px] break-inside-avoid">
-              <div className="text-center w-72">
-                <p className="font-semibold text-stone-800">PT. VISI TOUR UTAMA</p>
-                <p className="text-[11px] text-stone-500 mb-14">Direktorat Operasional & Pelayanan Jamaah</p>
-
-                {/* Stempel Visual Overlay */}
-                <div className="relative inline-block">
-                  <div className="absolute -top-12 -left-8 transform -rotate-12 border-2 border-emerald-700/60 rounded-full px-3 py-1 text-[10px] font-bold text-emerald-800 uppercase tracking-widest pointer-events-none select-none opacity-85">
-                    PT. VISI TOUR UTAMA<br />
-                    ★ RESMI PPIU ★
+                {/* Surat Meta (Nomor, Lamp, Hal, Tanggal) */}
+                <div className="flex items-start justify-between text-xs font-sans">
+                  <div className="space-y-0.5">
+                    <p>
+                      <strong>Nomor</strong>&nbsp;&nbsp;&nbsp;: {computedNomorSurat}
+                    </p>
+                    <p>
+                      <strong>Lamp</strong>&nbsp;&nbsp;&nbsp;&nbsp;: {customLampiran || "-"}
+                    </p>
+                    <p>
+                      <strong>Perihal</strong>&nbsp;: <strong>{renderedPerihal}</strong>
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p>Sidoarjo, {todayInfo.masehi}</p>
+                    <p className="text-[10px] text-stone-500">{todayInfo.hijriyah}</p>
                   </div>
                 </div>
 
-                <p className="font-bold underline text-stone-950 text-[13px]">{namaPenandatangan}</p>
-                <p className="text-stone-600 text-[11px]">{jabatanPenandatangan}</p>
+                {/* Destination */}
+                <div className="text-xs font-sans space-y-0.5 pt-1">
+                  <p className="font-semibold">{renderedTujuan}</p>
+                  <p>{renderedKotaTujuan}</p>
+                </div>
+
+                {/* Body Content */}
+                <div className="whitespace-pre-line text-xs font-sans pt-2 leading-relaxed text-justify">
+                  {renderedLetterBody}
+                </div>
+
+                {/* Signature & QR Code Verification */}
+                <div className="pt-8 flex items-end justify-between font-sans text-xs">
+                  {/* QR Code Barcode Verification */}
+                  {activeTemplate.penandatangan.showBarcode && (
+                    <div className="p-2.5 border border-stone-300 rounded-xl flex items-center gap-2.5 bg-stone-50 max-w-[240px]">
+                      <QrCode className="h-12 w-12 text-stone-900 shrink-0" />
+                      <div className="text-[9px] text-stone-700 leading-tight">
+                        <p className="font-bold text-stone-950">VERIFIKASI KEABSAHAN</p>
+                        <p className="mt-0.5 text-stone-500">Scan QR Code untuk verifikasi resmi di portal sistem VTU</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Signature Block */}
+                  <div className="text-center min-w-[220px] ml-auto space-y-1">
+                    <p className="font-bold">PT. VAUZA TRIKARSA UTAMA</p>
+                    <div className="h-20 flex items-center justify-center relative">
+                      {activeTemplate.penandatangan.showStempel && (
+                        <div className="absolute inset-0 flex items-center justify-center opacity-70 pointer-events-none">
+                          <div className="w-20 h-20 rounded-full border-2 border-dashed border-red-600 flex items-center justify-center text-[10px] font-black text-red-600 rotate-[-12deg]">
+                            STEMPEL RESMI
+                          </div>
+                        </div>
+                      )}
+                      <span className="italic text-stone-400 text-[10px]">(Tanda Tangan Digital & Stempel)</span>
+                    </div>
+                    <p className="font-bold underline uppercase">{activeTemplate.penandatangan.nama}</p>
+                    <p className="text-[11px] text-stone-600 font-medium">{activeTemplate.penandatangan.jabatan}</p>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
         </div>
-      </div>
+      )}
+
+      {/* ══════════════════════════════════════════════════════════ */}
+      {/* TAB 2: DASHBOARD & RIWAYAT SURAT TERGENERATE */}
+      {/* ══════════════════════════════════════════════════════════ */}
+      {activeMainTab === "history" && (
+        <div className="space-y-6">
+          {/* Summary Metric Cards */}
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <Card className="p-4 border-stone-200 dark:border-stone-800">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-muted-foreground font-medium">Total Surat Diterbitkan</p>
+                  <p className="text-2xl font-extrabold mt-1 text-foreground">{historyLogs.length}</p>
+                </div>
+                <div className="p-2.5 rounded-xl bg-primary/10 text-primary">
+                  <ScrollText className="h-5 w-5" />
+                </div>
+              </div>
+            </Card>
+
+            <Card className="p-4 border-stone-200 dark:border-stone-800">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-muted-foreground font-medium">Surat Rekom Paspor</p>
+                  <p className="text-2xl font-extrabold mt-1 text-blue-600 dark:text-blue-400">
+                    {historyLogs.filter((l) => l.templateSlug.includes("rekom")).length}
+                  </p>
+                </div>
+                <div className="p-2.5 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400">
+                  <FileSignature className="h-5 w-5" />
+                </div>
+              </div>
+            </Card>
+
+            <Card className="p-4 border-stone-200 dark:border-stone-800">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-muted-foreground font-medium">Surat Cuti / Izin</p>
+                  <p className="text-2xl font-extrabold mt-1 text-emerald-600 dark:text-emerald-400">
+                    {historyLogs.filter((l) => l.templateSlug.includes("cuti")).length}
+                  </p>
+                </div>
+                <div className="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                  <Building2 className="h-5 w-5" />
+                </div>
+              </div>
+            </Card>
+
+            <Card className="p-4 border-stone-200 dark:border-stone-800">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-muted-foreground font-medium">Template Aktif</p>
+                  <p className="text-2xl font-extrabold mt-1 text-purple-600 dark:text-purple-400">
+                    {templates.length} Template
+                  </p>
+                </div>
+                <div className="p-2.5 rounded-xl bg-purple-500/10 text-purple-600 dark:text-purple-400">
+                  <Layers className="h-5 w-5" />
+                </div>
+              </div>
+            </Card>
+          </div>
+
+          {/* Search & Filter Bar */}
+          <Card className="border-stone-200 dark:border-stone-800">
+            <CardContent className="pt-4 pb-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="relative flex-1 max-w-md">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Cari nomor surat, nama jamaah, paspor, atau paket..."
+                    className="pl-9 text-xs"
+                    value={historySearch}
+                    onChange={(e) => setHistorySearch(e.target.value)}
+                  />
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <Select
+                    value={historyFilterTemplate}
+                    onChange={(e) => setHistoryFilterTemplate(e.target.value)}
+                    options={[
+                      { value: "all", label: "Semua Template Surat" },
+                      ...templates.map((t) => ({ value: t.slug, label: t.nama })),
+                    ]}
+                    className="text-xs h-8 w-56"
+                  />
+                  <Button
+                    size="sm"
+                    className="text-xs bg-primary text-primary-foreground"
+                    onClick={() => setActiveMainTab("generator")}
+                  >
+                    <Plus className="mr-1.5 h-3.5 w-3.5" />
+                    Generate Surat Baru
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Data Table */}
+          <Card className="border-stone-200 dark:border-stone-800 overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs text-left">
+                <thead className="bg-muted/50 text-muted-foreground uppercase font-bold text-[10px] border-b">
+                  <tr>
+                    <th className="py-3 px-4">Nomor Surat</th>
+                    <th className="py-3 px-4">Template / Jenis</th>
+                    <th className="py-3 px-4">Nama Jamaah</th>
+                    <th className="py-3 px-4">Paket Umroh</th>
+                    <th className="py-3 px-4">Tanggal Terbit</th>
+                    <th className="py-3 px-4">Pembuat</th>
+                    <th className="py-3 px-4 text-right">Aksi Dokumen</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-stone-200 dark:divide-stone-800">
+                  {filteredHistory.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="py-8 text-center text-muted-foreground">
+                        Belum ada riwayat generate surat. Klik &ldquo;Generate Surat Baru&rdquo; untuk memulai.
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredHistory.map((log) => (
+                      <tr key={log.id} className="hover:bg-muted/30 transition-colors">
+                        <td className="py-3 px-4 font-mono font-bold text-primary">
+                          {log.nomorSurat}
+                        </td>
+                        <td className="py-3 px-4">
+                          <span className="font-semibold text-foreground">{log.templateName}</span>
+                          <p className="text-[10px] text-muted-foreground line-clamp-1">{log.perihal}</p>
+                        </td>
+                        <td className="py-3 px-4">
+                          <div className="font-bold text-foreground">{log.jamaahNama}</div>
+                          <div className="text-[10px] text-muted-foreground">
+                            Paspor: {log.jamaahPaspor || "-"}
+                          </div>
+                        </td>
+                        <td className="py-3 px-4">
+                          <span className="font-medium text-foreground">{log.packageName}</span>
+                        </td>
+                        <td className="py-3 px-4 text-muted-foreground">
+                          {formatDate(log.generatedDate)}
+                        </td>
+                        <td className="py-3 px-4 text-muted-foreground">
+                          {log.createdBy}
+                        </td>
+                        <td className="py-3 px-4 text-right">
+                          <div className="flex items-center justify-end gap-1">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-7 px-2 text-xs"
+                              title="Lihat Detail Surat"
+                              onClick={() => setPreviewModalLog(log)}
+                            >
+                              <Eye className="h-3 w-3 mr-1" />
+                              Preview
+                            </Button>
+
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              className="h-7 px-2 text-xs"
+                              title="Download Ulang"
+                              onClick={() => {
+                                const blob = new Blob([log.renderedText || ""], { type: "text/plain" });
+                                const url = URL.createObjectURL(blob);
+                                const a = document.createElement("a");
+                                a.href = url;
+                                a.download = `${log.nomorSurat.replace(/[/\\?%*:|"<>]/g, "-")}.txt`;
+                                a.click();
+                                URL.revokeObjectURL(url);
+                                showToast("Dokumen berhasil diunduh ulang!");
+                              }}
+                            >
+                              <Download className="h-3 w-3" />
+                            </Button>
+
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 w-7 p-0 text-destructive hover:bg-destructive/10"
+                              title="Hapus Riwayat"
+                              onClick={() => handleDeleteHistory(log.id)}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {/* ── MODAL PREVIEW DETAIL RIWAYAT SURAT ── */}
+      {previewModalLog && (
+        <Modal
+          open={!!previewModalLog}
+          onClose={() => setPreviewModalLog(null)}
+          title={`Detail Surat: ${previewModalLog.nomorSurat}`}
+          size="lg"
+        >
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-2 text-xs p-3 rounded-xl bg-muted/40 border">
+              <div>Nomor Surat: <strong>{previewModalLog.nomorSurat}</strong></div>
+              <div>Template: <strong>{previewModalLog.templateName}</strong></div>
+              <div>Nama Jamaah: <strong>{previewModalLog.jamaahNama}</strong></div>
+              <div>Paket: <strong>{previewModalLog.packageName}</strong></div>
+            </div>
+
+            <div className="p-4 rounded-xl bg-white text-stone-900 border font-sans text-xs whitespace-pre-line leading-relaxed max-h-[50vh] overflow-y-auto">
+              {previewModalLog.renderedText}
+            </div>
+
+            <div className="flex items-center justify-between border-t pt-3">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-xs"
+                onClick={() => setPreviewModalLog(null)}
+              >
+                Tutup
+              </Button>
+
+              <div className="flex items-center gap-2">
+                {previewModalLog.verificationUrl && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-xs"
+                    onClick={() => window.open(previewModalLog.verificationUrl, "_blank")}
+                  >
+                    <ExternalLink className="mr-1.5 h-3.5 w-3.5" />
+                    Cek Halaman Verifikasi
+                  </Button>
+                )}
+
+                <Button
+                  size="sm"
+                  className="text-xs bg-primary text-primary-foreground"
+                  onClick={() => {
+                    const printWin = window.open("", "_blank");
+                    if (printWin) {
+                      printWin.document.write(`
+                        <html>
+                          <head><title>${previewModalLog.nomorSurat}</title></head>
+                          <body style="font-family: sans-serif; padding: 40px; white-space: pre-line; line-height: 1.6;">
+                            ${previewModalLog.renderedText}
+                          </body>
+                        </html>
+                      `);
+                      printWin.document.close();
+                      printWin.print();
+                    }
+                  }}
+                >
+                  <Printer className="mr-1.5 h-3.5 w-3.5" />
+                  Cetak Dokumen
+                </Button>
+              </div>
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
+  );
+}
+
+export default function GenerateSuratPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <div className="flex flex-col items-center gap-3">
+            <ScrollText className="h-8 w-8 text-primary animate-pulse" />
+            <p className="text-xs text-muted-foreground">Memuat modul surat operasional...</p>
+          </div>
+        </div>
+      }
+    >
+      <GenerateSuratPageContent />
+    </Suspense>
   );
 }
