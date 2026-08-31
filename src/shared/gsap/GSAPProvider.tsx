@@ -33,41 +33,33 @@ export function GSAPProvider({ children }: { children: React.ReactNode }) {
   const meltVeilRef = useRef<HTMLDivElement | null>(null);
   const isInitialRender = useRef(true);
 
-  // ── GSAP Entrance Animation: Warna Melebur -> Kembali Jelas (Slow Motion) ──
+  // ── GSAP Entrance Animation: Buttery Smooth Crossfade (Zero Layout Shift) ──
   useEffect(() => {
     if (!pageWrapperRef.current) return;
 
-    // Smooth duration for slow-motion effect
-    const duration = isInitialRender.current ? 0.45 : 0.72;
+    const duration = isInitialRender.current ? 0.35 : 0.38;
     isInitialRender.current = false;
 
     const ctx = gsap.context(() => {
-      // 1. Page canvas animates from blurred chromatic color melt into crisp sharpness
+      // Clean, silky smooth opacity entrance with zero translation/scale jump
       gsap.fromTo(
         pageWrapperRef.current,
         {
           opacity: 0,
-          y: 14,
-          scale: 0.988,
-          filter: "blur(14px) brightness(1.15) saturate(1.35)",
         },
         {
           opacity: 1,
-          y: 0,
-          scale: 1,
-          filter: "blur(0px) brightness(1) saturate(1)",
           duration,
-          ease: "power3.out",
-          clearProps: "all",
+          ease: "power2.out",
+          clearProps: "opacity",
         }
       );
 
-      // 2. Dissolve the ambient color-melt chromatic veil
+      // Dissolve the ambient veil smoothly
       if (meltVeilRef.current) {
         gsap.to(meltVeilRef.current, {
           opacity: 0,
-          scale: 1.04,
-          duration: duration * 1.05,
+          duration: 0.3,
           ease: "power2.out",
           onComplete: () => {
             if (meltVeilRef.current) {
@@ -81,16 +73,12 @@ export function GSAPProvider({ children }: { children: React.ReactNode }) {
     return () => ctx.revert();
   }, [pathname]);
 
-  // ── GSAP Exit Animation: Meleburkan Warna & Slow Motion Dissolve ──
+  // ── GSAP Exit Animation: Smooth Seamless Fade (Zero Layout Shift) ──
   const navigateTo = useCallback(
     (href: string) => {
       if (href === pathname) return;
 
       setIsNavigating(true);
-
-      if (meltVeilRef.current) {
-        meltVeilRef.current.style.pointerEvents = "auto";
-      }
 
       const tl = gsap.timeline({
         onComplete: () => {
@@ -101,38 +89,20 @@ export function GSAPProvider({ children }: { children: React.ReactNode }) {
         },
       });
 
-      // 1. Page canvas dissolves and melts with chromatic color bloom
+      // Pure smooth opacity fade without jarring translation or scale jump
       if (pageWrapperRef.current) {
         tl.to(
           pageWrapperRef.current,
           {
             opacity: 0,
-            y: -10,
-            scale: 0.984,
-            filter: "blur(16px) brightness(1.18) saturate(1.45) contrast(0.95)",
-            duration: 0.52,
-            ease: "power3.inOut",
-          },
-          0
-        );
-      }
-
-      // 2. Ambient chromatic veil blooms into view
-      if (meltVeilRef.current) {
-        tl.fromTo(
-          meltVeilRef.current,
-          { opacity: 0, scale: 0.96 },
-          {
-            opacity: 0.85,
-            scale: 1,
-            duration: 0.48,
-            ease: "power3.out",
+            duration: 0.24,
+            ease: "power2.inOut",
           },
           0
         );
       }
     },
-    [pathname, router]
+    [pathname, router, startTransition]
   );
 
   // ── Global Internal Link Interceptor for Seamless GSAP Transition ──
