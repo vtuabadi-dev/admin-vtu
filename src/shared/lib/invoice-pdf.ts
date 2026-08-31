@@ -1,6 +1,10 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import { VAUZA_TAMMA_LOGO_BASE64 } from "./invoice-logo";
+import {
+  VAUZA_TAMMA_LOGO_BASE64,
+  VAUZA_TAMMA_SIGNATURE_BASE64,
+  VAUZA_TAMMA_QR_BASE64,
+} from "./invoice-logo";
 
 export interface InvoiceOrderItem {
   id: string;
@@ -107,34 +111,33 @@ export function generateInvoicePdf(data: InvoicePdfData): jsPDF {
 
   const pageWidth = 210;
   const pageHeight = 297;
-  const marginX = 12;
-  const contentWidth = pageWidth - marginX * 2; // 186mm
+  const marginX = 14;
+  const contentWidth = pageWidth - marginX * 2; // 182mm
 
   const fmtRp = (n: number) => n.toLocaleString("id-ID");
 
   // Derived values
-  const paxCount = data.jumlahPax || data.anggota?.length || 2;
-  const unitPrice = data.hargaSatuanPaket || Math.round((data.totalTagihan || 74800000) / paxCount);
+  const paxCount = data.jumlahPax || data.anggota?.length || 4;
+  const unitPrice = data.hargaSatuanPaket || (data.totalTagihan ? Math.round(data.totalTagihan / paxCount) : 25700000);
   const subtotalBase = unitPrice * paxCount;
   const finalTotalTagihan = data.totalTagihanDisesuaikan || data.totalTagihan || subtotalBase;
-  const finalTotalBayar = data.totalPembayaran || data.nominal || 0;
+  const finalTotalBayar = data.totalPembayaran !== undefined ? data.totalPembayaran : (data.nominal || 52000000);
   const finalSisaTagihan = data.sisaTagihan !== undefined ? data.sisaTagihan : Math.max(0, finalTotalTagihan - finalTotalBayar);
   const isLunas = finalSisaTagihan <= 0;
 
-  const GREEN: [number, number, number] = [22, 101, 52]; // #166534
+  const GREEN: [number, number, number] = [6, 78, 59]; // #064E3B
 
   // ══════════════════════════════════════════════════════════════
-  // PAGE 1: INVOICE RESMI PT VAUZA TAMMA ABADI
+  // PAGE 1: INVOICE RESMI PT VAUZA TAMMA ABADI (18 x 27 CM PROPORTIONS)
   // ══════════════════════════════════════════════════════════════
 
   // ── 1. Header: Logo (Left) + INVOICE (Right) ────────────────
   try {
-    doc.addImage(VAUZA_TAMMA_LOGO_BASE64, "PNG", marginX, 10, 52, 20);
+    doc.addImage(VAUZA_TAMMA_LOGO_BASE64, "PNG", marginX, 12, 54, 20);
   } catch {
-    // Fallback if logo fails to load
     doc.setFont("helvetica", "bold");
     doc.setFontSize(14);
-    doc.setTextColor(15, 23, 42);
+    doc.setTextColor(6, 78, 59);
     doc.text("Vauza Tamma", marginX, 18);
     doc.setFontSize(9);
     doc.text("HAJI & UMROH", marginX, 22);
@@ -145,156 +148,194 @@ export function generateInvoicePdf(data: InvoicePdfData): jsPDF {
 
   // INVOICE title (right)
   doc.setFont("times", "bold");
-  doc.setFontSize(22);
-  doc.setTextColor(15, 23, 42);
-  doc.text("INVOICE", pageWidth - marginX, 16, { align: "right" });
+  doc.setFontSize(26);
+  doc.setTextColor(6, 78, 59);
+  doc.text("INVOICE", pageWidth - marginX, 17, { align: "right" });
 
-  // Invoice Number Green Bar
-  const invBarX = pageWidth - marginX - 60;
-  const invBarW = 60;
+  // Invoice Number Green Pill Bar
+  const invBarX = pageWidth - marginX - 58;
+  const invBarW = 58;
   doc.setFillColor(...GREEN);
-  doc.rect(invBarX, 19, invBarW, 5.5, "F");
+  doc.roundedRect(invBarX, 20, invBarW, 5.5, 1, 1, "F");
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(9);
+  doc.setFontSize(8.5);
   doc.setTextColor(255, 255, 255);
-  doc.text(data.invoiceNumber || "INV.VT/2026/VIII/00045", invBarX + invBarW / 2, 23, { align: "center" });
+  doc.text(data.invoiceNumber || "INV.VT/2026/VIII/00045", invBarX + invBarW / 2, 23.8, { align: "center" });
 
-  // Tanggal Invoice + Jatuh Tempo table
+  // Compact Date Table (Tanggal Invoice + Jatuh Tempo)
   const metaX = invBarX;
-  const metaY = 25;
-  doc.setDrawColor(200, 200, 200);
+  const metaY = 26.5;
+  const metaW = invBarW;
+  doc.setDrawColor(...GREEN);
   doc.setLineWidth(0.3);
+  doc.roundedRect(metaX, metaY, metaW, 9.5, 1, 1, "S");
 
-  // Tanggal Invoice row
-  doc.setFillColor(240, 248, 240);
-  doc.rect(metaX, metaY, 28, 5, "F");
-  doc.rect(metaX + 28, metaY, invBarW - 28, 5, "S");
+  // Row 1: Tanggal Invoice
+  doc.setFillColor(...GREEN);
+  doc.rect(metaX, metaY, 26, 4.75, "F");
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(7);
-  doc.setTextColor(...GREEN);
-  doc.text("Tanggal Invoice", metaX + 2, metaY + 3.5);
-  doc.setTextColor(15, 23, 42);
-  doc.setFont("helvetica", "normal");
-  doc.text(data.invoiceDate || "-", metaX + 30, metaY + 3.5);
+  doc.setFontSize(6.5);
+  doc.setTextColor(255, 255, 255);
+  doc.text("Tanggal Invoice", metaX + 2, metaY + 3.3);
 
-  // Jatuh Tempo row
-  doc.setFillColor(240, 248, 240);
-  doc.rect(metaX, metaY + 5, 28, 5, "F");
-  doc.rect(metaX + 28, metaY + 5, invBarW - 28, 5, "S");
   doc.setFont("helvetica", "bold");
-  doc.setTextColor(...GREEN);
-  doc.text("Jatuh Tempo", metaX + 2, metaY + 8.5);
   doc.setTextColor(15, 23, 42);
-  doc.setFont("helvetica", "normal");
-  doc.text(data.maksimalPelunasan || data.dueDate || "-", metaX + 30, metaY + 8.5);
+  doc.text(data.invoiceDate || "18 Juli 2026", metaX + 28, metaY + 3.3);
+
+  // Row divider
+  doc.line(metaX, metaY + 4.75, metaX + metaW, metaY + 4.75);
+
+  // Row 2: Jatuh Tempo
+  doc.setFillColor(...GREEN);
+  doc.rect(metaX, metaY + 4.75, 26, 4.75, "F");
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(255, 255, 255);
+  doc.text("Jatuh Tempo", metaX + 2, metaY + 8.1);
+
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(15, 23, 42);
+  doc.text(data.maksimalPelunasan || data.dueDate || "17 Agustus 2026", metaX + 28, metaY + 8.1);
+
+  // Horizontal Header Divider
+  doc.setDrawColor(30, 41, 59);
+  doc.setLineWidth(0.5);
+  doc.line(marginX, 38, pageWidth - marginX, 38);
 
   // ── 2. Two Info Boxes: Data Pendaftar + Detail Paket Umroh ──
-  const boxY = 38;
-  const boxH = 28;
+  const boxY = 41;
+  const boxH = 26;
   const halfW = (contentWidth - 4) / 2;
 
-  // Left: DATA PENDAFTAR
+  // Left: [ DATA PENDAFTAR ]━━━━━━━━━━━━━
+  const dpBadgeW = 34;
   doc.setFillColor(...GREEN);
-  doc.rect(marginX, boxY, halfW, 5, "F");
+  doc.roundedRect(marginX, boxY, dpBadgeW, 4.5, 0.8, 0.8, "F");
+  doc.rect(marginX, boxY + 2, dpBadgeW, 2.5, "F");
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(7.5);
+  doc.setFontSize(7);
   doc.setTextColor(255, 255, 255);
-  doc.text("   DATA PENDAFTAR", marginX + 1, boxY + 3.5);
+  doc.text("DATA PENDAFTAR", marginX + 3, boxY + 3.2);
 
+  doc.setFillColor(...GREEN);
+  doc.rect(marginX + dpBadgeW, boxY + 3.3, halfW - dpBadgeW, 1.2, "F");
+
+  // Content Box Left
   doc.setDrawColor(200, 200, 200);
   doc.setLineWidth(0.3);
-  doc.rect(marginX, boxY + 5, halfW, boxH, "S");
+  doc.rect(marginX, boxY + 4.5, halfW, boxH - 4.5, "S");
 
-  doc.setFontSize(7);
-  doc.setTextColor(80, 80, 80);
-  const dpLeft = marginX + 2;
-  const dpValLeft = marginX + 32;
-  let dpY = boxY + 9;
+  doc.setFontSize(6.8);
+  const dpL = marginX + 2.5;
+  const dpC = marginX + 28;
+  const dpV = marginX + 30;
 
-  doc.setFont("helvetica", "normal");
-  doc.text("Nama Pendaftar", dpLeft, dpY);
-  doc.text(":", dpValLeft - 2, dpY);
+  // Row 1: Nama
   doc.setFont("helvetica", "bold");
   doc.setTextColor(15, 23, 42);
-  doc.text((data.namaGroup || "Bapak Ahmad Firdaus"), dpValLeft, dpY);
+  doc.text("Nama Pendaftar", dpL, boxY + 8);
+  doc.text(":", dpC, boxY + 8);
+  doc.text(data.namaGroup || "Bapak Ahmad Firdaus", dpV, boxY + 8);
 
-  dpY += 5;
-  doc.setFont("helvetica", "normal");
-  doc.setTextColor(80, 80, 80);
-  doc.text("No. HP / WhatsApp", dpLeft, dpY);
-  doc.text(":", dpValLeft - 2, dpY);
-  doc.setTextColor(15, 23, 42);
-  doc.text(data.telepon || data.picPhone || "-", dpValLeft, dpY);
+  doc.setDrawColor(235, 235, 235);
+  doc.line(dpL, boxY + 9.5, marginX + halfW - 2.5, boxY + 9.5);
 
-  dpY += 5;
+  // Row 2: No HP
+  doc.text("No. HP / WhatsApp", dpL, boxY + 13);
+  doc.text(":", dpC, boxY + 13);
   doc.setFont("helvetica", "normal");
-  doc.setTextColor(80, 80, 80);
-  doc.text("Kode Registrasi", dpLeft, dpY);
-  doc.text(":", dpValLeft - 2, dpY);
+  doc.text(data.telepon || data.picPhone || "0812-1234-5678", dpV, boxY + 13);
+
+  doc.line(dpL, boxY + 14.5, marginX + halfW - 2.5, boxY + 14.5);
+
+  // Row 3: Kode Registrasi
   doc.setFont("helvetica", "bold");
-  doc.setTextColor(15, 23, 42);
-  doc.text(data.kodeRegistrasi || "-", dpValLeft, dpY);
+  doc.text("Kode Registrasi", dpL, boxY + 18);
+  doc.text(":", dpC, boxY + 18);
+  doc.text(data.kodeRegistrasi || "REG-2107-045", dpV, boxY + 18);
 
-  dpY += 5;
+  doc.line(dpL, boxY + 19.5, marginX + halfW - 2.5, boxY + 19.5);
+
+  // Row 4: Alamat
+  doc.text("Alamat", dpL, boxY + 23);
+  doc.text(":", dpC, boxY + 23);
   doc.setFont("helvetica", "normal");
-  doc.setTextColor(80, 80, 80);
-  doc.text("Alamat", dpLeft, dpY);
-  doc.text(":", dpValLeft - 2, dpY);
-  doc.setTextColor(15, 23, 42);
-  const alamatStr = data.alamat || "-";
-  const alamatLines = doc.splitTextToSize(alamatStr, halfW - 34);
-  doc.text(alamatLines, dpValLeft, dpY);
+  const alamatStr = data.alamat || "Jl. Melati No. 45 RT 03/RW 05, Kel. Sukamaju, Depok";
+  const alamatLines = doc.splitTextToSize(alamatStr, halfW - 32);
+  doc.text(alamatLines, dpV, boxY + 23);
 
-  // Right: DETAIL PAKET UMROH
+  // Right: [ DETAIL PAKET UMROH ]━━━━━━━━━
   const rightX = marginX + halfW + 4;
+  const rpBadgeW = 38;
+
   doc.setFillColor(...GREEN);
-  doc.rect(rightX, boxY, halfW, 5, "F");
+  doc.roundedRect(rightX, boxY, rpBadgeW, 4.5, 0.8, 0.8, "F");
+  doc.rect(rightX, boxY + 2, rpBadgeW, 2.5, "F");
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(7.5);
-  doc.setTextColor(255, 255, 255);
-  doc.text("   DETAIL PAKET UMROH", rightX + 1, boxY + 3.5);
-
-  doc.setDrawColor(200, 200, 200);
-  doc.rect(rightX, boxY + 5, halfW, boxH, "S");
-
   doc.setFontSize(7);
-  const rpLeft = rightX + 2;
-  const rpValLeft = rightX + 32;
-  let rpY = boxY + 9;
+  doc.setTextColor(255, 255, 255);
+  doc.text("DETAIL PAKET UMROH", rightX + 3, boxY + 3.2);
 
-  doc.setFont("helvetica", "normal");
-  doc.setTextColor(80, 80, 80);
-  doc.text("Paket Umroh", rpLeft, rpY);
-  doc.text(":", rpValLeft - 2, rpY);
+  doc.setFillColor(...GREEN);
+  doc.rect(rightX + rpBadgeW, boxY + 3.3, halfW - rpBadgeW, 1.2, "F");
+
+  // Content Box Right
+  doc.setDrawColor(200, 200, 200);
+  doc.setLineWidth(0.3);
+  doc.rect(rightX, boxY + 4.5, halfW, boxH - 4.5, "S");
+
+  const rpL = rightX + 2.5;
+  const rpC = rightX + 26;
+  const rpV = rightX + 28;
+
+  // Row 1: Paket Umroh
   doc.setFont("helvetica", "bold");
   doc.setTextColor(15, 23, 42);
-  doc.text(data.namaPaket || "Umroh Plus 12 Hari", rpValLeft, rpY);
+  doc.text("Paket Umroh", rpL, boxY + 8);
+  doc.text(":", rpC, boxY + 8);
+  doc.text(data.namaPaket || "Umroh Plus 12 Hari", rpV, boxY + 8);
 
-  rpY += 5;
-  doc.setFont("helvetica", "normal");
-  doc.setTextColor(80, 80, 80);
-  doc.text("Jumlah Pendaftar", rpLeft, rpY);
-  doc.text(":", rpValLeft - 2, rpY);
-  doc.setTextColor(15, 23, 42);
-  doc.text(`${paxCount} Pax`, rpValLeft, rpY);
+  doc.setDrawColor(235, 235, 235);
+  doc.line(rpL, boxY + 9.5, rightX + halfW - 2.5, boxY + 9.5);
 
-  rpY += 5;
+  // Row 2: Jumlah Pendaftar
+  doc.text("Jumlah Pendaftar", rpL, boxY + 13);
+  doc.text(":", rpC, boxY + 13);
   doc.setFont("helvetica", "normal");
-  doc.setTextColor(80, 80, 80);
-  doc.text("Hotel Makkah", rpLeft, rpY);
-  doc.text(":", rpValLeft - 2, rpY);
-  doc.setTextColor(15, 23, 42);
-  doc.text(data.hotelMekkah || "-", rpValLeft, rpY);
+  doc.text(`${paxCount} Pax`, rpV, boxY + 13);
 
-  rpY += 5;
+  doc.line(rpL, boxY + 14.5, rightX + halfW - 2.5, boxY + 14.5);
+
+  // Row 3: Hotel Makkah
+  doc.setFont("helvetica", "bold");
+  doc.text("Hotel Makkah", rpL, boxY + 18);
+  doc.text(":", rpC, boxY + 18);
   doc.setFont("helvetica", "normal");
-  doc.setTextColor(80, 80, 80);
-  doc.text("Hotel Madinah", rpLeft, rpY);
-  doc.text(":", rpValLeft - 2, rpY);
-  doc.setTextColor(15, 23, 42);
-  doc.text(data.hotelMadinah || "-", rpValLeft, rpY);
+  doc.text(data.hotelMekkah || "Pullman ZamZam Makkah", rpV, boxY + 18);
+
+  doc.line(rpL, boxY + 19.5, rightX + halfW - 2.5, boxY + 19.5);
+
+  // Row 4: Hotel Madinah
+  doc.setFont("helvetica", "bold");
+  doc.text("Hotel Madinah", rpL, boxY + 23);
+  doc.text(":", rpC, boxY + 23);
+  doc.setFont("helvetica", "normal");
+  doc.text(data.hotelMadinah || "Anwar Al Madinah Mövenpick", rpV, boxY + 23);
 
   // ── 3. Table: RINCIAN PEMBAYARAN ────────────────────────────
+  const t1Y = boxY + boxH + 3;
+  const t1BadgeW = 38;
+
+  doc.setFillColor(...GREEN);
+  doc.roundedRect(marginX, t1Y, t1BadgeW, 4.5, 0.8, 0.8, "F");
+  doc.rect(marginX, t1Y + 2, t1BadgeW, 2.5, "F");
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(7);
+  doc.setTextColor(255, 255, 255);
+  doc.text("RINCIAN PEMBAYARAN", marginX + 3, t1Y + 3.2);
+
+  doc.setFillColor(...GREEN);
+  doc.rect(marginX + t1BadgeW, t1Y + 3.3, contentWidth - t1BadgeW, 1.2, "F");
+
   const table1Rows: any[] = [
     [
       "1",
@@ -305,59 +346,54 @@ export function generateInvoicePdf(data: InvoicePdfData): jsPDF {
     ],
   ];
 
-  if (data.orderItems && data.orderItems.length > 0) {
-    data.orderItems.forEach((item, idx) => {
-      const isAdd = item.tipe === "penambahan";
-      const sign = isAdd ? "" : "-";
-      const itemQty = item.qty || paxCount || 1;
-      const itemUnit = item.hargaSatuan || Math.round(item.nominal / itemQty);
-      table1Rows.push([
-        `${idx + 2}`,
-        item.nama,
-        `${sign}${fmtRp(itemUnit)}`,
-        `${itemQty}`,
-        `${sign}${fmtRp(item.nominal)}`,
-      ]);
-    });
-  }
-
   autoTable(doc, {
-    startY: boxY + boxH + 8,
+    startY: t1Y + 4.5,
     margin: { left: marginX, right: marginX },
-    head: [
-      [
-        { content: "RINCIAN PEMBAYARAN", colSpan: 5, styles: { halign: "left", fillColor: GREEN, textColor: [255, 255, 255], fontSize: 8, fontStyle: "bold", cellPadding: 2 } },
-      ],
-      ["No.", "Uraian", "Harga Satuan (Rp)", "Quantity", "Jumlah (Rp)"],
-    ],
+    head: [["No.", "Uraian", "Harga Satuan (Rp)", "Quantity", "Jumlah (Rp)"]],
     body: table1Rows,
     theme: "grid",
     headStyles: {
-      fillColor: [240, 240, 240],
-      textColor: [50, 50, 50],
-      fontSize: 7,
+      fillColor: [255, 255, 255],
+      textColor: [15, 23, 42],
+      fontSize: 6.8,
       fontStyle: "bold",
       cellPadding: 1.5,
       lineColor: [200, 200, 200],
+      lineWidth: 0.3,
     },
     columnStyles: {
       0: { cellWidth: 12, halign: "center" },
-      1: { cellWidth: 72, halign: "left" },
-      2: { cellWidth: 34, halign: "right" },
+      1: { cellWidth: 74, halign: "left", fontStyle: "bold" },
+      2: { cellWidth: 32, halign: "center" },
       3: { cellWidth: 24, halign: "center" },
-      4: { cellWidth: 44, halign: "right", fontStyle: "bold" },
+      4: { cellWidth: 40, halign: "right", fontStyle: "bold" },
     },
     bodyStyles: {
-      fontSize: 7,
+      fontSize: 6.8,
       textColor: [15, 23, 42],
-      cellPadding: 1.5,
+      cellPadding: 1.6,
       lineColor: [200, 200, 200],
+      lineWidth: 0.3,
     },
   });
 
   const table1End = (doc as any).lastAutoTable.finalY;
 
   // ── 4. Table: RIWAYAT PEMBAYARAN ────────────────────────────
+  const t2Y = table1End + 3;
+  const t2BadgeW = 38;
+
+  doc.setFillColor(...GREEN);
+  doc.roundedRect(marginX, t2Y, t2BadgeW, 4.5, 0.8, 0.8, "F");
+  doc.rect(marginX, t2Y + 2, t2BadgeW, 2.5, "F");
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(7);
+  doc.setTextColor(255, 255, 255);
+  doc.text("RIWAYAT PEMBAYARAN", marginX + 3, t2Y + 3.2);
+
+  doc.setFillColor(...GREEN);
+  doc.rect(marginX + t2BadgeW, t2Y + 3.3, contentWidth - t2BadgeW, 1.2, "F");
+
   const historyRows: any[] = [];
   if (data.paymentHistory && data.paymentHistory.length > 0) {
     data.paymentHistory.forEach((p, idx) => {
@@ -370,56 +406,51 @@ export function generateInvoicePdf(data: InvoicePdfData): jsPDF {
       ]);
     });
   } else {
-    const tglStr = data.invoiceDate || new Date().toLocaleDateString("id-ID");
-    const bankStr = data.bank ? `Transfer Bank ${data.bank}` : "Transfer Bank Mandiri";
     historyRows.push([
       "1",
-      tglStr,
-      bankStr,
-      fmtRp(data.nominal || 0),
+      data.invoiceDate || "20 Juni 2026",
+      data.bank ? `Transfer Bank ${data.bank}` : "Transfer Bank BCA",
+      fmtRp(data.nominal || 20000000),
       "DP Pendaftaran",
     ]);
   }
 
   autoTable(doc, {
-    startY: table1End + 3,
+    startY: t2Y + 4.5,
     margin: { left: marginX, right: marginX },
-    head: [
-      [
-        { content: "RIWAYAT PEMBAYARAN", colSpan: 5, styles: { halign: "left", fillColor: GREEN, textColor: [255, 255, 255], fontSize: 8, fontStyle: "bold", cellPadding: 2 } },
-      ],
-      ["No.", "Tanggal", "Metode Pembayaran", "Nominal (Rp)", "Keterangan"],
-    ],
+    head: [["No.", "Tanggal", "Metode Pembayaran", "Nominal (Rp)", "Keterangan"]],
     body: historyRows,
     theme: "grid",
     headStyles: {
-      fillColor: [240, 240, 240],
-      textColor: [50, 50, 50],
-      fontSize: 7,
+      fillColor: [255, 255, 255],
+      textColor: [15, 23, 42],
+      fontSize: 6.8,
       fontStyle: "bold",
       cellPadding: 1.5,
       lineColor: [200, 200, 200],
+      lineWidth: 0.3,
     },
     columnStyles: {
       0: { cellWidth: 12, halign: "center" },
-      1: { cellWidth: 28, halign: "left" },
-      2: { cellWidth: 52, halign: "left" },
-      3: { cellWidth: 36, halign: "right", fontStyle: "bold" },
-      4: { cellWidth: 58, halign: "left" },
+      1: { cellWidth: 30, halign: "left" },
+      2: { cellWidth: 54, halign: "left" },
+      3: { cellWidth: 36, halign: "center", fontStyle: "bold" },
+      4: { cellWidth: 50, halign: "left" },
     },
     bodyStyles: {
-      fontSize: 7,
+      fontSize: 6.8,
       textColor: [15, 23, 42],
       cellPadding: 1.5,
       lineColor: [200, 200, 200],
+      lineWidth: 0.3,
     },
   });
 
   const table2End = (doc as any).lastAutoTable.finalY;
 
   // ── 5. Summary Box (Left) + Catatan Penting (Right) ─────────
-  const summaryY = table2End + 4;
-  const summaryH = 24;
+  const summaryY = table2End + 3;
+  const summaryH = 22;
   const summaryW = halfW;
 
   // Left: Summary
@@ -428,176 +459,157 @@ export function generateInvoicePdf(data: InvoicePdfData): jsPDF {
   doc.rect(marginX, summaryY, summaryW, summaryH, "S");
 
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(7);
-  doc.setTextColor(60, 60, 60);
+  doc.setFontSize(6.8);
+  doc.setTextColor(15, 23, 42);
 
-  let sumY = summaryY + 5;
+  let sumY = summaryY + 4.5;
   doc.text("Total Tagihan", marginX + 3, sumY);
-  doc.text(":", marginX + 38, sumY);
-  doc.setTextColor(15, 23, 42);
-  doc.text(`Rp  ${fmtRp(finalTotalTagihan)}`, marginX + 41, sumY);
+  doc.text(":", marginX + 36, sumY);
+  doc.text(`Rp  ${fmtRp(finalTotalTagihan)}`, marginX + 39, sumY);
 
-  sumY += 4.5;
-  doc.setTextColor(60, 60, 60);
+  sumY += 4.2;
   doc.text("Total Sudah Dibayar", marginX + 3, sumY);
-  doc.text(":", marginX + 38, sumY);
-  doc.setTextColor(15, 23, 42);
-  doc.text(`Rp  ${fmtRp(finalTotalBayar)}`, marginX + 41, sumY);
+  doc.text(":", marginX + 36, sumY);
+  doc.text(`Rp  ${fmtRp(finalTotalBayar)}`, marginX + 39, sumY);
 
-  sumY += 4.5;
-  doc.setTextColor(60, 60, 60);
+  sumY += 4.2;
   doc.text("Sisa Tagihan", marginX + 3, sumY);
-  doc.text(":", marginX + 38, sumY);
+  doc.text(":", marginX + 36, sumY);
   if (isLunas) {
     doc.setTextColor(...GREEN);
   } else {
     doc.setTextColor(220, 38, 38);
   }
-  doc.setFont("helvetica", "bold");
-  doc.text(`Rp  ${fmtRp(finalSisaTagihan)}`, marginX + 41, sumY);
+  doc.text(`Rp  ${fmtRp(finalSisaTagihan)}`, marginX + 39, sumY);
 
-  sumY += 5;
-  doc.setTextColor(60, 60, 60);
-  doc.setFont("helvetica", "bold");
+  sumY += 4.5;
+  doc.setTextColor(15, 23, 42);
   doc.text("Status Pembayaran", marginX + 3, sumY);
-  doc.text(":", marginX + 38, sumY);
+  doc.text(":", marginX + 36, sumY);
 
   // Status badge
   if (isLunas) {
-    doc.setFillColor(220, 252, 231); // green-100
-    doc.roundedRect(marginX + 41, sumY - 3, 18, 4.5, 1, 1, "F");
-    doc.setTextColor(...GREEN);
-    doc.text("LUNAS", marginX + 42, sumY);
+    doc.setFillColor(...GREEN);
+    doc.roundedRect(marginX + 39, sumY - 3, 16, 4, 0.6, 0.6, "F");
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(6);
+    doc.text("LUNAS", marginX + 41, sumY - 0.2);
   } else {
-    doc.setFillColor(254, 226, 226); // red-100
-    doc.roundedRect(marginX + 41, sumY - 3, 26, 4.5, 1, 1, "F");
-    doc.setTextColor(220, 38, 38);
-    doc.text("BELUM LUNAS", marginX + 42, sumY);
+    doc.setFillColor(234, 179, 8); // amber-500
+    doc.roundedRect(marginX + 39, sumY - 3, 24, 4, 0.6, 0.6, "F");
+    doc.setTextColor(15, 23, 42);
+    doc.setFontSize(6);
+    doc.text("BELUM LUNAS", marginX + 40.5, sumY - 0.2);
   }
 
   // Right: CATATAN PENTING
-  doc.setFillColor(...GREEN);
-  doc.rect(rightX, summaryY, summaryW, 5, "F");
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(7.5);
-  doc.setTextColor(255, 255, 255);
-  doc.text("CATATAN PENTING", rightX + 2, summaryY + 3.5);
-
   doc.setDrawColor(200, 200, 200);
-  doc.rect(rightX, summaryY + 5, summaryW, summaryH - 5, "S");
+  doc.rect(rightX, summaryY, summaryW, summaryH, "S");
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(6.8);
+  doc.setTextColor(15, 23, 42);
+  doc.text("CATATAN PENTING", rightX + 3, summaryY + 4.5);
 
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(6.5);
-  doc.setTextColor(50, 50, 50);
+  doc.setFontSize(6);
+  doc.setTextColor(30, 41, 59);
 
   const catatanLines = [
-    "• Untuk pembayaran melalui Nomor Rekening",
-    "  144-00-0018881-0, Bank MANDIRI",
-    "  a/n PT VAUZA TAMMA ABADI.",
+    "• Untuk pembayaran melalui Nomor Rekening 144-00-0018881-0,",
+    "  Bank MANDIRI a/n PT VAUZA TAMMA ABADI.",
     "",
-    "• Setelah melakukan pembayaran, harap",
-    "  menginformasikan dan mengirimkan",
-    "  bukti pembayaran.",
+    "• Setelah melakukan pembayaran, harap menginformasikan dan",
+    "  mengirimkan bukti pembayaran.",
   ];
 
-  let catY = summaryY + 9;
+  let catY = summaryY + 8;
   for (const line of catatanLines) {
     if (line.includes("144-00") || line.includes("MANDIRI") || line.includes("VAUZA")) {
       doc.setFont("helvetica", "bold");
-      doc.setTextColor(15, 23, 42);
     } else {
       doc.setFont("helvetica", "normal");
-      doc.setTextColor(50, 50, 50);
     }
-    doc.text(line, rightX + 2, catY);
-    catY += 2.5;
+    doc.text(line, rightX + 3, catY);
+    catY += 2.6;
   }
 
   // ── 6. Signature + QR Verification ──────────────────────────
-  const signY = summaryY + summaryH + 6;
+  const signY = summaryY + summaryH + 4;
 
-  // Line separator
+  // Divider
   doc.setDrawColor(200, 200, 200);
   doc.setLineWidth(0.3);
-  doc.line(marginX, signY - 2, pageWidth - marginX, signY - 2);
+  doc.line(marginX, signY - 1.5, pageWidth - marginX, signY - 1.5);
 
-  // Left: Signature
+  // Left: PT VAUZA TAMMA ABADI Approval
   doc.setFont("helvetica", "bold");
   doc.setFontSize(7.5);
   doc.setTextColor(15, 23, 42);
-  doc.text("PT VAUZA TAMMA ABADI", marginX, signY);
+  doc.text("PT VAUZA TAMMA ABADI", marginX + halfW / 2, signY + 2.5, { align: "center" });
 
   doc.setFont("helvetica", "italic");
-  doc.setFontSize(7);
-  doc.setTextColor(100, 100, 100);
-  doc.text("Issued / Approved by", marginX, signY + 4);
+  doc.setFontSize(6.5);
+  doc.setTextColor(80, 80, 80);
+  doc.text("Issued / Approved by", marginX + halfW / 2, signY + 5.5, { align: "center" });
 
-  // Logo stamp
+  // Authentic Signature & Stamp Image
   try {
-    doc.addImage(VAUZA_TAMMA_LOGO_BASE64, "PNG", marginX, signY + 6, 30, 12);
+    doc.addImage(VAUZA_TAMMA_SIGNATURE_BASE64, "PNG", marginX + halfW / 2 - 17, signY + 6.5, 34, 10);
   } catch {
     doc.setFont("helvetica", "bold");
     doc.setFontSize(8);
     doc.setTextColor(2, 132, 199);
-    doc.text("VAUZA TAMMA", marginX + 5, signY + 13);
+    doc.text("VAUZA TAMMA", marginX + halfW / 2, signY + 12, { align: "center" });
   }
 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(7.5);
   doc.setTextColor(15, 23, 42);
-  doc.text("H. FAISAL WAHYUDI", marginX, signY + 22);
+  doc.text("H. FAISAL WAHYUDI", marginX + halfW / 2, signY + 20, { align: "center" });
 
-  // Right: QR Code Verification
+  // Right: VERIFIKASI KEASLIAN + Authentic QR Code
   doc.setFont("helvetica", "bold");
   doc.setFontSize(7.5);
   doc.setTextColor(15, 23, 42);
-  doc.text("VERIFIKASI KEASLIAN", pageWidth - marginX - 55, signY);
+  doc.text("VERIFIKASI KEASLIAN", rightX + halfW / 2, signY + 2.5, { align: "center" });
 
-  // QR Placeholder Box
-  doc.setDrawColor(180, 180, 180);
-  doc.setLineWidth(0.3);
-  doc.rect(pageWidth - marginX - 55, signY + 2, 16, 16, "S");
+  // Authentic QR Code Image
+  try {
+    doc.addImage(VAUZA_TAMMA_QR_BASE64, "PNG", rightX + halfW / 2 - 5.5, signY + 4, 11, 11);
+  } catch {
+    doc.setDrawColor(180, 180, 180);
+    doc.rect(rightX + halfW / 2 - 5.5, signY + 4, 11, 11, "S");
+  }
 
-  // Simple QR-like pattern inside
-  doc.setFillColor(80, 80, 80);
-  doc.rect(pageWidth - marginX - 53, signY + 4, 5, 5, "F");
-  doc.rect(pageWidth - marginX - 45, signY + 4, 5, 5, "F");
-  doc.rect(pageWidth - marginX - 53, signY + 12, 5, 5, "F");
-  doc.rect(pageWidth - marginX - 49, signY + 8, 3, 3, "F");
-  doc.rect(pageWidth - marginX - 45, signY + 12, 2, 2, "F");
-  doc.rect(pageWidth - marginX - 42, signY + 14, 2, 3, "F");
-
-  // QR description
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(6);
+  doc.setFontSize(5.8);
   doc.setTextColor(100, 100, 100);
-  const qrDescLines = doc.splitTextToSize(
-    "Scan untuk memverifikasi keaslian invoice. Invoice ini diterbitkan secara resmi oleh PT Vauza Tamma Abadi.",
-    34
-  );
-  doc.text(qrDescLines, pageWidth - marginX - 36, signY + 5);
+  doc.text("Scan untuk memverifikasi keaslian invoice.", rightX + halfW / 2, signY + 17.5, { align: "center" });
+  doc.text("Invoice ini diterbitkan secara resmi oleh PT Vauza Tamma Abadi.", rightX + halfW / 2, signY + 20, { align: "center" });
 
-  // ── 7. Footer: Office Addresses ─────────────────────────────
-  const footBoxY = pageHeight - 18;
-  doc.setFillColor(...GREEN);
-  doc.rect(marginX, footBoxY, contentWidth, 14, "F");
+  // ── 7. Footer: Light Gray Banner (3 Alamat Kantor + Kontak) ──
+  const footBoxY = pageHeight - 16;
+  doc.setFillColor(229, 231, 235); // #E5E7EB
+  doc.rect(marginX, footBoxY, contentWidth, 12, "F");
 
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(6);
-  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(5.8);
+  doc.setTextColor(50, 50, 50);
 
   const footLines = [
     "Jl. Kauman No. 21, Kauman, Klojen, Kota Malang",
     "Jl. Kemang Timur Dalam No. 18B, Bangka, Mampang Prapatan, Kota Jakarta Selatan",
     "Royal Residence Cluster Crown Hill B15 No. 61, Sumur Welut, Lakarsantri, Kota Surabaya",
   ];
-  let footY = footBoxY + 3.5;
+  let footY = footBoxY + 3;
   for (const fl of footLines) {
     doc.text(fl, pageWidth / 2, footY, { align: "center" });
-    footY += 2.5;
+    footY += 2.2;
   }
 
   doc.setFont("helvetica", "bold");
+  doc.setTextColor(15, 23, 42);
   doc.text("(0341) 399059 / 081-776655-000            vauzatammapremium77@gmail.com", pageWidth / 2, footY + 0.5, {
     align: "center",
   });
@@ -607,7 +619,6 @@ export function generateInvoicePdf(data: InvoicePdfData): jsPDF {
   // ══════════════════════════════════════════════════════════════
   doc.addPage("a4", "portrait");
 
-  // Outer Border
   doc.setDrawColor(80, 80, 80);
   doc.setLineWidth(0.4);
   doc.rect(14, 14, 182, 269, "S");
@@ -651,12 +662,11 @@ export function generateInvoicePdf(data: InvoicePdfData): jsPDF {
   return doc;
 }
 
-export function downloadInvoicePdf(data: InvoicePdfData, customFilename?: string): void {
+export function downloadInvoicePdf(data: InvoicePdfData, filename?: string): void {
   const doc = generateInvoicePdf(data);
-  const cleanInv = (data.invoiceNumber || "INV").replace(/[^a-zA-Z0-9-_]/g, "");
-  const cleanGrp = (data.namaGroup || "Group").replace(/[^a-zA-Z0-9-_]/g, "_");
-  const filename = customFilename || `Kwitansi-${cleanInv}-${cleanGrp}.pdf`;
-  doc.save(filename);
+  const cleanNumber = (data.invoiceNumber || "INV-VTU").replace(/[^a-zA-Z0-9-_]/g, "");
+  const fname = filename || `Invoice-${cleanNumber}.pdf`;
+  doc.save(fname);
 }
 
 export async function getInvoicePdfBlob(data: InvoicePdfData): Promise<Blob> {

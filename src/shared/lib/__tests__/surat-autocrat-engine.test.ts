@@ -14,7 +14,7 @@ describe("Surat Autocrat Merge Engine", () => {
   });
 
   it("should resolve manifest fields automatically when jamaah and package data are provided", () => {
-    const template = DEFAULT_SURAT_TEMPLATES[0]; // Rekom Paspor
+    const template = DEFAULT_SURAT_TEMPLATES[0]!; // Rekom Paspor
     const mockJamaah = {
       namaLengkap: "Muchamad Zamroni",
       nik: "3515082103850001",
