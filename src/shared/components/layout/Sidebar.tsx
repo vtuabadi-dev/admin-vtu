@@ -122,6 +122,7 @@ const adminNav: NavSection[] = [
           { label: "Histori Paket", href: "/admin/jamaah/histori-paket" },
           { label: "Dokumen Jamaah", href: "/admin/dokumen" },
           { label: "Review OCR Dokumen", href: "/admin/ocr-review" },
+          { label: "Generate Surat", href: "/admin/surat" },
         ],
       },
     ],
@@ -154,25 +155,6 @@ const adminNav: NavSection[] = [
           { label: "Manifest Blockseat", href: "/admin/manifest?type=blockseat" },
           { label: "Manifest Hotel", href: "/admin/rooming" },
           { label: "Manifest SISKOPATUH", href: "/admin/manifest?type=siskopatuh" },
-        ],
-      },
-    ],
-  },
-  {
-    title: "SURAT OPERASIONAL",
-    items: [
-      {
-        label: "Generate Surat",
-        icon: ScrollText,
-        children: [
-          { label: "Dashboard & Riwayat Surat", href: "/admin/surat?tab=history" },
-          { label: "Generator Surat (Autocrat)", href: "/admin/surat" },
-          { label: "Surat Rekom Paspor", href: "/admin/surat?template=rekom-paspor" },
-          { label: "Surat Cuti Pekerja", href: "/admin/surat?template=cuti-pekerja" },
-          { label: "Surat Cuti Sekolah", href: "/admin/surat?template=cuti-sekolah" },
-          { label: "Surat Keterangan Jamaah", href: "/admin/surat?template=keterangan" },
-          { label: "Surat Perintah Tugas", href: "/admin/surat?template=tugas" },
-          { label: "Surat Klaim Asuransi", href: "/admin/surat?template=klaim-asuransi" },
         ],
       },
     ],
