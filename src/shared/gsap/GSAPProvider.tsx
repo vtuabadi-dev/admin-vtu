@@ -58,7 +58,7 @@ export function GSAPProvider({ children }: { children: React.ReactNode }) {
           filter: "blur(0px) brightness(1) saturate(1)",
           duration,
           ease: "power3.out",
-          clearProps: "filter,transform,opacity",
+          clearProps: "all",
         }
       );
 
@@ -199,7 +199,7 @@ export function GSAPProvider({ children }: { children: React.ReactNode }) {
       {/* ── Main Page Canvas with Hardware-Accelerated Smooth Transitions ── */}
       <div
         ref={pageWrapperRef}
-        className="w-full min-h-screen will-change-[filter,transform,opacity] transform-gpu"
+        className="w-full min-h-screen"
       >
         {children}
       </div>
