@@ -243,3 +243,131 @@ html.intro-pending body {
     min-height: 0 !important;
   }
 }
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   PORTAL THEME (LUXURY ISLAMIC POSTER — IDENTICAL TO LOGIN PAGE)
+   ══════════════════════════════════════════════════════════════════════════════ */
+.portal-theme {
+  background-color: #07120f !important;
+  color: #f7f4ea !important;
+  font-family: Inter, system-ui, -apple-system, sans-serif;
+  min-height: 100dvh;
+}
+
+.portal-theme h1,
+.portal-theme h2,
+.portal-theme h3 {
+  font-family: Georgia, serif !important;
+  color: #f7f4ea !important;
+}
+
+.portal-theme h1 em,
+.portal-theme h2 em,
+.portal-theme h3 em,
+.portal-theme .text-gold {
+  color: #f0d99a !important;
+  font-style: normal;
+}
+
+/* Glassmorphism Cards & Panels across all 4 portals */
+.portal-theme .bg-white,
+.portal-theme .bg-white\/80,
+.portal-theme .bg-white\/90,
+.portal-theme .bg-slate-50,
+.portal-theme .bg-stone-50,
+.portal-theme .bg-muted\/20,
+.portal-theme .bg-muted\/40,
+.portal-theme .bg-muted {
+  background: linear-gradient(180deg, rgba(6, 30, 22, 0.75) 0%, rgba(4, 18, 13, 0.88) 100%) !important;
+  border-color: rgba(216, 177, 91, 0.3) !important;
+  color: #f7f4ea !important;
+  backdrop-filter: blur(14px) !important;
+}
+
+.portal-theme .text-slate-950,
+.portal-theme .text-slate-900,
+.portal-theme .text-gray-900,
+.portal-theme .text-stone-900,
+.portal-theme .text-foreground {
+  color: #f7f4ea !important;
+}
+
+.portal-theme .text-slate-700,
+.portal-theme .text-slate-600,
+.portal-theme .text-gray-700,
+.portal-theme .text-gray-600,
+.portal-theme .text-gray-500,
+.portal-theme .text-stone-600,
+.portal-theme .text-stone-500,
+.portal-theme .text-muted-foreground {
+  color: rgba(247, 244, 234, 0.72) !important;
+}
+
+/* Form Inputs, Selects, Textareas */
+.portal-theme input[type="text"],
+.portal-theme input[type="email"],
+.portal-theme input[type="tel"],
+.portal-theme input[type="number"],
+.portal-theme input[type="date"],
+.portal-theme input[type="password"],
+.portal-theme textarea,
+.portal-theme select {
+  background-color: rgba(3, 15, 11, 0.65) !important;
+  border: 1px solid rgba(247, 244, 234, 0.24) !important;
+  color: #ffffff !important;
+  border-radius: 12px !important;
+  backdrop-filter: blur(8px) !important;
+}
+
+.portal-theme input:focus,
+.portal-theme textarea:focus,
+.portal-theme select:focus {
+  border-color: rgba(216, 177, 91, 0.85) !important;
+  box-shadow: 0 0 0 3px rgba(216, 177, 91, 0.18) !important;
+  background-color: rgba(4, 20, 15, 0.85) !important;
+  outline: none !important;
+}
+
+.portal-theme input::placeholder,
+.portal-theme textarea::placeholder {
+  color: rgba(247, 244, 234, 0.42) !important;
+}
+
+/* Primary CTA Buttons */
+.portal-theme button.bg-blue-600,
+.portal-theme button.bg-emerald-600,
+.portal-theme button.bg-emerald-700,
+.portal-theme button.bg-primary {
+  background: linear-gradient(100deg, #f1d894, #c99a3d) !important;
+  color: #172015 !important;
+  font-weight: 700 !important;
+  border: 0 !important;
+  box-shadow: 0 10px 30px rgba(216, 177, 91, 0.22) !important;
+  transition: all 0.2s ease !important;
+}
+
+.portal-theme button.bg-blue-600:hover,
+.portal-theme button.bg-emerald-600:hover,
+.portal-theme button.bg-emerald-700:hover,
+.portal-theme button.bg-primary:hover {
+  transform: translateY(-1px) !important;
+  box-shadow: 0 14px 35px rgba(216, 177, 91, 0.32) !important;
+}
+
+/* Secondary Buttons */
+.portal-theme button.bg-white,
+.portal-theme button.bg-gray-100,
+.portal-theme button.bg-stone-100,
+.portal-theme button.bg-gray-200 {
+  background: rgba(4, 18, 13, 0.55) !important;
+  border: 1px solid rgba(216, 177, 91, 0.38) !important;
+  color: #f0d99a !important;
+}
+
+/* Border overrides */
+.portal-theme .border-gray-200,
+.portal-theme .border-stone-200,
+.portal-theme .border-slate-200,
+.portal-theme .border-border {
+  border-color: rgba(216, 177, 91, 0.24) !important;
+}

@@ -993,11 +993,6 @@ export default function RegisterPage() {
 
   return (
     <div className="w-full max-w-4xl mx-auto relative">
-      {/* ── Background Makkah & Madinah Golden Canvas Artwork ── */}
-      <div
-        className="fixed inset-0 bg-cover bg-center bg-no-repeat pointer-events-none z-0"
-        style={{ backgroundImage: `url('/assets/portals/bg-umroh.jpg')` }}
-      />
       <div className="relative z-10">
         {/* ── Floating Unified Portal Switcher Bar ── */}
         <PortalSwitcherNav />

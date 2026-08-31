@@ -413,13 +413,6 @@ export default function BadalUmrohRegisterPage() {
   if (submitted) {
     return (
       <div className="w-full max-w-4xl mx-auto relative">
-        {/* ── High-Performance Static Background ── */}
-        <div
-          className="fixed inset-0 bg-cover bg-center bg-no-repeat pointer-events-none z-0"
-          style={{ backgroundImage: `url('/assets/portals/bg-badal.jpg')` }}
-        />
-        <div className="fixed inset-0 bg-black/10 pointer-events-none z-0" />
-
         <div className="relative z-10 space-y-6">
           <div className="text-center bg-gradient-to-b from-white/20 to-white/05 backdrop-blur-[4px] p-6 rounded-3xl border-t border-l border-white/90 border-b border-r border-slate-900/25 shadow-[inset_1px_1px_2px_rgba(255,255,255,0.9),inset_-1px_-1px_3px_rgba(0,0,0,0.1),0_15px_35px_-10px_rgba(0,0,0,0.2)]">
             <div className="inline-flex items-center justify-center h-14 w-14 rounded-2xl bg-gradient-to-tr from-emerald-800 to-teal-700 text-white shadow-md shadow-emerald-900/30 mb-2">
@@ -500,13 +493,6 @@ export default function BadalUmrohRegisterPage() {
 
   return (
     <div className="w-full max-w-4xl mx-auto relative">
-      {/* ── High-Performance Static Background ── */}
-      <div
-        className="fixed inset-0 bg-cover bg-center bg-no-repeat pointer-events-none z-0"
-        style={{ backgroundImage: `url('/assets/portals/bg-badal.jpg')` }}
-      />
-      <div className="fixed inset-0 bg-black/10 pointer-events-none z-0" />
-
       <div className="relative z-10">
         {/* ── Floating Unified Portal Switcher Bar ── */}
         <PortalSwitcherNav />

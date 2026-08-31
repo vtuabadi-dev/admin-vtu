@@ -185,17 +185,9 @@ export default function TrackBadalWakafPage() {
   };
 
   return (
-    <div className="relative min-h-screen bg-[#07120f] py-10 px-4 flex flex-col items-center justify-center overflow-x-hidden">
-      {/* ── High-Performance Static Background ── */}
-      <div
-        className="fixed inset-0 bg-cover bg-center bg-no-repeat pointer-events-none z-0"
-        style={{ backgroundImage: `url('/assets/portals/bg-track.jpg')` }}
-      />
-      <div className="fixed inset-0 bg-slate-950/75 backdrop-blur-[2px] pointer-events-none z-0" />
-
-      <div className="relative z-10 w-full max-w-3xl space-y-6">
-        {/* ── Floating Unified Portal Switcher Bar ── */}
-        <PortalSwitcherNav className="mb-0" />
+    <div className="relative w-full max-w-3xl mx-auto space-y-6">
+      {/* ── Floating Unified Portal Switcher Bar ── */}
+      <PortalSwitcherNav className="mb-0" />
 
         <Card className="border border-border/80 shadow-2xl overflow-hidden backdrop-blur-md bg-white/95 dark:bg-slate-900/95">
           <CardHeader className="bg-gradient-to-r from-emerald-700 via-teal-700 to-sky-700 text-white p-6 text-center">
@@ -644,7 +636,6 @@ export default function TrackBadalWakafPage() {
             )}
           </CardContent>
         </Card>
-      </div>
 
       {/* Modal Upload Bukti Pembayaran */}
       <Modal

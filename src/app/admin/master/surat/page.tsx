@@ -62,8 +62,7 @@ export default function MasterSuratPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
 
-  // Editor Modal State
-  const [isEditorOpen, setIsEditorOpen] = useState(false);
+  // Editor Full-Page View State
   const [editingTemplate, setEditingTemplate] = useState<SuratTemplate | null>(null);
   const [editorActiveTab, setEditorActiveTab] = useState<"konfigurasi" | "editor" | "preview">("konfigurasi");
   const [savingTemplate, setSavingTemplate] = useState(false);
@@ -188,7 +187,6 @@ Demikian Surat Tugas ini dibuat dengan sebenarnya agar dapat dipergunakan sebaga
     setEditingTemplate(newTpl);
     setEditorActiveTab("konfigurasi");
     setShowFormatHelper(false);
-    setIsEditorOpen(true);
   };
 
   // Handle edit existing template
@@ -206,7 +204,6 @@ Demikian Surat Tugas ini dibuat dengan sebenarnya agar dapat dipergunakan sebaga
     setEditingTemplate(cloned);
     setEditorActiveTab("konfigurasi");
     setShowFormatHelper(false);
-    setIsEditorOpen(true);
   };
 
   // Handle Add New Column in Konfigurasi Isian Data
@@ -497,7 +494,7 @@ Demikian Surat Tugas ini dibuat dengan sebenarnya agar dapat dipergunakan sebaga
       });
 
       showToast(`Template "${updatedTemplate.nama}" berhasil disimpan!`);
-      setIsEditorOpen(false);
+      setEditingTemplate(null);
     } catch (err) {
       alert(`Gagal menyimpan template: ${(err as Error).message}`);
     } finally {
@@ -583,7 +580,6 @@ Demikian Surat Tugas ini dibuat dengan sebenarnya agar dapat dipergunakan sebaga
     // Open editor immediately to review mappings
     setEditingTemplate(newTemplate);
     setEditorActiveTab("konfigurasi");
-    setIsEditorOpen(true);
   };
 
   // Category Icon helper
@@ -623,7 +619,6 @@ Demikian Surat Tugas ini dibuat dengan sebenarnya agar dapat dipergunakan sebaga
             type="button"
             onClick={() => {
               setEditingTemplate(null);
-              setIsEditorOpen(false);
             }}
             className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-bold text-slate-700 dark:text-slate-200 bg-white dark:bg-stone-900 border border-stone-300 dark:border-stone-700 rounded-xl hover:bg-stone-100 dark:hover:bg-stone-800 transition-colors shadow-xs"
           >
@@ -657,7 +652,6 @@ Demikian Surat Tugas ini dibuat dengan sebenarnya agar dapat dipergunakan sebaga
                 size="sm"
                 onClick={() => {
                   setEditingTemplate(null);
-                  setIsEditorOpen(false);
                 }}
                 className="text-xs font-bold"
               >
@@ -834,7 +828,10 @@ Demikian Surat Tugas ini dibuat dengan sebenarnya agar dapat dipergunakan sebaga
                     <input
                       type="file"
                       accept=".docx,.doc,.txt,.html,.json"
-                      onChange={handleModalFileUpload}
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) handleModalFileUpload(file);
+                      }}
                       className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
                     />
                     <Button type="button" size="sm" variant="outline" className="text-xs font-bold gap-1.5 pointer-events-none">
@@ -983,7 +980,7 @@ Demikian Surat Tugas ini dibuat dengan sebenarnya agar dapat dipergunakan sebaga
 
                 {editingTemplate.placeholders.length === 0 ? (
                   <div className="p-6 text-center border border-dashed rounded-xl text-xs text-muted-foreground">
-                    Belum ada kolom isian data. Klik <strong>"+ Tambah Kolom"</strong> di atas.
+                    Belum ada kolom isian data. Klik <strong>&quot;+ Tambah Kolom&quot;</strong> di atas.
                   </div>
                 ) : (
                   <div className="space-y-3">
@@ -1463,7 +1460,6 @@ Demikian Surat Tugas ini dibuat dengan sebenarnya agar dapat dipergunakan sebaga
               type="button"
               onClick={() => {
                 setEditingTemplate(null);
-                setIsEditorOpen(false);
               }}
               className="inline-flex items-center gap-1.5 text-xs font-bold text-muted-foreground hover:text-foreground"
             >

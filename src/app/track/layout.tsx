@@ -1,5 +1,5 @@
 import PortalLayoutWrapper from "@/shared/components/PortalLayoutWrapper";
 
-export default function RegisterLayout({ children }: { children: React.ReactNode }) {
+export default function TrackLayout({ children }: { children: React.ReactNode }) {
   return <PortalLayoutWrapper>{children}</PortalLayoutWrapper>;
 }
