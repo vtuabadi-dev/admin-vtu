@@ -1902,10 +1902,16 @@ function PaymentReviewTabContent() {
                       variant="outline"
                       className="h-7 text-xs font-bold border-amber-500/40 text-amber-700 dark:text-amber-300 hover:bg-amber-500/10 gap-1"
                       onClick={() => {
-                        setNewOrderCategory("fast_train");
-                        setNewOrderName("");
-                        setNewOrderType("penambahan");
-                        setNewOrderNominal(0);
+                        const initPreset = ORDER_PRESETS[0] || {
+                          category: "fast_train",
+                          defaultName: "Tiket Kereta Cepat Haramain (Mekkah - Madinah)",
+                          type: "penambahan" as const,
+                          defaultNominal: 1250000,
+                        };
+                        setNewOrderCategory(initPreset.category);
+                        setNewOrderName(initPreset.defaultName);
+                        setNewOrderType(initPreset.type);
+                        setNewOrderNominal(initPreset.defaultNominal);
                         setShowAddOrderModal(true);
                       }}
                     >
@@ -2487,7 +2493,19 @@ function PaymentReviewTabContent() {
             <div className="grid grid-cols-2 gap-2 mt-1">
               <button
                 type="button"
-                onClick={() => setNewOrderType("penambahan")}
+                onClick={() => {
+                  setNewOrderType("penambahan");
+                  if (newOrderCategory === "diskon") {
+                    const fallback = ORDER_PRESETS[0] || {
+                      category: "fast_train",
+                      defaultName: "Tiket Kereta Cepat Haramain (Mekkah - Madinah)",
+                      defaultNominal: 1250000,
+                    };
+                    setNewOrderCategory(fallback.category);
+                    setNewOrderName(fallback.defaultName);
+                    setNewOrderNominal(fallback.defaultNominal);
+                  }
+                }}
                 className={`p-2 rounded-lg border text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${
                   newOrderType === "penambahan"
                     ? "bg-amber-500/15 border-amber-500 text-amber-700 dark:text-amber-300 shadow-2xs"
@@ -2498,7 +2516,17 @@ function PaymentReviewTabContent() {
               </button>
               <button
                 type="button"
-                onClick={() => setNewOrderType("pengurangan")}
+                onClick={() => {
+                  setNewOrderType("pengurangan");
+                  const discPreset = ORDER_PRESETS.find((p) => p.type === "pengurangan") || {
+                    category: "diskon",
+                    defaultName: "Potongan Khusus / Promo Grup Umroh",
+                    defaultNominal: 1000000,
+                  };
+                  setNewOrderCategory(discPreset.category);
+                  setNewOrderName(discPreset.defaultName);
+                  setNewOrderNominal(discPreset.defaultNominal);
+                }}
                 className={`p-2 rounded-lg border text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${
                   newOrderType === "pengurangan"
                     ? "bg-emerald-500/15 border-emerald-500 text-emerald-700 dark:text-emerald-300 shadow-2xs"
@@ -2517,38 +2545,53 @@ function PaymentReviewTabContent() {
               onChange={(e) => {
                 const cat = e.target.value;
                 setNewOrderCategory(cat);
-                if (cat === "fast_train" && !newOrderName) setNewOrderName("Kereta Cepat Haramain (Fast Train)");
-                else if (cat === "upgrade_kamar" && !newOrderName) setNewOrderName("Upgrade Kamar (Double / Triple)");
-                else if (cat === "upgrade_hotel" && !newOrderName) setNewOrderName("Upgrade Hotel Bintang 5");
-                else if (cat === "perlengkapan" && !newOrderName) setNewOrderName("Penambahan Perlengkapan Umroh Lengkap");
-                else if (cat === "paspor" && !newOrderName) setNewOrderName("Biaya Penanganan / Pembuatan Paspor");
-                else if (cat === "kursi_roda" && !newOrderName) setNewOrderName("Sewa Kursi Roda & Muthawif Pendorong");
-                else if (cat === "jahit" && !newOrderName) setNewOrderName("Ongkos Jahit Seragam Batik");
-                else if (cat === "city_tour" && !newOrderName) setNewOrderName("Tambahan Extra City Tour / Ziarah Taif");
+                const found = ORDER_PRESETS.find(
+                  (p) => p.category === cat || (cat === "jahit" && p.category === "jahit_seragam")
+                );
+                if (found) {
+                  setNewOrderName(found.defaultName);
+                  setNewOrderNominal(found.defaultNominal);
+                  setNewOrderType(found.type);
+                } else if (cat === "diskon") {
+                  setNewOrderName("Potongan Khusus / Diskon Tagihan");
+                  setNewOrderNominal(1000000);
+                  setNewOrderType("pengurangan");
+                } else {
+                  setNewOrderName("Layanan Tambahan Kustom");
+                  setNewOrderNominal(500000);
+                  setNewOrderType("penambahan");
+                }
               }}
               className="mt-1 w-full rounded-md border border-stone-300 dark:border-stone-700 bg-background px-3 py-1.5 text-xs focus:ring-1 focus:ring-amber-500"
             >
-              <option value="fast_train">🚄 Kereta Cepat Haramain</option>
-              <option value="upgrade_kamar">🛏️ Upgrade Kamar (Double/Triple)</option>
-              <option value="upgrade_hotel">🏨 Upgrade Hotel (Bintang 5)</option>
-              <option value="perlengkapan">🎒 Tambah Perlengkapan / Koper</option>
-              <option value="jahit">🧵 Ongkos Jahit Seragam</option>
+              <option value="fast_train">🚄 Kereta Cepat Haramain (Fast Train)</option>
+              <option value="upgrade_kamar">🛏️ Upgrade Kamar (Double / Triple)</option>
+              <option value="upgrade_hotel">🏨 Upgrade Hotel (Bintang 5 Ring 1)</option>
+              <option value="perlengkapan">🎒 Tambah Perlengkapan & Koper</option>
+              <option value="jahit_seragam">🧵 Ongkos Jahit Seragam Batik</option>
               <option value="kursi_roda">♿ Sewa Kursi Roda + Petugas</option>
-              <option value="paspor">🛂 Penanganan & Rekomendasi Paspor</option>
-              <option value="city_tour">🚌 Tambahan City Tour / Taif</option>
-              <option value="custom">✨ Layanan / Potongan Kustom Lainnya</option>
+              <option value="paspor">🛂 Penanganan & Biaya Paspor</option>
+              <option value="city_tour">🚌 Tambahan Extra City Tour / Taif</option>
+              <option value="diskon">🏷️ Diskon / Potongan Khusus</option>
+              <option value="custom">✨ Layanan / Beban Kustom Lainnya</option>
             </select>
           </div>
 
           <div>
-            <label className="text-[11px] font-bold text-foreground">Deskripsi / Nama Layanan</label>
+            <div className="flex items-center justify-between">
+              <label className="text-[11px] font-bold text-foreground">Deskripsi / Nama Layanan</label>
+              <span className="text-[9.5px] text-amber-600 dark:text-amber-400 font-semibold">Dapat diedit bebas</span>
+            </div>
             <Input
               type="text"
               value={newOrderName}
               onChange={(e) => setNewOrderName(e.target.value)}
               placeholder="Contoh: Tambah Kereta Cepat Haramain Makkah-Madinah"
-              className="mt-1 h-8 text-xs"
+              className="mt-1 h-8 text-xs font-medium"
             />
+            <p className="text-[10px] text-muted-foreground mt-1">
+              💡 Sistem otomatis mengisi deskripsi default sesuai kategori yang dipilih. Anda dapat mengubah atau menambahkan detail sesuai kebutuhan.
+            </p>
           </div>
 
           <div>
