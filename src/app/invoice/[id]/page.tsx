@@ -203,12 +203,12 @@ export default function PublicInvoicePage({ params }: { params: Promise<{ id: st
               </h1>
 
               {/* Green Bar Invoice Number */}
-              <div className="w-full mt-1 bg-[#064e3b] text-white font-mono text-[10.5px] font-bold py-1 rounded-md text-center tracking-wide">
+              <div className="w-full mt-1 bg-[#064e3b] text-white font-mono text-[10.5px] font-bold py-1 rounded-[6px] text-center tracking-wide">
                 {data?.invoiceNumber || "INV.VT/2026/VIII/00045"}
               </div>
 
               {/* Date Metadata Table */}
-              <div className="w-full mt-1.5 border border-[#064e3b] rounded-md overflow-hidden text-[9.5px]">
+              <div className="w-full mt-1.5 border border-[#064e3b] rounded-[6px] overflow-hidden text-[9.5px]">
                 <div className="flex border-b border-[#064e3b]/30">
                   <div className="w-[88px] bg-[#064e3b] text-white font-bold px-2 py-0.5 text-left shrink-0">
                     Tanggal Invoice
@@ -235,7 +235,7 @@ export default function PublicInvoicePage({ params }: { params: Promise<{ id: st
             <div>
               {/* Header with Title Badge + Thick Line */}
               <div className="flex items-center">
-                <div className="bg-[#064e3b] text-white text-[10px] font-bold px-2.5 py-1 rounded-t-md inline-flex items-center gap-1.5 shrink-0">
+                <div className="bg-[#064e3b] text-white text-[10px] font-bold px-2.5 py-1 rounded-t-[6px] inline-flex items-center gap-1.5 shrink-0">
                   {/* User/Person Icon */}
                   <svg className="w-3.5 h-3.5 text-white shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
@@ -247,7 +247,7 @@ export default function PublicInvoicePage({ params }: { params: Promise<{ id: st
               </div>
 
               {/* Content Card with Row Lines */}
-              <div className="border border-stone-300 rounded-b-md rounded-tr-md p-2.5 text-[10px] space-y-1.5 bg-white min-h-[108px] flex flex-col justify-between">
+              <div className="border border-[#B7C0BC] rounded-b-[6px] rounded-tr-[6px] p-2.5 text-[10px] space-y-1.5 bg-white min-h-[108px] flex flex-col justify-between">
                 <div className="grid grid-cols-[100px_8px_1fr] items-start">
                   <span className="text-stone-900 font-semibold">Nama Pendaftar</span>
                   <span className="text-stone-600">:</span>
@@ -283,7 +283,7 @@ export default function PublicInvoicePage({ params }: { params: Promise<{ id: st
             <div>
               {/* Header with Title Badge + Thick Line */}
               <div className="flex items-center">
-                <div className="bg-[#064e3b] text-white text-[10px] font-bold px-2.5 py-1 rounded-t-md inline-flex items-center gap-1.5 shrink-0">
+                <div className="bg-[#064e3b] text-white text-[10px] font-bold px-2.5 py-1 rounded-t-[6px] inline-flex items-center gap-1.5 shrink-0">
                   {/* Gift/Package Icon */}
                   <svg className="w-3.5 h-3.5 text-white shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                     <polyline points="20 12 20 22 4 22 4 12" />
@@ -298,7 +298,7 @@ export default function PublicInvoicePage({ params }: { params: Promise<{ id: st
               </div>
 
               {/* Content Card with Row Lines */}
-              <div className="border border-stone-300 rounded-b-md rounded-tr-md p-2.5 text-[10px] space-y-1.5 bg-white min-h-[108px] flex flex-col justify-between">
+              <div className="border border-[#B7C0BC] rounded-b-[6px] rounded-tr-[6px] p-2.5 text-[10px] space-y-1.5 bg-white min-h-[108px] flex flex-col justify-between">
                 <div className="grid grid-cols-[90px_8px_1fr] items-center">
                   <span className="text-stone-900 font-semibold">Paket Umroh</span>
                   <span className="text-stone-600">:</span>
@@ -332,29 +332,29 @@ export default function PublicInvoicePage({ params }: { params: Promise<{ id: st
           {/* ─── 3. TABEL RINCIAN PEMBAYARAN ─── */}
           <div className="my-1.5">
             <div className="flex items-center">
-              <div className="bg-[#064e3b] text-white text-[10px] font-bold px-3 py-1 rounded-t-md shrink-0">
+              <div className="bg-[#064e3b] text-white text-[10px] font-bold px-3 py-1 rounded-t-[6px] shrink-0">
                 RINCIAN PEMBAYARAN
               </div>
               <div className="flex-1 h-[3.5px] bg-[#064e3b]" />
             </div>
 
-            <div className="border border-stone-300 rounded-b-md rounded-tr-md overflow-hidden text-[10px]">
+            <div className="border border-[#B7C0BC] rounded-b-[6px] rounded-tr-[6px] overflow-hidden text-[10px]">
               <table className="w-full text-left border-collapse">
                 <thead>
-                  <tr className="bg-white border-b border-stone-300 text-stone-900 font-bold text-[10px] h-[28px]">
-                    <th className="py-1 px-2.5 text-center w-10 border-r border-stone-200 align-middle">No.</th>
-                    <th className="py-1 px-3 border-r border-stone-200 align-middle">Uraian</th>
-                    <th className="py-1 px-3 text-center w-[120px] border-r border-stone-200 align-middle">Harga Satuan (Rp)</th>
-                    <th className="py-1 px-3 text-center w-[75px] border-r border-stone-200 align-middle">Quantity</th>
+                  <tr className="bg-white border-b border-[#B7C0BC] text-stone-900 font-bold text-[10px] h-[28px]">
+                    <th className="py-1 px-2.5 text-center w-10 border-r border-[#B7C0BC]/60 align-middle">No.</th>
+                    <th className="py-1 px-3 border-r border-[#B7C0BC]/60 align-middle">Uraian</th>
+                    <th className="py-1 px-3 text-center w-[120px] border-r border-[#B7C0BC]/60 align-middle">Harga Satuan (Rp)</th>
+                    <th className="py-1 px-3 text-center w-[75px] border-r border-[#B7C0BC]/60 align-middle">Quantity</th>
                     <th className="py-1 px-3 text-right w-[130px] align-middle">Jumlah (Rp)</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-stone-200 text-stone-900">
+                <tbody className="divide-y divide-[#B7C0BC]/60 text-stone-900">
                   <tr className="h-[30px]">
-                    <td className="py-1 px-2.5 text-center border-r border-stone-200 align-middle font-mono">1</td>
-                    <td className="py-1 px-3 font-semibold border-r border-stone-200 align-middle">{data?.namaPaket || "Paket Umroh Plus 12 Hari"}</td>
-                    <td className="py-1 px-3 text-center border-r border-stone-200 font-mono align-middle">{formatRp(unitPrice)}</td>
-                    <td className="py-1 px-3 text-center border-r border-stone-200 font-mono align-middle">{paxCount} Pax</td>
+                    <td className="py-1 px-2.5 text-center border-r border-[#B7C0BC]/60 align-middle font-mono">1</td>
+                    <td className="py-1 px-3 font-semibold border-r border-[#B7C0BC]/60 align-middle">{data?.namaPaket || "Paket Umroh Plus 12 Hari"}</td>
+                    <td className="py-1 px-3 text-center border-r border-[#B7C0BC]/60 align-middle font-mono">{formatRp(unitPrice)}</td>
+                    <td className="py-1 px-3 text-center border-r border-[#B7C0BC]/60 align-middle font-mono">{paxCount} Pax</td>
                     <td className="py-1 px-3 text-right font-mono font-bold align-middle">{formatRp(subtotalBase)}</td>
                   </tr>
                 </tbody>
@@ -365,40 +365,40 @@ export default function PublicInvoicePage({ params }: { params: Promise<{ id: st
           {/* ─── 4. TABEL RIWAYAT PEMBAYARAN ─── */}
           <div className="my-1.5">
             <div className="flex items-center">
-              <div className="bg-[#064e3b] text-white text-[10px] font-bold px-3 py-1 rounded-t-md shrink-0">
+              <div className="bg-[#064e3b] text-white text-[10px] font-bold px-3 py-1 rounded-t-[6px] shrink-0">
                 RIWAYAT PEMBAYARAN
               </div>
               <div className="flex-1 h-[3.5px] bg-[#064e3b]" />
             </div>
 
-            <div className="border border-stone-300 rounded-b-md rounded-tr-md overflow-hidden text-[10px]">
+            <div className="border border-[#B7C0BC] rounded-b-[6px] rounded-tr-[6px] overflow-hidden text-[10px]">
               <table className="w-full text-left border-collapse">
                 <thead>
-                  <tr className="bg-white border-b border-stone-300 text-stone-900 font-bold text-[10px] h-[28px]">
-                    <th className="py-1 px-2.5 text-center w-10 border-r border-stone-200 align-middle">No.</th>
-                    <th className="py-1 px-3 w-[110px] border-r border-stone-200 align-middle">Tanggal</th>
-                    <th className="py-1 px-3 border-r border-stone-200 align-middle">Metode Pembayaran</th>
-                    <th className="py-1 px-3 text-center w-[120px] border-r border-stone-200 align-middle">Nominal (Rp)</th>
+                  <tr className="bg-white border-b border-[#B7C0BC] text-stone-900 font-bold text-[10px] h-[28px]">
+                    <th className="py-1 px-2.5 text-center w-10 border-r border-[#B7C0BC]/60 align-middle">No.</th>
+                    <th className="py-1 px-3 w-[110px] border-r border-[#B7C0BC]/60 align-middle">Tanggal</th>
+                    <th className="py-1 px-3 border-r border-[#B7C0BC]/60 align-middle">Metode Pembayaran</th>
+                    <th className="py-1 px-3 text-center w-[120px] border-r border-[#B7C0BC]/60 align-middle">Nominal (Rp)</th>
                     <th className="py-1 px-3 text-left w-[130px] align-middle">Keterangan</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-stone-200 text-stone-900">
+                <tbody className="divide-y divide-[#B7C0BC]/60 text-stone-900">
                   {data?.paymentHistory && data.paymentHistory.length > 0 ? (
                     data.paymentHistory.map((p, idx) => (
                       <tr key={idx} className="h-[28px]">
-                        <td className="py-1 px-2.5 text-center border-r border-stone-200 align-middle font-mono">{idx + 1}</td>
-                        <td className="py-1 px-3 border-r border-stone-200 align-middle">{p.tanggal}</td>
-                        <td className="py-1 px-3 border-r border-stone-200 align-middle">{p.metode}</td>
-                        <td className="py-1 px-3 text-center font-mono font-medium border-r border-stone-200 align-middle">{formatRp(p.nominal)}</td>
+                        <td className="py-1 px-2.5 text-center border-r border-[#B7C0BC]/60 align-middle font-mono">{idx + 1}</td>
+                        <td className="py-1 px-3 border-r border-[#B7C0BC]/60 align-middle">{p.tanggal}</td>
+                        <td className="py-1 px-3 border-r border-[#B7C0BC]/60 align-middle">{p.metode}</td>
+                        <td className="py-1 px-3 text-center font-mono font-medium border-r border-[#B7C0BC]/60 align-middle">{formatRp(p.nominal)}</td>
                         <td className="py-1 px-3 text-stone-800 align-middle">{idx === 0 ? "DP Pendaftaran" : `Pelunasan Tahap ${idx}`}</td>
                       </tr>
                     ))
                   ) : (
                     <tr className="h-[28px]">
-                      <td className="py-1 px-2.5 text-center border-r border-stone-200 align-middle font-mono">1</td>
-                      <td className="py-1 px-3 border-r border-stone-200 align-middle">{data?.invoiceDate || "20 Juni 2026"}</td>
-                      <td className="py-1 px-3 border-r border-stone-200 align-middle">{data?.bank ? `Transfer Bank ${data.bank}` : "Transfer Bank BCA"}</td>
-                      <td className="py-1 px-3 text-center font-mono font-medium border-r border-stone-200 align-middle">{formatRp(data?.nominal || 20000000)}</td>
+                      <td className="py-1 px-2.5 text-center border-r border-[#B7C0BC]/60 align-middle font-mono">1</td>
+                      <td className="py-1 px-3 border-r border-[#B7C0BC]/60 align-middle">{data?.invoiceDate || "20 Juni 2026"}</td>
+                      <td className="py-1 px-3 border-r border-[#B7C0BC]/60 align-middle">{data?.bank ? `Transfer Bank ${data.bank}` : "Transfer Bank BCA"}</td>
+                      <td className="py-1 px-3 text-center font-mono font-medium border-r border-[#B7C0BC]/60 align-middle">{formatRp(data?.nominal || 20000000)}</td>
                       <td className="py-1 px-3 text-stone-800 align-middle">DP Pendaftaran</td>
                     </tr>
                   )}
@@ -410,7 +410,7 @@ export default function PublicInvoicePage({ params }: { params: Promise<{ id: st
           {/* ─── 5. SUMMARY (LEFT) + CATATAN PENTING (RIGHT) ─── */}
           <div className="grid grid-cols-2 gap-3.5 my-1.5">
             {/* Box Kiri: Summary Finansial */}
-            <div className="border border-stone-300 rounded-md p-2.5 text-[10px] space-y-1.5 bg-white flex flex-col justify-between">
+            <div className="border border-[#B7C0BC] rounded-[6px] p-2.5 text-[10px] space-y-1.5 bg-white flex flex-col justify-between">
               <div className="grid grid-cols-[130px_8px_1fr] items-center">
                 <span className="text-stone-900 font-semibold">Total Tagihan</span>
                 <span className="text-stone-600">:</span>
@@ -434,11 +434,11 @@ export default function PublicInvoicePage({ params }: { params: Promise<{ id: st
                 <span className="text-stone-600">:</span>
                 <div>
                   {isLunas ? (
-                    <span className="inline-block bg-[#064e3b] text-white font-bold text-[9.5px] px-2.5 py-0.5 rounded-sm">
+                    <span className="inline-block bg-[#064e3b] text-white font-bold text-[9.5px] px-2.5 py-0.5 rounded-[4px]">
                       LUNAS
                     </span>
                   ) : (
-                    <span className="inline-block bg-[#eab308] text-stone-950 font-black text-[9.5px] px-2.5 py-0.5 rounded-sm">
+                    <span className="inline-block bg-[#eab308] text-stone-950 font-black text-[9.5px] px-2.5 py-0.5 rounded-[4px]">
                       BELUM LUNAS
                     </span>
                   )}
@@ -447,7 +447,7 @@ export default function PublicInvoicePage({ params }: { params: Promise<{ id: st
             </div>
 
             {/* Box Kanan: CATATAN PENTING */}
-            <div className="border border-stone-300 rounded-md p-2.5 text-[9.5px] bg-white flex flex-col justify-between">
+            <div className="border border-[#B7C0BC] rounded-[6px] p-2.5 text-[9.5px] bg-white flex flex-col justify-between">
               <p className="font-bold text-stone-900 text-[10px] mb-1">CATATAN PENTING</p>
               <ul className="space-y-1 text-stone-800 leading-normal list-disc pl-3">
                 <li>
@@ -461,9 +461,9 @@ export default function PublicInvoicePage({ params }: { params: Promise<{ id: st
           </div>
 
           {/* ─── 6. APPROVAL (LEFT) + VERIFIKASI KEASLIAN (RIGHT) ─── */}
-          <div className="grid grid-cols-2 gap-3.5 pt-1.5 border-t border-stone-300 my-1">
+          <div className="grid grid-cols-2 gap-3.5 pt-1.5 border-t border-[#B7C0BC] my-1">
             {/* Approval Kiri */}
-            <div className="text-center flex flex-col items-center justify-between min-h-[85px]">
+            <div className="text-center flex flex-col items-center justify-between min-h-[85px] p-2 border border-[#B7C0BC] rounded-[6px]">
               <div>
                 <p className="text-[10px] font-bold text-stone-900 tracking-wide">PT VAUZA TAMMA ABADI</p>
                 <p className="text-[9px] text-stone-600 italic">Issued / Approved by</p>
@@ -487,7 +487,7 @@ export default function PublicInvoicePage({ params }: { params: Promise<{ id: st
             </div>
 
             {/* QR Verifikasi Kanan */}
-            <div className="text-center flex flex-col items-center justify-between min-h-[85px]">
+            <div className="text-center flex flex-col items-center justify-between min-h-[85px] p-2 border border-[#B7C0BC] rounded-[6px]">
               <p className="text-[10px] font-bold text-stone-900 tracking-wide">VERIFIKASI KEASLIAN</p>
 
               {/* QR Code */}
@@ -512,7 +512,7 @@ export default function PublicInvoicePage({ params }: { params: Promise<{ id: st
         </div>
 
         {/* ─── 7. FOOTER (3 Alamat Kantor + Kontak Perusahaan) ─── */}
-        <div className="bg-[#e5e7eb] text-stone-800 px-4 py-2 text-center text-[8.5px] leading-tight space-y-0.5 border-t border-stone-300">
+        <div className="bg-[#e5e7eb] text-stone-800 px-4 py-2 text-center text-[8.5px] leading-tight space-y-0.5 border-t border-[#B7C0BC]">
           <p>Jl. Kauman No. 21, Kauman, Klojen, Kota Malang</p>
           <p>Jl. Kemang Timur Dalam No. 18B, Bangka, Mampang Prapatan, Kota Jakarta Selatan</p>
           <p>Royal Residence Cluster Crown Hill B15 No. 61, Sumur Welut, Lakarsantri, Kota Surabaya</p>

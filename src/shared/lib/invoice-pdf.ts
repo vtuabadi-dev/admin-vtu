@@ -228,9 +228,9 @@ export function generateInvoicePdf(data: InvoicePdfData): jsPDF {
   doc.rect(marginX + dpBadgeW, boxY + 3.3, halfW - dpBadgeW, 1.2, "F");
 
   // Content Box Left
-  doc.setDrawColor(200, 200, 200);
+  doc.setDrawColor(183, 192, 188);
   doc.setLineWidth(0.3);
-  doc.rect(marginX, boxY + 4.5, halfW, boxH - 4.5, "S");
+  doc.roundedRect(marginX, boxY + 4.5, halfW, boxH - 4.5, 1.2, 1.2, "S");
 
   doc.setFontSize(6.8);
   const dpL = marginX + 2.5;
@@ -295,9 +295,9 @@ export function generateInvoicePdf(data: InvoicePdfData): jsPDF {
   doc.rect(rightX + rpBadgeW, boxY + 3.3, halfW - rpBadgeW, 1.2, "F");
 
   // Content Box Right
-  doc.setDrawColor(200, 200, 200);
+  doc.setDrawColor(183, 192, 188);
   doc.setLineWidth(0.3);
-  doc.rect(rightX, boxY + 4.5, halfW, boxH - 4.5, "S");
+  doc.roundedRect(rightX, boxY + 4.5, halfW, boxH - 4.5, 1.2, 1.2, "S");
 
   const rpL = rightX + 2.5;
   const rpC = rightX + 26;
@@ -374,7 +374,7 @@ export function generateInvoicePdf(data: InvoicePdfData): jsPDF {
       fontSize: 6.8,
       fontStyle: "bold",
       cellPadding: 1.5,
-      lineColor: [200, 200, 200],
+      lineColor: [183, 192, 188],
       lineWidth: 0.3,
     },
     columnStyles: {
@@ -388,7 +388,7 @@ export function generateInvoicePdf(data: InvoicePdfData): jsPDF {
       fontSize: 6.8,
       textColor: [15, 23, 42],
       cellPadding: 1.6,
-      lineColor: [200, 200, 200],
+      lineColor: [183, 192, 188],
       lineWidth: 0.3,
     },
   });
@@ -443,7 +443,7 @@ export function generateInvoicePdf(data: InvoicePdfData): jsPDF {
       fontSize: 6.8,
       fontStyle: "bold",
       cellPadding: 1.5,
-      lineColor: [200, 200, 200],
+      lineColor: [183, 192, 188],
       lineWidth: 0.3,
     },
     columnStyles: {
@@ -457,7 +457,7 @@ export function generateInvoicePdf(data: InvoicePdfData): jsPDF {
       fontSize: 6.8,
       textColor: [15, 23, 42],
       cellPadding: 1.5,
-      lineColor: [200, 200, 200],
+      lineColor: [183, 192, 188],
       lineWidth: 0.3,
     },
   });
@@ -470,9 +470,9 @@ export function generateInvoicePdf(data: InvoicePdfData): jsPDF {
   const summaryW = halfW;
 
   // Left: Summary
-  doc.setDrawColor(200, 200, 200);
+  doc.setDrawColor(183, 192, 188);
   doc.setLineWidth(0.3);
-  doc.rect(marginX, summaryY, summaryW, summaryH, "S");
+  doc.roundedRect(marginX, summaryY, summaryW, summaryH, 1.2, 1.2, "S");
 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(6.8);
@@ -506,21 +506,21 @@ export function generateInvoicePdf(data: InvoicePdfData): jsPDF {
   // Status badge
   if (isLunas) {
     doc.setFillColor(...GREEN);
-    doc.roundedRect(marginX + 39, sumY - 3, 16, 4, 0.6, 0.6, "F");
+    doc.roundedRect(marginX + 39, sumY - 3, 16, 4, 0.8, 0.8, "F");
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(6);
     doc.text("LUNAS", marginX + 41, sumY - 0.2);
   } else {
     doc.setFillColor(234, 179, 8); // amber-500
-    doc.roundedRect(marginX + 39, sumY - 3, 24, 4, 0.6, 0.6, "F");
+    doc.roundedRect(marginX + 39, sumY - 3, 24, 4, 0.8, 0.8, "F");
     doc.setTextColor(15, 23, 42);
     doc.setFontSize(6);
     doc.text("BELUM LUNAS", marginX + 40.5, sumY - 0.2);
   }
 
   // Right: CATATAN PENTING
-  doc.setDrawColor(200, 200, 200);
-  doc.rect(rightX, summaryY, summaryW, summaryH, "S");
+  doc.setDrawColor(183, 192, 188);
+  doc.roundedRect(rightX, summaryY, summaryW, summaryH, 1.2, 1.2, "S");
 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(6.8);
@@ -554,24 +554,27 @@ export function generateInvoicePdf(data: InvoicePdfData): jsPDF {
   const signY = summaryY + summaryH + 4;
 
   // Divider
-  doc.setDrawColor(200, 200, 200);
+  doc.setDrawColor(183, 192, 188);
   doc.setLineWidth(0.3);
   doc.line(marginX, signY - 1.5, pageWidth - marginX, signY - 1.5);
 
-  // Left: PT VAUZA TAMMA ABADI Approval
+  // Left: PT VAUZA TAMMA ABADI Approval Card
+  doc.setDrawColor(183, 192, 188);
+  doc.roundedRect(marginX, signY, halfW, 23, 1.2, 1.2, "S");
+
   doc.setFont("helvetica", "bold");
   doc.setFontSize(7.5);
   doc.setTextColor(15, 23, 42);
-  doc.text("PT VAUZA TAMMA ABADI", marginX + halfW / 2, signY + 2.5, { align: "center" });
+  doc.text("PT VAUZA TAMMA ABADI", marginX + halfW / 2, signY + 3.5, { align: "center" });
 
   doc.setFont("helvetica", "italic");
   doc.setFontSize(6.5);
   doc.setTextColor(80, 80, 80);
-  doc.text("Issued / Approved by", marginX + halfW / 2, signY + 5.5, { align: "center" });
+  doc.text("Issued / Approved by", marginX + halfW / 2, signY + 6.5, { align: "center" });
 
   // Authentic Signature & Stamp Image
   try {
-    doc.addImage(VAUZA_TAMMA_SIGNATURE_BASE64, "PNG", marginX + halfW / 2 - 17, signY + 6.5, 34, 10);
+    doc.addImage(VAUZA_TAMMA_SIGNATURE_BASE64, "PNG", marginX + halfW / 2 - 17, signY + 7.5, 34, 10);
   } catch {
     doc.setFont("helvetica", "bold");
     doc.setFontSize(8);
@@ -582,24 +585,27 @@ export function generateInvoicePdf(data: InvoicePdfData): jsPDF {
   doc.setFont("helvetica", "bold");
   doc.setFontSize(7.5);
   doc.setTextColor(15, 23, 42);
-  doc.text("H. FAISAL WAHYUDI", marginX + halfW / 2, signY + 20, { align: "center" });
+  doc.text("H. FAISAL WAHYUDI", marginX + halfW / 2, signY + 20.5, { align: "center" });
 
   // Right: VERIFIKASI KEASLIAN + Authentic QR Code
+  doc.setDrawColor(183, 192, 188);
+  doc.roundedRect(rightX, signY, halfW, 23, 1.2, 1.2, "S");
+
   doc.setFont("helvetica", "bold");
   doc.setFontSize(7.5);
   doc.setTextColor(15, 23, 42);
-  doc.text("VERIFIKASI KEASLIAN", rightX + halfW / 2, signY + 2.5, { align: "center" });
+  doc.text("VERIFIKASI KEASLIAN", rightX + halfW / 2, signY + 3.5, { align: "center" });
 
   // Authentic QR Code Image
   try {
-    doc.addImage(VAUZA_TAMMA_QR_BASE64, "PNG", rightX + halfW / 2 - 5.5, signY + 4, 11, 11);
+    doc.addImage(VAUZA_TAMMA_QR_BASE64, "PNG", rightX + halfW / 2 - 5.5, signY + 4.5, 10, 10);
   } catch {
     doc.setDrawColor(180, 180, 180);
-    doc.rect(rightX + halfW / 2 - 5.5, signY + 4, 11, 11, "S");
+    doc.rect(rightX + halfW / 2 - 5.5, signY + 4.5, 10, 10, "S");
   }
 
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(5.8);
+  doc.setFontSize(5.5);
   doc.setTextColor(100, 100, 100);
   doc.text("Scan untuk memverifikasi keaslian invoice.", rightX + halfW / 2, signY + 17.5, { align: "center" });
   doc.text("Invoice ini diterbitkan secara resmi oleh PT Vauza Tamma Abadi.", rightX + halfW / 2, signY + 20, { align: "center" });
