@@ -141,6 +141,12 @@ export async function GET(
       membersList.push(group.namaGroup);
     }
 
+    const picName = group?.ketuaGroup?.namaLengkap || membersList[0] || "";
+    // Clean person name: prioritize ketuaGroup full name or strip "GRUP " prefix
+    const rawGroupName = group?.namaGroup || "";
+    const cleanedGroupName = rawGroupName.replace(/^(grup|group|keluarga)\s+/i, "").trim();
+    const resolvedNamaPendaftar = picName || cleanedGroupName || "Bapak/Ibu Jamaah";
+
     const payload = {
       invoiceNumber: invoice?.nomorInvoice || payment?.invoiceId || invId,
       invoiceDate: invoice?.createdAt
@@ -153,7 +159,7 @@ export async function GET(
       dueDate: invoice?.jatuhTempo
         ? new Date(invoice.jatuhTempo).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })
         : undefined,
-      namaGroup: group?.namaGroup || "Bapak/Ibu Jamaah",
+      namaGroup: resolvedNamaPendaftar,
       alamat: group?.ketuaGroup?.alamat || "DSN KAUMAN, 010/006, KALIPARE, KEC. KALIPARE, KAB. MALANG",
       telepon: group?.ketuaGroup?.nomorTelepon,
       kodeRegistrasi: group?.kodeRegistrasi || kode || "-",

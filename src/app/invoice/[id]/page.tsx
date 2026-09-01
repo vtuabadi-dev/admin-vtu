@@ -11,6 +11,7 @@ import {
   Phone,
   Mail,
 } from "lucide-react";
+import { formatInvoicePersonName } from "@/shared/lib/utils";
 import { downloadInvoicePdf, type InvoicePdfData } from "@/shared/lib/invoice-pdf";
 
 export default function PublicInvoicePage({ params }: { params: Promise<{ id: string }> }) {
@@ -251,7 +252,9 @@ export default function PublicInvoicePage({ params }: { params: Promise<{ id: st
                 <div className="grid grid-cols-[100px_8px_1fr] items-start">
                   <span className="text-stone-900 font-semibold">Nama Pendaftar</span>
                   <span className="text-stone-600">:</span>
-                  <span className="font-bold text-stone-900">{data?.namaGroup || "Bapak Ahmad Firdaus"}</span>
+                  <span className="font-bold text-stone-900">
+                    {formatInvoicePersonName(data?.namaGroup, data?.picName)}
+                  </span>
                 </div>
                 <div className="border-t border-stone-100" />
 

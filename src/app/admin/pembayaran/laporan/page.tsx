@@ -59,7 +59,7 @@ import type {
   InvoiceSplitConfig,
   InvoiceSplitItem,
 } from "@/shared/types";
-import { formatCurrency, formatDate } from "@/shared/lib/utils";
+import { formatCurrency, formatDate, formatInvoicePersonName } from "@/shared/lib/utils";
 
 const metodeOptions = [
   { value: "transfer", label: "Transfer" },
@@ -868,12 +868,17 @@ function PaymentReviewTabContent() {
 
     const membersToInclude = selectedAnggota.length > 0 ? selectedAnggota : (availableAnggota.length > 0 ? availableAnggota : [p.namaGroup || "Jamaah"]);
 
+    const resolvedPersonName = formatInvoicePersonName(
+      p.namaGroup || p.group?.namaGroup,
+      p.group?.ketuaGroup?.namaLengkap || p.ketuaGroup?.namaLengkap
+    );
+
     return {
       invoiceNumber: invNum,
       invoiceDate: formattedTgl,
       idReg: p.group?.kodeRegistrasi?.replace(/[^0-9]/g, "").slice(-4) || "3575",
       kode: p.group?.kodeRegistrasi?.slice(-3) || "104",
-      namaGroup: p.namaGroup || p.group?.namaGroup || "Bapak/Ibu",
+      namaGroup: resolvedPersonName,
       alamat: formAlamat || p.group?.ketuaGroup?.alamat || "DSN KAUMAN, 010/006, KALIPARE, KEC. KALIPARE, KAB. MALANG",
       telepon: targetPhone || p.group?.ketuaGroup?.nomorTelepon,
       kodeRegistrasi: p.kodeRegistrasi || p.group?.kodeRegistrasi || "-",
@@ -895,7 +900,7 @@ function PaymentReviewTabContent() {
       maksimalPelunasan: dueDate
         ? new Date(dueDate).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })
         : (h40Info?.h40Formatted || "-"),
-      picName: p.group?.ketuaGroup?.namaLengkap || p.namaGroup,
+      picName: resolvedPersonName,
       picPhone: targetPhone || p.group?.ketuaGroup?.nomorTelepon,
       picEmail: targetEmail || p.group?.ketuaGroup?.email,
       jenisPembayaran: formJenis || "DP Pendaftaran",
@@ -1503,7 +1508,12 @@ function PaymentReviewTabContent() {
                 <div className="p-3 bg-muted/40 rounded-lg border space-y-2">
                   <div className="flex items-center justify-between border-b pb-2">
                     <div>
-                      <p className="font-extrabold text-foreground text-sm">{selectedPayment.namaGroup || "Nama Perwakilan"}</p>
+                      <p className="font-extrabold text-foreground text-sm">
+                        {formatInvoicePersonName(
+                          selectedPayment.namaGroup || selectedPayment.group?.namaGroup,
+                          selectedPayment.group?.ketuaGroup?.namaLengkap || selectedPayment.ketuaGroup?.namaLengkap
+                        )}
+                      </p>
                       <p className="font-mono text-[11px] text-amber-600 dark:text-amber-400 font-bold">
                         ID Reg: {selectedPayment.kodeRegistrasi || selectedPayment.groupId}
                       </p>

@@ -54,6 +54,20 @@ export function formatDateDdMmmmTttt(dateStr: string): string {
   return `${day}/${MONTHS_ID[monthIdx]}/${year}`;
 }
 
+export function formatInvoicePersonName(namaGroup?: string, namaKetua?: string): string {
+  if (namaKetua && namaKetua.trim()) {
+    return namaKetua.trim();
+  }
+  if (!namaGroup) return "Bapak/Ibu Jamaah";
+  
+  // Strip "GRUP ", "Grup ", "GROUP ", "Group ", "KELUARGA ", "Keluarga " prefixes
+  const cleaned = namaGroup
+    .replace(/^(grup|group|keluarga)\s+/i, "")
+    .trim();
+    
+  return cleaned || namaGroup;
+}
+
 export function normalizeToIsoDate(dateStr: string): string {
   if (!dateStr) return "";
   const clean = dateStr.trim();

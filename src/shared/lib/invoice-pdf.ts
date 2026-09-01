@@ -238,11 +238,15 @@ export function generateInvoicePdf(data: InvoicePdfData): jsPDF {
   const dpV = marginX + 30;
 
   // Row 1: Nama
+  const personDisplayName = (data.picName && data.picName.trim())
+    ? data.picName.trim()
+    : (data.namaGroup || "Bapak Ahmad Firdaus").replace(/^(grup|group|keluarga)\s+/i, "").trim();
+
   doc.setFont("helvetica", "bold");
   doc.setTextColor(15, 23, 42);
   doc.text("Nama Pendaftar", dpL, boxY + 8);
   doc.text(":", dpC, boxY + 8);
-  doc.text(data.namaGroup || "Bapak Ahmad Firdaus", dpV, boxY + 8);
+  doc.text(personDisplayName || "Bapak Ahmad Firdaus", dpV, boxY + 8);
 
   doc.setDrawColor(235, 235, 235);
   doc.line(dpL, boxY + 9.5, marginX + halfW - 2.5, boxY + 9.5);
