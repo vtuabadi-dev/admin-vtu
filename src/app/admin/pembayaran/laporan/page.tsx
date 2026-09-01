@@ -1307,9 +1307,9 @@ function PaymentReviewTabContent() {
       {/* 2-CANVAS SPLIT LAYOUT */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
         {/* ========================================================= */}
-        {/* CANVAS KIRI: TABEL PEMBAYARAN MASUK */}
+        {/* CANVAS KIRI: TABEL PEMBAYARAN MASUK (NARROWER / COMPACT)  */}
         {/* ========================================================= */}
-        <div className={selectedPayment ? "lg:col-span-7 space-y-4" : "lg:col-span-12 space-y-4"}>
+        <div className={selectedPayment ? "lg:col-span-5 xl:col-span-4 space-y-4" : "lg:col-span-12 space-y-4"}>
           {filteredQueue.length === 0 ? (
             <EmptyState
               icon={ClipboardCheck}
@@ -1323,12 +1323,12 @@ function PaymentReviewTabContent() {
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b bg-muted/50 text-left text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
-                        <th className="py-2.5 px-3 w-8 text-center">#</th>
-                        <th className="py-2.5 px-3">ID Reg & Group</th>
-                        <th className="py-2.5 px-3">Jenis Pembayaran</th>
-                        <th className="py-2.5 px-3 text-right">Nominal</th>
-                        <th className="py-2.5 px-3 text-center">Metode Pembayaran</th>
-                        <th className="py-2.5 px-3 text-center">Bukti TF</th>
+                        <th className="py-2.5 px-2.5 w-7 text-center">#</th>
+                        <th className="py-2.5 px-2.5">ID Reg & Group</th>
+                        <th className="py-2.5 px-2.5">Jenis</th>
+                        <th className="py-2.5 px-2.5 text-right">Nominal</th>
+                        {!selectedPayment && <th className="py-2.5 px-2.5 text-center">Metode</th>}
+                        <th className="py-2.5 px-2 text-center w-9">Bukti</th>
                         {!selectedPayment && <th className="py-2.5 px-3 text-center">Status</th>}
                         {!selectedPayment && <th className="py-2.5 px-3 text-center">Aksi Invoice</th>}
                       </tr>
@@ -1346,8 +1346,8 @@ function PaymentReviewTabContent() {
                             }`}
                             onClick={() => handleSelectPayment(p)}
                           >
-                            <td className="px-3 py-3 text-center text-muted-foreground">{idx + 1}</td>
-                            <td className="px-3 py-3">
+                            <td className="px-2.5 py-2.5 text-center text-muted-foreground">{idx + 1}</td>
+                            <td className="px-2.5 py-2.5">
                               <p className="font-bold text-foreground leading-tight">{p.namaGroup ?? p.groupId}</p>
                               <div className="flex items-center gap-1.5 mt-0.5">
                                 <span className="font-mono text-[10px] text-amber-600 dark:text-amber-400 bg-amber-500/10 px-1 rounded font-bold">
@@ -1358,14 +1358,16 @@ function PaymentReviewTabContent() {
                                 </span>
                               </div>
                             </td>
-                            <td className="px-3 py-3">{getPaymentTypeBadge(p)}</td>
-                            <td className="px-3 py-3 text-right font-extrabold text-foreground font-mono">
+                            <td className="px-2.5 py-2.5">{getPaymentTypeBadge(p)}</td>
+                            <td className="px-2.5 py-2.5 text-right font-extrabold text-foreground font-mono">
                               {formatCurrency(p.jumlah)}
                             </td>
-                            <td className="px-3 py-3 text-center">
-                              {getMetodeBadge(p)}
-                            </td>
-                            <td className="px-3 py-3 text-center" onClick={(e) => e.stopPropagation()}>
+                            {!selectedPayment && (
+                              <td className="px-2.5 py-2.5 text-center">
+                                {getMetodeBadge(p)}
+                              </td>
+                            )}
+                            <td className="px-2 py-2.5 text-center" onClick={(e) => e.stopPropagation()}>
                               {p.buktiUrl ? (
                                 <Button
                                   variant="ghost"
@@ -1418,12 +1420,12 @@ function PaymentReviewTabContent() {
                                         className={`h-7 text-xs font-bold gap-1 ${
                                           isSelected
                                             ? "bg-amber-600 hover:bg-amber-700 text-white"
-                                            : "border-amber-500/30 text-amber-700 hover:bg-amber-50 dark:text-amber-300 dark:hover:bg-amber-950/50"
+                                            : "hover:bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-700"
                                         }`}
                                         onClick={() => handleSelectPayment(p)}
                                       >
                                         <FileText className="h-3.5 w-3.5" />
-                                        Buat Invoice
+                                        Terbitkan
                                       </Button>
                                       {p.status === "pending" && (
                                         <Button
@@ -1465,10 +1467,10 @@ function PaymentReviewTabContent() {
         </div>
 
         {/* ========================================================= */}
-        {/* CANVAS KANAN: FORM INVOICE GENERATOR / PREVIEW */}
+        {/* CANVAS KANAN: FORM INVOICE GENERATOR / PREVIEW (WIDER)    */}
         {/* ========================================================= */}
         {selectedPayment ? (
-          <div className="lg:col-span-5 sticky top-4 space-y-4">
+          <div className="lg:col-span-7 xl:col-span-8 sticky top-4 space-y-4">
             <Card className="border-2 border-amber-500/40 shadow-md">
               <CardHeader className="p-4 border-b bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent flex flex-row items-center justify-between space-y-0">
                 <div className="space-y-0.5">
