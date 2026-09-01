@@ -68,6 +68,68 @@ export function formatInvoicePersonName(namaGroup?: string, namaKetua?: string):
   return cleaned || namaGroup;
 }
 
+export function getManifestAlamat(jamaahOrGroup: any): string {
+  if (!jamaahOrGroup) return "DSN KAUMAN, 010/006, KALIPARE, KEC. KALIPARE, KAB. MALANG";
+
+  // If group object with ketuaGroup or anggota
+  if (jamaahOrGroup.ketuaGroup) {
+    const fromKetua = getManifestAlamat(jamaahOrGroup.ketuaGroup);
+    if (fromKetua && fromKetua !== "-" && fromKetua !== "DSN KAUMAN, 010/006, KALIPARE, KEC. KALIPARE, KAB. MALANG") {
+      return fromKetua;
+    }
+  }
+
+  if (Array.isArray(jamaahOrGroup.anggota) && jamaahOrGroup.anggota.length > 0) {
+    for (const m of jamaahOrGroup.anggota) {
+      const fromMember = getManifestAlamat(m);
+      if (fromMember && fromMember !== "-" && fromMember !== "DSN KAUMAN, 010/006, KALIPARE, KEC. KALIPARE, KAB. MALANG") {
+        return fromMember;
+      }
+    }
+  }
+
+  const j = jamaahOrGroup;
+
+  // 1. Check KTP document OCR or Manual Data
+  let ktpDoc: any = null;
+  if (j.dokumen && Array.isArray(j.dokumen)) {
+    ktpDoc = j.dokumen.find((d: any) => d.jenis === "ktp");
+  }
+
+  const manual = ktpDoc?.manualData;
+  const ocr = ktpDoc?.ocrData;
+
+  const docAlamat =
+    manual?.alamatLengkap ||
+    ocr?.alamatLengkap ||
+    manual?.alamat ||
+    ocr?.alamat;
+
+  if (docAlamat && docAlamat !== "-" && String(docAlamat).trim()) {
+    return String(docAlamat).trim();
+  }
+
+  // 2. Check direct fields on Jamaah (alamat, kelurahan, kecamatan, kota, provinsi)
+  if (j.alamat && j.alamat !== "-" && String(j.alamat).trim()) {
+    const cleanAlamat = String(j.alamat).trim();
+    if (/RT|RW|Kel|Kec|Kab|Kota/i.test(cleanAlamat)) return cleanAlamat;
+    const parts: string[] = [cleanAlamat];
+    if (j.kelurahan && j.kelurahan !== "-") parts.push(`Kel. ${j.kelurahan.replace(/^Kel(?:urahan|\.)?\s*/i, "")}`);
+    if (j.kecamatan && j.kecamatan !== "-") parts.push(`Kec. ${j.kecamatan.replace(/^Kec(?:amatan|\.)?\s*/i, "")}`);
+    if (j.kota && j.kota !== "-") parts.push(j.kota);
+    if (j.provinsi && j.provinsi !== "-") parts.push(j.provinsi);
+    return parts.join(", ");
+  }
+
+  if (j.kota && j.kota !== "-") {
+    const parts = [j.kota];
+    if (j.provinsi && j.provinsi !== "-") parts.push(j.provinsi);
+    return parts.join(", ");
+  }
+
+  return "DSN KAUMAN, 010/006, KALIPARE, KEC. KALIPARE, KAB. MALANG";
+}
+
 export function normalizeToIsoDate(dateStr: string): string {
   if (!dateStr) return "";
   const clean = dateStr.trim();

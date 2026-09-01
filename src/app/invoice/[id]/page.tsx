@@ -276,7 +276,7 @@ export default function PublicInvoicePage({ params }: { params: Promise<{ id: st
                   <span className="text-stone-900 font-semibold">Alamat</span>
                   <span className="text-stone-600">:</span>
                   <span className="text-stone-800 leading-tight">
-                    {data?.alamat || "Jl. Melati No. 45 RT 03/RW 05, Kel. Sukamaju, Kec. Cilodong, Kota Depok, Jawa Barat 16415"}
+                    {(data?.alamat && data.alamat !== "-") ? data.alamat : "DSN KAUMAN, 010/006, KALIPARE, KEC. KALIPARE, KAB. MALANG"}
                   </span>
                 </div>
               </div>

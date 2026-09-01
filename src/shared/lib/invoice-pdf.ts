@@ -271,7 +271,7 @@ export function generateInvoicePdf(data: InvoicePdfData): jsPDF {
   doc.text("Alamat", dpL, boxY + 23);
   doc.text(":", dpC, boxY + 23);
   doc.setFont("helvetica", "normal");
-  const alamatStr = data.alamat || "Jl. Melati No. 45 RT 03/RW 05, Kel. Sukamaju, Depok";
+  const alamatStr = (data.alamat && data.alamat !== "-") ? data.alamat : "DSN KAUMAN, 010/006, KALIPARE, KEC. KALIPARE, KAB. MALANG";
   const alamatLines = doc.splitTextToSize(alamatStr, halfW - 32);
   doc.text(alamatLines, dpV, boxY + 23);
 

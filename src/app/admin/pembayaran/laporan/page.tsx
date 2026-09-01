@@ -59,7 +59,7 @@ import type {
   InvoiceSplitConfig,
   InvoiceSplitItem,
 } from "@/shared/types";
-import { formatCurrency, formatDate, formatInvoicePersonName } from "@/shared/lib/utils";
+import { formatCurrency, formatDate, formatInvoicePersonName, getManifestAlamat } from "@/shared/lib/utils";
 
 const metodeOptions = [
   { value: "transfer", label: "Transfer" },
@@ -703,8 +703,8 @@ function PaymentReviewTabContent() {
     setFormHotelMekkah(kbr?.hotelMekkah || "GRAND AL MASSA");
     setFormHotelMadinah(kbr?.hotelMadinah || "DURRAT AL EIMAN");
 
-    // Alamat
-    const alamat = payment.group?.ketuaGroup?.alamat || payment.group?.alamat || "DSN KAUMAN, 010/006, KALIPARE, KEC. KALIPARE, KAB. MALANG";
+    // Alamat (Single Source of Truth from Manifest / Jamaah / KTP / Group)
+    const alamat = getManifestAlamat(payment.group || payment);
     setFormAlamat(alamat);
 
     // Anggota List & Split Support
@@ -879,7 +879,7 @@ function PaymentReviewTabContent() {
       idReg: p.group?.kodeRegistrasi?.replace(/[^0-9]/g, "").slice(-4) || "3575",
       kode: p.group?.kodeRegistrasi?.slice(-3) || "104",
       namaGroup: resolvedPersonName,
-      alamat: formAlamat || p.group?.ketuaGroup?.alamat || "DSN KAUMAN, 010/006, KALIPARE, KEC. KALIPARE, KAB. MALANG",
+      alamat: formAlamat || getManifestAlamat(p.group || p),
       telepon: targetPhone || p.group?.ketuaGroup?.nomorTelepon,
       kodeRegistrasi: p.kodeRegistrasi || p.group?.kodeRegistrasi || "-",
       namaPaket: p.group?.keberangkatan?.namaPaket || formCatatan || "PAKET UMROH 10 H SBY ( JED.C )",

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { prisma } from "@/server/db/client";
+import { getManifestAlamat } from "@/shared/lib/utils";
 
 // GET /api/invoices/public/[id]?kode=GRP-XXXX
 export async function GET(
@@ -39,6 +40,17 @@ export async function GET(
           nomorTelepon: true,
           email: true,
           alamat: true,
+          provinsi: true,
+          kota: true,
+          kecamatan: true,
+          kelurahan: true,
+          dokumen: {
+            select: {
+              jenis: true,
+              manualData: true,
+              ocrData: true,
+            },
+          },
         },
       },
       anggota: {
@@ -49,6 +61,17 @@ export async function GET(
           nomorTelepon: true,
           email: true,
           alamat: true,
+          provinsi: true,
+          kota: true,
+          kecamatan: true,
+          kelurahan: true,
+          dokumen: {
+            select: {
+              jenis: true,
+              manualData: true,
+              ocrData: true,
+            },
+          },
         },
       },
       pembayaran: {
@@ -160,7 +183,7 @@ export async function GET(
         ? new Date(invoice.jatuhTempo).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })
         : undefined,
       namaGroup: resolvedNamaPendaftar,
-      alamat: group?.ketuaGroup?.alamat || "DSN KAUMAN, 010/006, KALIPARE, KEC. KALIPARE, KAB. MALANG",
+      alamat: getManifestAlamat(group),
       telepon: group?.ketuaGroup?.nomorTelepon,
       kodeRegistrasi: group?.kodeRegistrasi || kode || "-",
       namaPaket: group?.keberangkatan?.namaPaket || "PAKET UMROH 10 H SBY ( JED.C )",

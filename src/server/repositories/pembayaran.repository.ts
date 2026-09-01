@@ -323,6 +323,17 @@ export const pembayaranRepo = {
                 nomorTelepon: true,
                 email: true,
                 alamat: true,
+                provinsi: true,
+                kota: true,
+                kecamatan: true,
+                kelurahan: true,
+                dokumen: {
+                  select: {
+                    jenis: true,
+                    manualData: true,
+                    ocrData: true,
+                  },
+                },
               },
             },
             ketuaGroup: {
@@ -332,6 +343,17 @@ export const pembayaranRepo = {
                 nomorTelepon: true,
                 email: true,
                 alamat: true,
+                provinsi: true,
+                kota: true,
+                kecamatan: true,
+                kelurahan: true,
+                dokumen: {
+                  select: {
+                    jenis: true,
+                    manualData: true,
+                    ocrData: true,
+                  },
+                },
               },
             },
           },
