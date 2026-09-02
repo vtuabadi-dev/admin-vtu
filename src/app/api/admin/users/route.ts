@@ -101,8 +101,14 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // Determine host origin for invite URL
-    const origin = request.headers.get("origin") || request.nextUrl.origin || "https://vtu-admin-498fvb6ie-vtuabadi.vercel.app";
+    // Determine host origin for invite URL (Prefer production domain to prevent Vercel Preview SSO redirect)
+    let origin = process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL || "";
+    if (!origin || origin.includes("localhost")) {
+      origin = request.headers.get("origin") || request.nextUrl.origin || "https://vtu-admin-830zrfv1l-vtuabadi.vercel.app";
+    }
+    // Clean trailing slash
+    origin = origin.replace(/\/$/, "");
+
     const inviteUrl = `${origin}/setup-password?token=${inviteToken}`;
 
     // Dispatch invitation email via notification service
