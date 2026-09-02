@@ -203,8 +203,49 @@ export function generateInvoicePdf(data: InvoicePdfData): jsPDF {
 
   // ── 2. Two Info Boxes: Data Pendaftar + Detail Paket Umroh ──
   const boxY = 41;
-  const boxH = 26;
-  const halfW = (contentWidth - 4) / 2;
+  const halfW = (contentWidth - 4) / 2; // 89mm
+  const valW_L = halfW - 32; // 57mm max width for Left box text values
+  const valW_R = halfW - 30; // 59mm max width for Right box text values
+
+  const lineStep = 3.4; // Height per text line in mm
+
+  // Left Box Texts & Line Wraps
+  const personDisplayName = (data.picName && data.picName.trim())
+    ? data.picName.trim()
+    : (data.namaGroup || "Bapak Ahmad Firdaus").replace(/^(grup|group|keluarga)\s+/i, "").trim();
+
+  doc.setFontSize(6.8);
+  const nameLinesL = doc.splitTextToSize(personDisplayName || "Bapak Ahmad Firdaus", valW_L);
+  const hpStrL = data.telepon || data.picPhone || "0812-1234-5678";
+  const regCodeStrL = data.kodeRegistrasi || "REG-2107-045";
+  const alamatStrL = (data.alamat && data.alamat !== "-") ? data.alamat : "DSN KAUMAN, 010/006, KALIPARE, KEC. KALIPARE, KAB. MALANG";
+  const alamatLinesL = doc.splitTextToSize(alamatStrL, valW_L);
+
+  // Right Box Texts & Line Wraps
+  const pkgNameStrR = data.namaPaket || "Umroh Plus 12 Hari";
+  const pkgLinesR = doc.splitTextToSize(pkgNameStrR, valW_R);
+  const paxStrR = `${paxCount} Pax`;
+  const hotelMekkahStrR = data.hotelMekkah || "Pullman ZamZam Makkah";
+  const hotelMekkahLinesR = doc.splitTextToSize(hotelMekkahStrR, valW_R);
+  const hotelMadinahStrR = data.hotelMadinah || "Anwar Al Madinah Mövenpick";
+  const hotelMadinahLinesR = doc.splitTextToSize(hotelMadinahStrR, valW_R);
+
+  // Dynamic Row Heights Left
+  const r1HL = Math.max(1, nameLinesL.length) * lineStep + 1.2;
+  const r2HL = 1 * lineStep + 1.2;
+  const r3HL = 1 * lineStep + 1.2;
+  const r4HL = Math.max(1, alamatLinesL.length) * lineStep + 1.2;
+  const boxH_L = 4.5 + r1HL + r2HL + r3HL + r4HL + 2;
+
+  // Dynamic Row Heights Right
+  const r1HR = Math.max(1, pkgLinesR.length) * lineStep + 1.2;
+  const r2HR = 1 * lineStep + 1.2;
+  const r3HR = Math.max(1, hotelMekkahLinesR.length) * lineStep + 1.2;
+  const r4HR = Math.max(1, hotelMadinahLinesR.length) * lineStep + 1.2;
+  const boxH_R = 4.5 + r1HR + r2HR + r3HR + r4HR + 2;
+
+  // Final Flexible Box Height
+  const boxH = Math.max(26, boxH_L, boxH_R);
 
   // Left: [ DATA PENDAFTAR ]━━━━━━━━━━━━━
   const dpBadgeW = 37;
@@ -232,48 +273,49 @@ export function generateInvoicePdf(data: InvoicePdfData): jsPDF {
   doc.setLineWidth(0.3);
   doc.roundedRect(marginX, boxY + 4.5, halfW, boxH - 4.5, 1.2, 1.2, "S");
 
-  doc.setFontSize(6.8);
   const dpL = marginX + 2.5;
   const dpC = marginX + 28;
   const dpV = marginX + 30;
 
-  // Row 1: Nama
-  const personDisplayName = (data.picName && data.picName.trim())
-    ? data.picName.trim()
-    : (data.namaGroup || "Bapak Ahmad Firdaus").replace(/^(grup|group|keluarga)\s+/i, "").trim();
+  let curYL = boxY + 8;
 
+  // Left Row 1: Nama
   doc.setFont("helvetica", "bold");
   doc.setTextColor(15, 23, 42);
-  doc.text("Nama Pendaftar", dpL, boxY + 8);
-  doc.text(":", dpC, boxY + 8);
-  doc.text(personDisplayName || "Bapak Ahmad Firdaus", dpV, boxY + 8);
+  doc.text("Nama Pendaftar", dpL, curYL);
+  doc.text(":", dpC, curYL);
+  doc.text(nameLinesL, dpV, curYL);
+  curYL += (Math.max(1, nameLinesL.length) - 1) * lineStep + 2;
 
   doc.setDrawColor(235, 235, 235);
-  doc.line(dpL, boxY + 9.5, marginX + halfW - 2.5, boxY + 9.5);
+  doc.line(dpL, curYL, marginX + halfW - 2.5, curYL);
+  curYL += 3.5;
 
-  // Row 2: No HP
-  doc.text("No. HP / WhatsApp", dpL, boxY + 13);
-  doc.text(":", dpC, boxY + 13);
+  // Left Row 2: No HP
+  doc.text("No. HP / WhatsApp", dpL, curYL);
+  doc.text(":", dpC, curYL);
   doc.setFont("helvetica", "normal");
-  doc.text(data.telepon || data.picPhone || "0812-1234-5678", dpV, boxY + 13);
+  doc.text(hpStrL, dpV, curYL);
+  curYL += 2;
 
-  doc.line(dpL, boxY + 14.5, marginX + halfW - 2.5, boxY + 14.5);
+  doc.line(dpL, curYL, marginX + halfW - 2.5, curYL);
+  curYL += 3.5;
 
-  // Row 3: Kode Registrasi
+  // Left Row 3: Kode Registrasi
   doc.setFont("helvetica", "bold");
-  doc.text("Kode Registrasi", dpL, boxY + 18);
-  doc.text(":", dpC, boxY + 18);
-  doc.text(data.kodeRegistrasi || "REG-2107-045", dpV, boxY + 18);
+  doc.text("Kode Registrasi", dpL, curYL);
+  doc.text(":", dpC, curYL);
+  doc.text(regCodeStrL, dpV, curYL);
+  curYL += 2;
 
-  doc.line(dpL, boxY + 19.5, marginX + halfW - 2.5, boxY + 19.5);
+  doc.line(dpL, curYL, marginX + halfW - 2.5, curYL);
+  curYL += 3.5;
 
-  // Row 4: Alamat
-  doc.text("Alamat", dpL, boxY + 23);
-  doc.text(":", dpC, boxY + 23);
+  // Left Row 4: Alamat
+  doc.text("Alamat", dpL, curYL);
+  doc.text(":", dpC, curYL);
   doc.setFont("helvetica", "normal");
-  const alamatStr = (data.alamat && data.alamat !== "-") ? data.alamat : "DSN KAUMAN, 010/006, KALIPARE, KEC. KALIPARE, KAB. MALANG";
-  const alamatLines = doc.splitTextToSize(alamatStr, halfW - 32);
-  doc.text(alamatLines, dpV, boxY + 23);
+  doc.text(alamatLinesL, dpV, curYL);
 
   // Right: [ DETAIL PAKET UMROH ]━━━━━━━━━
   const rightX = marginX + halfW + 4;
@@ -307,42 +349,50 @@ export function generateInvoicePdf(data: InvoicePdfData): jsPDF {
   const rpC = rightX + 26;
   const rpV = rightX + 28;
 
-  // Row 1: Paket Umroh
+  let curYR = boxY + 8;
+
+  // Right Row 1: Paket Umroh
   doc.setFont("helvetica", "bold");
   doc.setTextColor(15, 23, 42);
-  doc.text("Paket Umroh", rpL, boxY + 8);
-  doc.text(":", rpC, boxY + 8);
-  doc.text(data.namaPaket || "Umroh Plus 12 Hari", rpV, boxY + 8);
+  doc.text("Paket Umroh", rpL, curYR);
+  doc.text(":", rpC, curYR);
+  doc.text(pkgLinesR, rpV, curYR);
+  curYR += (Math.max(1, pkgLinesR.length) - 1) * lineStep + 2;
 
   doc.setDrawColor(235, 235, 235);
-  doc.line(rpL, boxY + 9.5, rightX + halfW - 2.5, boxY + 9.5);
+  doc.line(rpL, curYR, rightX + halfW - 2.5, curYR);
+  curYR += 3.5;
 
-  // Row 2: Jumlah Pendaftar
-  doc.text("Jumlah Pendaftar", rpL, boxY + 13);
-  doc.text(":", rpC, boxY + 13);
+  // Right Row 2: Jumlah Pendaftar
+  doc.text("Jumlah Pendaftar", rpL, curYR);
+  doc.text(":", rpC, curYR);
   doc.setFont("helvetica", "normal");
-  doc.text(`${paxCount} Pax`, rpV, boxY + 13);
+  doc.text(paxStrR, rpV, curYR);
+  curYR += 2;
 
-  doc.line(rpL, boxY + 14.5, rightX + halfW - 2.5, boxY + 14.5);
+  doc.line(rpL, curYR, rightX + halfW - 2.5, curYR);
+  curYR += 3.5;
 
-  // Row 3: Hotel Makkah
+  // Right Row 3: Hotel Makkah
   doc.setFont("helvetica", "bold");
-  doc.text("Hotel Makkah", rpL, boxY + 18);
-  doc.text(":", rpC, boxY + 18);
+  doc.text("Hotel Makkah", rpL, curYR);
+  doc.text(":", rpC, curYR);
   doc.setFont("helvetica", "normal");
-  doc.text(data.hotelMekkah || "Pullman ZamZam Makkah", rpV, boxY + 18);
+  doc.text(hotelMekkahLinesR, rpV, curYR);
+  curYR += (Math.max(1, hotelMekkahLinesR.length) - 1) * lineStep + 2;
 
-  doc.line(rpL, boxY + 19.5, rightX + halfW - 2.5, boxY + 19.5);
+  doc.line(rpL, curYR, rightX + halfW - 2.5, curYR);
+  curYR += 3.5;
 
-  // Row 4: Hotel Madinah
+  // Right Row 4: Hotel Madinah
   doc.setFont("helvetica", "bold");
-  doc.text("Hotel Madinah", rpL, boxY + 23);
-  doc.text(":", rpC, boxY + 23);
+  doc.text("Hotel Madinah", rpL, curYR);
+  doc.text(":", rpC, curYR);
   doc.setFont("helvetica", "normal");
-  doc.text(data.hotelMadinah || "Anwar Al Madinah Mövenpick", rpV, boxY + 23);
+  doc.text(hotelMadinahLinesR, rpV, curYR);
 
   // ── 3. Table: RINCIAN PEMBAYARAN ────────────────────────────
-  const t1Y = boxY + boxH + 3;
+  const t1Y = boxY + boxH + 4;
   const t1BadgeW = 38;
 
   doc.setFillColor(...GREEN);

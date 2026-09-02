@@ -248,11 +248,11 @@ export default function PublicInvoicePage({ params }: { params: Promise<{ id: st
               </div>
 
               {/* Content Card with Row Lines */}
-              <div className="border border-[#B7C0BC] rounded-b-[6px] rounded-tr-[6px] p-2.5 text-[10px] space-y-1.5 bg-white min-h-[108px] flex flex-col justify-between">
+              <div className="border border-[#B7C0BC] rounded-b-[6px] rounded-tr-[6px] p-2.5 text-[10px] space-y-1.5 bg-white h-full flex flex-col justify-between">
                 <div className="grid grid-cols-[100px_8px_1fr] items-start">
                   <span className="text-stone-900 font-semibold">Nama Pendaftar</span>
                   <span className="text-stone-600">:</span>
-                  <span className="font-bold text-stone-900">
+                  <span className="font-bold text-stone-900 break-words min-w-0 leading-tight">
                     {formatInvoicePersonName(data?.namaGroup, data?.picName)}
                   </span>
                 </div>
@@ -261,21 +261,21 @@ export default function PublicInvoicePage({ params }: { params: Promise<{ id: st
                 <div className="grid grid-cols-[100px_8px_1fr] items-center">
                   <span className="text-stone-900 font-semibold">No. HP / WhatsApp</span>
                   <span className="text-stone-600">:</span>
-                  <span className="text-stone-900">{data?.telepon || data?.picPhone || "0812-1234-5678"}</span>
+                  <span className="text-stone-900 break-words min-w-0">{data?.telepon || data?.picPhone || "0812-1234-5678"}</span>
                 </div>
                 <div className="border-t border-stone-100" />
 
                 <div className="grid grid-cols-[100px_8px_1fr] items-center">
                   <span className="text-stone-900 font-semibold">Kode Registrasi</span>
                   <span className="text-stone-600">:</span>
-                  <span className="font-mono font-bold text-stone-900">{data?.kodeRegistrasi || "REG-2107-045"}</span>
+                  <span className="font-mono font-bold text-stone-900 break-words min-w-0">{data?.kodeRegistrasi || "REG-2107-045"}</span>
                 </div>
                 <div className="border-t border-stone-100" />
 
                 <div className="grid grid-cols-[100px_8px_1fr] items-start">
                   <span className="text-stone-900 font-semibold">Alamat</span>
                   <span className="text-stone-600">:</span>
-                  <span className="text-stone-800 leading-tight">
+                  <span className="text-stone-800 leading-tight break-words min-w-0">
                     {(data?.alamat && data.alamat !== "-") ? data.alamat : "DSN KAUMAN, 010/006, KALIPARE, KEC. KALIPARE, KAB. MALANG"}
                   </span>
                 </div>
@@ -301,32 +301,32 @@ export default function PublicInvoicePage({ params }: { params: Promise<{ id: st
               </div>
 
               {/* Content Card with Row Lines */}
-              <div className="border border-[#B7C0BC] rounded-b-[6px] rounded-tr-[6px] p-2.5 text-[10px] space-y-1.5 bg-white min-h-[108px] flex flex-col justify-between">
-                <div className="grid grid-cols-[90px_8px_1fr] items-center">
+              <div className="border border-[#B7C0BC] rounded-b-[6px] rounded-tr-[6px] p-2.5 text-[10px] space-y-1.5 bg-white h-full flex flex-col justify-between">
+                <div className="grid grid-cols-[90px_8px_1fr] items-start">
                   <span className="text-stone-900 font-semibold">Paket Umroh</span>
                   <span className="text-stone-600">:</span>
-                  <span className="font-bold text-stone-900">{data?.namaPaket || "Umroh Plus 12 Hari"}</span>
+                  <span className="font-bold text-stone-900 break-words min-w-0 leading-tight">{data?.namaPaket || "Umroh Plus 12 Hari"}</span>
                 </div>
                 <div className="border-t border-stone-100" />
 
                 <div className="grid grid-cols-[90px_8px_1fr] items-center">
                   <span className="text-stone-900 font-semibold">Jumlah Pendaftar</span>
                   <span className="text-stone-600">:</span>
-                  <span className="text-stone-900 font-medium">{paxCount} Pax</span>
+                  <span className="text-stone-900 font-medium break-words min-w-0">{paxCount} Pax</span>
                 </div>
                 <div className="border-t border-stone-100" />
 
-                <div className="grid grid-cols-[90px_8px_1fr] items-center">
+                <div className="grid grid-cols-[90px_8px_1fr] items-start">
                   <span className="text-stone-900 font-semibold">Hotel Makkah</span>
                   <span className="text-stone-600">:</span>
-                  <span className="text-stone-900">{data?.hotelMekkah || "Pullman ZamZam Makkah"}</span>
+                  <span className="text-stone-900 break-words min-w-0 leading-tight">{data?.hotelMekkah || "Pullman ZamZam Makkah"}</span>
                 </div>
                 <div className="border-t border-stone-100" />
 
-                <div className="grid grid-cols-[90px_8px_1fr] items-center">
+                <div className="grid grid-cols-[90px_8px_1fr] items-start">
                   <span className="text-stone-900 font-semibold">Hotel Madinah</span>
                   <span className="text-stone-600">:</span>
-                  <span className="text-stone-900">{data?.hotelMadinah || "Anwar Al Madinah Mövenpick"}</span>
+                  <span className="text-stone-900 break-words min-w-0 leading-tight">{data?.hotelMadinah || "Anwar Al Madinah Mövenpick"}</span>
                 </div>
               </div>
             </div>
