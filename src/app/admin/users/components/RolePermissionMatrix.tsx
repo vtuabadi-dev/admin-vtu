@@ -154,9 +154,20 @@ export function RolePermissionMatrix() {
                     Level: {rc.enterpriseLevel}
                   </span>
                 </div>
-                <span className={`px-2 py-0.5 rounded-full text-[10.5px] font-bold border ${rc.badgeClass}`}>
-                  {rc.label}
-                </span>
+                <div className="flex items-center gap-1.5">
+                  <span className={`px-2 py-0.5 rounded-full text-[10.5px] font-bold border ${rc.badgeClass}`}>
+                    {rc.label}
+                  </span>
+                  {/* RODA GIGI (GEAR ICON) CONFIG BUTTON */}
+                  <button
+                    type="button"
+                    onClick={() => openEditModal(rc)}
+                    className="p-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 transition-all cursor-pointer shadow-2xs hover:shadow"
+                    title={`Atur & Edit Hak Akses Modul ${rc.label}`}
+                  >
+                    <Settings className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                  </button>
+                </div>
               </div>
 
               <p className="text-xs text-muted-foreground leading-relaxed min-h-[40px]">
