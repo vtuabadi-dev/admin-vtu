@@ -237,18 +237,18 @@ function CityCombobox({
             onChange(e.target.value.toUpperCase());
             if (!isOpen) setIsOpen(true);
           }}
-          className="w-full h-11 px-3.5 py-2 border border-stone-300 rounded-xl text-sm font-bold uppercase transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-emerald-600 pr-8 bg-white text-slate-950 shadow-xs placeholder:text-gray-400 placeholder:font-normal placeholder:normal-case"
+          className="w-full h-11 px-3.5 py-2 border-2 border-emerald-500/40 rounded-xl text-sm font-bold uppercase transition-all focus:outline-none focus:ring-2 focus:ring-amber-400/50 focus:border-amber-400 pr-8 bg-slate-950/90 text-white shadow-inner placeholder:text-emerald-200/40 placeholder:font-normal placeholder:normal-case"
           placeholder={placeholder}
         />
         <ChevronDown
-          className="w-4 h-4 text-gray-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none"
+          className="w-4 h-4 text-amber-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none"
         />
       </div>
 
       {isOpen && (
         <div
           ref={listRef}
-          className="absolute z-50 left-0 right-0 mt-1 max-h-[252px] overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg divide-y divide-gray-100"
+          className="absolute z-50 left-0 right-0 mt-1 max-h-[252px] overflow-y-auto bg-slate-950 border-2 border-emerald-500/50 rounded-xl shadow-2xl divide-y divide-emerald-900/60"
         >
           {filteredCities.length > 0 ? (
             filteredCities.map((city, idx) => {
@@ -267,21 +267,21 @@ function CityCombobox({
                   className={cn(
                     "w-full text-left px-3.5 py-2 text-sm transition-colors flex items-center justify-between",
                     isHighlighted
-                      ? "bg-blue-100 font-semibold text-blue-900"
+                      ? "bg-emerald-800 text-amber-300 font-extrabold"
                       : isSelected
-                        ? "bg-blue-50 font-semibold text-blue-700"
-                        : "text-gray-700 hover:bg-gray-50"
+                        ? "bg-emerald-900 text-amber-300 font-bold"
+                        : "text-white hover:bg-emerald-900/80"
                   )}
                 >
                   <span>{city}</span>
                   {isSelected && (
-                    <Check className="w-4 h-4 text-blue-600 shrink-0" />
+                    <Check className="w-4 h-4 text-amber-400 shrink-0" />
                   )}
                 </button>
               );
             })
           ) : (
-            <div className="px-3.5 py-2.5 text-xs text-gray-400 italic">
+            <div className="px-3.5 py-2.5 text-xs text-emerald-200/60 italic">
               Kota &quot;{value}&quot; (Bisa digunakan / tekan Lanjut)
             </div>
           )}
@@ -1395,20 +1395,20 @@ export default function RegisterPage() {
             })()}
 
             {members.map((member, i) => (
-              <div key={i} className="border border-gray-200 rounded-lg p-4 space-y-3">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-semibold text-gray-700">
+              <div key={i} className="bg-emerald-950/70 border-2 border-emerald-500/40 rounded-2xl p-5 space-y-4 shadow-lg backdrop-blur-xl">
+                <div className="flex items-center justify-between border-b border-emerald-800/80 pb-3">
+                  <h3 className="text-sm font-extrabold text-white tracking-wide">
                     Jamaah #{i + 1} {i === 0 && "(Ketua Grup)"}
                   </h3>
                   {i === 0 && useRepAsJamaah1 && (
-                    <span className="text-[11px] font-medium bg-blue-100 text-blue-700 px-2.5 py-0.5 rounded-full flex items-center gap-1">
-                      <Check className="w-3 h-3" /> Sama dengan Perwakilan
+                    <span className="text-[11px] font-black bg-amber-400 text-slate-950 px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                      <Check className="w-3.5 h-3.5 text-slate-950" /> Sama dengan Perwakilan
                     </span>
                   )}
                 </div>
 
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Nama Lengkap</label>
+                  <label className="block text-xs font-extrabold text-white mb-1.5 drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]">Nama Lengkap</label>
                   <input
                     id={`member_${i}_nama`}
                     type="text"
@@ -1423,21 +1423,21 @@ export default function RegisterPage() {
                       }
                     }}
                     className={cn(
-                      "w-full px-3 py-2 border rounded-lg text-sm uppercase transition-colors placeholder:text-gray-400 placeholder:font-normal placeholder:normal-case",
+                      "w-full h-11 px-3.5 py-2 border-2 rounded-xl text-sm uppercase font-bold text-white transition-all placeholder:text-emerald-200/40 placeholder:font-normal placeholder:normal-case shadow-inner",
                       i === 0 && useRepAsJamaah1
-                        ? "bg-gray-100 text-gray-700 cursor-not-allowed border-gray-200 font-medium"
-                        : "focus:outline-none focus:ring-2 focus:ring-blue-500 border-gray-300 font-bold text-gray-900",
-                      errors[`member_${i}_nama`] ? "border-red-300" : ""
+                        ? "bg-slate-900/90 text-amber-300 cursor-not-allowed border-emerald-600/40 font-bold"
+                        : "bg-slate-950/90 border-emerald-500/40 focus:outline-none focus:ring-2 focus:ring-amber-400/50 focus:border-amber-400",
+                      errors[`member_${i}_nama`] ? "border-red-500 bg-red-950/50 text-red-100" : ""
                     )}
                     placeholder="Contoh: Nama Pendaftar"
                   />
                   {errors[`member_${i}_nama`] && (
-                    <p className="text-xs text-red-500 mt-1">{errors[`member_${i}_nama`]}</p>
+                    <p className="text-xs text-red-400 mt-1 font-extrabold">{errors[`member_${i}_nama`]}</p>
                   )}
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-800 mb-1.5">Jenis Kelamin</label>
+                  <label className="block text-xs font-extrabold text-white mb-1.5 drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]">Jenis Kelamin</label>
                   <div className="flex items-center gap-6 pt-1">
                     <label className="inline-flex items-center gap-2 cursor-pointer select-none">
                       <input
@@ -1454,9 +1454,9 @@ export default function RegisterPage() {
                             if (nextElem) nextElem.focus();
                           }
                         }}
-                        className="h-4 w-4 text-emerald-700 border-stone-400 focus:ring-emerald-600 cursor-pointer"
+                        className="h-4 w-4 text-amber-500 border-emerald-500/40 focus:ring-amber-400 cursor-pointer accent-amber-500"
                       />
-                      <span className="text-sm font-medium text-slate-900">Laki-laki</span>
+                      <span className="text-sm font-bold text-white">Laki-laki</span>
                     </label>
                     <label className="inline-flex items-center gap-2 cursor-pointer select-none">
                       <input
@@ -1473,16 +1473,16 @@ export default function RegisterPage() {
                             if (nextElem) nextElem.focus();
                           }
                         }}
-                        className="h-4 w-4 text-emerald-700 border-stone-400 focus:ring-emerald-600 cursor-pointer"
+                        className="h-4 w-4 text-amber-500 border-emerald-500/40 focus:ring-amber-400 cursor-pointer accent-amber-500"
                       />
-                      <span className="text-sm font-medium text-slate-900">Perempuan</span>
+                      <span className="text-sm font-bold text-white">Perempuan</span>
                     </label>
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs font-bold text-slate-800 mb-1.5">
+                    <label className="block text-xs font-extrabold text-white mb-1.5 drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]">
                       Tempat Lahir
                     </label>
                     <CityCombobox
@@ -1498,7 +1498,7 @@ export default function RegisterPage() {
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold text-slate-800 mb-1.5">
+                    <label className="block text-xs font-extrabold text-white mb-1.5 drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]">
                       Tanggal Lahir
                     </label>
                     <input
@@ -1506,7 +1506,7 @@ export default function RegisterPage() {
                       type="date"
                       value={member.tanggalLahir || ""}
                       onChange={(e) => updateMember(i, "tanggalLahir", e.target.value)}
-                      style={{ colorScheme: "light" }}
+                      style={{ colorScheme: "dark" }}
                       onKeyDown={(e) => {
                         if (e.key === "Enter") {
                           e.preventDefault();
@@ -1523,10 +1523,10 @@ export default function RegisterPage() {
                         }
                       }}
                       className={cn(
-                        "w-full h-11 px-3.5 py-2 border rounded-xl text-sm font-semibold text-slate-950 bg-white border-stone-300 shadow-xs transition-colors",
-                        "[color-scheme:light]",
-                        "focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-emerald-600",
-                        errors[`member_${i}_tglLahir`] ? "border-red-400 ring-1 ring-red-400" : ""
+                        "w-full h-11 px-3.5 py-2 border-2 rounded-xl text-sm font-bold text-white bg-slate-950/90 border-emerald-500/40 shadow-inner transition-all",
+                        "[color-scheme:dark]",
+                        "focus:outline-none focus:ring-2 focus:ring-amber-400/50 focus:border-amber-400",
+                        errors[`member_${i}_tglLahir`] ? "border-red-500 bg-red-950/50 text-red-100" : ""
                       )}
                     />
                     {member.tanggalLahir && (() => {
