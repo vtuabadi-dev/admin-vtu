@@ -1071,8 +1071,8 @@ export default function RegisterPage() {
         </div>
       </div>
 
-      {/* Step content */}
-      <div className="bg-gradient-to-b from-white/20 to-white/08 backdrop-blur-[5px] p-6 sm:p-8 rounded-3xl border-t border-l border-white/90 border-b border-r border-slate-900/25 shadow-[inset_1.5px_1.5px_3px_rgba(255,255,255,0.9),inset_-1.5px_-1.5px_4px_rgba(0,0,0,0.12),0_20px_50px_-15px_rgba(0,0,0,0.25)]">
+      {/* Step content — Dark Green Hijau Tua Syariah Card Container */}
+      <div className="bg-gradient-to-br from-[#062118]/95 via-[#041710]/98 to-[#030e0b]/99 backdrop-blur-xl p-6 sm:p-8 rounded-3xl border-2 border-emerald-500/40 shadow-2xl shadow-black/80 relative overflow-hidden">
         {/* Step 1: Representative */}
         {step === 1 && (
           <div className="space-y-4">
@@ -1082,70 +1082,70 @@ export default function RegisterPage() {
             <div>
               <label className="block text-sm font-extrabold text-white mb-1.5 drop-shadow-[0_1.5px_3px_rgba(0,0,0,0.9)]">Nama Perwakilan</label>
               <div className="relative group">
-                <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 z-20 pointer-events-none text-slate-800 stroke-[2] transition-all duration-200 group-focus-within:text-emerald-950 group-focus-within:opacity-100 group-focus-within:stroke-[2.5] group-focus-within:scale-110 group-hover:text-slate-950" />
+                <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 z-20 pointer-events-none text-amber-400 stroke-[2.5]" />
                 <input
                   type="text"
                   value={namaPerwakilan}
                   onChange={(e) => setNamaPerwakilan(e.target.value.toUpperCase())}
                   className={cn(
-                    "w-full pl-10 pr-3.5 py-2.5 bg-white/15 backdrop-blur-sm rounded-xl text-sm uppercase transition-all font-bold text-slate-950 placeholder:text-slate-700/40 placeholder:font-normal placeholder:normal-case",
-                    "border-t border-l border-slate-900/20 border-b border-r border-white/90 shadow-[inset_0_2px_4px_rgba(0,0,0,0.12)]",
-                    "focus:bg-white/90 focus:outline-none focus:ring-2 focus:ring-emerald-600/50 focus:border-emerald-700",
-                    errors.namaPerwakilan ? "border-red-500 bg-red-50/70" : ""
+                    "w-full pl-10 pr-3.5 py-2.5 bg-slate-950/80 rounded-xl text-sm uppercase transition-all font-bold text-white placeholder:text-emerald-200/40 placeholder:font-normal placeholder:normal-case",
+                    "border-2 border-emerald-500/40 shadow-inner",
+                    "focus:bg-slate-950 focus:outline-none focus:ring-2 focus:ring-amber-400/50 focus:border-amber-400",
+                    errors.namaPerwakilan ? "border-red-500 bg-red-950/50 text-red-100" : ""
                   )}
                   placeholder="Contoh: Nama Pendaftar"
                 />
               </div>
-              {errors.namaPerwakilan && <p className="text-xs text-red-600 mt-1 font-extrabold">{errors.namaPerwakilan}</p>}
+              {errors.namaPerwakilan && <p className="text-xs text-red-400 mt-1 font-extrabold">{errors.namaPerwakilan}</p>}
             </div>
 
             <div>
               <label className="block text-sm font-extrabold text-white mb-1.5 drop-shadow-[0_1.5px_3px_rgba(0,0,0,0.9)]">Nomor Telepon (WhatsApp)</label>
               <div className="relative group">
-                <Phone className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 z-20 pointer-events-none text-slate-800 stroke-[2] transition-all duration-200 group-focus-within:text-emerald-950 group-focus-within:opacity-100 group-focus-within:stroke-[2.5] group-focus-within:scale-110 group-hover:text-slate-950" />
+                <Phone className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 z-20 pointer-events-none text-amber-400 stroke-[2.5]" />
                 <input
                   type="tel"
                   value={nomorTelepon}
                   onChange={(e) => setNomorTelepon(e.target.value)}
                   className={cn(
-                    "w-full pl-10 pr-3.5 py-2.5 bg-white/15 backdrop-blur-sm rounded-xl text-sm transition-all font-bold text-slate-950 placeholder:text-slate-700/40 placeholder:font-normal",
-                    "border-t border-l border-slate-900/20 border-b border-r border-white/90 shadow-[inset_0_2px_4px_rgba(0,0,0,0.12)]",
-                    "focus:bg-white/90 focus:outline-none focus:ring-2 focus:ring-emerald-600/50 focus:border-emerald-700",
-                    errors.nomorTelepon ? "border-red-500 bg-red-50/70" : ""
+                    "w-full pl-10 pr-3.5 py-2.5 bg-slate-950/80 rounded-xl text-sm transition-all font-bold text-white placeholder:text-emerald-200/40 placeholder:font-normal",
+                    "border-2 border-emerald-500/40 shadow-inner",
+                    "focus:bg-slate-950 focus:outline-none focus:ring-2 focus:ring-amber-400/50 focus:border-amber-400",
+                    errors.nomorTelepon ? "border-red-500 bg-red-950/50 text-red-100" : ""
                   )}
                   placeholder="Contoh: 081234567890"
                 />
               </div>
-              {errors.nomorTelepon && <p className="text-xs text-red-600 mt-1 font-extrabold">{errors.nomorTelepon}</p>}
+              {errors.nomorTelepon && <p className="text-xs text-red-400 mt-1 font-extrabold">{errors.nomorTelepon}</p>}
             </div>
 
             <div>
               <label className="block text-sm font-extrabold text-white mb-1.5 drop-shadow-[0_1.5px_3px_rgba(0,0,0,0.9)]">Email</label>
               <div className="relative group">
-                <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 z-20 pointer-events-none text-slate-800 stroke-[2] transition-all duration-200 group-focus-within:text-emerald-950 group-focus-within:opacity-100 group-focus-within:stroke-[2.5] group-focus-within:scale-110 group-hover:text-slate-950" />
+                <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 z-20 pointer-events-none text-amber-400 stroke-[2.5]" />
                 <input
                   type="email"
                   value={emailPerwakilan}
                   onChange={(e) => setEmailPerwakilan(e.target.value)}
                   className={cn(
-                    "w-full pl-10 pr-3.5 py-2.5 bg-white/15 backdrop-blur-sm rounded-xl text-sm transition-all font-bold text-slate-950 placeholder:text-slate-700/40 placeholder:font-normal",
-                    "border-t border-l border-slate-900/20 border-b border-r border-white/90 shadow-[inset_0_2px_4px_rgba(0,0,0,0.12)]",
-                    "focus:bg-white/90 focus:outline-none focus:ring-2 focus:ring-emerald-600/50 focus:border-emerald-700",
-                    errors.emailPerwakilan ? "border-red-500 bg-red-50/70" : ""
+                    "w-full pl-10 pr-3.5 py-2.5 bg-slate-950/80 rounded-xl text-sm transition-all font-bold text-white placeholder:text-emerald-200/40 placeholder:font-normal",
+                    "border-2 border-emerald-500/40 shadow-inner",
+                    "focus:bg-slate-950 focus:outline-none focus:ring-2 focus:ring-amber-400/50 focus:border-amber-400",
+                    errors.emailPerwakilan ? "border-red-500 bg-red-950/50 text-red-100" : ""
                   )}
                   placeholder="Contoh: nama@gmail.com"
                 />
               </div>
-              {errors.emailPerwakilan && <p className="text-xs text-red-600 mt-1 font-extrabold">{errors.emailPerwakilan}</p>}
+              {errors.emailPerwakilan && <p className="text-xs text-red-400 mt-1 font-extrabold">{errors.emailPerwakilan}</p>}
             </div>
 
             {/* Toggle switch to use representative as Jamaah #1 */}
-            <div className="pt-3 border-t border-gray-100 flex items-center justify-between gap-4">
+            <div className="pt-3 border-t border-emerald-800/80 flex items-center justify-between gap-4">
               <div>
-                <label htmlFor="toggle-rep-jamaah1-step1" className="text-sm font-medium text-gray-800 cursor-pointer">
+                <label htmlFor="toggle-rep-jamaah1-step1" className="text-sm font-bold text-white cursor-pointer">
                   Daftarkan perwakilan sebagai Jamaah #1
                 </label>
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-emerald-200/80">
                   Otomatis memasukkan nama perwakilan ke dalam data anggota rombongan (Ketua Grup).
                 </p>
               </div>
@@ -1163,7 +1163,7 @@ export default function RegisterPage() {
                   }}
                   className="sr-only peer"
                 />
-                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                <div className="w-11 h-6 bg-slate-800 border border-emerald-500/40 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-amber-400 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-500"></div>
               </label>
             </div>
           </div>
