@@ -21,6 +21,7 @@ export interface SearchableSelectProps {
   size?: "sm" | "md";
   id?: string;
   nextFocusId?: string;
+  allowCustomText?: boolean;
 }
 
 export function SearchableSelect({
@@ -33,6 +34,7 @@ export function SearchableSelect({
   size = "md",
   id,
   nextFocusId,
+  allowCustomText = false,
 }: SearchableSelectProps) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -47,10 +49,12 @@ export function SearchableSelect({
   useEffect(() => {
     if (selectedOption) {
       setQuery(selectedOption.label);
+    } else if (value && allowCustomText) {
+      setQuery(value);
     } else if (!value) {
       setQuery("");
     }
-  }, [value, selectedOption]);
+  }, [value, selectedOption, allowCustomText]);
 
   // Close on outside click
   useEffect(() => {
@@ -59,6 +63,8 @@ export function SearchableSelect({
         setOpen(false);
         if (selectedOption) {
           setQuery(selectedOption.label);
+        } else if (value && allowCustomText) {
+          setQuery(value);
         } else if (!value) {
           setQuery("");
         }
@@ -66,7 +72,7 @@ export function SearchableSelect({
     }
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [selectedOption, value]);
+  }, [selectedOption, value, allowCustomText]);
 
   // Auto scroll highlighted option into view
   useEffect(() => {
@@ -171,7 +177,11 @@ export function SearchableSelect({
             setHighlightedIndex(0);
           }}
           onChange={(e) => {
-            setQuery(e.target.value);
+            const val = e.target.value;
+            setQuery(val);
+            if (allowCustomText) {
+              onChange(val);
+            }
             setHighlightedIndex(0);
             if (!open) setOpen(true);
           }}

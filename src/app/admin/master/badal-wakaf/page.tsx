@@ -17,6 +17,7 @@ import { Button } from "@/shared/components/ui/Button";
 import { Input } from "@/shared/components/ui/Input";
 import { Modal } from "@/shared/components/ui/Modal";
 import { Badge } from "@/shared/components/ui/Badge";
+import { BankSelect } from "@/shared/components/ui/BankSelect";
 
 const formatRupiah = (val: number) => {
   return new Intl.NumberFormat("id-ID", {
@@ -433,11 +434,11 @@ export default function MasterBadalWakafPage() {
 
           <div className="space-y-1.5">
             <label className="font-bold text-slate-700">Nama Bank *</label>
-            <Input
+            <BankSelect
               value={formRekening.namaBank}
-              onChange={(e) => setFormRekening({ ...formRekening, namaBank: e.target.value })}
-              placeholder="Contoh: Bank Syariah Indonesia (BSI) / Bank Mandiri / BCA"
-              className="text-xs h-10 rounded-xl"
+              onChange={(val) => setFormRekening({ ...formRekening, namaBank: val })}
+              placeholder="Cari / Pilih Nama Bank (contoh: BSI, Mandiri, BCA)..."
+              size="sm"
             />
           </div>
 

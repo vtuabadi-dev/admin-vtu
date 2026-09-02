@@ -5,6 +5,7 @@ import { Save } from "lucide-react";
 import { PermissionGuard } from "@/shared/components/PermissionGuard";
 import { Tabs } from "@/shared/components/ui/Tabs";
 import { Select } from "@/shared/components/ui/Select";
+import { BankSelect } from "@/shared/components/ui/BankSelect";
 import { Button } from "@/shared/components/ui/Button";
 import { OcrSettingsTab } from "./components/OcrSettingsTab";
 import { TelegramBroadcastTab } from "./components/TelegramBroadcastTab";
@@ -240,11 +241,12 @@ function AturanOperasional() {
     <div className="space-y-4">
       <SettingSection title="Rekening Tujuan Pembayaran (DP & Pelunasan)" desc="Rekening bank resmi yang ditampilkan pada Step 8 Formulir Pendaftaran Online">
         <SettingRow label="Nama Bank" desc="Nama bank tujuan transfer resmi (misal: BSI, Bank Mandiri, BCA)">
-          <input
-            className="h-9 w-64 rounded-md border border-input bg-background px-3 py-1 text-sm font-medium"
+          <BankSelect
             value={bankName}
-            onChange={(e) => setBankName(e.target.value)}
-            placeholder="Bank Syariah Indonesia (BSI)"
+            onChange={(val) => setBankName(val)}
+            placeholder="Cari / Pilih Nama Bank..."
+            className="w-64"
+            size="sm"
           />
         </SettingRow>
         <SettingRow label="Nomor Rekening" desc="Nomor rekening perusahaan">

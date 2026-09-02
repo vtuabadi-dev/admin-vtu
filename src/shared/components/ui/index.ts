@@ -6,6 +6,7 @@ export { Table } from "./Table";
 export { Modal } from "./Modal";
 export { Select } from "./Select";
 export { SearchableSelect } from "./SearchableSelect";
+export { BankSelect } from "./BankSelect";
 export { Tabs } from "./Tabs";
 export { StatCard } from "./StatCard";
 export { AccordionSection } from "./Accordion";
