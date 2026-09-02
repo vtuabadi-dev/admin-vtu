@@ -3,7 +3,9 @@ import type { NextRequest } from "next/server";
 import { auth } from "@/server/auth";
 import { prisma } from "@/server/db/client";
 import bcrypt from "bcryptjs";
+import crypto from "crypto";
 import type { OperationalRole } from "@/shared/types";
+import { sendNotification } from "@/server/services/notify";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +23,9 @@ export async function GET(_request: NextRequest) {
         email: true,
         role: true,
         mustChangePassword: true,
+        isInvitePending: true,
+        inviteToken: true,
+        inviteExpires: true,
         createdAt: true,
         updatedAt: true,
       },
@@ -41,10 +46,10 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { name, email, password, role } = body;
+    const { name, email, role } = body;
 
-    if (!name || !email || !password || !role) {
-      return NextResponse.json({ success: false, message: "Semua field wajib diisi" }, { status: 400 });
+    if (!name || !email || !role) {
+      return NextResponse.json({ success: false, message: "Nama lengkap, email, dan role wajib diisi" }, { status: 400 });
     }
 
     const normalizedEmail = String(email).toLowerCase().trim();
@@ -55,7 +60,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, message: "Email sudah terdaftar" }, { status: 400 });
     }
 
-    const passwordHash = await bcrypt.hash(password, 10);
+    // Generate secure 64-char hex token for invitation
+    const inviteToken = crypto.randomBytes(32).toString("hex");
+    // Token valid for 72 hours (3 days)
+    const inviteExpires = new Date(Date.now() + 72 * 60 * 60 * 1000);
+
+    // Random dummy hash for password until user sets their own password
+    const dummyPassword = crypto.randomBytes(16).toString("hex");
+    const passwordHash = await bcrypt.hash(dummyPassword, 10);
 
     const newUser = await prisma.user.create({
       data: {
@@ -63,7 +75,10 @@ export async function POST(request: NextRequest) {
         email: normalizedEmail,
         passwordHash,
         role: role as OperationalRole,
-        mustChangePassword: true, // Force password change on first login
+        mustChangePassword: true,
+        inviteToken,
+        inviteExpires,
+        isInvitePending: true,
       },
       select: {
         id: true,
@@ -71,11 +86,49 @@ export async function POST(request: NextRequest) {
         email: true,
         role: true,
         mustChangePassword: true,
+        isInvitePending: true,
+        inviteToken: true,
+        inviteExpires: true,
         createdAt: true,
       },
     });
 
-    return NextResponse.json({ success: true, data: newUser }, { status: 201 });
+    // Determine host origin for invite URL
+    const origin = request.headers.get("origin") || request.nextUrl.origin || "https://vtu-admin-498fvb6ie-vtuabadi.vercel.app";
+    const inviteUrl = `${origin}/setup-password?token=${inviteToken}`;
+
+    // Dispatch invitation email via notification service
+    try {
+      await sendNotification({
+        channel: "email",
+        recipient: normalizedEmail,
+        subject: "Undangan Pengelola Sistem VTU — Atur Password Akun Anda",
+        body: `Assalamu'alaikum Wr. Wb. ${name},
+
+Anda telah diundang oleh Super Admin sebagai pengelola sistem VTU (${role}).
+
+Silakan klik tautan di bawah ini untuk mengatur password akun masuk Anda:
+${inviteUrl}
+
+Tautan ini berlaku selama 72 jam. Jika Anda tidak merasa meminta akun ini, abaikan pesan ini.
+
+Terima kasih,
+PT VAUZA TAMMA ABADI
+Sistem Operasional Travel`,
+      });
+    } catch (emailErr) {
+      console.warn("[INVITE EMAIL FAILED]", emailErr);
+    }
+
+    return NextResponse.json(
+      {
+        success: true,
+        data: newUser,
+        inviteUrl,
+        message: "Admin baru berhasil dibuat dan undangan telah dikirim",
+      },
+      { status: 201 }
+    );
   } catch (error) {
     return NextResponse.json({ success: false, message: (error as Error).message }, { status: 400 });
   }
