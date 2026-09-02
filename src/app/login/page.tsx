@@ -129,9 +129,12 @@ export default function LoginPage() {
     }
   };
 
-  // GSAP Entrance & Ambient Animations (Triggered ONLY when Intro completes & store is ready)
+  const hasAnimatedRef = useRef(false);
+
+  // GSAP Entrance & Ambient Animations (Triggered ONLY ONCE when Intro completes & store is ready)
   useEffect(() => {
-    if (storeLoading || isIntroPending || !root.current) return;
+    if (storeLoading || isIntroPending || !root.current || hasAnimatedRef.current) return;
+    hasAnimatedRef.current = true;
 
     const ctx = gsap.context(() => {
       // Entrance Timeline with explicit starting and ending values

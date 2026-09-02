@@ -132,7 +132,6 @@ export const useAuthStore = create<AuthState>()(
       },
 
       logout: () => {
-        signOut({ redirect: false }).catch(() => {});
         set({
           user: null,
           isAuthenticated: false,
@@ -140,6 +139,7 @@ export const useAuthStore = create<AuthState>()(
           sessionExpired: false,
           lastActivity: 0,
         });
+        signOut({ callbackUrl: "/login" }).catch(() => {});
       },
 
       refreshSession: () => {

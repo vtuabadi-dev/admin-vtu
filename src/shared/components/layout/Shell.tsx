@@ -20,7 +20,6 @@ import {
   Plane,
   CreditCard,
 } from "lucide-react";
-import { signOut } from "next-auth/react";
 import type { OperationalRole } from "@/shared/types";
 
 interface ShellProps {
@@ -169,10 +168,7 @@ export function Shell({ children, role }: ShellProps) {
               </div>
               <button
                 type="button"
-                onClick={() => {
-                  logout();
-                  signOut({ callbackUrl: "/login" });
-                }}
+                onClick={() => logout()}
                 className="flex items-center gap-1.5 px-2 py-1.5 text-xs font-semibold text-rose-300 hover:bg-rose-950/40 hover:text-rose-200 rounded-lg transition-colors border border-rose-500/30"
                 title="Keluar"
               >
