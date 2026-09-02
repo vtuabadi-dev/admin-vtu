@@ -2,9 +2,9 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ShieldCheck, Phone, HeartHandshake, BookOpen, ExternalLink, Download, AlertCircle, Upload, Plus, User, KeyRound, CheckCircle2 } from "lucide-react";
+import { ShieldCheck, Phone, HeartHandshake, BookOpen, ExternalLink, Download, AlertCircle, Upload, Plus, User, KeyRound, CheckCircle2, Loader2 } from "lucide-react";
 import { Button } from "@/shared/components/ui/Button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/shared/components/ui/Card";
+import { Card } from "@/shared/components/ui/Card";
 import { Input } from "@/shared/components/ui/Input";
 import { Badge } from "@/shared/components/ui/Badge";
 import { Modal } from "@/shared/components/ui/Modal";
@@ -189,86 +189,99 @@ export default function TrackBadalWakafPage() {
       {/* ── Floating Unified Portal Switcher Bar ── */}
       <PortalSwitcherNav className="mb-0" />
 
-        <Card className="border border-border/80 shadow-2xl overflow-hidden backdrop-blur-md bg-white/95 dark:bg-slate-900/95">
-          <CardHeader className="bg-gradient-to-r from-emerald-700 via-teal-700 to-sky-700 text-white p-6 text-center">
-            <div className="mx-auto w-12 h-12 rounded-full bg-white/20 flex items-center justify-center mb-3">
-              <ShieldCheck className="h-6 w-6 text-white" />
-            </div>
-            <CardTitle className="text-xl font-bold">Portal Cek Status Badal Umroh & Wakaf Qur&apos;an</CardTitle>
-            <p className="text-emerald-100 text-xs mt-1 max-w-md mx-auto">
-              Masukkan Kombinasi Nama Pendaftar & Nomor WhatsApp Sebagai Sandi Unik Akses Pengecekan Riwayat Order & Sertifikat.
-            </p>
-          </CardHeader>
+      {/* ── Header Title Banner Card ── */}
+      <div className="text-center mb-6 bg-gradient-to-b from-white/20 to-white/05 backdrop-blur-[4px] p-6 rounded-3xl border-t border-l border-white/90 border-b border-r border-slate-900/25 shadow-[inset_1px_1px_2px_rgba(255,255,255,0.9),inset_-1px_-1px_3px_rgba(0,0,0,0.1),0_15px_35px_-10px_rgba(0,0,0,0.2)]">
+        <div className="inline-flex items-center justify-center h-12 w-12 rounded-2xl bg-gradient-to-tr from-emerald-800 to-teal-700 text-white shadow-md shadow-emerald-900/30 mb-2">
+          <ShieldCheck className="h-6 w-6" />
+        </div>
+        <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight drop-shadow-[0_2px_4px_rgba(0,0,0,0.85)]">
+          Portal Cek Status Badal &amp; Wakaf
+        </h1>
+        <p className="text-sm font-bold text-stone-200 mt-1 drop-shadow-[0_1.5px_3px_rgba(0,0,0,0.8)] max-w-lg mx-auto">
+          Masukkan Kombinasi Nama Pendaftar &amp; Nomor WhatsApp Sebagai Sandi Unik Akses Pengecekan Riwayat Order &amp; Sertifikat.
+        </p>
+      </div>
 
-          <CardContent className="p-6">
-            {errorMsg && (
-              <div className="mb-4 p-3.5 rounded-lg bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 text-rose-800 dark:text-rose-200 text-xs flex items-start gap-2.5 animate-in fade-in-0 duration-200">
-                <AlertCircle className="h-4 w-4 text-rose-600 shrink-0 mt-0.5" />
-                <div className="leading-relaxed">{errorMsg}</div>
+      {/* ── Main Portal Form Glass Container ── */}
+      <div className="bg-gradient-to-b from-white/30 to-white/10 backdrop-blur-[4px] p-6 sm:p-8 rounded-3xl border-t border-l border-white/90 border-b border-r border-slate-900/25 shadow-[inset_1px_1px_2px_rgba(255,255,255,0.9),inset_-1px_-1px_3px_rgba(0,0,0,0.1),0_15px_35px_-10px_rgba(0,0,0,0.2)] space-y-6">
+        {errorMsg && (
+          <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-start gap-2.5 shadow-xs animate-in fade-in-0 duration-200">
+            <AlertCircle className="h-4 w-4 text-rose-600 shrink-0 mt-0.5" />
+            <div className="leading-relaxed font-semibold">{errorMsg}</div>
+          </div>
+        )}
+
+        {/* ── STEP 1: FORM LOGIN (Kombinasi Nama Pendaftar & No. WA) ── */}
+        {step === "login" && (
+          <form onSubmit={handleTrackLogin} className="space-y-4 text-xs max-w-md mx-auto py-2">
+            <div className="bg-white/90 p-5 sm:p-6 rounded-2xl border border-stone-200 shadow-xs space-y-4">
+              <div className="text-center space-y-1.5 pb-3 border-b border-stone-100">
+                <div className="mx-auto w-10 h-10 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center mb-1">
+                  <KeyRound className="h-5 w-5" />
+                </div>
+                <h3 className="font-extrabold text-sm text-stone-900">Kombinasi Sandi Akses Pendaftar</h3>
+                <p className="text-stone-600 text-xs leading-relaxed">
+                  Hanya pendaftar yang sudah pernah mengajukan pendaftaran Badal atau Wakaf yang dapat mengakses portal ini.
+                </p>
               </div>
-            )}
 
-            {/* ── STEP 1: FORM LOGIN (Kombinasi Nama Pendaftar & No. WA) ── */}
-            {step === "login" && (
-              <form onSubmit={handleTrackLogin} className="space-y-4 text-xs max-w-md mx-auto py-4">
-                <div className="text-center space-y-1.5 pb-2">
-                  <div className="mx-auto w-10 h-10 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-600 flex items-center justify-center mb-1">
-                    <KeyRound className="h-5 w-5" />
-                  </div>
-                  <h3 className="font-bold text-sm text-foreground">Kombinasi Sandi Akses Pendaftar</h3>
-                  <p className="text-muted-foreground text-xs leading-relaxed">
-                    Hanya pendaftar yang sudah pernah mengajukan pendaftaran Badal atau Wakaf yang dapat mengakses portal ini.
-                  </p>
-                </div>
+              {/* 1. Nama Lengkap Pendaftar */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-stone-700 flex items-center gap-1.5">
+                  <User className="h-3.5 w-3.5 text-emerald-700" /> Nama Lengkap Pendaftar <span className="text-rose-500">*</span>
+                </label>
+                <Input
+                  type="text"
+                  required
+                  value={namaPemohon}
+                  onChange={(e) => setNamaPemohon(e.target.value)}
+                  placeholder="Masukkan nama pendaftar..."
+                  className="bg-white border-stone-300 rounded-xl text-xs h-10"
+                />
+              </div>
 
-                {/* 1. Nama Lengkap Pendaftar */}
-                <div className="space-y-1.5">
-                  <label className="font-semibold text-foreground flex items-center gap-1.5">
-                    <User className="h-3.5 w-3.5 text-emerald-600" /> Nama Lengkap Pendaftar <span className="text-red-500">*</span>
-                  </label>
-                  <Input
-                    type="text"
-                    required
-                    value={namaPemohon}
-                    onChange={(e) => setNamaPemohon(e.target.value)}
-                    placeholder="Masukkan nama pendaftar..."
-                    className="text-xs h-10"
-                  />
-                </div>
+              {/* 2. Nomor WhatsApp Pendaftar */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-stone-700 flex items-center gap-1.5">
+                  <Phone className="h-3.5 w-3.5 text-emerald-700" /> Nomor WhatsApp Pendaftar <span className="text-rose-500">*</span>
+                </label>
+                <Input
+                  type="tel"
+                  required
+                  value={nomorWhatsapp}
+                  onChange={(e) => setNomorWhatsapp(e.target.value)}
+                  placeholder="Contoh: 081234567890"
+                  className="bg-white border-stone-300 rounded-xl text-xs h-10 font-medium"
+                />
+              </div>
 
-                {/* 2. Nomor WhatsApp Pendaftar */}
-                <div className="space-y-1.5">
-                  <label className="font-semibold text-foreground flex items-center gap-1.5">
-                    <Phone className="h-3.5 w-3.5 text-emerald-600" /> Nomor WhatsApp Pendaftar <span className="text-red-500">*</span>
-                  </label>
-                  <Input
-                    type="tel"
-                    required
-                    value={nomorWhatsapp}
-                    onChange={(e) => setNomorWhatsapp(e.target.value)}
-                    placeholder="Contoh: 081234567890"
-                    className="text-xs h-10 font-medium"
-                  />
-                </div>
+              <div className="pt-2 space-y-3">
+                <Button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full h-11 bg-gradient-to-r from-amber-500 via-amber-600 to-yellow-600 hover:from-amber-600 hover:to-yellow-700 text-white font-extrabold rounded-xl shadow-md text-xs tracking-wider uppercase flex items-center justify-center gap-2"
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" /> Memeriksa Pendaftaran...
+                    </>
+                  ) : (
+                    <>
+                      <KeyRound className="w-4 h-4" /> Masuk &amp; Cek Pendaftaran Saya
+                    </>
+                  )}
+                </Button>
 
-                <div className="pt-2 space-y-3">
-                  <Button
-                    type="submit"
-                    disabled={loading}
-                    className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs py-2.5 shadow-xs"
-                  >
-                    {loading ? "Memeriksa Pendaftaran..." : "Masuk & Cek Pendaftaran Saya"}
-                  </Button>
-
-                  <p className="text-[11px] text-center text-muted-foreground">
-                    Belum mendaftar?{" "}
-                    <Link href="/register/badal-umroh" className="text-emerald-600 hover:underline font-bold">
-                      Daftar Badal Umroh Baru
-                    </Link>
-                  </p>
-                </div>
-              </form>
-            )}
+                <p className="text-[11px] text-center text-stone-600 font-medium">
+                  Belum mendaftar?{" "}
+                  <Link href="/register/badal-umroh" className="text-emerald-800 hover:underline font-extrabold">
+                    Daftar Badal Umroh Baru
+                  </Link>
+                </p>
+              </div>
+            </div>
+          </form>
+        )}
 
             {/* ── STEP 2: DASHBOARD TERVERIFIKASI ── */}
             {step === "data" && (
@@ -634,8 +647,7 @@ export default function TrackBadalWakafPage() {
                 )}
               </div>
             )}
-          </CardContent>
-        </Card>
+      </div>
 
       {/* Modal Upload Bukti Pembayaran */}
       <Modal
