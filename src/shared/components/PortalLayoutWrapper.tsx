@@ -15,8 +15,14 @@ export default function PortalLayoutWrapper({ children, className }: PortalLayou
       <div
         className="fixed inset-0 z-0 pointer-events-none bg-cover bg-center bg-no-repeat"
         style={{
-          backgroundImage: `linear-gradient(180deg, rgba(0, 0, 0, 0.22) 0%, rgba(0, 0, 0, 0.08) 45%, rgba(0, 0, 0, 0.35) 100%), url("/images/kaaba-makkah.jpg")`,
+          backgroundImage: `linear-gradient(180deg, rgba(7, 18, 15, 0.65) 0%, rgba(7, 18, 15, 0.42) 45%, rgba(7, 18, 15, 0.70) 100%), url("/images/kaaba-makkah.jpg")`,
         }}
+        aria-hidden="true"
+      />
+
+      {/* ── Dark Translucent Layering Overlay ── */}
+      <div
+        className="fixed inset-0 z-[1] pointer-events-none bg-black/25 backdrop-brightness-95"
         aria-hidden="true"
       />
 
