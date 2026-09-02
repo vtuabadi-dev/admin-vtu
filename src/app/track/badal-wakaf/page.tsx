@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
-import Link from "next/link";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { GSAPLink } from "@/shared/gsap/GSAPProvider";
 import { ShieldCheck, Phone, HeartHandshake, BookOpen, ExternalLink, Download, AlertCircle, Upload, Plus, User, KeyRound, CheckCircle2, Loader2 } from "lucide-react";
 import { Button } from "@/shared/components/ui/Button";
 import { Card } from "@/shared/components/ui/Card";
@@ -11,6 +12,16 @@ import { Modal } from "@/shared/components/ui/Modal";
 import PortalSwitcherNav from "@/shared/components/PortalSwitcherNav";
 
 export default function TrackBadalWakafPage() {
+  const router = useRouter();
+
+  useEffect(() => {
+    try {
+      router.prefetch("/register/badal-umroh");
+      router.prefetch("/register/wakaf-quran");
+    } catch {
+      /* prefetch fallback */
+    }
+  }, [router]);
   const [step, setStep] = useState<"login" | "data">("login");
   const [namaPemohon, setNamaPemohon] = useState("");
   const [nomorWhatsapp, setNomorWhatsapp] = useState("");
@@ -277,13 +288,13 @@ export default function TrackBadalWakafPage() {
 
               <p className="text-xs text-center text-stone-200 font-medium drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
                 Belum mendaftar?{" "}
-                <Link href="/register/badal-umroh" className="text-amber-300 hover:text-amber-200 underline font-bold ml-0.5">
+                <GSAPLink href="/register/badal-umroh" className="text-amber-300 hover:text-amber-200 underline font-bold ml-0.5 transition-colors duration-200">
                   Daftar Badal Umroh
-                </Link>
+                </GSAPLink>
                 <span className="mx-1 text-stone-300">atau</span>
-                <Link href="/register/wakaf-quran" className="text-amber-300 hover:text-amber-200 underline font-bold">
+                <GSAPLink href="/register/wakaf-quran" className="text-amber-300 hover:text-amber-200 underline font-bold transition-colors duration-200">
                   Daftar Wakaf Al-Qur&apos;an
-                </Link>
+                </GSAPLink>
               </p>
             </div>
           </form>
@@ -352,11 +363,11 @@ export default function TrackBadalWakafPage() {
                         <p className="text-xs text-muted-foreground max-w-sm mx-auto">
                           Anda belum memiliki riwayat pendaftaran Badal Umroh. Silakan buat pendaftaran Badal Umroh baru.
                         </p>
-                        <Link href="/register/badal-umroh" className="inline-block pt-2">
+                        <GSAPLink href="/register/badal-umroh" className="inline-block pt-2">
                           <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs">
                             Daftar Badal Umroh Sekarang
                           </Button>
-                        </Link>
+                        </GSAPLink>
                       </div>
                     ) : (
                       resultData.badalList.map((item) => (

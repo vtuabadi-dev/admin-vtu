@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
   CheckCircle2,
@@ -83,6 +84,17 @@ export default function BadalUmrohRegisterPage() {
   const [metodePembayaranOption, setMetodePembayaranOption] = useState<"sekarang" | "nanti">("sekarang");
   const [rekeningList, setRekeningList] = useState<any[]>([]);
   const [copiedRekening, setCopiedRekening] = useState<string | null>(null);
+
+  const router = useRouter();
+
+  useEffect(() => {
+    try {
+      router.prefetch("/register/wakaf-quran");
+      router.prefetch("/track/badal-wakaf");
+    } catch {
+      /* prefetch fallback */
+    }
+  }, [router]);
 
   // State Pilihan Status Kejamaahan & Verifikasi Paspor
   const [isJamaahVauza, setIsJamaahVauza] = useState<boolean>(true);
