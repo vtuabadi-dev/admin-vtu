@@ -23,6 +23,7 @@ import {
   Minus,
   Plus,
   AlertTriangle,
+  AlertCircle,
   CheckCircle2,
   CreditCard,
   Building2,
@@ -2616,20 +2617,23 @@ export default function RegisterPage() {
             ) : (
               /* Step 8 Payment Proof Upload Form */
               <div className="space-y-6">
-                <div className="bg-slate-900 text-white rounded-2xl p-5 shadow-md">
-                  <div className="flex items-center gap-2 text-xs font-semibold text-blue-200 uppercase tracking-wider mb-1">
+                {/* Header Box — Warm Islamic Soothing Emerald & Gold */}
+                <div className="bg-gradient-to-br from-emerald-900 via-teal-950 to-emerald-950 text-white rounded-2xl p-6 shadow-xl border-l-4 border-l-amber-400 border border-emerald-500/30 relative overflow-hidden">
+                  <div className="flex items-center gap-2 text-xs font-bold text-amber-300 uppercase tracking-wider mb-1.5">
                     <CreditCard className="w-4 h-4 text-amber-400" />
                     Langkah 8 dari 8 — Pembayaran Down Payment (DP)
                   </div>
-                  <h2 className="text-xl font-bold">Instruksi Pembayaran & Upload Bukti Transfer</h2>
-                  <p className="text-xs text-blue-100 mt-1">
+                  <h2 className="text-xl sm:text-2xl font-bold font-serif text-white tracking-wide">
+                    Instruksi Pembayaran &amp; Upload Bukti Transfer
+                  </h2>
+                  <p className="text-xs sm:text-sm text-emerald-100 mt-1.5 leading-relaxed">
                     Silakan selesaikan pembayaran DP minimal 30% untuk mengamankan kuota pendaftaran rombongan Anda.
                   </p>
                 </div>
 
                 {/* Payment Method Selector (Transfer vs Tunai) */}
-                <div className="space-y-2">
-                  <label className="text-xs font-bold text-gray-700 uppercase tracking-wider block">
+                <div className="space-y-2.5">
+                  <label className="text-xs font-bold text-emerald-200 uppercase tracking-wider block">
                     Pilih Metode Pembayaran DP:
                   </label>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -2640,23 +2644,23 @@ export default function RegisterPage() {
                         setPaymentProofError("");
                       }}
                       className={cn(
-                        "p-3.5 rounded-xl border-2 text-left transition-all flex items-start justify-between gap-2",
+                        "p-4 rounded-2xl border-2 text-left transition-all flex items-start justify-between gap-3 cursor-pointer",
                         paymentMethodOption === "transfer"
-                          ? "border-blue-600 bg-blue-50/70 ring-2 ring-blue-500/20 shadow-xs"
-                          : "border-slate-200 bg-white hover:bg-slate-50 text-slate-600"
+                          ? "border-emerald-400 bg-emerald-900/70 text-white ring-2 ring-emerald-400/40 shadow-md"
+                          : "border-slate-700 bg-slate-900/80 hover:bg-slate-800 text-slate-300"
                       )}
                     >
                       <div className="space-y-1">
-                        <div className="flex items-center gap-1.5 font-bold text-xs text-slate-900">
-                          <CreditCard className="w-4 h-4 text-blue-600" />
+                        <div className="flex items-center gap-2 font-bold text-sm text-white">
+                          <CreditCard className="w-4 h-4 text-amber-400" />
                           <span>1. Transfer Bank (BSI / Online)</span>
                         </div>
-                        <p className="text-[11px] text-slate-500 leading-snug">
-                          Transfer ke rekening resmi VTU & upload foto bukti transfer.
+                        <p className="text-xs text-emerald-200/90 leading-snug">
+                          Transfer ke rekening resmi VTU &amp; upload foto bukti transfer.
                         </p>
                       </div>
                       {paymentMethodOption === "transfer" && (
-                        <CheckCircle2 className="w-4 h-4 text-blue-600 flex-shrink-0 mt-0.5" />
+                        <CheckCircle2 className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
                       )}
                     </button>
 
@@ -2667,23 +2671,23 @@ export default function RegisterPage() {
                         setPaymentProofError("");
                       }}
                       className={cn(
-                        "p-3.5 rounded-xl border-2 text-left transition-all flex items-start justify-between gap-2",
+                        "p-4 rounded-2xl border-2 text-left transition-all flex items-start justify-between gap-3 cursor-pointer",
                         paymentMethodOption === "tunai"
-                          ? "border-emerald-600 bg-emerald-50/70 ring-2 ring-emerald-500/20 shadow-xs"
-                          : "border-slate-200 bg-white hover:bg-slate-50 text-slate-600"
+                          ? "border-amber-400 bg-amber-900/70 text-white ring-2 ring-amber-400/40 shadow-md"
+                          : "border-slate-700 bg-slate-900/80 hover:bg-slate-800 text-slate-300"
                       )}
                     >
                       <div className="space-y-1">
-                        <div className="flex items-center gap-1.5 font-bold text-xs text-slate-900">
-                          <Building2 className="w-5 h-5 text-emerald-600" />
+                        <div className="flex items-center gap-2 font-bold text-sm text-white">
+                          <Building2 className="w-4 h-4 text-amber-400" />
                           <span>2. Pembayaran Tunai (Cash di Kantor)</span>
                         </div>
-                        <p className="text-[11px] text-slate-500 leading-snug">
+                        <p className="text-xs text-amber-200/90 leading-snug">
                           Bayar langsung di kantor VTU Travel atau melalui perwakilan resmi.
                         </p>
                       </div>
                       {paymentMethodOption === "tunai" && (
-                        <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0 mt-0.5" />
+                        <CheckCircle2 className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
                       )}
                     </button>
                   </div>
@@ -2691,29 +2695,29 @@ export default function RegisterPage() {
 
                 {/* Summary & Bank Details Grid */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Order Summary */}
-                  <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3">
-                    <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 border-b pb-2">
+                  {/* Order Summary Box */}
+                  <div className="bg-slate-900/90 border-2 border-emerald-500/40 rounded-2xl p-5 shadow-lg space-y-4">
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-emerald-300 border-b border-emerald-800/80 pb-2">
                       Ringkasan Pendaftaran
                     </h3>
-                    <div className="text-xs space-y-1.5">
-                      <div className="flex justify-between">
-                        <span className="text-gray-500">Kode Registrasi:</span>
-                        <span className="font-mono font-bold text-blue-900">
+                    <div className="text-xs space-y-2">
+                      <div className="flex justify-between items-center">
+                        <span className="text-emerald-200">Kode Registrasi:</span>
+                        <span className="font-mono font-extrabold text-amber-300 text-sm bg-amber-950/80 px-2.5 py-0.5 rounded border border-amber-500/40">
                           {submitResult?.kodeRegistrasi || (submitResult as any)?.data?.kodeRegistrasi || "-"}
                         </span>
                       </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-500">Nama PIC:</span>
-                        <span className="font-bold text-gray-800 uppercase">{namaPerwakilan}</span>
+                      <div className="flex justify-between items-center">
+                        <span className="text-emerald-200">Nama PIC:</span>
+                        <span className="font-bold text-white text-xs uppercase">{namaPerwakilan}</span>
                       </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-500">Jumlah Jamaah:</span>
-                        <span className="font-bold text-gray-800">{paxCount} PAX</span>
+                      <div className="flex justify-between items-center">
+                        <span className="text-emerald-200">Jumlah Jamaah:</span>
+                        <span className="font-bold text-emerald-300 text-xs">{paxCount} PAX</span>
                       </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-500">Paket Umroh:</span>
-                        <span className="font-semibold text-gray-800">
+                      <div className="flex justify-between items-center">
+                        <span className="text-emerald-200">Paket Umroh:</span>
+                        <span className="font-semibold text-white text-xs max-w-[180px] text-right truncate">
                           {selectedPaket?.namaPaket || selectedPaket?.paketUmroh?.namaPaket || "-"}
                         </span>
                       </div>
@@ -2738,21 +2742,21 @@ export default function RegisterPage() {
                       const effectiveDp = isCustomDp && parsedCustomDp > 0 ? parsedCustomDp : minimalDpStandard;
 
                       return (
-                        <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 space-y-2">
+                        <div className="bg-emerald-950/80 border border-emerald-500/40 rounded-xl p-4 space-y-2.5">
                           <div className="flex justify-between text-xs">
-                            <span className="text-amber-800">Estimasi Biaya ({paxCount} PAX):</span>
-                            <span className="font-semibold text-amber-900">Rp {totalEstimasi.toLocaleString("id-ID")}</span>
+                            <span className="text-emerald-200">Estimasi Biaya ({paxCount} PAX):</span>
+                            <span className="font-semibold text-white">Rp {totalEstimasi.toLocaleString("id-ID")}</span>
                           </div>
-                          <div className="flex justify-between text-xs pt-1 border-t border-amber-200">
-                            <span className="font-bold text-amber-900">Nominal Minimal DP (Rp {(defaultDpPerPax / 1000000).toLocaleString("id-ID")} Juta / Pax):</span>
-                            <span className="font-extrabold text-blue-900 text-sm">
+                          <div className="flex justify-between items-center text-xs pt-1.5 border-t border-emerald-800/80">
+                            <span className="font-bold text-amber-200">Nominal Minimal DP (Rp {(defaultDpPerPax / 1000000).toLocaleString("id-ID")} Juta / Pax):</span>
+                            <span className="font-extrabold text-amber-300 text-sm">
                               Rp {minimalDpStandard.toLocaleString("id-ID")}
                             </span>
                           </div>
 
                           {/* Saklar / Toggle Switch for Custom DP */}
-                          <div className="pt-2 border-t border-amber-200 flex items-center justify-between">
-                            <label className="text-xs font-semibold text-gray-800 flex items-center gap-1.5 cursor-pointer select-none">
+                          <div className="pt-2 border-t border-emerald-800/80 flex items-center justify-between">
+                            <label className="text-xs font-semibold text-emerald-100 flex items-center gap-2 cursor-pointer select-none">
                               <input
                                 type="checkbox"
                                 checked={isCustomDp}
@@ -2760,12 +2764,12 @@ export default function RegisterPage() {
                                   setIsCustomDp(e.target.checked);
                                   if (!e.target.checked) setCustomDpAmount("");
                                 }}
-                                className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 cursor-pointer"
+                                className="w-4 h-4 rounded text-amber-500 focus:ring-amber-400 cursor-pointer"
                               />
                               <span>Bayar Nominal DP Lainnya (Custom)</span>
                             </label>
                             {isCustomDp && (
-                              <span className="text-[10px] bg-blue-100 text-blue-800 font-bold px-2 py-0.5 rounded-full">
+                              <span className="text-[10px] bg-amber-400 text-slate-950 font-black px-2 py-0.5 rounded-full">
                                 Aktif
                               </span>
                             )}
@@ -2774,7 +2778,7 @@ export default function RegisterPage() {
                           {/* Column Input for Custom DP */}
                           {isCustomDp && (
                             <div className="pt-1.5 space-y-1">
-                              <label className="block text-[11px] font-bold text-blue-900">
+                              <label className="block text-[11px] font-bold text-amber-300">
                                 Masukkan Nominal DP Yang Dibayar (Rp):
                               </label>
                               <input
@@ -2786,17 +2790,17 @@ export default function RegisterPage() {
                                   setCustomDpAmount(rawVal);
                                 }}
                                 placeholder={`Misal: Rp ${(minimalDpStandard + 2000000).toLocaleString("id-ID")}`}
-                                className="w-full h-9 px-3 text-xs font-bold font-mono bg-white border-2 border-blue-400 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-blue-950"
+                                className="w-full h-10 px-3 text-sm font-bold font-mono bg-slate-950 border-2 border-amber-400 rounded-lg text-amber-300 focus:ring-2 focus:ring-amber-400 focus:outline-none"
                               />
                             </div>
                           )}
 
                           {/* Total DP Effective Display */}
-                          <div className="flex justify-between text-xs pt-1.5 border-t border-amber-200">
-                            <span className="font-extrabold text-amber-950">
+                          <div className="flex justify-between items-center text-xs pt-2 border-t border-emerald-800/80">
+                            <span className="font-extrabold text-emerald-100">
                               {isCustomDp ? "Nominal DP Yang Dicatat:" : "Nominal DP Pembayaran:"}
                             </span>
-                            <span className="font-extrabold text-blue-900 text-sm">
+                            <span className="font-black text-amber-300 text-base">
                               Rp {effectiveDp.toLocaleString("id-ID")}
                             </span>
                           </div>
@@ -2806,16 +2810,17 @@ export default function RegisterPage() {
                   </div>
 
                   {paymentMethodOption === "transfer" ? (
-                    <div className="bg-white border-2 border-blue-200 rounded-xl p-4 shadow-sm space-y-3">
-                      <div className="flex items-center gap-2 border-b pb-2">
-                        <Building2 className="w-5 h-5 text-blue-600" />
+                    /* Bank Transfer Details Box — Very Large Font & High Contrast for Elderly Jamaah */
+                    <div className="bg-slate-900/90 border-2 border-emerald-500/40 rounded-2xl p-5 shadow-lg space-y-3.5">
+                      <div className="flex items-center gap-2 border-b border-emerald-800/80 pb-2.5">
+                        <Building2 className="w-5 h-5 text-amber-400" />
                         <div>
-                          <h3 className="text-xs font-bold text-gray-900 uppercase">Rekening Tujuan Pembayaran</h3>
-                          <p className="text-[10px] text-gray-500">Transfer Resmi PT VTU ABADI TRAVEL</p>
+                          <h3 className="text-xs font-bold text-emerald-300 uppercase tracking-wider">Rekening Tujuan Pembayaran</h3>
+                          <p className="text-[11px] text-emerald-200/80">Transfer Resmi PT VTU ABADI TRAVEL</p>
                         </div>
                       </div>
 
-                      <div className="space-y-2 text-xs">
+                      <div className="space-y-3 text-xs">
                         {(() => {
                           let bankName = "Bank Syariah Indonesia (BSI)";
                           let bankAccount = "7123 4567 89";
@@ -2835,15 +2840,17 @@ export default function RegisterPage() {
 
                           return (
                             <>
-                              <div className="bg-blue-50 p-2.5 rounded-lg border border-blue-100">
-                                <p className="text-[10px] text-blue-600 font-semibold uppercase">Nama Bank</p>
-                                <p className="font-bold text-gray-900 text-sm">{bankName}</p>
+                              {/* Nama Bank Box */}
+                              <div className="bg-emerald-950/90 p-3 rounded-xl border border-emerald-500/30 space-y-0.5">
+                                <p className="text-[10px] text-emerald-300 font-bold uppercase tracking-wider">Nama Bank</p>
+                                <p className="font-extrabold text-white text-base">{bankName}</p>
                               </div>
 
-                              <div className="bg-blue-50 p-2.5 rounded-lg border border-blue-100 flex items-center justify-between">
-                                <div>
-                                  <p className="text-[10px] text-blue-600 font-semibold uppercase">Nomor Rekening</p>
-                                  <p className="font-mono font-bold text-blue-900 text-base">{bankAccount}</p>
+                              {/* Nomor Rekening Box — Big Bold Font & High Contrast */}
+                              <div className="bg-emerald-950/90 p-3.5 rounded-xl border-2 border-amber-400/60 flex items-center justify-between shadow-md">
+                                <div className="space-y-0.5">
+                                  <p className="text-[10px] text-amber-300 font-bold uppercase tracking-wider">Nomor Rekening</p>
+                                  <p className="font-mono font-black text-amber-300 text-lg sm:text-xl tracking-wider">{bankAccount}</p>
                                 </div>
                                 <button
                                   type="button"
@@ -2852,25 +2859,27 @@ export default function RegisterPage() {
                                     setCopiedAccount(true);
                                     setTimeout(() => setCopiedAccount(false), 2000);
                                   }}
-                                  className="px-2.5 py-1 bg-white border border-blue-300 rounded text-[11px] font-semibold text-blue-700 hover:bg-blue-100 flex items-center gap-1"
+                                  className="px-3 py-1.5 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 font-extrabold text-xs rounded-lg shadow transition-all flex items-center gap-1.5 cursor-pointer shrink-0"
                                 >
-                                  {copiedAccount ? <Check className="w-3.5 h-3.5 text-green-600" /> : <Copy className="w-3.5 h-3.5" />}
-                                  {copiedAccount ? "Tersalin" : "Salin"}
+                                  {copiedAccount ? <Check className="w-4 h-4 text-slate-950" /> : <Copy className="w-4 h-4 text-slate-950" />}
+                                  {copiedAccount ? "Tersalin!" : "Salin No. Rek"}
                                 </button>
                               </div>
 
-                              <div className="bg-blue-50 p-2.5 rounded-lg border border-blue-100">
-                                <p className="text-[10px] text-blue-600 font-semibold uppercase">Atas Nama Rekening</p>
-                                <p className="font-bold text-gray-900">{bankHolder}</p>
+                              {/* Atas Nama Rekening Box */}
+                              <div className="bg-emerald-950/90 p-3 rounded-xl border border-emerald-500/30 space-y-0.5">
+                                <p className="text-[10px] text-emerald-300 font-bold uppercase tracking-wider">Atas Nama Rekening</p>
+                                <p className="font-extrabold text-white text-sm">{bankHolder}</p>
                               </div>
                             </>
                           );
                         })()}
 
-                        <div className="bg-amber-50 p-2.5 rounded-lg border border-amber-200 flex items-center justify-between">
+                        {/* Berita Transfer Box */}
+                        <div className="bg-amber-950/70 p-3 rounded-xl border border-amber-500/40 flex items-center justify-between">
                           <div>
-                            <p className="text-[10px] text-amber-700 font-semibold uppercase">Berita Transfer / Ref</p>
-                            <p className="font-mono font-bold text-amber-900">
+                            <p className="text-[10px] text-amber-300 font-bold uppercase tracking-wider">Berita Transfer / Ref</p>
+                            <p className="font-mono font-extrabold text-amber-200 text-sm">
                               {submitResult?.kodeRegistrasi || (submitResult as any)?.data?.kodeRegistrasi || "-"}
                             </p>
                           </div>
@@ -2882,35 +2891,36 @@ export default function RegisterPage() {
                               setCopiedRef(true);
                               setTimeout(() => setCopiedRef(false), 2000);
                             }}
-                            className="px-2.5 py-1 bg-white border border-amber-300 rounded text-[11px] font-semibold text-amber-800 hover:bg-amber-100 flex items-center gap-1"
+                            className="px-3 py-1.5 bg-amber-400 hover:bg-amber-300 text-slate-950 font-extrabold text-xs rounded-lg shadow transition-colors flex items-center gap-1 cursor-pointer shrink-0"
                           >
-                            {copiedRef ? <Check className="w-3.5 h-3.5 text-green-600" /> : <Copy className="w-3.5 h-3.5" />}
-                            {copiedRef ? "Tersalin" : "Salin Ref"}
+                            {copiedRef ? <Check className="w-3.5 h-3.5 text-slate-950" /> : <Copy className="w-3.5 h-3.5 text-slate-950" />}
+                            {copiedRef ? "Tersalin!" : "Salin Ref"}
                           </button>
                         </div>
                       </div>
                     </div>
                   ) : (
-                    <div className="bg-white border-2 border-emerald-200 rounded-xl p-4 shadow-sm space-y-3">
-                      <div className="flex items-center gap-2 border-b pb-2">
-                        <Building2 className="w-5 h-5 text-emerald-600" />
+                    /* Cash Details Box */
+                    <div className="bg-slate-900/90 border-2 border-amber-500/40 rounded-2xl p-5 shadow-lg space-y-3.5">
+                      <div className="flex items-center gap-2 border-b border-amber-800/80 pb-2.5">
+                        <Building2 className="w-5 h-5 text-amber-400" />
                         <div>
-                          <h3 className="text-xs font-bold text-gray-900 uppercase">Pembayaran Tunai (Cash)</h3>
-                          <p className="text-[10px] text-gray-500">Bayar Langsung ke Kantor PT VTU ABADI TRAVEL</p>
+                          <h3 className="text-xs font-bold text-amber-300 uppercase tracking-wider">Pembayaran Tunai (Cash)</h3>
+                          <p className="text-[11px] text-amber-200/80">Bayar Langsung ke Kantor PT VTU ABADI TRAVEL</p>
                         </div>
                       </div>
 
-                      <div className="space-y-2 text-xs">
-                        <div className="bg-emerald-50 p-2.5 rounded-lg border border-emerald-100">
-                          <p className="text-[10px] text-emerald-600 font-semibold uppercase">Lokasi Kantor Pusat</p>
-                          <p className="font-bold text-gray-900 text-sm">PT Vauza Tamma Abadi</p>
-                          <p className="text-gray-700 mt-1">Ruko Griya Shanta, Jl. Soekarno Hatta No.1, Kota Malang, Jawa Timur</p>
+                      <div className="space-y-3 text-xs">
+                        <div className="bg-amber-950/80 p-3 rounded-xl border border-amber-500/30">
+                          <p className="text-[10px] text-amber-300 font-bold uppercase tracking-wider">Lokasi Kantor Pusat</p>
+                          <p className="font-extrabold text-white text-sm">PT Vauza Tamma Abadi</p>
+                          <p className="text-amber-100 text-xs mt-1 leading-relaxed">Ruko Griya Shanta, Jl. Soekarno Hatta No.1, Kota Malang, Jawa Timur</p>
                         </div>
 
-                        <div className="bg-amber-50 p-2.5 rounded-lg border border-amber-200 flex items-center justify-between">
+                        <div className="bg-amber-950/70 p-3 rounded-xl border border-amber-500/40 flex items-center justify-between">
                           <div>
-                            <p className="text-[10px] text-amber-700 font-semibold uppercase">Kode Registrasi Referensi</p>
-                            <p className="font-mono font-bold text-amber-900 text-base">
+                            <p className="text-[10px] text-amber-300 font-bold uppercase tracking-wider">Kode Registrasi Referensi</p>
+                            <p className="font-mono font-extrabold text-amber-200 text-base">
                               {submitResult?.kodeRegistrasi || (submitResult as any)?.data?.kodeRegistrasi || "-"}
                             </p>
                           </div>
@@ -2922,16 +2932,16 @@ export default function RegisterPage() {
                               setCopiedRef(true);
                               setTimeout(() => setCopiedRef(false), 2000);
                             }}
-                            className="px-2.5 py-1 bg-white border border-amber-300 rounded text-[11px] font-semibold text-amber-800 hover:bg-amber-100 flex items-center gap-1"
+                            className="px-3 py-1.5 bg-amber-400 hover:bg-amber-300 text-slate-950 font-extrabold text-xs rounded-lg shadow transition-colors flex items-center gap-1 cursor-pointer shrink-0"
                           >
-                            {copiedRef ? <Check className="w-3.5 h-3.5 text-green-600" /> : <Copy className="w-3.5 h-3.5" />}
-                            {copiedRef ? "Tersalin" : "Salin Ref"}
+                            {copiedRef ? <Check className="w-3.5 h-3.5 text-slate-950" /> : <Copy className="w-3.5 h-3.5 text-slate-950" />}
+                            {copiedRef ? "Tersalin!" : "Salin Ref"}
                           </button>
                         </div>
 
-                        <div className="bg-emerald-50 p-2.5 rounded-lg border border-emerald-100">
-                          <p className="text-[10px] text-emerald-600 font-semibold uppercase">Instruksi Pembayaran</p>
-                          <p className="text-gray-700 mt-1 font-medium leading-relaxed">
+                        <div className="bg-amber-950/80 p-3 rounded-xl border border-amber-500/30">
+                          <p className="text-[10px] text-amber-300 font-bold uppercase tracking-wider">Instruksi Pembayaran</p>
+                          <p className="text-amber-100 text-xs mt-1 leading-relaxed">
                             Silakan kunjungi kantor kami pada jam operasional (Senin - Sabtu, 08:00 - 17:00 WIB) dengan menunjukkan <strong>Kode Registrasi Referensi</strong> di atas untuk menyelesaikan administrasi DP tunai dan menerima kwitansi resmi.
                           </p>
                         </div>
@@ -2940,45 +2950,46 @@ export default function RegisterPage() {
                   )}
                 </div>
 
-                {/* Upload File Box */}
-                <div className="bg-slate-50 border border-slate-200 rounded-xl p-5 space-y-4">
-                  <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                    <Upload className="w-4 h-4 text-blue-600" />
+                {/* Upload File Box — Friendly Dropzone for Elderly Jamaah */}
+                <div className="bg-slate-900/90 border-2 border-emerald-500/40 rounded-2xl p-5 sm:p-6 shadow-lg space-y-4">
+                  <h3 className="text-sm font-bold text-emerald-200 flex items-center gap-2">
+                    <Upload className="w-4 h-4 text-amber-400" />
                     {paymentMethodOption === "tunai" 
                       ? "Upload Foto Kuitansi / Tanda Terima Tunai (Opsional)" 
                       : "Upload Foto / File Bukti Transfer DP"}
                   </h3>
 
-                  <div className="border-2 border-dashed border-blue-300 bg-white rounded-xl p-6 text-center space-y-3 hover:bg-blue-50/50 transition-colors">
+                  <div className="border-2 border-dashed border-emerald-400/60 bg-emerald-950/50 hover:bg-emerald-900/60 rounded-2xl p-6 sm:p-8 text-center space-y-3 transition-all cursor-pointer shadow-inner">
                     {paymentProofPreview ? (
                       <div className="space-y-3">
                         <img
                           src={paymentProofPreview}
                           alt="Kuitansi / Bukti Pembayaran DP"
-                          className="max-h-48 max-w-full mx-auto rounded-lg shadow-sm border object-contain"
+                          className="max-h-56 max-w-full mx-auto rounded-xl shadow-lg border-2 border-amber-400/50 object-contain"
                         />
-                        <p className="text-xs text-gray-500 font-medium">{paymentProofFile?.name}</p>
+                        <p className="text-xs text-emerald-200 font-medium font-mono">{paymentProofFile?.name}</p>
                         <button
                           type="button"
                           onClick={() => {
                             setPaymentProofFile(null);
                             setPaymentProofPreview("");
                           }}
-                          className="text-xs text-red-600 hover:underline font-semibold"
+                          className="px-3 py-1 bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/40 rounded-lg text-xs font-bold transition-colors cursor-pointer"
                         >
-                          Ganti File
+                          Ganti Foto Bukti
                         </button>
                       </div>
                     ) : (
-                      <label className="cursor-pointer block space-y-2">
-                        <Upload className="w-10 h-10 text-blue-500 mx-auto" />
-                        <div>
-                          <p className="text-sm font-semibold text-gray-700">
+                      <label className="cursor-pointer block space-y-3">
+                        <Upload className="w-12 h-12 text-emerald-400 mx-auto animate-bounce" />
+                        <div className="space-y-1">
+                          <p className="text-base sm:text-lg font-extrabold text-white">
                             {paymentMethodOption === "tunai" 
-                              ? "Pilih Foto Kuitansi Pembayaran (Jika Ada)" 
-                              : "Pilih Foto atau File Bukti Transfer"}
+                              ? "Sentuh Di Sini Untuk Memilih Foto Kuitansi Pembayaran" 
+                              : "Sentuh / Klik Di Sini Untuk Memilih Foto Bukti Transfer"}
                           </p>
-                          <p className="text-xs text-gray-400">Format: JPG, JPEG, PNG, PDF (Maksimal 5 MB)</p>
+                          <p className="text-xs sm:text-sm font-semibold text-emerald-100">Ambil foto struk transfer atau pilih gambar dari galeri HP Anda</p>
+                          <p className="text-[11px] text-amber-300 font-mono font-bold pt-1">Format: JPG, JPEG, PNG, PDF (Maksimal 5 MB)</p>
                         </div>
                         <input
                           type="file"
@@ -3001,8 +3012,9 @@ export default function RegisterPage() {
                   </div>
 
                   {paymentProofError && (
-                    <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700">
-                      {paymentProofError}
+                    <div className="p-3.5 bg-rose-950/80 border border-rose-500/50 rounded-xl text-xs font-bold text-rose-200 flex items-center gap-2">
+                      <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+                      <span>{paymentProofError}</span>
                     </div>
                   )}
 
@@ -3012,7 +3024,7 @@ export default function RegisterPage() {
                       onClick={handlePaymentProofSubmit}
                       disabled={isUploadingProof}
                       className={cn(
-                        "w-full py-3 bg-blue-600 text-white rounded-xl font-semibold text-sm hover:bg-blue-700 shadow-md transition-all flex items-center justify-center gap-2",
+                        "w-full py-4 px-6 bg-gradient-to-r from-amber-400 via-amber-500 to-emerald-400 hover:from-amber-300 hover:to-emerald-300 text-slate-950 font-black text-base sm:text-lg rounded-xl shadow-2xl transition-all flex items-center justify-center gap-2 cursor-pointer border-2 border-amber-200",
                         "disabled:opacity-50 disabled:cursor-not-allowed"
                       )}
                     >
