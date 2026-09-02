@@ -3102,11 +3102,18 @@ export default function RegisterPage() {
         )}
       </div>
 
-      {/* Footer */}
-      <p className="text-center text-xs font-medium text-slate-700 mt-6 bg-white/60 backdrop-blur-sm py-2 px-4 rounded-full inline-block mx-auto">
-        Sudah punya akun?{" "}
-        <a href="/login" className="text-emerald-700 font-bold hover:underline">Login di sini</a>
-      </p>
+      {/* Footer Pill Link — Dark Green Hijau Tua (High Contrast for Elderly Jamaah) */}
+      <div className="flex justify-center mt-6">
+        <p className="text-center text-xs sm:text-sm font-semibold text-white bg-emerald-950/95 border-2 border-emerald-400/60 shadow-xl backdrop-blur-md py-2.5 px-6 rounded-full inline-flex items-center gap-1.5">
+          <span>Sudah punya akun?</span>{" "}
+          <a
+            href="/login"
+            className="text-amber-300 font-black hover:text-amber-200 underline decoration-amber-400 decoration-2 underline-offset-2 transition-all"
+          >
+            Login di sini
+          </a>
+        </p>
+      </div>
     </div>
   </div>
   );
