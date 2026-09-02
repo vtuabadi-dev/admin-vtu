@@ -947,7 +947,7 @@ export default function BadalUmrohRegisterPage() {
                     {formData.metodeSouvenir === "dikantor" && <CheckCircle2 className="w-5 h-5 text-emerald-600" />}
                   </div>
                   <div>
-                    <h3 className="font-extrabold text-sm text-stone-900">Ambil di Kantor VTU (Gratis)</h3>
+                    <h3 className="font-extrabold text-sm text-stone-900">Ambil di Kantor VTU</h3>
                     <p className="text-xs text-stone-600 mt-0.5 leading-relaxed">
                       Sertifikat dan souvenir diambil langsung di kantor operasional VTU setelah rombongan kepulangan.
                     </p>
@@ -971,7 +971,7 @@ export default function BadalUmrohRegisterPage() {
                     {formData.metodeSouvenir === "dikirim" && <CheckCircle2 className="w-5 h-5 text-emerald-600" />}
                   </div>
                   <div>
-                    <h3 className="font-extrabold text-sm text-stone-900">Kirim ke Alamat Rumah (Ekspedisi)</h3>
+                    <h3 className="font-extrabold text-sm text-stone-900">Kirim ke Alamat Rumah</h3>
                     <p className="text-xs text-stone-600 mt-0.5 leading-relaxed">
                       Sertifikat fisik dan souvenir dipaketkan langsung ke alamat rumah Anda melalui ekspedisi terpercaya.
                     </p>
