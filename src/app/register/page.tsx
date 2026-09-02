@@ -1673,36 +1673,36 @@ export default function RegisterPage() {
                   const upgradeDouble = Number(activeCluster?.upgradeDouble || 2500000);
 
                   return (
-                    <div className="border border-blue-100 rounded-2xl p-5 bg-gradient-to-br from-blue-50/40 via-white to-slate-50 shadow-sm space-y-6">
+                    <div className="bg-[#24150B]/95 border-2 border-amber-500/50 backdrop-blur-xl shadow-2xl rounded-3xl p-6 space-y-6 text-white">
                       {/* Header Info */}
-                      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-gray-200/80 pb-4">
+                      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-amber-500/30 pb-5">
                         <div>
-                          <span className="text-[11px] font-bold uppercase tracking-wider text-blue-600 bg-blue-100/80 px-2.5 py-0.5 rounded-md">
+                          <span className="text-[11px] font-black uppercase tracking-wider text-amber-300 bg-amber-500/20 border border-amber-400/40 px-3 py-1 rounded-lg shadow-sm">
                             Detail Paket Keberangkatan
                           </span>
-                          <h3 className="text-base font-bold text-gray-900 mt-1">
+                          <h3 className="text-lg font-extrabold text-white mt-2 drop-shadow-[0_1.5px_3px_rgba(0,0,0,0.9)]">
                             {selectedPaket.namaPaket || selectedPaket.paketUmroh?.namaPaket}
                           </h3>
-                          <p className="text-xs text-gray-600 mt-1 flex items-center gap-2 flex-wrap">
+                          <p className="text-xs font-semibold text-amber-200/90 mt-1 flex items-center gap-2 flex-wrap drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
                             <span>✈️ {selectedPaket.maskapai || selectedPaket.maskapaiId || "Saudia Airlines"} • Flight {selectedPaket.nomorPenerbangan || "-"}</span>
                             <span>•</span>
                             <span>📅 {new Date(selectedPaket.tanggalBerangkat).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })} — {new Date(selectedPaket.tanggalPulang).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}</span>
                           </p>
                         </div>
-                        <div className="sm:text-right shrink-0">
-                          <span className="text-xs text-gray-500 block">Harga Base Paket</span>
-                          <span className="text-lg font-extrabold text-blue-600">
+                        <div className="sm:text-right shrink-0 bg-[#160D07]/90 px-4 py-2.5 rounded-2xl border border-amber-500/30 shadow-inner">
+                          <span className="text-xs text-amber-200/70 block font-semibold">Harga Base Paket</span>
+                          <span className="text-xl font-black text-amber-400">
                             Rp {basePrice.toLocaleString("id-ID")}
                           </span>
-                          <span className="text-xs text-gray-400"> / orang</span>
+                          <span className="text-xs text-amber-200/70"> / orang</span>
                         </div>
                       </div>
 
                       {/* Multi-Cluster Selector (If Multi Cluster) */}
                       {isMultiCluster && clusters && (
                         <div className="space-y-3">
-                          <label className="block text-xs font-bold text-gray-800 uppercase tracking-wider">
-                            🏢 Pilih Klaster Hotel & Fasilitas
+                          <label className="block text-xs font-bold text-amber-200 uppercase tracking-wider">
+                            🏢 Pilih Klaster Hotel &amp; Fasilitas
                           </label>
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                             {clusters.map((cl: any, idx: number) => {
@@ -1720,27 +1720,23 @@ export default function RegisterPage() {
                                     if (cl.clusterName) setHotelUpgrade(cl.clusterName);
                                   }}
                                   className={cn(
-                                    "p-3.5 rounded-xl border-2 text-left transition-all relative flex flex-col justify-between gap-2.5",
+                                    "p-3.5 rounded-2xl border-2 text-left transition-all relative flex flex-col justify-between gap-2.5 cursor-pointer shadow-md",
                                     isSelected
-                                      ? isPromo
-                                        ? "border-purple-600 bg-purple-50/80 shadow-sm ring-1 ring-purple-500"
-                                        : "border-blue-600 bg-blue-50/80 shadow-sm ring-1 ring-blue-500"
-                                      : isPromo
-                                        ? "border-purple-200 bg-gradient-to-br from-purple-50/30 to-white hover:border-purple-300"
-                                        : "border-gray-200 bg-white hover:border-gray-300"
+                                      ? "border-amber-400 bg-amber-500 text-slate-950 ring-2 ring-amber-300 shadow-xl"
+                                      : "border-amber-500/30 bg-[#160D07]/80 text-white hover:border-amber-400 hover:bg-[#24150B]"
                                   )}
                                 >
                                   <div className="flex items-start justify-between gap-2">
                                     <div className="space-y-1">
                                       <div className="flex items-center gap-1.5 flex-wrap">
                                         <span className={cn(
-                                          "font-bold text-sm",
-                                          isPromo ? "text-purple-900" : "text-gray-900"
+                                          "font-extrabold text-sm",
+                                          isSelected ? "text-slate-950" : "text-white"
                                         )}>
                                           {cl.clusterName || `Klaster ${idx + 1}`}
                                         </span>
                                         {isPromo && (
-                                          <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-gradient-to-r from-purple-500/20 to-pink-500/20 text-purple-800 border border-purple-400/40">
+                                          <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-400 text-slate-950 border border-amber-300">
                                             🏷️ PROMO DEAL
                                           </span>
                                         )}
@@ -1749,29 +1745,29 @@ export default function RegisterPage() {
                                       {/* Perlengkapan Indicator */}
                                       <div>
                                         {isTanpaPerlengkapan ? (
-                                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-rose-50 text-rose-700 border border-rose-200">
+                                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-rose-950 text-rose-200 border border-rose-500/40">
                                             ⚠️ Tanpa Perlengkapan (LA Only)
                                           </span>
                                         ) : (
-                                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-950 text-emerald-200 border border-emerald-500/40">
                                             🎁 Termasuk Perlengkapan Lengkap
                                           </span>
                                         )}
                                       </div>
                                     </div>
-                                    {isSelected && <CheckCircle2 className={cn("w-5 h-5 shrink-0", isPromo ? "text-purple-600" : "text-blue-600")} />}
+                                    {isSelected && <CheckCircle2 className="w-5 h-5 shrink-0 text-slate-950" />}
                                   </div>
 
-                                  <div className="text-xs text-gray-600 space-y-0.5 bg-white/70 p-2 rounded-lg border border-gray-100">
+                                  <div className={cn("text-xs space-y-0.5 p-2 rounded-xl border", isSelected ? "bg-amber-600/30 text-slate-950 border-amber-600/40 font-bold" : "bg-[#100804]/70 text-amber-100 border-amber-500/20")}>
                                     <p>🕋 Mekkah: <strong>{cl.hotelMekkah || "TBA"}</strong></p>
                                     <p>🕌 Madinah: <strong>{cl.hotelMadinah || "TBA"}</strong></p>
                                   </div>
 
                                   <div className={cn(
-                                    "text-xs font-bold pt-1.5 border-t",
-                                    isPromo ? "text-purple-700 border-purple-100" : "text-blue-700 border-gray-100"
+                                    "text-xs font-extrabold pt-1.5 border-t",
+                                    isSelected ? "text-slate-950 border-amber-600/40" : "text-amber-400 border-amber-500/20"
                                   )}>
-                                    Harga Base: <span className="text-sm font-extrabold">Rp {clPrice.toLocaleString("id-ID")}</span> / pax
+                                    Harga Base: <span className="text-sm font-black">Rp {clPrice.toLocaleString("id-ID")}</span> / pax
                                   </div>
                                 </button>
                               );
@@ -1780,16 +1776,16 @@ export default function RegisterPage() {
                         </div>
                       )}
 
-                      {/* Single Cluster Hotel Info (If Single Cluster) */}
+                      {/* Single Cluster Hotel Info (If Single Cluster) — Dark Brown Box */}
                       {!isMultiCluster && (
-                        <div className="bg-white border border-gray-200 rounded-xl p-3.5 flex flex-col sm:flex-row gap-4 sm:items-center justify-between text-xs shadow-2xs">
+                        <div className="bg-[#160D07]/90 border border-amber-500/30 rounded-2xl p-4 flex flex-col sm:flex-row gap-4 sm:items-center justify-between text-xs shadow-inner">
                           <div className="flex items-center gap-2">
-                            <span className="font-semibold text-gray-700">🕋 Hotel Mekkah:</span>
-                            <span className="text-gray-900 font-bold">{hotelMekkah}</span>
+                            <span className="font-bold text-amber-200/80">🕋 Hotel Mekkah:</span>
+                            <span className="text-white font-extrabold bg-amber-950/80 border border-amber-500/40 px-3 py-1.5 rounded-xl">{hotelMekkah}</span>
                           </div>
                           <div className="flex items-center gap-2">
-                            <span className="font-semibold text-gray-700">🕌 Hotel Madinah:</span>
-                            <span className="text-gray-900 font-bold">{hotelMadinah}</span>
+                            <span className="font-bold text-amber-200/80">🕌 Hotel Madinah:</span>
+                            <span className="text-white font-extrabold bg-amber-950/80 border border-amber-500/40 px-3 py-1.5 rounded-xl">{hotelMadinah}</span>
                           </div>
                         </div>
                       )}
@@ -1819,11 +1815,11 @@ export default function RegisterPage() {
                         return (
                           <div className="space-y-4">
                             <div className="space-y-3">
-                              <div className="flex justify-between items-center">
-                                <label className="block text-xs font-bold text-gray-800 uppercase tracking-wider">
+                              <div className="flex justify-between items-center flex-wrap gap-2">
+                                <label className="block text-xs font-bold text-amber-200 uppercase tracking-wider">
                                   🛏️ Pilihan Upgrade Tipe Kamar ({paxCount} Jamaah)
                                 </label>
-                                <span className="text-[11px] text-gray-500 font-medium">
+                                <span className="text-[11px] text-amber-300 font-semibold drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
                                   {paxCount === 1
                                     ? "Tipe Kamar Tunggal: MIX (Travel)"
                                     : paxCount === 2
@@ -1841,18 +1837,18 @@ export default function RegisterPage() {
                                     type="button"
                                     onClick={() => setRoomUpgrade("quad")}
                                     className={cn(
-                                      "p-3 rounded-xl border-2 text-left transition-all flex flex-col justify-between gap-1.5",
+                                      "p-3.5 rounded-2xl border-2 text-left transition-all flex flex-col justify-between gap-1.5 shadow-md cursor-pointer",
                                       roomUpgrade === "quad"
-                                        ? "border-blue-600 bg-blue-50/80 ring-1 ring-blue-500 shadow-sm"
-                                        : "border-gray-200 bg-white hover:border-gray-300"
+                                        ? "border-amber-400 bg-amber-500 text-slate-950 shadow-xl ring-2 ring-amber-300 font-bold"
+                                        : "border-amber-500/30 bg-[#160D07]/80 text-white hover:border-amber-400 hover:bg-[#24150B]"
                                     )}
                                   >
                                     <div className="flex items-center justify-between">
-                                      <span className="font-bold text-xs text-gray-900">QUAD (4 Pax)</span>
-                                      {roomUpgrade === "quad" && <Check className="w-3.5 h-3.5 text-blue-600" />}
+                                      <span className="font-extrabold text-xs">QUAD (4 Pax)</span>
+                                      {roomUpgrade === "quad" && <Check className="w-4 h-4 text-slate-950 stroke-[3]" />}
                                     </div>
-                                    <p className="text-[11px] text-gray-500">4 orang per kamar</p>
-                                    <p className="text-xs font-bold text-emerald-700 mt-1">Base (+ Rp 0)</p>
+                                    <p className={cn("text-[11px]", roomUpgrade === "quad" ? "text-slate-900 font-bold" : "text-amber-200/70")}>4 orang per kamar</p>
+                                    <p className={cn("text-xs font-black mt-1", roomUpgrade === "quad" ? "text-slate-950" : "text-amber-400")}>Base (+ Rp 0)</p>
                                   </button>
                                 )}
 
@@ -1862,18 +1858,18 @@ export default function RegisterPage() {
                                     type="button"
                                     onClick={() => setRoomUpgrade("triple")}
                                     className={cn(
-                                      "p-3 rounded-xl border-2 text-left transition-all flex flex-col justify-between gap-1.5",
+                                      "p-3.5 rounded-2xl border-2 text-left transition-all flex flex-col justify-between gap-1.5 shadow-md cursor-pointer",
                                       roomUpgrade === "triple"
-                                        ? "border-blue-600 bg-blue-50/80 ring-1 ring-blue-500 shadow-sm"
-                                        : "border-gray-200 bg-white hover:border-gray-300"
+                                        ? "border-amber-400 bg-amber-500 text-slate-950 shadow-xl ring-2 ring-amber-300 font-bold"
+                                        : "border-amber-500/30 bg-[#160D07]/80 text-white hover:border-amber-400 hover:bg-[#24150B]"
                                     )}
                                   >
                                     <div className="flex items-center justify-between">
-                                      <span className="font-bold text-xs text-gray-900">TRIPLE (3 Pax)</span>
-                                      {roomUpgrade === "triple" && <Check className="w-3.5 h-3.5 text-blue-600" />}
+                                      <span className="font-extrabold text-xs">TRIPLE (3 Pax)</span>
+                                      {roomUpgrade === "triple" && <Check className="w-4 h-4 text-slate-950 stroke-[3]" />}
                                     </div>
-                                    <p className="text-[11px] text-gray-500">3 orang per kamar</p>
-                                    <p className="text-xs font-bold text-blue-700 mt-1">
+                                    <p className={cn("text-[11px]", roomUpgrade === "triple" ? "text-slate-900 font-bold" : "text-amber-200/70")}>3 orang per kamar</p>
+                                    <p className={cn("text-xs font-black mt-1", roomUpgrade === "triple" ? "text-slate-950" : "text-amber-400")}>
                                       + Rp {upgradeTriple.toLocaleString("id-ID")} / pax
                                     </p>
                                   </button>
@@ -1885,18 +1881,18 @@ export default function RegisterPage() {
                                     type="button"
                                     onClick={() => setRoomUpgrade("double")}
                                     className={cn(
-                                      "p-3 rounded-xl border-2 text-left transition-all flex flex-col justify-between gap-1.5",
+                                      "p-3.5 rounded-2xl border-2 text-left transition-all flex flex-col justify-between gap-1.5 shadow-md cursor-pointer",
                                       roomUpgrade === "double"
-                                        ? "border-blue-600 bg-blue-50/80 ring-1 ring-blue-500 shadow-sm"
-                                        : "border-gray-200 bg-white hover:border-gray-300"
+                                        ? "border-amber-400 bg-amber-500 text-slate-950 shadow-xl ring-2 ring-amber-300 font-bold"
+                                        : "border-amber-500/30 bg-[#160D07]/80 text-white hover:border-amber-400 hover:bg-[#24150B]"
                                     )}
                                   >
                                     <div className="flex items-center justify-between">
-                                      <span className="font-bold text-xs text-gray-900">DOUBLE (2 Pax)</span>
-                                      {roomUpgrade === "double" && <Check className="w-3.5 h-3.5 text-blue-600" />}
+                                      <span className="font-extrabold text-xs">DOUBLE (2 Pax)</span>
+                                      {roomUpgrade === "double" && <Check className="w-4 h-4 text-slate-950 stroke-[3]" />}
                                     </div>
-                                    <p className="text-[11px] text-gray-500">2 orang per kamar</p>
-                                    <p className="text-xs font-bold text-blue-700 mt-1">
+                                    <p className={cn("text-[11px]", roomUpgrade === "double" ? "text-slate-900 font-bold" : "text-amber-200/70")}>2 orang per kamar</p>
+                                    <p className={cn("text-xs font-black mt-1", roomUpgrade === "double" ? "text-slate-950" : "text-amber-400")}>
                                       + Rp {upgradeDouble.toLocaleString("id-ID")} / pax
                                     </p>
                                   </button>
@@ -1908,18 +1904,18 @@ export default function RegisterPage() {
                                     type="button"
                                     onClick={() => setRoomUpgrade("mix")}
                                     className={cn(
-                                      "p-3 rounded-xl border-2 text-left transition-all flex flex-col justify-between gap-1.5",
+                                      "p-3.5 rounded-2xl border-2 text-left transition-all flex flex-col justify-between gap-1.5 shadow-md cursor-pointer",
                                       roomUpgrade === "mix"
-                                        ? "border-blue-600 bg-blue-50/80 ring-1 ring-blue-500 shadow-sm"
-                                        : "border-gray-200 bg-white hover:border-gray-300"
+                                        ? "border-amber-400 bg-amber-500 text-slate-950 shadow-xl ring-2 ring-amber-300 font-bold"
+                                        : "border-amber-500/30 bg-[#160D07]/80 text-white hover:border-amber-400 hover:bg-[#24150B]"
                                     )}
                                   >
                                     <div className="flex items-center justify-between">
-                                      <span className="font-bold text-xs text-gray-900">MIX (Kamar Travel)</span>
-                                      {roomUpgrade === "mix" && <Check className="w-3.5 h-3.5 text-blue-600" />}
+                                      <span className="font-extrabold text-xs">MIX (Kamar Travel)</span>
+                                      {roomUpgrade === "mix" && <Check className="w-4 h-4 text-slate-950 stroke-[3]" />}
                                     </div>
-                                    <p className="text-[11px] text-gray-500">Diatur oleh travel</p>
-                                    <p className="text-xs font-bold text-emerald-700 mt-1">Base (+ Rp 0)</p>
+                                    <p className={cn("text-[11px]", roomUpgrade === "mix" ? "text-slate-900 font-bold" : "text-amber-200/70")}>Diatur oleh travel</p>
+                                    <p className={cn("text-xs font-black mt-1", roomUpgrade === "mix" ? "text-slate-950" : "text-amber-400")}>Base (+ Rp 0)</p>
                                   </button>
                                 )}
                               </div>
@@ -2028,22 +2024,22 @@ export default function RegisterPage() {
                               </div>
                             )}
 
-                            {/* Individual Member Room Placement Selector (For Multi-Member Groups) */}
+                            {/* Individual Member Room Placement Selector (For Multi-Member Groups) — Dark Bronze Glass */}
                             {paxCount >= 2 && (
-                              <div className="bg-white border border-blue-200/90 rounded-xl p-4 space-y-3 shadow-xs">
-                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-gray-100 pb-2.5">
+                              <div className="bg-[#160D07]/90 border border-amber-500/30 rounded-2xl p-4 space-y-3 shadow-inner text-white">
+                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-amber-500/20 pb-2.5">
                                   <div>
-                                    <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+                                    <h4 className="text-xs font-extrabold text-amber-200 uppercase tracking-wider flex items-center gap-1.5">
                                       <span>👤 Penentuan Tipe Kamar Per Jamaah ({members.length} Anggota)</span>
                                     </h4>
-                                    <p className="text-[11px] text-slate-500">
+                                    <p className="text-[11px] text-amber-200/70 font-semibold">
                                       Tentukan tipe kamar spesifik untuk masing-masing jamaah dalam rombongan.
                                     </p>
                                   </div>
                                   <button
                                     type="button"
                                     onClick={() => setIsCustomRoomAssignment(!isCustomRoomAssignment)}
-                                    className="text-[11px] font-bold text-blue-600 hover:text-blue-800 underline self-start sm:self-center shrink-0"
+                                    className="text-[11px] font-bold text-amber-400 hover:text-amber-300 underline self-start sm:self-center shrink-0 cursor-pointer"
                                   >
                                     {isCustomRoomAssignment ? "Ganti ke Mode Seragam" : "Atur Spesifik Per Jamaah"}
                                   </button>
@@ -2052,7 +2048,7 @@ export default function RegisterPage() {
                                 {isCustomRoomAssignment && (
                                   <div className="space-y-3 pt-1">
                                     <div className="flex items-center justify-between gap-2 text-[11px]">
-                                      <span className="font-semibold text-slate-700">Preset Cepat Kombinasi:</span>
+                                      <span className="font-semibold text-amber-200/80">Preset Cepat Kombinasi:</span>
                                       <div className="flex gap-2 flex-wrap">
                                         <button
                                           type="button"
@@ -2064,7 +2060,7 @@ export default function RegisterPage() {
                                               }))
                                             );
                                           }}
-                                          className="px-2 py-0.5 bg-blue-50 border border-blue-200 text-blue-800 rounded font-semibold text-[10px] hover:bg-blue-100"
+                                          className="px-2 py-0.5 bg-amber-500/20 border border-amber-400/40 text-amber-300 rounded-lg font-bold text-[10px] hover:bg-amber-500/30 cursor-pointer"
                                         >
                                           1 Double + Sisa Mix
                                         </button>
@@ -2079,7 +2075,7 @@ export default function RegisterPage() {
                                                 }))
                                               );
                                             }}
-                                            className="px-2 py-0.5 bg-indigo-50 border border-indigo-200 text-indigo-800 rounded font-semibold text-[10px] hover:bg-indigo-100"
+                                            className="px-2 py-0.5 bg-amber-500/20 border border-amber-400/40 text-amber-300 rounded-lg font-bold text-[10px] hover:bg-amber-500/30 cursor-pointer"
                                           >
                                             1 Double + 1 Triple + Sisa Mix
                                           </button>
@@ -2087,30 +2083,30 @@ export default function RegisterPage() {
                                       </div>
                                     </div>
 
-                                    <div className="divide-y divide-gray-100 border border-gray-200 rounded-lg overflow-hidden bg-slate-50/50">
+                                    <div className="divide-y divide-amber-500/20 border border-amber-500/30 rounded-xl overflow-hidden bg-[#100804]/90">
                                       {members.map((m, idx) => {
                                         const currentRoom = m.tipeKamar || roomUpgrade || "mix";
                                         const mAge = calculateAge(m.tanggalLahir);
                                         return (
                                           <div
                                             key={idx}
-                                            className="p-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2 hover:bg-white transition-colors"
+                                            className="p-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2 hover:bg-[#1B0F07] transition-colors"
                                           >
                                             <div className="flex items-center gap-2">
-                                              <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-800 font-bold text-[10px] flex items-center justify-center shrink-0">
+                                              <span className="w-5 h-5 rounded-full bg-amber-400 text-slate-950 font-black text-[10px] flex items-center justify-center shrink-0">
                                                 {idx + 1}
                                               </span>
                                               <div>
-                                                <span className="text-xs font-bold text-slate-900">
+                                                <span className="text-xs font-extrabold text-white">
                                                   {m.namaLengkap ? m.namaLengkap.toUpperCase() : `Jamaah #${idx + 1}`}
                                                 </span>
                                                 {mAge && (
-                                                  <span className="ml-1.5 text-[10px] font-semibold text-slate-500">
+                                                  <span className="ml-1.5 text-[10px] font-bold text-amber-200/80">
                                                     ({mAge.category})
                                                   </span>
                                                 )}
                                                 {idx === 0 && (
-                                                  <span className="ml-1.5 text-[9px] font-extrabold uppercase bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">
+                                                  <span className="ml-1.5 text-[9px] font-black uppercase bg-amber-400 text-slate-950 px-1.5 py-0.5 rounded">
                                                     PIC
                                                   </span>
                                                 )}
@@ -2126,14 +2122,14 @@ export default function RegisterPage() {
                                                     prev.map((item, i) => (i === idx ? { ...item, tipeKamar: val } : item))
                                                   );
                                                 }}
-                                                className="px-2.5 py-1.5 border border-stone-300 rounded-lg text-xs font-bold text-slate-950 bg-white focus:ring-2 focus:ring-emerald-600 focus:outline-none cursor-pointer"
+                                                className="px-2.5 py-1.5 border border-amber-500/40 rounded-lg text-xs font-bold text-white bg-slate-950 focus:ring-2 focus:ring-amber-400 focus:outline-none cursor-pointer"
                                               >
-                                                <option value="mix" className="text-slate-950 bg-white font-bold py-1.5">MIX (Kamar Travel - Base +Rp0)</option>
-                                                <option value="quad" className="text-slate-950 bg-white font-bold py-1.5">QUAD (4 Pax - Base +Rp0)</option>
-                                                <option value="triple" className="text-slate-950 bg-white font-bold py-1.5">
+                                                <option value="mix" className="text-white bg-slate-950 font-bold py-1.5">MIX (Kamar Travel - Base +Rp0)</option>
+                                                <option value="quad" className="text-white bg-slate-950 font-bold py-1.5">QUAD (4 Pax - Base +Rp0)</option>
+                                                <option value="triple" className="text-white bg-slate-950 font-bold py-1.5">
                                                   TRIPLE (3 Pax - +Rp {upgradeTriple.toLocaleString("id-ID")})
                                                 </option>
-                                                <option value="double" className="text-slate-950 bg-white font-bold py-1.5">
+                                                <option value="double" className="text-white bg-slate-950 font-bold py-1.5">
                                                   DOUBLE (2 Pax - +Rp {upgradeDouble.toLocaleString("id-ID")})
                                                 </option>
                                               </select>
@@ -2147,7 +2143,7 @@ export default function RegisterPage() {
                               </div>
                             )}
 
-                            {/* Pricing Summary Breakdown */}
+                            {/* Pricing Summary Breakdown — Dark Bronze Card */}
                             {(() => {
                               let totalSurcharge = 0;
                               if (isCustomRoomAssignment) {
@@ -2172,24 +2168,24 @@ export default function RegisterPage() {
                               const averagePerPax = Math.round(totalGroup / (paxCount || 1));
 
                               return (
-                                <div className="bg-slate-900 text-white rounded-xl p-4 space-y-2 text-xs shadow-inner">
-                                  <div className="flex justify-between items-center text-slate-300">
+                                <div className="bg-[#120A05]/95 border-2 border-amber-500/50 text-white rounded-2xl p-5 space-y-2.5 text-xs shadow-2xl">
+                                  <div className="flex justify-between items-center text-amber-200/80 font-medium">
                                     <span>Harga Base Paket ({isMultiCluster ? activeCluster?.clusterName : "Reguler"}):</span>
-                                    <span>Rp {basePrice.toLocaleString("id-ID")} / pax</span>
+                                    <span className="font-bold text-white">Rp {basePrice.toLocaleString("id-ID")} / pax</span>
                                   </div>
                                   {totalSurcharge > 0 && (
-                                    <div className="flex justify-between items-center text-amber-300 font-medium">
+                                    <div className="flex justify-between items-center text-amber-300 font-bold">
                                       <span>Total Upgrade Kamar Rombongan:</span>
                                       <span>+ Rp {totalSurcharge.toLocaleString("id-ID")}</span>
                                     </div>
                                   )}
-                                  <div className="flex justify-between items-center text-slate-200 font-semibold pt-1 border-t border-slate-700">
+                                  <div className="flex justify-between items-center text-amber-100 font-bold pt-2 border-t border-amber-500/20">
                                     <span>Rata-Rata Total per Pax:</span>
                                     <span>Rp {averagePerPax.toLocaleString("id-ID")} / pax</span>
                                   </div>
-                                  <div className="flex justify-between items-center text-sm font-extrabold text-blue-400 pt-1.5 border-t border-slate-700">
-                                    <span>Total Registrasi Rombongan ({paxCount} PAX):</span>
-                                    <span className="text-base text-emerald-400">
+                                  <div className="flex justify-between items-center text-sm font-extrabold text-white pt-2 border-t border-amber-500/30">
+                                    <span className="text-amber-200">Total Registrasi Rombongan ({paxCount} PAX):</span>
+                                    <span className="text-lg font-black text-amber-400 drop-shadow-[0_1.5px_3px_rgba(0,0,0,0.9)]">
                                       Rp {totalGroup.toLocaleString("id-ID")}
                                     </span>
                                   </div>
