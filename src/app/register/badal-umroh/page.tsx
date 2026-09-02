@@ -511,14 +511,14 @@ export default function BadalUmrohRegisterPage() {
         </div>
 
       {/* ── Step Indicator ── */}
-      <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-md p-4 sm:p-5 rounded-2xl border-t border-l border-white/90 border-b border-r border-slate-900/20 shadow-[inset_1px_1px_2px_rgba(255,255,255,0.9),0_15px_30px_-10px_rgba(0,0,0,0.15)] mb-6 overflow-x-auto">
+      <div className="bg-[#061e17]/40 dark:bg-[#061e17]/40 backdrop-blur-md p-4 sm:p-5 rounded-2xl border border-emerald-500/30 shadow-[inset_0_1px_1px_rgba(255,255,255,0.15),0_15px_30px_-10px_rgba(0,0,0,0.3)] mb-6 overflow-x-auto">
         <div className="relative flex items-start justify-between min-w-[320px] max-w-2xl mx-auto">
           {/* Base Background Connecting Track */}
-          <div className="absolute top-[18px] left-[12.5%] right-[12.5%] h-0.5 bg-stone-300 dark:bg-stone-700 z-0" />
+          <div className="absolute top-[18px] left-[12.5%] right-[12.5%] h-0.5 bg-emerald-800/60 dark:bg-emerald-800/60 z-0" />
           
           {/* Active Progress Filled Track */}
           <div
-            className="absolute top-[18px] left-[12.5%] h-0.5 bg-emerald-600 transition-all duration-300 z-0"
+            className="absolute top-[18px] left-[12.5%] h-0.5 bg-emerald-500 transition-all duration-300 z-0"
             style={{
               width: `${((step - 1) / (steps.length - 1)) * 75}%`,
             }}
@@ -535,9 +535,9 @@ export default function BadalUmrohRegisterPage() {
                 <div
                   className={cn(
                     "w-9 h-9 rounded-full flex items-center justify-center text-xs font-extrabold transition-all duration-200 shadow-sm",
-                    isCurrent && "bg-gradient-to-tr from-emerald-800 to-teal-600 text-white shadow-md ring-4 ring-emerald-500/30 scale-110 border border-white",
+                    isCurrent && "bg-gradient-to-tr from-emerald-700 to-teal-500 text-white shadow-md ring-4 ring-emerald-500/30 scale-110 border border-white",
                     isCompleted && "bg-emerald-800 text-white border border-emerald-600 shadow-sm",
-                    !isCurrent && !isCompleted && "bg-white text-slate-700 border border-stone-300 shadow-xs"
+                    !isCurrent && !isCompleted && "bg-emerald-950/80 text-emerald-200/80 border border-emerald-700/60 shadow-xs"
                   )}
                 >
                   {isCompleted ? <Check className="w-4 h-4 text-white stroke-[2.5]" /> : <Icon className="w-4 h-4" />}
@@ -546,10 +546,10 @@ export default function BadalUmrohRegisterPage() {
                   className={cn(
                     "text-[10.5px] sm:text-xs font-bold mt-2 whitespace-nowrap text-center transition-colors",
                     isCurrent
-                      ? "text-emerald-950 font-black drop-shadow-[0_1px_1px_rgba(255,255,255,0.9)]"
+                      ? "text-white font-black drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]"
                       : isCompleted
-                      ? "text-emerald-800 font-extrabold"
-                      : "text-slate-700 font-semibold"
+                      ? "text-emerald-300 font-bold drop-shadow-[0_1px_1px_rgba(0,0,0,0.6)]"
+                      : "text-stone-300/80 font-medium drop-shadow-[0_1px_1px_rgba(0,0,0,0.6)]"
                   )}
                 >
                   {s.label}
