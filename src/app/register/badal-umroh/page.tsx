@@ -80,13 +80,7 @@ export default function BadalUmrohRegisterPage() {
   const [canSubmitStep5, setCanSubmitStep5] = useState(false);
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
   const [metodePembayaranOption, setMetodePembayaranOption] = useState<"sekarang" | "nanti">("sekarang");
-  const [rekeningList, setRekeningList] = useState<any[]>([
-    {
-      namaBank: "Bank Mandiri (IDR)",
-      nomorRekening: "142-00-1234567-8",
-      atasNama: "PT VAUZA TIGA UTAMA",
-    },
-  ]);
+  const [rekeningList, setRekeningList] = useState<any[]>([]);
   const [copiedRekening, setCopiedRekening] = useState<string | null>(null);
 
   // State Pilihan Status Kejamaahan & Verifikasi Paspor

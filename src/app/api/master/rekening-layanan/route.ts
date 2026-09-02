@@ -7,20 +7,20 @@ export const dynamic = "force-dynamic";
 
 const DEFAULT_REKENING = [
   {
-    tipeLayanan: "BADAL_WAKAF",
-    namaBank: "Bank Syariah Indonesia (BSI)",
-    nomorRekening: "721 888 9991",
+    tipeLayanan: "BADAL_UMROH",
+    namaBank: "Bank Mandiri (IDR)",
+    nomorRekening: "142-00-1234567-8",
     atasNama: "PT VAUZA TIGA UTAMA",
-    keterangan: "Rekening Resmi Operasional Badal & Wakaf",
+    keterangan: "Rekening Khusus Badal Umroh Amanah",
     isActive: true,
     urutan: 1,
   },
   {
-    tipeLayanan: "BADAL_WAKAF",
+    tipeLayanan: "WAKAF_QURAN",
     namaBank: "Bank Mandiri",
     nomorRekening: "142 00 9988 7766",
     atasNama: "PT VAUZA TIGA UTAMA",
-    keterangan: "Rekening Resmi Operasional Badal & Wakaf",
+    keterangan: "Rekening Operasional Wakaf Al-Qur'an",
     isActive: true,
     urutan: 2,
   },

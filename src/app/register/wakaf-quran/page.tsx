@@ -81,18 +81,7 @@ export default function WakafQuranRegisterPage() {
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
   const [metodePembayaranOption, setMetodePembayaranOption] = useState<"sekarang" | "nanti">("sekarang");
   const [activePaketList, setActivePaketList] = useState<string[]>([]);
-  const [rekeningList, setRekeningList] = useState<any[]>([
-    {
-      namaBank: "Bank Syariah Indonesia (BSI)",
-      nomorRekening: "721 888 9991",
-      atasNama: "PT VAUZA TIGA UTAMA",
-    },
-    {
-      namaBank: "Bank Mandiri",
-      nomorRekening: "142 00 9988 7766",
-      atasNama: "PT VAUZA TIGA UTAMA",
-    },
-  ]);
+  const [rekeningList, setRekeningList] = useState<any[]>([]);
   const [copiedRekening, setCopiedRekening] = useState<string | null>(null);
 
   // State Pilihan Status Kejamaahan & Verifikasi Paspor
