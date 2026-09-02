@@ -209,10 +209,37 @@ export default function UserManagementPage() {
     }
   };
 
+  const [resendingId, setResendingId] = useState<string | null>(null);
+
   const handleCopyLink = (url: string) => {
     navigator.clipboard.writeText(url);
     setCopiedToken(true);
     setTimeout(() => setCopiedToken(false), 2500);
+  };
+
+  const handleResendInvite = async (user: UserItem) => {
+    try {
+      setResendingId(user.id);
+      const res = await fetch(`/api/admin/users/${user.id}/resend-invite`, {
+        method: "POST",
+      });
+      const json = await res.json();
+      if (!json.success) throw new Error(json.message);
+
+      // Open created invite dialog so Super Admin gets fresh link
+      setCreatedInvite({
+        name: user.name,
+        email: user.email,
+        role: ROLE_LABELS[user.role] || user.role,
+        inviteUrl: json.inviteUrl,
+      });
+
+      fetchUsers();
+    } catch (err: any) {
+      alert(err.message || "Gagal mengirim ulang undangan.");
+    } finally {
+      setResendingId(null);
+    }
   };
 
   const handleCreateRole = async (e: React.FormEvent) => {
@@ -448,17 +475,36 @@ export default function UserManagementPage() {
                             </td>
                             <td className="px-4 py-3 text-center">
                               <div className="flex items-center justify-center gap-1.5">
-                                {user.isInvitePending && inviteUrl && (
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="h-7 text-[10.5px] font-bold border-amber-500/40 text-amber-700 dark:text-amber-300 hover:bg-amber-500/10 gap-1"
-                                    onClick={() => handleCopyLink(inviteUrl)}
-                                    title="Salin Link Undangan ke Clipboard"
-                                  >
-                                    <Copy className="w-3 h-3" />
-                                    Salin Link
-                                  </Button>
+                                {user.isInvitePending && (
+                                  <>
+                                    {inviteUrl && (
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="h-7 text-[10.5px] font-bold border-amber-500/40 text-amber-700 dark:text-amber-300 hover:bg-amber-500/10 gap-1"
+                                        onClick={() => handleCopyLink(inviteUrl)}
+                                        title="Salin Link Undangan ke Clipboard"
+                                      >
+                                        <Copy className="w-3 h-3" />
+                                        Salin Link
+                                      </Button>
+                                    )}
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="h-7 text-[10.5px] font-bold border-purple-500/40 text-purple-700 dark:text-purple-300 hover:bg-purple-500/10 gap-1"
+                                      onClick={() => handleResendInvite(user)}
+                                      disabled={resendingId === user.id}
+                                      title="Kirim Ulang Email & Perbarui Link Undangan"
+                                    >
+                                      {resendingId === user.id ? (
+                                        <Loader2 className="w-3 h-3 animate-spin" />
+                                      ) : (
+                                        <Send className="w-3 h-3 text-purple-600" />
+                                      )}
+                                      Kirim Ulang
+                                    </Button>
+                                  </>
                                 )}
                                 <Button
                                   size="sm"
