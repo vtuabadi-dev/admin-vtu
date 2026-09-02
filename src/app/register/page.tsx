@@ -1206,16 +1206,16 @@ export default function RegisterPage() {
               </div>
             )}
 
-            {/* Single Checkbox */}
+            {/* Single Checkbox Agreement — High Contrast Dark Emerald Glass */}
             <div className="pt-2">
               <label
                 className={cn(
-                  "flex items-start gap-3 p-4 rounded-xl border transition-all cursor-pointer select-none",
+                  "flex items-start gap-3.5 p-4 sm:p-5 rounded-2xl border-2 transition-all cursor-pointer select-none backdrop-blur-xl shadow-xl",
                   !hasScrolledToBottom
-                    ? "bg-gray-50 border-gray-200 opacity-60 cursor-not-allowed"
+                    ? "bg-slate-900/50 border-slate-800 opacity-50 cursor-not-allowed text-slate-400"
                     : termsAccepted
-                      ? "bg-blue-50/90 border-blue-300 text-blue-950 shadow-sm"
-                      : "bg-white border-gray-300 hover:border-gray-400"
+                      ? "bg-emerald-950/95 border-emerald-400 text-white shadow-2xl ring-2 ring-emerald-400/40"
+                      : "bg-slate-900/90 border-emerald-500/40 hover:border-emerald-400 text-white"
                 )}
               >
                 <input
@@ -1223,13 +1223,19 @@ export default function RegisterPage() {
                   checked={termsAccepted}
                   disabled={!hasScrolledToBottom}
                   onChange={(e) => setTermsAccepted(e.target.checked)}
-                  className="mt-0.5 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 disabled:cursor-not-allowed shrink-0"
+                  className="mt-1 h-5 w-5 rounded border-amber-400/60 text-amber-500 focus:ring-amber-400 disabled:cursor-not-allowed shrink-0 cursor-pointer accent-amber-500"
                 />
-                <div className="text-sm">
-                  <span className="font-semibold text-gray-900">
-                    Saya telah membaca, memahami, dan menyetujui seluruh Syarat & Ketentuan Umroh di atas.
+                <div className="text-sm space-y-1">
+                  <span className={cn(
+                    "block font-extrabold text-sm sm:text-base leading-snug drop-shadow-[0_1.5px_3px_rgba(0,0,0,0.95)]",
+                    termsAccepted ? "text-white" : "text-emerald-100"
+                  )}>
+                    Saya telah membaca, memahami, dan menyetujui seluruh Syarat &amp; Ketentuan Umroh di atas.
                   </span>
-                  <p className="text-xs text-gray-500 mt-1">
+                  <p className={cn(
+                    "text-xs leading-relaxed font-semibold drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]",
+                    termsAccepted ? "text-amber-300" : "text-emerald-200/80"
+                  )}>
                     Persetujuan ini mencakup klausul pendaftaran, kebijakan pembayaran, pembatalan, dan pengolahan data pribadi.
                   </p>
                 </div>
