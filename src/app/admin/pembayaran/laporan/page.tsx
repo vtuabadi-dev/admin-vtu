@@ -1171,6 +1171,13 @@ function PaymentReviewTabContent() {
     groupTotalTagihanDisesuaikan - (groupTotalBayar + (selectedPayment?.status === "verified" ? 0 : formNominal))
   );
 
+  const paymentHistoryList =
+    selectedPayment?.group?.pembayaran && selectedPayment.group.pembayaran.length > 0
+      ? selectedPayment.group.pembayaran
+      : selectedPayment
+      ? [selectedPayment]
+      : [];
+
   return (
     <div className="space-y-4">
       {/* Top Filter & Search Bar */}
@@ -2012,6 +2019,85 @@ function PaymentReviewTabContent() {
                   )}
                 </div>
 
+                {/* 3.8. Tabel Rincian Pembayaran (Di Atas Kalkulasi Tagihan Group) */}
+                <div className="p-3 bg-muted/30 rounded-xl border border-emerald-500/30 dark:border-emerald-500/20 shadow-2xs space-y-2.5 text-xs">
+                  <div className="flex items-center justify-between border-b pb-2">
+                    <div className="flex items-center gap-1.5">
+                      <div className="p-1 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-md">
+                        <Receipt className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-foreground text-xs">Tabel Rincian Pembayaran</h4>
+                        <p className="text-[10px] text-muted-foreground">
+                          Daftar riwayat transaksi pembayaran yang telah masuk untuk grup / jamaah ini.
+                        </p>
+                      </div>
+                    </div>
+                    <Badge variant="outline" className="text-[10.5px] font-mono font-bold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800">
+                      Total Masuk: {formatCurrency(groupTotalBayar || selectedPayment?.jumlah || 0)}
+                    </Badge>
+                  </div>
+
+                  {/* Payment History Table */}
+                  {paymentHistoryList.length > 0 ? (
+                    <div className="overflow-x-auto rounded-lg border bg-background max-h-48 overflow-y-auto">
+                      <table className="w-full text-left text-[11px]">
+                        <thead>
+                          <tr className="border-b bg-muted/60 text-muted-foreground font-bold uppercase tracking-wider text-[10px] sticky top-0 bg-muted/90 backdrop-blur-xs">
+                            <th className="py-2 px-2.5 text-center w-8">#</th>
+                            <th className="py-2 px-2.5">Tanggal</th>
+                            <th className="py-2 px-2.5">Tahap / Jenis</th>
+                            <th className="py-2 px-2.5">Metode &amp; Bank</th>
+                            <th className="py-2 px-2.5 text-right">Nominal</th>
+                            <th className="py-2 px-2.5 text-center">Status</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y text-xs font-medium">
+                          {paymentHistoryList.map((p: any, idx: number) => {
+                            const isCurrent = p.id === selectedPayment.id;
+                            return (
+                              <tr
+                                key={p.id || idx}
+                                className={isCurrent ? "bg-amber-500/10 font-bold" : "hover:bg-muted/30"}
+                              >
+                                <td className="py-2 px-2.5 text-center text-muted-foreground font-mono">{idx + 1}</td>
+                                <td className="py-2 px-2.5 font-semibold text-foreground whitespace-nowrap">
+                                  {p.tanggal ? formatDate(p.tanggal) : "-"}
+                                </td>
+                                <td className="py-2 px-2.5 font-bold text-slate-800 dark:text-slate-200">
+                                  {p.jenisPembayaran || p.tahap || "Pembayaran"}
+                                </td>
+                                <td className="py-2 px-2.5 text-muted-foreground whitespace-nowrap">
+                                  <span className="font-semibold text-foreground uppercase">
+                                    {p.bankPengirim ? `Transfer ${p.bankPengirim}` : p.metode || "Transfer"}
+                                  </span>
+                                  {p.noRekening ? <span className="font-mono text-[10px] block text-stone-500">({p.noRekening})</span> : null}
+                                </td>
+                                <td className="py-2 px-2.5 text-right font-extrabold font-mono text-emerald-700 dark:text-emerald-400 whitespace-nowrap">
+                                  {formatCurrency(p.jumlah || 0)}
+                                </td>
+                                <td className="py-2 px-2.5 text-center whitespace-nowrap">
+                                  {p.status === "verified" ? (
+                                    <Badge variant="success" className="text-[9.5px] px-1.5 py-0">Verified</Badge>
+                                  ) : p.status === "rejected" ? (
+                                    <Badge variant="destructive" className="text-[9.5px] px-1.5 py-0">Ditolak</Badge>
+                                  ) : (
+                                    <Badge variant="warning" className="text-[9.5px] px-1.5 py-0">Pending</Badge>
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <div className="p-3 text-center text-muted-foreground text-[11px] border border-dashed rounded-lg bg-muted/20">
+                      Belum ada riwayat pembayaran yang tercatat sebelumnya.
+                    </div>
+                  )}
+                </div>
+
                 {/* 4. Ringkasan Keuangan Group */}
                 <div className="p-3 bg-muted/60 rounded-lg border space-y-1.5 text-[11px]">
                   <p className="font-bold text-foreground text-xs border-b pb-1">Kalkulasi Tagihan Group</p>
@@ -2056,43 +2142,6 @@ function PaymentReviewTabContent() {
                     </span>
                   </div>
                 </div>
-
-                {/* 4.5. Riwayat Pembayaran Masuk (Payment History) */}
-                {selectedPayment.group?.pembayaran && selectedPayment.group.pembayaran.length > 0 && (
-                  <div className="p-3 bg-muted/40 rounded-xl border space-y-2 text-xs">
-                    <div className="flex items-center justify-between border-b pb-1">
-                      <span className="font-bold text-foreground flex items-center gap-1.5">
-                        <Receipt className="w-3.5 h-3.5 text-emerald-600" />
-                        Riwayat Pembayaran Group ({selectedPayment.group.pembayaran.length})
-                      </span>
-                      <span className="text-[10px] font-mono text-muted-foreground font-semibold">
-                        Total Terbayar: {formatCurrency(groupTotalBayar)}
-                      </span>
-                    </div>
-
-                    <div className="space-y-1 max-h-32 overflow-y-auto">
-                      {selectedPayment.group.pembayaran.map((p: any, idx: number) => (
-                        <div
-                          key={p.id || idx}
-                          className="flex items-center justify-between p-1.5 bg-background rounded border text-[11px]"
-                        >
-                          <div className="flex items-center gap-2">
-                            <span className="text-[10px] text-muted-foreground font-mono">#{idx + 1}</span>
-                            <span className="font-medium text-foreground">
-                              {p.tanggal ? new Date(p.tanggal).toLocaleDateString("id-ID") : "-"}
-                            </span>
-                            <span className="text-[10px] text-muted-foreground uppercase">
-                              {p.bankPengirim ? `TF ${p.bankPengirim}` : p.metode || "Transfer"}
-                            </span>
-                          </div>
-                          <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">
-                            {formatCurrency(p.jumlah)}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
 
                 {/* 5. Action Buttons di Form Invoice */}
                 <div className="pt-2 border-t flex flex-col gap-2">
