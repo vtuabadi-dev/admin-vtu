@@ -2,6 +2,7 @@
 
 import { prisma } from "@/server/db/client";
 import { packageService } from "@/server/services/package.service";
+import { groupRepo, pembayaranRepo } from "@/server/repositories";
 
 
 // ==========================================
@@ -339,28 +340,56 @@ export async function getReminderList() {
   return []; // Mock return for now
 }
 
-export async function getGroupPaymentSummary(_groupId: string) {
-  return null as any;
+export async function getGroupPaymentSummary(groupId: string) {
+  try {
+    return await groupRepo.getPaymentSummary(groupId);
+  } catch (err) {
+    console.error("getGroupPaymentSummary error:", err);
+    return null;
+  }
 }
 
-export async function addPembayaran(_data: any) {
-  return null as any;
+export async function addPembayaran(data: any) {
+  try {
+    return await pembayaranRepo.create({
+      ...data,
+      status: data.status || "verified",
+    });
+  } catch (err) {
+    console.error("addPembayaran error:", err);
+    throw err;
+  }
 }
 
 export async function cancelInvoiceItem(_invoiceId: string, _itemId: string, _reason: string, _user: string) {
   return null as any;
 }
 
-export async function getGroupByKode(_kode: string) {
-  return null as any;
+export async function getGroupByKode(kode: string) {
+  try {
+    return await groupRepo.findByKode(kode);
+  } catch (err) {
+    console.error("getGroupByKode error:", err);
+    return null;
+  }
 }
 
-export async function fetchInvoiceSplitConfig(_groupId: string) {
-  return null as any;
+export async function fetchInvoiceSplitConfig(groupId: string) {
+  try {
+    return await groupRepo.getInvoiceSplitConfig(groupId);
+  } catch (err) {
+    console.error("fetchInvoiceSplitConfig error:", err);
+    return null;
+  }
 }
 
-export async function saveInvoiceSplitConfig(_groupId: string, _data: any) {
-  return null as any;
+export async function saveInvoiceSplitConfig(groupId: string, data: any) {
+  try {
+    return await groupRepo.saveInvoiceSplitConfig(groupId, data.splits || data);
+  } catch (err) {
+    console.error("saveInvoiceSplitConfig error:", err);
+    throw err;
+  }
 }
 
 export async function getDashboardData() {

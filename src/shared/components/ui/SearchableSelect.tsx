@@ -22,6 +22,7 @@ export interface SearchableSelectProps {
   id?: string;
   nextFocusId?: string;
   allowCustomText?: boolean;
+  maxHeight?: string;
 }
 
 export function SearchableSelect({
@@ -35,6 +36,7 @@ export function SearchableSelect({
   id,
   nextFocusId,
   allowCustomText = false,
+  maxHeight = "max-h-[400px]",
 }: SearchableSelectProps) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -231,8 +233,8 @@ export function SearchableSelect({
 
       {/* Popover Options List */}
       {open && (
-        <div className="absolute z-50 mt-1 max-h-60 w-full overflow-hidden rounded-xl border border-stone-200 bg-white text-slate-900 shadow-2xl animate-in fade-in-0 zoom-in-95">
-          <div ref={listRef} className="max-h-56 overflow-y-auto p-1.5 space-y-1">
+        <div className="absolute z-50 mt-1 w-full overflow-hidden rounded-xl border border-stone-200 bg-white text-slate-900 shadow-2xl animate-in fade-in-0 zoom-in-95">
+          <div ref={listRef} className={cn("overflow-y-auto p-1.5 space-y-1", maxHeight)}>
             {filteredOptions.length === 0 ? (
               <div className="py-4 text-center text-xs font-medium text-stone-500">
                 Tidak ada data yang cocok dengan &quot;{query}&quot;

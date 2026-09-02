@@ -122,14 +122,88 @@ export const groupRepo = {
   },
 
   async findByKode(kodeRegistrasi: string) {
-    const row = await prisma.registrationGroup.findUnique({
-      where: { kodeRegistrasi },
+    const trimmed = kodeRegistrasi.trim();
+    const numMatch = trimmed.match(/\d+$/);
+    const numSuffix = numMatch ? String(parseInt(numMatch[0], 10)).padStart(3, "0") : null;
+
+    const row: any = await prisma.registrationGroup.findFirst({
+      where: {
+        OR: [
+          { kodeRegistrasi: trimmed },
+          { kodeRegistrasi: { equals: trimmed, mode: "insensitive" as const } },
+          { id: trimmed },
+          { kodeRegistrasi: { contains: trimmed, mode: "insensitive" as const } },
+          ...(numSuffix
+            ? [
+                { kodeRegistrasi: { contains: numSuffix, mode: "insensitive" as const } },
+                { id: { contains: numSuffix, mode: "insensitive" as const } },
+              ]
+            : []),
+        ],
+      },
       include: {
         anggota: true,
-        registrationRequests: { select: { hotelUpgrade: true, roomUpgrade: true } },
+        keberangkatan: { include: { paketUmroh: true } },
+        registrationRequests: { select: { hotelUpgrade: true, roomUpgrade: true, nomorTelepon: true, emailPerwakilan: true } },
+        ketuaGroup: true,
       },
     });
-    return row ? mapGroup(row) : null;
+
+    if (row) return mapGroup(row);
+
+    // Fallback search in RegistrationRequest
+    const req: any = await prisma.registrationRequest.findFirst({
+      where: {
+        OR: [
+          { kodeRegistrasi: trimmed },
+          { kodeRegistrasi: { equals: trimmed, mode: "insensitive" as const } },
+          { id: trimmed },
+          { kodeRegistrasi: { contains: trimmed, mode: "insensitive" as const } },
+          ...(numSuffix ? [{ kodeRegistrasi: { contains: numSuffix, mode: "insensitive" as const } }] : []),
+        ],
+      },
+      include: {
+        keberangkatan: { include: { paketUmroh: true } },
+        members: true,
+        group: {
+          include: {
+            anggota: true,
+            keberangkatan: { include: { paketUmroh: true } },
+            ketuaGroup: true,
+          },
+        },
+      },
+    });
+
+    if (req) {
+      if (req.group) {
+        return mapGroup(req.group);
+      }
+      return {
+        id: req.id,
+        kodeRegistrasi: req.kodeRegistrasi,
+        namaGroup: `Group ${req.namaPerwakilan}`,
+        ketuaGroupId: req.members[0]?.id || "",
+        paketKeberangkatanId: req.paketId,
+        jumlahAnggota: req.paxCount,
+        totalTagihan: (req.keberangkatan?.hargaPaket ?? 0) * req.paxCount,
+        totalPembayaran: 0,
+        sisaPembayaran: (req.keberangkatan?.hargaPaket ?? 0) * req.paxCount,
+        status: "active",
+        hotelUpgrade: req.hotelUpgrade || undefined,
+        roomUpgrade: req.roomUpgrade || undefined,
+        anggotaIds: req.members ? req.members.map((m: any) => m.id) : [],
+        createdAt: req.createdAt ? req.createdAt.toISOString() : new Date().toISOString(),
+        updatedAt: req.updatedAt ? req.updatedAt.toISOString() : new Date().toISOString(),
+        kontakNama: req.namaPerwakilan,
+        kontakHp: req.nomorTelepon,
+        paketKeberangkatan: req.keberangkatan
+          ? { tanggalBerangkat: req.keberangkatan.tanggalBerangkat?.toISOString() }
+          : undefined,
+      } as any;
+    }
+
+    return null;
   },
 
   async create(data: Omit<RegistrationGroup, "id" | "createdAt" | "updatedAt">) {
@@ -160,14 +234,103 @@ export const groupRepo = {
   },
 
   async getPaymentSummary(groupId: string): Promise<GroupPaymentSummary | null> {
-    const row = await prisma.registrationGroup.findUnique({
-      where: { id: groupId },
+    const trimmed = groupId.trim();
+    const numMatch = trimmed.match(/\d+$/);
+    const numSuffix = numMatch ? String(parseInt(numMatch[0], 10)).padStart(3, "0") : null;
+
+    let row: any = await prisma.registrationGroup.findFirst({
+      where: {
+        OR: [
+          { id: trimmed },
+          { kodeRegistrasi: trimmed },
+          { kodeRegistrasi: { equals: trimmed, mode: "insensitive" as const } },
+          { kodeRegistrasi: { contains: trimmed, mode: "insensitive" as const } },
+          ...(numSuffix
+            ? [
+                { kodeRegistrasi: { contains: numSuffix, mode: "insensitive" as const } },
+                { id: { contains: numSuffix, mode: "insensitive" as const } },
+              ]
+            : []),
+        ],
+      },
       include: {
         anggota: { include: { dokumen: true } },
         pembayaran: { include: { alokasi: true } },
         invoices: { include: { items: true } },
       },
     });
+
+    if (!row) {
+      const req: any = await prisma.registrationRequest.findFirst({
+        where: {
+          OR: [
+            { id: trimmed },
+            { kodeRegistrasi: trimmed },
+            { kodeRegistrasi: { equals: trimmed, mode: "insensitive" as const } },
+            { kodeRegistrasi: { contains: trimmed, mode: "insensitive" as const } },
+            ...(numSuffix ? [{ kodeRegistrasi: { contains: numSuffix, mode: "insensitive" as const } }] : []),
+          ],
+        },
+        include: {
+          group: {
+            include: {
+              anggota: { include: { dokumen: true } },
+              pembayaran: { include: { alokasi: true } },
+              invoices: { include: { items: true } },
+            },
+          },
+          members: true,
+          keberangkatan: true,
+        },
+      });
+
+      if (req?.group) {
+        row = req.group;
+      } else if (req) {
+        const totalHarga = (req.keberangkatan?.hargaPaket ?? 0) * req.paxCount;
+        return {
+          groupId: req.id,
+          kodeRegistrasi: req.kodeRegistrasi,
+          namaGroup: `Group ${req.namaPerwakilan}`,
+          totalTagihan: totalHarga,
+          totalPembayaran: 0,
+          sisaPembayaran: totalHarga,
+          status: "dp",
+          jumlahAnggota: req.paxCount,
+          anggota: req.members.map((m: any) => ({
+            id: m.id,
+            registrationId: req.id,
+            groupId: req.id,
+            nomorPeserta: `PST-${m.id.slice(-6).toUpperCase()}`,
+            namaLengkap: m.namaLengkap,
+            namaAyah: m.namaAyah || "",
+            jenisKelamin: m.jenisKelamin,
+            tempatLahir: m.tempatLahir || "Jakarta",
+            tanggalLahir: m.tanggalLahir ? (typeof m.tanggalLahir === "string" ? m.tanggalLahir : m.tanggalLahir.toISOString()) : new Date().toISOString(),
+            nik: m.nik || "",
+            nomorPaspor: m.nomorPaspor || "-",
+            masaBerlakuPaspor: m.masaBerlakuPaspor ? (typeof m.masaBerlakuPaspor === "string" ? m.masaBerlakuPaspor : m.masaBerlakuPaspor.toISOString()) : new Date().toISOString(),
+            nomorTelepon: req.nomorTelepon,
+            email: req.emailPerwakilan,
+            alamat: "",
+            provinsi: "",
+            kota: "",
+            kecamatan: "",
+            kelurahan: "",
+            status: "registered",
+            hotelMekkah: "Hotel Setaraf Bintang 5",
+            hotelMadinah: "Hotel Setaraf Bintang 4",
+            syaratDisetujui: true,
+            dokumen: [],
+            createdAt: m.createdAt ? (typeof m.createdAt === "string" ? m.createdAt : m.createdAt.toISOString()) : new Date().toISOString(),
+            updatedAt: m.updatedAt ? (typeof m.updatedAt === "string" ? m.updatedAt : m.updatedAt.toISOString()) : new Date().toISOString(),
+          })),
+          pembayaran: [],
+          invoices: [],
+        };
+      }
+    }
+
     if (!row) return null;
 
     return {

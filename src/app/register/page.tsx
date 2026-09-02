@@ -1643,6 +1643,7 @@ export default function RegisterPage() {
                     }}
                     placeholder="-- Pilih / Cari Nama Paket Umroh --"
                     searchPlaceholder="Ketik nama paket, tanggal, atau maskapai..."
+                    maxHeight="max-h-[420px]"
                     className={cn(
                       "w-full rounded-xl shadow-xs",
                       errors.paket && "border-red-500 ring-1 ring-red-500"
@@ -2205,24 +2206,24 @@ export default function RegisterPage() {
 
         {/* Step 6: Signature */}
         {step === 6 && (
-          <div className="space-y-4">
+          <div className="space-y-5">
             <div>
-              <h2 className="text-lg font-black text-slate-950">Tanda Tangan Digital</h2>
-              <p className="text-sm font-semibold text-slate-800">
+              <h2 className="text-lg font-black text-white drop-shadow-[0_1.5px_3px_rgba(0,0,0,0.9)]">Tanda Tangan Digital</h2>
+              <p className="text-sm font-bold text-emerald-200/90 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
                 Goreskan tanda tangan langsung di layar ponsel/laptop Anda, atau unggah foto tanda tangan PIC pada kertas putih.
               </p>
             </div>
 
             {/* Mode Selector Tabs */}
-            <div className="flex gap-2 p-1 bg-white/30 backdrop-blur-md rounded-xl border border-white/60 max-w-sm">
+            <div className="flex gap-2 p-1.5 bg-emerald-950/80 backdrop-blur-xl rounded-xl border border-emerald-500/40 max-w-sm">
               <button
                 type="button"
                 onClick={() => setSignatureMode("draw")}
                 className={cn(
-                  "flex-1 py-2 px-3 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5",
+                  "flex-1 py-2 px-3 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer",
                   signatureMode === "draw"
-                    ? "bg-emerald-800 text-white shadow-sm"
-                    : "text-slate-700 hover:bg-white/40"
+                    ? "bg-amber-400 text-slate-950 font-black shadow-md"
+                    : "text-emerald-200/80 hover:text-white hover:bg-emerald-900/60"
                 )}
               >
                 <PenTool className="w-3.5 h-3.5" />
@@ -2232,10 +2233,10 @@ export default function RegisterPage() {
                 type="button"
                 onClick={() => setSignatureMode("upload")}
                 className={cn(
-                  "flex-1 py-2 px-3 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5",
+                  "flex-1 py-2 px-3 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer",
                   signatureMode === "upload"
-                    ? "bg-emerald-800 text-white shadow-sm"
-                    : "text-slate-700 hover:bg-white/40"
+                    ? "bg-amber-400 text-slate-950 font-black shadow-md"
+                    : "text-emerald-200/80 hover:text-white hover:bg-emerald-900/60"
                 )}
               >
                 <Upload className="w-3.5 h-3.5" />
@@ -2243,11 +2244,11 @@ export default function RegisterPage() {
               </button>
             </div>
 
-            {/* Signature Display Container */}
-            <div className="bg-white/30 backdrop-blur-md border-t border-l border-white/90 border-b border-r border-slate-900/20 rounded-2xl p-6 shadow-[inset_1px_1px_2px_rgba(255,255,255,0.9),0_10px_25px_-5px_rgba(0,0,0,0.15)] text-center">
+            {/* Signature Display Outer Container (Hijau Tua / Dark Emerald Glass) */}
+            <div className="bg-emerald-950/90 border-2 border-emerald-500/40 backdrop-blur-2xl rounded-3xl p-6 sm:p-8 shadow-2xl text-center space-y-4">
               {activeSignatureSrc ? (
-                <div className="space-y-3 max-w-xs mx-auto bg-white p-4 rounded-xl border border-slate-200 shadow-md">
-                  <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Pratinjau Tanda Tangan Digital</p>
+                <div className="space-y-3 max-w-xs mx-auto bg-white p-5 rounded-2xl border-2 border-emerald-400 shadow-xl text-slate-900">
+                  <p className="text-xs font-extrabold text-slate-600 uppercase tracking-wider">Pratinjau Tanda Tangan Digital</p>
                   <img
                     src={activeSignatureSrc}
                     alt="Tanda Tangan Digital"
@@ -2258,7 +2259,7 @@ export default function RegisterPage() {
                       }
                     }}
                   />
-                  <div className="pt-2 flex items-center justify-center gap-1.5 text-xs text-emerald-700 font-bold">
+                  <div className="pt-2 flex items-center justify-center gap-1.5 text-xs text-emerald-700 font-extrabold">
                     <CheckCircle2 className="w-4 h-4 text-emerald-600" />
                     Tanda Tangan Terverifikasi & Tersimpan
                   </div>
@@ -2268,22 +2269,22 @@ export default function RegisterPage() {
                       clearCanvasSignature();
                       clearSignature();
                     }}
-                    className="text-xs text-red-600 hover:underline font-bold pt-1 block mx-auto"
+                    className="text-xs text-red-600 hover:underline font-bold pt-1 block mx-auto cursor-pointer"
                   >
                     Hapus & Tanda Tangan Ulang
                   </button>
                 </div>
               ) : signatureMode === "draw" ? (
-                /* Canvas Drawing Pad */
-                <div className="space-y-3 max-w-md mx-auto">
-                  <p className="text-xs font-bold text-slate-700">
+                /* Canvas Drawing Pad (White Paper Canvas inside Dark Green Box) */
+                <div className="space-y-4 max-w-lg mx-auto">
+                  <p className="text-xs sm:text-sm font-extrabold text-amber-300 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
                     Gunakan Jari / Mouse / Stylus untuk membuat Tanda Tangan di bawah ini:
                   </p>
-                  <div className="bg-white rounded-xl border-2 border-dashed border-slate-400 p-1 shadow-inner relative touch-none">
+                  <div className="bg-white rounded-2xl border-2 border-dashed border-emerald-400/80 p-2 shadow-inner relative touch-none overflow-hidden">
                     <canvas
                       ref={canvasRef}
-                      width={400}
-                      height={180}
+                      width={450}
+                      height={200}
                       onMouseDown={startDrawingCanvas}
                       onMouseMove={drawCanvas}
                       onMouseUp={stopDrawingCanvas}
@@ -2291,20 +2292,20 @@ export default function RegisterPage() {
                       onTouchStart={startDrawingCanvas}
                       onTouchMove={drawCanvas}
                       onTouchEnd={stopDrawingCanvas}
-                      className="w-full h-44 bg-white rounded-lg cursor-crosshair block"
+                      className="w-full h-48 bg-white rounded-xl cursor-crosshair block"
                     />
                     {!hasDrawnOnCanvas && (
-                      <span className="absolute inset-0 flex items-center justify-center pointer-events-none text-slate-400 text-xs italic">
+                      <span className="absolute inset-0 flex items-center justify-center pointer-events-none text-slate-400 text-xs sm:text-sm font-medium italic">
                         (Coret/Tanda tangan di area ini)
                       </span>
                     )}
                   </div>
 
-                  <div className="flex items-center justify-center gap-3 pt-1">
+                  <div className="flex items-center justify-center gap-3 pt-2">
                     <button
                       type="button"
                       onClick={clearCanvasSignature}
-                      className="px-4 py-2 bg-slate-200 text-slate-800 rounded-lg text-xs font-bold hover:bg-slate-300 transition-colors"
+                      className="px-4 py-2.5 bg-slate-800 text-slate-200 hover:bg-slate-700 hover:text-white border border-slate-600 rounded-xl text-xs font-bold transition-all cursor-pointer"
                     >
                       Bersihkan Canvas
                     </button>
@@ -2313,18 +2314,18 @@ export default function RegisterPage() {
                       onClick={saveCanvasSignature}
                       disabled={!hasDrawnOnCanvas || uploading}
                       className={cn(
-                        "px-5 py-2 bg-emerald-800 text-white rounded-lg text-xs font-bold hover:bg-emerald-900 shadow-md transition-all flex items-center gap-1.5",
+                        "px-6 py-2.5 bg-amber-400 text-slate-950 font-black rounded-xl text-xs hover:bg-amber-300 shadow-lg transition-all flex items-center gap-1.5 cursor-pointer",
                         "disabled:opacity-50 disabled:cursor-not-allowed"
                       )}
                     >
                       {uploading ? (
                         <>
-                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          <Loader2 className="w-4 h-4 animate-spin text-slate-950" />
                           Menyimpan...
                         </>
                       ) : (
                         <>
-                          <Check className="w-3.5 h-3.5" />
+                          <Check className="w-4 h-4 text-slate-950 stroke-[3]" />
                           Simpan Tanda Tangan Ini
                         </>
                       )}
@@ -2333,11 +2334,11 @@ export default function RegisterPage() {
                 </div>
               ) : (
                 /* Image File Upload Mode */
-                <div className="space-y-3 max-w-sm mx-auto">
-                  <Upload className="w-10 h-10 text-slate-500 mx-auto" />
+                <div className="space-y-4 max-w-md mx-auto p-6 bg-emerald-900/60 border-2 border-dashed border-emerald-400/50 rounded-2xl text-white">
+                  <Upload className="w-10 h-10 text-amber-400 mx-auto" />
                   <div>
-                    <label className="cursor-pointer inline-flex items-center gap-2 px-5 py-2.5 bg-emerald-800 text-white rounded-xl text-xs font-bold hover:bg-emerald-900 shadow-md transition-all">
-                      <Upload className="w-4 h-4" />
+                    <label className="cursor-pointer inline-flex items-center gap-2 px-6 py-3 bg-amber-400 text-slate-950 font-black rounded-xl text-xs hover:bg-amber-300 shadow-lg transition-all">
+                      <Upload className="w-4 h-4 text-slate-950" />
                       Pilih Foto Tanda Tangan (PNG/JPG)
                       <input
                         type="file"
@@ -2347,21 +2348,21 @@ export default function RegisterPage() {
                       />
                     </label>
                   </div>
-                  <p className="text-xs font-semibold text-slate-600">Maksimal file 100 KB dengan foto pada kertas putih polos</p>
+                  <p className="text-xs font-semibold text-emerald-200/90">Maksimal file 100 KB dengan foto pada kertas putih polos</p>
                 </div>
               )}
 
               {uploading && (
-                <div className="flex items-center justify-center gap-2 mt-4 text-xs font-bold text-emerald-800">
-                  <Loader2 className="w-4 h-4 animate-spin text-emerald-700" />
+                <div className="flex items-center justify-center gap-2 mt-4 text-xs font-extrabold text-amber-300">
+                  <Loader2 className="w-4 h-4 animate-spin text-amber-400" />
                   Mengunggah & Menyimpan Tanda Tangan...
                 </div>
               )}
 
-              {uploadError && <p className="text-xs font-bold text-red-600 mt-3">{uploadError}</p>}
+              {uploadError && <p className="text-xs font-extrabold text-red-400 mt-3">{uploadError}</p>}
             </div>
 
-            {errors.signature && <p className="text-xs text-red-600 font-extrabold">{errors.signature}</p>}
+            {errors.signature && <p className="text-xs text-red-400 font-extrabold">{errors.signature}</p>}
           </div>
         )}
 

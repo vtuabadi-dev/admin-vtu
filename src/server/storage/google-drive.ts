@@ -80,7 +80,7 @@ export async function checkStorageQuotaDiagnostics(): Promise<{ totalBytes?: num
 }
 
 export async function getOrCreateFolder(folderName: string, parentId?: string): Promise<string> {
-  const rootId = parentId || process.env.GOOGLE_DRIVE_FOLDER_ID!;
+  const rootId = parentId || getGoogleDriveFolderId();
   const query = `'${rootId}' in parents and name = '${folderName.replace(/'/g, "\\'")}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false`;
 
   const res = await apiFetch(
@@ -356,7 +356,7 @@ export async function provisionAllUnprovisionedPackages(): Promise<{ total: numb
 export async function getOrCreateFormulirPendaftaranDriveFolder(packageFolderId?: string): Promise<string | undefined> {
   if (!isGoogleDriveConfigured()) return undefined;
   try {
-    const parentId = packageFolderId || process.env.GOOGLE_DRIVE_FOLDER_ID;
+    const parentId = packageFolderId || getGoogleDriveFolderId();
     if (!parentId) return undefined;
     const folderId = await getOrCreateFolder("FORMULIR PENDAFTARAN", parentId);
     return folderId;
@@ -371,7 +371,7 @@ export async function createHotelVideoFolderHierarchy(
   hotelName: string
 ): Promise<string> {
   if (!isGoogleDriveConfigured()) {
-    return process.env.GOOGLE_DRIVE_FOLDER_ID || "local-mock";
+    return getGoogleDriveFolderId();
   }
 
   const videoHotelFolderId = await getOrCreateFolder("VIDEO HOTEL");
@@ -383,9 +383,9 @@ export async function createHotelVideoFolderHierarchy(
 }
 
 export function createGoogleDriveAdapter(): StorageAdapter {
-  const folderId = process.env.GOOGLE_DRIVE_FOLDER_ID!;
+  const folderId = getGoogleDriveFolderId();
 
-  if (!/^[a-zA-Z0-9_-]{15,60}$/.test(folderId)) {
+  if (!folderId || !/^[a-zA-Z0-9_-]{15,60}$/.test(folderId)) {
     throw new Error(
       `[Google Drive] GOOGLE_DRIVE_FOLDER_ID format tidak valid: "${folderId}". ` +
       "Folder ID dapat ditemukan di URL: https://drive.google.com/drive/folders/<FOLDER_ID>"
