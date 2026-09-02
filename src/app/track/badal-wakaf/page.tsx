@@ -277,8 +277,12 @@ export default function TrackBadalWakafPage() {
 
               <p className="text-xs text-center text-stone-200 font-medium drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
                 Belum mendaftar?{" "}
-                <Link href="/register/badal-umroh" className="text-amber-300 hover:text-amber-200 underline font-bold ml-1">
-                  Daftar Badal Umroh Baru
+                <Link href="/register/badal-umroh" className="text-amber-300 hover:text-amber-200 underline font-bold ml-0.5">
+                  Daftar Badal Umroh
+                </Link>
+                <span className="mx-1 text-stone-300">atau</span>
+                <Link href="/register/wakaf-quran" className="text-amber-300 hover:text-amber-200 underline font-bold">
+                  Daftar Wakaf Al-Qur&apos;an
                 </Link>
               </p>
             </div>
