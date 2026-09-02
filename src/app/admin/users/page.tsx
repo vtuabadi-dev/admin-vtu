@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Users, Shield, UserPlus, Loader2, RefreshCw, Copy, Check, Mail, Send, ShieldPlus } from "lucide-react";
+import { Users, Shield, UserPlus, Loader2, RefreshCw, Copy, Check, Mail, Send, ShieldPlus, Edit3 } from "lucide-react";
 import { Button } from "@/shared/components/ui/Button";
 import { Input } from "@/shared/components/ui/Input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/components/ui/Card";
@@ -15,6 +15,7 @@ interface UserItem {
   name: string;
   email: string;
   role: OperationalRole;
+  secondaryRoles?: string[];
   mustChangePassword: boolean;
   isInvitePending?: boolean;
   inviteToken?: string;
@@ -44,6 +45,15 @@ const ROLE_BADGE_CLASSES: Record<OperationalRole, string> = {
   jamaah: "bg-slate-500/10 text-slate-600 border-slate-200 dark:border-slate-800",
 };
 
+const AVAILABLE_SECONDARY_ROLES: { role: OperationalRole; label: string }[] = [
+  { role: "admin_operasional", label: "Admin Operasional" },
+  { role: "admin_pembayaran", label: "Admin Pembayaran / Keuangan" },
+  { role: "admin_manifest", label: "Admin Manifest Flight & Rooming" },
+  { role: "admin_dokumen", label: "Admin Dokumen & AI OCR" },
+  { role: "admin_badal", label: "Admin Badal Umroh & Wakaf" },
+  { role: "tour_leader", label: "Tour Leader / Pembimbing Lapangan" },
+];
+
 export default function UserManagementPage() {
   const [activeTab, setActiveTab] = useState<"users" | "roles">("users");
 
@@ -57,9 +67,20 @@ export default function UserManagementPage() {
     name: "",
     email: "",
     role: "admin_operasional" as OperationalRole,
+    secondaryRoles: [] as string[],
   });
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+
+  // Modal Edit User Role State
+  const [editingUser, setEditingUser] = useState<UserItem | null>(null);
+  const [editFormData, setEditFormData] = useState({
+    name: "",
+    role: "admin_operasional" as OperationalRole,
+    secondaryRoles: [] as string[],
+  });
+  const [editSubmitting, setEditSubmitting] = useState(false);
+  const [editFormError, setEditFormError] = useState<string | null>(null);
 
   // Modal Add Custom Role State
   const [isAddRoleModalOpen, setIsAddRoleModalOpen] = useState(false);
@@ -119,6 +140,7 @@ export default function UserManagementPage() {
         name: "",
         email: "",
         role: "admin_operasional",
+        secondaryRoles: [],
       });
       setIsModalOpen(false);
 
@@ -135,6 +157,41 @@ export default function UserManagementPage() {
       setFormError(err.message || "Gagal menambah admin.");
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const openEditModal = (user: UserItem) => {
+    setEditingUser(user);
+    setEditFormData({
+      name: user.name,
+      role: user.role,
+      secondaryRoles: user.secondaryRoles || [],
+    });
+    setEditFormError(null);
+  };
+
+  const handleUpdateUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingUser) return;
+    setEditFormError(null);
+    setEditSubmitting(true);
+
+    try {
+      const res = await fetch(`/api/admin/users/${editingUser.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(editFormData),
+      });
+
+      const json = await res.json();
+      if (!json.success) throw new Error(json.message);
+
+      setEditingUser(null);
+      fetchUsers();
+    } catch (err: any) {
+      setEditFormError(err.message || "Gagal memperbarui role pengelola.");
+    } finally {
+      setEditSubmitting(false);
     }
   };
 
@@ -337,13 +394,24 @@ export default function UserManagementPage() {
                               {user.email}
                             </td>
                             <td className="px-4 py-3">
-                              <span
-                                className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${
-                                  ROLE_BADGE_CLASSES[user.role] || "bg-gray-100 text-gray-800"
-                                }`}
-                              >
-                                {ROLE_LABELS[user.role] || user.role}
-                              </span>
+                              <div className="flex flex-wrap items-center gap-1.5">
+                                <span
+                                  className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${
+                                    ROLE_BADGE_CLASSES[user.role] || "bg-gray-100 text-gray-800"
+                                  }`}
+                                >
+                                  {ROLE_LABELS[user.role] || user.role}
+                                </span>
+                                {user.secondaryRoles && user.secondaryRoles.length > 0 && user.secondaryRoles.map((sRole) => (
+                                  <span
+                                    key={sRole}
+                                    className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30"
+                                    title="Role Tambahan (Akses Sekunder)"
+                                  >
+                                    + {ROLE_LABELS[sRole as OperationalRole] || sRole}
+                                  </span>
+                                ))}
+                              </div>
                             </td>
                             <td className="px-4 py-3 text-center">
                               {user.isInvitePending ? (
@@ -364,20 +432,30 @@ export default function UserManagementPage() {
                               {formatDate(user.createdAt)}
                             </td>
                             <td className="px-4 py-3 text-center">
-                              {user.isInvitePending && inviteUrl ? (
+                              <div className="flex items-center justify-center gap-1.5">
+                                {user.isInvitePending && inviteUrl && (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-7 text-[10.5px] font-bold border-amber-500/40 text-amber-700 dark:text-amber-300 hover:bg-amber-500/10 gap-1"
+                                    onClick={() => handleCopyLink(inviteUrl)}
+                                    title="Salin Link Undangan ke Clipboard"
+                                  >
+                                    <Copy className="w-3 h-3" />
+                                    Salin Link
+                                  </Button>
+                                )}
                                 <Button
                                   size="sm"
-                                  variant="outline"
-                                  className="h-7 text-[10.5px] font-bold border-amber-500/40 text-amber-700 dark:text-amber-300 hover:bg-amber-500/10 gap-1"
-                                  onClick={() => handleCopyLink(inviteUrl)}
-                                  title="Salin Link Undangan ke Clipboard"
+                                  variant="ghost"
+                                  className="h-7 text-[10.5px] font-semibold text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white gap-1"
+                                  onClick={() => openEditModal(user)}
+                                  title="Edit Role & Akses Pengelola"
                                 >
-                                  <Copy className="w-3 h-3" />
-                                  Salin Link
+                                  <Edit3 className="w-3 h-3 text-primary" />
+                                  Edit Role
                                 </Button>
-                              ) : (
-                                <span className="text-muted-foreground text-[10px]">-</span>
-                              )}
+                              </div>
                             </td>
                           </tr>
                         );
@@ -445,7 +523,7 @@ export default function UserManagementPage() {
               </div>
 
               <div className="space-y-1.5">
-                <label className="font-bold text-foreground">Role / Tanggung Jawab *</label>
+                <label className="font-bold text-foreground">Role Utama (Primary Role) *</label>
                 <select
                   value={formData.role}
                   onChange={(e) =>
@@ -462,6 +540,39 @@ export default function UserManagementPage() {
                   <option value="tour_leader">Tour Leader</option>
                 </select>
               </div>
+
+              {/* Secondary / Double Roles Checkboxes */}
+              {formData.role !== "super_admin" && (
+                <div className="space-y-1.5 pt-1">
+                  <label className="font-bold text-foreground">Akses Tambahan (Secondary / Double Roles)</label>
+                  <p className="text-[11px] text-muted-foreground">
+                    Pilih role sekunder jika pengelola ini merangkap kewenangan di modul lain.
+                  </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 bg-muted/30 p-2.5 rounded-lg border text-xs">
+                    {AVAILABLE_SECONDARY_ROLES.map(({ role: rKey, label: rLabel }) => {
+                      if (rKey === formData.role) return null;
+                      const isChecked = formData.secondaryRoles?.includes(rKey);
+                      return (
+                        <label key={rKey} className="flex items-center gap-2 cursor-pointer hover:text-primary">
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={(e) => {
+                              const current = formData.secondaryRoles || [];
+                              const updated = e.target.checked
+                                ? [...current, rKey]
+                                : current.filter((r) => r !== rKey);
+                              setFormData({ ...formData, secondaryRoles: updated });
+                            }}
+                            className="rounded border-slate-700 text-primary focus:ring-primary"
+                          />
+                          <span className="text-[11px] font-medium">{rLabel}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
 
               <div className="flex justify-end gap-2 pt-3 border-t">
                 <Button
@@ -484,6 +595,113 @@ export default function UserManagementPage() {
                       <Send className="h-3.5 w-3.5" />
                       Simpan &amp; Kirim Undangan
                     </>
+                  )}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Edit Admin & Role Akses */}
+      {editingUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md bg-card rounded-xl border shadow-xl p-6 space-y-4 animate-in fade-in-0 zoom-in-95">
+            <div className="flex items-center justify-between border-b pb-3">
+              <h3 className="text-base font-bold flex items-center gap-2 text-foreground">
+                <Edit3 className="h-5 w-5 text-primary" />
+                Edit Role &amp; Akses Pengelola
+              </h3>
+              <button
+                onClick={() => setEditingUser(null)}
+                className="text-muted-foreground hover:text-foreground cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            {editFormError && (
+              <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-lg text-xs text-destructive">
+                {editFormError}
+              </div>
+            )}
+
+            <div className="p-3 rounded-lg bg-muted/40 border text-xs space-y-1">
+              <p className="font-semibold text-foreground">{editingUser.name}</p>
+              <p className="font-mono text-muted-foreground text-[11px]">{editingUser.email}</p>
+            </div>
+
+            <form onSubmit={handleUpdateUser} className="space-y-4 text-xs">
+              <div className="space-y-1.5">
+                <label className="font-bold text-foreground">Role Utama (Primary Role) *</label>
+                <select
+                  value={editFormData.role}
+                  onChange={(e) =>
+                    setEditFormData({ ...editFormData, role: e.target.value as OperationalRole })
+                  }
+                  className="w-full h-9 px-2.5 rounded-md border bg-background text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-primary"
+                >
+                  <option value="super_admin">Super Admin (Akses Penuh System)</option>
+                  <option value="admin_operasional">Admin Operasional</option>
+                  <option value="admin_pembayaran">Admin Pembayaran / Keuangan</option>
+                  <option value="admin_manifest">Admin Manifest</option>
+                  <option value="admin_dokumen">Admin Dokumen</option>
+                  <option value="admin_badal">Admin Badal Umroh &amp; Wakaf</option>
+                  <option value="tour_leader">Tour Leader</option>
+                </select>
+              </div>
+
+              {/* Secondary / Double Roles Checkboxes */}
+              {editFormData.role !== "super_admin" && (
+                <div className="space-y-1.5 pt-1">
+                  <label className="font-bold text-foreground">Akses Tambahan (Secondary / Double Roles)</label>
+                  <p className="text-[11px] text-muted-foreground">
+                    Atur role sekunder tambahan bagi {editingUser.name}.
+                  </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 bg-muted/30 p-2.5 rounded-lg border text-xs">
+                    {AVAILABLE_SECONDARY_ROLES.map(({ role: rKey, label: rLabel }) => {
+                      if (rKey === editFormData.role) return null;
+                      const isChecked = editFormData.secondaryRoles?.includes(rKey);
+                      return (
+                        <label key={rKey} className="flex items-center gap-2 cursor-pointer hover:text-primary">
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={(e) => {
+                              const current = editFormData.secondaryRoles || [];
+                              const updated = e.target.checked
+                                ? [...current, rKey]
+                                : current.filter((r) => r !== rKey);
+                              setEditFormData({ ...editFormData, secondaryRoles: updated });
+                            }}
+                            className="rounded border-slate-700 text-primary focus:ring-primary"
+                          />
+                          <span className="text-[11px] font-medium">{rLabel}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              <div className="flex justify-end gap-2 pt-3 border-t">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setEditingUser(null)}
+                  disabled={editSubmitting}
+                >
+                  Batal
+                </Button>
+                <Button type="submit" size="sm" disabled={editSubmitting} className="gap-1.5 font-bold">
+                  {editSubmitting ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Menyimpan...
+                    </>
+                  ) : (
+                    "Simpan Perubahan Role"
                   )}
                 </Button>
               </div>

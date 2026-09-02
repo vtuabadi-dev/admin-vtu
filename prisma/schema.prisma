@@ -275,6 +275,7 @@ model User {
   email              String          @unique
   passwordHash       String
   role               OperationalRole @default(jamaah)
+  secondaryRoles     String[]        @default([])
   mustChangePassword Boolean         @default(false)
   inviteToken        String?         @unique
   inviteExpires      DateTime?

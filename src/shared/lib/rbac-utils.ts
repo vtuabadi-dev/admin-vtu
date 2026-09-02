@@ -214,17 +214,29 @@ export function canAccessModule(role: OperationalRole, module: string): Permissi
   return ROLE_PERMISSIONS[role]?.[module] ?? NONE;
 }
 
-export function hasModulePermission(role: OperationalRole, module: PermissionModule, action: PermissionAction): boolean {
-  const check = ROLE_PERMISSIONS[role]?.[module] ?? NONE;
-  switch (action) {
-    case "view":     return check.canView;
-    case "create":   return check.canCreate;
-    case "edit":     return check.canEdit;
-    case "approve":  return check.canApprove;
-    case "export":   return check.canExport;
-    case "delete":   return check.canDelete;
-    default:         return false;
-  }
+export function hasModulePermission(
+  role: OperationalRole,
+  module: PermissionModule,
+  action: PermissionAction,
+  secondaryRoles?: (OperationalRole | string)[]
+): boolean {
+  const allRoles: OperationalRole[] = [
+    role,
+    ...(secondaryRoles ? (secondaryRoles as OperationalRole[]) : []),
+  ];
+
+  return allRoles.some((r) => {
+    const check = ROLE_PERMISSIONS[r]?.[module] ?? NONE;
+    switch (action) {
+      case "view":     return check.canView;
+      case "create":   return check.canCreate;
+      case "edit":     return check.canEdit;
+      case "approve":  return check.canApprove;
+      case "export":   return check.canExport;
+      case "delete":   return check.canDelete;
+      default:         return false;
+    }
+  });
 }
 
 // ── Server-side auth-aware check ──────────────────────────────

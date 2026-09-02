@@ -22,6 +22,7 @@ export async function GET(_request: NextRequest) {
         name: true,
         email: true,
         role: true,
+        secondaryRoles: true,
         mustChangePassword: true,
         isInvitePending: true,
         inviteToken: true,
@@ -46,7 +47,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { name, email, role } = body;
+    const { name, email, role, secondaryRoles } = body;
 
     if (!name || !email || !role) {
       return NextResponse.json({ success: false, message: "Nama lengkap, email, dan role wajib diisi" }, { status: 400 });
@@ -59,6 +60,11 @@ export async function POST(request: NextRequest) {
     if (existing) {
       return NextResponse.json({ success: false, message: "Email sudah terdaftar" }, { status: 400 });
     }
+
+    // Process secondaryRoles array
+    const validSecondaryRoles = Array.isArray(secondaryRoles)
+      ? secondaryRoles.filter((r: string) => typeof r === "string" && r !== role)
+      : [];
 
     // Generate secure 64-char hex token for invitation
     const inviteToken = crypto.randomBytes(32).toString("hex");
@@ -75,6 +81,7 @@ export async function POST(request: NextRequest) {
         email: normalizedEmail,
         passwordHash,
         role: role as OperationalRole,
+        secondaryRoles: validSecondaryRoles,
         mustChangePassword: true,
         inviteToken,
         inviteExpires,
@@ -85,6 +92,7 @@ export async function POST(request: NextRequest) {
         name: true,
         email: true,
         role: true,
+        secondaryRoles: true,
         mustChangePassword: true,
         isInvitePending: true,
         inviteToken: true,
