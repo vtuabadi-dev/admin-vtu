@@ -23,6 +23,7 @@ export default function GSAPIntroLoader({
   const cardRef = useRef<HTMLDivElement | null>(null);
   const emblemWrapperRef = useRef<HTMLDivElement | null>(null);
   const textContentRef = useRef<HTMLDivElement | null>(null);
+  const progressBarRef = useRef<HTMLDivElement | null>(null);
   const skipBtnRef = useRef<HTMLButtonElement | null>(null);
 
   // Check Session Storage for Intro state
@@ -94,6 +95,14 @@ export default function GSAPIntroLoader({
           { opacity: 0, y: -10 },
           { opacity: 1, y: 0, duration: 0.5, ease: "power2.out" },
           "-=0.5"
+        )
+
+        // ── Stage 4: Smooth Golden Progress Bar Fill (0% -> 100%) ──
+        .fromTo(
+          progressBarRef.current,
+          { width: "0%" },
+          { width: "100%", duration: 1.8, ease: "power1.inOut" },
+          "-=0.2"
         );
 
       // Continuous Ambient Floating & Emblem Pulsing
@@ -265,7 +274,11 @@ export default function GSAPIntroLoader({
 
         {/* Loading Progress Bar */}
         <div data-intro-text className="w-full max-w-[180px] h-1.5 bg-[#030e0b] rounded-full overflow-hidden border border-[#D4AF37]/35 mt-6 opacity-0">
-          <div className="h-full bg-gradient-to-r from-[#F5D061] via-[#D4AF37] to-[#B8860B] rounded-full animate-pulse w-full" />
+          <div
+            ref={progressBarRef}
+            className="h-full bg-gradient-to-r from-[#F5D061] via-[#D4AF37] to-[#B8860B] rounded-full shadow-[0_0_8px_rgba(245,208,97,0.6)]"
+            style={{ width: "0%" }}
+          />
         </div>
       </div>
 
