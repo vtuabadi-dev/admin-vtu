@@ -259,9 +259,9 @@ html.intro-pending body {
 .portal-theme h1,
 .portal-theme h2 {
   font-family: Georgia, serif !important;
-  color: #f7f4ea !important;
+  color: #ffffff !important;
   font-weight: 800 !important;
-  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.7) !important;
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.95), 0 0 12px rgba(0, 0, 0, 0.9) !important;
 }
 
 .portal-theme h3,
@@ -269,7 +269,7 @@ html.intro-pending body {
 .portal-theme h5 {
   color: #ffffff !important;
   font-weight: 700 !important;
-  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.6) !important;
+  text-shadow: 0 2px 5px rgba(0, 0, 0, 0.95), 0 0 8px rgba(0, 0, 0, 0.8) !important;
 }
 
 .portal-theme h1 em,

@@ -1076,11 +1076,11 @@ export default function RegisterPage() {
         {/* Step 1: Representative */}
         {step === 1 && (
           <div className="space-y-4">
-            <h2 className="text-lg font-black text-slate-950 drop-shadow-[0_1px_1px_rgba(255,255,255,0.9)]">Data Perwakilan Grup</h2>
-            <p className="text-sm font-semibold text-slate-900 drop-shadow-[0_1px_1px_rgba(255,255,255,0.9)]">Masukkan data perwakilan yang akan menjadi kontak utama grup.</p>
+            <h2 className="text-xl font-extrabold text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.95)] tracking-wide">Data Perwakilan Grup</h2>
+            <p className="text-sm font-semibold text-emerald-100 drop-shadow-[0_1.5px_3px_rgba(0,0,0,0.9)]">Masukkan data perwakilan yang akan menjadi kontak utama grup.</p>
 
             <div>
-              <label className="block text-sm font-extrabold text-slate-950 mb-1 drop-shadow-[0_1px_1px_rgba(255,255,255,0.9)]">Nama Perwakilan</label>
+              <label className="block text-sm font-extrabold text-white mb-1.5 drop-shadow-[0_1.5px_3px_rgba(0,0,0,0.9)]">Nama Perwakilan</label>
               <div className="relative group">
                 <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 z-20 pointer-events-none text-slate-800 stroke-[2] transition-all duration-200 group-focus-within:text-emerald-950 group-focus-within:opacity-100 group-focus-within:stroke-[2.5] group-focus-within:scale-110 group-hover:text-slate-950" />
                 <input
@@ -1100,7 +1100,7 @@ export default function RegisterPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-extrabold text-slate-950 mb-1 drop-shadow-[0_1px_1px_rgba(255,255,255,0.9)]">Nomor Telepon (WhatsApp)</label>
+              <label className="block text-sm font-extrabold text-white mb-1.5 drop-shadow-[0_1.5px_3px_rgba(0,0,0,0.9)]">Nomor Telepon (WhatsApp)</label>
               <div className="relative group">
                 <Phone className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 z-20 pointer-events-none text-slate-800 stroke-[2] transition-all duration-200 group-focus-within:text-emerald-950 group-focus-within:opacity-100 group-focus-within:stroke-[2.5] group-focus-within:scale-110 group-hover:text-slate-950" />
                 <input
@@ -1120,7 +1120,7 @@ export default function RegisterPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-extrabold text-slate-950 mb-1 drop-shadow-[0_1px_1px_rgba(255,255,255,0.9)]">Email</label>
+              <label className="block text-sm font-extrabold text-white mb-1.5 drop-shadow-[0_1.5px_3px_rgba(0,0,0,0.9)]">Email</label>
               <div className="relative group">
                 <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 z-20 pointer-events-none text-slate-800 stroke-[2] transition-all duration-200 group-focus-within:text-emerald-950 group-focus-within:opacity-100 group-focus-within:stroke-[2.5] group-focus-within:scale-110 group-hover:text-slate-950" />
                 <input
