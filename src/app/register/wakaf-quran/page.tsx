@@ -153,9 +153,6 @@ export default function WakafQuranRegisterPage() {
   };
 
   // Handlers Multi-Niat
-  const handleAddNiat = () => {
-    updateJumlahMushaf(formData.jumlahMushaf + 1);
-  };
 
   const handleRemoveNiat = (id: string) => {
     if (niatList.length <= 1) return;
@@ -922,22 +919,11 @@ export default function WakafQuranRegisterPage() {
 
                   {/* Multi-Niat List (Sesuai Jumlah Mushaf) */}
                   <div className="pt-2 border-t border-stone-100 space-y-3">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
-                      <div className="flex items-center gap-1.5">
-                        <Heart className="w-4 h-4 text-emerald-700" />
-                        <span className="text-xs font-bold uppercase tracking-wider text-emerald-950">
-                          Niat Atas Nama ({formData.jumlahMushaf} Baris Isian Sesuai {formData.jumlahMushaf} Mushaf)
-                        </span>
-                      </div>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={handleAddNiat}
-                        className="bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border-emerald-300 font-bold text-xs h-8 px-3 rounded-lg flex items-center gap-1 self-start sm:self-auto"
-                      >
-                        <Plus className="w-3.5 h-3.5" /> Tambah Mushaf / Nama
-                      </Button>
+                    <div className="flex items-center gap-1.5">
+                      <Heart className="w-4 h-4 text-emerald-700" />
+                      <span className="text-xs font-bold uppercase tracking-wider text-emerald-950">
+                        Niat Atas Nama ({formData.jumlahMushaf} Baris Isian Sesuai {formData.jumlahMushaf} Mushaf)
+                      </span>
                     </div>
 
                     <div className="space-y-2.5">
