@@ -1329,17 +1329,17 @@ export default function RegisterPage() {
             <h2 className="text-lg font-semibold text-gray-900">Data Jamaah</h2>
             <p className="text-sm text-gray-500">Isi data setiap anggota rombongan. Semua nama akan otomatis menjadi HURUF BESAR.</p>
 
-            {/* Banner switch to auto-fill Jamaah #1 from Representative */}
-            <div className="bg-blue-50/80 border border-blue-200/80 rounded-xl p-4 flex items-center justify-between gap-4">
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-lg bg-blue-600/10 text-blue-700 flex items-center justify-center shrink-0">
-                  <User className="w-5 h-5" />
+            {/* Banner switch to auto-fill Jamaah #1 from Representative — Dark Green Glass Box */}
+            <div className="bg-emerald-950/85 border-2 border-emerald-500/50 backdrop-blur-xl rounded-2xl p-4 sm:p-5 flex items-center justify-between gap-4 shadow-xl">
+              <div className="flex items-center gap-3.5">
+                <div className="w-10 h-10 rounded-xl bg-amber-400/20 border border-amber-400/40 text-amber-300 flex items-center justify-center shrink-0 shadow-inner">
+                  <User className="w-5 h-5 text-amber-400" />
                 </div>
                 <div>
-                  <p className="text-sm font-semibold text-gray-900">
+                  <p className="text-sm sm:text-base font-extrabold text-white drop-shadow-[0_1.5px_3px_rgba(0,0,0,0.9)]">
                     Gunakan Data Perwakilan sebagai Jamaah #1
                   </p>
-                  <p className="text-xs text-gray-500">
+                  <p className="text-xs font-semibold text-emerald-200/90 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)] mt-0.5">
                     {namaPerwakilan
                       ? `Nama perwakilan: "${namaPerwakilan}"`
                       : "Otomatis mengisi nama perwakilan ke Jamaah #1 (Ketua Grup)"}
@@ -1360,28 +1360,28 @@ export default function RegisterPage() {
                   }}
                   className="sr-only peer"
                 />
-                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                <div className="w-11 h-6 bg-slate-800 border border-emerald-500/40 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-amber-400 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-400"></div>
               </label>
             </div>
 
-            {/* Group Lansia Alert Banner */}
+            {/* Group Lansia Alert Banner — Dark Amber/Emerald Glass */}
             {(() => {
               const lansiaList = members.filter((m) => calculateAge(m.tanggalLahir)?.isLansia);
               if (lansiaList.length === 0) return null;
               return (
-                <div className="bg-amber-50 border-2 border-amber-300 rounded-xl p-4 flex items-start gap-3 text-amber-950 shadow-sm">
-                  <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                <div className="bg-amber-950/80 border-2 border-amber-400/50 backdrop-blur-xl rounded-2xl p-4 flex items-start gap-3.5 text-amber-100 shadow-xl">
+                  <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
                   <div className="text-sm space-y-1">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-semibold text-amber-950">
+                      <span className="font-extrabold text-amber-200">
                         Terdeteksi {lansiaList.length} Jamaah Lansia (Usia ≥ 60 Tahun)
                       </span>
-                      <span className="text-[11px] bg-amber-200 text-amber-900 font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+                      <span className="text-[10px] bg-amber-400 text-slate-950 font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider">
                         Wajib Berkas Tambahan
                       </span>
                     </div>
-                    <p className="text-xs text-amber-800 leading-relaxed">
-                      Sesuai ketentuan operasional, jamaah berusia 60 tahun ke atas wajib melengkapi <strong>Surat Pernyataan Keluarga Lansia</strong>. Berkas ini wajib dilampirkan pada saat penyerahan dokumen/pemberkasan.
+                    <p className="text-xs text-amber-100/90 leading-relaxed">
+                      Sesuai ketentuan operasional, jamaah berusia 60 tahun ke atas wajib melengkapi <strong>Surat Pernyataan Keluarga Lansia</strong> pada saat penyerahan dokumen/pemberkasan.
                     </p>
                   </div>
                 </div>
