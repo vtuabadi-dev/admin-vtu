@@ -1,8 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Shield, Check, X, Search, Info, Lock, Eye, Edit3, Trash2, Download, CheckCircle2 } from "lucide-react";
-import { Badge } from "@/shared/components/ui/Badge";
+import { Shield, Check, X, Search, Lock } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/components/ui/Card";
 import type { RoleConfigItem } from "@/app/api/admin/roles/route";
 

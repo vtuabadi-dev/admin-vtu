@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { KeyRound, Eye, EyeOff, ShieldCheck, CheckCircle2, AlertCircle, Loader2, Lock } from "lucide-react";
+import { KeyRound, Eye, EyeOff, ShieldCheck, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
 
 export default function SetupPasswordPage() {
   const searchParams = useSearchParams();
