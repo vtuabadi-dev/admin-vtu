@@ -419,6 +419,19 @@ export default function MasterBadalWakafPage() {
       >
         <div className="space-y-4 pt-1 text-xs">
           <div className="space-y-1.5">
+            <label className="font-bold text-slate-700">Peruntukan Layanan *</label>
+            <select
+              value={formRekening.tipeLayanan}
+              onChange={(e) => setFormRekening({ ...formRekening, tipeLayanan: e.target.value as any })}
+              className="w-full h-10 px-3 rounded-xl border border-slate-300 bg-white text-xs font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-emerald-500"
+            >
+              <option value="BADAL_WAKAF">Semua Layanan (Badal Umroh &amp; Wakaf Al-Qur&apos;an)</option>
+              <option value="WAKAF_QURAN">Khusus Wakaf Al-Qur&apos;an Saja</option>
+              <option value="BADAL_UMROH">Khusus Badal Umroh Saja</option>
+            </select>
+          </div>
+
+          <div className="space-y-1.5">
             <label className="font-bold text-slate-700">Nama Bank *</label>
             <Input
               value={formRekening.namaBank}

@@ -62,7 +62,7 @@ export default function BadalUmrohRegisterPage() {
       })
       .catch(console.error);
 
-    fetch("/api/master/rekening-layanan")
+    fetch("/api/master/rekening-layanan?tipeLayanan=BADAL_UMROH")
       .then((res) => res.json())
       .then((json) => {
         if (json.success && Array.isArray(json.data) && json.data.length > 0) {
