@@ -132,6 +132,11 @@ export const useAuthStore = create<AuthState>()(
       },
 
       logout: () => {
+        if (typeof window !== "undefined") {
+          try {
+            localStorage.removeItem("vtu-auth-storage");
+          } catch {}
+        }
         set({
           user: null,
           isAuthenticated: false,
@@ -139,7 +144,10 @@ export const useAuthStore = create<AuthState>()(
           sessionExpired: false,
           lastActivity: 0,
         });
-        signOut({ callbackUrl: "/login" }).catch(() => {});
+        signOut({ redirect: false }).catch(() => {});
+        if (typeof window !== "undefined" && window.location.pathname !== "/login") {
+          window.location.href = "/login";
+        }
       },
 
       refreshSession: () => {
