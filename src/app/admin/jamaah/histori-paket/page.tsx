@@ -166,8 +166,8 @@ export default function HistoriPaketPage() {
         <Card variant="operational" className="border-l-4 border-l-teal-500">
           <CardContent className="p-4 flex items-center justify-between">
             <div>
-              <p className="text-xs text-muted-foreground font-semibold">Jamaah Baru Masuk</p>
-              <p className="text-2xl font-bold text-teal-600 dark:text-teal-400 mt-0.5">+{totalMasukBaru}</p>
+              <p className="text-xs text-muted-foreground font-semibold">Jamaah Baru Masuk (Pax)</p>
+              <p className="text-2xl font-bold text-teal-600 dark:text-teal-400 mt-0.5">+{totalMasukBaru} Pax</p>
             </div>
             <div className="h-10 w-10 rounded-lg bg-teal-500/10 text-teal-600 flex items-center justify-center">
               <UserPlus className="h-5 w-5" />
@@ -178,8 +178,8 @@ export default function HistoriPaketPage() {
         <Card variant="operational" className="border-l-4 border-l-rose-500">
           <CardContent className="p-4 flex items-center justify-between">
             <div>
-              <p className="text-xs text-muted-foreground font-semibold">Pembatalan (Cancel)</p>
-              <p className="text-2xl font-bold text-rose-600 dark:text-rose-400 mt-0.5">-{totalCancel}</p>
+              <p className="text-xs text-muted-foreground font-semibold">Pembatalan (Cancel Pax)</p>
+              <p className="text-2xl font-bold text-rose-600 dark:text-rose-400 mt-0.5">-{totalCancel} Pax</p>
             </div>
             <div className="h-10 w-10 rounded-lg bg-rose-500/10 text-rose-600 flex items-center justify-center">
               <UserMinus className="h-5 w-5" />
@@ -190,8 +190,8 @@ export default function HistoriPaketPage() {
         <Card variant="operational" className="border-l-4 border-l-amber-500">
           <CardContent className="p-4 flex items-center justify-between">
             <div>
-              <p className="text-xs text-muted-foreground font-semibold">Perpindahan Paket</p>
-              <p className="text-2xl font-bold text-amber-600 dark:text-amber-400 mt-0.5">{totalPindahPaket}</p>
+              <p className="text-xs text-muted-foreground font-semibold">Perpindahan Paket (Pax)</p>
+              <p className="text-2xl font-bold text-amber-600 dark:text-amber-400 mt-0.5">{totalPindahPaket} Pax</p>
             </div>
             <div className="h-10 w-10 rounded-lg bg-amber-500/10 text-amber-600 flex items-center justify-center">
               <ArrowLeftRight className="h-5 w-5" />
@@ -386,17 +386,17 @@ export default function HistoriPaketPage() {
                     <div className="flex items-center gap-1.5">
                       {item.summary.masukBaru > 0 && (
                         <Badge variant="success" className="text-[10px] font-bold">
-                          +{item.summary.masukBaru} Masuk Baru
+                          +{item.summary.masukBaru} Pax Masuk
                         </Badge>
                       )}
                       {item.summary.cancel > 0 && (
                         <Badge variant="destructive" className="text-[10px] font-bold">
-                          -{item.summary.cancel} Cancel
+                          -{item.summary.cancel} Pax Cancel
                         </Badge>
                       )}
                       {item.summary.pindahPaket > 0 && (
                         <Badge variant="warning" className="text-[10px] font-bold">
-                          {item.summary.pindahPaket} Pindah Paket
+                          {item.summary.pindahPaket} Pax Pindah
                         </Badge>
                       )}
                     </div>

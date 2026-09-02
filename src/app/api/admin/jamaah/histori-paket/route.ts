@@ -15,6 +15,7 @@ export interface PackageHistoryEvent {
   keterangan: string;
   paketAsalOrTujuan?: string;
   actorName: string;
+  paxCount?: number;
 }
 
 export interface PackageHistoryItem {
@@ -97,6 +98,7 @@ export async function GET(request: NextRequest) {
               nomorPeserta: req.kodeRegistrasi,
               keterangan: `Pendaftaran jamaah baru pada paket ${keb.namaPaket}`,
               actorName: req.reviewedBy || "Sistem Registrasi Online",
+              paxCount: req.paxCount || 1,
             });
           }
 
@@ -112,6 +114,7 @@ export async function GET(request: NextRequest) {
               nomorPeserta: req.kodeRegistrasi,
               keterangan: req.catatanAdmin || `Pembatalan pendaftaran jamaah dari paket ${keb.namaPaket}`,
               actorName: req.reviewedBy || "Admin Operasional",
+              paxCount: req.paxCount || 1,
             });
           }
         }
@@ -133,6 +136,7 @@ export async function GET(request: NextRequest) {
               namaJamaah: ev.triggeredBy || "Jamaah Operasional",
               keterangan: ev.message,
               actorName: ev.triggeredBy || "Admin Operasional",
+              paxCount: 1,
             });
           } else if (evMsgLower.includes("cancel") || evMsgLower.includes("batal")) {
             actions.push({
@@ -143,6 +147,7 @@ export async function GET(request: NextRequest) {
               namaJamaah: "Jamaah Terdaftar",
               keterangan: ev.message,
               actorName: ev.triggeredBy || "Admin Operasional",
+              paxCount: 1,
             });
           }
         }
@@ -164,6 +169,7 @@ export async function GET(request: NextRequest) {
             namaJamaah: ae.userName || "Admin",
             keterangan: ae.detail,
             actorName: ae.userName || ae.role,
+            paxCount: 1,
           });
         }
       }
@@ -205,12 +211,18 @@ export async function GET(request: NextRequest) {
         continue;
       }
 
-      // Calculate summary counts
-      const masukBaruCount = filteredActions.filter((a) => a.actionType === "MASUK_BARU").length;
-      const cancelCount = filteredActions.filter((a) => a.actionType === "CANCEL").length;
-      const pindahCount = filteredActions.filter(
-        (a) => a.actionType === "PINDAH_PAKET_KELUAR" || a.actionType === "PINDAH_PAKET_MASUK"
-      ).length;
+      // Calculate summary counts (SUMming PAX COUNT instead of just counting 1 per group transaction!)
+      const masukBaruCount = filteredActions
+        .filter((a) => a.actionType === "MASUK_BARU")
+        .reduce((sum, a) => sum + (a.paxCount || 1), 0);
+
+      const cancelCount = filteredActions
+        .filter((a) => a.actionType === "CANCEL")
+        .reduce((sum, a) => sum + (a.paxCount || 1), 0);
+
+      const pindahCount = filteredActions
+        .filter((a) => a.actionType === "PINDAH_PAKET_KELUAR" || a.actionType === "PINDAH_PAKET_MASUK")
+        .reduce((sum, a) => sum + (a.paxCount || 1), 0);
 
       // Calculate total active jamaah in package
       const totalJamaahAktif = (keb.registrationRequests || [])
