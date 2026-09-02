@@ -8,6 +8,7 @@ import type {
 } from "@/shared/types";
 
 function mapGroup(row: any): RegistrationGroup {
+  const req = row.registrationRequests && row.registrationRequests.length > 0 ? row.registrationRequests[0] : null;
   return {
     id: row.id,
     kodeRegistrasi: row.kodeRegistrasi,
@@ -19,6 +20,8 @@ function mapGroup(row: any): RegistrationGroup {
     totalPembayaran: row.totalPembayaran,
     sisaPembayaran: row.sisaPembayaran,
     status: row.status,
+    hotelUpgrade: req?.hotelUpgrade || row.hotelUpgrade || undefined,
+    roomUpgrade: req?.roomUpgrade || row.roomUpgrade || undefined,
     anggotaIds: row.anggota?.map((a: any) => a.id) ?? [],
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
@@ -94,7 +97,10 @@ export const groupRepo = {
     const [rows, total] = await Promise.all([
       prisma.registrationGroup.findMany({
         where,
-        include: { anggota: true },
+        include: {
+          anggota: true,
+          registrationRequests: { select: { hotelUpgrade: true, roomUpgrade: true } },
+        },
         take: params?.limit,
         skip: params?.offset,
         orderBy: { createdAt: "asc" },
@@ -105,12 +111,24 @@ export const groupRepo = {
   },
 
   async findById(id: string) {
-    const row = await prisma.registrationGroup.findUnique({ where: { id }, include: { anggota: true } });
+    const row = await prisma.registrationGroup.findUnique({
+      where: { id },
+      include: {
+        anggota: true,
+        registrationRequests: { select: { hotelUpgrade: true, roomUpgrade: true } },
+      },
+    });
     return row ? mapGroup(row) : null;
   },
 
   async findByKode(kodeRegistrasi: string) {
-    const row = await prisma.registrationGroup.findUnique({ where: { kodeRegistrasi }, include: { anggota: true } });
+    const row = await prisma.registrationGroup.findUnique({
+      where: { kodeRegistrasi },
+      include: {
+        anggota: true,
+        registrationRequests: { select: { hotelUpgrade: true, roomUpgrade: true } },
+      },
+    });
     return row ? mapGroup(row) : null;
   },
 

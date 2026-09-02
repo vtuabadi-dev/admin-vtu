@@ -78,6 +78,8 @@ export interface RegistrationGroup {
   totalPembayaran: number;
   sisaPembayaran: number;
   status: "active" | "completed" | "cancelled";
+  hotelUpgrade?: string;
+  roomUpgrade?: string;
   /** Anggota jamaah dalam grup ini */
   anggotaIds: string[];
   createdAt: string;
