@@ -622,65 +622,70 @@ export default function WakafQuranRegisterPage() {
             {step === 1 && (
               <div className="space-y-6 animate-in fade-in-0 duration-200">
                 <div>
-                  <h2 className="text-lg font-extrabold text-slate-950">Status Kejamaahan &amp; Verifikasi Paspor</h2>
-                  <p className="text-xs font-semibold text-slate-700 mt-0.5">
+                  <h2 className="text-xl font-bold text-stone-900">Status Kejamaahan &amp; Verifikasi Paspor</h2>
+                  <p className="text-xs text-stone-600 mt-0.5">
                     Tentukan apakah pendaftaran wakaf ini terkait dengan rombongan jamaah umroh VTU yang sedang/akan berangkat.
                   </p>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div
+                {/* Pilihan 2 Card Status */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                  <button
+                    type="button"
                     onClick={() => {
                       setIsJamaahVauza(true);
                       setJamaahVerified(null);
+                      setVerifyMessage("");
                     }}
                     className={cn(
-                      "p-4 rounded-2xl cursor-pointer border-2 transition-all flex flex-col justify-between",
+                      "p-4 rounded-2xl border-2 text-left transition-all relative flex flex-col justify-between gap-3 shadow-xs",
                       isJamaahVauza
-                        ? "bg-emerald-50/90 border-emerald-600 shadow-md ring-2 ring-emerald-500/20"
-                        : "bg-white/80 border-white hover:border-emerald-300 shadow-xs"
+                        ? "border-emerald-600 bg-white/95 ring-2 ring-emerald-500/30"
+                        : "border-stone-200/80 bg-white/70 hover:bg-white/90"
                     )}
                   >
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center">
+                    <div className="flex items-start justify-between">
+                      <div className="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center">
                         <UserCheck className="w-5 h-5" />
                       </div>
-                      {isJamaahVauza && <BadgeCheck className="w-5 h-5 text-emerald-600" />}
+                      {isJamaahVauza && <CheckCircle2 className="w-5 h-5 text-emerald-600" />}
                     </div>
                     <div>
-                      <h3 className="font-extrabold text-slate-900 text-sm">Ya, Saya Jamaah VTU</h3>
-                      <p className="text-xs text-slate-600 mt-1 leading-relaxed">
+                      <h3 className="font-extrabold text-sm text-stone-900">Ya, Saya Jamaah VTU</h3>
+                      <p className="text-xs text-stone-600 mt-0.5 leading-relaxed">
                         Sedang atau akan mengikuti perjalanan Umroh bersama rombongan Vauza Tiga Utama.
                       </p>
                     </div>
-                  </div>
+                  </button>
 
-                  <div
+                  <button
+                    type="button"
                     onClick={() => {
                       setIsJamaahVauza(false);
                       setJamaahVerified(true);
                       setFormData((p) => ({ ...p, namaPaketUmroh: "" }));
+                      setVerifyMessage("");
                     }}
                     className={cn(
-                      "p-4 rounded-2xl cursor-pointer border-2 transition-all flex flex-col justify-between",
+                      "p-4 rounded-2xl border-2 text-left transition-all relative flex flex-col justify-between gap-3 shadow-xs",
                       !isJamaahVauza
-                        ? "bg-emerald-50/90 border-emerald-600 shadow-md ring-2 ring-emerald-500/20"
-                        : "bg-white/80 border-white hover:border-emerald-300 shadow-xs"
+                        ? "border-emerald-600 bg-white/95 ring-2 ring-emerald-500/30"
+                        : "border-stone-200/80 bg-white/70 hover:bg-white/90"
                     )}
                   >
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="w-10 h-10 rounded-xl bg-stone-100 text-stone-700 flex items-center justify-center">
+                    <div className="flex items-start justify-between">
+                      <div className="w-9 h-9 rounded-xl bg-stone-100 text-stone-700 flex items-center justify-center">
                         <User className="w-5 h-5" />
                       </div>
-                      {!isJamaahVauza && <BadgeCheck className="w-5 h-5 text-emerald-600" />}
+                      {!isJamaahVauza && <CheckCircle2 className="w-5 h-5 text-emerald-600" />}
                     </div>
                     <div>
-                      <h3 className="font-extrabold text-slate-900 text-sm">Bukan (Pendaftaran Umum)</h3>
-                      <p className="text-xs text-slate-600 mt-1 leading-relaxed">
+                      <h3 className="font-extrabold text-sm text-stone-900">Bukan (Pendaftaran Umum)</h3>
+                      <p className="text-xs text-stone-600 mt-0.5 leading-relaxed">
                         Mendaftarkan Wakaf Al-Qur&apos;an secara umum tanpa terikat keberangkatan paket rombongan jamaah.
                       </p>
                     </div>
-                  </div>
+                  </button>
                 </div>
 
                 {!isJamaahVauza && (
