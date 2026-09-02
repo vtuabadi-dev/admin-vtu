@@ -418,10 +418,10 @@ export default function BadalUmrohRegisterPage() {
             <div className="inline-flex items-center justify-center h-14 w-14 rounded-2xl bg-gradient-to-tr from-emerald-800 to-teal-700 text-white shadow-md shadow-emerald-900/30 mb-2">
               <CheckCircle2 className="h-8 w-8" />
             </div>
-            <h1 className="text-2xl sm:text-3xl font-black text-slate-950 tracking-tight drop-shadow-[0_1px_2px_rgba(255,255,255,0.9)]">
+            <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight drop-shadow-[0_2px_4px_rgba(0,0,0,0.85)]">
               Pendaftaran Badal Umroh Berhasil!
             </h1>
-            <p className="text-sm font-bold text-slate-900 mt-1 drop-shadow-[0_1px_1px_rgba(255,255,255,0.9)]">
+            <p className="text-sm font-bold text-stone-200 mt-1 drop-shadow-[0_1.5px_3px_rgba(0,0,0,0.8)]">
               Jazakallah Khairan, formulir pendaftaran Anda telah berhasil dicatat oleh sistem VTU Operasional.
             </p>
           </div>
@@ -502,10 +502,10 @@ export default function BadalUmrohRegisterPage() {
           <div className="inline-flex items-center justify-center h-12 w-12 rounded-2xl bg-gradient-to-tr from-emerald-800 to-teal-700 text-white shadow-md shadow-emerald-900/30 mb-2">
             <HeartHandshake className="h-6 w-6" />
           </div>
-          <h1 className="text-2xl sm:text-3xl font-black text-slate-950 tracking-tight drop-shadow-[0_1px_2px_rgba(255,255,255,0.9)]">
+          <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight drop-shadow-[0_2px_4px_rgba(0,0,0,0.85)]">
             Pendaftaran Badal Umroh
           </h1>
-          <p className="text-sm font-bold text-slate-900 mt-1 drop-shadow-[0_1px_1px_rgba(255,255,255,0.9)]">
+          <p className="text-sm font-bold text-stone-200 mt-1 drop-shadow-[0_1.5px_3px_rgba(0,0,0,0.8)]">
             Layanan Badal Umroh Resmi &amp; Amanah — Aman, Cepat, dan Terdokumentasi Lengkap
           </p>
         </div>

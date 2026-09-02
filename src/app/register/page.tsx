@@ -1017,8 +1017,8 @@ export default function RegisterPage() {
         <div className="inline-flex items-center justify-center h-12 w-12 rounded-2xl bg-gradient-to-tr from-emerald-800 to-teal-700 text-white shadow-md shadow-emerald-900/30 mb-2">
           <Building2 className="h-6 w-6" />
         </div>
-        <h1 className="text-2xl sm:text-3xl font-black text-slate-950 tracking-tight drop-shadow-[0_1px_2px_rgba(255,255,255,0.9)]">Registrasi Grup Umroh</h1>
-        <p className="text-sm font-bold text-slate-900 mt-1 drop-shadow-[0_1px_1px_rgba(255,255,255,0.9)]">Daftarkan rombongan Anda dalam 8 langkah mudah & cepat</p>
+        <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight drop-shadow-[0_2px_4px_rgba(0,0,0,0.85)]">Registrasi Grup Umroh</h1>
+        <p className="text-sm font-bold text-stone-200 mt-1 drop-shadow-[0_1.5px_3px_rgba(0,0,0,0.8)]">Daftarkan rombongan Anda dalam 8 langkah mudah & cepat</p>
       </div>
 
       {/* Step indicator */}
