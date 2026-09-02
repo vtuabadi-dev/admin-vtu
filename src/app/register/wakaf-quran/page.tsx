@@ -24,6 +24,7 @@ import {
   Check,
   Heart,
   Copy,
+  MapPin,
 } from "lucide-react";
 import { Button } from "@/shared/components/ui/Button";
 import { Input } from "@/shared/components/ui/Input";
@@ -912,8 +913,9 @@ export default function WakafQuranRegisterPage() {
                     {/* Lokasi Penyaluran (Fixed Masjidil Haram Makkah) */}
                     <div className="space-y-1.5">
                       <label className="text-xs font-bold text-stone-700">Lokasi Penyaluran</label>
-                      <div className="h-10 px-3 rounded-xl border border-emerald-200 bg-emerald-50/60 flex items-center text-xs font-extrabold text-emerald-950 shadow-xs">
-                        Masjidil Haram Makkah Al-Mukarramah
+                      <div className="h-10 px-3.5 rounded-xl border-2 border-[#D4AF37] bg-gradient-to-r from-[#3d2717] via-[#4a301d] to-[#331f11] flex items-center gap-2 text-xs font-black text-[#F5D061] shadow-md shadow-amber-950/30 ring-1 ring-[#F5D061]/40">
+                        <MapPin className="w-4 h-4 text-[#F5D061] shrink-0" />
+                        <span>Masjidil Haram Makkah Al-Mukarramah</span>
                       </div>
                     </div>
                   </div>
