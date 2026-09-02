@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { formatInvoicePersonName } from "@/shared/lib/utils";
 import { downloadInvoicePdf, type InvoicePdfData } from "@/shared/lib/invoice-pdf";
+import { resolveHotelForKlaster } from "@/shared/lib/hotel-utils";
 
 export default function PublicInvoicePage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params);
@@ -319,14 +320,18 @@ export default function PublicInvoicePage({ params }: { params: Promise<{ id: st
                 <div className="grid grid-cols-[90px_8px_1fr] items-start">
                   <span className="text-stone-900 font-semibold">Hotel Makkah</span>
                   <span className="text-stone-600">:</span>
-                  <span className="text-stone-900 break-words min-w-0 leading-tight">{data?.hotelMekkah || "Pullman ZamZam Makkah"}</span>
+                  <span className="text-stone-900 break-words min-w-0 leading-tight">
+                    {resolveHotelForKlaster(data?.hotelMekkah, data?.tipePaket || "SILVER") || "Pullman ZamZam Makkah"}
+                  </span>
                 </div>
                 <div className="border-t border-stone-100" />
 
                 <div className="grid grid-cols-[90px_8px_1fr] items-start">
                   <span className="text-stone-900 font-semibold">Hotel Madinah</span>
                   <span className="text-stone-600">:</span>
-                  <span className="text-stone-900 break-words min-w-0 leading-tight">{data?.hotelMadinah || "Anwar Al Madinah Mövenpick"}</span>
+                  <span className="text-stone-900 break-words min-w-0 leading-tight">
+                    {resolveHotelForKlaster(data?.hotelMadinah, data?.tipePaket || "SILVER") || "Anwar Al Madinah Mövenpick"}
+                  </span>
                 </div>
               </div>
             </div>

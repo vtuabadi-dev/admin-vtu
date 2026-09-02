@@ -5,6 +5,7 @@ import {
   VAUZA_TAMMA_SIGNATURE_BASE64,
   VAUZA_TAMMA_QR_BASE64,
 } from "./invoice-logo";
+import { resolveHotelForKlaster } from "./hotel-utils";
 
 export interface InvoiceOrderItem {
   id: string;
@@ -222,12 +223,13 @@ export function generateInvoicePdf(data: InvoicePdfData): jsPDF {
   const alamatLinesL = doc.splitTextToSize(alamatStrL, valW_L);
 
   // Right Box Texts & Line Wraps
+  const targetCluster = data.tipePaket || "SILVER";
   const pkgNameStrR = data.namaPaket || "Umroh Plus 12 Hari";
   const pkgLinesR = doc.splitTextToSize(pkgNameStrR, valW_R);
   const paxStrR = `${paxCount} Pax`;
-  const hotelMekkahStrR = data.hotelMekkah || "Pullman ZamZam Makkah";
+  const hotelMekkahStrR = resolveHotelForKlaster(data.hotelMekkah, targetCluster) || "Pullman ZamZam Makkah";
   const hotelMekkahLinesR = doc.splitTextToSize(hotelMekkahStrR, valW_R);
-  const hotelMadinahStrR = data.hotelMadinah || "Anwar Al Madinah Mövenpick";
+  const hotelMadinahStrR = resolveHotelForKlaster(data.hotelMadinah, targetCluster) || "Anwar Al Madinah Mövenpick";
   const hotelMadinahLinesR = doc.splitTextToSize(hotelMadinahStrR, valW_R);
 
   // Dynamic Row Heights Left

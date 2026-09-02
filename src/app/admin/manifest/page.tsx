@@ -31,6 +31,7 @@ import { formatDateShort, formatDate, cn } from "@/shared/lib/utils";
 import type { Manifest, Keberangkatan, Jamaah, RegistrationGroup } from "@/shared/types";
 import { useOperationalStore } from "@/stores/operational-store";
 import { extractFilesFromEvent } from "@/shared/lib/file-drop-utils";
+import { resolveHotelForKlaster } from "@/shared/lib/hotel-utils";
 
 // ── Helper Utilities ─────────────────────────────────────────
 
@@ -1448,12 +1449,18 @@ function ManifestPageContent() {
 
                                 {/* HOTEL MAKKAH */}
                                 <td className={`px-3 py-2.5 ${cellBorder}`}>
-                                  {activePackage.hotelMekkah || j.hotelMekkah || "Safwah Tower"}
+                                  {resolveHotelForKlaster(
+                                    j.hotelMekkah || activePackage.hotelMekkah,
+                                    (group.groupObj as any)?.hotelUpgrade || j.hotelUpgrade || j.cluster || "SILVER"
+                                  )}
                                 </td>
 
                                 {/* HOTEL MADINAH */}
                                 <td className={`px-3 py-2.5 ${cellBorder}`}>
-                                  {activePackage.hotelMadinah || j.hotelMadinah || "Durrat Al Eiman"}
+                                  {resolveHotelForKlaster(
+                                    j.hotelMadinah || activePackage.hotelMadinah,
+                                    (group.groupObj as any)?.hotelUpgrade || j.hotelUpgrade || j.cluster || "SILVER"
+                                  )}
                                 </td>
 
                                 {/* KAMAR */}

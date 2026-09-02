@@ -46,3 +46,45 @@ export function getHotelCombinations(
   });
   return result;
 }
+
+/**
+ * Resolves the specific hotel for a given package cluster (e.g. SILVER, BRONZE, GOLD)
+ * when a package contains multiple slash-separated hotels (e.g. "GRAND AL MASSA / RAYYANA GRAND PLAZA / SAFWAH TOWER").
+ */
+export function resolveHotelForKlaster(
+  rawHotel: string | undefined | null,
+  klasterName: string | undefined | null
+): string {
+  if (!rawHotel) return "-";
+  const rawClean = rawHotel.trim();
+  if (!rawClean.includes("/")) return rawClean;
+
+  const parts = rawClean.split("/").map((s) => s.trim()).filter(Boolean);
+  if (parts.length <= 1) return rawClean;
+
+  const kUpper = (klasterName || "").toUpperCase();
+
+  // Explicit keyword matching for clusters/variants
+  if (kUpper.includes("BRONZE") || kUpper.includes("PROMO") || kUpper.includes("HERO")) {
+    return parts[0] || rawClean;
+  }
+  if (
+    kUpper.includes("SILVER") ||
+    kUpper.includes("REGULAR") ||
+    kUpper.includes("STANDARD") ||
+    kUpper.includes("EKONOMI")
+  ) {
+    return parts[1] || parts[0] || rawClean;
+  }
+  if (
+    kUpper.includes("GOLD") ||
+    kUpper.includes("VIP") ||
+    kUpper.includes("EXECUTIVE") ||
+    kUpper.includes("PLATINUM")
+  ) {
+    return parts[parts.length - 1] || rawClean;
+  }
+
+  // Fallback if klaster is SILVER or unspecified
+  return parts[1] || parts[0] || rawClean;
+}
