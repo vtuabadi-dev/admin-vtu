@@ -213,22 +213,23 @@ export default function TrackBadalWakafPage() {
 
         {/* ── STEP 1: FORM LOGIN (Kombinasi Nama Pendaftar & No. WA) ── */}
         {step === "login" && (
-          <form onSubmit={handleTrackLogin} className="space-y-4 text-xs max-w-md mx-auto py-2">
-            <div className="bg-white/90 p-5 sm:p-6 rounded-2xl border border-stone-200 shadow-xs space-y-4">
-              <div className="text-center space-y-1.5 pb-3 border-b border-stone-100">
-                <div className="mx-auto w-10 h-10 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center mb-1">
+          <form onSubmit={handleTrackLogin} className="space-y-6 max-w-xl mx-auto py-2">
+            {/* ── Dark Green Form Box (Box Hijau) ── */}
+            <div className="p-6 sm:p-8 rounded-2xl bg-gradient-to-b from-[#061e16]/90 via-[#041610]/95 to-[#061e16]/90 backdrop-blur-xl border-t border-t-amber-400/40 border-b border-b-black/80 border-x border-x-amber-400/20 shadow-[inset_0_1px_1px_rgba(255,255,255,0.18),0_12px_32px_rgba(0,0,0,0.65)] space-y-5">
+              <div className="text-center space-y-2 pb-4 border-b border-amber-400/20">
+                <div className="mx-auto w-11 h-11 rounded-2xl bg-gradient-to-tr from-emerald-900 to-teal-800 border border-emerald-400/30 text-amber-300 flex items-center justify-center shadow-md">
                   <KeyRound className="h-5 w-5" />
                 </div>
-                <h3 className="font-extrabold text-sm text-stone-900">Kombinasi Sandi Akses Pendaftar</h3>
-                <p className="text-stone-600 text-xs leading-relaxed">
+                <h3 className="font-extrabold text-base text-white tracking-wide">Kombinasi Sandi Akses Pendaftar</h3>
+                <p className="text-amber-100/70 text-xs leading-relaxed max-w-md mx-auto">
                   Hanya pendaftar yang sudah pernah mengajukan pendaftaran Badal atau Wakaf yang dapat mengakses portal ini.
                 </p>
               </div>
 
               {/* 1. Nama Lengkap Pendaftar */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-stone-700 flex items-center gap-1.5">
-                  <User className="h-3.5 w-3.5 text-emerald-700" /> Nama Lengkap Pendaftar <span className="text-rose-500">*</span>
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-amber-100/90 flex items-center gap-1.5">
+                  <User className="h-4 w-4 text-amber-400" /> Nama Lengkap Pendaftar <span className="text-rose-400">*</span>
                 </label>
                 <Input
                   type="text"
@@ -236,14 +237,14 @@ export default function TrackBadalWakafPage() {
                   value={namaPemohon}
                   onChange={(e) => setNamaPemohon(e.target.value)}
                   placeholder="Masukkan nama pendaftar..."
-                  className="bg-white border-stone-300 rounded-xl text-xs h-10"
+                  className="bg-[#03120d] border-amber-400/30 text-white placeholder:text-stone-500 rounded-xl text-xs h-11 px-4 focus:border-amber-400 focus:ring-1 focus:ring-amber-400 font-medium"
                 />
               </div>
 
               {/* 2. Nomor WhatsApp Pendaftar */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-stone-700 flex items-center gap-1.5">
-                  <Phone className="h-3.5 w-3.5 text-emerald-700" /> Nomor WhatsApp Pendaftar <span className="text-rose-500">*</span>
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-amber-100/90 flex items-center gap-1.5">
+                  <Phone className="h-4 w-4 text-amber-400" /> Nomor WhatsApp Pendaftar <span className="text-rose-400">*</span>
                 </label>
                 <Input
                   type="tel"
@@ -251,34 +252,35 @@ export default function TrackBadalWakafPage() {
                   value={nomorWhatsapp}
                   onChange={(e) => setNomorWhatsapp(e.target.value)}
                   placeholder="Contoh: 081234567890"
-                  className="bg-white border-stone-300 rounded-xl text-xs h-10 font-medium"
+                  className="bg-[#03120d] border-amber-400/30 text-white placeholder:text-stone-500 rounded-xl text-xs h-11 px-4 focus:border-amber-400 focus:ring-1 focus:ring-amber-400 font-medium"
                 />
               </div>
+            </div>
 
-              <div className="pt-2 space-y-3">
-                <Button
-                  type="submit"
-                  disabled={loading}
-                  className="w-full h-11 bg-gradient-to-r from-amber-500 via-amber-600 to-yellow-600 hover:from-amber-600 hover:to-yellow-700 text-white font-extrabold rounded-xl shadow-md text-xs tracking-wider uppercase flex items-center justify-center gap-2"
-                >
-                  {loading ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" /> Memeriksa Pendaftaran...
-                    </>
-                  ) : (
-                    <>
-                      <KeyRound className="w-4 h-4" /> Masuk &amp; Cek Pendaftaran Saya
-                    </>
-                  )}
-                </Button>
+            {/* ── OUTSIDE THE DARK GREEN BOX: Action Button & Link (Sesuai Gambar Kedua) ── */}
+            <div className="flex flex-col items-center sm:items-end gap-3 pt-2">
+              <Button
+                type="submit"
+                disabled={loading}
+                className="w-full sm:w-auto px-8 h-12 bg-gradient-to-r from-[#e5b23e] via-[#d4a029] to-[#bf8818] hover:from-[#f0be48] hover:to-[#cb941d] text-[#061a13] font-black rounded-xl shadow-[inset_0_1px_1px_rgba(255,255,255,0.4),0_6px_20px_rgba(216,177,91,0.4)] text-xs tracking-wider uppercase flex items-center justify-center gap-2 transition-all active:scale-95"
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin text-[#061a13]" /> Memeriksa Pendaftaran...
+                  </>
+                ) : (
+                  <>
+                    <KeyRound className="w-4 h-4 text-[#061a13]" /> Masuk &amp; Cek Pendaftaran Saya
+                  </>
+                )}
+              </Button>
 
-                <p className="text-[11px] text-center text-stone-600 font-medium">
-                  Belum mendaftar?{" "}
-                  <Link href="/register/badal-umroh" className="text-emerald-800 hover:underline font-extrabold">
-                    Daftar Badal Umroh Baru
-                  </Link>
-                </p>
-              </div>
+              <p className="text-xs text-center sm:text-right text-stone-200 font-medium drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
+                Belum mendaftar?{" "}
+                <Link href="/register/badal-umroh" className="text-amber-300 hover:text-amber-200 underline font-bold ml-1">
+                  Daftar Badal Umroh Baru
+                </Link>
+              </p>
             </div>
           </form>
         )}
