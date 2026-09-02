@@ -9,6 +9,19 @@ import { Badge } from "@/shared/components/ui/Badge";
 import { formatDate } from "@/shared/lib/utils";
 import type { OperationalRole } from "@/shared/types";
 import { RolePermissionMatrix } from "./components/RolePermissionMatrix";
+import { ModulePermissionEditor } from "./components/ModulePermissionEditor";
+import type { ModulePermission } from "@/app/api/admin/roles/route";
+
+const INITIAL_MODULE_PERMISSIONS: ModulePermission[] = [
+  { moduleKey: "paket", moduleLabel: "Paket Umroh & Keberangkatan", canView: true, canCreate: true, canEdit: true, canApprove: true, canExport: true, canDelete: false },
+  { moduleKey: "jamaah", moduleLabel: "Data Jamaah & Registrasi", canView: true, canCreate: true, canEdit: true, canApprove: true, canExport: true, canDelete: false },
+  { moduleKey: "dokumen", moduleLabel: "Dokumen Paspor & AI OCR", canView: true, canCreate: true, canEdit: true, canApprove: true, canExport: true, canDelete: false },
+  { moduleKey: "pembayaran", moduleLabel: "Pembayaran & Invoice Group", canView: true, canCreate: true, canEdit: true, canApprove: true, canExport: true, canDelete: false },
+  { moduleKey: "manifest", moduleLabel: "Manifest Flight & Rooming", canView: true, canCreate: true, canEdit: true, canApprove: true, canExport: true, canDelete: false },
+  { moduleKey: "badal", moduleLabel: "Program Badal Umroh & Wakaf", canView: true, canCreate: true, canEdit: true, canApprove: true, canExport: true, canDelete: false },
+  { moduleKey: "audit", moduleLabel: "Audit Log & System Maintenance", canView: false, canCreate: false, canEdit: false, canApprove: false, canExport: false, canDelete: false },
+  { moduleKey: "users", moduleLabel: "Manajemen User & Hak Akses", canView: false, canCreate: false, canEdit: false, canApprove: false, canExport: false, canDelete: false },
+];
 
 interface UserItem {
   id: string;
@@ -89,6 +102,7 @@ export default function UserManagementPage() {
     description: "",
     enterpriseLevel: "ADMIN",
     baseRole: "admin_operasional",
+    permissions: INITIAL_MODULE_PERMISSIONS as ModulePermission[],
   });
   const [roleSubmitting, setRoleSubmitting] = useState(false);
   const [roleFormError, setRoleFormError] = useState<string | null>(null);
@@ -230,6 +244,7 @@ export default function UserManagementPage() {
           description: "",
           enterpriseLevel: "ADMIN",
           baseRole: "admin_operasional",
+          permissions: INITIAL_MODULE_PERMISSIONS,
         });
         setRoleSuccessMsg(null);
       }, 1200);
@@ -775,16 +790,16 @@ export default function UserManagementPage() {
 
       {/* Modal Add Custom Role */}
       {isAddRoleModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-md bg-card border rounded-xl shadow-xl p-6 space-y-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="w-full max-w-2xl bg-card border rounded-xl shadow-2xl p-6 space-y-4 max-h-[90vh] overflow-y-auto animate-in fade-in-0 zoom-in-95">
             <div className="flex items-center justify-between border-b pb-3">
-              <h2 className="text-lg font-bold flex items-center gap-2">
+              <h2 className="text-base font-bold flex items-center gap-2">
                 <ShieldPlus className="w-5 h-5 text-purple-600" />
-                Tambah Role &amp; Hak Akses Baru
+                Tambah Role &amp; Konfigurasi Hak Akses Modul
               </h2>
               <button
                 onClick={() => setIsAddRoleModalOpen(false)}
-                className="text-muted-foreground hover:text-foreground text-sm font-bold"
+                className="text-muted-foreground hover:text-foreground text-sm font-bold cursor-pointer"
               >
                 ✕
               </button>
@@ -803,50 +818,37 @@ export default function UserManagementPage() {
             )}
 
             <form onSubmit={handleCreateRole} className="space-y-4">
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold">Nama Role Operasional *</label>
-                <Input
-                  required
-                  placeholder="Contoh: Admin Keuangan Vendor"
-                  value={roleFormData.label}
-                  onChange={(e) => setRoleFormData({ ...roleFormData, label: e.target.value })}
-                />
-              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold">Nama Role Operasional *</label>
+                  <Input
+                    required
+                    placeholder="Contoh: Admin Keuangan Vendor"
+                    value={roleFormData.label}
+                    onChange={(e) => setRoleFormData({ ...roleFormData, label: e.target.value })}
+                    className="h-9 text-xs"
+                  />
+                </div>
 
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold">Tingkat Akses Enterprise (Enterprise Level)</label>
-                <select
-                  value={roleFormData.enterpriseLevel}
-                  onChange={(e) => setRoleFormData({ ...roleFormData, enterpriseLevel: e.target.value })}
-                  className="w-full h-10 px-3 text-xs bg-background border rounded-lg focus:outline-none focus:ring-1 focus:ring-primary"
-                >
-                  <option value="ADMIN">ADMIN — Pengelola Operasional Standar</option>
-                  <option value="OWNER">OWNER — Penanggung Jawab Manajerial</option>
-                  <option value="STAFF">STAFF — Staf Pelaksana Khusus</option>
-                  <option value="VIEWER">VIEWER — Akses Pantau / Baca Data</option>
-                </select>
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold">Salin Hak Akses Dari (Preset Baseline)</label>
-                <select
-                  value={roleFormData.baseRole}
-                  onChange={(e) => setRoleFormData({ ...roleFormData, baseRole: e.target.value })}
-                  className="w-full h-10 px-3 text-xs bg-background border rounded-lg focus:outline-none focus:ring-1 focus:ring-primary"
-                >
-                  <option value="admin_operasional">Admin Operasional (Akses Lengkap Fitur Harian)</option>
-                  <option value="admin_pembayaran">Admin Pembayaran / Keuangan</option>
-                  <option value="admin_manifest">Admin Manifest Flight &amp; Rooming</option>
-                  <option value="admin_dokumen">Admin Dokumen &amp; AI OCR</option>
-                  <option value="admin_badal">Admin Badal Umroh &amp; Wakaf</option>
-                  <option value="tour_leader">Tour Leader / Pembimbing Lapangan</option>
-                </select>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold">Tingkat Akses Enterprise (Enterprise Level)</label>
+                  <select
+                    value={roleFormData.enterpriseLevel}
+                    onChange={(e) => setRoleFormData({ ...roleFormData, enterpriseLevel: e.target.value })}
+                    className="w-full h-9 px-3 text-xs bg-background border rounded-lg focus:outline-none focus:ring-1 focus:ring-primary font-semibold"
+                  >
+                    <option value="ADMIN">ADMIN — Pengelola Operasional Standar</option>
+                    <option value="OWNER">OWNER — Penanggung Jawab Manajerial</option>
+                    <option value="STAFF">STAFF — Staf Pelaksana Khusus</option>
+                    <option value="VIEWER">VIEWER — Akses Pantau / Baca Data</option>
+                  </select>
+                </div>
               </div>
 
               <div className="space-y-1.5">
                 <label className="text-xs font-semibold">Deskripsi &amp; Tanggung Jawab Role</label>
                 <textarea
-                  rows={3}
+                  rows={2}
                   placeholder="Jelaskan cakupan tugas dan tanggung jawab dari role baru ini..."
                   value={roleFormData.description}
                   onChange={(e) => setRoleFormData({ ...roleFormData, description: e.target.value })}
@@ -854,7 +856,13 @@ export default function UserManagementPage() {
                 />
               </div>
 
-              <div className="pt-2 flex justify-end gap-2 border-t">
+              {/* Interactive Module Permissions Customizer Grid */}
+              <ModulePermissionEditor
+                permissions={roleFormData.permissions}
+                onChange={(updatedPerms) => setRoleFormData({ ...roleFormData, permissions: updatedPerms })}
+              />
+
+              <div className="pt-3 flex justify-end gap-2 border-t">
                 <Button
                   type="button"
                   variant="outline"
@@ -863,14 +871,14 @@ export default function UserManagementPage() {
                 >
                   Batal
                 </Button>
-                <Button type="submit" size="sm" disabled={roleSubmitting} className="bg-purple-600 hover:bg-purple-700 text-white">
+                <Button type="submit" size="sm" disabled={roleSubmitting} className="bg-purple-600 hover:bg-purple-700 text-white font-bold">
                   {roleSubmitting ? (
                     <>
                       <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />
-                      Menyimpan...
+                      Menyimpan Role...
                     </>
                   ) : (
-                    "Simpan Role Baru"
+                    "Simpan Role & Hak Akses"
                   )}
                 </Button>
               </div>
