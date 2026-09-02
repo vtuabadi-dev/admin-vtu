@@ -257,12 +257,12 @@ export default function TrackBadalWakafPage() {
               </div>
             </div>
 
-            {/* ── OUTSIDE THE DARK GREEN BOX: Action Button & Link (Sesuai Gambar Kedua) ── */}
-            <div className="flex flex-col items-center sm:items-end gap-3 pt-2">
+            {/* ── OUTSIDE THE DARK GREEN BOX: Action Button & Link (Centered) ── */}
+            <div className="flex flex-col items-center justify-center text-center gap-3 pt-2">
               <Button
                 type="submit"
                 disabled={loading}
-                className="w-full sm:w-auto px-8 h-12 bg-gradient-to-r from-[#e5b23e] via-[#d4a029] to-[#bf8818] hover:from-[#f0be48] hover:to-[#cb941d] text-[#061a13] font-black rounded-xl shadow-[inset_0_1px_1px_rgba(255,255,255,0.4),0_6px_20px_rgba(216,177,91,0.4)] text-xs tracking-wider uppercase flex items-center justify-center gap-2 transition-all active:scale-95"
+                className="w-full sm:w-auto px-8 h-12 bg-gradient-to-r from-[#e5b23e] via-[#d4a029] to-[#bf8818] hover:from-[#f0be48] hover:to-[#cb941d] text-[#061a13] font-black rounded-xl shadow-[inset_0_1px_1px_rgba(255,255,255,0.4),0_6px_20px_rgba(216,177,91,0.4)] text-xs tracking-wider uppercase flex items-center justify-center gap-2 transition-all active:scale-95 mx-auto"
               >
                 {loading ? (
                   <>
@@ -275,7 +275,7 @@ export default function TrackBadalWakafPage() {
                 )}
               </Button>
 
-              <p className="text-xs text-center sm:text-right text-stone-200 font-medium drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
+              <p className="text-xs text-center text-stone-200 font-medium drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
                 Belum mendaftar?{" "}
                 <Link href="/register/badal-umroh" className="text-amber-300 hover:text-amber-200 underline font-bold ml-1">
                   Daftar Badal Umroh Baru
