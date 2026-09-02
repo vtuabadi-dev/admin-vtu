@@ -462,7 +462,7 @@ export default function WakafQuranRegisterPage() {
               <div className="flex items-center justify-between pb-3 border-b border-stone-100">
                 <span className="text-xs font-bold text-stone-500 uppercase tracking-wider">Status Kejamaahan</span>
                 <span className="text-xs font-extrabold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200">
-                  {isJamaahVauza ? "Jamaah Vauza Tiga Utama (VTU)" : "Pendaftaran Umum"}
+                  {isJamaahVauza ? "Jamaah Vauza Tamma Abadi (VTU)" : "Pendaftaran Umum"}
                 </span>
               </div>
               {isJamaahVauza && formData.namaPaketUmroh && (
@@ -640,7 +640,7 @@ export default function WakafQuranRegisterPage() {
                     <div>
                       <h3 className="font-extrabold text-sm text-stone-900">Ya, Saya Jamaah VTU</h3>
                       <p className="text-xs text-stone-600 mt-0.5 leading-relaxed">
-                        Sedang atau akan mengikuti perjalanan Umroh bersama rombongan Vauza Tiga Utama.
+                        Sedang atau akan mengikuti perjalanan Umroh bersama rombongan Vauza Tamma Abadi.
                       </p>
                     </div>
                   </button>
@@ -965,7 +965,7 @@ export default function WakafQuranRegisterPage() {
                 <div>
                   <h2 className="text-lg font-extrabold text-slate-950">Ringkasan Tagihan &amp; Pembayaran</h2>
                   <p className="text-xs font-semibold text-slate-700 mt-0.5">
-                    Silakan transfer biaya wakaf ke rekening resmi PT Vauza Tiga Utama dan unggah bukti transfer.
+                    Silakan transfer biaya wakaf ke rekening resmi PT Vauza Tamma Abadi dan unggah bukti transfer.
                   </p>
                 </div>
 
@@ -998,7 +998,7 @@ export default function WakafQuranRegisterPage() {
                   <div className="flex items-center gap-2 border-b border-white/10 pb-3">
                     <Building2 className="w-5 h-5 text-emerald-400" />
                     <span className="text-xs font-extrabold tracking-wider uppercase text-emerald-300">
-                      Rekening Resmi PT Vauza Tiga Utama
+                      Rekening Resmi PT Vauza Tamma Abadi
                     </span>
                   </div>
 
@@ -1215,7 +1215,7 @@ export default function WakafQuranRegisterPage() {
               </div>
               <div className="flex justify-between">
                 <span className="text-stone-500 font-medium">Status Kejamaahan:</span>
-                <span className="font-bold text-stone-900">{isJamaahVauza ? "Jamaah Vauza Tiga Utama" : "Pendaftaran Umum"}</span>
+                <span className="font-bold text-stone-900">{isJamaahVauza ? "Jamaah Vauza Tamma Abadi" : "Pendaftaran Umum"}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-stone-500 font-medium">Jumlah Mushaf:</span>

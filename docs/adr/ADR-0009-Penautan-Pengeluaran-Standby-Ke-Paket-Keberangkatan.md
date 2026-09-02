@@ -7,7 +7,7 @@ APPROVED
 2026-09-02
 
 ## Konteks
-Pada operasional Travel Umroh PT Vauza Tiga Utama, transaksi pembayaran vendor (seperti *Down Payment* Hotel Makkah/Madinah, deposit tiket pesawat, atau pembayaran awal armada bus) sering kali harus dilunasi/dibayar di awal oleh perusahaan **sebelum** Paket Keberangkatan (`Keberangkatan` / `RegistrationGroup`) resmi dijadwalkan dan dibuat di sistem.
+Pada operasional Travel Umroh PT Vauza Tamma Abadi, transaksi pembayaran vendor (seperti *Down Payment* Hotel Makkah/Madinah, deposit tiket pesawat, atau pembayaran awal armada bus) sering kali harus dilunasi/dibayar di awal oleh perusahaan **sebelum** Paket Keberangkatan (`Keberangkatan` / `RegistrationGroup`) resmi dijadwalkan dan dibuat di sistem.
 
 Sebelumnya, pengeluaran yang dicatat tanpa paket keberangkatan masuk ke kategori `Operasional Umum (Non-Grup)`. Namun, belum tersedia mekanisme sistematis untuk menampung transaksi tersebut sebagai **Pengeluaran Standby** dan menautkannya (*reassign*) ke Paket Keberangkatan yang baru dibuat di kemudian hari.
 

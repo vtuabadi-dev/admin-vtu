@@ -433,7 +433,7 @@ export default function BadalUmrohRegisterPage() {
               <div className="flex items-center justify-between pb-3 border-b border-stone-100">
                 <span className="text-xs font-bold text-stone-500 uppercase tracking-wider">Status Kejamaahan</span>
                 <span className="text-xs font-extrabold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200">
-                  {isJamaahVauza ? "Jamaah Vauza Tiga Utama" : "Pendaftaran Umum"}
+                  {isJamaahVauza ? "Jamaah Vauza Tamma Abadi" : "Pendaftaran Umum"}
                 </span>
               </div>
               {isJamaahVauza && formData.namaPaketUmroh && (
@@ -603,7 +603,7 @@ export default function BadalUmrohRegisterPage() {
                   <div>
                     <h3 className="font-extrabold text-sm text-stone-900">Ya, Saya Jamaah VTU</h3>
                     <p className="text-xs text-stone-600 mt-0.5 leading-relaxed">
-                      Sedang atau akan mengikuti perjalanan Umroh bersama rombongan Vauza Tiga Utama.
+                      Sedang atau akan mengikuti perjalanan Umroh bersama rombongan Vauza Tamma Abadi.
                     </p>
                   </div>
                 </button>
@@ -1006,7 +1006,7 @@ export default function BadalUmrohRegisterPage() {
               <div>
                 <h2 className="text-xl font-bold text-stone-900">Ringkasan Tagihan &amp; Pembayaran</h2>
                 <p className="text-xs text-stone-600 mt-0.5">
-                  Lakukan pembayaran biaya badal umroh ke rekening resmi operasional PT Vauza Tiga Utama.
+                  Lakukan pembayaran biaya badal umroh ke rekening resmi operasional PT Vauza Tamma Abadi.
                 </p>
               </div>
 
@@ -1037,7 +1037,7 @@ export default function BadalUmrohRegisterPage() {
                 <div className="flex items-center gap-2 border-b border-white/10 pb-3">
                   <CreditCard className="w-5 h-5 text-emerald-400" />
                   <h3 className="text-xs font-extrabold uppercase tracking-wider text-emerald-300">
-                    Rekening Resmi PT Vauza Tiga Utama
+                    Rekening Resmi PT Vauza Tamma Abadi
                   </h3>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -1249,7 +1249,7 @@ export default function BadalUmrohRegisterPage() {
               </div>
               <div className="flex justify-between">
                 <span className="text-stone-500 font-medium">Status Kejamaahan:</span>
-                <span className="font-bold text-stone-900">{isJamaahVauza ? "Jamaah Vauza Tiga Utama" : "Pendaftaran Umum"}</span>
+                <span className="font-bold text-stone-900">{isJamaahVauza ? "Jamaah Vauza Tamma Abadi" : "Pendaftaran Umum"}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-stone-500 font-medium">Jumlah Badal:</span>

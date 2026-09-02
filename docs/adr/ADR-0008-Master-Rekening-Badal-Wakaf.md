@@ -7,7 +7,7 @@ APPROVED
 2026-08-27
 
 ## Konteks
-Pada operasional PT Vauza Tiga Utama, penerimaan dana untuk program **Wakaf Mushaf Al-Qur'an** dan **Badal Umroh** memiliki rekening tujuan khusus yang terpisah dari rekening penampungan pendaftaran/pelunasan paket umroh reguler.
+Pada operasional PT Vauza Tamma Abadi, penerimaan dana untuk program **Wakaf Mushaf Al-Qur'an** dan **Badal Umroh** memiliki rekening tujuan khusus yang terpisah dari rekening penampungan pendaftaran/pelunasan paket umroh reguler.
 
 Sebelumnya, nomor rekening pembayaran pada formulir pendaftaran `/register/wakaf-quran` dan `/register/badal-umroh` di-*hardcode* pada antarmuka frontend, sehingga manajemen tidak dapat memperbarui, menambah, atau mengganti nomor rekening operasional wakaf & badal secara mandiri tanpa modifikasi *source code*.
 
@@ -20,7 +20,7 @@ Diperlukan arsitektur konfigurasi dinamis yang dikelola langsung dari menu **Mas
      - `tipeLayanan`: String (`'WAKAF_QURAN'`, `'BADAL_UMROH'`, `'GENERAL'`)
      - `namaBank`: String (misal: "Bank Syariah Indonesia (BSI)", "Bank Mandiri", "BCA")
      - `nomorRekening`: String (misal: "721 888 9991")
-     - `atasNama`: String (misal: "PT VAUZA TIGA UTAMA")
+     - `atasNama`: String (misal: "PT VAUZA TAMMA ABADI")
      - `keterangan`: String? (opsional keterangan/catatan peruntukan)
      - `isActive`: Boolean (default `true`)
      - `urutan`: Int (default `1`)

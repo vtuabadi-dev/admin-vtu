@@ -58,7 +58,7 @@ export default function MasterBadalWakafPage() {
     tipeLayanan: "BADAL_UMROH",
     namaBank: "",
     nomorRekening: "",
-    atasNama: "PT VAUZA TIGA UTAMA",
+    atasNama: "PT VAUZA TAMMA ABADI",
     keterangan: "Rekening Resmi Operasional Badal & Wakaf",
     isActive: true,
     urutan: 1,
@@ -123,7 +123,7 @@ export default function MasterBadalWakafPage() {
       tipeLayanan: "BADAL_UMROH",
       namaBank: "",
       nomorRekening: "",
-      atasNama: "PT VAUZA TIGA UTAMA",
+      atasNama: "PT VAUZA TAMMA ABADI",
       keterangan: "Rekening Resmi Operasional Badal & Wakaf",
       isActive: true,
       urutan: rekeningList.length + 1,
@@ -456,7 +456,7 @@ export default function MasterBadalWakafPage() {
             <Input
               value={formRekening.atasNama}
               onChange={(e) => setFormRekening({ ...formRekening, atasNama: e.target.value })}
-              placeholder="Contoh: PT VAUZA TIGA UTAMA"
+              placeholder="Contoh: PT VAUZA TAMMA ABADI"
               className="text-xs h-10 rounded-xl font-semibold"
             />
           </div>
