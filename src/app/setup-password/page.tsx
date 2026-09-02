@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { KeyRound, Eye, EyeOff, ShieldCheck, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
 
-export default function SetupPasswordPage() {
+function SetupPasswordForm() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const token = searchParams.get("token");
@@ -242,5 +242,22 @@ export default function SetupPasswordPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function SetupPasswordPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
+          <div className="flex flex-col items-center gap-3 text-emerald-400">
+            <Loader2 className="w-8 h-8 animate-spin" />
+            <p className="text-xs">Memuat halaman penyiapan password...</p>
+          </div>
+        </div>
+      }
+    >
+      <SetupPasswordForm />
+    </Suspense>
   );
 }
