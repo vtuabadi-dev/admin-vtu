@@ -23,6 +23,7 @@ import {
   Plus,
   Check,
   Copy,
+  MapPin,
 } from "lucide-react";
 import { Button } from "@/shared/components/ui/Button";
 import { Input } from "@/shared/components/ui/Input";
@@ -105,6 +106,50 @@ export default function BadalUmrohRegisterPage() {
     metodeSouvenir: "dikantor", // "dikantor" | "dikirim"
     alamatPengiriman: "",
   });
+
+  // State Alamat Pengiriman Terstruktur (9 Field Lengkap)
+  const [alamatForm, setAlamatForm] = useState({
+    namaPenerima: "",
+    noHpPenerima: "",
+    jalanRumah: "",
+    rtRw: "",
+    kelurahan: "",
+    kecamatan: "",
+    kotaKabupaten: "",
+    provinsi: "",
+    kodePos: "",
+  });
+
+  const updateFormattedAddress = (newForm: typeof alamatForm) => {
+    setAlamatForm(newForm);
+    const parts = [
+      newForm.namaPenerima ? `Penerima: ${newForm.namaPenerima}` : "",
+      newForm.noHpPenerima ? `(Telp: ${newForm.noHpPenerima})` : "",
+      newForm.jalanRumah ? newForm.jalanRumah : "",
+      newForm.rtRw ? `RT/RW: ${newForm.rtRw}` : "",
+      newForm.kelurahan ? `Kel. ${newForm.kelurahan}` : "",
+      newForm.kecamatan ? `Kec. ${newForm.kecamatan}` : "",
+      newForm.kotaKabupaten ? newForm.kotaKabupaten : "",
+      newForm.provinsi ? newForm.provinsi : "",
+      newForm.kodePos ? `Kode Pos: ${newForm.kodePos}` : "",
+    ].filter(Boolean);
+
+    setFormData((prev) => ({ ...prev, alamatPengiriman: parts.join(", ") }));
+  };
+
+  useEffect(() => {
+    if (step === 4 && formData.metodeSouvenir === "dikirim") {
+      setAlamatForm((prev) => {
+        const updated = {
+          ...prev,
+          namaPenerima: prev.namaPenerima || formData.namaPemohon || "",
+          noHpPenerima: prev.noHpPenerima || formData.nomorWhatsapp || "",
+        };
+        updateFormattedAddress(updated);
+        return updated;
+      });
+    }
+  }, [step, formData.metodeSouvenir, formData.namaPemohon, formData.nomorWhatsapp]);
 
   const [buktiTransferFile, setBuktiTransferFile] = useState<File | null>(null);
   const [buktiTransferPreview, setBuktiTransferPreview] = useState<string>("");
@@ -980,19 +1025,138 @@ export default function BadalUmrohRegisterPage() {
               </div>
 
               {formData.metodeSouvenir === "dikirim" && (
-                <div className="p-5 rounded-2xl bg-white/90 border border-stone-200/90 shadow-xs space-y-2">
-                  <label className="text-xs font-bold text-stone-700">Alamat Pengiriman Lengkap *</label>
-                  <textarea
-                    rows={3}
-                    value={formData.alamatPengiriman}
-                    onChange={(e) => setFormData({ ...formData, alamatPengiriman: e.target.value })}
-                    placeholder="Contoh: Jl. Mawar No. 12, RT 02/RW 04, Kel. Kebon Jeruk, Kec. Kebon Jeruk, Jakarta Barat 11530"
-                    className="w-full p-3 rounded-xl border border-stone-200 text-xs text-stone-900 bg-white focus:outline-hidden focus:ring-2 focus:ring-emerald-500/30"
-                    required
-                  />
-                  <p className="text-[11px] text-stone-500">
-                    Pastikan mencantumkan nama penerima, nomor telepon, dan kode pos untuk kelancaran pengiriman ekspedisi.
-                  </p>
+                <div className="p-5 sm:p-6 rounded-2xl bg-white/90 border border-stone-200/90 shadow-xs space-y-4">
+                  <div className="flex items-center gap-2 border-b border-stone-200 pb-3">
+                    <MapPin className="w-4 h-4 text-emerald-700 shrink-0" />
+                    <h3 className="text-xs font-bold text-stone-900 uppercase tracking-wider">
+                      Formulir Alamat Pengiriman Ekspedisi (Lengkap &amp; Terstruktur)
+                    </h3>
+                  </div>
+
+                  {/* 1. Nama & No HP Penerima */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-stone-700">Nama Penerima Paket *</label>
+                      <Input
+                        type="text"
+                        required
+                        value={alamatForm.namaPenerima}
+                        onChange={(e) => updateFormattedAddress({ ...alamatForm, namaPenerima: e.target.value })}
+                        placeholder="Nama penerima paket..."
+                        className="bg-white border-stone-300 rounded-xl text-xs h-10"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-stone-700">No. HP / WhatsApp Penerima *</label>
+                      <Input
+                        type="tel"
+                        required
+                        value={alamatForm.noHpPenerima}
+                        onChange={(e) => updateFormattedAddress({ ...alamatForm, noHpPenerima: e.target.value })}
+                        placeholder="Contoh: 081234567890"
+                        className="bg-white border-stone-300 rounded-xl text-xs h-10 font-medium"
+                      />
+                    </div>
+                  </div>
+
+                  {/* 2. Alamat Jalan & Rumah */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-stone-700">Alamat Jalan, No. Rumah, &amp; Patokan *</label>
+                    <textarea
+                      rows={2}
+                      required
+                      value={alamatForm.jalanRumah}
+                      onChange={(e) => updateFormattedAddress({ ...alamatForm, jalanRumah: e.target.value })}
+                      placeholder="Contoh: Jl. Mawar No. 12, Komplek Permata Indah (Depan Masjid Al-Ikhlas)"
+                      className="w-full p-3 rounded-xl border border-stone-300 text-xs text-stone-900 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
+                    />
+                  </div>
+
+                  {/* 3. RT/RW, Kelurahan, Kecamatan */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-stone-700">RT / RW *</label>
+                      <Input
+                        type="text"
+                        required
+                        value={alamatForm.rtRw}
+                        onChange={(e) => updateFormattedAddress({ ...alamatForm, rtRw: e.target.value })}
+                        placeholder="Contoh: RT 02 / RW 04"
+                        className="bg-white border-stone-300 rounded-xl text-xs h-10"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-stone-700">Kelurahan / Desa *</label>
+                      <Input
+                        type="text"
+                        required
+                        value={alamatForm.kelurahan}
+                        onChange={(e) => updateFormattedAddress({ ...alamatForm, kelurahan: e.target.value })}
+                        placeholder="Contoh: Kebon Jeruk"
+                        className="bg-white border-stone-300 rounded-xl text-xs h-10"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-stone-700">Kecamatan *</label>
+                      <Input
+                        type="text"
+                        required
+                        value={alamatForm.kecamatan}
+                        onChange={(e) => updateFormattedAddress({ ...alamatForm, kecamatan: e.target.value })}
+                        placeholder="Contoh: Kebon Jeruk"
+                        className="bg-white border-stone-300 rounded-xl text-xs h-10"
+                      />
+                    </div>
+                  </div>
+
+                  {/* 4. Kota/Kabupaten, Provinsi, Kode Pos */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-stone-700">Kota / Kabupaten *</label>
+                      <Input
+                        type="text"
+                        required
+                        value={alamatForm.kotaKabupaten}
+                        onChange={(e) => updateFormattedAddress({ ...alamatForm, kotaKabupaten: e.target.value })}
+                        placeholder="Contoh: Jakarta Barat"
+                        className="bg-white border-stone-300 rounded-xl text-xs h-10"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-stone-700">Provinsi *</label>
+                      <Input
+                        type="text"
+                        required
+                        value={alamatForm.provinsi}
+                        onChange={(e) => updateFormattedAddress({ ...alamatForm, provinsi: e.target.value })}
+                        placeholder="Contoh: DKI Jakarta"
+                        className="bg-white border-stone-300 rounded-xl text-xs h-10"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-stone-700">Kode Pos *</label>
+                      <Input
+                        type="text"
+                        required
+                        value={alamatForm.kodePos}
+                        onChange={(e) => updateFormattedAddress({ ...alamatForm, kodePos: e.target.value })}
+                        placeholder="Contoh: 11530"
+                        className="bg-white border-stone-300 rounded-xl text-xs h-10 font-mono"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Preview Format Alamat */}
+                  {formData.alamatPengiriman && (
+                    <div className="p-3.5 bg-emerald-50/90 border border-emerald-200 rounded-xl space-y-1">
+                      <span className="text-[10.5px] font-extrabold text-emerald-800 uppercase tracking-wide block">
+                        Preview Format Alamat Pengiriman LENGKAP:
+                      </span>
+                      <p className="text-xs font-bold text-emerald-950 leading-relaxed font-mono">
+                        {formData.alamatPengiriman}
+                      </p>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
