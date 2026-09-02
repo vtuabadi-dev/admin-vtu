@@ -5,27 +5,6 @@ import { auth } from "@/server/auth";
 
 export const dynamic = "force-dynamic";
 
-const DEFAULT_REKENING = [
-  {
-    tipeLayanan: "BADAL_UMROH",
-    namaBank: "Bank Mandiri (IDR)",
-    nomorRekening: "142-00-1234567-8",
-    atasNama: "PT VAUZA TAMMA ABADI",
-    keterangan: "Rekening Khusus Badal Umroh Amanah",
-    isActive: true,
-    urutan: 1,
-  },
-  {
-    tipeLayanan: "WAKAF_QURAN",
-    namaBank: "Bank Mandiri",
-    nomorRekening: "142 00 9988 7766",
-    atasNama: "PT VAUZA TAMMA ABADI",
-    keterangan: "Rekening Operasional Wakaf Al-Qur'an",
-    isActive: true,
-    urutan: 2,
-  },
-];
-
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
@@ -41,30 +20,10 @@ export async function GET(request: NextRequest) {
       };
     }
 
-    let records = await prisma.masterRekeningLayanan.findMany({
+    const records = await prisma.masterRekeningLayanan.findMany({
       where,
       orderBy: [{ urutan: "asc" }, { createdAt: "asc" }],
     });
-
-    // If database is completely empty, seed default unified records
-    if (records.length === 0) {
-      const created = await Promise.all(
-        DEFAULT_REKENING.map((item) =>
-          prisma.masterRekeningLayanan.create({
-            data: {
-              tipeLayanan: "BADAL_WAKAF",
-              namaBank: item.namaBank,
-              nomorRekening: item.nomorRekening,
-              atasNama: item.atasNama,
-              keterangan: item.keterangan,
-              isActive: true,
-              urutan: item.urutan,
-            },
-          })
-        )
-      );
-      records = created;
-    }
 
     return NextResponse.json({ success: true, data: records });
   } catch (error: any) {
