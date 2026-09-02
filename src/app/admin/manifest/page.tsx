@@ -284,23 +284,40 @@ function formatIdRegister(baseCode: string, memberIndex: number, totalInGroup: n
   return cleanCode;
 }
 
+function getJamaahCluster(groupObj: any, j: any): string {
+  const c =
+    (groupObj as any)?.hotelUpgrade ||
+    (groupObj as any)?.cluster ||
+    (groupObj as any)?.namaCluster ||
+    j?.hotelUpgrade ||
+    j?.cluster ||
+    j?.klaster ||
+    "";
+  if (!c || c === "null" || c === "undefined") return "";
+  return c;
+}
+
 function formatGroupMergeLabel(groupObj: any, groupMembers: any[]): string {
   const paxCount = groupMembers.length;
+  const firstMember = groupMembers[0] || {};
   const defaultRoom =
     paxCount === 1
       ? "SINGLE"
       : paxCount === 2
-      ? "UPGRADE DOUBLE"
+      ? "DOUBLE"
       : paxCount === 3
-      ? "UPGRADE TRIPLE"
-      : paxCount >= 4
-      ? "UPGRADE QUAD"
-      : "UPGRADE DOUBLE";
-  const roomType = groupObj?.roomUpgrade || groupObj?.tipeKamar || defaultRoom;
-  const cluster = groupObj?.hotelUpgrade || groupObj?.namaCluster || "PLATINUM (38.900)";
-  const dateStr = formatDisplayDate(groupObj?.createdAt || groupMembers[0]?.createdAt || new Date());
+      ? "TRIPLE"
+      : "QUAD";
+
+  const rawRoom = groupObj?.roomUpgrade || groupObj?.tipeKamar || firstMember?.tipeKamar || defaultRoom;
+  const clusterName = getJamaahCluster(groupObj, firstMember);
+
+  const dateStr = formatDisplayDate(groupObj?.createdAt || firstMember?.createdAt || new Date());
   
-  return `${paxCount} PAX ${String(roomType).toUpperCase()} + ${String(cluster).toUpperCase()} ${dateStr}`;
+  const roomStr = String(rawRoom).toUpperCase().replace(/^UPGRADE\s+/i, "UPGRADE ");
+  const clusterStr = clusterName ? ` + ${clusterName.toUpperCase()}` : "";
+
+  return `${paxCount} PAX ${roomStr}${clusterStr} ${dateStr}`;
 }
 
 // ── Main Page Component Content ──────────────────────────────
@@ -1414,7 +1431,8 @@ function ManifestPageContent() {
                                 {/* KLASTER & FASILITAS */}
                                 <td className={`px-3 py-2.5 ${cellBorder}`}>
                                   {(() => {
-                                    const klasterName = (group.groupObj as any)?.hotelUpgrade || j.hotelUpgrade || j.cluster || "SILVER";
+                                    const rawKlaster = getJamaahCluster(group.groupObj, j);
+                                    const klasterName = rawKlaster || "SILVER";
                                     const isPromoKlaster = klasterName.toUpperCase().includes("PROMO");
                                     const isTanpaPerlengkapan = (group.groupObj as any)?.tanpaPerlengkapan || (group.groupObj as any)?.perlengkapan === "EXCLUDE" || j.tanpaPerlengkapan;
 
@@ -1451,7 +1469,7 @@ function ManifestPageContent() {
                                 <td className={`px-3 py-2.5 ${cellBorder}`}>
                                   {resolveHotelForKlaster(
                                     j.hotelMekkah || activePackage.hotelMekkah,
-                                    (group.groupObj as any)?.hotelUpgrade || j.hotelUpgrade || j.cluster || "SILVER"
+                                    getJamaahCluster(group.groupObj, j) || "SILVER"
                                   )}
                                 </td>
 
@@ -1459,7 +1477,7 @@ function ManifestPageContent() {
                                 <td className={`px-3 py-2.5 ${cellBorder}`}>
                                   {resolveHotelForKlaster(
                                     j.hotelMadinah || activePackage.hotelMadinah,
-                                    (group.groupObj as any)?.hotelUpgrade || j.hotelUpgrade || j.cluster || "SILVER"
+                                    getJamaahCluster(group.groupObj, j) || "SILVER"
                                   )}
                                 </td>
 
