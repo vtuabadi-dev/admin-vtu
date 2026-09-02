@@ -1022,7 +1022,7 @@ export default function RegisterPage() {
       </div>
 
       {/* Step indicator */}
-      <div className="bg-[#061e17]/40 dark:bg-[#061e17]/40 backdrop-blur-md p-4 sm:p-5 rounded-2xl border border-emerald-500/30 shadow-[inset_0_1px_1px_rgba(255,255,255,0.15),0_15px_30px_-10px_rgba(0,0,0,0.3)] mb-6 overflow-x-auto">
+      <div className="bg-[#061e17]/40 dark:bg-[#061e17]/40 backdrop-blur-md p-4 sm:p-5 rounded-2xl border-t border-l border-emerald-400/40 border-b border-r border-black/60 shadow-[inset_1.5px_1.5px_3px_rgba(255,255,255,0.2),inset_-1.5px_-1.5px_4px_rgba(0,0,0,0.6),0_15px_35px_-10px_rgba(0,0,0,0.5)] mb-6 overflow-x-auto">
         <div className="relative flex items-start justify-between min-w-[580px] sm:min-w-[620px] max-w-4xl mx-auto">
           {/* Base Background Connecting Track */}
           <div className="absolute top-[18px] left-[6.25%] right-[6.25%] h-0.5 bg-emerald-800/60 dark:bg-emerald-800/60 z-0" />
