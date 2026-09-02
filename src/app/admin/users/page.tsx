@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Users, Shield, UserPlus, Loader2, RefreshCw, Copy, Check, Mail, Send } from "lucide-react";
+import { Users, Shield, UserPlus, Loader2, RefreshCw, Copy, Check, Mail, Send, ShieldPlus } from "lucide-react";
 import { Button } from "@/shared/components/ui/Button";
 import { Input } from "@/shared/components/ui/Input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/components/ui/Card";
@@ -60,6 +60,18 @@ export default function UserManagementPage() {
   });
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+
+  // Modal Add Custom Role State
+  const [isAddRoleModalOpen, setIsAddRoleModalOpen] = useState(false);
+  const [roleFormData, setRoleFormData] = useState({
+    label: "",
+    description: "",
+    enterpriseLevel: "ADMIN",
+    baseRole: "admin_operasional",
+  });
+  const [roleSubmitting, setRoleSubmitting] = useState(false);
+  const [roleFormError, setRoleFormError] = useState<string | null>(null);
+  const [roleSuccessMsg, setRoleSuccessMsg] = useState<string | null>(null);
 
   // Modal Success / Copy Invite Link State
   const [createdInvite, setCreatedInvite] = useState<{
@@ -132,6 +144,45 @@ export default function UserManagementPage() {
     setTimeout(() => setCopiedToken(false), 2500);
   };
 
+  const handleCreateRole = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setRoleFormError(null);
+    setRoleSuccessMsg(null);
+
+    if (!roleFormData.label.trim()) {
+      setRoleFormError("Nama role harus diisi.");
+      return;
+    }
+
+    try {
+      setRoleSubmitting(true);
+      const res = await fetch("/api/admin/roles", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(roleFormData),
+      });
+
+      const json = await res.json();
+      if (!json.success) throw new Error(json.message);
+
+      setRoleSuccessMsg(`Role kustom "${roleFormData.label}" berhasil dibuat!`);
+      setTimeout(() => {
+        setIsAddRoleModalOpen(false);
+        setRoleFormData({
+          label: "",
+          description: "",
+          enterpriseLevel: "ADMIN",
+          baseRole: "admin_operasional",
+        });
+        setRoleSuccessMsg(null);
+      }, 1200);
+    } catch (err: any) {
+      setRoleFormError(err.message || "Gagal membuat role baru.");
+    } finally {
+      setRoleSubmitting(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -150,10 +201,17 @@ export default function UserManagementPage() {
             <RefreshCw className={`h-4 w-4 mr-1 ${loading ? "animate-spin" : ""}`} />
             Refresh
           </Button>
-          <Button onClick={() => setIsModalOpen(true)}>
-            <UserPlus className="h-4 w-4 mr-2" />
-            Tambah Admin
-          </Button>
+          {activeTab === "users" ? (
+            <Button onClick={() => setIsModalOpen(true)}>
+              <UserPlus className="h-4 w-4 mr-2" />
+              Tambah Admin
+            </Button>
+          ) : (
+            <Button onClick={() => setIsAddRoleModalOpen(true)} className="bg-purple-600 hover:bg-purple-700 text-white">
+              <ShieldPlus className="h-4 w-4 mr-2" />
+              Tambah Role
+            </Button>
+          )}
         </div>
       </div>
 
@@ -493,6 +551,112 @@ export default function UserManagementPage() {
                 Selesai
               </Button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Add Custom Role */}
+      {isAddRoleModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md bg-card border rounded-xl shadow-xl p-6 space-y-4">
+            <div className="flex items-center justify-between border-b pb-3">
+              <h2 className="text-lg font-bold flex items-center gap-2">
+                <ShieldPlus className="w-5 h-5 text-purple-600" />
+                Tambah Role &amp; Hak Akses Baru
+              </h2>
+              <button
+                onClick={() => setIsAddRoleModalOpen(false)}
+                className="text-muted-foreground hover:text-foreground text-sm font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
+            {roleFormError && (
+              <div className="p-3 rounded-lg bg-destructive/10 text-destructive text-xs">
+                {roleFormError}
+              </div>
+            )}
+
+            {roleSuccessMsg && (
+              <div className="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs font-bold">
+                {roleSuccessMsg}
+              </div>
+            )}
+
+            <form onSubmit={handleCreateRole} className="space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold">Nama Role Operasional *</label>
+                <Input
+                  required
+                  placeholder="Contoh: Admin Keuangan Vendor"
+                  value={roleFormData.label}
+                  onChange={(e) => setRoleFormData({ ...roleFormData, label: e.target.value })}
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold">Tingkat Akses Enterprise (Enterprise Level)</label>
+                <select
+                  value={roleFormData.enterpriseLevel}
+                  onChange={(e) => setRoleFormData({ ...roleFormData, enterpriseLevel: e.target.value })}
+                  className="w-full h-10 px-3 text-xs bg-background border rounded-lg focus:outline-none focus:ring-1 focus:ring-primary"
+                >
+                  <option value="ADMIN">ADMIN — Pengelola Operasional Standar</option>
+                  <option value="OWNER">OWNER — Penanggung Jawab Manajerial</option>
+                  <option value="STAFF">STAFF — Staf Pelaksana Khusus</option>
+                  <option value="VIEWER">VIEWER — Akses Pantau / Baca Data</option>
+                </select>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold">Salin Hak Akses Dari (Preset Baseline)</label>
+                <select
+                  value={roleFormData.baseRole}
+                  onChange={(e) => setRoleFormData({ ...roleFormData, baseRole: e.target.value })}
+                  className="w-full h-10 px-3 text-xs bg-background border rounded-lg focus:outline-none focus:ring-1 focus:ring-primary"
+                >
+                  <option value="admin_operasional">Admin Operasional (Akses Lengkap Fitur Harian)</option>
+                  <option value="admin_pembayaran">Admin Pembayaran / Keuangan</option>
+                  <option value="admin_manifest">Admin Manifest Flight &amp; Rooming</option>
+                  <option value="admin_dokumen">Admin Dokumen &amp; AI OCR</option>
+                  <option value="admin_badal">Admin Badal Umroh &amp; Wakaf</option>
+                  <option value="tour_leader">Tour Leader / Pembimbing Lapangan</option>
+                </select>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold">Deskripsi &amp; Tanggung Jawab Role</label>
+                <textarea
+                  rows={3}
+                  placeholder="Jelaskan cakupan tugas dan tanggung jawab dari role baru ini..."
+                  value={roleFormData.description}
+                  onChange={(e) => setRoleFormData({ ...roleFormData, description: e.target.value })}
+                  className="w-full p-2.5 text-xs bg-background border rounded-lg focus:outline-none focus:ring-1 focus:ring-primary resize-none"
+                />
+              </div>
+
+              <div className="pt-2 flex justify-end gap-2 border-t">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIsAddRoleModalOpen(false)}
+                >
+                  Batal
+                </Button>
+                <Button type="submit" size="sm" disabled={roleSubmitting} className="bg-purple-600 hover:bg-purple-700 text-white">
+                  {roleSubmitting ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />
+                      Menyimpan...
+                    </>
+                  ) : (
+                    "Simpan Role Baru"
+                  )}
+                </Button>
+              </div>
+            </form>
           </div>
         </div>
       )}

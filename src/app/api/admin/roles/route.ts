@@ -147,11 +147,57 @@ const ROLE_CONFIG_DATA: RoleConfigItem[] = [
   },
 ];
 
+// Memory store for custom roles added by Super Admin
+const customRoles: RoleConfigItem[] = [];
+
 export async function GET(_request: NextRequest) {
   const session = await auth();
   if (!session?.user) {
     return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
   }
 
-  return NextResponse.json({ success: true, data: ROLE_CONFIG_DATA });
+  return NextResponse.json({ success: true, data: [...ROLE_CONFIG_DATA, ...customRoles] });
+}
+
+export async function POST(request: NextRequest) {
+  const session = await auth();
+  if (!session?.user) {
+    return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
+  }
+
+  try {
+    const body = await request.json();
+    const { label, description, enterpriseLevel, baseRole } = body;
+
+    if (!label || typeof label !== "string") {
+      return NextResponse.json({ success: false, message: "Nama role wajib diisi." }, { status: 400 });
+    }
+
+    const roleKey = label.toLowerCase().trim().replace(/[^a-z0-9]+/g, "_");
+    
+    // Find base permissions template from existing roles
+    const baseItem = ROLE_CONFIG_DATA.find((r) => r.role === baseRole) ?? ROLE_CONFIG_DATA[0];
+
+    const newRoleItem: RoleConfigItem = {
+      role: roleKey as OperationalRole,
+      label,
+      description: description || `Role kustom ${label} dengan konfigurasi kewenangan operasional.`,
+      badgeClass: "bg-emerald-500/10 text-emerald-600 border-emerald-200",
+      enterpriseLevel: enterpriseLevel || "ADMIN",
+      permissions: JSON.parse(JSON.stringify(baseItem?.permissions ?? [])),
+    };
+
+    customRoles.push(newRoleItem);
+
+    return NextResponse.json({
+      success: true,
+      message: `Role kustom "${label}" berhasil dibuat.`,
+      data: newRoleItem,
+    });
+  } catch (err: any) {
+    return NextResponse.json(
+      { success: false, message: err.message || "Gagal membuat role baru." },
+      { status: 500 }
+    );
+  }
 }
