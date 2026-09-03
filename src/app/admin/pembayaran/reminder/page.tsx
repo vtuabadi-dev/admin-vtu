@@ -564,8 +564,8 @@ Mohon segera diselesaikan. Terima kasih.
                         },
                         "PAKET UMROH 9H JKT (SV)",
                         sampleBerangkatDate,
-                        sampleDeadlineDate,
-                        stage.daysBefore
+                        stage.daysBefore,
+                        globalDeadlineDays
                       )}
                     </div>
                   </div>
@@ -767,9 +767,9 @@ Mohon segera diselesaikan. Terima kasih.
                 <div>
                   <span>Tanggal Berangkat: <strong>{formatDate(activePackageModal.tanggalBerangkat)}</strong></span>
                   <span className="mx-2">•</span>
-                  <span>Batas Pelunasan Resmi (H-{globalDeadlineDays}): <strong className="text-amber-600 font-bold">{formatDate(hitungDeadlineDate(activePackageModal.tanggalBerangkat, selectedStage.daysBefore, globalDeadlineDays).officialDeadlineDate)}</strong></span>
+                  <span>Batas Pelunasan Resmi (H-{globalDeadlineDays}): <strong className="text-amber-600 font-bold">{formatDate(calc.officialDeadlineDate)}</strong></span>
                   <span className="mx-2">•</span>
-                  <span>Pengingat: <strong>Tahap H-{selectedStage.daysBefore} ({hitungDeadlineDate(activePackageModal.tanggalBerangkat, selectedStage.daysBefore, globalDeadlineDays).sisaHariKeOfficialDeadline} Hari Lagi ke Deadline Resmi)</strong></span>
+                  <span>Pengingat: <strong>Tahap H-{selectedStage.daysBefore} ({calc.sisaHariKeOfficialDeadline} Hari Lagi ke Deadline Resmi)</strong></span>
                 </div>
                 <Button
                   size="sm"
