@@ -2539,14 +2539,6 @@ function PaymentReviewTabContent() {
                 <Eye className="h-4 w-4" />
                 Preview Dokumen
               </Button>
-              <Button
-                variant="outline"
-                className="font-bold h-9 text-xs gap-1.5"
-                onClick={() => handleDownloadPdf(sendInvoiceTarget)}
-              >
-                <Download className="h-4 w-4" />
-                Unduh PDF
-              </Button>
             </div>
           </div>
         )}
