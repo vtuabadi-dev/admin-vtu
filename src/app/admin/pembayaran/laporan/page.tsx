@@ -3013,10 +3013,10 @@ export default function LaporanPembayaranPage() {
   function handleResetMasterDefaults() {
     if (newBillingKategori === "tambahan") {
       saveTambahanOptions(DEFAULT_TAMBAHAN_OPTIONS);
-      setNewBillingNama(DEFAULT_TAMBAHAN_OPTIONS[0]);
+      setNewBillingNama(DEFAULT_TAMBAHAN_OPTIONS[0] ?? "");
     } else {
       savePotonganOptions(DEFAULT_POTONGAN_OPTIONS);
-      setNewBillingNama(DEFAULT_POTONGAN_OPTIONS[0]);
+      setNewBillingNama(DEFAULT_POTONGAN_OPTIONS[0] ?? "");
     }
   }
 
