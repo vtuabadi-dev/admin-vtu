@@ -3899,30 +3899,14 @@ export default function LaporanPembayaranPage() {
               <label className="text-xs font-bold text-foreground">
                 {newBillingKategori === "tambahan" ? "Jenis Tambahan Tagihan" : "Jenis Potongan / Diskon"}
               </label>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setShowManageJenisModal(true)}
-                  className="text-[11px] font-bold text-amber-600 dark:text-amber-400 hover:underline flex items-center gap-1 cursor-pointer"
-                  title="Edit atau Hapus Jenis dalam Daftar Opsi Master"
-                >
-                  <Settings2 className="h-3 w-3" />
-                  Kelola / Hapus Jenis
-                </button>
-                {!isCustomJenisMode && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsCustomJenisMode(true);
-                      setNewBillingNama("");
-                    }}
-                    className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1 cursor-pointer"
-                  >
-                    <Plus className="h-3 w-3" />
-                    + Tambah Jenis Baru
-                  </button>
-                )}
-              </div>
+              <button
+                type="button"
+                onClick={() => setShowManageJenisModal(true)}
+                className="p-1 rounded-md text-amber-600 dark:text-amber-400 hover:bg-amber-500/15 transition-colors cursor-pointer"
+                title="⚙️ Kelola, Tambah, Edit, atau Hapus Daftar Opsi Jenis"
+              >
+                <Settings2 className="h-4 w-4" />
+              </button>
             </div>
 
             {isCustomJenisMode ? (
