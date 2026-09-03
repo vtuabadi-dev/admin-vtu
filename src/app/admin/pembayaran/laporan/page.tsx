@@ -945,10 +945,25 @@ function PaymentReviewTabContent() {
       `*Total Tagihan Disesuaikan:* Rp ${tagihanDisesuaikan.toLocaleString("id-ID")}`,
     ] : [];
 
-    const baseUrl = typeof window !== "undefined" && window.location.origin
-      ? window.location.origin
-      : "https://vtuabadi.com";
-    const downloadPdfUrl = `${baseUrl}/invoice/${encodeURIComponent(invNum)}?kode=${encodeURIComponent(kodeReg)}`;
+    // Resolve Google Drive Direct File Download Link (Forces direct file download - No Drive UI / Folder View access)
+    let downloadPdfUrl = "";
+    const driveFileId = p.driveFileId || p.googleDriveFileId || p.invoiceDriveId || p.group?.invoiceDriveFileId;
+
+    if (driveFileId) {
+      downloadPdfUrl = `https://drive.google.com/uc?export=download&id=${driveFileId}`;
+    } else if (p.driveUrl && typeof p.driveUrl === "string" && p.driveUrl.includes("drive.google.com")) {
+      const match = p.driveUrl.match(/\/d\/([a-zA-Z0-9_-]+)/) || p.driveUrl.match(/id=([a-zA-Z0-9_-]+)/);
+      if (match && match[1]) {
+        downloadPdfUrl = `https://drive.google.com/uc?export=download&id=${match[1]}`;
+      } else {
+        downloadPdfUrl = p.driveUrl.replace(/\/view.*$/, "/uc?export=download").replace(/\/edit.*$/, "/uc?export=download");
+      }
+    } else {
+      const baseUrl = typeof window !== "undefined" && window.location.origin
+        ? window.location.origin
+        : "https://vtuabadi.com";
+      downloadPdfUrl = `${baseUrl}/invoice/${encodeURIComponent(invNum)}?kode=${encodeURIComponent(kodeReg)}&download=true`;
+    }
 
     return [
       `*INVOICE PEMBAYARAN RESMI — VTU ABADI TRAVEL*`,
@@ -967,7 +982,7 @@ function PaymentReviewTabContent() {
       `🏦 *Metode / Bank:* ${bank}`,
       `✅ *Status:* LUNAS / TERVERIFIKASI`,
       ``,
-      `📥 *Unduh Dokumen PDF Resmi Secara Online:*`,
+      `📥 *Unduh Dokumen PDF Resmi Secara Online (Direct Download):*`,
       `👉 ${downloadPdfUrl}`,
       ``,
       `Dokumen kuitansi & invoice ini merupakan bukti pembayaran resmi yang diterbitkan oleh PT Vauza Tamma Abadi (VTU ABADI Travel).`,

@@ -24,6 +24,7 @@ export default function PublicInvoicePage({ params }: { params: Promise<{ id: st
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [data, setData] = useState<InvoicePdfData | null>(null);
+  const shouldAutoDownload = searchParams.get("download") === "true" || searchParams.get("download") === "1";
 
   useEffect(() => {
     async function fetchInvoice() {
@@ -34,6 +35,9 @@ export default function PublicInvoicePage({ params }: { params: Promise<{ id: st
         const json = await res.json();
         if (json.success && json.data) {
           setData(json.data);
+          if (shouldAutoDownload) {
+            downloadInvoicePdf(json.data);
+          }
         } else {
           setData({
             invoiceNumber: decodeURIComponent(rawId),
