@@ -2,6 +2,32 @@ import fs from "fs";
 import path from "path";
 import { prisma } from "@/server/db/client";
 
+export const DEFAULT_INVOICE_TEMPLATE = `*INVOICE PEMBAYARAN RESMI — VTU ABADI TRAVEL*
+--------------------------------------------------
+Assalamu'alaikum Warahmatullahi Wabarakatuh.
+
+Yth. *{NAMA_GROUP}* (Kode Reg: *{KODE_REG}*)
+Alhamdulillah, pembayaran Anda telah berhasil kami verifikasi dengan rincian sebagai berikut:
+
+📄 *No. Invoice:* {NO_INVOICE}
+📦 *Paket Umroh:* {NAMA_PAKET}
+💳 *Jenis Pembayaran:* {JENIS_PEMBAYARAN}
+💰 *Nominal Terverifikasi:* Rp {NOMINAL}
+{RINCIAN_TAMBAHAN}
+📅 *Tanggal Transaksi:* {TANGGAL}
+🏦 *Metode / Bank:* {BANK}
+✅ *Status:* LUNAS / TERVERIFIKASI
+
+📥 *Unduh Dokumen PDF Resmi Secara Online (Direct Download):*
+👉 {LINK_PDF_INVOICE}
+
+Dokumen kuitansi & invoice ini merupakan bukti pembayaran resmi yang diterbitkan oleh PT Vauza Tamma Abadi (VTU ABADI Travel).
+Semoga Allah SWT senantiasa memberikan kelancaran dan kemudahan dalam persiapan ibadah ke Baitullah.
+
+Wassalamu'alaikum Warahmatullahi Wabarakatuh.
+*Finance & Operational Team — VTU ABADI Travel*
+🌐 https://vtuabadi.com`;
+
 export interface GeneralSystemSettings {
   bankName: string;
   bankAccount: string;
@@ -9,6 +35,7 @@ export interface GeneralSystemSettings {
   minDpPerPax: string;
   waHeader?: string;
   waBadalFormat?: string;
+  waInvoiceTemplate?: string;
   masterTambahanOpts?: string[];
   masterPotonganOpts?: string[];
   updatedAt?: string;
@@ -20,6 +47,7 @@ const DEFAULT_SETTINGS: GeneralSystemSettings = {
   bankAccount: "7123 4567 89",
   bankHolder: "PT VTU ABADI TRAVEL",
   minDpPerPax: "5000000",
+  waInvoiceTemplate: DEFAULT_INVOICE_TEMPLATE,
   updatedAt: new Date().toISOString(),
   updatedBy: "system",
 };

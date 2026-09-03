@@ -903,6 +903,21 @@ function PaymentReviewTabContent() {
     }
   }, [selectedPayment]);
 
+  const [customWaInvoiceTemplate, setCustomWaInvoiceTemplate] = useState<string>("");
+
+  useEffect(() => {
+    async function loadWaTemplate() {
+      try {
+        const res = await fetch("/api/admin/settings/general");
+        const json = await res.json();
+        if (json.success && json.data?.waInvoiceTemplate) {
+          setCustomWaInvoiceTemplate(json.data.waInvoiceTemplate);
+        }
+      } catch (err) {}
+    }
+    loadWaTemplate();
+  }, []);
+
   useEffect(() => {
     if (sendInvoiceTarget) {
       const p = sendInvoiceTarget;
@@ -965,6 +980,22 @@ function PaymentReviewTabContent() {
       downloadPdfUrl = `${baseUrl}/invoice/${encodeURIComponent(invNum)}?kode=${encodeURIComponent(kodeReg)}&download=true`;
     }
 
+    const rincianTambahanStr = orderLines.length > 0 ? orderLines.join("\n") : "";
+
+    if (customWaInvoiceTemplate && customWaInvoiceTemplate.trim().length > 0) {
+      return customWaInvoiceTemplate
+        .replace(/\{NAMA_GROUP\}/g, groupName)
+        .replace(/\{KODE_REG\}/g, kodeReg)
+        .replace(/\{NO_INVOICE\}/g, invNum)
+        .replace(/\{NAMA_PAKET\}/g, paketName)
+        .replace(/\{JENIS_PEMBAYARAN\}/g, formJenis || "DP Pendaftaran")
+        .replace(/\{NOMINAL\}/g, nominal.toLocaleString("id-ID"))
+        .replace(/\{RINCIAN_TAMBAHAN\}/g, rincianTambahanStr)
+        .replace(/\{TANGGAL\}/g, tgl)
+        .replace(/\{BANK\}/g, bank)
+        .replace(/\{LINK_PDF_INVOICE\}/g, downloadPdfUrl);
+    }
+
     return [
       `*INVOICE PEMBAYARAN RESMI — VTU ABADI TRAVEL*`,
       `--------------------------------------------------`,
@@ -992,7 +1023,7 @@ function PaymentReviewTabContent() {
       `*Finance & Operational Team — VTU ABADI Travel*`,
       `🌐 https://vtuabadi.com`,
     ].join("\n");
-  }, [formJenis, formBank, orderItems]);
+  }, [formJenis, formBank, orderItems, customWaInvoiceTemplate]);
 
   const getInvoicePdfPayload = useCallback((p: any, invNum: string, nominal: number) => {
     const rawTgl = p.tanggal ? new Date(p.tanggal) : new Date();

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Save } from "lucide-react";
+import { Save, Sparkles } from "lucide-react";
 import { PermissionGuard } from "@/shared/components/PermissionGuard";
 import { Tabs } from "@/shared/components/ui/Tabs";
 import { Select } from "@/shared/components/ui/Select";
@@ -9,6 +9,32 @@ import { BankSelect } from "@/shared/components/ui/BankSelect";
 import { Button } from "@/shared/components/ui/Button";
 import { OcrSettingsTab } from "./components/OcrSettingsTab";
 import { TelegramBroadcastTab } from "./components/TelegramBroadcastTab";
+
+const DEFAULT_WA_INVOICE_TPL = `*INVOICE PEMBAYARAN RESMI — VTU ABADI TRAVEL*
+--------------------------------------------------
+Assalamu'alaikum Warahmatullahi Wabarakatuh.
+
+Yth. *{NAMA_GROUP}* (Kode Reg: *{KODE_REG}*)
+Alhamdulillah, pembayaran Anda telah berhasil kami verifikasi dengan rincian sebagai berikut:
+
+📄 *No. Invoice:* {NO_INVOICE}
+📦 *Paket Umroh:* {NAMA_PAKET}
+💳 *Jenis Pembayaran:* {JENIS_PEMBAYARAN}
+💰 *Nominal Terverifikasi:* Rp {NOMINAL}
+{RINCIAN_TAMBAHAN}
+📅 *Tanggal Transaksi:* {TANGGAL}
+🏦 *Metode / Bank:* {BANK}
+✅ *Status:* LUNAS / TERVERIFIKASI
+
+📥 *Unduh Dokumen PDF Resmi Secara Online (Direct Download):*
+👉 {LINK_PDF_INVOICE}
+
+Dokumen kuitansi & invoice ini merupakan bukti pembayaran resmi yang diterbitkan oleh PT Vauza Tamma Abadi (VTU ABADI Travel).
+Semoga Allah SWT senantiasa memberikan kelancaran dan kemudahan dalam persiapan ibadah ke Baitullah.
+
+Wassalamu'alaikum Warahmatullahi Wabarakatuh.
+*Finance & Operational Team — VTU ABADI Travel*
+🌐 https://vtuabadi.com`;
 
 // ── Settings section wrapper ──
 function SettingSection({ title, desc, children }: { title: string; desc?: string; children: React.ReactNode }) {
@@ -193,6 +219,7 @@ function AturanOperasional() {
   const [bankAccount, setBankAccount] = useState("7123 4567 89");
   const [bankHolder, setBankHolder] = useState("PT VTU ABADI TRAVEL");
   const [minDpPerPax, setMinDpPerPax] = useState("5000000");
+  const [waInvoiceTemplate, setWaInvoiceTemplate] = useState<string>(DEFAULT_WA_INVOICE_TPL);
 
   useEffect(() => {
     async function fetchSettings() {
@@ -204,6 +231,7 @@ function AturanOperasional() {
           if (json.data.bankAccount) setBankAccount(json.data.bankAccount);
           if (json.data.bankHolder) setBankHolder(json.data.bankHolder);
           if (json.data.minDpPerPax) setMinDpPerPax(json.data.minDpPerPax);
+          if (json.data.waInvoiceTemplate) setWaInvoiceTemplate(json.data.waInvoiceTemplate);
           return;
         }
       } catch (e) {
@@ -219,6 +247,7 @@ function AturanOperasional() {
             if (parsed.bankAccount) setBankAccount(parsed.bankAccount);
             if (parsed.bankHolder) setBankHolder(parsed.bankHolder);
             if (parsed.minDpPerPax) setMinDpPerPax(parsed.minDpPerPax);
+            if (parsed.waInvoiceTemplate) setWaInvoiceTemplate(parsed.waInvoiceTemplate);
           } catch (e) {}
         }
       }
@@ -227,7 +256,7 @@ function AturanOperasional() {
   }, []);
 
   const handleSave = async () => {
-    const payload = { bankName, bankAccount, bankHolder, minDpPerPax };
+    const payload = { bankName, bankAccount, bankHolder, minDpPerPax, waInvoiceTemplate };
     if (typeof window !== "undefined") {
       localStorage.setItem("vtu_bank_config", JSON.stringify(payload));
     }
@@ -346,6 +375,50 @@ function AturanOperasional() {
             defaultValue="Yth. {nama_jamaah}, pembayaran Anda untuk paket {nama_paket} telah LUNAS. Terima kasih. Dokumen Anda sedang diverifikasi untuk keberangkatan pada {tanggal_berangkat}."
           />
         </SettingRow>
+      </SettingSection>
+
+      <SettingSection
+        title="Template Pesan WhatsApp Invoice Resmi"
+        desc="Atur susunan kata dan format pesan WhatsApp konfirmasi pembayaran invoice tergenerate"
+      >
+        <div className="space-y-3 pt-1">
+          <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs space-y-1.5">
+            <p className="font-bold text-amber-900 dark:text-amber-300 flex items-center gap-1.5">
+              <Sparkles className="w-4 h-4 text-amber-600" />
+              Variabel Dinamis Yang Bisa Disisipkan (Klik untuk menyisipkan ke dalam template):
+            </p>
+            <div className="flex flex-wrap gap-1.5 pt-1">
+              {[
+                "{NAMA_GROUP}",
+                "{KODE_REG}",
+                "{NO_INVOICE}",
+                "{NAMA_PAKET}",
+                "{JENIS_PEMBAYARAN}",
+                "{NOMINAL}",
+                "{RINCIAN_TAMBAHAN}",
+                "{TANGGAL}",
+                "{BANK}",
+                "{LINK_PDF_INVOICE}",
+              ].map((v) => (
+                <code
+                  key={v}
+                  onClick={() => setWaInvoiceTemplate((prev) => prev + " " + v)}
+                  className="px-2 py-0.5 rounded bg-background border text-[11px] font-mono font-bold text-amber-700 dark:text-amber-300 cursor-pointer hover:bg-amber-100 transition-colors"
+                  title="Klik untuk menyisipkan variabel ini"
+                >
+                  {v}
+                </code>
+              ))}
+            </div>
+          </div>
+          <textarea
+            rows={12}
+            className="w-full rounded-md border border-input bg-background px-3 py-2 text-xs font-mono leading-relaxed"
+            value={waInvoiceTemplate}
+            onChange={(e) => setWaInvoiceTemplate(e.target.value)}
+            placeholder="Ketik susunan template pesan WA invoice di sini..."
+          />
+        </div>
       </SettingSection>
 
       <div className="flex items-center gap-2 pt-2">
