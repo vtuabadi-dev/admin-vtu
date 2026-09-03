@@ -9,6 +9,9 @@ const CRITICAL_ROUTES = [
   "/register/badal-umroh",
   "/register/wakaf-quran",
   "/track/badal-wakaf",
+  "/admin/dashboard",
+  "/admin/pembayaran/laporan",
+  "/admin/jamaah",
 ];
 
 const CRITICAL_IMAGES = [
@@ -20,6 +23,7 @@ const CRITICAL_IMAGES = [
 
 const CRITICAL_APIS = [
   "/api/master/harga-layanan",
+  "/api/pembayaran/review?status=all",
 ];
 
 export default function PortalBackgroundPrewarmer() {

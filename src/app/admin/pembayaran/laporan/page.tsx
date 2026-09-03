@@ -40,8 +40,17 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/shared/components/ui
 import { Button } from "@/shared/components/ui/Button";
 import { Input } from "@/shared/components/ui/Input";
 import { Select } from "@/shared/components/ui/Select";
-import { StatusBadge, Badge } from "@/shared/components/ui/Badge";
 import { Modal } from "@/shared/components/ui/Modal";
+
+export interface BillingItem {
+  id: string;
+  nama: string;
+  kategori: "utama" | "tambahan" | "potongan";
+  nominal: number;
+  catatan?: string;
+  isDefault?: boolean;
+}
+import { StatusBadge, Badge } from "@/shared/components/ui/Badge";
 import { EmptyState } from "@/shared/components/EmptyState";
 import { LoadingSkeleton } from "@/shared/components/LoadingSkeleton";
 import {
@@ -2838,6 +2847,71 @@ export default function LaporanPembayaranPage() {
   const [catatan, setCatatan] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
+  // WA Transfer Slip Drag & Drop / Paste state
+  const [waTransferPreview, setWaTransferPreview] = useState<string | null>(null);
+  const [waTransferFile, setWaTransferFile] = useState<File | null>(null);
+  const [isDraggingWa, setIsDraggingWa] = useState(false);
+
+  // Billing Breakdown Items state (Rincian Tagihan & Potongan)
+  const [billingItems, setBillingItems] = useState<BillingItem[]>([]);
+  const [showAddItemModal, setShowAddItemModal] = useState(false);
+  const [newBillingNama, setNewBillingNama] = useState("");
+  const [newBillingKategori, setNewBillingKategori] = useState<"tambahan" | "potongan">("tambahan");
+  const [newBillingNominal, setNewBillingNominal] = useState(0);
+  const [newBillingCatatan, setNewBillingCatatan] = useState("");
+
+  const totalTambahan = useMemo(() => {
+    return billingItems
+      .filter((i) => i.kategori === "tambahan")
+      .reduce((sum, i) => sum + i.nominal, 0);
+  }, [billingItems]);
+
+  const totalPotongan = useMemo(() => {
+    return billingItems
+      .filter((i) => i.kategori === "potongan")
+      .reduce((sum, i) => sum + i.nominal, 0);
+  }, [billingItems]);
+
+  const calculatedTotalTagihan = useMemo(() => {
+    const base = groupData?.totalTagihan || 0;
+    return base + totalTambahan - totalPotongan;
+  }, [groupData?.totalTagihan, totalTambahan, totalPotongan]);
+
+  const calculatedSisaPembayaran = useMemo(() => {
+    const dibayar = groupData?.totalPembayaran || 0;
+    return calculatedTotalTagihan - dibayar;
+  }, [calculatedTotalTagihan, groupData?.totalPembayaran]);
+
+  function handleAddBillingItem() {
+    if (!newBillingNama.trim() || newBillingNominal <= 0) return;
+    const newItem: BillingItem = {
+      id: `bill-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+      nama: newBillingNama.trim(),
+      kategori: newBillingKategori,
+      nominal: newBillingNominal,
+      catatan: newBillingCatatan.trim() || undefined,
+    };
+    setBillingItems((prev) => [...prev, newItem]);
+    setNewBillingNama("");
+    setNewBillingNominal(0);
+    setNewBillingCatatan("");
+    setShowAddItemModal(false);
+  }
+
+  function handleRemoveBillingItem(id: string) {
+    setBillingItems((prev) => prev.filter((i) => i.id !== id || i.isDefault));
+  }
+
+  function handleWaFileProcess(file: File) {
+    setWaTransferFile(file);
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const res = e.target?.result as string;
+      setWaTransferPreview(res);
+    };
+    reader.readAsDataURL(file);
+  }
+
   // Alokasi
   const [alokasi, setAlokasi] = useState<Record<string, number>>({});
 
@@ -2890,6 +2964,15 @@ export default function LaporanPembayaranPage() {
       }
 
       setGroupData(summary);
+      setBillingItems([
+        {
+          id: "base-package",
+          nama: `Tagihan Paket Utama (${summary.jumlahAnggota} Pax)`,
+          kategori: "utama",
+          nominal: summary.totalTagihan,
+          isDefault: true,
+        },
+      ]);
       if (split) {
         setSplitConfig(split);
         setActiveSplitId(split.splits[0]?.id ?? null);
@@ -2930,6 +3013,7 @@ export default function LaporanPembayaranPage() {
         metode,
         sumber: "admin",
         tanggal: new Date().toISOString().split("T")[0]!,
+        buktiUrl: waTransferPreview || undefined,
         catatan: catatan || undefined,
         alokasi: Object.entries(alokasi).map(([jamaahId, jumlah]) => ({
           jamaahId,
@@ -2949,6 +3033,8 @@ export default function LaporanPembayaranPage() {
       setNominal(0);
       setCatatan("");
       setAlokasi({});
+      setWaTransferPreview(null);
+      setWaTransferFile(null);
 
       // Refresh
       const summary = await getGroupPaymentSummary(groupData.groupId);
@@ -3054,8 +3140,8 @@ export default function LaporanPembayaranPage() {
                       <p className="font-medium">{groupData.namaGroup}</p>
                     </div>
                     <div>
-                      <p className="text-xs text-muted-foreground">Total Tagihan</p>
-                      <p className="font-semibold">{formatCurrency(groupData.totalTagihan)}</p>
+                      <p className="text-xs text-muted-foreground">Total Tagihan (Net)</p>
+                      <p className="font-semibold text-foreground">{formatCurrency(calculatedTotalTagihan)}</p>
                     </div>
                     <div>
                       <p className="text-xs text-muted-foreground">Total Dibayar</p>
@@ -3063,7 +3149,7 @@ export default function LaporanPembayaranPage() {
                     </div>
                     <div>
                       <p className="text-xs text-muted-foreground">Sisa</p>
-                      <p className="font-semibold text-destructive">{formatCurrency(groupData.sisaPembayaran)}</p>
+                      <p className="font-semibold text-destructive">{formatCurrency(calculatedSisaPembayaran)}</p>
                     </div>
                   </div>
                 </CardContent>
@@ -3089,30 +3175,128 @@ export default function LaporanPembayaranPage() {
                 </div>
               )}
 
-              {/* Two-column: History | Form */}
+              {/* Two-column: History & Billing Breakdown | Form */}
               <div className="grid gap-6 lg:grid-cols-2">
-                {/* LEFT: Payment History */}
-                <Card>
-                  <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="text-sm">
-                        {activeSplit
-                          ? `Histori ${activeSplit.label}`
-                          : "Histori Pembayaran Group"}
-                      </CardTitle>
-                      {!splitConfig && (
+                {/* LEFT: Billing Breakdown Table ABOVE Payment History */}
+                <div className="space-y-6">
+                  {/* CARD 1: RINCIAN TAGIHAN & POTONGAN */}
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="text-sm flex items-center gap-2">
+                          <Receipt className="h-4 w-4 text-amber-500" />
+                          Rincian Tagihan & Potongan Group
+                        </CardTitle>
                         <Button
                           size="sm"
                           variant="outline"
-                          className="h-7 text-xs"
-                          onClick={() => setShowSplitModal(true)}
+                          className="h-7 text-xs font-bold border-amber-500/40 hover:bg-amber-500/10 text-amber-600 dark:text-amber-400"
+                          onClick={() => setShowAddItemModal(true)}
                         >
-                          <Columns3 className="mr-1 h-3 w-3" />
-                          Pecah Invoice
+                          <PlusCircle className="mr-1.5 h-3.5 w-3.5" />
+                          Tambah Item
                         </Button>
-                      )}
-                    </div>
-                  </CardHeader>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-xs">
+                          <thead>
+                            <tr className="border-b text-left font-medium text-muted-foreground bg-stone-50 dark:bg-stone-900/50">
+                              <th className="p-2">Deskripsi Item Tagihan / Potongan</th>
+                              <th className="p-2">Kategori</th>
+                              <th className="p-2 text-right">Nominal</th>
+                              <th className="p-2 text-center w-12">Aksi</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y">
+                            {billingItems.map((item) => (
+                              <tr key={item.id} className="hover:bg-muted/30 transition-colors">
+                                <td className="p-2 font-medium">
+                                  <div>
+                                    <p className="text-foreground">{item.nama}</p>
+                                    {item.catatan && (
+                                      <p className="text-[10px] text-muted-foreground">{item.catatan}</p>
+                                    )}
+                                  </div>
+                                </td>
+                                <td className="p-2">
+                                  {item.kategori === "utama" && (
+                                    <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                                      Tagihan Utama
+                                    </span>
+                                  )}
+                                  {item.kategori === "tambahan" && (
+                                    <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300">
+                                      + Tambahan
+                                    </span>
+                                  )}
+                                  {item.kategori === "potongan" && (
+                                    <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">
+                                      - Potongan
+                                    </span>
+                                  )}
+                                </td>
+                                <td className={`p-2 text-right font-mono font-bold tabular-nums ${
+                                  item.kategori === "potongan" ? "text-amber-600 dark:text-amber-400" : "text-emerald-700 dark:text-emerald-400"
+                                }`}>
+                                  {item.kategori === "potongan" ? `- ${formatCurrency(item.nominal)}` : formatCurrency(item.nominal)}
+                                </td>
+                                <td className="p-2 text-center">
+                                  {!item.isDefault ? (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleRemoveBillingItem(item.id)}
+                                      className="text-stone-400 hover:text-destructive transition-colors p-1"
+                                      title="Hapus Item Ini"
+                                    >
+                                      <Trash2 className="h-3.5 w-3.5" />
+                                    </button>
+                                  ) : (
+                                    <span className="text-[10px] text-muted-foreground font-mono">-</span>
+                                  )}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                          <tfoot>
+                            <tr className="border-t-2 border-stone-200 dark:border-stone-800 bg-stone-50/80 dark:bg-stone-900/80 font-bold text-xs">
+                              <td colSpan={2} className="p-2.5 text-right uppercase tracking-wider text-muted-foreground">
+                                Total Tagihan Akhir (Net)
+                              </td>
+                              <td className="p-2.5 text-right font-mono text-sm text-emerald-700 dark:text-emerald-400">
+                                {formatCurrency(calculatedTotalTagihan)}
+                              </td>
+                              <td></td>
+                            </tr>
+                          </tfoot>
+                        </table>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* CARD 2: HISTORI PEMBAYARAN GROUP */}
+                  <Card>
+                    <CardHeader>
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="text-sm">
+                          {activeSplit
+                            ? `Histori ${activeSplit.label}`
+                            : "Histori Pembayaran Group"}
+                        </CardTitle>
+                        {!splitConfig && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 text-xs"
+                            onClick={() => setShowSplitModal(true)}
+                          >
+                            <Columns3 className="mr-1 h-3 w-3" />
+                            Pecah Invoice
+                          </Button>
+                        )}
+                      </div>
+                    </CardHeader>
                   <CardContent>
                     {activePembayaran.length === 0 ? (
                       <p className="text-sm text-muted-foreground py-8 text-center">
@@ -3162,6 +3346,99 @@ export default function LaporanPembayaranPage() {
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
+                    {/* Drag & Drop Bukti Transfer WA (Sebelum Nominal Pembayaran) */}
+                    <div>
+                      <label className="text-xs font-bold text-foreground flex items-center gap-1.5 uppercase tracking-wider mb-1.5">
+                        <Sparkles className="h-3.5 w-3.5 text-amber-500" />
+                        Drag & Drop Bukti Transfer WA (Opsional)
+                      </label>
+                      <div
+                        onDragOver={(e) => {
+                          e.preventDefault();
+                          setIsDraggingWa(true);
+                        }}
+                        onDragLeave={() => setIsDraggingWa(false)}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          setIsDraggingWa(false);
+                          const file = e.dataTransfer.files?.[0];
+                          if (file && file.type.startsWith("image/")) {
+                            handleWaFileProcess(file);
+                          }
+                        }}
+                        onPaste={(e) => {
+                          const items = e.clipboardData?.items;
+                          if (items) {
+                            for (let i = 0; i < items.length; i++) {
+                              const item = items[i];
+                              if (item && item.type && item.type.startsWith("image/")) {
+                                const file = item.getAsFile();
+                                if (file) handleWaFileProcess(file);
+                                break;
+                              }
+                            }
+                          }
+                        }}
+                        className={`relative rounded-xl border-2 border-dashed p-3 text-center transition-all cursor-pointer select-none ${
+                          isDraggingWa
+                            ? "border-amber-500 bg-amber-500/20 shadow-md scale-[1.01]"
+                            : waTransferPreview
+                            ? "border-emerald-500 bg-emerald-500/10"
+                            : "border-stone-300 dark:border-stone-700 bg-stone-50/50 dark:bg-stone-900/40 hover:border-amber-500 hover:bg-amber-500/10"
+                        }`}
+                      >
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) handleWaFileProcess(file);
+                          }}
+                          className="hidden"
+                          id="wa-file-input-group"
+                        />
+
+                        {waTransferPreview ? (
+                          <div className="flex items-center gap-3 text-left">
+                            <img
+                              src={waTransferPreview}
+                              alt="Bukti Transfer WA"
+                              className="h-14 w-14 rounded-lg object-cover border border-emerald-400 shadow-xs shrink-0"
+                            />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs font-bold text-emerald-800 dark:text-emerald-300 truncate">
+                                ✓ Bukti Transfer WA Terlampir
+                              </p>
+                              <p className="text-[10px] text-muted-foreground truncate">
+                                {waTransferFile?.name || "bukti_tf.png"} ({Math.round((waTransferFile?.size || 0) / 1024)} KB)
+                              </p>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setWaTransferPreview(null);
+                                  setWaTransferFile(null);
+                                }}
+                                className="mt-1 text-[10px] font-bold text-destructive hover:underline cursor-pointer"
+                              >
+                                Hapus / Ganti Bukti
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <label htmlFor="wa-file-input-group" className="cursor-pointer block space-y-1">
+                            <div className="flex items-center justify-center gap-2 text-amber-600 dark:text-amber-400 font-bold text-xs">
+                              <Upload className="h-4 w-4" />
+                              <span>Seret / Paste Gambar Bukti TF dari WhatsApp</span>
+                            </div>
+                            <p className="text-[10.5px] text-muted-foreground">
+                              Drop foto / screenshot slip transfer dari WA Desktop di sini, atau tekan <kbd className="px-1 py-0.5 bg-muted rounded border text-[9px] font-mono">Ctrl+V</kbd>
+                            </p>
+                          </label>
+                        )}
+                      </div>
+                    </div>
+
                     <div>
                       <label className="text-sm font-medium">Nominal Pembayaran</label>
                       <Input
@@ -3247,6 +3524,7 @@ export default function LaporanPembayaranPage() {
                     </Button>
                   </CardContent>
                 </Card>
+                </div>
               </div>
             </>
           )}
@@ -3276,6 +3554,104 @@ export default function LaporanPembayaranPage() {
           onSubmit={handleSplitSubmit}
         />
       )}
+
+      {/* Modal Tambah Item Tagihan / Potongan */}
+      <Modal
+        open={showAddItemModal}
+        onClose={() => setShowAddItemModal(false)}
+        title="Tambah Item Tagihan / Potongan"
+        size="sm"
+      >
+        <div className="space-y-4 pt-1">
+          <div>
+            <label className="text-xs font-bold text-foreground block mb-1.5">
+              Kategori Item
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setNewBillingKategori("tambahan")}
+                className={`p-2.5 rounded-lg border text-xs font-bold transition-all cursor-pointer ${
+                  newBillingKategori === "tambahan"
+                    ? "border-emerald-500 bg-emerald-500/15 text-emerald-800 dark:text-emerald-300 shadow-xs"
+                    : "border-stone-200 dark:border-stone-800 text-muted-foreground hover:bg-muted/50"
+                }`}
+              >
+                + Tambahan Tagihan
+              </button>
+              <button
+                type="button"
+                onClick={() => setNewBillingKategori("potongan")}
+                className={`p-2.5 rounded-lg border text-xs font-bold transition-all cursor-pointer ${
+                  newBillingKategori === "potongan"
+                    ? "border-amber-500 bg-amber-500/15 text-amber-800 dark:text-amber-300 shadow-xs"
+                    : "border-stone-200 dark:border-stone-800 text-muted-foreground hover:bg-muted/50"
+                }`}
+              >
+                - Potongan / Diskon
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <label className="text-xs font-bold text-foreground block mb-1">
+              Deskripsi / Nama Item
+            </label>
+            <Input
+              placeholder={
+                newBillingKategori === "tambahan"
+                  ? "Contoh: Upgrade Kamar Double 2 Pax"
+                  : "Contoh: Diskon Promo Early Bird"
+              }
+              value={newBillingNama}
+              onChange={(e) => setNewBillingNama(e.target.value)}
+            />
+          </div>
+
+          <div>
+            <label className="text-xs font-bold text-foreground block mb-1">
+              Nominal (Rp)
+            </label>
+            <Input
+              type="number"
+              placeholder="Masukkan nominal"
+              value={newBillingNominal || ""}
+              onChange={(e) => setNewBillingNominal(Number(e.target.value))}
+            />
+          </div>
+
+          <div>
+            <label className="text-xs font-bold text-foreground block mb-1">
+              Catatan (Opsional)
+            </label>
+            <Input
+              placeholder="Keterangan tambahan..."
+              value={newBillingCatatan}
+              onChange={(e) => setNewBillingCatatan(e.target.value)}
+            />
+          </div>
+
+          <div className="flex justify-end gap-2 pt-2 border-t">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setShowAddItemModal(false)}
+            >
+              Batal
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              className="font-bold bg-amber-500 hover:bg-amber-600 text-slate-950"
+              onClick={handleAddBillingItem}
+              disabled={!newBillingNama.trim() || newBillingNominal <= 0}
+            >
+              Simpan Item
+            </Button>
+          </div>
+        </div>
+      </Modal>
 
       {/* Success Modal */}
       <Modal

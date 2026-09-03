@@ -277,6 +277,8 @@ export const pembayaranRepo = {
     }
     const rows = await prisma.pembayaran.findMany({
       where: whereClause,
+      take: 150,
+      orderBy: { tanggal: "desc" },
       include: {
         alokasi: true,
         group: {
@@ -359,7 +361,6 @@ export const pembayaranRepo = {
           },
         },
       },
-      orderBy: { tanggal: "desc" },
     });
     // Deduplicate mapped rows by unique groupId + status + sumber + buktiUrl so identical duplicate entries are never shown twice
     const seen = new Set<string>();

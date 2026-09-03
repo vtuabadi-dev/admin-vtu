@@ -4,6 +4,8 @@ import React, { useState, useEffect, useRef } from "react";
 import { Volume2, VolumeX, SkipForward } from "lucide-react";
 import gsap from "gsap";
 
+import { useRouter } from "next/navigation";
+
 interface IntroVideoLoaderProps {
   onComplete?: () => void;
   forceShow?: boolean;
@@ -15,6 +17,7 @@ export default function IntroVideoLoader({
   forceShow = false,
   videoSrc,
 }: IntroVideoLoaderProps) {
+  const router = useRouter();
   const [isVisible, setIsVisible] = useState(true);
   const [isVideoPlaying, setIsVideoPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(true);
@@ -25,6 +28,17 @@ export default function IntroVideoLoader({
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const headerRef = useRef<HTMLDivElement | null>(null);
   const ambientGlowRef = useRef<HTMLDivElement | null>(null);
+
+  // Pre-warm client side routes and critical APIs while intro video plays
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      try {
+        router.prefetch("/admin/dashboard");
+        router.prefetch("/admin/pembayaran/laporan");
+        fetch("/api/pembayaran/review?status=all", { method: "GET" }).catch(() => {});
+      } catch {}
+    }
+  }, [router]);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
