@@ -30,6 +30,8 @@ import {
   FileDown,
   PlusCircle,
   Plus,
+  Settings2,
+  Edit3,
   Trash2,
   AlertTriangle,
   ShoppingBag,
@@ -465,6 +467,54 @@ const ORDER_PRESETS = [
     icon: "🎁",
   },
 ];
+
+const DEFAULT_TAMBAHAN_OPTIONS = [
+  "Upgrade Kamar Double",
+  "Upgrade Kamar Single",
+  "Tiket Kereta Cepat Haramain (Mekkah - Madinah)",
+  "Upgrade Hotel Bintang 5",
+  "Paspor Express & Penanganan Dokumen",
+  "Perlengkapan Tambahan & Handling",
+  "Ongkos Jahit Seragam Batik",
+  "Sewa Kursi Roda & Muthawwif Pendorong",
+  "Pengurusan Visa Khusus / Single",
+  "Biaya Overbagasi / Airport Handling",
+];
+
+const DEFAULT_POTONGAN_OPTIONS = [
+  "Diskon Promo Early Bird",
+  "Voucher Potongan Khusus",
+  "Potongan Group / Cashback",
+  "Keringanan Biaya Anak / Balita",
+  "Potongan Manajemen / Direksi",
+  "Diskon Spesial Mitra",
+];
+
+function getInitialTambahanOptions(): string[] {
+  if (typeof window !== "undefined") {
+    try {
+      const stored = localStorage.getItem("vtu_master_tambahan_opts");
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+  }
+  return DEFAULT_TAMBAHAN_OPTIONS;
+}
+
+function getInitialPotonganOptions(): string[] {
+  if (typeof window !== "undefined") {
+    try {
+      const stored = localStorage.getItem("vtu_master_potongan_opts");
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+  }
+  return DEFAULT_POTONGAN_OPTIONS;
+}
 
 // Module-level in-memory cache for Review Queue to avoid skeleton flicker on tab switch/revisit
 let cachedReviewQueue: any[] | null = null;
@@ -2890,25 +2940,85 @@ export default function LaporanPembayaranPage() {
   const [isCustomJenisMode, setIsCustomJenisMode] = useState<boolean>(false);
 
   // Master lists for Additional Charges and Discounts
-  const [masterTambahanOptions, setMasterTambahanOptions] = useState<string[]>([
-    "Upgrade Kamar Double",
-    "Upgrade Kamar Single",
-    "Paspor Express & Penanganan",
-    "Perlengkapan Tambahan & Handling",
-    "Layanan Fast Track & Kereta Cepat",
-    "Kursi Roda & Layanan Lansia",
-    "Pengurusan Visa Khusus",
-    "Biaya Overbagasi / Airport Handling",
-  ]);
+  const [masterTambahanOptions, setMasterTambahanOptions] = useState<string[]>(getInitialTambahanOptions);
+  const [masterPotonganOptions, setMasterPotonganOptions] = useState<string[]>(getInitialPotonganOptions);
 
-  const [masterPotonganOptions, setMasterPotonganOptions] = useState<string[]>([
-    "Diskon Promo Early Bird",
-    "Voucher Potongan Khusus",
-    "Potongan Group / Cashback",
-    "Keringanan Biaya Anak / Balita",
-    "Potongan Manajemen / Direksi",
-    "Diskon Spesial Mitra",
-  ]);
+  // Master Options Manager Modal State
+  const [showManageJenisModal, setShowManageJenisModal] = useState(false);
+  const [tempNewJenis, setTempNewJenis] = useState("");
+  const [editingJenisIndex, setEditingJenisIndex] = useState<number | null>(null);
+  const [editingJenisText, setEditingJenisText] = useState("");
+
+  const saveTambahanOptions = (opts: string[]) => {
+    setMasterTambahanOptions(opts);
+    if (typeof window !== "undefined") {
+      try { localStorage.setItem("vtu_master_tambahan_opts", JSON.stringify(opts)); } catch {}
+    }
+  };
+
+  const savePotonganOptions = (opts: string[]) => {
+    setMasterPotonganOptions(opts);
+    if (typeof window !== "undefined") {
+      try { localStorage.setItem("vtu_master_potongan_opts", JSON.stringify(opts)); } catch {}
+    }
+  };
+
+  function handleAddNewMasterJenis() {
+    if (!tempNewJenis.trim()) return;
+    const name = tempNewJenis.trim();
+    if (newBillingKategori === "tambahan") {
+      if (!masterTambahanOptions.includes(name)) {
+        saveTambahanOptions([...masterTambahanOptions, name]);
+      }
+      setNewBillingNama(name);
+    } else {
+      if (!masterPotonganOptions.includes(name)) {
+        savePotonganOptions([...masterPotonganOptions, name]);
+      }
+      setNewBillingNama(name);
+    }
+    setTempNewJenis("");
+  }
+
+  function handleSaveEditMasterJenis(idx: number) {
+    if (!editingJenisText.trim()) return;
+    const name = editingJenisText.trim();
+    if (newBillingKategori === "tambahan") {
+      const updated = [...masterTambahanOptions];
+      updated[idx] = name;
+      saveTambahanOptions(updated);
+      if (newBillingNama === masterTambahanOptions[idx]) setNewBillingNama(name);
+    } else {
+      const updated = [...masterPotonganOptions];
+      updated[idx] = name;
+      savePotonganOptions(updated);
+      if (newBillingNama === masterPotonganOptions[idx]) setNewBillingNama(name);
+    }
+    setEditingJenisIndex(null);
+    setEditingJenisText("");
+  }
+
+  function handleDeleteMasterJenis(optName: string) {
+    if (newBillingKategori === "tambahan") {
+      const updated = masterTambahanOptions.filter((o) => o !== optName);
+      saveTambahanOptions(updated);
+      if (newBillingNama === optName) setNewBillingNama(updated[0] || "");
+    } else {
+      const updated = masterPotonganOptions.filter((o) => o !== optName);
+      savePotonganOptions(updated);
+      if (newBillingNama === optName) setNewBillingNama(updated[0] || "");
+    }
+  }
+
+  function handleResetMasterDefaults() {
+    if (newBillingKategori === "tambahan") {
+      saveTambahanOptions(DEFAULT_TAMBAHAN_OPTIONS);
+      setNewBillingNama(DEFAULT_TAMBAHAN_OPTIONS[0]);
+    } else {
+      savePotonganOptions(DEFAULT_POTONGAN_OPTIONS);
+      setNewBillingNama(DEFAULT_POTONGAN_OPTIONS[0]);
+    }
+  }
 
   const maxQtyLimit = useMemo(() => {
     return groupData?.jumlahAnggota || 1;
@@ -3681,19 +3791,30 @@ export default function LaporanPembayaranPage() {
               <label className="text-xs font-bold text-foreground">
                 {newBillingKategori === "tambahan" ? "Jenis Tambahan Tagihan" : "Jenis Potongan / Diskon"}
               </label>
-              {!isCustomJenisMode && (
+              <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => {
-                    setIsCustomJenisMode(true);
-                    setNewBillingNama("");
-                  }}
+                  onClick={() => setShowManageJenisModal(true)}
                   className="text-[11px] font-bold text-amber-600 dark:text-amber-400 hover:underline flex items-center gap-1 cursor-pointer"
+                  title="Edit atau Hapus Jenis dalam Daftar Opsi Master"
                 >
-                  <Plus className="h-3 w-3" />
-                  + Tambah Jenis Baru
+                  <Settings2 className="h-3 w-3" />
+                  Kelola / Hapus Jenis
                 </button>
-              )}
+                {!isCustomJenisMode && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsCustomJenisMode(true);
+                      setNewBillingNama("");
+                    }}
+                    className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1 cursor-pointer"
+                  >
+                    <Plus className="h-3 w-3" />
+                    + Tambah Jenis Baru
+                  </button>
+                )}
+              </div>
             </div>
 
             {isCustomJenisMode ? (
@@ -3819,6 +3940,117 @@ export default function LaporanPembayaranPage() {
               disabled={!newBillingNama.trim() || newBillingNominal <= 0}
             >
               Simpan Item
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Modal Kelola Master Jenis Item (Edit / Hapus / Tambah Opsi) */}
+      <Modal
+        open={showManageJenisModal}
+        onClose={() => setShowManageJenisModal(false)}
+        title={`Kelola Master Opsi — ${newBillingKategori === "tambahan" ? "Tambahan Tagihan" : "Potongan / Diskon"}`}
+        size="sm"
+      >
+        <div className="space-y-4 pt-1">
+          <p className="text-xs text-muted-foreground">
+            Ubah nama atau hapus opsi jenis {newBillingKategori === "tambahan" ? "tambahan tagihan" : "potongan"} yang kurang sesuai. Perubahan tersimpan secara otomatis.
+          </p>
+
+          {/* Input Tambah Jenis Langsung */}
+          <div className="flex gap-2">
+            <Input
+              placeholder={newBillingKategori === "tambahan" ? "Tambah jenis tambahan baru..." : "Tambah jenis potongan baru..."}
+              value={tempNewJenis}
+              onChange={(e) => setTempNewJenis(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleAddNewMasterJenis()}
+            />
+            <Button
+              type="button"
+              size="sm"
+              className="font-bold bg-amber-500 hover:bg-amber-600 text-slate-950 shrink-0 gap-1"
+              onClick={handleAddNewMasterJenis}
+              disabled={!tempNewJenis.trim()}
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Tambah
+            </Button>
+          </div>
+
+          {/* List of current options with Edit & Delete controls */}
+          <div className="max-h-60 overflow-y-auto space-y-1.5 border rounded-lg p-2 bg-stone-50 dark:bg-stone-900/50">
+            {(newBillingKategori === "tambahan" ? masterTambahanOptions : masterPotonganOptions).map((opt, idx) => (
+              <div key={opt + idx} className="flex items-center justify-between gap-2 p-2 bg-background rounded-md border text-xs">
+                {editingJenisIndex === idx ? (
+                  <div className="flex-1 flex gap-1 items-center">
+                    <Input
+                      value={editingJenisText}
+                      onChange={(e) => setEditingJenisText(e.target.value)}
+                      className="h-7 text-xs"
+                      autoFocus
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleSaveEditMasterJenis(idx)}
+                      className="p-1 text-emerald-600 hover:bg-emerald-500/10 rounded cursor-pointer"
+                      title="Simpan Nama Jenis"
+                    >
+                      <Check className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEditingJenisIndex(null)}
+                      className="p-1 text-stone-400 hover:bg-stone-500/10 rounded cursor-pointer"
+                      title="Batal Edit"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <span className="font-medium text-foreground truncate">{opt}</span>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingJenisIndex(idx);
+                          setEditingJenisText(opt);
+                        }}
+                        className="p-1 text-stone-400 hover:text-amber-600 transition-colors cursor-pointer"
+                        title="Edit Nama Jenis"
+                      >
+                        <Edit3 className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteMasterJenis(opt)}
+                        className="p-1 text-stone-400 hover:text-destructive transition-colors cursor-pointer"
+                        title="Hapus Jenis Ini"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {/* Footer actions */}
+          <div className="flex justify-between items-center pt-2 border-t text-xs">
+            <button
+              type="button"
+              onClick={handleResetMasterDefaults}
+              className="text-stone-500 hover:text-foreground text-[11px] underline cursor-pointer"
+            >
+              Reset ke Opsi Standar Sistem
+            </button>
+            <Button
+              type="button"
+              size="sm"
+              onClick={() => setShowManageJenisModal(false)}
+            >
+              Selesai
             </Button>
           </div>
         </div>
