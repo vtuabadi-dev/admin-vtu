@@ -29,6 +29,7 @@ import {
   Download,
   FileDown,
   PlusCircle,
+  Plus,
   Trash2,
   AlertTriangle,
   ShoppingBag,
@@ -47,6 +48,7 @@ export interface BillingItem {
   nama: string;
   kategori: "utama" | "tambahan" | "potongan";
   nominal: number;
+  qty: number;
   catatan?: string;
   isDefault?: boolean;
 }
@@ -2861,18 +2863,53 @@ export default function LaporanPembayaranPage() {
   const [newBillingNama, setNewBillingNama] = useState("");
   const [newBillingKategori, setNewBillingKategori] = useState<"tambahan" | "potongan">("tambahan");
   const [newBillingNominal, setNewBillingNominal] = useState(0);
-  const [newBillingCatatan, setNewBillingCatatan] = useState("");
+  const [newBillingQty, setNewBillingQty] = useState<number>(1);
+  const [isCustomJenisMode, setIsCustomJenisMode] = useState<boolean>(false);
+
+  // Master lists for Additional Charges and Discounts
+  const [masterTambahanOptions, setMasterTambahanOptions] = useState<string[]>([
+    "Upgrade Kamar Double",
+    "Upgrade Kamar Single",
+    "Paspor Express & Penanganan",
+    "Perlengkapan Tambahan & Handling",
+    "Layanan Fast Track & Kereta Cepat",
+    "Kursi Roda & Layanan Lansia",
+    "Pengurusan Visa Khusus",
+    "Biaya Overbagasi / Airport Handling",
+  ]);
+
+  const [masterPotonganOptions, setMasterPotonganOptions] = useState<string[]>([
+    "Diskon Promo Early Bird",
+    "Voucher Potongan Khusus",
+    "Potongan Group / Cashback",
+    "Keringanan Biaya Anak / Balita",
+    "Potongan Manajemen / Direksi",
+    "Diskon Spesial Mitra",
+  ]);
+
+  const maxQtyLimit = useMemo(() => {
+    return groupData?.jumlahAnggota || 1;
+  }, [groupData?.jumlahAnggota]);
+
+  useEffect(() => {
+    if (newBillingKategori === "tambahan") {
+      setNewBillingNama(masterTambahanOptions[0] || "");
+    } else {
+      setNewBillingNama(masterPotonganOptions[0] || "");
+    }
+    setIsCustomJenisMode(false);
+  }, [newBillingKategori, masterTambahanOptions, masterPotonganOptions]);
 
   const totalTambahan = useMemo(() => {
     return billingItems
       .filter((i) => i.kategori === "tambahan")
-      .reduce((sum, i) => sum + i.nominal, 0);
+      .reduce((sum, i) => sum + i.nominal * i.qty, 0);
   }, [billingItems]);
 
   const totalPotongan = useMemo(() => {
     return billingItems
       .filter((i) => i.kategori === "potongan")
-      .reduce((sum, i) => sum + i.nominal, 0);
+      .reduce((sum, i) => sum + i.nominal * i.qty, 0);
   }, [billingItems]);
 
   const calculatedTotalTagihan = useMemo(() => {
@@ -2887,17 +2924,31 @@ export default function LaporanPembayaranPage() {
 
   function handleAddBillingItem() {
     if (!newBillingNama.trim() || newBillingNominal <= 0) return;
+
+    const trimmedName = newBillingNama.trim();
+
+    if (newBillingKategori === "tambahan") {
+      if (!masterTambahanOptions.includes(trimmedName)) {
+        setMasterTambahanOptions((prev) => [...prev, trimmedName]);
+      }
+    } else {
+      if (!masterPotonganOptions.includes(trimmedName)) {
+        setMasterPotonganOptions((prev) => [...prev, trimmedName]);
+      }
+    }
+
     const newItem: BillingItem = {
       id: `bill-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
-      nama: newBillingNama.trim(),
+      nama: trimmedName,
       kategori: newBillingKategori,
       nominal: newBillingNominal,
-      catatan: newBillingCatatan.trim() || undefined,
+      qty: Math.min(Math.max(1, newBillingQty), maxQtyLimit),
     };
+
     setBillingItems((prev) => [...prev, newItem]);
-    setNewBillingNama("");
     setNewBillingNominal(0);
-    setNewBillingCatatan("");
+    setNewBillingQty(1);
+    setIsCustomJenisMode(false);
     setShowAddItemModal(false);
   }
 
@@ -2972,7 +3023,8 @@ export default function LaporanPembayaranPage() {
           id: "base-package",
           nama: `Tagihan Paket Utama (${summary.jumlahAnggota} Pax)`,
           kategori: "utama",
-          nominal: summary.totalTagihan,
+          nominal: summary.totalTagihan / Math.max(1, summary.jumlahAnggota),
+          qty: summary.jumlahAnggota,
           isDefault: true,
         },
       ]);
@@ -3208,63 +3260,74 @@ export default function LaporanPembayaranPage() {
                             <tr className="border-b text-left font-medium text-muted-foreground bg-stone-50 dark:bg-stone-900/50">
                               <th className="p-2">Deskripsi Item Tagihan / Potongan</th>
                               <th className="p-2">Kategori</th>
-                              <th className="p-2 text-right">Nominal</th>
-                              <th className="p-2 text-center w-12">Aksi</th>
+                              <th className="p-2 text-center">Qty</th>
+                              <th className="p-2 text-right">Harga / Pax</th>
+                              <th className="p-2 text-right">Total Nominal</th>
+                              <th className="p-2 text-center w-10">Aksi</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y">
-                            {billingItems.map((item) => (
-                              <tr key={item.id} className="hover:bg-muted/30 transition-colors">
-                                <td className="p-2 font-medium">
-                                  <div>
-                                    <p className="text-foreground">{item.nama}</p>
-                                    {item.catatan && (
-                                      <p className="text-[10px] text-muted-foreground">{item.catatan}</p>
+                            {billingItems.map((item) => {
+                              const itemTotal = item.nominal * item.qty;
+                              return (
+                                <tr key={item.id} className="hover:bg-muted/30 transition-colors">
+                                  <td className="p-2 font-medium">
+                                    <div>
+                                      <p className="text-foreground">{item.nama}</p>
+                                      {item.catatan && (
+                                        <p className="text-[10px] text-muted-foreground">{item.catatan}</p>
+                                      )}
+                                    </div>
+                                  </td>
+                                  <td className="p-2">
+                                    {item.kategori === "utama" && (
+                                      <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                                        Tagihan Utama
+                                      </span>
                                     )}
-                                  </div>
-                                </td>
-                                <td className="p-2">
-                                  {item.kategori === "utama" && (
-                                    <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
-                                      Tagihan Utama
-                                    </span>
-                                  )}
-                                  {item.kategori === "tambahan" && (
-                                    <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300">
-                                      + Tambahan
-                                    </span>
-                                  )}
-                                  {item.kategori === "potongan" && (
-                                    <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">
-                                      - Potongan
-                                    </span>
-                                  )}
-                                </td>
-                                <td className={`p-2 text-right font-mono font-bold tabular-nums ${
-                                  item.kategori === "potongan" ? "text-amber-600 dark:text-amber-400" : "text-emerald-700 dark:text-emerald-400"
-                                }`}>
-                                  {item.kategori === "potongan" ? `- ${formatCurrency(item.nominal)}` : formatCurrency(item.nominal)}
-                                </td>
-                                <td className="p-2 text-center">
-                                  {!item.isDefault ? (
-                                    <button
-                                      type="button"
-                                      onClick={() => handleRemoveBillingItem(item.id)}
-                                      className="text-stone-400 hover:text-destructive transition-colors p-1"
-                                      title="Hapus Item Ini"
-                                    >
-                                      <Trash2 className="h-3.5 w-3.5" />
-                                    </button>
-                                  ) : (
-                                    <span className="text-[10px] text-muted-foreground font-mono">-</span>
-                                  )}
-                                </td>
-                              </tr>
-                            ))}
+                                    {item.kategori === "tambahan" && (
+                                      <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300">
+                                        + Tambahan
+                                      </span>
+                                    )}
+                                    {item.kategori === "potongan" && (
+                                      <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">
+                                        - Potongan
+                                      </span>
+                                    )}
+                                  </td>
+                                  <td className="p-2 text-center font-mono font-bold text-slate-700 dark:text-slate-300">
+                                    {item.qty} Pax
+                                  </td>
+                                  <td className="p-2 text-right font-mono tabular-nums text-stone-600 dark:text-stone-400">
+                                    {formatCurrency(item.nominal)}
+                                  </td>
+                                  <td className={`p-2 text-right font-mono font-bold tabular-nums ${
+                                    item.kategori === "potongan" ? "text-amber-600 dark:text-amber-400" : "text-emerald-700 dark:text-emerald-400"
+                                  }`}>
+                                    {item.kategori === "potongan" ? `- ${formatCurrency(itemTotal)}` : formatCurrency(itemTotal)}
+                                  </td>
+                                  <td className="p-2 text-center">
+                                    {!item.isDefault ? (
+                                      <button
+                                        type="button"
+                                        onClick={() => handleRemoveBillingItem(item.id)}
+                                        className="text-stone-400 hover:text-destructive transition-colors p-1 cursor-pointer"
+                                        title="Hapus Item Ini"
+                                      >
+                                        <Trash2 className="h-3.5 w-3.5" />
+                                      </button>
+                                    ) : (
+                                      <span className="text-[10px] text-muted-foreground font-mono">-</span>
+                                    )}
+                                  </td>
+                                </tr>
+                              );
+                            })}
                           </tbody>
                           <tfoot>
                             <tr className="border-t-2 border-stone-200 dark:border-stone-800 bg-stone-50/80 dark:bg-stone-900/80 font-bold text-xs">
-                              <td colSpan={2} className="p-2.5 text-right uppercase tracking-wider text-muted-foreground">
+                              <td colSpan={4} className="p-2.5 text-right uppercase tracking-wider text-muted-foreground">
                                 Total Tagihan Akhir (Net)
                               </td>
                               <td className="p-2.5 text-right font-mono text-sm text-emerald-700 dark:text-emerald-400">
@@ -3558,8 +3621,9 @@ export default function LaporanPembayaranPage() {
         size="sm"
       >
         <div className="space-y-4 pt-1">
+          {/* 1. Kategori Switcher */}
           <div>
-            <label className="text-xs font-bold text-foreground block mb-1.5">
+            <label className="text-xs font-bold text-foreground block mb-1.5 uppercase tracking-wider">
               Kategori Item
             </label>
             <div className="grid grid-cols-2 gap-2">
@@ -3588,24 +3652,85 @@ export default function LaporanPembayaranPage() {
             </div>
           </div>
 
+          {/* 2. Searchable / Selectable Jenis Item */}
           <div>
-            <label className="text-xs font-bold text-foreground block mb-1">
-              Deskripsi / Nama Item
-            </label>
-            <Input
-              placeholder={
-                newBillingKategori === "tambahan"
-                  ? "Contoh: Upgrade Kamar Double 2 Pax"
-                  : "Contoh: Diskon Promo Early Bird"
-              }
-              value={newBillingNama}
-              onChange={(e) => setNewBillingNama(e.target.value)}
-            />
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-xs font-bold text-foreground">
+                {newBillingKategori === "tambahan" ? "Jenis Tambahan Tagihan" : "Jenis Potongan / Diskon"}
+              </label>
+              {!isCustomJenisMode && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsCustomJenisMode(true);
+                    setNewBillingNama("");
+                  }}
+                  className="text-[11px] font-bold text-amber-600 dark:text-amber-400 hover:underline flex items-center gap-1 cursor-pointer"
+                >
+                  <Plus className="h-3 w-3" />
+                  + Tambah Jenis Baru
+                </button>
+              )}
+            </div>
+
+            {isCustomJenisMode ? (
+              <div className="space-y-1.5">
+                <div className="flex gap-2">
+                  <Input
+                    placeholder={
+                      newBillingKategori === "tambahan"
+                        ? "Ketik jenis tambahan baru..."
+                        : "Ketik jenis potongan baru..."
+                    }
+                    value={newBillingNama}
+                    onChange={(e) => setNewBillingNama(e.target.value)}
+                    autoFocus
+                  />
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="text-xs shrink-0"
+                    onClick={() => {
+                      setIsCustomJenisMode(false);
+                      const opts = newBillingKategori === "tambahan" ? masterTambahanOptions : masterPotonganOptions;
+                      if (opts[0]) setNewBillingNama(opts[0]);
+                    }}
+                  >
+                    Batal
+                  </Button>
+                </div>
+                <p className="text-[10px] text-muted-foreground">
+                  ✨ Jenis baru ini akan otomatis tersimpan sebagai opsi pilihan berikutnya.
+                </p>
+              </div>
+            ) : (
+              <select
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-xs ring-offset-background focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+                value={newBillingNama}
+                onChange={(e) => {
+                  if (e.target.value === "__ADD_NEW__") {
+                    setIsCustomJenisMode(true);
+                    setNewBillingNama("");
+                  } else {
+                    setNewBillingNama(e.target.value);
+                  }
+                }}
+              >
+                {(newBillingKategori === "tambahan" ? masterTambahanOptions : masterPotonganOptions).map((opt) => (
+                  <option key={opt} value={opt}>
+                    {opt}
+                  </option>
+                ))}
+                <option value="__ADD_NEW__">➕ + Tambah Jenis Baru...</option>
+              </select>
+            )}
           </div>
 
+          {/* 3. Nominal Input */}
           <div>
             <label className="text-xs font-bold text-foreground block mb-1">
-              Nominal (Rp)
+              Nominal Per Unit / Pax (Rp)
             </label>
             <Input
               type="number"
@@ -3615,17 +3740,45 @@ export default function LaporanPembayaranPage() {
             />
           </div>
 
+          {/* 4. Quantity Input with Max Limit */}
           <div>
-            <label className="text-xs font-bold text-foreground block mb-1">
-              Catatan (Opsional)
-            </label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-xs font-bold text-foreground">
+                Quantity (Jumlah Pax)
+              </label>
+              <span className="text-[10px] font-bold text-amber-700 dark:text-amber-300 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/30">
+                Maksimal: {maxQtyLimit} Jamaah
+              </span>
+            </div>
             <Input
-              placeholder="Keterangan tambahan..."
-              value={newBillingCatatan}
-              onChange={(e) => setNewBillingCatatan(e.target.value)}
+              type="number"
+              min={1}
+              max={maxQtyLimit}
+              placeholder="1"
+              value={newBillingQty}
+              onChange={(e) => {
+                const val = parseInt(e.target.value, 10);
+                if (isNaN(val) || val < 1) setNewBillingQty(1);
+                else if (val > maxQtyLimit) setNewBillingQty(maxQtyLimit);
+                else setNewBillingQty(val);
+              }}
             />
+            <p className="mt-1 text-[10px] text-muted-foreground">
+              Dibatasi sesuai jumlah {maxQtyLimit} jamaah terdaftar di grup ini.
+            </p>
           </div>
 
+          {/* Subtotal Preview */}
+          {newBillingNominal > 0 && (
+            <div className="p-2.5 rounded-lg bg-stone-100 dark:bg-stone-900 border text-xs flex justify-between items-center">
+              <span className="text-muted-foreground font-medium">Subtotal Tambahan/Potongan:</span>
+              <span className="font-mono font-bold text-amber-600 dark:text-amber-400 text-sm">
+                {formatCurrency(newBillingNominal * newBillingQty)}
+              </span>
+            </div>
+          )}
+
+          {/* Actions */}
           <div className="flex justify-end gap-2 pt-2 border-t">
             <Button
               type="button"
