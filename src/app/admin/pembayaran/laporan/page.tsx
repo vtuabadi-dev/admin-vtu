@@ -2549,6 +2549,17 @@ function PaymentReviewTabContent() {
               />
             </div>
 
+            {/* Quick Tip for Sending Actual PDF File */}
+            <div className="p-2.5 bg-amber-500/10 border border-amber-500/30 rounded-lg flex items-start gap-2 text-[11px] text-amber-950 dark:text-amber-200">
+              <FileText className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+              <div>
+                <span className="font-extrabold block">📎 CARA MENGIRIM FILE PDF ASLI DI WA WEB:</span>
+                <span>
+                  Saat klik tombol hijau di bawah, <strong>File PDF Invoice asli</strong> akan otomatis terunduh dan WA Web terbuka ke chat Jamaah. Tarik/geser file PDF yang terunduh di baris bawah browser ke ruang chat WA Web, lalu tekan <strong>Kirim (Enter)</strong>!
+                </span>
+              </div>
+            </div>
+
             {/* Send Buttons */}
             <div className="flex flex-col sm:flex-row gap-2 pt-2 border-t">
               <Button
