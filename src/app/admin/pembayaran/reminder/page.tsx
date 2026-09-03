@@ -15,6 +15,7 @@ import {
   Plus,
   Trash2,
   Layers,
+  Loader2,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/components/ui/Card";
 import { Button } from "@/shared/components/ui/Button";
@@ -170,11 +171,33 @@ export default function JadwalReminderPage() {
   // View mode state: "dashboard" (Monitoring) or "settings" (Halaman Pengaturan Custom Multi-Reminder)
   const [viewMode, setViewMode] = useState<"dashboard" | "settings">("dashboard");
 
-  // Dynamic Multiple Custom Reminder Stages
-  const [reminderStages, setReminderStages] = useState<ReminderStage[]>(DEFAULT_STAGES);
+  // Dynamic Multiple Custom Reminder Stages (Instant Frame-1 Sync Load from Cache)
+  const [reminderStages, setReminderStages] = useState<ReminderStage[]>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const savedStages = localStorage.getItem("vtu_custom_reminder_stages_v2");
+        if (savedStages) {
+          const parsed = JSON.parse(savedStages);
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        }
+      } catch (e) {}
+    }
+    return DEFAULT_STAGES;
+  });
 
   // Global Official Payment Deadline Target (Default: H-40)
-  const [globalDeadlineDays, setGlobalDeadlineDays] = useState<number>(40);
+  const [globalDeadlineDays, setGlobalDeadlineDays] = useState<number>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const savedGlobalDeadline = localStorage.getItem("vtu_global_deadline_days");
+        if (savedGlobalDeadline) {
+          const parsed = parseInt(savedGlobalDeadline, 10);
+          if (!isNaN(parsed) && parsed > 0) return parsed;
+        }
+      } catch (e) {}
+    }
+    return 40;
+  });
 
   // Draft / Send Modal State (For Sending Messages)
   const [activePackageModal, setActivePackageModal] = useState<PackageDeadline | null>(null);
@@ -182,64 +205,41 @@ export default function JadwalReminderPage() {
   const [copiedGroupIdx, setCopiedGroupIdx] = useState<number | null>(null);
   const [saveSuccessMsg, setSaveSuccessMsg] = useState<string>("");
 
-  // Load reminder stages configuration and global deadline days from Server API & localStorage
+  // Parallelized Async Data & Server Settings Fetching
   useEffect(() => {
-    async function loadSettings() {
+    let isMounted = true;
+    async function loadAllData() {
       try {
-        const res = await fetch("/api/admin/settings/reminder");
-        const json = await res.json();
-        if (json.success && json.data) {
-          if (Array.isArray(json.data.stages) && json.data.stages.length > 0) {
-            setReminderStages(json.data.stages);
-            localStorage.setItem("vtu_custom_reminder_stages_v2", JSON.stringify(json.data.stages));
-          }
-          if (json.data.globalDeadlineDays) {
-            setGlobalDeadlineDays(json.data.globalDeadlineDays);
-            localStorage.setItem("vtu_global_deadline_days", String(json.data.globalDeadlineDays));
-          }
-          return;
-        }
-      } catch (e) {
-        console.warn("API reminder settings failed, falling back to localStorage", e);
-      }
+        const [settingsRes, summariesRes, kbrRes] = await Promise.all([
+          fetch("/api/admin/settings/reminder").then((r) => r.json()).catch(() => null),
+          getAllPaymentSummaries().catch(() => []),
+          getKeberangkatanList().catch(() => []),
+        ]);
 
-      // Fallback to localStorage
-      try {
-        const savedStages = localStorage.getItem("vtu_custom_reminder_stages_v2");
-        if (savedStages) {
-          const parsed = JSON.parse(savedStages);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            setReminderStages(parsed);
+        if (!isMounted) return;
+
+        if (settingsRes?.success && settingsRes?.data) {
+          if (Array.isArray(settingsRes.data.stages) && settingsRes.data.stages.length > 0) {
+            setReminderStages(settingsRes.data.stages);
+            localStorage.setItem("vtu_custom_reminder_stages_v2", JSON.stringify(settingsRes.data.stages));
+          }
+          if (settingsRes.data.globalDeadlineDays) {
+            setGlobalDeadlineDays(settingsRes.data.globalDeadlineDays);
+            localStorage.setItem("vtu_global_deadline_days", String(settingsRes.data.globalDeadlineDays));
           }
         }
-        const savedGlobalDeadline = localStorage.getItem("vtu_global_deadline_days");
-        if (savedGlobalDeadline) {
-          const parsed = parseInt(savedGlobalDeadline, 10);
-          if (!isNaN(parsed) && parsed > 0) setGlobalDeadlineDays(parsed);
-        }
-      } catch (e) {
-        console.error("Failed to load reminder stages from localStorage", e);
-      }
-    }
 
-    loadSettings();
-  }, []);
-
-  // Fetch Payment Summaries & Keberangkatan List
-  useEffect(() => {
-    async function loadData() {
-      try {
-        setLoading(true);
-        const [s, k] = await Promise.all([getAllPaymentSummaries(), getKeberangkatanList()]);
-        setSummaries(s);
-        setKbrList(k);
+        setSummaries(summariesRes || []);
+        setKbrList(kbrRes || []);
       } catch (err) {
         console.error("Error loading reminder data:", err);
       } finally {
-        setLoading(false);
+        if (isMounted) setLoading(false);
       }
     }
-    loadData();
+
+    loadAllData();
+    return () => { isMounted = false; };
   }, []);
 
   // Save Reminder Stages to Server API & localStorage
@@ -372,13 +372,7 @@ Mohon segera diselesaikan. Terima kasih.
     }, 400);
   }
 
-  if (loading) {
-    return (
-      <div className="flex h-64 items-center justify-center">
-        <p className="text-muted-foreground font-semibold">Memuat data reminder &amp; jadwal penagihan...</p>
-      </div>
-    );
-  }
+
 
   // =========================================================================
   // VIEW MODE 2: SETTINGS PAGE (PAGE REPLACEMENT — NO FLOATING MODAL)
@@ -704,7 +698,12 @@ Mohon segera diselesaikan. Terima kasih.
           </Badge>
         </CardHeader>
         <CardContent>
-          {packageDeadlines.length === 0 ? (
+          {loading ? (
+            <div className="flex h-36 items-center justify-center space-x-2 text-muted-foreground text-xs font-semibold">
+              <Loader2 className="w-5 h-5 animate-spin text-amber-500" />
+              <span>Memuat data reminder &amp; jadwal penagihan...</span>
+            </div>
+          ) : packageDeadlines.length === 0 ? (
             <div className="flex h-36 flex-col items-center justify-center text-muted-foreground text-sm space-y-2 border border-dashed rounded-xl bg-muted/20">
               <Check className="h-8 w-8 text-emerald-500" />
               <p className="font-medium text-foreground">Semua paket sudah lunas!</p>
