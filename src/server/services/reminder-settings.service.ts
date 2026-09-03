@@ -1,5 +1,6 @@
 import fs from "fs";
 import path from "path";
+import { prisma } from "@/server/db/client";
 
 export interface ReminderStageConfig {
   id: string;
@@ -89,6 +90,30 @@ function getStorageFilePath(): string {
 export async function getGlobalReminderSettings(): Promise<GlobalReminderSettings> {
   if (cachedSettings) return cachedSettings;
 
+  // 1. Try reading from PostgreSQL Database via AuditEntry (Persistent across cold-starts)
+  try {
+    const latestDbRecord = await prisma.auditEntry.findFirst({
+      where: { action: "UPDATE_REMINDER_SETTINGS" },
+      orderBy: { timestamp: "desc" },
+    });
+
+    if (latestDbRecord?.after) {
+      const parsed = JSON.parse(latestDbRecord.after);
+      if (parsed && Array.isArray(parsed.stages) && parsed.stages.length > 0) {
+        cachedSettings = {
+          globalDeadlineDays: Number(parsed.globalDeadlineDays) || 40,
+          stages: parsed.stages,
+          updatedAt: latestDbRecord.timestamp.toISOString(),
+          updatedBy: latestDbRecord.userName || "admin",
+        };
+        return cachedSettings;
+      }
+    }
+  } catch (dbErr) {
+    console.warn("[ReminderSettings] Error reading settings from Database:", dbErr);
+  }
+
+  // 2. Fallback to local storage file if DB is empty
   try {
     const filePath = getStorageFilePath();
     if (fs.existsSync(filePath)) {
@@ -134,6 +159,24 @@ export async function updateGlobalReminderSettings(
 
   cachedSettings = updated;
 
+  // Save to PostgreSQL database (Permanent storage - Never reverts on cold-starts)
+  try {
+    await prisma.auditEntry.create({
+      data: {
+        userId: "admin-settings",
+        userName: updatedBy,
+        role: "super_admin",
+        module: "pembayaran",
+        action: "UPDATE_REMINDER_SETTINGS",
+        detail: `Konfigurasi deadline resmi H-${updated.globalDeadlineDays} & ${updated.stages.length} tahapan reminder disimpan di database`,
+        after: JSON.stringify(updated),
+      },
+    });
+  } catch (dbErr) {
+    console.error("[ReminderSettings] Failed to save settings to PostgreSQL Database:", dbErr);
+  }
+
+  // Also save to file
   try {
     const filePath = getStorageFilePath();
     fs.writeFileSync(filePath, JSON.stringify(updated, null, 2), "utf-8");
