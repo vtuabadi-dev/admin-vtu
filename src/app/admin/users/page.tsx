@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Users, Shield, UserPlus, Loader2, RefreshCw, Copy, Check, Mail, Send, ShieldPlus, Edit3 } from "lucide-react";
+import { Users, Shield, UserPlus, Loader2, RefreshCw, Copy, Check, Mail, Send, ShieldPlus, Edit3, ExternalLink, Clock } from "lucide-react";
 import { Button } from "@/shared/components/ui/Button";
 import { Input } from "@/shared/components/ui/Input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/components/ui/Card";
@@ -427,8 +427,20 @@ export default function UserManagementPage() {
                     <tbody className="divide-y text-xs">
                       {users.map((user) => {
                         const inviteUrl = user.inviteToken
-                          ? `${window.location.origin}/setup-password?token=${user.inviteToken}`
+                          ? `${typeof window !== "undefined" ? window.location.origin : ""}/setup-password?token=${user.inviteToken}`
                           : null;
+                        const isExpired = Boolean(
+                          user.isInvitePending && user.inviteExpires && new Date(user.inviteExpires) < new Date()
+                        );
+                        const expiresFormatted = user.inviteExpires
+                          ? new Date(user.inviteExpires).toLocaleDateString("id-ID", {
+                              day: "numeric",
+                              month: "short",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })
+                          : null;
+
                         return (
                           <tr key={user.id} className="hover:bg-muted/30 transition-colors">
                             <td className="px-4 py-3 font-semibold text-foreground">{user.name}</td>
@@ -456,10 +468,29 @@ export default function UserManagementPage() {
                               </div>
                             </td>
                             <td className="px-4 py-3 text-center">
-                              {user.isInvitePending ? (
-                                <Badge variant="warning" className="text-[10px] font-bold animate-pulse">
-                                  ✉️ Undangan Pending
-                                </Badge>
+                              {isExpired ? (
+                                <div className="space-y-0.5">
+                                  <Badge variant="destructive" className="text-[10px] font-bold">
+                                    ⚠️ Undangan Kadaluarsa
+                                  </Badge>
+                                  {expiresFormatted && (
+                                    <p className="text-[9.5px] text-destructive font-mono">
+                                      Kadaluarsa: {expiresFormatted}
+                                    </p>
+                                  )}
+                                </div>
+                              ) : user.isInvitePending ? (
+                                <div className="space-y-0.5">
+                                  <Badge variant="warning" className="text-[10px] font-bold animate-pulse">
+                                    ✉️ Undangan Pending
+                                  </Badge>
+                                  {expiresFormatted && (
+                                    <p className="text-[9.5px] text-muted-foreground font-mono flex items-center justify-center gap-1">
+                                      <Clock className="w-3 h-3 text-amber-500 inline" />
+                                      s.d. {expiresFormatted}
+                                    </p>
+                                  )}
+                                </div>
                               ) : user.mustChangePassword ? (
                                 <Badge variant="secondary" className="text-[10px]">
                                   Password Sementara
@@ -474,37 +505,47 @@ export default function UserManagementPage() {
                               {formatDate(user.createdAt)}
                             </td>
                             <td className="px-4 py-3 text-center">
-                              <div className="flex items-center justify-center gap-1.5">
-                                {user.isInvitePending && (
+                              <div className="flex items-center justify-center gap-1.5 flex-wrap">
+                                {(user.isInvitePending || isExpired) && inviteUrl && (
                                   <>
-                                    {inviteUrl && (
-                                      <Button
-                                        size="sm"
-                                        variant="outline"
-                                        className="h-7 text-[10.5px] font-bold border-amber-500/40 text-amber-700 dark:text-amber-300 hover:bg-amber-500/10 gap-1"
-                                        onClick={() => handleCopyLink(inviteUrl)}
-                                        title="Salin Link Undangan ke Clipboard"
-                                      >
-                                        <Copy className="w-3 h-3" />
-                                        Salin Link
-                                      </Button>
-                                    )}
                                     <Button
                                       size="sm"
                                       variant="outline"
-                                      className="h-7 text-[10.5px] font-bold border-purple-500/40 text-purple-700 dark:text-purple-300 hover:bg-purple-500/10 gap-1"
-                                      onClick={() => handleResendInvite(user)}
-                                      disabled={resendingId === user.id}
-                                      title="Kirim Ulang Email & Perbarui Link Undangan"
+                                      className="h-7 text-[10.5px] font-bold border-blue-500/40 text-blue-700 dark:text-blue-300 hover:bg-blue-500/10 gap-1 shadow-2xs"
+                                      onClick={() => window.open(inviteUrl, "_blank")}
+                                      title="Buka Link Undangan Setup Password di Tab Baru"
                                     >
-                                      {resendingId === user.id ? (
-                                        <Loader2 className="w-3 h-3 animate-spin" />
-                                      ) : (
-                                        <Send className="w-3 h-3 text-purple-600" />
-                                      )}
-                                      Kirim Ulang
+                                      <ExternalLink className="w-3 h-3 text-blue-600" />
+                                      Buka Link
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="h-7 text-[10.5px] font-bold border-amber-500/40 text-amber-700 dark:text-amber-300 hover:bg-amber-500/10 gap-1 shadow-2xs"
+                                      onClick={() => handleCopyLink(inviteUrl)}
+                                      title="Salin Link Undangan ke Clipboard"
+                                    >
+                                      <Copy className="w-3 h-3 text-amber-600" />
+                                      Salin Link
                                     </Button>
                                   </>
+                                )}
+                                {(user.isInvitePending || isExpired) && (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-7 text-[10.5px] font-bold border-purple-500/40 text-purple-700 dark:text-purple-300 hover:bg-purple-500/10 gap-1 shadow-2xs"
+                                    onClick={() => handleResendInvite(user)}
+                                    disabled={resendingId === user.id}
+                                    title="Kirim Ulang Email, Perbarui Token & Perpanjang Masa Kadaluarsa 72 Jam"
+                                  >
+                                    {resendingId === user.id ? (
+                                      <Loader2 className="w-3 h-3 animate-spin" />
+                                    ) : (
+                                      <Send className="w-3 h-3 text-purple-600" />
+                                    )}
+                                    Kirim Ulang
+                                  </Button>
                                 )}
                                 <Button
                                   size="sm"
@@ -807,20 +848,43 @@ export default function UserManagementPage() {
 
               <div className="space-y-1 pt-1">
                 <label className="font-bold text-foreground">Tautan Undangan Setup Password (Berlaku 72 Jam):</label>
-                <div className="flex gap-2 items-center">
+                <div className="space-y-2">
                   <input
                     readOnly
                     value={createdInvite.inviteUrl}
-                    className="flex-1 h-9 bg-muted px-2.5 font-mono text-[11px] rounded border focus:outline-none select-all"
+                    className="w-full h-9 bg-muted px-2.5 font-mono text-[11px] rounded border focus:outline-none select-all"
                   />
-                  <Button
-                    size="sm"
-                    className="h-9 px-3 font-bold gap-1.5 shrink-0 bg-emerald-600 hover:bg-emerald-700 text-white"
-                    onClick={() => handleCopyLink(createdInvite.inviteUrl)}
-                  >
-                    {copiedToken ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                    {copiedToken ? "Disalin!" : "Salin Link"}
-                  </Button>
+                  <div className="flex gap-2 items-center flex-wrap">
+                    <Button
+                      size="sm"
+                      className="h-8 px-3 font-bold gap-1.5 shrink-0 bg-emerald-600 hover:bg-emerald-700 text-white text-xs"
+                      onClick={() => handleCopyLink(createdInvite.inviteUrl)}
+                    >
+                      {copiedToken ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                      {copiedToken ? "Disalin!" : "Salin Link"}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-8 px-3 font-bold gap-1.5 shrink-0 border-blue-500/40 text-blue-700 dark:text-blue-300 hover:bg-blue-500/10 text-xs"
+                      onClick={() => window.open(createdInvite.inviteUrl, "_blank")}
+                    >
+                      <ExternalLink className="w-3.5 h-3.5 text-blue-600" />
+                      Buka Link Undangan
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-8 px-3 font-bold gap-1.5 shrink-0 border-emerald-500/40 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/10 text-xs"
+                      onClick={() => {
+                        const waMsg = `Assalamu'alaikum Wr. Wb. ${createdInvite.name},\n\nBerikut adalah tautan undangan Anda sebagai pengelola sistem VTU (${createdInvite.role}).\n\nSilakan atur password akun Anda melalui tautan di bawah ini (berlaku 72 jam):\n${createdInvite.inviteUrl}`;
+                        window.open(`https://web.whatsapp.com/send?text=${encodeURIComponent(waMsg)}`, "_blank");
+                      }}
+                    >
+                      <Send className="w-3.5 h-3.5 text-emerald-600" />
+                      Kirim via WA
+                    </Button>
+                  </div>
                 </div>
               </div>
             </div>
