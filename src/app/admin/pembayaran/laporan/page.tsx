@@ -3400,9 +3400,10 @@ export default function LaporanPembayaranPage() {
                     )}
                   </CardContent>
                 </Card>
+              </div>
 
-                {/* RIGHT: Payment Form */}
-                <Card>
+              {/* RIGHT: Payment Form */}
+              <Card>
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2 text-sm">
                       <CreditCard className="h-4 w-4" />
@@ -3582,7 +3583,6 @@ export default function LaporanPembayaranPage() {
                     </Button>
                   </CardContent>
                 </Card>
-                </div>
               </div>
             </>
           )}
