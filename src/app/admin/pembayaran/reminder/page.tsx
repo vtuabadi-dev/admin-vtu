@@ -431,7 +431,6 @@ Mohon segera diselesaikan. Terima kasih.
         {/* STAGES LIST (CARDS) */}
         <div className="space-y-6">
           {reminderStages.map((stage, idx) => {
-            const sampleDeadlineDate = "2026-06-23";
             const sampleBerangkatDate = "2026-08-02";
 
             return (
