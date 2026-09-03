@@ -1769,11 +1769,16 @@ function PaymentReviewTabContent() {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-1.5">
                       <Building className="w-4 h-4 text-emerald-600" />
-                      <span className="font-bold text-foreground text-xs">Hotel Pesanan & Anggota (A/N)</span>
+                      <span className="font-bold text-foreground text-xs">Hotel Pesanan &amp; Anggota (A/N)</span>
                     </div>
-                    <Badge variant="outline" className="text-[10px]">
-                      {selectedAnggota.length} / {availableAnggota.length || 1} Jamaah
-                    </Badge>
+                    <div className="flex items-center gap-2">
+                      <span className="inline-flex items-center px-2 py-0.5 rounded text-[10.5px] font-extrabold bg-amber-500/15 text-amber-800 dark:text-amber-300 border border-amber-500/30">
+                        🏷️ Klaster Pendaftaran: {selectedPayment.group?.keberangkatan?.packageType?.name || selectedPayment.group?.keberangkatan?.tipePaket || selectedPayment.packageType || "SILVER"}
+                      </span>
+                      <Badge variant="outline" className="text-[10px]">
+                        {selectedAnggota.length} / {availableAnggota.length || 1} Jamaah
+                      </Badge>
+                    </div>
                   </div>
 
                   {/* Hotel Makkah & Madinah Inputs */}
@@ -2095,7 +2100,104 @@ function PaymentReviewTabContent() {
                   )}
                 </div>
 
-                {/* 3.8. Tabel Rincian Pembayaran (Di Atas Kalkulasi Tagihan Group) */}
+                {/* 3.75. Tabel Rincian Tagihan & Potongan Group (Di Atas Riwayat Pembayaran) */}
+                <div className="p-3 bg-stone-50 dark:bg-stone-900/60 rounded-xl border border-stone-200 dark:border-stone-800 space-y-2 text-xs">
+                  <div className="flex items-center justify-between border-b pb-2">
+                    <div className="flex items-center gap-1.5">
+                      <div className="p-1 bg-amber-500/10 text-amber-600 dark:text-amber-400 rounded-md">
+                        <Receipt className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-foreground text-xs">Rincian Tagihan &amp; Potongan Group</h4>
+                        <p className="text-[10px] text-muted-foreground">
+                          Rincian komponen tagihan dasar paket, beban tambahan order, dan potongan diskon.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="overflow-x-auto rounded-lg border bg-background">
+                    <table className="w-full text-left text-[11px]">
+                      <thead>
+                        <tr className="border-b bg-muted/60 text-muted-foreground font-bold uppercase tracking-wider text-[10px]">
+                          <th className="py-2 px-2.5">Deskripsi Item Tagihan / Potongan</th>
+                          <th className="py-2 px-2.5">Kategori</th>
+                          <th className="py-2 px-2.5 text-center">Qty</th>
+                          <th className="py-2 px-2.5 text-right">Harga / Pax</th>
+                          <th className="py-2 px-2.5 text-right">Total Nominal</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y text-xs">
+                        {/* Base Package Main Billing Item */}
+                        <tr className="hover:bg-muted/30 transition-colors">
+                          <td className="py-2 px-2.5 font-medium text-foreground">
+                            {selectedPayment.group?.keberangkatan?.namaPaket || "Tagihan Paket Utama"}
+                          </td>
+                          <td className="py-2 px-2.5">
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                              Tagihan Utama
+                            </span>
+                          </td>
+                          <td className="py-2 px-2.5 text-center font-mono font-bold text-slate-700 dark:text-slate-300">
+                            {selectedPayment.group?.jumlahAnggota || availableAnggota.length || 1} Pax
+                          </td>
+                          <td className="py-2 px-2.5 text-right font-mono tabular-nums text-stone-600 dark:text-stone-400">
+                            {formatCurrency(selectedPayment.group?.keberangkatan?.hargaPaket || (totalTagihanBase / Math.max(1, selectedPayment.group?.jumlahAnggota || 1)))}
+                          </td>
+                          <td className="py-2 px-2.5 text-right font-mono font-bold text-emerald-700 dark:text-emerald-400 tabular-nums">
+                            {formatCurrency(totalTagihanBase)}
+                          </td>
+                        </tr>
+
+                        {/* Dynamic Order Items (Tambahan / Potongan) */}
+                        {orderItems.map((item) => {
+                          const isPotongan = item.tipe === "pengurangan";
+                          return (
+                            <tr key={item.id} className="hover:bg-muted/30 transition-colors">
+                              <td className="py-2 px-2.5 font-medium text-foreground">
+                                {item.nama}
+                              </td>
+                              <td className="py-2 px-2.5">
+                                {isPotongan ? (
+                                  <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">
+                                    - Potongan
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300">
+                                    + Tambahan
+                                  </span>
+                                )}
+                              </td>
+                              <td className="py-2 px-2.5 text-center font-mono font-bold text-slate-700 dark:text-slate-300">
+                                1 Item
+                              </td>
+                              <td className="py-2 px-2.5 text-right font-mono tabular-nums text-stone-600 dark:text-stone-400">
+                                {formatCurrency(item.nominal)}
+                              </td>
+                              <td className={`py-2 px-2.5 text-right font-mono font-bold tabular-nums ${
+                                isPotongan ? "text-amber-600 dark:text-amber-400" : "text-emerald-700 dark:text-emerald-400"
+                              }`}>
+                                {isPotongan ? `- ${formatCurrency(item.nominal)}` : formatCurrency(item.nominal)}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                      <tfoot>
+                        <tr className="border-t-2 border-stone-200 dark:border-stone-800 bg-stone-50/80 dark:bg-stone-900/80 font-bold text-xs">
+                          <td colSpan={4} className="py-2 px-2.5 text-right uppercase tracking-wider text-muted-foreground">
+                            Total Tagihan Akhir (Net)
+                          </td>
+                          <td className="py-2 px-2.5 text-right font-mono text-sm text-emerald-700 dark:text-emerald-400">
+                            {formatCurrency(totalTagihanDisesuaikan)}
+                          </td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                </div>
+
+                {/* 3.8. Riwayat Pembayaran (Di Atas Kalkulasi Tagihan Group) */}
                 <div className="p-3 bg-muted/30 rounded-xl border border-emerald-500/30 dark:border-emerald-500/20 shadow-2xs space-y-2.5 text-xs">
                   <div className="flex items-center justify-between border-b pb-2">
                     <div className="flex items-center gap-1.5">
@@ -2103,7 +2205,7 @@ function PaymentReviewTabContent() {
                         <Receipt className="w-4 h-4" />
                       </div>
                       <div>
-                        <h4 className="font-bold text-foreground text-xs">Tabel Rincian Pembayaran</h4>
+                        <h4 className="font-bold text-foreground text-xs">Riwayat Pembayaran</h4>
                         <p className="text-[10px] text-muted-foreground">
                           Daftar riwayat transaksi pembayaran yang telah masuk untuk grup / jamaah ini.
                         </p>
@@ -3463,14 +3565,14 @@ export default function LaporanPembayaranPage() {
                     </CardContent>
                   </Card>
 
-                  {/* CARD 2: HISTORI PEMBAYARAN GROUP */}
+                  {/* CARD 2: RIWAYAT PEMBAYARAN GROUP */}
                   <Card>
                     <CardHeader>
                       <div className="flex items-center justify-between">
                         <CardTitle className="text-sm">
                           {activeSplit
-                            ? `Histori ${activeSplit.label}`
-                            : "Histori Pembayaran Group"}
+                            ? `Riwayat Pembayaran — ${activeSplit.label}`
+                            : "Riwayat Pembayaran Group"}
                         </CardTitle>
                         {!splitConfig && (
                           <Button
