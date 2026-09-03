@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { auth } from "@/server/auth";
+import { prisma } from "@/server/db/client";
 import { checkServerPermission } from "@/shared/lib/rbac-utils";
 import {
   getGlobalReminderSettings,
@@ -46,9 +47,30 @@ export async function POST(request: NextRequest) {
       session.user.name || session.user.email || "admin"
     );
 
+    // Save Notification Log Entry to Database (Audit Trail)
+    try {
+      await prisma.auditEntry.create({
+        data: {
+          userId: session.user.id || "admin",
+          userName: session.user.name || session.user.email || "Admin Pembayaran",
+          role: (session.user.role as any) || "super_admin",
+          module: "pembayaran",
+          action: "UPDATE_REMINDER_SETTINGS",
+          detail: `Konfigurasi deadline resmi H-${body.globalDeadlineDays || 40} & ${body.stages?.length || 0} tahapan reminder berhasil disimpan ke Database`,
+          after: JSON.stringify({
+            globalDeadlineDays: body.globalDeadlineDays,
+            stagesCount: body.stages?.length,
+            updatedAt: updated.updatedAt,
+          }),
+        },
+      });
+    } catch (dbErr) {
+      console.warn("[AuditTrail DB Notice]:", dbErr);
+    }
+
     return NextResponse.json({
       success: true,
-      message: "Konfigurasi tahapan reminder berhasil disimpan dan berlaku secara global!",
+      message: "Konfigurasi tahapan reminder berhasil disimpan ke database!",
       data: updated,
     });
   } catch (error) {

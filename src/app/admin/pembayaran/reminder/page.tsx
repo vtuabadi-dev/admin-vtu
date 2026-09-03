@@ -180,6 +180,7 @@ export default function JadwalReminderPage() {
   const [activePackageModal, setActivePackageModal] = useState<PackageDeadline | null>(null);
   const [selectedModalStageId, setSelectedModalStageId] = useState<string>("");
   const [copiedGroupIdx, setCopiedGroupIdx] = useState<number | null>(null);
+  const [saveSuccessMsg, setSaveSuccessMsg] = useState<string>("");
 
   // Load reminder stages configuration and global deadline days from Server API & localStorage
   useEffect(() => {
@@ -266,11 +267,12 @@ export default function JadwalReminderPage() {
         throw new Error(json.message || "Gagal menyimpan ke server");
       }
 
-      alert(`✅ Konfigurasi deadline resmi (H-${globalDeadlineDays}) & ${sorted.length} tahapan reminder berhasil disimpan secara global di server & semua PC!`);
+      setSaveSuccessMsg(`Konfigurasi deadline resmi (H-${globalDeadlineDays}) & ${sorted.length} tahapan reminder berhasil disimpan di database`);
       setViewMode("dashboard");
+      setTimeout(() => setSaveSuccessMsg(""), 7000);
     } catch (e) {
       console.error(e);
-      alert(`⚠️ ${(e as Error).message || "Gagal menyimpan konfigurasi reminder."}`);
+      setSaveSuccessMsg(`⚠️ ${(e as Error).message || "Gagal menyimpan konfigurasi reminder."}`);
     }
   };
 
@@ -636,6 +638,18 @@ Mohon segera diselesaikan. Terima kasih.
   // =========================================================================
   return (
     <div className="space-y-6">
+      {saveSuccessMsg && (
+        <div className="p-3.5 bg-emerald-500/15 border border-emerald-500/30 text-emerald-900 dark:text-emerald-300 rounded-xl flex items-center justify-between text-xs font-bold shadow-xs animate-in fade-in-0 slide-in-from-top-2">
+          <div className="flex items-center gap-2">
+            <Check className="w-4 h-4 text-emerald-600 shrink-0" />
+            <span>{saveSuccessMsg}</span>
+          </div>
+          <button onClick={() => setSaveSuccessMsg("")} className="text-emerald-700 hover:text-emerald-950 dark:text-emerald-300 dark:hover:text-white font-bold cursor-pointer">
+            ✕
+          </button>
+        </div>
+      )}
+
       {/* HEADER BAR */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b pb-4">
         <div>
