@@ -1019,23 +1019,29 @@ function PaymentReviewTabContent() {
     const nom = sendInvoiceTarget.jumlah || formNominal;
     const payload = getInvoicePdfPayload(sendInvoiceTarget, invNum, nom);
 
-    // 1. If Web Share API with file attachment is supported (Mobile / Chrome), trigger native share
+    // 1. If Web Share API with file attachment is supported (Mobile Chrome/Safari), trigger native share
     if (typeof navigator !== "undefined" && typeof navigator.share === "function") {
       const shared = await shareInvoicePdf(payload);
       if (shared) return;
     }
 
-    // 2. Otherwise: Download PDF file & open WhatsApp Chat with text
+    // 2. Download PDF file as local backup
     downloadInvoicePdf(payload);
 
+    // 3. Open WhatsApp Web directly targeted at Jamaah phone number with prefilled text & online PDF link
     const cleanPhone = (targetPhone || "").replace(/[^0-9]/g, "").replace(/^0/, "62");
     const msg = generateInvoiceMessage(sendInvoiceTarget, invNum, nom);
+
+    const isMobile = typeof navigator !== "undefined" && /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
     const waUrl = cleanPhone
-      ? `https://wa.me/${cleanPhone}?text=${encodeURIComponent(msg)}`
-      : `https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`;
+      ? isMobile
+        ? `https://wa.me/${cleanPhone}?text=${encodeURIComponent(msg)}`
+        : `https://web.whatsapp.com/send?phone=${cleanPhone}&text=${encodeURIComponent(msg)}`
+      : `https://web.whatsapp.com/send?text=${encodeURIComponent(msg)}`;
+
     window.open(waUrl, "_blank");
 
-    setSuccessMessage("File PDF Invoice berhasil diunduh & WhatsApp telah dibuka. Anda dapat langsung melampirkan file PDF tersebut ke chat!");
+    setSuccessMessage(`WhatsApp Web berhasil dibuka langsung ke nomor ${targetPhone || "Jamaah"}! Teks pesan & link PDF resmi sudah otomatis terisi.`);
     setShowSuccess(true);
   };
 
