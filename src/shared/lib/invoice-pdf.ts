@@ -742,8 +742,12 @@ export function generateInvoicePdf(data: InvoicePdfData): jsPDF {
 
 export function downloadInvoicePdf(data: InvoicePdfData, filename?: string): void {
   const doc = generateInvoicePdf(data);
-  const cleanNumber = (data.invoiceNumber || "INV-VTU").replace(/[^a-zA-Z0-9-_]/g, "");
-  const fname = filename || `Invoice-${cleanNumber}.pdf`;
+  let fname = filename;
+  if (!fname) {
+    const reg = (data.kodeRegistrasi || data.idReg || "REG").replace(/[/\\?%*:|"<>]/g, "").trim();
+    const grp = (data.namaGroup || data.picName || "Jamaah").replace(/[/\\?%*:|"<>]/g, "").trim();
+    fname = `${reg} - ${grp}.pdf`;
+  }
   doc.save(fname);
 }
 

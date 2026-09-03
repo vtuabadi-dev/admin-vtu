@@ -311,6 +311,12 @@ export interface GroupPaymentSummary {
   anggota: Jamaah[];
   pembayaran: Pembayaran[];
   invoices: Invoice[];
+  keberangkatan?: {
+    id: string;
+    namaPaket: string;
+    hargaPaket: number;
+    tanggalBerangkat?: string;
+  };
 }
 
 // ============================================================

@@ -257,6 +257,7 @@ export const groupRepo = {
         anggota: { include: { dokumen: true } },
         pembayaran: { include: { alokasi: true } },
         invoices: { include: { items: true } },
+        keberangkatan: true,
       },
     });
 
@@ -372,6 +373,16 @@ export const groupRepo = {
       })),
       pembayaran: row.pembayaran.map(mapPembayaran),
       invoices: row.invoices.map(mapInvoice),
+      keberangkatan: row.keberangkatan
+        ? {
+            id: row.keberangkatan.id,
+            namaPaket: row.keberangkatan.namaPaket,
+            hargaPaket: row.keberangkatan.hargaPaket,
+            tanggalBerangkat: row.keberangkatan.tanggalBerangkat
+              ? row.keberangkatan.tanggalBerangkat.toISOString()
+              : undefined,
+          }
+        : undefined,
     };
   },
 

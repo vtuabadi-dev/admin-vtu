@@ -10,6 +10,7 @@ import {
   Button,
   StatusBadge,
   Select,
+  SearchableSelect,
   Table,
   StatCard,
 } from "@/shared/components/ui";
@@ -175,12 +176,16 @@ export default function PembayaranMonitoringPage() {
         <CardContent className="pt-4 pb-4">
           <div className="flex flex-wrap items-end gap-3">
             {/* Paket Filter */}
-            <div className="w-52">
-              <Select
-                label="Paket Umroh"
+            <div className="w-72 sm:w-80 space-y-1">
+              <label className="text-sm font-medium leading-none block">
+                Paket Umroh
+              </label>
+              <SearchableSelect
                 options={paketOptions}
                 value={paketFilter}
-                onChange={(e) => setPaketFilter(e.target.value)}
+                onChange={(val) => setPaketFilter(val || "semua")}
+                placeholder="Pilih / Cari Paket Umroh..."
+                size="sm"
               />
             </div>
 

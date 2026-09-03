@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Building2, Users, ChevronDown, ChevronRight, ArrowLeft } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/shared/components/ui/Card";
 import { Button } from "@/shared/components/ui/Button";
-import { Select } from "@/shared/components/ui/Select";
+import { SearchableSelect } from "@/shared/components/ui/SearchableSelect";
 import { Badge } from "@/shared/components/ui/Badge";
 import { getHotelCombinations, generateHotelLabel } from "@/shared/lib/hotel-utils";
 import { getKeberangkatanList, getJamaahList } from "@/server/actions/api";
@@ -60,17 +60,18 @@ export default function HotelCombinationPage() {
 
       <div className="flex items-center gap-3">
         <div className="w-80">
-          <Select
+          <SearchableSelect
             options={keberangkatanList.map((k) => ({
               value: k.id,
               label: `${k.kode} — ${k.paketUmroh?.namaPaket || "-"}`,
             }))}
             placeholder="-- Pilih Paket Keberangkatan --"
             value={selectedKbrId}
-            onChange={(e) => {
-              setSelectedKbrId(e.target.value);
+            onChange={(val) => {
+              setSelectedKbrId(val);
               setExpandedCombo(null);
             }}
+            size="sm"
           />
         </div>
       </div>

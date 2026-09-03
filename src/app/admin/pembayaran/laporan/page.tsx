@@ -34,11 +34,11 @@ import {
   Edit3,
   Trash2,
   AlertTriangle,
-  ShoppingBag,
   Building,
   Users,
 } from "lucide-react";
-import { downloadInvoicePdf, shareInvoicePdf, type InvoiceOrderItem } from "@/shared/lib/invoice-pdf";
+import { downloadInvoicePdf, type InvoiceOrderItem } from "@/shared/lib/invoice-pdf";
+import { resolveHotelForKlaster } from "@/shared/lib/hotel-utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/components/ui/Card";
 import { Button } from "@/shared/components/ui/Button";
 import { Input } from "@/shared/components/ui/Input";
@@ -536,6 +536,66 @@ function getInitialReviewQueue(): any[] {
   return [];
 }
 
+function resolveKlasterName(p: any): string {
+  if (!p) return "Standard / Non-Cluster";
+  const kbr = p.group?.keberangkatan;
+  const hotelM = kbr?.hotelMekkah || p.hotelMekkah || "";
+  const hotelN = kbr?.hotelMadinah || p.hotelMadinah || "";
+
+  // Detect if package has multiple cluster variants (multi-hotel with slashes or cluster configs)
+  const isMultiClusterPackage =
+    hotelM.includes("/") ||
+    hotelN.includes("/") ||
+    Boolean(kbr?.clusterConfigs && Object.keys(kbr.clusterConfigs).length > 0) ||
+    Boolean(kbr?.isAdaKlaster === "ya");
+
+  const candidates = [
+    p.group?.packageTypeName,
+    p.group?.klasterName,
+    p.group?.klaster,
+    p.group?.clusterName,
+    p.group?.selectedCluster,
+    p.group?.keberangkatan?.packageType?.name,
+    p.group?.keberangkatan?.tipePaket,
+    p.packageType,
+    p.tipePaket,
+    p.klaster,
+    p.clusterName,
+    p.selectedCluster,
+  ];
+
+  for (const cand of candidates) {
+    if (cand && typeof cand === "string") {
+      const trimmed = cand.trim();
+      if (
+        trimmed &&
+        !/^paket\s+umroh/i.test(trimmed) &&
+        !/^standar\s+paket/i.test(trimmed) &&
+        !/^non-cluster/i.test(trimmed)
+      ) {
+        return trimmed;
+      }
+    }
+  }
+
+  const pkgName = p.group?.keberangkatan?.namaPaket || p.namaPaket || "";
+  const groupCode = p.group?.kodeRegistrasi || p.kodeRegistrasi || "";
+  const combined = `${pkgName} ${groupCode}`.toUpperCase();
+  if (combined.includes("PLATINUM")) return "PLATINUM";
+  if (combined.includes("GOLD") || combined.includes("VIP")) return "GOLD";
+  if (combined.includes("BRONZE") || combined.includes("PROMO")) return "BRONZE";
+  if (combined.includes("TURKI") || combined.includes("TURKEY")) return "TURKIYE";
+  if (combined.includes("SILVER")) return "SILVER";
+  if (combined.includes("REG") || combined.includes("REGULER")) return "REGULER";
+
+  // If package is Single Hotel (no cluster variants available), label as Standard / Non-Cluster
+  if (!isMultiClusterPackage) {
+    return "Standard / Non-Cluster";
+  }
+
+  return "SILVER";
+}
+
 function PaymentReviewTabContent() {
   const initialQueue = getInitialReviewQueue();
   const [queue, setQueue] = useState<any[]>(initialQueue);
@@ -785,10 +845,13 @@ function PaymentReviewTabContent() {
     setFormRekening(payment.nomorRekening || "");
     setFormCatatan(payment.catatan || "");
 
-    // Hotel Information from Package
+    // Hotel Information from Package resolved specifically for Jamaah/Group Cluster Choice
+    const targetKlaster = resolveKlasterName(payment);
     const kbr = payment.group?.keberangkatan;
-    setFormHotelMekkah(kbr?.hotelMekkah || "GRAND AL MASSA");
-    setFormHotelMadinah(kbr?.hotelMadinah || "DURRAT AL EIMAN");
+    const resolvedMekkah = resolveHotelForKlaster(kbr?.hotelMekkah, targetKlaster) || kbr?.hotelMekkah || "GRAND AL MASSA";
+    const resolvedMadinah = resolveHotelForKlaster(kbr?.hotelMadinah, targetKlaster) || kbr?.hotelMadinah || "DURRAT AL EIMAN";
+    setFormHotelMekkah(resolvedMekkah);
+    setFormHotelMadinah(resolvedMadinah);
 
     // Alamat (Single Source of Truth from Manifest / Jamaah / KTP / Group)
     const alamat = getManifestAlamat(payment.group || payment);
@@ -1008,8 +1071,13 @@ function PaymentReviewTabContent() {
     const invNum = p.invoiceId || invoiceNumber;
     const nom = p.jumlah || formNominal;
     const payload = getInvoicePdfPayload(p, invNum, nom);
-    downloadInvoicePdf(payload);
-    setSuccessMessage(`File PDF Invoice ${invNum} berhasil diunduh!`);
+
+    const regId = (p.kodeRegistrasi || p.group?.kodeRegistrasi || payload.kodeRegistrasi || "REG").replace(/[/\\?%*:|"<>]/g, "").trim();
+    const grpName = (p.namaGroup || p.group?.namaGroup || payload.namaGroup || "Jamaah").replace(/[/\\?%*:|"<>]/g, "").trim();
+    const customFilename = `${regId} - ${grpName}.pdf`;
+
+    downloadInvoicePdf(payload, customFilename);
+    setSuccessMessage(`File PDF Invoice (${customFilename}) berhasil diunduh!`);
     setShowSuccess(true);
   }, [sendInvoiceTarget, selectedPayment, invoiceNumber, formNominal, getInvoicePdfPayload]);
 
@@ -1019,29 +1087,30 @@ function PaymentReviewTabContent() {
     const nom = sendInvoiceTarget.jumlah || formNominal;
     const payload = getInvoicePdfPayload(sendInvoiceTarget, invNum, nom);
 
-    // 1. If Web Share API with file attachment is supported (Mobile Chrome/Safari), trigger native share
-    if (typeof navigator !== "undefined" && typeof navigator.share === "function") {
-      const shared = await shareInvoicePdf(payload);
-      if (shared) return;
-    }
+    // 1. Template nama file: [ID Reg] - [Nama Perwakilan Jamaah / Ketua Group Pendaftar].pdf
+    const regId = (sendInvoiceTarget.kodeRegistrasi || sendInvoiceTarget.group?.kodeRegistrasi || payload.kodeRegistrasi || "REG").replace(/[/\\?%*:|"<>]/g, "").trim();
+    const grpName = (sendInvoiceTarget.namaGroup || sendInvoiceTarget.group?.namaGroup || payload.namaGroup || "Jamaah").replace(/[/\\?%*:|"<>]/g, "").trim();
+    const customFilename = `${regId} - ${grpName}.pdf`;
 
-    // 2. Download PDF file as local backup
-    downloadInvoicePdf(payload);
+    // 2. Fungsi 1: Otomatis download file PDF invoice fisik
+    downloadInvoicePdf(payload, customFilename);
 
-    // 3. Open WhatsApp Web directly targeted at Jamaah phone number with prefilled text & online PDF link
-    const cleanPhone = (targetPhone || "").replace(/[^0-9]/g, "").replace(/^0/, "62");
+    // 3. Fungsi 2: Otomatis hyperlink langsung ke nomor WA Web tujuan + prefilled text
+    const rawPhone = targetPhone || sendInvoiceTarget.telepon || sendInvoiceTarget.group?.ketuaGroup?.nomorTelepon || "";
+    const cleanPhone = rawPhone.replace(/[^0-9]/g, "").replace(/^0/, "62");
     const msg = generateInvoiceMessage(sendInvoiceTarget, invNum, nom);
 
     const isMobile = typeof navigator !== "undefined" && /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
     const waUrl = cleanPhone
       ? isMobile
-        ? `https://wa.me/${cleanPhone}?text=${encodeURIComponent(msg)}`
+        ? `https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodeURIComponent(msg)}`
         : `https://web.whatsapp.com/send?phone=${cleanPhone}&text=${encodeURIComponent(msg)}`
       : `https://web.whatsapp.com/send?text=${encodeURIComponent(msg)}`;
 
+    // Buka tab WhatsApp Web secara langsung
     window.open(waUrl, "_blank");
 
-    setSuccessMessage(`WhatsApp Web berhasil dibuka langsung ke nomor ${targetPhone || "Jamaah"}! Teks pesan & link PDF resmi sudah otomatis terisi.`);
+    setSuccessMessage(`File (${customFilename}) otomatis terunduh & WhatsApp Web dibuka langsung ke nomor ${cleanPhone || "Jamaah"}!`);
     setShowSuccess(true);
   };
 
@@ -1757,17 +1826,6 @@ function PaymentReviewTabContent() {
                       </span>
                     </div>
                   ) : null}
-
-                  {/* Catatan / Keterangan */}
-                  <div>
-                    <label className="text-[11px] font-bold text-foreground">Keterangan / Catatan Transaksi</label>
-                    <textarea
-                      value={formCatatan}
-                      onChange={(e) => setFormCatatan(e.target.value)}
-                      placeholder="Contoh: Pembayaran DP 3 Pax Paket Umroh 17 Juni"
-                      className="mt-1 w-full rounded-md border bg-background px-2.5 py-1.5 text-xs focus:ring-1 focus:ring-primary min-h-[50px]"
-                    />
-                  </div>
                 </div>
 
                 {/* 2.5. Hotel Pesanan & Anggota Jamaah / Split Invoice */}
@@ -1779,7 +1837,7 @@ function PaymentReviewTabContent() {
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="inline-flex items-center px-2 py-0.5 rounded text-[10.5px] font-extrabold bg-amber-500/15 text-amber-800 dark:text-amber-300 border border-amber-500/30">
-                        🏷️ Klaster Pendaftaran: {selectedPayment.group?.keberangkatan?.packageType?.name || selectedPayment.group?.keberangkatan?.tipePaket || selectedPayment.packageType || "SILVER"}
+                        🏷️ Klaster Pendaftaran: {resolveKlasterName(selectedPayment)}
                       </span>
                       <Badge variant="outline" className="text-[10px]">
                         {selectedAnggota.length} / {availableAnggota.length || 1} Jamaah
@@ -1968,24 +2026,24 @@ function PaymentReviewTabContent() {
                   </div>
                 )}
 
-                {/* 3.5. Penyesuaian Biaya & Tambahan Order (Layanan Ekstra / Potongan) */}
-                <div className="p-3 bg-gradient-to-br from-amber-500/5 via-primary/5 to-emerald-500/5 rounded-xl border border-amber-500/20 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className="p-1.5 bg-amber-500/10 text-amber-600 dark:text-amber-400 rounded-lg">
-                        <ShoppingBag className="w-4 h-4" />
+                {/* 3.75. Tabel Rincian Tagihan & Potongan Group (Di Atas Riwayat Pembayaran) */}
+                <div className="p-3 bg-stone-50 dark:bg-stone-900/60 rounded-xl border border-stone-200 dark:border-stone-800 space-y-2 text-xs">
+                  <div className="flex items-center justify-between border-b pb-2">
+                    <div className="flex items-center gap-1.5">
+                      <div className="p-1 bg-amber-500/10 text-amber-600 dark:text-amber-400 rounded-md">
+                        <Receipt className="w-4 h-4" />
                       </div>
                       <div>
-                        <h4 className="text-xs font-bold text-foreground flex items-center gap-1.5">
-                          Tambahan Order & Penyesuaian Biaya
+                        <h4 className="font-bold text-foreground text-xs flex items-center gap-1.5">
+                          Rincian Tagihan &amp; Potongan Group
                           {orderItems.length > 0 && (
                             <Badge variant="warning" className="text-[10px] px-1.5 py-0">
-                              {orderItems.length} Item
+                              +{orderItems.length} Item Tambahan
                             </Badge>
                           )}
                         </h4>
                         <p className="text-[10px] text-muted-foreground">
-                          Tambah beban (kereta cepat, upgrade kamar, seragam) atau potongan biaya.
+                          Rincian komponen tagihan dasar paket, beban tambahan order, dan potongan diskon.
                         </p>
                       </div>
                     </div>
@@ -1994,7 +2052,7 @@ function PaymentReviewTabContent() {
                       type="button"
                       size="sm"
                       variant="outline"
-                      className="h-7 text-xs font-bold border-amber-500/40 text-amber-700 dark:text-amber-300 hover:bg-amber-500/10 gap-1"
+                      className="h-7 text-xs font-bold border-amber-500/40 text-amber-700 dark:text-amber-300 hover:bg-amber-500/10 gap-1 shadow-2xs"
                       onClick={() => {
                         const initPreset = ORDER_PRESETS[0] || {
                           category: "fast_train",
@@ -2014,114 +2072,6 @@ function PaymentReviewTabContent() {
                     </Button>
                   </div>
 
-                  {/* Quick Preset Chips for 1-Click Adding */}
-                  <div>
-                    <p className="text-[10px] font-bold uppercase text-muted-foreground mb-1.5">Pilih Cepat Kategori Layanan:</p>
-                    <div className="flex flex-wrap gap-1.5">
-                      {ORDER_PRESETS.map((preset) => (
-                        <button
-                          key={preset.category}
-                          type="button"
-                          onClick={() => {
-                            const newItem: InvoiceOrderItem = {
-                              id: `order-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
-                              kategori: preset.category,
-                              nama: preset.defaultName,
-                              tipe: preset.type,
-                              nominal: preset.defaultNominal,
-                            };
-                            setOrderItems((prev) => [...prev, newItem]);
-                          }}
-                          className="px-2 py-1 bg-background hover:bg-muted border rounded-lg text-[10.5px] font-medium text-foreground flex items-center gap-1 transition-colors shadow-2xs cursor-pointer"
-                          title={`Klik untuk tambah ${preset.label}`}
-                        >
-                          <span>{preset.icon}</span>
-                          <span>{preset.label}</span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Active Order Items List */}
-                  {orderItems.length > 0 ? (
-                    <div className="space-y-2 pt-1 border-t border-border/60">
-                      {orderItems.map((item) => (
-                        <div
-                          key={item.id}
-                          className="flex items-center justify-between gap-2 p-2 bg-background/90 rounded-lg border text-xs shadow-2xs"
-                        >
-                          <div className="flex items-center gap-2 flex-1 min-w-0">
-                            <span className={`px-1.5 py-0.5 rounded text-[9.5px] font-extrabold uppercase shrink-0 ${
-                              item.tipe === "penambahan"
-                                ? "bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-300 dark:border-amber-800"
-                                : "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800"
-                            }`}>
-                              {item.tipe === "penambahan" ? "+ Beban" : "- Potongan"}
-                            </span>
-                            <input
-                              type="text"
-                              value={item.nama}
-                              onChange={(e) => {
-                                const val = e.target.value;
-                                setOrderItems((prev) =>
-                                  prev.map((it) => (it.id === item.id ? { ...it, nama: val } : it))
-                                );
-                              }}
-                              className="bg-transparent border-b border-dashed border-border text-xs font-semibold text-foreground flex-1 min-w-0 focus:outline-none focus:border-primary"
-                              placeholder="Nama layanan / beban"
-                            />
-                          </div>
-
-                          <div className="flex items-center gap-1.5 shrink-0">
-                            <span className="text-[10px] text-muted-foreground font-mono">Rp</span>
-                            <input
-                              type="number"
-                              value={item.nominal || ""}
-                              onChange={(e) => {
-                                const val = Number(e.target.value) || 0;
-                                setOrderItems((prev) =>
-                                  prev.map((it) => (it.id === item.id ? { ...it, nominal: val } : it))
-                                );
-                              }}
-                              className="w-24 h-7 text-xs font-mono font-bold text-right bg-muted/40 border rounded px-1.5 focus:outline-none focus:ring-1 focus:ring-primary"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setOrderItems((prev) => prev.filter((it) => it.id !== item.id));
-                              }}
-                              className="p-1 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded transition-colors"
-                              title="Hapus item order"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="p-2.5 rounded-lg border border-dashed text-center text-muted-foreground text-[11px]">
-                      Belum ada beban tambahan atau potongan order. Klik chip preset di atas atau tombol Tambah Order untuk menambahkan.
-                    </div>
-                  )}
-                </div>
-
-                {/* 3.75. Tabel Rincian Tagihan & Potongan Group (Di Atas Riwayat Pembayaran) */}
-                <div className="p-3 bg-stone-50 dark:bg-stone-900/60 rounded-xl border border-stone-200 dark:border-stone-800 space-y-2 text-xs">
-                  <div className="flex items-center justify-between border-b pb-2">
-                    <div className="flex items-center gap-1.5">
-                      <div className="p-1 bg-amber-500/10 text-amber-600 dark:text-amber-400 rounded-md">
-                        <Receipt className="w-4 h-4" />
-                      </div>
-                      <div>
-                        <h4 className="font-bold text-foreground text-xs">Rincian Tagihan &amp; Potongan Group</h4>
-                        <p className="text-[10px] text-muted-foreground">
-                          Rincian komponen tagihan dasar paket, beban tambahan order, dan potongan diskon.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
                   <div className="overflow-x-auto rounded-lg border bg-background">
                     <table className="w-full text-left text-[11px]">
                       <thead>
@@ -2137,7 +2087,7 @@ function PaymentReviewTabContent() {
                         {/* Base Package Main Billing Item */}
                         <tr className="hover:bg-muted/30 transition-colors">
                           <td className="py-2 px-2.5 font-medium text-foreground">
-                            {selectedPayment.group?.keberangkatan?.namaPaket || "Tagihan Paket Utama"}
+                            {selectedPayment.group?.keberangkatan?.namaPaket || selectedPayment.namaPaket || selectedPayment.group?.namaPaket || "Paket Umroh"}
                           </td>
                           <td className="py-2 px-2.5">
                             <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
@@ -3258,11 +3208,16 @@ export default function LaporanPembayaranPage() {
         return;
       }
 
+      const pkgName = summary.keberangkatan?.namaPaket || (summary as any).namaPaket || (summary as any).paketUmroh?.namaPaket;
+      const billingItemName = pkgName
+        ? `${pkgName} (${summary.jumlahAnggota} Pax)`
+        : `Tagihan Paket (${summary.jumlahAnggota} Pax)`;
+
       setGroupData(summary);
       setBillingItems([
         {
           id: "base-package",
-          nama: `Tagihan Paket Utama (${summary.jumlahAnggota} Pax)`,
+          nama: billingItemName,
           kategori: "utama",
           nominal: summary.totalTagihan / Math.max(1, summary.jumlahAnggota),
           qty: summary.jumlahAnggota,
