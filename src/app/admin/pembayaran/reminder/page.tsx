@@ -181,24 +181,47 @@ export default function JadwalReminderPage() {
   const [selectedModalStageId, setSelectedModalStageId] = useState<string>("");
   const [copiedGroupIdx, setCopiedGroupIdx] = useState<number | null>(null);
 
-  // Load reminder stages configuration and global deadline days from localStorage
+  // Load reminder stages configuration and global deadline days from Server API & localStorage
   useEffect(() => {
-    try {
-      const savedStages = localStorage.getItem("vtu_custom_reminder_stages_v2");
-      if (savedStages) {
-        const parsed = JSON.parse(savedStages);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          setReminderStages(parsed);
+    async function loadSettings() {
+      try {
+        const res = await fetch("/api/admin/settings/reminder");
+        const json = await res.json();
+        if (json.success && json.data) {
+          if (Array.isArray(json.data.stages) && json.data.stages.length > 0) {
+            setReminderStages(json.data.stages);
+            localStorage.setItem("vtu_custom_reminder_stages_v2", JSON.stringify(json.data.stages));
+          }
+          if (json.data.globalDeadlineDays) {
+            setGlobalDeadlineDays(json.data.globalDeadlineDays);
+            localStorage.setItem("vtu_global_deadline_days", String(json.data.globalDeadlineDays));
+          }
+          return;
         }
+      } catch (e) {
+        console.warn("API reminder settings failed, falling back to localStorage", e);
       }
-      const savedGlobalDeadline = localStorage.getItem("vtu_global_deadline_days");
-      if (savedGlobalDeadline) {
-        const parsed = parseInt(savedGlobalDeadline, 10);
-        if (!isNaN(parsed) && parsed > 0) setGlobalDeadlineDays(parsed);
+
+      // Fallback to localStorage
+      try {
+        const savedStages = localStorage.getItem("vtu_custom_reminder_stages_v2");
+        if (savedStages) {
+          const parsed = JSON.parse(savedStages);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setReminderStages(parsed);
+          }
+        }
+        const savedGlobalDeadline = localStorage.getItem("vtu_global_deadline_days");
+        if (savedGlobalDeadline) {
+          const parsed = parseInt(savedGlobalDeadline, 10);
+          if (!isNaN(parsed) && parsed > 0) setGlobalDeadlineDays(parsed);
+        }
+      } catch (e) {
+        console.error("Failed to load reminder stages from localStorage", e);
       }
-    } catch (e) {
-      console.error("Failed to load reminder stages from localStorage", e);
     }
+
+    loadSettings();
   }, []);
 
   // Fetch Payment Summaries & Keberangkatan List
@@ -218,18 +241,36 @@ export default function JadwalReminderPage() {
     loadData();
   }, []);
 
-  // Save Reminder Stages to localStorage
-  const handleSaveStagesConfig = () => {
+  // Save Reminder Stages to Server API & localStorage
+  const handleSaveStagesConfig = async () => {
     try {
       // Sort stages descending by daysBefore (e.g. H-50, H-45, H-40)
       const sorted = [...reminderStages].sort((a, b) => b.daysBefore - a.daysBefore);
       setReminderStages(sorted);
+
+      // Save locally
       localStorage.setItem("vtu_custom_reminder_stages_v2", JSON.stringify(sorted));
       localStorage.setItem("vtu_global_deadline_days", String(globalDeadlineDays));
-      alert(`✅ Konfigurasi deadline resmi (H-${globalDeadlineDays}) & ${sorted.length} tahapan reminder berhasil disimpan!`);
+
+      // Save to server API for all PCs & sessions
+      const res = await fetch("/api/admin/settings/reminder", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          globalDeadlineDays,
+          stages: sorted,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        throw new Error(json.message || "Gagal menyimpan ke server");
+      }
+
+      alert(`✅ Konfigurasi deadline resmi (H-${globalDeadlineDays}) & ${sorted.length} tahapan reminder berhasil disimpan secara global di server & semua PC!`);
       setViewMode("dashboard");
     } catch (e) {
-      alert("⚠️ Gagal menyimpan konfigurasi reminder.");
+      console.error(e);
+      alert(`⚠️ ${(e as Error).message || "Gagal menyimpan konfigurasi reminder."}`);
     }
   };
 
