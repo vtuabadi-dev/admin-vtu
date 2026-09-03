@@ -284,12 +284,12 @@ Mohon segera diselesaikan. Terima kasih.
         const jumlahJamaahBelumLunas = unpaidGroups.reduce((sum, g) => sum + g.jumlahAnggota, 0);
 
         const stageDeadlines = reminderStages.map((stg) => {
-          const { deadlineDate, sisaHari } = hitungDeadlineDate(kbr.tanggalBerangkat, stg.daysBefore);
+          const { officialDeadlineDate, sisaHariCurrent } = hitungDeadlineDate(kbr.tanggalBerangkat, stg.daysBefore, globalDeadlineDays);
           return {
             stage: stg,
-            deadlineDate,
-            sisaHari,
-            isDue: sisaHari <= 0,
+            deadlineDate: officialDeadlineDate,
+            sisaHari: sisaHariCurrent,
+            isDue: sisaHariCurrent <= 0,
           };
         });
 
@@ -314,9 +314,8 @@ Mohon segera diselesaikan. Terima kasih.
   // Handle Batch Send Simulation
   function handleKirimSemuaBatch(pkg: PackageDeadline, stage: ReminderStage) {
     setSending(pkg.paketId);
-    const { deadlineDate } = hitungDeadlineDate(pkg.tanggalBerangkat, stage.daysBefore);
     const messages = pkg.unpaidGroups.map((g) =>
-      renderMessage(stage.template, g, pkg.namaPaket, pkg.tanggalBerangkat, deadlineDate, stage.daysBefore)
+      renderMessage(stage.template, g, pkg.namaPaket, pkg.tanggalBerangkat, stage.daysBefore, globalDeadlineDays)
     );
 
     setTimeout(() => {
@@ -737,7 +736,7 @@ Mohon segera diselesaikan. Terima kasih.
         {activePackageModal && (() => {
           const selectedStage =
             reminderStages.find((s) => s.id === selectedModalStageId) || reminderStages[0] || DEFAULT_STAGES[0]!;
-          const { deadlineDate } = hitungDeadlineDate(activePackageModal.tanggalBerangkat, selectedStage.daysBefore);
+          const calc = hitungDeadlineDate(activePackageModal.tanggalBerangkat, selectedStage.daysBefore, globalDeadlineDays);
 
           return (
             <div className="space-y-4 pt-2">
