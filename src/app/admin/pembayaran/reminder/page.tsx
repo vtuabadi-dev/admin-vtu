@@ -56,11 +56,11 @@ const DEFAULT_STAGES: ReminderStage[] = [
 
 Yth. Bapak/Ibu {NAMA_GROUP} ({NAMA_JAMAAH})
 
-Kami menginfokan bahwa paket {NAMA_PAKET} (Keberangkatan: {TANGGAL_BERANGKAT}) telah memasuki periode penagihan H-50.
+Kami menginfokan bahwa pendaftaran paket {NAMA_PAKET} (Keberangkatan: {TANGGAL_BERANGKAT}) telah memasuki periode pengingat H-50.
 
-Batas akhir pelunasan tahap pertama adalah tanggal {DEADLINE_DATE}. Saat ini sisa tagihan rombongan Anda sebesar Rp{SISA_TAGIHAN}.
+Batas akhir pelunasan resmi jatuh pada tanggal {DEADLINE_DATE} (tersisa {SISA_HARI_DEADLINE} hari lagi). Saat ini sisa tagihan rombongan Anda sebesar Rp{SISA_TAGIHAN}.
 
-Mohon dapat dipersiapkan pelunasannya. Terima kasih.
+Mohon dapat dipersiapkan pelunasannya sebelum tanggal deadline tersebut. Terima kasih.
 
 *VTU Travel Operational*`,
   },
@@ -72,9 +72,9 @@ Mohon dapat dipersiapkan pelunasannya. Terima kasih.
 
 Yth. Bapak/Ibu {NAMA_GROUP} ({NAMA_JAMAAH})
 
-Peringatan kedua untuk pendaftaran {NAMA_PAKET} (Keberangkatan: {TANGGAL_BERANGKAT}). Batas akhir pelunasan jatuh pada {DEADLINE_DATE} (H-45 sebelum keberangkatan).
+Pengingat kedua untuk pendaftaran paket {NAMA_PAKET} (Keberangkatan: {TANGGAL_BERANGKAT}).
 
-Saat ini masih terdapat sisa tagihan sebesar Rp{SISA_TAGIHAN}.
+Batas akhir pelunasan resmi jatuh pada tanggal {DEADLINE_DATE} (tinggal {SISA_HARI_DEADLINE} hari lagi ke deadline H-{DEADLINE_DAYS}). Saat ini masih terdapat sisa tagihan sebesar Rp{SISA_TAGIHAN}.
 
 Mohon segera melakukan konfirmasi dan pelunasan. Terima kasih.
 
@@ -88,9 +88,9 @@ Mohon segera melakukan konfirmasi dan pelunasan. Terima kasih.
 
 Yth. Bapak/Ibu {NAMA_GROUP} ({NAMA_JAMAAH})
 
-PERINGATAN DEADLINE: Pelunasan paket {NAMA_PAKET} (Keberangkatan: {TANGGAL_BERANGKAT}) jatuh pada tanggal {DEADLINE_DATE} (H-40).
+PERINGATAN DEADLINE: Hari ini adalah batas akhir pelunasan resmi tanggal {DEADLINE_DATE} (H-{DEADLINE_DAYS} sebelum keberangkatan).
 
-Sisa tagihan rombongan sebesar Rp{SISA_TAGIHAN} WAJIB dilunasi sebelum tanggal tersebut untuk pemrosesan visa dan perlengkapan.
+Sisa tagihan rombongan sebesar Rp{SISA_TAGIHAN} WAJIB dilunasi sekarang untuk pemrosesan visa dan perlengkapan jamaah.
 
 Terima kasih atas perhatian dan kerja samanya.
 
@@ -98,24 +98,43 @@ Terima kasih atas perhatian dan kerja samanya.
   },
 ];
 
-function hitungDeadlineDate(tanggalBerangkat: string, daysBefore: number): { deadlineDate: string; sisaHari: number } {
-  if (!tanggalBerangkat) return { deadlineDate: "-", sisaHari: 999 };
+function hitungDeadlineDate(
+  tanggalBerangkat: string,
+  daysBeforeReminder: number,
+  globalDeadlineDays: number = 40
+): {
+  officialDeadlineDate: string;
+  reminderTriggerDate: string;
+  sisaHariKeOfficialDeadline: number;
+  sisaHariCurrent: number;
+} {
+  if (!tanggalBerangkat) return { officialDeadlineDate: "-", reminderTriggerDate: "-", sisaHariKeOfficialDeadline: 0, sisaHariCurrent: 999 };
   const berangkat = new Date(tanggalBerangkat);
-  if (isNaN(berangkat.getTime())) return { deadlineDate: "-", sisaHari: 999 };
+  if (isNaN(berangkat.getTime())) return { officialDeadlineDate: "-", reminderTriggerDate: "-", sisaHariKeOfficialDeadline: 0, sisaHariCurrent: 999 };
 
-  const deadline = new Date(berangkat);
-  deadline.setDate(deadline.getDate() - daysBefore);
+  // Official Deadline Date = Tanggal Berangkat - globalDeadlineDays (default H-40)
+  const officialDeadline = new Date(berangkat);
+  officialDeadline.setDate(officialDeadline.getDate() - globalDeadlineDays);
+
+  // Reminder Trigger Date = Tanggal Berangkat - daysBeforeReminder (misal H-50)
+  const reminderTrigger = new Date(berangkat);
+  reminderTrigger.setDate(reminderTrigger.getDate() - daysBeforeReminder);
+
+  // Sisa hari dari tahap reminder ke official deadline (misal H-50 ke H-40 = 10 hari lagi)
+  const sisaHariKeOfficialDeadline = Math.max(0, daysBeforeReminder - globalDeadlineDays);
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  deadline.setHours(0, 0, 0, 0);
+  officialDeadline.setHours(0, 0, 0, 0);
 
-  const diffTime = deadline.getTime() - today.getTime();
-  const sisaHari = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  const diffTime = officialDeadline.getTime() - today.getTime();
+  const sisaHariCurrent = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
   return {
-    deadlineDate: deadline.toISOString().split("T")[0]!,
-    sisaHari,
+    officialDeadlineDate: officialDeadline.toISOString().split("T")[0]!,
+    reminderTriggerDate: reminderTrigger.toISOString().split("T")[0]!,
+    sisaHariKeOfficialDeadline,
+    sisaHariCurrent,
   };
 }
 
@@ -124,17 +143,21 @@ function renderMessage(
   g: GroupPaymentSummary,
   pkgName: string,
   tglBerangkat: string,
-  deadlineDate: string,
-  daysBefore: number
+  daysBeforeReminder: number,
+  globalDeadlineDays: number = 40
 ) {
   const mainJamaah = g.anggota && g.anggota.length > 0 && g.anggota[0] ? g.anggota[0].namaLengkap : g.namaGroup;
+  const calc = hitungDeadlineDate(tglBerangkat, daysBeforeReminder, globalDeadlineDays);
+
   return template
     .replace(/\{NAMA_GROUP\}/g, g.namaGroup)
     .replace(/\{NAMA_JAMAAH\}/g, mainJamaah)
     .replace(/\{NAMA_PAKET\}/g, pkgName)
     .replace(/\{TANGGAL_BERANGKAT\}/g, formatDate(tglBerangkat))
-    .replace(/\{DEADLINE_DATE\}/g, formatDate(deadlineDate))
-    .replace(/\{DEADLINE_DAYS\}/g, String(daysBefore))
+    .replace(/\{DEADLINE_DATE\}/g, formatDate(calc.officialDeadlineDate))
+    .replace(/\{SISA_HARI_DEADLINE\}/g, String(calc.sisaHariKeOfficialDeadline))
+    .replace(/\{DEADLINE_DAYS\}/g, String(globalDeadlineDays))
+    .replace(/\{TARGET_HARI_REMINDER\}/g, String(daysBeforeReminder))
     .replace(/\{SISA_TAGIHAN\}/g, g.sisaPembayaran.toLocaleString("id-ID"));
 }
 
@@ -150,12 +173,15 @@ export default function JadwalReminderPage() {
   // Dynamic Multiple Custom Reminder Stages
   const [reminderStages, setReminderStages] = useState<ReminderStage[]>(DEFAULT_STAGES);
 
+  // Global Official Payment Deadline Target (Default: H-40)
+  const [globalDeadlineDays, setGlobalDeadlineDays] = useState<number>(40);
+
   // Draft / Send Modal State (For Sending Messages)
   const [activePackageModal, setActivePackageModal] = useState<PackageDeadline | null>(null);
   const [selectedModalStageId, setSelectedModalStageId] = useState<string>("");
   const [copiedGroupIdx, setCopiedGroupIdx] = useState<number | null>(null);
 
-  // Load reminder stages configuration from localStorage
+  // Load reminder stages configuration and global deadline days from localStorage
   useEffect(() => {
     try {
       const savedStages = localStorage.getItem("vtu_custom_reminder_stages_v2");
@@ -164,6 +190,11 @@ export default function JadwalReminderPage() {
         if (Array.isArray(parsed) && parsed.length > 0) {
           setReminderStages(parsed);
         }
+      }
+      const savedGlobalDeadline = localStorage.getItem("vtu_global_deadline_days");
+      if (savedGlobalDeadline) {
+        const parsed = parseInt(savedGlobalDeadline, 10);
+        if (!isNaN(parsed) && parsed > 0) setGlobalDeadlineDays(parsed);
       }
     } catch (e) {
       console.error("Failed to load reminder stages from localStorage", e);
@@ -194,7 +225,8 @@ export default function JadwalReminderPage() {
       const sorted = [...reminderStages].sort((a, b) => b.daysBefore - a.daysBefore);
       setReminderStages(sorted);
       localStorage.setItem("vtu_custom_reminder_stages_v2", JSON.stringify(sorted));
-      alert("✅ Pengaturan multi-reminder & custom template pesan berhasil disimpan!");
+      localStorage.setItem("vtu_global_deadline_days", String(globalDeadlineDays));
+      alert(`✅ Konfigurasi deadline resmi (H-${globalDeadlineDays}) & ${sorted.length} tahapan reminder berhasil disimpan!`);
       setViewMode("dashboard");
     } catch (e) {
       alert("⚠️ Gagal menyimpan konfigurasi reminder.");
@@ -335,8 +367,50 @@ Mohon segera diselesaikan. Terima kasih.
           </p>
         </div>
 
-        {/* BANNER ADD REMINDER & ACTION */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 rounded-2xl bg-amber-500/10 border-2 border-amber-500/30">
+        {/* GLOBAL DEADLINE CONFIGURATION CARD */}
+        <Card className="border-amber-500/40 bg-gradient-to-r from-amber-500/10 via-background to-transparent shadow-md">
+          <CardContent className="pt-6 space-y-3">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 bg-amber-500 text-slate-950 rounded-xl font-bold">
+                <Clock className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-sm font-extrabold text-foreground flex items-center gap-2">
+                  ⚙️ Konfigurasi Target Batas Akhir Pelunasan Resmi (Global Deadline Target)
+                </h3>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Tentukan tanggal batas akhir pelunasan resmi jamaah (default: <strong className="text-amber-600 dark:text-amber-400">H-40 sebelum berangkat</strong>). Variabel <code className="bg-amber-500/15 text-amber-700 dark:text-amber-300 px-1.5 py-0.5 rounded font-mono text-[11px] font-bold">{"{DEADLINE_DATE}"}</code> akan mengacu pada tanggal ini.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3 pt-2 max-w-md">
+              <div className="flex-1">
+                <label className="text-xs font-bold text-foreground block mb-1">
+                  Batas Akhir Pelunasan Resmi Utamaku:
+                </label>
+                <div className="flex items-center gap-2">
+                  <span className="font-extrabold text-sm text-amber-600 dark:text-amber-400">H -</span>
+                  <Input
+                    type="number"
+                    min={1}
+                    max={90}
+                    value={globalDeadlineDays}
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value, 10);
+                      if (!isNaN(val) && val > 0) setGlobalDeadlineDays(val);
+                    }}
+                    className="w-24 font-extrabold text-center h-10 text-sm"
+                  />
+                  <span className="text-xs text-muted-foreground font-semibold">Hari Sebelum Berangkat</span>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* STAGES OVERVIEW HEADER */}
+        <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <h3 className="text-sm font-extrabold text-amber-950 dark:text-amber-200 flex items-center gap-2">
               <Layers className="h-4 w-4 text-amber-500" />
@@ -438,8 +512,10 @@ Mohon segera diselesaikan. Terima kasih.
                           { tag: "{NAMA_JAMAAH}", label: "Nama Utama Jamaah" },
                           { tag: "{NAMA_PAKET}", label: "Nama Paket Umroh" },
                           { tag: "{TANGGAL_BERANGKAT}", label: "Tgl Berangkat" },
-                          { tag: "{DEADLINE_DATE}", label: "Tgl Batas Deadline" },
-                          { tag: "{DEADLINE_DAYS}", label: "Hitungan H-X" },
+                          { tag: "{DEADLINE_DATE}", label: `Tgl Batas Pelunasan Resmi (H-${globalDeadlineDays})` },
+                          { tag: "{SISA_HARI_DEADLINE}", label: "Sisa Hari ke Deadline Pelunasan" },
+                          { tag: "{DEADLINE_DAYS}", label: `Batas Pelunasan Resmi (H-${globalDeadlineDays})` },
+                          { tag: "{TARGET_HARI_REMINDER}", label: `Target Hari Pengingat (H-${stage.daysBefore})` },
                           { tag: "{SISA_TAGIHAN}", label: "Sisa Tagihan (Rp)" },
                         ].map(({ tag, label }) => (
                           <button
@@ -692,7 +768,9 @@ Mohon segera diselesaikan. Terima kasih.
                 <div>
                   <span>Tanggal Berangkat: <strong>{formatDate(activePackageModal.tanggalBerangkat)}</strong></span>
                   <span className="mx-2">•</span>
-                  <span>Batas Deadline ({selectedStage.title}): <strong>{formatDate(deadlineDate)}</strong></span>
+                  <span>Batas Pelunasan Resmi (H-{globalDeadlineDays}): <strong className="text-amber-600 font-bold">{formatDate(hitungDeadlineDate(activePackageModal.tanggalBerangkat, selectedStage.daysBefore, globalDeadlineDays).officialDeadlineDate)}</strong></span>
+                  <span className="mx-2">•</span>
+                  <span>Pengingat: <strong>Tahap H-{selectedStage.daysBefore} ({hitungDeadlineDate(activePackageModal.tanggalBerangkat, selectedStage.daysBefore, globalDeadlineDays).sisaHariKeOfficialDeadline} Hari Lagi ke Deadline Resmi)</strong></span>
                 </div>
                 <Button
                   size="sm"
@@ -713,8 +791,8 @@ Mohon segera diselesaikan. Terima kasih.
                     g,
                     activePackageModal.namaPaket,
                     activePackageModal.tanggalBerangkat,
-                    deadlineDate,
-                    selectedStage.daysBefore
+                    selectedStage.daysBefore,
+                    globalDeadlineDays
                   );
                   const firstPhone =
                     g.anggota && g.anggota.length > 0
