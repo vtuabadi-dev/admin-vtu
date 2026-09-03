@@ -2142,10 +2142,10 @@ function PaymentReviewTabContent() {
                             {selectedPayment.group?.jumlahAnggota || availableAnggota.length || 1} Pax
                           </td>
                           <td className="py-2 px-2.5 text-right font-mono tabular-nums text-stone-600 dark:text-stone-400">
-                            {formatCurrency(selectedPayment.group?.keberangkatan?.hargaPaket || (totalTagihanBase / Math.max(1, selectedPayment.group?.jumlahAnggota || 1)))}
+                            {formatCurrency(selectedPayment.group?.keberangkatan?.hargaPaket || (groupTotalTagihanBase / Math.max(1, selectedPayment.group?.jumlahAnggota || 1)))}
                           </td>
                           <td className="py-2 px-2.5 text-right font-mono font-bold text-emerald-700 dark:text-emerald-400 tabular-nums">
-                            {formatCurrency(totalTagihanBase)}
+                            {formatCurrency(groupTotalTagihanBase)}
                           </td>
                         </tr>
 
@@ -2189,7 +2189,7 @@ function PaymentReviewTabContent() {
                             Total Tagihan Akhir (Net)
                           </td>
                           <td className="py-2 px-2.5 text-right font-mono text-sm text-emerald-700 dark:text-emerald-400">
-                            {formatCurrency(totalTagihanDisesuaikan)}
+                            {formatCurrency(groupTotalTagihanDisesuaikan)}
                           </td>
                         </tr>
                       </tfoot>
