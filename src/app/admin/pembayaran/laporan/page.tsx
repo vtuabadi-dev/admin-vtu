@@ -1752,17 +1752,6 @@ function PaymentReviewTabContent() {
                     </div>
                   ) : null}
 
-                  <div>
-                    <label className="text-[11px] font-bold text-foreground">No. Rekening / Ref Transaksi</label>
-                    <Input
-                      type="text"
-                      value={formRekening}
-                      onChange={(e) => setFormRekening(e.target.value)}
-                      placeholder="Nomor referensi / rekening pengirim"
-                      className="h-8 text-xs mt-1 font-mono"
-                    />
-                  </div>
-
                   {/* Catatan / Keterangan */}
                   <div>
                     <label className="text-[11px] font-bold text-foreground">Keterangan / Catatan Transaksi</label>
