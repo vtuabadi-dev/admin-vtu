@@ -1,19 +1,66 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { auth } from "@/server/auth";
+import { prisma } from "@/server/db/client";
 import { checkServerPermission } from "@/shared/lib/rbac-utils";
 import { DEFAULT_SURAT_TEMPLATES } from "@/shared/lib/surat-autocrat-engine";
 import type { SuratTemplate } from "@/shared/types/surat";
 
-// In-memory runtime cache for server-side persistence
-let serverCustomTemplates: SuratTemplate[] = [...DEFAULT_SURAT_TEMPLATES];
+export const dynamic = "force-dynamic";
+
+// In-memory runtime cache with Supabase PostgreSQL fallback
+let cachedSuratTemplates: SuratTemplate[] | null = null;
+
+async function getSuratTemplatesFromDb(): Promise<SuratTemplate[]> {
+  if (cachedSuratTemplates) return cachedSuratTemplates;
+
+  try {
+    const latestDbRecord = await prisma.auditEntry.findFirst({
+      where: { action: "UPDATE_SURAT_TEMPLATES" },
+      orderBy: { timestamp: "desc" },
+    });
+
+    if (latestDbRecord?.after) {
+      const parsed = JSON.parse(latestDbRecord.after);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        cachedSuratTemplates = parsed;
+        return cachedSuratTemplates!;
+      }
+    }
+  } catch (err) {
+    console.warn("[SuratTemplates] Error reading from Supabase DB:", err);
+  }
+
+  cachedSuratTemplates = [...DEFAULT_SURAT_TEMPLATES];
+  return cachedSuratTemplates;
+}
+
+async function saveSuratTemplatesToDb(templates: SuratTemplate[], userName: string): Promise<void> {
+  cachedSuratTemplates = templates;
+  try {
+    await prisma.auditEntry.create({
+      data: {
+        userId: "admin-settings",
+        userName,
+        role: "super_admin",
+        module: "dokumen",
+        action: "UPDATE_SURAT_TEMPLATES",
+        detail: `Template surat (${templates.length} template) berhasil disimpan di Supabase Database`,
+        after: JSON.stringify(templates),
+      },
+    });
+  } catch (err) {
+    console.error("[SuratTemplates] Failed to save templates to Supabase DB:", err);
+  }
+}
 
 export async function GET() {
   try {
+    const templates = await getSuratTemplatesFromDb();
     return NextResponse.json({
       success: true,
-      data: serverCustomTemplates,
-      total: serverCustomTemplates.length,
+      data: templates,
+      total: templates.length,
     });
   } catch (error) {
     return NextResponse.json({ success: false, message: (error as Error).message }, { status: 500 });
@@ -31,6 +78,8 @@ export async function POST(request: NextRequest) {
     if (!body.nama || !body.templateContent) {
       return NextResponse.json({ success: false, message: "Nama template dan isi konten surat wajib diisi" }, { status: 400 });
     }
+
+    const currentTemplates = await getSuratTemplatesFromDb();
 
     const newTemplate: SuratTemplate = {
       id: body.id || `tpl-custom-${Date.now()}`,
@@ -57,11 +106,12 @@ export async function POST(request: NextRequest) {
       updatedAt: new Date().toISOString(),
     };
 
-    serverCustomTemplates = [newTemplate, ...serverCustomTemplates.filter((t) => t.id !== newTemplate.id)];
+    const updatedList = [newTemplate, ...currentTemplates.filter((t) => t.id !== newTemplate.id)];
+    await saveSuratTemplatesToDb(updatedList, session.user.name || session.user.email || "admin");
 
     return NextResponse.json({
       success: true,
-      message: "Template surat berhasil disimpan",
+      message: "Template surat berhasil disimpan ke Supabase database",
       data: newTemplate,
     });
   } catch (error) {
@@ -81,21 +131,25 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ success: false, message: "Template ID required" }, { status: 400 });
     }
 
-    const index = serverCustomTemplates.findIndex((t) => t.id === body.id);
+    const currentTemplates = await getSuratTemplatesFromDb();
+    const index = currentTemplates.findIndex((t) => t.id === body.id);
     const updatedTemplate: SuratTemplate = {
       ...body,
       updatedAt: new Date().toISOString(),
     };
 
+    let updatedList = [...currentTemplates];
     if (index >= 0) {
-      serverCustomTemplates[index] = updatedTemplate;
+      updatedList[index] = updatedTemplate;
     } else {
-      serverCustomTemplates.push(updatedTemplate);
+      updatedList.push(updatedTemplate);
     }
+
+    await saveSuratTemplatesToDb(updatedList, session.user.name || session.user.email || "admin");
 
     return NextResponse.json({
       success: true,
-      message: "Template surat berhasil diperbarui",
+      message: "Template surat berhasil diperbarui di Supabase database",
       data: updatedTemplate,
     });
   } catch (error) {
@@ -114,11 +168,14 @@ export async function DELETE(request: NextRequest) {
     const id = searchParams.get("id");
     if (!id) return NextResponse.json({ success: false, message: "Template ID required" }, { status: 400 });
 
-    serverCustomTemplates = serverCustomTemplates.filter((t) => t.id !== id);
+    const currentTemplates = await getSuratTemplatesFromDb();
+    const updatedList = currentTemplates.filter((t) => t.id !== id);
+
+    await saveSuratTemplatesToDb(updatedList, session.user.name || session.user.email || "admin");
 
     return NextResponse.json({
       success: true,
-      message: "Template surat berhasil dihapus",
+      message: "Template surat berhasil dihapus dari Supabase database",
     });
   } catch (error) {
     return NextResponse.json({ success: false, message: (error as Error).message }, { status: 500 });
