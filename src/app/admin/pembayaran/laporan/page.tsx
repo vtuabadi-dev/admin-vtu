@@ -464,13 +464,12 @@ const ORDER_PRESETS = [
   },
 ];
 
-// ============================================================
-// PENINJAUAN PEMBAYARAN VIEW
-// ============================================================
+// Module-level in-memory cache for Review Queue to avoid skeleton flicker on tab switch/revisit
+let cachedReviewQueue: any[] | null = null;
 
 function PaymentReviewTabContent() {
-  const [queue, setQueue] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [queue, setQueue] = useState<any[]>(cachedReviewQueue ?? []);
+  const [loading, setLoading] = useState(cachedReviewQueue === null);
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [selectedPayment, setSelectedPayment] = useState<any | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -528,13 +527,17 @@ function PaymentReviewTabContent() {
   const [cascadeGroupDelete, setCascadeGroupDelete] = useState(true);
   const [isDeletingPayment, setIsDeletingPayment] = useState(false);
 
-  const loadData = useCallback(async () => {
+  const loadData = useCallback(async (isSilent = false) => {
     try {
-      setLoading(true);
+      if (!isSilent && cachedReviewQueue === null) {
+        setLoading(true);
+      }
       const res = await fetch("/api/pembayaran/review?status=all");
       if (res.ok) {
         const json = await res.json();
-        setQueue(json.data ?? []);
+        const data = json.data ?? [];
+        cachedReviewQueue = data;
+        setQueue(data);
       }
     } catch (err) {
       console.error("Failed to load review queue:", err);
@@ -544,7 +547,7 @@ function PaymentReviewTabContent() {
   }, []);
 
   useEffect(() => {
-    loadData();
+    loadData(cachedReviewQueue !== null);
   }, [loadData]);
 
   const handleDeleteSinglePayment = async () => {
