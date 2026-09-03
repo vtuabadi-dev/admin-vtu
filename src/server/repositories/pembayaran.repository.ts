@@ -179,6 +179,24 @@ export const pembayaranRepo = {
             ? (reg.members as any[]).sort((a, b) => (a.urutan || 0) - (b.urutan || 0))
             : [{ namaLengkap: reg.namaPerwakilan, jenisKelamin: "L", tempatLahir: "-", tanggalLahir: "2000-01-01", urutan: 1 }];
 
+          // Ensure RegistrationGroup exists FIRST so Jamaah has a valid groupId foreign key
+          if (!group) {
+            const totalTagihan = (reg.keberangkatan?.hargaPaket || 0) * (reg.paxCount || memberList.length || 1);
+            group = await prisma.registrationGroup.create({
+              data: {
+                kodeRegistrasi: reg.kodeRegistrasi,
+                namaGroup: `GRUP ${reg.namaPerwakilan}`,
+                paketKeberangkatanId: reg.paketId,
+                jumlahAnggota: reg.paxCount || memberList.length,
+                totalTagihan,
+                totalPembayaran: 0,
+                sisaPembayaran: totalTagihan,
+                status: "active",
+              },
+            });
+          }
+
+          // Create Jamaah records linked to valid group.id
           const createdJamaah: any[] = [];
           for (let i = 0; i < memberList.length; i++) {
             const m = memberList[i];
@@ -188,7 +206,7 @@ export const pembayaranRepo = {
               j = await prisma.jamaah.create({
                 data: {
                   registrationId: regId,
-                  groupId: group?.id || "",
+                  groupId: group.id,
                   nomorPeserta: `PS/${year}/${seq}/${i + 1}`,
                   namaLengkap: m.namaLengkap || (i === 0 ? reg.namaPerwakilan : `Anggota ${i + 1}`),
                   namaAyah: "",
@@ -215,21 +233,10 @@ export const pembayaranRepo = {
             createdJamaah.push(j);
           }
 
-          if (!group) {
-            const ketua = createdJamaah[0];
-            const totalTagihan = (reg.keberangkatan?.hargaPaket || 0) * (reg.paxCount || memberList.length || 1);
-            group = await prisma.registrationGroup.create({
-              data: {
-                kodeRegistrasi: reg.kodeRegistrasi,
-                namaGroup: `GRUP ${reg.namaPerwakilan}`,
-                ketuaGroupId: ketua.id,
-                paketKeberangkatanId: reg.paketId,
-                jumlahAnggota: reg.paxCount || memberList.length,
-                totalTagihan,
-                totalPembayaran: 0,
-                sisaPembayaran: totalTagihan,
-                status: "active",
-              },
+          if (createdJamaah.length > 0 && !group.ketuaGroupId) {
+            await prisma.registrationGroup.update({
+              where: { id: group.id },
+              data: { ketuaGroupId: createdJamaah[0].id },
             });
           }
 

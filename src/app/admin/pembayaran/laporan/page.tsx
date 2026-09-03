@@ -469,9 +469,27 @@ const ORDER_PRESETS = [
 // Module-level in-memory cache for Review Queue to avoid skeleton flicker on tab switch/revisit
 let cachedReviewQueue: any[] | null = null;
 
+function getInitialReviewQueue(): any[] {
+  if (cachedReviewQueue && cachedReviewQueue.length > 0) return cachedReviewQueue;
+  if (typeof window !== "undefined") {
+    try {
+      const stored = sessionStorage.getItem("vtu_review_queue_cache");
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          cachedReviewQueue = parsed;
+          return parsed;
+        }
+      }
+    } catch {}
+  }
+  return [];
+}
+
 function PaymentReviewTabContent() {
-  const [queue, setQueue] = useState<any[]>(cachedReviewQueue ?? []);
-  const [loading, setLoading] = useState(cachedReviewQueue === null);
+  const initialQueue = getInitialReviewQueue();
+  const [queue, setQueue] = useState<any[]>(initialQueue);
+  const [loading, setLoading] = useState(initialQueue.length === 0);
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [selectedPayment, setSelectedPayment] = useState<any | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -539,6 +557,11 @@ function PaymentReviewTabContent() {
         const json = await res.json();
         const data = json.data ?? [];
         cachedReviewQueue = data;
+        if (typeof window !== "undefined") {
+          try {
+            sessionStorage.setItem("vtu_review_queue_cache", JSON.stringify(data));
+          } catch {}
+        }
         setQueue(data);
       }
     } catch (err) {
@@ -549,8 +572,8 @@ function PaymentReviewTabContent() {
   }, []);
 
   useEffect(() => {
-    loadData(cachedReviewQueue !== null);
-  }, [loadData]);
+    loadData(initialQueue.length > 0);
+  }, [loadData, initialQueue.length]);
 
   const handleDeleteSinglePayment = async () => {
     if (!deletePaymentTarget) return;
