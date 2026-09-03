@@ -3468,14 +3468,6 @@ export default function LaporanPembayaranPage() {
                       />
                     </div>
 
-                    <div>
-                      <label className="text-sm font-medium">Upload Bukti (Opsional)</label>
-                      <div className="mt-1 flex items-center justify-center rounded-md border border-dashed p-4 text-xs text-muted-foreground hover:bg-muted/30 cursor-pointer">
-                        <Upload className="mr-1.5 h-3.5 w-3.5" />
-                        Klik untuk upload bukti pembayaran (mock)
-                      </div>
-                    </div>
-
                     {activeAnggota.length > 0 && (
                       <div>
                         <div className="flex items-center justify-between mb-2">
