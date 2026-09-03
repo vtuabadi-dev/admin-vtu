@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Save } from "lucide-react";
 import { PermissionGuard } from "@/shared/components/PermissionGuard";
 import { Tabs } from "@/shared/components/ui/Tabs";
@@ -189,50 +189,59 @@ function NotifikasiSettings() {
 // ── Aturan Operasional ──
 function AturanOperasional() {
   const [saved, setSaved] = useState(false);
-  const [bankName, setBankName] = useState(() => {
-    if (typeof window !== "undefined") {
-      const savedConfig = localStorage.getItem("vtu_bank_config");
-      if (savedConfig) {
-        try { return JSON.parse(savedConfig).bankName || "Bank Syariah Indonesia (BSI)"; } catch (e) {}
+  const [bankName, setBankName] = useState("Bank Syariah Indonesia (BSI)");
+  const [bankAccount, setBankAccount] = useState("7123 4567 89");
+  const [bankHolder, setBankHolder] = useState("PT VTU ABADI TRAVEL");
+  const [minDpPerPax, setMinDpPerPax] = useState("5000000");
+
+  useEffect(() => {
+    async function fetchSettings() {
+      try {
+        const res = await fetch("/api/admin/settings/general");
+        const json = await res.json();
+        if (json.success && json.data) {
+          if (json.data.bankName) setBankName(json.data.bankName);
+          if (json.data.bankAccount) setBankAccount(json.data.bankAccount);
+          if (json.data.bankHolder) setBankHolder(json.data.bankHolder);
+          if (json.data.minDpPerPax) setMinDpPerPax(json.data.minDpPerPax);
+          return;
+        }
+      } catch (e) {
+        console.warn("Falling back to local storage for bank settings", e);
+      }
+
+      if (typeof window !== "undefined") {
+        const savedConfig = localStorage.getItem("vtu_bank_config");
+        if (savedConfig) {
+          try {
+            const parsed = JSON.parse(savedConfig);
+            if (parsed.bankName) setBankName(parsed.bankName);
+            if (parsed.bankAccount) setBankAccount(parsed.bankAccount);
+            if (parsed.bankHolder) setBankHolder(parsed.bankHolder);
+            if (parsed.minDpPerPax) setMinDpPerPax(parsed.minDpPerPax);
+          } catch (e) {}
+        }
       }
     }
-    return "Bank Syariah Indonesia (BSI)";
-  });
+    fetchSettings();
+  }, []);
 
-  const [bankAccount, setBankAccount] = useState(() => {
+  const handleSave = async () => {
+    const payload = { bankName, bankAccount, bankHolder, minDpPerPax };
     if (typeof window !== "undefined") {
-      const savedConfig = localStorage.getItem("vtu_bank_config");
-      if (savedConfig) {
-        try { return JSON.parse(savedConfig).bankAccount || "7123 4567 89"; } catch (e) {}
-      }
+      localStorage.setItem("vtu_bank_config", JSON.stringify(payload));
     }
-    return "7123 4567 89";
-  });
 
-  const [bankHolder, setBankHolder] = useState(() => {
-    if (typeof window !== "undefined") {
-      const savedConfig = localStorage.getItem("vtu_bank_config");
-      if (savedConfig) {
-        try { return JSON.parse(savedConfig).bankHolder || "PT VTU ABADI TRAVEL"; } catch (e) {}
-      }
+    try {
+      await fetch("/api/admin/settings/general", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+    } catch (err) {
+      console.error("Gagal simpan ke server:", err);
     }
-    return "PT VTU ABADI TRAVEL";
-  });
 
-  const [minDpPerPax, setMinDpPerPax] = useState(() => {
-    if (typeof window !== "undefined") {
-      const savedConfig = localStorage.getItem("vtu_bank_config");
-      if (savedConfig) {
-        try { return JSON.parse(savedConfig).minDpPerPax || "5000000"; } catch (e) {}
-      }
-    }
-    return "5000000";
-  });
-
-  const handleSave = () => {
-    if (typeof window !== "undefined") {
-      localStorage.setItem("vtu_bank_config", JSON.stringify({ bankName, bankAccount, bankHolder, minDpPerPax }));
-    }
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   };
@@ -271,7 +280,7 @@ function AturanOperasional() {
         <SettingRow label="DP Minimum Per Pax" desc="Nominal DP minimum yang ditagihkan per jamaah (Pax)">
           <Select
             value={minDpPerPax}
-            onChange={(val) => setMinDpPerPax(val)}
+            onChange={(e) => setMinDpPerPax(e.target.value)}
             options={[
               { value: "3000000", label: "Rp 3.000.000 / Pax" },
               { value: "5000000", label: "Rp 5.000.000 / Pax (Standar)" },
