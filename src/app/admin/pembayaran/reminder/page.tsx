@@ -162,10 +162,14 @@ function renderMessage(
     .replace(/\{SISA_TAGIHAN\}/g, g.sisaPembayaran.toLocaleString("id-ID"));
 }
 
+// Client-Side In-Memory Cache for Instant 0ms Page Navigation (Stale-While-Revalidate)
+let memoryCachedSummaries: GroupPaymentSummary[] | null = null;
+let memoryCachedKbrList: Keberangkatan[] | null = null;
+
 export default function JadwalReminderPage() {
-  const [summaries, setSummaries] = useState<GroupPaymentSummary[]>([]);
-  const [kbrList, setKbrList] = useState<Keberangkatan[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [summaries, setSummaries] = useState<GroupPaymentSummary[]>(() => memoryCachedSummaries || []);
+  const [kbrList, setKbrList] = useState<Keberangkatan[]>(() => memoryCachedKbrList || []);
+  const [loading, setLoading] = useState<boolean>(() => !memoryCachedSummaries || !memoryCachedKbrList);
   const [sending, setSending] = useState<string | null>(null);
 
   // View mode state: "dashboard" (Monitoring) or "settings" (Halaman Pengaturan Custom Multi-Reminder)
@@ -205,7 +209,7 @@ export default function JadwalReminderPage() {
   const [copiedGroupIdx, setCopiedGroupIdx] = useState<number | null>(null);
   const [saveSuccessMsg, setSaveSuccessMsg] = useState<string>("");
 
-  // Parallelized Async Data & Server Settings Fetching
+  // Parallelized Async Data & Server Settings Fetching with Client-Side Memory Caching
   useEffect(() => {
     let isMounted = true;
     async function loadAllData() {
@@ -229,8 +233,15 @@ export default function JadwalReminderPage() {
           }
         }
 
-        setSummaries(summariesRes || []);
-        setKbrList(kbrRes || []);
+        const freshSummaries = summariesRes || [];
+        const freshKbr = kbrRes || [];
+
+        // Save to client-side in-memory cache for instant future navigations
+        memoryCachedSummaries = freshSummaries;
+        memoryCachedKbrList = freshKbr;
+
+        setSummaries(freshSummaries);
+        setKbrList(freshKbr);
       } catch (err) {
         console.error("Error loading reminder data:", err);
       } finally {
