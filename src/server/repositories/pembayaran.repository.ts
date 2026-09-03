@@ -186,6 +186,7 @@ export const pembayaranRepo = {
               data: {
                 kodeRegistrasi: reg.kodeRegistrasi,
                 namaGroup: `GRUP ${reg.namaPerwakilan}`,
+                ketuaGroupId: "",
                 paketKeberangkatanId: reg.paketId,
                 jumlahAnggota: reg.paxCount || memberList.length,
                 totalTagihan,
