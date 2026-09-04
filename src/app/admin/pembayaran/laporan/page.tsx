@@ -3136,6 +3136,25 @@ export default function LaporanPembayaranPage() {
   const [editingJenisIndex, setEditingJenisIndex] = useState<number | null>(null);
   const [editingJenisText, setEditingJenisText] = useState("");
 
+  // Fetch persistent master billing options from Supabase on load
+  useEffect(() => {
+    fetch("/api/admin/pembayaran/billing-options")
+      .then((res) => res.json())
+      .then((json) => {
+        if (json.success && json.data) {
+          if (Array.isArray(json.data.tambahan) && json.data.tambahan.length > 0) {
+            setMasterTambahanOptions(json.data.tambahan);
+            try { localStorage.setItem("vtu_master_tambahan_opts", JSON.stringify(json.data.tambahan)); } catch {}
+          }
+          if (Array.isArray(json.data.potongan) && json.data.potongan.length > 0) {
+            setMasterPotonganOptions(json.data.potongan);
+            try { localStorage.setItem("vtu_master_potongan_opts", JSON.stringify(json.data.potongan)); } catch {}
+          }
+        }
+      })
+      .catch((err) => console.warn("[BillingOptions] Fetch error:", err));
+  }, []);
+
   const saveTambahanOptions = (opts: string[]) => {
     setMasterTambahanOptions(opts);
     if (typeof window !== "undefined") {
@@ -3150,7 +3169,7 @@ export default function LaporanPembayaranPage() {
     }
   };
 
-  function handleAddNewMasterJenis() {
+  async function handleAddNewMasterJenis() {
     if (!tempNewJenis.trim()) return;
     const name = tempNewJenis.trim();
     if (newBillingKategori === "tambahan") {
@@ -3165,27 +3184,51 @@ export default function LaporanPembayaranPage() {
       setNewBillingNama(name);
     }
     setTempNewJenis("");
+
+    // Persist to Supabase Database
+    try {
+      await fetch("/api/admin/pembayaran/billing-options", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ kategori: newBillingKategori, nama: name }),
+      });
+    } catch (err) {
+      console.warn("[BillingOptions] Save to Supabase error:", err);
+    }
   }
 
-  function handleSaveEditMasterJenis(idx: number) {
+  async function handleSaveEditMasterJenis(idx: number) {
     if (!editingJenisText.trim()) return;
     const name = editingJenisText.trim();
+    const oldName = newBillingKategori === "tambahan" ? masterTambahanOptions[idx] : masterPotonganOptions[idx];
+
     if (newBillingKategori === "tambahan") {
       const updated = [...masterTambahanOptions];
       updated[idx] = name;
       saveTambahanOptions(updated);
-      if (newBillingNama === masterTambahanOptions[idx]) setNewBillingNama(name);
+      if (newBillingNama === oldName) setNewBillingNama(name);
     } else {
       const updated = [...masterPotonganOptions];
       updated[idx] = name;
       savePotonganOptions(updated);
-      if (newBillingNama === masterPotonganOptions[idx]) setNewBillingNama(name);
+      if (newBillingNama === oldName) setNewBillingNama(name);
     }
     setEditingJenisIndex(null);
     setEditingJenisText("");
+
+    // Persist update to Supabase Database
+    try {
+      await fetch("/api/admin/pembayaran/billing-options", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ oldNama: oldName, newNama: name, kategori: newBillingKategori }),
+      });
+    } catch (err) {
+      console.warn("[BillingOptions] Edit to Supabase error:", err);
+    }
   }
 
-  function handleDeleteMasterJenis(optName: string) {
+  async function handleDeleteMasterJenis(optName: string) {
     if (newBillingKategori === "tambahan") {
       const updated = masterTambahanOptions.filter((o) => o !== optName);
       saveTambahanOptions(updated);
@@ -3194,6 +3237,17 @@ export default function LaporanPembayaranPage() {
       const updated = masterPotonganOptions.filter((o) => o !== optName);
       savePotonganOptions(updated);
       if (newBillingNama === optName) setNewBillingNama(updated[0] || "");
+    }
+
+    // Persist delete to Supabase Database
+    try {
+      await fetch("/api/admin/pembayaran/billing-options", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nama: optName, kategori: newBillingKategori }),
+      });
+    } catch (err) {
+      console.warn("[BillingOptions] Delete from Supabase error:", err);
     }
   }
 

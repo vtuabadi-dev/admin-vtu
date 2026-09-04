@@ -32,6 +32,9 @@ function mapJamaah(row: any): Jamaah {
     tandaTanganDigital: row.tandaTanganDigital,
     syaratDisetujui: row.syaratDisetujui,
     status: row.status as StatusJamaah,
+    statusPerlengkapan: row.statusPerlengkapan || "BELUM_AMBIL",
+    tanggalAmbilPerlengkapan: row.tanggalAmbilPerlengkapan ? row.tanggalAmbilPerlengkapan.toISOString() : null,
+    catatanPerlengkapan: row.catatanPerlengkapan || null,
     hotelMekkah: row.hotelMekkah,
     hotelMadinah: row.hotelMadinah,
     dokumen: (row.dokumen ?? []).map(dokumenRepo.mapDokumen),
@@ -144,6 +147,11 @@ export const jamaahRepo = {
     if (data.kecamatan !== undefined) updateData.kecamatan = data.kecamatan;
     if (data.kelurahan !== undefined) updateData.kelurahan = data.kelurahan;
     if (data.status !== undefined) updateData.status = data.status;
+    if (data.statusPerlengkapan !== undefined) updateData.statusPerlengkapan = data.statusPerlengkapan;
+    if (data.tanggalAmbilPerlengkapan !== undefined) {
+      updateData.tanggalAmbilPerlengkapan = data.tanggalAmbilPerlengkapan ? new Date(data.tanggalAmbilPerlengkapan) : null;
+    }
+    if (data.catatanPerlengkapan !== undefined) updateData.catatanPerlengkapan = data.catatanPerlengkapan;
     if (data.hotelMekkah !== undefined) updateData.hotelMekkah = data.hotelMekkah;
     if (data.hotelMadinah !== undefined) updateData.hotelMadinah = data.hotelMadinah;
 

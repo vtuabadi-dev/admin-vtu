@@ -98,6 +98,7 @@ export function isSidebarItemVisible(role: OperationalRole | undefined | null, s
       "JAMAAH-Jamaah",
       "PEMBAYARAN-Pembayaran",
       "MANIFEST-Manifest",
+      "PERLENGKAPAN-Perlengkapan",
       "LAINNYA-Laporan",
     ]);
     return viewableKeys.has(key);

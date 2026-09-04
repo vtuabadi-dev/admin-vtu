@@ -20,7 +20,8 @@ const modalSizeVariants = cva("", {
 });
 
 export interface ModalProps extends VariantProps<typeof modalSizeVariants> {
-  open: boolean;
+  open?: boolean;
+  isOpen?: boolean;
   onClose: () => void;
   title?: string;
   description?: string;
@@ -31,6 +32,7 @@ export interface ModalProps extends VariantProps<typeof modalSizeVariants> {
 
 export function Modal({
   open,
+  isOpen,
   onClose,
   title,
   description,
@@ -38,6 +40,8 @@ export function Modal({
   className,
   size = "default",
 }: ModalProps) {
+  const isShown = open ?? isOpen ?? false;
+
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
@@ -46,7 +50,7 @@ export function Modal({
   );
 
   useEffect(() => {
-    if (open) {
+    if (isShown) {
       document.addEventListener("keydown", handleKeyDown);
       document.body.style.overflow = "hidden";
     }
@@ -54,9 +58,9 @@ export function Modal({
       document.removeEventListener("keydown", handleKeyDown);
       document.body.style.overflow = "";
     };
-  }, [open, handleKeyDown]);
+  }, [isShown, handleKeyDown]);
 
-  if (!open) return null;
+  if (!isShown) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">

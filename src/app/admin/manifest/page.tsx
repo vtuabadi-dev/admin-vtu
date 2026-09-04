@@ -441,6 +441,35 @@ function ManifestPageContent() {
     loadAllData();
   }, [loadAllData]);
 
+  const handleUpdatePerlengkapanStatus = async (jamaahId: string, newStatus: string) => {
+    try {
+      setAllJamaah((prev) =>
+        prev.map((item) =>
+          item.id === jamaahId ? { ...item, statusPerlengkapan: newStatus } : item
+        )
+      );
+
+      const res = await fetch(`/api/jamaah/${jamaahId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          statusPerlengkapan: newStatus,
+          tanggalAmbilPerlengkapan:
+            newStatus === "SUDAH_AMBIL" || newStatus === "SEBAGIAN"
+              ? new Date().toISOString()
+              : null,
+        }),
+      });
+
+      if (!res.ok) {
+        throw new Error("Gagal mengupdate status perlengkapan");
+      }
+    } catch (err: any) {
+      alert("Error: " + err.message);
+      loadAllData();
+    }
+  };
+
   // Selected package details
   const activePackage = useMemo(() => {
     if (!selectedKeberangkatan) return null;
@@ -1259,8 +1288,8 @@ function ManifestPageContent() {
                         <th className="px-3 py-3 font-extrabold uppercase tracking-wider text-[10px] text-stone-800 dark:text-stone-100 border-r border-stone-300/80 dark:border-stone-700/80 min-w-[130px] shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
                           KOTA PASPOR
                         </th>
-                        <th className="px-3 py-3 font-extrabold uppercase tracking-wider text-[10px] text-stone-800 dark:text-stone-100 border-r border-stone-300/80 dark:border-stone-700/80 min-w-[150px] shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
-                          KLASTER &amp; FASILITAS
+                        <th className="px-3 py-3 font-extrabold uppercase tracking-wider text-[10px] text-stone-800 dark:text-stone-100 border-r border-stone-300/80 dark:border-stone-700/80 min-w-[155px] shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
+                          KLASTER &amp; PERLENGKAPAN
                         </th>
                         <th className="px-3 py-3 font-extrabold uppercase tracking-wider text-[10px] text-stone-800 dark:text-stone-100 border-r border-stone-300/80 dark:border-stone-700/80 min-w-[130px] shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
                           HOTEL MAKKAH
@@ -1444,16 +1473,17 @@ function ManifestPageContent() {
                                   {pasporInfo.kotaPaspor}
                                 </td>
 
-                                {/* KLASTER & FASILITAS */}
+                                {/* KLASTER & PERLENGKAPAN */}
                                 <td className={`px-3 py-2.5 ${cellBorder}`}>
                                   {(() => {
                                     const rawKlaster = getJamaahCluster(group.groupObj, j);
                                     const klasterName = rawKlaster || "SILVER";
                                     const isPromoKlaster = klasterName.toUpperCase().includes("PROMO");
-                                    const isTanpaPerlengkapan = (group.groupObj as any)?.tanpaPerlengkapan || (group.groupObj as any)?.perlengkapan === "EXCLUDE" || j.tanpaPerlengkapan;
+                                    const isGroupTanpa = (group.groupObj as any)?.tanpaPerlengkapan || (group.groupObj as any)?.perlengkapan === "EXCLUDE" || j.tanpaPerlengkapan;
+                                    const currentStatus = j.statusPerlengkapan || (isGroupTanpa ? "TANPA" : "BELUM_AMBIL");
 
                                     return (
-                                      <div className="space-y-1">
+                                      <div className="space-y-1.5">
                                         <div>
                                           {isPromoKlaster ? (
                                             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-extrabold bg-purple-500/20 text-purple-800 dark:text-purple-300 border border-purple-500/40">
@@ -1466,15 +1496,23 @@ function ManifestPageContent() {
                                           )}
                                         </div>
                                         <div>
-                                          {isTanpaPerlengkapan ? (
-                                            <span className="inline-flex items-center gap-0.5 text-[9px] font-semibold text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/50 px-1.5 py-0.5 rounded border border-rose-200 dark:border-rose-800">
-                                              ⚠️ Tanpa Perlengkapan
-                                            </span>
-                                          ) : (
-                                            <span className="inline-flex items-center gap-0.5 text-[9px] font-semibold text-emerald-700 dark:emerald-400 bg-emerald-50 dark:bg-emerald-950/50 px-1.5 py-0.5 rounded border border-emerald-200 dark:border-emerald-800">
-                                              🎁 Termasuk Perlengkapan
-                                            </span>
-                                          )}
+                                          <select
+                                            value={currentStatus}
+                                            onChange={(e) => handleUpdatePerlengkapanStatus(j.id, e.target.value)}
+                                            className={cn(
+                                              "text-[10px] font-black rounded px-2 py-0.5 cursor-pointer border shadow-sm outline-none transition-all",
+                                              currentStatus === "TANPA" && "bg-black text-white border-stone-800 hover:bg-stone-900",
+                                              currentStatus === "SUDAH_AMBIL" && "bg-emerald-600 text-white border-emerald-700 hover:bg-emerald-700",
+                                              currentStatus === "BELUM_AMBIL" && "bg-amber-500 text-white border-amber-600 hover:bg-amber-600",
+                                              currentStatus === "SEBAGIAN" && "bg-yellow-400 text-stone-950 border-yellow-500 hover:bg-yellow-500"
+                                            )}
+                                            title="Ubah status perlengkapan jamaah"
+                                          >
+                                            <option value="TANPA" className="bg-stone-900 text-white font-bold">⬛ TANPA</option>
+                                            <option value="BELUM_AMBIL" className="bg-amber-500 text-white font-bold">🟧 BELUM AMBIL</option>
+                                            <option value="SEBAGIAN" className="bg-yellow-400 text-stone-950 font-bold">🟨 AMBIL SEBAGIAN</option>
+                                            <option value="SUDAH_AMBIL" className="bg-emerald-600 text-white font-bold">🟩 SUDAH AMBIL</option>
+                                          </select>
                                         </div>
                                       </div>
                                     );

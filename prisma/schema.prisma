@@ -458,6 +458,9 @@ model Jamaah {
   tandaTanganDigital String? // Base64 encoded
   syaratDisetujui    Boolean      @default(false)
   status             StatusJamaah @default(registered)
+  statusPerlengkapan String       @default("BELUM_AMBIL") // "TANPA" | "BELUM_AMBIL" | "SEBAGIAN" | "SUDAH_AMBIL"
+  tanggalAmbilPerlengkapan DateTime?
+  catatanPerlengkapan String?
   hotelMekkah        String
   hotelMadinah       String
   userId             String?
@@ -472,6 +475,7 @@ model Jamaah {
   manifestRows      ManifestRow[]
   penghuniKamar     PenghuniKamar[]
   alokasiPembayaran AlokasiPembayaran[]
+  detailPengambilan PengambilanPerlengkapanItem[]
 
   @@index([groupId])
   @@index([status])
@@ -1143,14 +1147,62 @@ model MasterPackageType {
 }
 
 model MasterPerlengkapan {
+  id           String   @id @default(cuid())
+  code         String   @unique
+  name         String
+  stokTersedia Int      @default(0)
+  stokMinimum  Int      @default(10)
+  satuan       String   @default("pcs")
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  mutasi       PerlengkapanMutasi[]
+  pengambilan  PengambilanPerlengkapanItem[]
+
+  @@map("master_perlengkapan")
+}
+
+model PerlengkapanMutasi {
+  id         String             @id @default(cuid())
+  barangId   String
+  barang     MasterPerlengkapan @relation(fields: [barangId], references: [id], onDelete: Cascade)
+  tipe       String             // "MASUK" | "KELUAR"
+  jumlah     Int
+  keterangan String?
+  petugas    String?
+  createdAt  DateTime           @default(now())
+
+  @@index([barangId])
+  @@map("perlengkapan_mutasi")
+}
+
+model PengambilanPerlengkapanItem {
+  id           String             @id @default(cuid())
+  jamaahId     String
+  jamaah       Jamaah             @relation(fields: [jamaahId], references: [id], onDelete: Cascade)
+  barangId     String
+  barang       MasterPerlengkapan @relation(fields: [barangId], references: [id], onDelete: Cascade)
+  status       String             @default("BELUM") // "SUDAH" | "BELUM"
+  tanggalAmbil DateTime?
+  petugas      String?
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+
+  @@unique([jamaahId, barangId])
+  @@map("pengambilan_perlengkapan_items")
+}
+
+model MasterBillingOption {
   id        String   @id @default(cuid())
-  code      String   @unique
-  name      String
+  kategori  String   // "tambahan" | "potongan"
+  nama      String
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@map("master_perlengkapan")
+  @@index([kategori])
+  @@map("master_billing_options")
 }
 
 model MasterCluster {

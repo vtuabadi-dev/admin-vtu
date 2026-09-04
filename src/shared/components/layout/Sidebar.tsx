@@ -22,6 +22,7 @@ import {
   Wrench,
   ScrollText,
   HeartHandshake,
+  Package,
   X,
   type LucideIcon,
 } from "lucide-react";
@@ -155,6 +156,19 @@ const adminNav: NavSection[] = [
           { label: "Manifest Blockseat", href: "/admin/manifest?type=blockseat" },
           { label: "Manifest Hotel", href: "/admin/rooming" },
           { label: "Manifest SISKOPATUH", href: "/admin/manifest?type=siskopatuh" },
+        ],
+      },
+    ],
+  },
+  {
+    title: "PERLENGKAPAN",
+    items: [
+      {
+        label: "Perlengkapan",
+        icon: Package,
+        children: [
+          { label: "Stok Gudang", href: "/admin/perlengkapan/stok" },
+          { label: "Pengambilan", href: "/admin/perlengkapan/pengambilan" },
         ],
       },
     ],

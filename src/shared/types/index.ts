@@ -116,6 +116,9 @@ export interface Jamaah {
   tandaTanganDigital?: string;
   syaratDisetujui: boolean;
   status: StatusJamaah;
+  statusPerlengkapan?: "TANPA" | "BELUM_AMBIL" | "SEBAGIAN" | "SUDAH_AMBIL" | string;
+  tanggalAmbilPerlengkapan?: string | null;
+  catatanPerlengkapan?: string | null;
   /** Hotel assignment — determines manifest grouping */
   hotelMekkah: string;
   hotelMadinah: string;
@@ -902,3 +905,45 @@ export interface TenantBoundary {
   // TODO: Multi-tenant — add tenantId FK to core entities before SaaS launch
   // TODO: Multi-tenant — enforce RLS policies in Supabase per tenantId
 }
+
+// ============================================================
+// PERLENGKAPAN DOMAIN TYPES
+// ============================================================
+
+export type StatusPerlengkapan = "TANPA" | "BELUM_AMBIL" | "SEBAGIAN" | "SUDAH_AMBIL";
+
+export interface MasterPerlengkapanItem {
+  id: string;
+  code: string;
+  name: string;
+  stokTersedia: number;
+  stokMinimum: number;
+  satuan: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PerlengkapanMutasiItem {
+  id: string;
+  barangId: string;
+  barang?: MasterPerlengkapanItem;
+  tipe: "MASUK" | "KELUAR";
+  jumlah: number;
+  keterangan?: string | null;
+  petugas?: string | null;
+  createdAt: string;
+}
+
+export interface PengambilanPerlengkapanItem {
+  id: string;
+  jamaahId: string;
+  barangId: string;
+  barang?: MasterPerlengkapanItem;
+  status: "SUDAH" | "BELUM";
+  tanggalAmbil?: string | null;
+  petugas?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
