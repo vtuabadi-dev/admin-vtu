@@ -1218,14 +1218,31 @@ model MasterCluster {
 }
 
 model MasterPetugas {
-  id        String   @id @default(cuid())
-  kode      String?  @unique
-  nama      String
-  tipe      String   // "TOUR_LEADER" or "MUTHOWIF"
-  noHp      String?
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id              String    @id @default(cuid())
+  kode            String?   @unique
+  nama            String
+  tipe            String    // "TOUR_LEADER" or "MUTHOWIF"
+  noHp            String?
+  isActive        Boolean   @default(true)
+
+  // Dokumen & Storage Google Drive (Folder: 184fhhhwKNxe_Xy6lBs2h6oPfjbRyLE-G)
+  pasporUrl       String?
+  pasporDriveId   String?
+  fotoUrl         String?
+  fotoDriveId     String?
+
+  // Data Paspor Hasil Ekstraksi OCR
+  nomorPaspor     String?
+  tglDikeluarkan  DateTime?
+  tglHabis        DateTime?
+  kotaPaspor      String?
+  nik             String?
+  tempatLahir     String?
+  tanggalLahir    DateTime?
+  jenisKelamin    String?   // "L" | "P"
+
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   @@map("master_petugas")
 }
