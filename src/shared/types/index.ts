@@ -254,6 +254,7 @@ export interface Pembayaran {
   };
   /** How this payment is allocated across group members */
   alokasi: AlokasiPembayaran[];
+  invoiceDriveId?: string;
 }
 
 export interface AlokasiPembayaran {
@@ -274,6 +275,7 @@ export interface Invoice {
   sisaTagihan: number;
   status: StatusInvoice;
   jatuhTempo: string;
+  invoiceDriveId?: string;
   items: InvoiceItem[];
   createdAt: string;
   updatedAt: string;

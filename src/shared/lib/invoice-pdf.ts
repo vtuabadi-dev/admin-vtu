@@ -756,6 +756,11 @@ export async function getInvoicePdfBlob(data: InvoicePdfData): Promise<Blob> {
   return doc.output("blob");
 }
 
+export function getInvoicePdfBase64(data: InvoicePdfData): string {
+  const doc = generateInvoicePdf(data);
+  return doc.output("datauristring");
+}
+
 export async function shareInvoicePdf(data: InvoicePdfData): Promise<boolean> {
   try {
     const blob = await getInvoicePdfBlob(data);

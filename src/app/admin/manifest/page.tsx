@@ -33,6 +33,7 @@ import type { Manifest, Keberangkatan, Jamaah, RegistrationGroup } from "@/share
 import { useOperationalStore } from "@/stores/operational-store";
 import { extractFilesFromEvent } from "@/shared/lib/file-drop-utils";
 import { resolveHotelForKlaster } from "@/shared/lib/hotel-utils";
+import { hasPackageTourLeader } from "@/shared/lib/file-standardization";
 
 // ── Helper Utilities ─────────────────────────────────────────
 
@@ -265,18 +266,22 @@ function formatDisplayDate(dateInput?: string | Date): string {
 function formatIdRegister(baseCode: string, memberIndex: number, totalInGroup: number): string {
   if (!baseCode) return "-";
   
-  // If baseCode is already formatted like 8759301-1, strip existing member suffix if re-indexing
+  // If baseCode is already a full unique registrationId like GRP-2026-0004-1 or GRP-2026-00004-1, return directly!
+  if (/^GRP-\d{4}-\d+-\d+$/i.test(baseCode)) {
+    return baseCode;
+  }
+
+  // If baseCode is a group code like GRP-2026-0004 or GRP-2026-00004, append member index
+  if (/^GRP-\d{4}-\d+$/i.test(baseCode)) {
+    return `${baseCode}-${memberIndex + 1}`;
+  }
+
+  // Legacy fallback
   let cleanCode = baseCode.replace(/-\d+$/, "");
-  
-  // Handle GRP-YYYY-NNNNN (e.g. GRP-2026-00003) -> 2026003 (7-digit standard register ID)
   const grpMatch = cleanCode.match(/^GRP-(\d{4})-(\d+)$/i);
   if (grpMatch && grpMatch[1] && grpMatch[2]) {
-    const year = grpMatch[1]; // "2026"
-    const seq = parseInt(grpMatch[2], 10) || 1;
-    cleanCode = `${year}${String(seq).padStart(3, "0")}`; // "2026003"
-  } else {
-    // If it starts with GRP- but other format, clean GRP- prefix
-    cleanCode = cleanCode.replace(/^GRP-/i, "");
+    cleanCode = `GRP-${grpMatch[1]}-${grpMatch[2]}`;
+    return `${cleanCode}-${memberIndex + 1}`;
   }
 
   if (totalInGroup > 1) {
@@ -948,8 +953,10 @@ function ManifestPageContent() {
     }
   }
 
-  // Counter variable for global sequential NO JAMAAH
-  let globalNoJamaahCounter = 1;
+  // ADR-0014: Counter variable for global sequential NO JAMAAH
+  // Starts from 2 if package has a Tour Leader (No. 1 reserved for TL), or 1 if without TL
+  const packageHasTL = hasPackageTourLeader(activePackage);
+  let globalNoJamaahCounter = packageHasTL ? 2 : 1;
 
   return (
     <div className="space-y-6">
@@ -1090,6 +1097,14 @@ function ManifestPageContent() {
                         <Plane className="h-3.5 w-3.5 text-amber-400" />
                         Maskapai: <strong className="text-white">{getAirlineCode(activePackage.maskapai)}</strong>
                       </span>
+                      {packageHasTL && (
+                        <>
+                          <span className="text-stone-600">•</span>
+                          <span className="inline-flex items-center gap-1 bg-amber-500/20 border border-amber-500/30 px-2 py-0.5 rounded text-amber-300 font-medium text-[11px]">
+                            ⭐ Tour Leader (No. 1): <strong>{(activePackage as any).tourLeader?.nama || (activePackage.driveFolderIds as any)?.tourLeader?.nama || (activePackage.driveFolderIds as any)?.tourLeader || (activePackage as any)?.namaTourLeader || "Tersedia"}</strong>
+                          </span>
+                        </>
+                      )}
                     </div>
                   </div>
 
@@ -1336,9 +1351,9 @@ function ManifestPageContent() {
                               ktpDoc = j.dokumen.find((d: any) => d.jenis === "ktp");
                             }
 
-                            // ID Register Format
-                            const baseCode = group.groupObj?.kodeRegistrasi || j.registrationId || j.groupId || "2980";
-                            const idRegister = formatIdRegister(baseCode, memberIdx, totalInGroup);
+                            // ADR-0014: ID Register Format (SSOT: Prioritize authentic registrationId)
+                            const baseCode = group.groupObj?.kodeRegistrasi || j.registrationId || j.groupId || "-";
+                            const idRegister = j.registrationId || formatIdRegister(baseCode, memberIdx, totalInGroup);
 
                             const tipeKamarDisplay = j.tipeKamar || (group.groupObj as any)?.roomUpgrade || "Upgrade Double";
                             const statusMenikahDisplay =

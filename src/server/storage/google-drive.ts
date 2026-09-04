@@ -16,8 +16,14 @@ const TOK_P1 = "1//0gRpuh9NhCAPqCgYIARAAGBASNwF-L9IrXZDxG0zE9k6NSR52-dC5ta_BCNI2
 const TOK_P2 = "C1FOTfeo8rhDlyOMwp-iyQfT_bT8IXo";
 const DEFAULT_REFRESH_TOKEN = `${TOK_P1}${TOK_P2}`;
 
+export const DEFAULT_INVOICE_FOLDER_ID = "1KWIURZBbS0lGvazUkSNpMGmo54DM6kDl";
+
 export function getGoogleDriveFolderId(): string {
   return process.env.GOOGLE_DRIVE_FOLDER_ID || DEFAULT_FOLDER_ID;
+}
+
+export function getGoogleDriveInvoiceFolderId(): string {
+  return process.env.GOOGLE_DRIVE_INVOICE_FOLDER_ID || DEFAULT_INVOICE_FOLDER_ID;
 }
 
 export function isGoogleDriveConfigured(): boolean {
@@ -329,6 +335,53 @@ export async function provisionPackageStorage(packageId: string): Promise<DriveF
 
   console.log(`[Cloud Vault Provisioning COMPLETE] Package: "${packageName}" (ID: ${paket.id}) - Folder IDs saved to DB.`);
   return folderRegistry;
+}
+
+/**
+ * ADR-0014: Move a file between Google Drive folders and optionally rename it.
+ * Used during package transfer (pindah paket) to relocate passport/photos to the new package folder
+ * and update the filename with the new sequential manifest number.
+ */
+export async function moveAndRenameDriveFile(
+  fileIdOrUrl: string,
+  newFolderId?: string,
+  oldFolderId?: string,
+  newFileName?: string
+): Promise<boolean> {
+  if (!isGoogleDriveConfigured() || !fileIdOrUrl) return false;
+  try {
+    let cleanId = fileIdOrUrl;
+    if (cleanId.includes("id=")) {
+      cleanId = cleanId.split("id=")[1]?.split("&")[0] || cleanId;
+    }
+    cleanId = cleanId.replace(/^https?:\/\/[^\/]+\//, "").replace(/^\//, "");
+
+    const params = new URLSearchParams({
+      supportsAllDrives: "true",
+    });
+    if (newFolderId && newFolderId !== oldFolderId) {
+      params.append("addParents", newFolderId);
+      if (oldFolderId) params.append("removeParents", oldFolderId);
+    }
+
+    const body: any = {};
+    if (newFileName) {
+      body.name = newFileName;
+    }
+
+    const url = `${DRIVE_API}/files/${cleanId}?${params.toString()}`;
+    const res = await apiFetch(url, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+
+    console.log(`[Google Drive Relocation Success] File ${cleanId} renamed to "${newFileName}" and moved to "${newFolderId}"`);
+    return res.ok;
+  } catch (err: any) {
+    console.warn(`[Google Drive Relocation Warning] Could not move/rename file ${fileIdOrUrl}:`, err?.message || err);
+    return false;
+  }
 }
 
 export async function provisionAllUnprovisionedPackages(): Promise<{ total: number; provisioned: number }> {

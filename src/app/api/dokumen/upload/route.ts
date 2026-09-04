@@ -7,6 +7,7 @@ import { dokumenRepo } from "@/server/repositories";
 import { checkRateLimit, rateLimitKey, getRateLimitConfig } from "@/server/lib/rate-limit";
 import type { DokumenJenis } from "@/shared/types";
 import { prisma } from "@/server/db/client";
+import { formatStandardDocumentFileName, hasPackageTourLeader } from "@/shared/lib/file-standardization";
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 const VALID_DOKUMEN_JENIS: DokumenJenis[] = ["ktp", "kk", "paspor", "akta", "pas_foto", "vaksin"];
@@ -74,17 +75,51 @@ export async function POST(request: NextRequest) {
 
     if (jamaah) {
       const driveFolders = (jamaah.group?.keberangkatan?.driveFolderIds as any) || {};
-      const regId = jamaah.registrationId || jamaah.id;
-      const cleanName = jamaah.namaLengkap.toUpperCase().replace(/\s+/g, "-").replace(/[^A-Z0-9-]/g, "");
+      const regCode = jamaah.registrationId || jamaah.group?.kodeRegistrasi || jamaah.id;
 
-      // Get manifest number if available (fallback 000)
+      // ADR-0014: Determine accurate manifest sequential number
+      let nomorManifest = 1;
       const manifestRow = await prisma.manifestRow.findFirst({
         where: { jamaahId: jamaah.id },
         select: { nomorUrut: true },
       });
-      const nomorManifest = String(manifestRow?.nomorUrut || "000").padStart(3, "0");
 
-      formattedFileName = `${nomorManifest}-${regId}_${cleanName}.${ext}`;
+      if (manifestRow?.nomorUrut) {
+        nomorManifest = manifestRow.nomorUrut;
+      } else if (jamaah.group?.paketKeberangkatanId) {
+        // Compute chronological position within the package
+        const keberangkatan = jamaah.group.keberangkatan;
+        const hasTL = hasPackageTourLeader(keberangkatan);
+        const offset = hasTL ? 2 : 1;
+
+        // Fetch all groups under this package ordered chronologically
+        const packageGroups = await prisma.registrationGroup.findMany({
+          where: { paketKeberangkatanId: jamaah.group.paketKeberangkatanId },
+          orderBy: { updatedAt: "asc" },
+          include: {
+            anggota: {
+              where: { status: { not: "batal" as any } },
+              orderBy: { createdAt: "asc" },
+              select: { id: true },
+            },
+          },
+        });
+
+        let currentCounter = offset;
+        for (const g of packageGroups) {
+          for (const m of g.anggota) {
+            if (m.id === jamaah.id) {
+              nomorManifest = currentCounter;
+              break;
+            }
+            currentCounter++;
+          }
+          if (nomorManifest !== 1 || (currentCounter > offset && nomorManifest === currentCounter)) break;
+        }
+      }
+
+      // ADR-0014: [no urut manifest]-[4 digit id reg]-[nama manifest].[ext]
+      formattedFileName = formatStandardDocumentFileName(nomorManifest, regCode, jamaah.namaLengkap, ext);
 
       // Pick subfolder by document type
       if (jenisDokumen === "paspor") targetFolderId = driveFolders.paspor;

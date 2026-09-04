@@ -12,8 +12,33 @@ const MIN_PAX = 1;
 
 async function generateKodeRegistrasi(): Promise<string> {
   const year = new Date().getFullYear();
-  const count = await (await import("@/server/db/client")).prisma.registrationRequest.count();
-  const next = (count + 1).toString().padStart(5, "0");
+  const { prisma } = await import("@/server/db/client");
+  
+  // Hardened logic: Find the highest sequence number in the current year across both requests & groups
+  const [latestReq, latestGroup] = await Promise.all([
+    prisma.registrationRequest.findFirst({
+      where: { kodeRegistrasi: { startsWith: `GRP-${year}-` } },
+      orderBy: { kodeRegistrasi: "desc" },
+      select: { kodeRegistrasi: true },
+    }),
+    prisma.registrationGroup.findFirst({
+      where: { kodeRegistrasi: { startsWith: `GRP-${year}-` } },
+      orderBy: { kodeRegistrasi: "desc" },
+      select: { kodeRegistrasi: true },
+    }),
+  ]);
+
+  let maxSeq = 0;
+  for (const item of [latestReq, latestGroup]) {
+    if (item?.kodeRegistrasi) {
+      const parts = item.kodeRegistrasi.split("-");
+      const num = parseInt(parts[2] || "0", 10);
+      if (!isNaN(num) && num > maxSeq) maxSeq = num;
+    }
+  }
+
+  const nextSeq = maxSeq + 1;
+  const next = nextSeq.toString().padStart(4, "0");
   return `GRP-${year}-${next}`;
 }
 

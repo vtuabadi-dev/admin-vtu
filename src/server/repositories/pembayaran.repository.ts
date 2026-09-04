@@ -19,6 +19,7 @@ function mapPembayaran(row: any): Pembayaran {
     bankPengirim: row.bankPengirim ?? undefined,
     nomorRekening: row.nomorRekening ?? undefined,
     catatan: row.catatan ?? undefined,
+    invoiceDriveId: row.invoiceDriveId ?? undefined,
     ocrData: row.ocrData as Pembayaran["ocrData"],
     alokasi: (row.alokasi ?? []).map((a: any) => ({
       jamaahId: a.jamaahId,
@@ -322,6 +323,7 @@ export const pembayaranRepo = {
                 status: true,
                 catatan: true,
                 invoiceId: true,
+                invoiceDriveId: true,
               },
               orderBy: { tanggal: "asc" },
             },

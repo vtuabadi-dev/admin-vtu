@@ -576,9 +576,10 @@ model Invoice {
   jumlah       Int
   sisaTagihan  Int
   status       StatusInvoice @default(unpaid)
-  jatuhTempo   DateTime
-  tenantId     String?
-  createdAt    DateTime      @default(now())
+  jatuhTempo     DateTime
+  invoiceDriveId String?
+  tenantId       String?
+  createdAt      DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
 
   // Relations
@@ -649,10 +650,11 @@ model Pembayaran {
   reviewedAt    DateTime?
   bankPengirim  String?
   nomorRekening String?
-  catatan       String?
-  ocrData       Json? // { nominal?, bank?, tanggal?, confidence? }
-  tenantId      String?
-  createdAt     DateTime                     @default(now())
+  catatan        String?
+  ocrData        Json? // { nominal?, bank?, tanggal?, confidence? }
+  invoiceDriveId String?
+  tenantId       String?
+  createdAt      DateTime                     @default(now())
   updatedAt     DateTime                     @updatedAt
 
   // Relations

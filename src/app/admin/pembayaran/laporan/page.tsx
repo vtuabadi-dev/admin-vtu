@@ -37,7 +37,7 @@ import {
   Building,
   Users,
 } from "lucide-react";
-import { downloadInvoicePdf, type InvoiceOrderItem } from "@/shared/lib/invoice-pdf";
+import { downloadInvoicePdf, getInvoicePdfBase64, type InvoiceOrderItem } from "@/shared/lib/invoice-pdf";
 import { resolveHotelForKlaster } from "@/shared/lib/hotel-utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/components/ui/Card";
 import { Button } from "@/shared/components/ui/Button";
@@ -646,6 +646,8 @@ function PaymentReviewTabContent() {
   const [targetPhone, setTargetPhone] = useState("");
   const [targetEmail, setTargetEmail] = useState("");
   const [copiedInvoiceText, setCopiedInvoiceText] = useState(false);
+  const [isUploadingToDrive, setIsUploadingToDrive] = useState(false);
+  const [driveUploadError, setDriveUploadError] = useState<string | null>(null);
 
   // Toast / Feedback
   const [successMessage, setSuccessMessage] = useState("");
@@ -1111,6 +1113,66 @@ function PaymentReviewTabContent() {
     };
   }, [dueDate, formJenis, formMetode, formBank, formRekening, formCatatan, formHotelMekkah, formHotelMadinah, formAlamat, selectedAnggota, availableAnggota, orderItems, targetPhone, targetEmail]);
 
+  // Synchronize official PDF invoice to centralized Google Drive folder (1KWIURZBbS0lGvazUkSNpMGmo54DM6kDl)
+  const syncInvoiceToGoogleDrive = useCallback(async (target: any) => {
+    if (!target) return null;
+    const existingId = target.invoiceDriveId || target.driveFileId;
+    if (existingId) return existingId;
+
+    const invNum = target.invoiceId || invoiceNumber;
+    if (!invNum) return null;
+    const nom = target.jumlah || formNominal;
+    const payload = getInvoicePdfPayload(target, invNum, nom);
+    const pdfBase64 = getInvoicePdfBase64(payload);
+
+    setIsUploadingToDrive(true);
+    setDriveUploadError(null);
+    try {
+      const res = await fetch("/api/invoices/upload-drive", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          paymentId: target.id,
+          invoiceNumber: invNum,
+          kodeRegistrasi: target.kodeRegistrasi || target.group?.kodeRegistrasi || payload.kodeRegistrasi,
+          namaGroup: target.namaGroup || target.group?.namaGroup || payload.namaGroup,
+          pdfBase64,
+        }),
+      });
+      const data = await res.json();
+      if (data.success && data.fileId) {
+        setSendInvoiceTarget((prev: any) =>
+          prev && prev.id === target.id
+            ? { ...prev, invoiceDriveId: data.fileId, driveFileId: data.fileId }
+            : prev
+        );
+        setQueue((prev) =>
+          prev.map((it) => (it.id === target.id ? { ...it, invoiceDriveId: data.fileId } : it))
+        );
+        if (selectedPayment?.id === target.id) {
+          setSelectedPayment((prev: any) => (prev ? { ...prev, invoiceDriveId: data.fileId } : null));
+        }
+        return data.fileId;
+      } else {
+        console.warn("[syncInvoiceToGoogleDrive] Upload response notice:", data.message);
+        setDriveUploadError(data.message);
+        return null;
+      }
+    } catch (err: any) {
+      console.error("[syncInvoiceToGoogleDrive] Error:", err);
+      setDriveUploadError(err?.message || "Gagal mengunggah ke Google Drive");
+      return null;
+    } finally {
+      setIsUploadingToDrive(false);
+    }
+  }, [invoiceNumber, formNominal, getInvoicePdfPayload, selectedPayment]);
+
+  useEffect(() => {
+    if (sendInvoiceTarget && !sendInvoiceTarget.invoiceDriveId && !sendInvoiceTarget.driveFileId) {
+      syncInvoiceToGoogleDrive(sendInvoiceTarget);
+    }
+  }, [sendInvoiceTarget, syncInvoiceToGoogleDrive]);
+
   const handleDownloadPdf = useCallback((paymentObj?: any) => {
     const p = paymentObj || sendInvoiceTarget || selectedPayment;
     if (!p) return;
@@ -1141,10 +1203,19 @@ function PaymentReviewTabContent() {
     // 2. Fungsi 1: Otomatis download file PDF invoice fisik
     downloadInvoicePdf(payload, customFilename);
 
-    // 3. Fungsi 2: Otomatis hyperlink langsung ke nomor WA Web tujuan + prefilled text
-    const rawPhone = targetPhone || sendInvoiceTarget.telepon || sendInvoiceTarget.group?.ketuaGroup?.nomorTelepon || "";
+    // 3. Pastikan upload ke Google Drive selesai sebelum membuka link WA jika belum ada
+    let currentTarget = sendInvoiceTarget;
+    if (!currentTarget.invoiceDriveId && !currentTarget.driveFileId) {
+      const uploadedId = await syncInvoiceToGoogleDrive(currentTarget);
+      if (uploadedId) {
+        currentTarget = { ...currentTarget, invoiceDriveId: uploadedId, driveFileId: uploadedId };
+      }
+    }
+
+    // 4. Fungsi 2: Otomatis hyperlink langsung ke nomor WA Web tujuan + prefilled text
+    const rawPhone = targetPhone || currentTarget.telepon || currentTarget.group?.ketuaGroup?.nomorTelepon || "";
     const cleanPhone = rawPhone.replace(/[^0-9]/g, "").replace(/^0/, "62");
-    const msg = generateInvoiceMessage(sendInvoiceTarget, invNum, nom);
+    const msg = generateInvoiceMessage(currentTarget, invNum, nom);
 
     const isMobile = typeof navigator !== "undefined" && /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
     const waUrl = cleanPhone
@@ -1212,6 +1283,9 @@ function PaymentReviewTabContent() {
       // Auto-generate & download official PDF invoice upon issuance
       const payload = getInvoicePdfPayload(updated, invoiceNumber, formNominal);
       downloadInvoicePdf(payload);
+
+      // Otomatis sinkronkan invoice ke Google Drive terpusat
+      syncInvoiceToGoogleDrive(updated);
     } catch {
       window.alert("Gagal memproses approval & invoice");
     } finally {
@@ -2471,9 +2545,26 @@ function PaymentReviewTabContent() {
                       Invoice-{(sendInvoiceTarget?.invoiceId || invoiceNumber).replace(/[^a-zA-Z0-9-_]/g, "")}.pdf
                     </span>
                     <Badge variant="success" className="text-[9px] px-1.5 py-0">Dokumen PDF Siap</Badge>
+                    {isUploadingToDrive ? (
+                      <Badge variant="outline" className="text-[9px] px-1.5 py-0 text-blue-600 border-blue-400 animate-pulse gap-1">
+                        <Loader2 className="h-2.5 w-2.5 animate-spin" />
+                        Sync Google Drive...
+                      </Badge>
+                    ) : sendInvoiceTarget?.invoiceDriveId || sendInvoiceTarget?.driveFileId ? (
+                      <Badge variant="outline" className="text-[9px] px-1.5 py-0 text-emerald-700 border-emerald-500 bg-emerald-100/60 dark:bg-emerald-950/40 gap-1 font-semibold">
+                        <Check className="h-2.5 w-2.5" />
+                        Google Drive Ready
+                      </Badge>
+                    ) : driveUploadError ? (
+                      <Badge variant="outline" className="text-[9px] px-1.5 py-0 text-amber-600 border-amber-400">
+                        GDrive: Web Fallback
+                      </Badge>
+                    ) : null}
                   </div>
                   <p className="text-[10px] text-emerald-800 dark:text-emerald-400 mt-0.5">
-                    Dokumen resmi kuitansi & invoice PT Vauza Tamma Abadi (Otomatis terlampir saat kirim)
+                    {sendInvoiceTarget?.invoiceDriveId || sendInvoiceTarget?.driveFileId
+                      ? "Dokumen resmi tersimpan aman di Google Drive Perusahaan (Direct Download aktif di link WA)"
+                      : "Dokumen resmi kuitansi & invoice PT Vauza Tamma Abadi (Otomatis terlampir saat kirim)"}
                   </p>
                 </div>
               </div>
