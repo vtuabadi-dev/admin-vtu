@@ -22,14 +22,9 @@ import {
   CheckCircle2,
   AlertCircle,
   Loader2,
-  Eye,
   Sparkles,
   ExternalLink,
-  X,
   CreditCard,
-  Calendar,
-  MapPin,
-  IdCard,
 } from "lucide-react";
 
 type Petugas = {
