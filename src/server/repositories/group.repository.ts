@@ -23,6 +23,7 @@ function mapGroup(row: any): RegistrationGroup {
     hotelUpgrade: req?.hotelUpgrade || row.hotelUpgrade || undefined,
     roomUpgrade: req?.roomUpgrade || row.roomUpgrade || undefined,
     anggotaIds: row.anggota?.map((a: any) => a.id) ?? [],
+    invoices: (row.invoices ?? []).map(mapInvoice),
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
@@ -100,6 +101,7 @@ export const groupRepo = {
         include: {
           anggota: true,
           registrationRequests: { select: { hotelUpgrade: true, roomUpgrade: true } },
+          invoices: { include: { items: true } },
         },
         take: params?.limit,
         skip: params?.offset,
@@ -116,6 +118,7 @@ export const groupRepo = {
       include: {
         anggota: true,
         registrationRequests: { select: { hotelUpgrade: true, roomUpgrade: true } },
+        invoices: { include: { items: true } },
       },
     });
     return row ? mapGroup(row) : null;

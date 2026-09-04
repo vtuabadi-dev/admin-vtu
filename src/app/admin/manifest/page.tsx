@@ -326,6 +326,87 @@ function formatGroupMergeLabel(groupObj: any, groupMembers: any[]): string {
   return `${paxCount} PAX ${roomStr}${clusterStr} ${dateStr}`;
 }
 
+function hasEquipmentAddonInInvoice(groupObj: any, j: any): boolean {
+  if (!groupObj) return false;
+  if (j?.hasPerlengkapanAddon || j?.addonPerlengkapan) return true;
+
+  const invoices = groupObj.invoices || [];
+  for (const inv of invoices) {
+    if (inv.status === "cancelled") continue;
+    if (inv.jamaahId && inv.jamaahId !== j.id) continue;
+
+    const items = inv.items || [];
+    for (const item of items) {
+      if (item.status === "cancelled") continue;
+      const text = `${item.kategori || ""} ${item.deskripsi || ""}`.toLowerCase();
+      if (text.includes("perlengkapan")) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
+function resolveSystemStatusPerlengkapan(activePackage: any, groupObj: any, j: any): {
+  status: "TANPA" | "BELUM_AMBIL" | "SEBAGIAN" | "SUDAH_AMBIL";
+  isAddon: boolean;
+  keterangan: string;
+} {
+  const physicalStatus = j?.statusPerlengkapan;
+
+  const clusterName = (getJamaahCluster(groupObj, j) || "").toLowerCase();
+  const isClusterTanpa =
+    clusterName.includes("la only") ||
+    clusterName.includes("tanpa perlengkapan") ||
+    clusterName.includes("exclude perlengkapan");
+
+  const isGroupTanpa =
+    (groupObj as any)?.tanpaPerlengkapan === true ||
+    (groupObj as any)?.perlengkapan === "EXCLUDE" ||
+    (groupObj as any)?.isTanpaPerlengkapan === true ||
+    j?.tanpaPerlengkapan === true ||
+    isClusterTanpa;
+
+  let isPackageExclude = false;
+  if (activePackage?.exclude && Array.isArray(activePackage.exclude)) {
+    isPackageExclude = activePackage.exclude.some((ex: string) => /perlengkapan/i.test(ex));
+  }
+
+  const isBaseWithoutEquipment = isGroupTanpa || isPackageExclude;
+  const hasAddon = hasEquipmentAddonInInvoice(groupObj, j);
+
+  // If base package / cluster is without equipment:
+  if (isBaseWithoutEquipment) {
+    if (hasAddon) {
+      // Customer ordered equipment add-on in invoice:
+      if (physicalStatus === "SUDAH_AMBIL") {
+        return { status: "SUDAH_AMBIL", isAddon: true, keterangan: "Add-on Tagihan • Sudah Diambil" };
+      }
+      if (physicalStatus === "SEBAGIAN") {
+        return { status: "SEBAGIAN", isAddon: true, keterangan: "Add-on Tagihan • Ambil Sebagian" };
+      }
+      return { status: "BELUM_AMBIL", isAddon: true, keterangan: "Add-on Tagihan • Belum Diambil" };
+    }
+
+    // No add-on purchased: Strictly TANPA
+    return { status: "TANPA", isAddon: false, keterangan: "Paket Tanpa Perlengkapan" };
+  }
+
+  // If base package includes equipment:
+  if (physicalStatus === "SUDAH_AMBIL") {
+    return { status: "SUDAH_AMBIL", isAddon: false, keterangan: "Termasuk Paket • Sudah Diambil" };
+  }
+  if (physicalStatus === "SEBAGIAN") {
+    return { status: "SEBAGIAN", isAddon: false, keterangan: "Termasuk Paket • Ambil Sebagian" };
+  }
+  if (physicalStatus === "TANPA") {
+    return { status: "TANPA", isAddon: false, keterangan: "Tanpa Perlengkapan (Opt-out)" };
+  }
+
+  return { status: "BELUM_AMBIL", isAddon: false, keterangan: "Termasuk Paket • Belum Diambil" };
+}
+
 // ── Main Page Component Content ──────────────────────────────
 
 function ManifestPageContent() {
@@ -440,35 +521,6 @@ function ManifestPageContent() {
   useEffect(() => {
     loadAllData();
   }, [loadAllData]);
-
-  const handleUpdatePerlengkapanStatus = async (jamaahId: string, newStatus: string) => {
-    try {
-      setAllJamaah((prev) =>
-        prev.map((item) =>
-          item.id === jamaahId ? { ...item, statusPerlengkapan: newStatus } : item
-        )
-      );
-
-      const res = await fetch(`/api/jamaah/${jamaahId}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          statusPerlengkapan: newStatus,
-          tanggalAmbilPerlengkapan:
-            newStatus === "SUDAH_AMBIL" || newStatus === "SEBAGIAN"
-              ? new Date().toISOString()
-              : null,
-        }),
-      });
-
-      if (!res.ok) {
-        throw new Error("Gagal mengupdate status perlengkapan");
-      }
-    } catch (err: any) {
-      alert("Error: " + err.message);
-      loadAllData();
-    }
-  };
 
   // Selected package details
   const activePackage = useMemo(() => {
@@ -1479,11 +1531,10 @@ function ManifestPageContent() {
                                     const rawKlaster = getJamaahCluster(group.groupObj, j);
                                     const klasterName = rawKlaster || "SILVER";
                                     const isPromoKlaster = klasterName.toUpperCase().includes("PROMO");
-                                    const isGroupTanpa = (group.groupObj as any)?.tanpaPerlengkapan || (group.groupObj as any)?.perlengkapan === "EXCLUDE" || j.tanpaPerlengkapan;
-                                    const currentStatus = j.statusPerlengkapan || (isGroupTanpa ? "TANPA" : "BELUM_AMBIL");
+                                    const resolved = resolveSystemStatusPerlengkapan(activePackage, group.groupObj, j);
 
                                     return (
-                                      <div className="space-y-1.5">
+                                      <div className="space-y-1">
                                         <div>
                                           {isPromoKlaster ? (
                                             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-extrabold bg-purple-500/20 text-purple-800 dark:text-purple-300 border border-purple-500/40">
@@ -1496,23 +1547,41 @@ function ManifestPageContent() {
                                           )}
                                         </div>
                                         <div>
-                                          <select
-                                            value={currentStatus}
-                                            onChange={(e) => handleUpdatePerlengkapanStatus(j.id, e.target.value)}
-                                            className={cn(
-                                              "text-[10px] font-black rounded px-2 py-0.5 cursor-pointer border shadow-sm outline-none transition-all",
-                                              currentStatus === "TANPA" && "bg-black text-white border-stone-800 hover:bg-stone-900",
-                                              currentStatus === "SUDAH_AMBIL" && "bg-emerald-600 text-white border-emerald-700 hover:bg-emerald-700",
-                                              currentStatus === "BELUM_AMBIL" && "bg-amber-500 text-white border-amber-600 hover:bg-amber-600",
-                                              currentStatus === "SEBAGIAN" && "bg-yellow-400 text-stone-950 border-yellow-500 hover:bg-yellow-500"
-                                            )}
-                                            title="Ubah status perlengkapan jamaah"
-                                          >
-                                            <option value="TANPA" className="bg-stone-900 text-white font-bold">⬛ TANPA</option>
-                                            <option value="BELUM_AMBIL" className="bg-amber-500 text-white font-bold">🟧 BELUM AMBIL</option>
-                                            <option value="SEBAGIAN" className="bg-yellow-400 text-stone-950 font-bold">🟨 AMBIL SEBAGIAN</option>
-                                            <option value="SUDAH_AMBIL" className="bg-emerald-600 text-white font-bold">🟩 SUDAH AMBIL</option>
-                                          </select>
+                                          {resolved.status === "TANPA" ? (
+                                            <span
+                                              className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-black bg-black text-white shadow-sm border border-stone-800 tracking-wider select-none"
+                                              title={resolved.keterangan}
+                                            >
+                                              TANPA
+                                            </span>
+                                          ) : resolved.status === "SUDAH_AMBIL" ? (
+                                            <span
+                                              className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-600 text-white shadow-sm select-none"
+                                              title={resolved.keterangan}
+                                            >
+                                              SUDAH AMBIL
+                                            </span>
+                                          ) : resolved.status === "SEBAGIAN" ? (
+                                            <span
+                                              className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-yellow-400 text-stone-950 shadow-sm select-none"
+                                              title={resolved.keterangan}
+                                            >
+                                              AMBIL SEBAGIAN
+                                            </span>
+                                          ) : (
+                                            <span
+                                              className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500 text-white shadow-sm select-none"
+                                              title={resolved.keterangan}
+                                            >
+                                              BELUM AMBIL
+                                            </span>
+                                          )}
+
+                                          {resolved.isAddon && (
+                                            <span className="text-[9px] font-bold text-amber-600 dark:text-amber-400 block mt-0.5">
+                                              + Add-on Biaya
+                                            </span>
+                                          )}
                                         </div>
                                       </div>
                                     );

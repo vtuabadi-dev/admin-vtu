@@ -82,6 +82,7 @@ export interface RegistrationGroup {
   roomUpgrade?: string;
   /** Anggota jamaah dalam grup ini */
   anggotaIds: string[];
+  invoices?: Invoice[];
   createdAt: string;
   updatedAt: string;
 }

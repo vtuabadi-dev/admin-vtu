@@ -59,6 +59,11 @@ export async function GET(request: NextRequest) {
         group: {
           include: {
             keberangkatan: true,
+            invoices: {
+              include: {
+                items: true,
+              },
+            },
           },
         },
         detailPengambilan: {
@@ -80,11 +85,33 @@ export async function GET(request: NextRequest) {
     let countSudahAmbil = 0;
 
     const formattedJamaah = jamaahList.map((j: any) => {
-      const isGroupTanpa = j.group?.tanpaPerlengkapan || j.group?.perlengkapan === "EXCLUDE";
+      const isGroupTanpa = j.group?.tanpaPerlengkapan || j.group?.perlengkapan === "EXCLUDE" || j.tanpaPerlengkapan;
+      
+      // Check if jamaah or group purchased equipment add-on in invoice
+      const hasAddon = (j.group?.invoices || []).some((inv: any) =>
+        inv.status !== "cancelled" &&
+        (!inv.jamaahId || inv.jamaahId === j.id) &&
+        (inv.items || []).some((it: any) =>
+          it.status !== "cancelled" &&
+          `${it.kategori || ""} ${it.deskripsi || ""}`.toLowerCase().includes("perlengkapan")
+        )
+      );
+
       let effectiveStatus = j.statusPerlengkapan;
-      if (!effectiveStatus || effectiveStatus === "BELUM_AMBIL") {
-        if (isGroupTanpa) effectiveStatus = "TANPA";
-        else effectiveStatus = "BELUM_AMBIL";
+
+      // If package/group is without equipment, but customer ordered equipment add-on:
+      if (isGroupTanpa) {
+        if (hasAddon) {
+          if (!effectiveStatus || effectiveStatus === "TANPA" || effectiveStatus === "BELUM_AMBIL") {
+            effectiveStatus = "BELUM_AMBIL";
+          }
+        } else {
+          effectiveStatus = "TANPA";
+        }
+      } else {
+        if (!effectiveStatus || effectiveStatus === "BELUM_AMBIL") {
+          effectiveStatus = "BELUM_AMBIL";
+        }
       }
 
       if (effectiveStatus === "TANPA") countTanpa++;
