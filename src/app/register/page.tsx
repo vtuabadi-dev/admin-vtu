@@ -819,12 +819,11 @@ export default function RegisterPage() {
 
   // Initialize canvas paper background when Step 6 is active
   useEffect(() => {
-    if (step === 6 && signatureMode === "draw") {
-      const timer = setTimeout(() => {
-        resetCanvasPaper();
-      }, 50);
-      return () => clearTimeout(timer);
-    }
+    if (step !== 6 || signatureMode !== "draw") return;
+    const timer = setTimeout(() => {
+      resetCanvasPaper();
+    }, 50);
+    return () => clearTimeout(timer);
   }, [step, signatureMode, resetCanvasPaper]);
 
   const startDrawingCanvas = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
