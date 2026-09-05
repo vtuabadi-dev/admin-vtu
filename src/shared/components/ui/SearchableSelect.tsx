@@ -23,6 +23,7 @@ export interface SearchableSelectProps {
   nextFocusId?: string;
   allowCustomText?: boolean;
   maxHeight?: string;
+  variant?: "default" | "portal";
 }
 
 export function SearchableSelect({
@@ -37,6 +38,7 @@ export function SearchableSelect({
   nextFocusId,
   allowCustomText = false,
   maxHeight = "max-h-[400px]",
+  variant = "default",
 }: SearchableSelectProps) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -163,6 +165,8 @@ export function SearchableSelect({
     }
   };
 
+  const isPortal = variant === "portal";
+
   return (
     <div ref={containerRef} className={cn("relative w-full", className)}>
       {/* In-Place Direct Input */}
@@ -189,9 +193,12 @@ export function SearchableSelect({
           }}
           onKeyDown={handleKeyDown}
           className={cn(
-            "w-full rounded-xl border border-stone-300 bg-white px-3.5 pr-14 text-slate-950 font-bold shadow-xs transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-emerald-600 disabled:cursor-not-allowed disabled:opacity-50 placeholder:text-stone-400 placeholder:font-normal",
-            size === "sm" ? "h-9 text-xs" : "h-11 text-sm",
-            open && "border-emerald-600 ring-2 ring-emerald-500"
+            "w-full rounded-xl pr-14 font-bold shadow-xs transition-colors focus:outline-none disabled:cursor-not-allowed disabled:opacity-50",
+            size === "sm" ? "h-9 text-xs px-3" : "h-11 text-sm px-3.5",
+            isPortal
+              ? "bg-[#2D1B0E] border-2 border-[#D4AF37] text-white placeholder:text-[#D4AF37]/60 focus:ring-2 focus:ring-[#F5D061]/50 focus:border-[#F5D061]"
+              : "border border-stone-300 bg-white text-slate-950 placeholder:text-stone-400 placeholder:font-normal focus:ring-2 focus:ring-emerald-600 focus:border-emerald-600",
+            open && (isPortal ? "border-[#F5D061] ring-2 ring-[#F5D061]/50" : "border-emerald-600 ring-2 ring-emerald-500")
           )}
         />
 
@@ -201,7 +208,10 @@ export function SearchableSelect({
             <button
               type="button"
               onClick={handleClear}
-              className="p-1 rounded-full text-stone-400 hover:text-stone-700 hover:bg-stone-100 transition-colors cursor-pointer"
+              className={cn(
+                "p-1 rounded-full transition-colors cursor-pointer",
+                isPortal ? "text-[#D4AF37] hover:text-[#F5D061] hover:bg-[#3D2513]" : "text-stone-400 hover:text-stone-700 hover:bg-stone-100"
+              )}
               title="Hapus / Reset"
             >
               <X className="h-4 w-4" />
@@ -219,12 +229,15 @@ export function SearchableSelect({
                 setOpen(true);
               }
             }}
-            className="p-0.5 text-stone-400 hover:text-stone-600 transition-colors cursor-pointer"
+            className={cn(
+              "p-0.5 transition-colors cursor-pointer",
+              isPortal ? "text-[#D4AF37] hover:text-[#F5D061]" : "text-stone-400 hover:text-stone-600"
+            )}
           >
             <ChevronDown
               className={cn(
                 "h-4 w-4 transition-transform duration-200",
-                open && "rotate-180 text-emerald-600"
+                open && (isPortal ? "rotate-180 text-[#F5D061]" : "rotate-180 text-emerald-600")
               )}
             />
           </button>
@@ -233,10 +246,13 @@ export function SearchableSelect({
 
       {/* Popover Options List */}
       {open && (
-        <div className="absolute z-50 mt-1 w-full overflow-hidden rounded-xl border border-stone-200 bg-white text-slate-900 shadow-2xl animate-in fade-in-0 zoom-in-95">
+        <div className={cn(
+          "absolute z-50 mt-1 w-full overflow-hidden rounded-xl border-2 shadow-2xl animate-in fade-in-0 zoom-in-95",
+          isPortal ? "border-[#D4AF37] bg-[#2D1B0E] text-white" : "border-stone-200 bg-white text-slate-900"
+        )}>
           <div ref={listRef} className={cn("overflow-y-auto p-1.5 space-y-1", maxHeight)}>
             {filteredOptions.length === 0 ? (
-              <div className="py-4 text-center text-xs font-medium text-stone-500">
+              <div className={cn("py-4 text-center text-xs font-medium", isPortal ? "text-amber-200/70" : "text-stone-500")}>
                 Tidak ada data yang cocok dengan &quot;{query}&quot;
               </div>
             ) : (
@@ -251,7 +267,13 @@ export function SearchableSelect({
                     onMouseEnter={() => setHighlightedIndex(idx)}
                     className={cn(
                       "flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-xs text-left transition-colors cursor-pointer",
-                      isSelected
+                      isPortal
+                        ? isSelected
+                          ? "bg-[#D4AF37] text-slate-950 font-black shadow-2xs"
+                          : isHighlighted
+                          ? "bg-[#3D2513] text-amber-200 font-bold"
+                          : "text-white font-semibold hover:bg-[#3D2513]"
+                        : isSelected
                         ? "bg-emerald-50 text-emerald-950 font-extrabold border border-emerald-300 shadow-2xs"
                         : isHighlighted
                         ? "bg-stone-100 text-slate-950 font-bold"
@@ -261,12 +283,15 @@ export function SearchableSelect({
                     <div className="flex flex-col truncate pr-2">
                       <span className="truncate">{opt.label}</span>
                       {opt.sublabel && (
-                        <span className="text-[10px] text-stone-500 font-normal truncate mt-0.5">
+                        <span className={cn(
+                          "text-[10px] font-normal truncate mt-0.5",
+                          isPortal ? (isSelected ? "text-slate-800 font-bold" : "text-amber-200/70") : "text-stone-500"
+                        )}>
                           {opt.sublabel}
                         </span>
                       )}
                     </div>
-                    {isSelected && <Check className="h-4 w-4 shrink-0 text-emerald-700 font-black" />}
+                    {isSelected && <Check className={cn("h-4 w-4 shrink-0 font-black", isPortal ? "text-slate-950" : "text-emerald-700")} />}
                   </button>
                 );
               })

@@ -237,18 +237,18 @@ function CityCombobox({
             onChange(e.target.value.toUpperCase());
             if (!isOpen) setIsOpen(true);
           }}
-          className="w-full h-11 px-3.5 py-2 border-2 border-emerald-500/40 rounded-xl text-sm font-bold uppercase transition-all focus:outline-none focus:ring-2 focus:ring-amber-400/50 focus:border-amber-400 pr-8 bg-slate-950/90 text-white shadow-inner placeholder:text-emerald-200/40 placeholder:font-normal placeholder:normal-case"
+          className="w-full h-11 px-3.5 py-2 border-2 border-[#D4AF37] rounded-xl text-sm font-bold uppercase transition-all focus:outline-none focus:ring-2 focus:ring-[#F5D061]/50 focus:border-[#F5D061] pr-8 bg-[#2D1B0E] text-white shadow-inner placeholder:text-[#D4AF37]/60 placeholder:font-normal placeholder:normal-case"
           placeholder={placeholder}
         />
         <ChevronDown
-          className="w-4 h-4 text-amber-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none"
+          className="w-4 h-4 text-[#D4AF37] absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none"
         />
       </div>
 
       {isOpen && (
         <div
           ref={listRef}
-          className="absolute z-50 left-0 right-0 mt-1 max-h-[252px] overflow-y-auto bg-slate-950 border-2 border-emerald-500/50 rounded-xl shadow-2xl divide-y divide-emerald-900/60"
+          className="absolute z-50 left-0 right-0 mt-1 max-h-[252px] overflow-y-auto bg-[#2D1B0E] border-2 border-[#D4AF37] rounded-xl shadow-2xl divide-y divide-[#D4AF37]/30"
         >
           {filteredCities.length > 0 ? (
             filteredCities.map((city, idx) => {
@@ -267,15 +267,15 @@ function CityCombobox({
                   className={cn(
                     "w-full text-left px-3.5 py-2 text-sm transition-colors flex items-center justify-between",
                     isHighlighted
-                      ? "bg-emerald-800 text-amber-300 font-extrabold"
+                      ? "bg-[#3D2513] text-amber-300 font-extrabold"
                       : isSelected
-                        ? "bg-emerald-900 text-amber-300 font-bold"
-                        : "text-white hover:bg-emerald-900/80"
+                        ? "bg-[#D4AF37] text-slate-950 font-black"
+                        : "text-white hover:bg-[#3D2513]"
                   )}
                 >
                   <span>{city}</span>
                   {isSelected && (
-                    <Check className="w-4 h-4 text-amber-400 shrink-0" />
+                    <Check className="w-4 h-4 text-slate-950 shrink-0 stroke-[3]" />
                   )}
                 </button>
               );
@@ -1088,9 +1088,9 @@ export default function RegisterPage() {
                   value={namaPerwakilan}
                   onChange={(e) => setNamaPerwakilan(e.target.value.toUpperCase())}
                   className={cn(
-                    "w-full pl-10 pr-3.5 py-2.5 bg-slate-950/80 rounded-xl text-sm uppercase transition-all font-bold text-white placeholder:text-emerald-200/40 placeholder:font-normal placeholder:normal-case",
-                    "border-2 border-emerald-500/40 shadow-inner",
-                    "focus:bg-slate-950 focus:outline-none focus:ring-2 focus:ring-amber-400/50 focus:border-amber-400",
+                    "w-full pl-10 pr-3.5 py-2.5 bg-[#2D1B0E] rounded-xl text-sm uppercase transition-all font-bold text-white placeholder:text-[#D4AF37]/60 placeholder:font-normal placeholder:normal-case",
+                    "border-2 border-[#D4AF37] shadow-inner",
+                    "focus:bg-[#2D1B0E] focus:outline-none focus:ring-2 focus:ring-[#F5D061]/50 focus:border-[#F5D061]",
                     errors.namaPerwakilan ? "border-red-500 bg-red-950/50 text-red-100" : ""
                   )}
                   placeholder="Contoh: Nama Pendaftar"
@@ -1108,9 +1108,9 @@ export default function RegisterPage() {
                   value={nomorTelepon}
                   onChange={(e) => setNomorTelepon(e.target.value)}
                   className={cn(
-                    "w-full pl-10 pr-3.5 py-2.5 bg-slate-950/80 rounded-xl text-sm transition-all font-bold text-white placeholder:text-emerald-200/40 placeholder:font-normal",
-                    "border-2 border-emerald-500/40 shadow-inner",
-                    "focus:bg-slate-950 focus:outline-none focus:ring-2 focus:ring-amber-400/50 focus:border-amber-400",
+                    "w-full pl-10 pr-3.5 py-2.5 bg-[#2D1B0E] rounded-xl text-sm transition-all font-bold text-white placeholder:text-[#D4AF37]/60 placeholder:font-normal",
+                    "border-2 border-[#D4AF37] shadow-inner",
+                    "focus:bg-[#2D1B0E] focus:outline-none focus:ring-2 focus:ring-[#F5D061]/50 focus:border-[#F5D061]",
                     errors.nomorTelepon ? "border-red-500 bg-red-950/50 text-red-100" : ""
                   )}
                   placeholder="Contoh: 081234567890"
@@ -1128,9 +1128,9 @@ export default function RegisterPage() {
                   value={emailPerwakilan}
                   onChange={(e) => setEmailPerwakilan(e.target.value)}
                   className={cn(
-                    "w-full pl-10 pr-3.5 py-2.5 bg-slate-950/80 rounded-xl text-sm transition-all font-bold text-white placeholder:text-emerald-200/40 placeholder:font-normal",
-                    "border-2 border-emerald-500/40 shadow-inner",
-                    "focus:bg-slate-950 focus:outline-none focus:ring-2 focus:ring-amber-400/50 focus:border-amber-400",
+                    "w-full pl-10 pr-3.5 py-2.5 bg-[#2D1B0E] rounded-xl text-sm transition-all font-bold text-white placeholder:text-[#D4AF37]/60 placeholder:font-normal",
+                    "border-2 border-[#D4AF37] shadow-inner",
+                    "focus:bg-[#2D1B0E] focus:outline-none focus:ring-2 focus:ring-[#F5D061]/50 focus:border-[#F5D061]",
                     errors.emailPerwakilan ? "border-red-500 bg-red-950/50 text-red-100" : ""
                   )}
                   placeholder="Contoh: nama@gmail.com"
@@ -1279,9 +1279,9 @@ export default function RegisterPage() {
                     }
                   }}
                   className={cn(
-                    "w-24 h-14 text-center text-3xl font-black rounded-xl border-2 bg-white text-slate-950 shadow-sm",
-                    "focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-emerald-600",
-                    errors.paxCount ? "border-red-500 text-red-600" : "border-stone-300"
+                    "w-24 h-14 text-center text-3xl font-black rounded-xl border-2 border-[#D4AF37] bg-[#2D1B0E] text-white shadow-sm",
+                    "focus:outline-none focus:ring-2 focus:ring-[#F5D061] focus:border-[#F5D061]",
+                    errors.paxCount ? "border-red-500 text-red-400" : "border-[#D4AF37]"
                   )}
                   style={{ MozAppearance: "textfield" }}
                 />
@@ -1423,10 +1423,10 @@ export default function RegisterPage() {
                       }
                     }}
                     className={cn(
-                      "w-full h-11 px-3.5 py-2 border-2 rounded-xl text-sm uppercase font-bold text-white transition-all placeholder:text-emerald-200/40 placeholder:font-normal placeholder:normal-case shadow-inner",
+                      "w-full h-11 px-3.5 py-2 border-2 rounded-xl text-sm uppercase font-bold text-white transition-all placeholder:text-[#D4AF37]/60 placeholder:font-normal placeholder:normal-case shadow-inner",
                       i === 0 && useRepAsJamaah1
-                        ? "bg-slate-900/90 text-amber-300 cursor-not-allowed border-emerald-600/40 font-bold"
-                        : "bg-slate-950/90 border-emerald-500/40 focus:outline-none focus:ring-2 focus:ring-amber-400/50 focus:border-amber-400",
+                        ? "bg-[#1C1008] text-amber-300 cursor-not-allowed border-[#D4AF37]/60 font-bold"
+                        : "bg-[#2D1B0E] border-[#D4AF37] focus:outline-none focus:ring-2 focus:ring-[#F5D061]/50 focus:border-[#F5D061]",
                       errors[`member_${i}_nama`] ? "border-red-500 bg-red-950/50 text-red-100" : ""
                     )}
                     placeholder="Contoh: Nama Pendaftar"
@@ -1523,9 +1523,9 @@ export default function RegisterPage() {
                         }
                       }}
                       className={cn(
-                        "w-full h-11 px-3.5 py-2 border-2 rounded-xl text-sm font-bold text-white bg-slate-950/90 border-emerald-500/40 shadow-inner transition-all",
+                        "w-full h-11 px-3.5 py-2 border-2 border-[#D4AF37] rounded-xl text-sm font-bold text-white bg-[#2D1B0E] shadow-inner transition-all",
                         "[color-scheme:dark]",
-                        "focus:outline-none focus:ring-2 focus:ring-amber-400/50 focus:border-amber-400",
+                        "focus:outline-none focus:ring-2 focus:ring-[#F5D061]/50 focus:border-[#F5D061]",
                         errors[`member_${i}_tglLahir`] ? "border-red-500 bg-red-950/50 text-red-100" : ""
                       )}
                     />
@@ -1568,7 +1568,7 @@ export default function RegisterPage() {
 
                 {members.length > 1 && (
                   <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                    <label className="block text-xs font-bold text-white mb-1 drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]">
                       {i === 0
                         ? `Hubungan dengan Jamaah #2`
                         : `Hubungan dengan Jamaah #1 (${members[0]?.namaLengkap ? members[0].namaLengkap.toUpperCase() : "Ketua Grup"})`}
@@ -1589,17 +1589,17 @@ export default function RegisterPage() {
                           }
                         }
                       }}
-                      className="w-full px-3 py-2 border border-stone-300 rounded-lg text-sm font-bold text-slate-950 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-600 cursor-pointer shadow-xs"
+                      className="w-full h-11 px-3.5 border-2 border-[#D4AF37] rounded-xl text-sm font-bold text-white bg-[#2D1B0E] focus:outline-none focus:ring-2 focus:ring-[#F5D061]/50 focus:border-[#F5D061] cursor-pointer shadow-inner"
                     >
-                      <option value="" className="text-slate-950 bg-white font-extrabold py-2">Pilih hubungan...</option>
-                      <option value="Suami" className="text-slate-950 bg-white font-bold py-1.5">Suami</option>
-                      <option value="Istri" className="text-slate-950 bg-white font-bold py-1.5">Istri</option>
-                      <option value="Ayah / Ibu" className="text-slate-950 bg-white font-bold py-1.5">Ayah / Ibu</option>
-                      <option value="Anak" className="text-slate-950 bg-white font-bold py-1.5">Anak</option>
-                      <option value="Kakak / Adik" className="text-slate-950 bg-white font-bold py-1.5">Kakak / Adik</option>
-                      <option value="Keluarga / Mahram" className="text-slate-950 bg-white font-bold py-1.5">Keluarga / Mahram</option>
-                      <option value="Teman / Rekan" className="text-slate-950 bg-white font-bold py-1.5">Teman / Rekan</option>
-                      <option value="Lainnya" className="text-slate-950 bg-white font-bold py-1.5">Lainnya</option>
+                      <option value="" className="text-white bg-[#2D1B0E] font-extrabold py-2">Pilih hubungan...</option>
+                      <option value="Suami" className="text-white bg-[#2D1B0E] font-bold py-1.5">Suami</option>
+                      <option value="Istri" className="text-white bg-[#2D1B0E] font-bold py-1.5">Istri</option>
+                      <option value="Ayah / Ibu" className="text-white bg-[#2D1B0E] font-bold py-1.5">Ayah / Ibu</option>
+                      <option value="Anak" className="text-white bg-[#2D1B0E] font-bold py-1.5">Anak</option>
+                      <option value="Kakak / Adik" className="text-white bg-[#2D1B0E] font-bold py-1.5">Kakak / Adik</option>
+                      <option value="Keluarga / Mahram" className="text-white bg-[#2D1B0E] font-bold py-1.5">Keluarga / Mahram</option>
+                      <option value="Teman / Rekan" className="text-white bg-[#2D1B0E] font-bold py-1.5">Teman / Rekan</option>
+                      <option value="Lainnya" className="text-white bg-[#2D1B0E] font-bold py-1.5">Lainnya</option>
                     </select>
                   </div>
                 )}
@@ -1644,6 +1644,7 @@ export default function RegisterPage() {
                     placeholder="-- Pilih / Cari Nama Paket Umroh --"
                     searchPlaceholder="Ketik nama paket, tanggal, atau maskapai..."
                     maxHeight="max-h-[420px]"
+                    variant="portal"
                     className={cn(
                       "w-full rounded-xl shadow-xs",
                       errors.paket && "border-red-500 ring-1 ring-red-500"
@@ -2123,14 +2124,14 @@ export default function RegisterPage() {
                                                     prev.map((item, i) => (i === idx ? { ...item, tipeKamar: val } : item))
                                                   );
                                                 }}
-                                                className="px-2.5 py-1.5 border border-amber-500/40 rounded-lg text-xs font-bold text-white bg-slate-950 focus:ring-2 focus:ring-amber-400 focus:outline-none cursor-pointer"
+                                                className="px-3 py-2 border-2 border-[#D4AF37] rounded-xl text-xs font-bold text-white bg-[#2D1B0E] focus:ring-2 focus:ring-[#F5D061]/50 focus:border-[#F5D061] focus:outline-none cursor-pointer"
                                               >
-                                                <option value="mix" className="text-white bg-slate-950 font-bold py-1.5">MIX (Kamar Travel - Base +Rp0)</option>
-                                                <option value="quad" className="text-white bg-slate-950 font-bold py-1.5">QUAD (4 Pax - Base +Rp0)</option>
-                                                <option value="triple" className="text-white bg-slate-950 font-bold py-1.5">
+                                                <option value="mix" className="text-white bg-[#2D1B0E] font-bold py-1.5">MIX (Kamar Travel - Base +Rp0)</option>
+                                                <option value="quad" className="text-white bg-[#2D1B0E] font-bold py-1.5">QUAD (4 Pax - Base +Rp0)</option>
+                                                <option value="triple" className="text-white bg-[#2D1B0E] font-bold py-1.5">
                                                   TRIPLE (3 Pax - +Rp {upgradeTriple.toLocaleString("id-ID")})
                                                 </option>
-                                                <option value="double" className="text-white bg-slate-950 font-bold py-1.5">
+                                                <option value="double" className="text-white bg-[#2D1B0E] font-bold py-1.5">
                                                   DOUBLE (2 Pax - +Rp {upgradeDouble.toLocaleString("id-ID")})
                                                 </option>
                                               </select>
@@ -2793,7 +2794,7 @@ export default function RegisterPage() {
                                   setCustomDpAmount(rawVal);
                                 }}
                                 placeholder={`Misal: Rp ${(minimalDpStandard + 2000000).toLocaleString("id-ID")}`}
-                                className="w-full h-10 px-3 text-sm font-bold font-mono bg-slate-950 border-2 border-amber-400 rounded-lg text-amber-300 focus:ring-2 focus:ring-amber-400 focus:outline-none"
+                                className="w-full h-10 px-3 text-sm font-bold font-mono bg-[#2D1B0E] border-2 border-[#D4AF37] rounded-lg text-white focus:ring-2 focus:ring-[#F5D061]/50 focus:border-[#F5D061] focus:outline-none placeholder:text-[#D4AF37]/60"
                               />
                             </div>
                           )}
