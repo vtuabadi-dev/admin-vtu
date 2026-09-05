@@ -151,8 +151,9 @@ export function calculateAge(birthDate: string | Date | null | undefined): numbe
   try {
     if (typeof birthDate === "string") {
       const parts = birthDate.split("-");
-      if (parts.length === 3 && parts[0].length === 4) {
-        const yearNum = parseInt(parts[0], 10);
+      const yearStr = parts[0];
+      if (parts.length === 3 && yearStr && yearStr.length === 4) {
+        const yearNum = parseInt(yearStr, 10);
         if (isNaN(yearNum) || yearNum < 1900 || yearNum > new Date().getFullYear()) {
           return null;
         }
