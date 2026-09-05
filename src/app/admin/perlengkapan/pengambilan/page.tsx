@@ -707,15 +707,23 @@ export default function PengambilanPerlengkapanPage() {
                         {/* Size Selection Dropdown for Seragam / Items with Variants */}
                         {(item.ukuran || []).filter((u) => u.kodeUkuran !== "STD").length > 0 ? (
                           <select
+                            value={itemSizeState[item.id] || ""}
+                            onChange={(e) => {
+                              e.stopPropagation();
+                              const val = e.target.value;
+                              setItemSizeState((prev) => ({ ...prev, [item.id]: val }));
+                            }}
                             onClick={(e) => e.stopPropagation()}
                             className="text-[11px] font-bold p-1 rounded border border-stone-300 dark:border-stone-700 bg-white dark:bg-stone-800 text-stone-800 dark:text-stone-100"
                           >
                             <option value="">Pilih Ukuran / Opsi...</option>
-                            {item.ukuran?.map((u) => (
-                              <option key={u.id} value={u.kodeUkuran}>
-                                {u.namaUkuran}
-                              </option>
-                            ))}
+                            {item.ukuran
+                              ?.filter((u) => u.kodeUkuran !== "STD")
+                              .map((u) => (
+                                <option key={u.id} value={u.kodeUkuran}>
+                                  {u.namaUkuran}
+                                </option>
+                              ))}
                           </select>
                         ) : (
                           <span className="text-[10px] font-bold text-stone-400">
