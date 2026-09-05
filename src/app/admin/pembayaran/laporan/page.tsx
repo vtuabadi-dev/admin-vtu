@@ -39,7 +39,7 @@ import {
 } from "lucide-react";
 import { downloadInvoicePdf, getInvoicePdfBase64, type InvoiceOrderItem } from "@/shared/lib/invoice-pdf";
 import { resolveHotelForKlaster } from "@/shared/lib/hotel-utils";
-import { resolveDocumentImageUrl } from "@/shared/lib/document-utils";
+import { resolveDocumentImageUrl, sortGroupMembers } from "@/shared/lib/document-utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/components/ui/Card";
 import { Button } from "@/shared/components/ui/Button";
 import { Input } from "@/shared/components/ui/Input";
@@ -305,7 +305,7 @@ function SplitInvoiceModal({
   groupData: GroupPaymentSummary;
   onSubmit: (config: InvoiceSplitConfig) => void;
 }) {
-  const anggota = groupData.anggota;
+  const anggota = sortGroupMembers(groupData.anggota);
   const [splitCount, setSplitCount] = useState(2);
   const [assignments, setAssignments] = useState<Record<string, number>>({});
 
@@ -863,7 +863,8 @@ function PaymentReviewTabContent() {
     // Anggota List & Split Support
     const memberNames: string[] = [];
     if (payment.group?.anggota && payment.group.anggota.length > 0) {
-      payment.group.anggota.forEach((m: any) => {
+      const sorted = sortGroupMembers(payment.group.anggota);
+      sorted.forEach((m: any) => {
         if (m.namaLengkap) memberNames.push(m.namaLengkap);
       });
     } else if (payment.namaGroup) {

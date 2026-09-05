@@ -330,6 +330,7 @@ export const pembayaranRepo = {
             anggota: {
               select: {
                 id: true,
+                registrationId: true,
                 namaLengkap: true,
                 nomorPeserta: true,
                 nomorTelepon: true,
@@ -339,6 +340,7 @@ export const pembayaranRepo = {
                 kota: true,
                 kecamatan: true,
                 kelurahan: true,
+                createdAt: true,
                 dokumen: {
                   select: {
                     jenis: true,
@@ -347,6 +349,7 @@ export const pembayaranRepo = {
                   },
                 },
               },
+              orderBy: [{ registrationId: "asc" }, { createdAt: "asc" }],
             },
             ketuaGroup: {
               select: {

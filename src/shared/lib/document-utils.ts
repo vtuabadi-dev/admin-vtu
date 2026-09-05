@@ -355,4 +355,30 @@ export function resolveDocumentImageUrl(url?: string | null): string {
   return `/api/storage/download?id=${encodeURIComponent(trimmed)}`;
 }
 
+export function getMemberSequenceNumber(m: any): number {
+  if (typeof m?.urutan === "number") return m.urutan;
+  const regId = m?.registrationId || m?.nomorPeserta || "";
+  const match = regId.match(/-(\d+)$/);
+  if (match && match[1]) {
+    return parseInt(match[1], 10);
+  }
+  return 999;
+}
+
+export function sortGroupMembers<T extends Record<string, any>>(members: T[]): T[] {
+  if (!members || !Array.isArray(members)) return [];
+  return [...members].sort((a, b) => {
+    const seqA = getMemberSequenceNumber(a);
+    const seqB = getMemberSequenceNumber(b);
+
+    if (seqA !== seqB) return seqA - seqB;
+
+    const timeA = new Date(a.createdAt || 0).getTime();
+    const timeB = new Date(b.createdAt || 0).getTime();
+    if (timeA !== timeB) return timeA - timeB;
+
+    return (a.namaLengkap || "").localeCompare(b.namaLengkap || "");
+  });
+}
+
 
