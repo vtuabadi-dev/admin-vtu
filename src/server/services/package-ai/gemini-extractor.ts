@@ -129,6 +129,10 @@ export async function extractWithGemini(
     `• Termasuk Perlengkapan ('isAdaPerlengkapan'):\n` +
     `  - Jika caption menyebutkan "Termasuk Perlengkapan", "Free Perlengkapan", "All In Perlengkapan", isi 'isAdaPerlengkapan' = "ya".\n` +
     `  - Jika caption menyebutkan "Belum Termasuk Perlengkapan", "Tanpa Perlengkapan", isi 'isAdaPerlengkapan' = "tidak".\n` +
+    `• Termasuk Kereta Cepat ('isAdaKeretaCepat'):\n` +
+    `  - Jika flyer/caption menyebutkan "Kereta Cepat", "Fast Train", "Haramain", isi 'isAdaKeretaCepat' = "ya", selain itu "tidak".\n` +
+    `• Termasuk City Tour Thoif ('isAdaThoif'):\n` +
+    `  - Jika flyer/caption menyebutkan "Thoif", "Taif", "City Tour Taif", isi 'isAdaThoif' = "ya", selain itu "tidak".\n` +
     `• Harga Upgrade Kamar Double & Triple:\n` +
     `  - 'upgradeDouble': Nominal upgrade kamar berdua (cth: 7500000 dari "Sekamar Berdua + Rp 7.500.000").\n` +
     `  - 'upgradeTriple': Nominal upgrade kamar bertiga (cth: 5000000 dari "Sekamar Bertiga + Rp 5.000.000").\n\n` +
@@ -194,7 +198,9 @@ export async function extractWithGemini(
                 hotelMekkah: { type: SchemaType.STRING, description: "Hotel Mekkah dari Flyer Utama" },
                 hotelMadinah: { type: SchemaType.STRING, description: "Hotel Madinah dari Flyer Utama" },
                 landingRoute: { type: SchemaType.STRING, description: "Rute In-Out pesawat dari analisis alur itinerary" },
-                isAdaPerlengkapan: { type: SchemaType.STRING, description: "Dari Caption: 'ya' jika termasuk perlengkapan (cth: Perlengkapan umroh under Termasuk), 'tidak' jika belum/tidak termasuk" },
+                isAdaPerlengkapan: { type: SchemaType.STRING, description: "Dari Caption: 'ya' jika termasuk perlengkapan, 'tidak' jika belum/tidak" },
+                isAdaKeretaCepat: { type: SchemaType.STRING, description: "'ya' jika termasuk kereta cepat Haramain / fast train, 'tidak' jika tidak" },
+                isAdaThoif: { type: SchemaType.STRING, description: "'ya' jika termasuk city tour Thoif / Ta'if, 'tidak' jika tidak" },
                 hargaBase: { type: SchemaType.STRING, description: "Harga base paket (hanya angka nominal)" },
                 upgradeDouble: { type: SchemaType.STRING, description: "Harga upgrade kamar double umum dari Caption (hanya angka nominal)" },
                 upgradeTriple: { type: SchemaType.STRING, description: "Harga upgrade kamar triple umum dari Caption (hanya angka nominal)" },

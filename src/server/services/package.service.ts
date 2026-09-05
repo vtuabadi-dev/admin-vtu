@@ -264,6 +264,17 @@ export const packageService = {
         ? pairedItemForThisDate.childSeat
         : parseInt(data.kapasitas || data.kuota || "45", 10);
 
+      const includeList: string[] = Array.isArray(data.include) ? [...data.include] : [];
+      if (data.isAdaPerlengkapan === "ya" && !includeList.includes("Perlengkapan Umroh")) {
+        includeList.push("Perlengkapan Umroh");
+      }
+      if (data.isAdaKeretaCepat === "ya" && !includeList.includes("Kereta Cepat Haramain")) {
+        includeList.push("Kereta Cepat Haramain");
+      }
+      if (data.isAdaThoif === "ya" && !includeList.includes("City Tour Thoif")) {
+        includeList.push("City Tour Thoif");
+      }
+
       const created = await keberangkatanRepo.create({
         kode: kodeIndividu,
         kodeIndividu,
@@ -273,6 +284,7 @@ export const packageService = {
         splitLabel: data.splitLabel || data.promoLabel || undefined,
         promoLabel: data.promoLabel || (data.splitReason === "promo" ? data.splitLabel : undefined),
         driveFolderIds,
+        include: includeList,
         namaPaket: formattedPackageName,
         hargaPaket: parseInt(data.hargaBase || data.hargaPaket || "0", 10),
         tanggalBerangkat: depDate.toISOString(),

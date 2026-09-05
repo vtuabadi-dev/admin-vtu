@@ -138,6 +138,8 @@ export default function GeneratePaketPage() {
     kapasitas: "45",
     targetMaterialisasi: "30",
     isAdaPerlengkapan: "",
+    isAdaKeretaCepat: "tidak",
+    isAdaThoif: "tidak",
     hargaBase: "",
     durasiHari: "9",
     upgradeDouble: "",
@@ -708,6 +710,22 @@ export default function GeneratePaketPage() {
         if (result.durationDays) finalFormData.durasiHari = String(result.durationDays);
         if (result.hargaBase) finalFormData.hargaBase = String(result.hargaBase).replace(/\D/g, "");
         if (result.isAdaPerlengkapan) finalFormData.isAdaPerlengkapan = result.isAdaPerlengkapan;
+        if (result.isAdaKeretaCepat) {
+          finalFormData.isAdaKeretaCepat = result.isAdaKeretaCepat;
+        } else {
+          const fullText = `${caption || ""} ${result.rawOcrText || ""}`.toLowerCase();
+          if (fullText.includes("kereta cepat") || fullText.includes("fast train") || fullText.includes("haramain")) {
+            finalFormData.isAdaKeretaCepat = "ya";
+          }
+        }
+        if (result.isAdaThoif) {
+          finalFormData.isAdaThoif = result.isAdaThoif;
+        } else {
+          const fullText = `${caption || ""} ${result.rawOcrText || ""}`.toLowerCase();
+          if (fullText.includes("thoif") || fullText.includes("taif") || fullText.includes("ta'if") || fullText.includes("thowif")) {
+            finalFormData.isAdaThoif = "ya";
+          }
+        }
         if (result.upgradeDouble) finalFormData.upgradeDouble = String(result.upgradeDouble).replace(/\D/g, "");
         if (result.upgradeTriple) finalFormData.upgradeTriple = String(result.upgradeTriple).replace(/\D/g, "");
 
@@ -900,6 +918,9 @@ export default function GeneratePaketPage() {
       maxSeat: Number(formData.kapasitas || 45),
       targetMaterialisasi: Number(formData.targetMaterialisasi || 30),
       isAdaKlaster: formData.isAdaKlaster,
+      isAdaPerlengkapan: formData.isAdaPerlengkapan,
+      isAdaKeretaCepat: formData.isAdaKeretaCepat,
+      isAdaThoif: formData.isAdaThoif,
       clusterConfigs: formData.isAdaKlaster === "ya" ? activeClusterConfigs : null,
       caption: caption || undefined,
       flyerBase64List,
@@ -940,6 +961,8 @@ export default function GeneratePaketPage() {
           kapasitas: "45",
           targetMaterialisasi: "30",
           isAdaPerlengkapan: "",
+          isAdaKeretaCepat: "tidak",
+          isAdaThoif: "tidak",
           hargaBase: "",
           durasiHari: "9",
           upgradeDouble: "",
@@ -1486,7 +1509,7 @@ export default function GeneratePaketPage() {
                 />
               </div>
               <div className="flex flex-col justify-end h-full">
-                <label className="block text-sm font-medium mb-1 min-h-[2.5rem] flex items-end">Termasuk Perlengkapan?</label>
+                <label className="block text-xs font-bold text-slate-800 mb-1 min-h-[2.5rem] flex items-end">Termasuk Perlengkapan?</label>
                 <div className="flex items-center gap-2 h-10">
                   <button
                     type="button"
@@ -1494,8 +1517,8 @@ export default function GeneratePaketPage() {
                     aria-checked={formData.isAdaPerlengkapan === "ya"}
                     onClick={() => setFormData(prev => ({ ...prev, isAdaPerlengkapan: prev.isAdaPerlengkapan === "ya" ? "tidak" : "ya" }))}
                     className={cn(
-                      "relative inline-flex h-7 w-14 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2",
-                      formData.isAdaPerlengkapan === "ya" ? "bg-primary" : "bg-input"
+                      "relative inline-flex h-7 w-14 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-2",
+                      formData.isAdaPerlengkapan === "ya" ? "bg-emerald-600" : "bg-stone-300"
                     )}
                   >
                     <span
@@ -1506,12 +1529,76 @@ export default function GeneratePaketPage() {
                     />
                   </button>
                   <span className={cn(
-                    "text-xs font-semibold px-2.5 py-1 rounded-md border min-w-[55px] text-center transition-colors select-none",
+                    "text-xs font-bold px-2.5 py-1 rounded-md border min-w-[55px] text-center transition-colors select-none",
                     formData.isAdaPerlengkapan === "ya" 
-                      ? "bg-primary/10 text-primary border-primary/30" 
-                      : "bg-background text-muted-foreground border-border"
+                      ? "bg-emerald-50 text-emerald-950 border-emerald-300" 
+                      : "bg-white text-stone-700 border-stone-300"
                   )}>
                     {formData.isAdaPerlengkapan === "ya" ? "Ya" : "Tidak"}
+                  </span>
+                </div>
+              </div>
+
+              {/* Saklar Termasuk Kereta Cepat */}
+              <div className="flex flex-col justify-end h-full">
+                <label className="block text-xs font-bold text-slate-800 mb-1 min-h-[2.5rem] flex items-end">Termasuk Kereta Cepat?</label>
+                <div className="flex items-center gap-2 h-10">
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={formData.isAdaKeretaCepat === "ya"}
+                    onClick={() => setFormData(prev => ({ ...prev, isAdaKeretaCepat: prev.isAdaKeretaCepat === "ya" ? "tidak" : "ya" }))}
+                    className={cn(
+                      "relative inline-flex h-7 w-14 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-2",
+                      formData.isAdaKeretaCepat === "ya" ? "bg-emerald-600" : "bg-stone-300"
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        "pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out",
+                        formData.isAdaKeretaCepat === "ya" ? "translate-x-7" : "translate-x-0"
+                      )}
+                    />
+                  </button>
+                  <span className={cn(
+                    "text-xs font-bold px-2.5 py-1 rounded-md border min-w-[55px] text-center transition-colors select-none",
+                    formData.isAdaKeretaCepat === "ya" 
+                      ? "bg-emerald-50 text-emerald-950 border-emerald-300" 
+                      : "bg-white text-stone-700 border-stone-300"
+                  )}>
+                    {formData.isAdaKeretaCepat === "ya" ? "Ya" : "Tidak"}
+                  </span>
+                </div>
+              </div>
+
+              {/* Saklar Termasuk City Tour Thoif */}
+              <div className="flex flex-col justify-end h-full">
+                <label className="block text-xs font-bold text-slate-800 mb-1 min-h-[2.5rem] flex items-end">Termasuk City Tour Thoif?</label>
+                <div className="flex items-center gap-2 h-10">
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={formData.isAdaThoif === "ya"}
+                    onClick={() => setFormData(prev => ({ ...prev, isAdaThoif: prev.isAdaThoif === "ya" ? "tidak" : "ya" }))}
+                    className={cn(
+                      "relative inline-flex h-7 w-14 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-2",
+                      formData.isAdaThoif === "ya" ? "bg-emerald-600" : "bg-stone-300"
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        "pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out",
+                        formData.isAdaThoif === "ya" ? "translate-x-7" : "translate-x-0"
+                      )}
+                    />
+                  </button>
+                  <span className={cn(
+                    "text-xs font-bold px-2.5 py-1 rounded-md border min-w-[55px] text-center transition-colors select-none",
+                    formData.isAdaThoif === "ya" 
+                      ? "bg-emerald-50 text-emerald-950 border-emerald-300" 
+                      : "bg-white text-stone-700 border-stone-300"
+                  )}>
+                    {formData.isAdaThoif === "ya" ? "Ya" : "Tidak"}
                   </span>
                 </div>
               </div>
@@ -1960,8 +2047,8 @@ export default function GeneratePaketPage() {
                   aria-checked={formData.isAdaPerlengkapan === "ya"}
                   onClick={() => setFormData(prev => ({ ...prev, isAdaPerlengkapan: prev.isAdaPerlengkapan === "ya" ? "tidak" : "ya" }))}
                   className={cn(
-                    "relative inline-flex h-7 w-14 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2",
-                    formData.isAdaPerlengkapan === "ya" ? "bg-primary" : "bg-input"
+                    "relative inline-flex h-7 w-14 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-2",
+                    formData.isAdaPerlengkapan === "ya" ? "bg-emerald-600" : "bg-stone-300"
                   )}
                 >
                   <span
@@ -1974,10 +2061,74 @@ export default function GeneratePaketPage() {
                 <span className={cn(
                   "text-xs font-semibold px-2.5 py-1 rounded-md border min-w-[55px] text-center transition-colors select-none",
                   formData.isAdaPerlengkapan === "ya" 
-                    ? "bg-primary/10 text-primary border-primary/30" 
-                    : "bg-background text-muted-foreground border-border"
+                    ? "bg-emerald-50 text-emerald-950 border-emerald-300" 
+                    : "bg-white text-stone-700 border-stone-300"
                 )}>
                   {formData.isAdaPerlengkapan === "ya" ? "Ya" : "Tidak"}
+                </span>
+              </div>
+            </div>
+
+            {/* Saklar Termasuk Kereta Cepat (OCR Mode) */}
+            <div className="flex flex-col justify-end h-full">
+              <label className="block text-xs font-semibold mb-1 min-h-[2.25rem] flex items-end">Termasuk Kereta Cepat?</label>
+              <div className="flex items-center gap-2 h-10">
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={formData.isAdaKeretaCepat === "ya"}
+                  onClick={() => setFormData(prev => ({ ...prev, isAdaKeretaCepat: prev.isAdaKeretaCepat === "ya" ? "tidak" : "ya" }))}
+                  className={cn(
+                    "relative inline-flex h-7 w-14 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-2",
+                    formData.isAdaKeretaCepat === "ya" ? "bg-emerald-600" : "bg-stone-300"
+                  )}
+                >
+                  <span
+                    className={cn(
+                      "pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out",
+                      formData.isAdaKeretaCepat === "ya" ? "translate-x-7" : "translate-x-0"
+                    )}
+                  />
+                </button>
+                <span className={cn(
+                  "text-xs font-semibold px-2.5 py-1 rounded-md border min-w-[55px] text-center transition-colors select-none",
+                  formData.isAdaKeretaCepat === "ya" 
+                    ? "bg-emerald-50 text-emerald-950 border-emerald-300" 
+                    : "bg-white text-stone-700 border-stone-300"
+                )}>
+                  {formData.isAdaKeretaCepat === "ya" ? "Ya" : "Tidak"}
+                </span>
+              </div>
+            </div>
+
+            {/* Saklar Termasuk City Tour Thoif (OCR Mode) */}
+            <div className="flex flex-col justify-end h-full">
+              <label className="block text-xs font-semibold mb-1 min-h-[2.25rem] flex items-end">Termasuk City Tour Thoif?</label>
+              <div className="flex items-center gap-2 h-10">
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={formData.isAdaThoif === "ya"}
+                  onClick={() => setFormData(prev => ({ ...prev, isAdaThoif: prev.isAdaThoif === "ya" ? "tidak" : "ya" }))}
+                  className={cn(
+                    "relative inline-flex h-7 w-14 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-2",
+                    formData.isAdaThoif === "ya" ? "bg-emerald-600" : "bg-stone-300"
+                  )}
+                >
+                  <span
+                    className={cn(
+                      "pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out",
+                      formData.isAdaThoif === "ya" ? "translate-x-7" : "translate-x-0"
+                    )}
+                  />
+                </button>
+                <span className={cn(
+                  "text-xs font-semibold px-2.5 py-1 rounded-md border min-w-[55px] text-center transition-colors select-none",
+                  formData.isAdaThoif === "ya" 
+                    ? "bg-emerald-50 text-emerald-950 border-emerald-300" 
+                    : "bg-white text-stone-700 border-stone-300"
+                )}>
+                  {formData.isAdaThoif === "ya" ? "Ya" : "Tidak"}
                 </span>
               </div>
             </div>
