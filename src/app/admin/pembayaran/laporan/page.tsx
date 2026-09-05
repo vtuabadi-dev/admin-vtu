@@ -398,76 +398,7 @@ function SplitInvoiceModal({
   );
 }
 
-// ============================================================
-// PRESETS PENYESUAIAN & TAMBAHAN ORDER LAYANAN
-// ============================================================
 
-const ORDER_PRESETS = [
-  {
-    category: "fast_train",
-    label: "Kereta Cepat (Fast Train)",
-    defaultName: "Tiket Kereta Cepat Haramain (Mekkah - Madinah)",
-    defaultNominal: 1250000,
-    type: "penambahan" as const,
-    icon: "🚅",
-  },
-  {
-    category: "upgrade_kamar",
-    label: "Upgrade Kamar",
-    defaultName: "Upgrade Kamar Quad ke Double/Triple",
-    defaultNominal: 3500000,
-    type: "penambahan" as const,
-    icon: "🛏️",
-  },
-  {
-    category: "upgrade_hotel",
-    label: "Upgrade Hotel",
-    defaultName: "Upgrade Hotel Bintang 5 Ring 1",
-    defaultNominal: 4500000,
-    type: "penambahan" as const,
-    icon: "🏨",
-  },
-  {
-    category: "perlengkapan",
-    label: "Tambah Perlengkapan",
-    defaultName: "Tambahan Set Koper & Seragam Umroh",
-    defaultNominal: 1200000,
-    type: "penambahan" as const,
-    icon: "🎒",
-  },
-  {
-    category: "jahit_seragam",
-    label: "Ongkos Jahit Seragam",
-    defaultName: "Ongkos Jahit Seragam Batik / Abaya",
-    defaultNominal: 250000,
-    type: "penambahan" as const,
-    icon: "✂️",
-  },
-  {
-    category: "kursi_roda",
-    label: "Sewa Kursi Roda & Pendorong",
-    defaultName: "Sewa Kursi Roda + Muthawwif Pendorong",
-    defaultNominal: 1500000,
-    type: "penambahan" as const,
-    icon: "♿",
-  },
-  {
-    category: "paspor",
-    label: "Biaya Paspor / Visa",
-    defaultName: "Biaya Penanganan Paspor & Dokumen Jamaah",
-    defaultNominal: 650000,
-    type: "penambahan" as const,
-    icon: "🛂",
-  },
-  {
-    category: "diskon",
-    label: "Diskon / Potongan Harga",
-    defaultName: "Potongan Khusus / Promo Grup Umroh",
-    defaultNominal: 1000000,
-    type: "pengurangan" as const,
-    icon: "🎁",
-  },
-];
 
 const DEFAULT_TAMBAHAN_OPTIONS = [
   "Upgrade Kamar Double",
@@ -632,7 +563,6 @@ function PaymentReviewTabContent() {
   // Order Items / Adjustments (Beban Tambahan & Pengurangan Biaya)
   const [orderItems, setOrderItems] = useState<InvoiceOrderItem[]>([]);
   const [showAddOrderModal, setShowAddOrderModal] = useState(false);
-  const [newOrderCategory, setNewOrderCategory] = useState("fast_train");
   const [newOrderName, setNewOrderName] = useState("");
   const [newOrderType, setNewOrderType] = useState<"penambahan" | "pengurangan">("penambahan");
   const [newOrderNominal, setNewOrderNominal] = useState<number>(0);
@@ -2067,23 +1997,11 @@ function PaymentReviewTabContent() {
                       type="button"
                       size="sm"
                       variant="outline"
-                      className="h-7 text-xs font-bold border-amber-500/40 text-amber-700 dark:text-amber-300 hover:bg-amber-500/10 gap-1 shadow-2xs"
-                      onClick={() => {
-                        const initPreset = ORDER_PRESETS[0] || {
-                          category: "fast_train",
-                          defaultName: "Tiket Kereta Cepat Haramain (Mekkah - Madinah)",
-                          type: "penambahan" as const,
-                          defaultNominal: 1250000,
-                        };
-                        setNewOrderCategory(initPreset.category);
-                        setNewOrderName(initPreset.defaultName);
-                        setNewOrderType(initPreset.type);
-                        setNewOrderNominal(initPreset.defaultNominal);
-                        setShowAddOrderModal(true);
-                      }}
+                      className="h-7 text-xs font-bold border-amber-500/40 hover:bg-amber-500/10 text-amber-600 dark:text-amber-400 gap-1.5"
+                      onClick={() => setShowAddOrderModal(true)}
                     >
                       <PlusCircle className="w-3.5 h-3.5" />
-                      Tambah Order
+                      Tambah Item
                     </Button>
                   </div>
 
@@ -2096,6 +2014,7 @@ function PaymentReviewTabContent() {
                           <th className="py-2 px-2.5 text-center">Qty</th>
                           <th className="py-2 px-2.5 text-right">Harga / Pax</th>
                           <th className="py-2 px-2.5 text-right">Total Nominal</th>
+                          <th className="py-2 px-2.5 text-center w-10">Aksi</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y text-xs">
@@ -2118,6 +2037,9 @@ function PaymentReviewTabContent() {
                           <td className="py-2 px-2.5 text-right font-mono font-bold text-emerald-700 dark:text-emerald-400 tabular-nums">
                             {formatCurrency(groupTotalTagihanBase)}
                           </td>
+                          <td className="py-2 px-2.5 text-center">
+                            <span className="text-stone-300 dark:text-stone-700 select-none">—</span>
+                          </td>
                         </tr>
 
                         {/* Dynamic Order Items (Tambahan / Potongan) */}
@@ -2126,7 +2048,9 @@ function PaymentReviewTabContent() {
                           return (
                             <tr key={item.id} className="hover:bg-muted/30 transition-colors">
                               <td className="py-2 px-2.5 font-medium text-foreground">
-                                {item.nama}
+                                <div>
+                                  <p>{item.nama}</p>
+                                </div>
                               </td>
                               <td className="py-2 px-2.5">
                                 {isPotongan ? (
@@ -2150,6 +2074,16 @@ function PaymentReviewTabContent() {
                               }`}>
                                 {isPotongan ? `- ${formatCurrency(item.nominal)}` : formatCurrency(item.nominal)}
                               </td>
+                              <td className="py-2 px-2.5 text-center">
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-6 w-6 p-0 text-destructive hover:bg-destructive/10"
+                                  onClick={() => setOrderItems((prev) => prev.filter((i) => i.id !== item.id))}
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
+                              </td>
                             </tr>
                           );
                         })}
@@ -2159,7 +2093,7 @@ function PaymentReviewTabContent() {
                           <td colSpan={4} className="py-2 px-2.5 text-right uppercase tracking-wider text-muted-foreground">
                             Total Tagihan Akhir (Net)
                           </td>
-                          <td className="py-2 px-2.5 text-right font-mono text-sm text-emerald-700 dark:text-emerald-400">
+                          <td colSpan={2} className="py-2 px-2.5 text-right font-mono text-sm text-emerald-700 dark:text-emerald-400">
                             {formatCurrency(groupTotalTagihanDisesuaikan)}
                           </td>
                         </tr>
@@ -2695,163 +2629,7 @@ function PaymentReviewTabContent() {
         </div>
       </Modal>
 
-      {/* ========================================================= */}
-      {/* MODAL TAMBAH ORDER / PENYESUAIAN BIAYA CUSTOM */}
-      {/* ========================================================= */}
-      <Modal
-        open={showAddOrderModal}
-        onClose={() => setShowAddOrderModal(false)}
-        title="Tambah Layanan Order / Penyesuaian Biaya"
-        description="Tambahkan beban biaya ekstra jamaah atau potongan khusus ke dalam invoice."
-        size="default"
-      >
-        <div className="space-y-3.5 pt-1">
-          <div>
-            <label className="text-[11px] font-bold text-foreground">Tipe Penyesuaian</label>
-            <div className="grid grid-cols-2 gap-2 mt-1">
-              <button
-                type="button"
-                onClick={() => {
-                  setNewOrderType("penambahan");
-                  if (newOrderCategory === "diskon") {
-                    const fallback = ORDER_PRESETS[0] || {
-                      category: "fast_train",
-                      defaultName: "Tiket Kereta Cepat Haramain (Mekkah - Madinah)",
-                      defaultNominal: 1250000,
-                    };
-                    setNewOrderCategory(fallback.category);
-                    setNewOrderName(fallback.defaultName);
-                    setNewOrderNominal(fallback.defaultNominal);
-                  }
-                }}
-                className={`p-2 rounded-lg border text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${
-                  newOrderType === "penambahan"
-                    ? "bg-amber-500/15 border-amber-500 text-amber-700 dark:text-amber-300 shadow-2xs"
-                    : "bg-background text-muted-foreground hover:bg-muted"
-                }`}
-              >
-                <span>➕ Tambahan Beban (+)</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setNewOrderType("pengurangan");
-                  const discPreset = ORDER_PRESETS.find((p) => p.type === "pengurangan") || {
-                    category: "diskon",
-                    defaultName: "Potongan Khusus / Promo Grup Umroh",
-                    defaultNominal: 1000000,
-                  };
-                  setNewOrderCategory(discPreset.category);
-                  setNewOrderName(discPreset.defaultName);
-                  setNewOrderNominal(discPreset.defaultNominal);
-                }}
-                className={`p-2 rounded-lg border text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${
-                  newOrderType === "pengurangan"
-                    ? "bg-emerald-500/15 border-emerald-500 text-emerald-700 dark:text-emerald-300 shadow-2xs"
-                    : "bg-background text-muted-foreground hover:bg-muted"
-                }`}
-              >
-                <span>➖ Pengurangan / Potongan (-)</span>
-              </button>
-            </div>
-          </div>
 
-          <div>
-            <label className="text-[11px] font-bold text-foreground">Kategori Layanan</label>
-            <select
-              value={newOrderCategory}
-              onChange={(e) => {
-                const cat = e.target.value;
-                setNewOrderCategory(cat);
-                const found = ORDER_PRESETS.find(
-                  (p) => p.category === cat || (cat === "jahit" && p.category === "jahit_seragam")
-                );
-                if (found) {
-                  setNewOrderName(found.defaultName);
-                  setNewOrderNominal(found.defaultNominal);
-                  setNewOrderType(found.type);
-                } else if (cat === "diskon") {
-                  setNewOrderName("Potongan Khusus / Diskon Tagihan");
-                  setNewOrderNominal(1000000);
-                  setNewOrderType("pengurangan");
-                } else {
-                  setNewOrderName("Layanan Tambahan Kustom");
-                  setNewOrderNominal(500000);
-                  setNewOrderType("penambahan");
-                }
-              }}
-              className="mt-1 w-full rounded-md border border-stone-300 dark:border-stone-700 bg-background px-3 py-1.5 text-xs focus:ring-1 focus:ring-amber-500"
-            >
-              <option value="fast_train">🚄 Kereta Cepat Haramain (Fast Train)</option>
-              <option value="upgrade_kamar">🛏️ Upgrade Kamar (Double / Triple)</option>
-              <option value="upgrade_hotel">🏨 Upgrade Hotel (Bintang 5 Ring 1)</option>
-              <option value="perlengkapan">🎒 Tambah Perlengkapan & Koper</option>
-              <option value="jahit_seragam">🧵 Ongkos Jahit Seragam Batik</option>
-              <option value="kursi_roda">♿ Sewa Kursi Roda + Petugas</option>
-              <option value="paspor">🛂 Penanganan & Biaya Paspor</option>
-              <option value="city_tour">🚌 Tambahan Extra City Tour / Taif</option>
-              <option value="diskon">🏷️ Diskon / Potongan Khusus</option>
-              <option value="custom">✨ Layanan / Beban Kustom Lainnya</option>
-            </select>
-          </div>
-
-          <div>
-            <div className="flex items-center justify-between">
-              <label className="text-[11px] font-bold text-foreground">Deskripsi / Nama Layanan</label>
-              <span className="text-[9.5px] text-amber-600 dark:text-amber-400 font-semibold">Dapat diedit bebas</span>
-            </div>
-            <Input
-              type="text"
-              value={newOrderName}
-              onChange={(e) => setNewOrderName(e.target.value)}
-              placeholder="Contoh: Tambah Kereta Cepat Haramain Makkah-Madinah"
-              className="mt-1 h-8 text-xs font-medium"
-            />
-            <p className="text-[10px] text-muted-foreground mt-1">
-              💡 Sistem otomatis mengisi deskripsi default sesuai kategori yang dipilih. Anda dapat mengubah atau menambahkan detail sesuai kebutuhan.
-            </p>
-          </div>
-
-          <div>
-            <label className="text-[11px] font-bold text-foreground">Nominal (Rupiah)</label>
-            <Input
-              type="number"
-              value={newOrderNominal || ""}
-              onChange={(e) => setNewOrderNominal(Number(e.target.value) || 0)}
-              placeholder="Contoh: 500000"
-              className="mt-1 h-8 text-xs font-mono font-bold"
-            />
-          </div>
-
-          <div className="flex gap-2 justify-end pt-3 border-t">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowAddOrderModal(false)}
-            >
-              Batal
-            </Button>
-            <Button
-              size="sm"
-              disabled={!newOrderName.trim() || newOrderNominal <= 0}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold"
-              onClick={() => {
-                const newItem: InvoiceOrderItem = {
-                  id: `order-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
-                  kategori: newOrderCategory,
-                  nama: newOrderName.trim(),
-                  tipe: newOrderType,
-                  nominal: newOrderNominal,
-                };
-                setOrderItems((prev) => [...prev, newItem]);
-                setShowAddOrderModal(false);
-              }}
-            >
-              Simpan Layanan
-            </Button>
-          </div>
-        </div>
-      </Modal>
 
       {/* ========================================================= */}
       {/* MODAL KONFIRMASI HAPUS PEMBAYARAN SATUAN */}
@@ -2965,6 +2743,88 @@ function PaymentReviewTabContent() {
         </div>
       </Modal>
 
+      {/* Modal Tambah Item (Tab 1) */}
+      <Modal
+        open={showAddOrderModal}
+        onClose={() => setShowAddOrderModal(false)}
+        title="Tambah Item Tagihan / Potongan"
+        size="sm"
+      >
+        <div className="space-y-4 pt-1">
+          <div>
+            <label className="text-xs font-bold text-foreground block mb-1">
+              Kategori Item
+            </label>
+            <select
+              className="w-full rounded-md border border-input bg-background px-3 py-2 text-xs"
+              value={newOrderType}
+              onChange={(e) => setNewOrderType(e.target.value as "penambahan" | "pengurangan")}
+            >
+              <option value="penambahan">+ Tambahan Biaya / Tagihan</option>
+              <option value="pengurangan">- Potongan Biaya / Diskon</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="text-xs font-bold text-foreground block mb-1">
+              Deskripsi Item
+            </label>
+            <Input
+              placeholder={newOrderType === "penambahan" ? "Contoh: Kereta Cepat Haramain" : "Contoh: Diskon Promo Special"}
+              value={newOrderName}
+              onChange={(e) => setNewOrderName(e.target.value)}
+            />
+          </div>
+
+          <div>
+            <label className="text-xs font-bold text-foreground block mb-1">
+              Nominal (Rp)
+            </label>
+            <Input
+              type="number"
+              placeholder="Masukkan nominal"
+              value={newOrderNominal || ""}
+              onChange={(e) => setNewOrderNominal(Number(e.target.value))}
+            />
+          </div>
+
+          <div className="flex justify-end gap-2 pt-2 border-t">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setShowAddOrderModal(false)}
+            >
+              Batal
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              className="font-bold bg-amber-500 hover:bg-amber-600 text-slate-950"
+              onClick={() => {
+                if (!newOrderName.trim() || newOrderNominal <= 0) return;
+                setOrderItems((prev) => [
+                  ...prev,
+                  {
+                    id: `item-${Date.now()}`,
+                    nama: newOrderName.trim(),
+                    nominal: newOrderNominal,
+                    tipe: newOrderType,
+                    kategori: newOrderType === "pengurangan" ? "potongan" : "tambahan",
+                  },
+                ]);
+                setNewOrderName("");
+                setNewOrderNominal(0);
+                setShowAddOrderModal(false);
+              }}
+              disabled={!newOrderName.trim() || newOrderNominal <= 0}
+            >
+              Simpan Item
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
       {/* Success Toast / Modal */}
       <Modal open={showSuccess} onClose={() => setShowSuccess(false)} title="Berhasil" size="sm">
         <p className="text-sm font-medium">{successMessage}</p>
@@ -3020,6 +2880,8 @@ export default function LaporanPembayaranPage() {
   const [newBillingNominal, setNewBillingNominal] = useState(0);
   const [newBillingQty, setNewBillingQty] = useState<number>(1);
   const [isCustomJenisMode, setIsCustomJenisMode] = useState<boolean>(false);
+
+
 
   // Master lists for Additional Charges and Discounts
   const [masterTambahanOptions, setMasterTambahanOptions] = useState<string[]>(getInitialTambahanOptions);
