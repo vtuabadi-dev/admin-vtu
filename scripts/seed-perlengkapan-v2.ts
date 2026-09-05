@@ -1,7 +1,7 @@
 import { prisma } from "../src/server/db/client";
 
 async function main() {
-  console.log("=== SEEDING MASTER GUDANG & PERLENGKAPAN V2 (FAST) ===");
+  console.log("=== SEEDING MASTER GUDANG & PERLENGKAPAN V2 ===");
 
   const gudangData = [
     { kodeGudang: "GDG-SUB", namaGudang: "Gudang Utama Surabaya", alamat: "Jl. Raya Surabaya No. 12", penanggungJawab: "Admin Surabaya" },
@@ -9,10 +9,18 @@ async function main() {
     { kodeGudang: "GDG-BND", namaGudang: "Gudang Operasional Bandara", alamat: "Area Handling Bandara", penanggungJawab: "Tim Handling" },
   ];
 
-  const gudangList = await Promise.all(
-    gudangData.map(g => prisma.masterGudang.upsert({ where: { kodeGudang: g.kodeGudang }, update: g, create: g }))
-  );
+  const gudangList = [];
+  for (const g of gudangData) {
+    const gdg = await prisma.masterGudang.upsert({ where: { kodeGudang: g.kodeGudang }, update: g, create: g });
+    gudangList.push(gdg);
+  }
   console.log("Gudang Seeded:", gudangList.map(g => g.namaGudang));
+
+  // Deactivate old unified item SRG-VTU if exists
+  await prisma.masterPerlengkapan.updateMany({
+    where: { code: "SRG-VTU" },
+    data: { isActive: false },
+  });
 
   const items = [
     { code: "BTK-DOA", name: "Buku Doa & Dzikir Panduan Umroh", satuan: "buku", tipePengambilan: "BEBAS_KAPAN_SAJA", sifatPerlengkapan: "UMUM_WAJIB", genderTarget: "ALL" },
@@ -21,7 +29,8 @@ async function main() {
     { code: "IDC-JMH", name: "ID Card & Tali Gantung Jamaah (Hari H)", satuan: "pcs", tipePengambilan: "SERENTAK_HARI_H", sifatPerlengkapan: "UMUM_WAJIB", genderTarget: "ALL" },
 
     { code: "KPR-24", name: "Koper Bagasi Besar 24 Inch VTU", satuan: "pcs", tipePengambilan: "BEBAS_KAPAN_SAJA", sifatPerlengkapan: "PAKET_STANDAR", genderTarget: "ALL" },
-    { code: "SRG-VTU", name: "Seragam Umroh VTU (Kain/Jadi)", satuan: "set", tipePengambilan: "BEBAS_KAPAN_SAJA", sifatPerlengkapan: "PAKET_STANDAR", genderTarget: "ALL" },
+    { code: "SRG-LAK", name: "Seragam Umroh Laki-Laki (Kain / Kemeja)", satuan: "set", tipePengambilan: "BEBAS_KAPAN_SAJA", sifatPerlengkapan: "PAKET_STANDAR", genderTarget: "LAKI_LAKI" },
+    { code: "SRG-PRM", name: "Seragam Umroh Perempuan (Kain / Outer)", satuan: "set", tipePengambilan: "BEBAS_KAPAN_SAJA", sifatPerlengkapan: "PAKET_STANDAR", genderTarget: "PEREMPUAN" },
     { code: "MKN-WMN", name: "Mukena & Bergo Wanita VTU", satuan: "set", tipePengambilan: "BEBAS_KAPAN_SAJA", sifatPerlengkapan: "PAKET_STANDAR", genderTarget: "PEREMPUAN" },
     { code: "IHR-PRI", name: "Kain Ihram Pria (Set 2 Lembar)", satuan: "set", tipePengambilan: "BEBAS_KAPAN_SAJA", sifatPerlengkapan: "PAKET_STANDAR", genderTarget: "LAKI_LAKI" },
     { code: "CVR-PAS", name: "Cover Paspor Paspor VTU", satuan: "pcs", tipePengambilan: "BEBAS_KAPAN_SAJA", sifatPerlengkapan: "PAKET_STANDAR", genderTarget: "ALL" },
@@ -35,63 +44,58 @@ async function main() {
   for (const it of items) {
     const itemObj = await prisma.masterPerlengkapan.upsert({
       where: { code: it.code },
-      update: it as any,
-      create: it as any,
+      update: { ...it, isActive: true } as any,
+      create: { ...it, isActive: true } as any,
     });
 
-    if (it.code === "SRG-VTU") {
-      const sizes = [
-        { kelompokUkuran: "ANAK_LAKI", kodeUkuran: "3", namaUkuran: "Anak Kemeja No 3" },
-        { kelompokUkuran: "ANAK_LAKI", kodeUkuran: "4", namaUkuran: "Anak Kemeja No 4" },
-        { kelompokUkuran: "ANAK_LAKI", kodeUkuran: "5", namaUkuran: "Anak Kemeja No 5" },
-        { kelompokUkuran: "ANAK_LAKI", kodeUkuran: "6", namaUkuran: "Anak Kemeja No 6" },
-        { kelompokUkuran: "ANAK_LAKI", kodeUkuran: "7", namaUkuran: "Anak Kemeja No 7" },
-        { kelompokUkuran: "ANAK_LAKI", kodeUkuran: "8", namaUkuran: "Anak Kemeja No 8" },
-        { kelompokUkuran: "ANAK_LAKI", kodeUkuran: "9", namaUkuran: "Anak Kemeja No 9" },
-        { kelompokUkuran: "ANAK_LAKI", kodeUkuran: "10", namaUkuran: "Anak Kemeja No 10" },
+    let sizes: { kelompokUkuran: string; kodeUkuran: string; namaUkuran: string }[] = [];
 
-        { kelompokUkuran: "DEWASA_LAKI", kodeUkuran: "S", namaUkuran: "Dewasa Laki Kemeja S" },
-        { kelompokUkuran: "DEWASA_LAKI", kodeUkuran: "M", namaUkuran: "Dewasa Laki Kemeja M" },
-        { kelompokUkuran: "DEWASA_LAKI", kodeUkuran: "L", namaUkuran: "Dewasa Laki Kemeja L" },
-        { kelompokUkuran: "DEWASA_LAKI", kodeUkuran: "XL", namaUkuran: "Dewasa Laki Kemeja XL" },
-        { kelompokUkuran: "DEWASA_LAKI", kodeUkuran: "XXL", namaUkuran: "Dewasa Laki Kemeja XXL" },
-        { kelompokUkuran: "DEWASA_LAKI", kodeUkuran: "4L", namaUkuran: "Dewasa Laki Kemeja 4L" },
-
-        { kelompokUkuran: "DEWASA_PEREMPUAN", kodeUkuran: "W-S", namaUkuran: "Dewasa Perempuan Outer S" },
-        { kelompokUkuran: "DEWASA_PEREMPUAN", kodeUkuran: "W-M", namaUkuran: "Dewasa Perempuan Outer M" },
-        { kelompokUkuran: "DEWASA_PEREMPUAN", kodeUkuran: "W-L", namaUkuran: "Dewasa Perempuan Outer L" },
-        { kelompokUkuran: "DEWASA_PEREMPUAN", kodeUkuran: "W-XL", namaUkuran: "Dewasa Perempuan Outer XL" },
+    if (it.code === "SRG-LAK") {
+      sizes = [
+        { kelompokUkuran: "KAIN", kodeUkuran: "KAIN", namaUkuran: "Bahan Kain (Belum Jadi)" },
+        { kelompokUkuran: "DEWASA_LAKI", kodeUkuran: "S", namaUkuran: "Kemeja Dewasa S" },
+        { kelompokUkuran: "DEWASA_LAKI", kodeUkuran: "M", namaUkuran: "Kemeja Dewasa M" },
+        { kelompokUkuran: "DEWASA_LAKI", kodeUkuran: "L", namaUkuran: "Kemeja Dewasa L" },
+        { kelompokUkuran: "DEWASA_LAKI", kodeUkuran: "XL", namaUkuran: "Kemeja Dewasa XL" },
+        { kelompokUkuran: "DEWASA_LAKI", kodeUkuran: "XXL", namaUkuran: "Kemeja Dewasa XXL" },
+        { kelompokUkuran: "DEWASA_LAKI", kodeUkuran: "4L", namaUkuran: "Kemeja Dewasa 4L" },
+        { kelompokUkuran: "ANAK_LAKI", kodeUkuran: "3", namaUkuran: "Kemeja Anak No 3" },
+        { kelompokUkuran: "ANAK_LAKI", kodeUkuran: "4", namaUkuran: "Kemeja Anak No 4" },
+        { kelompokUkuran: "ANAK_LAKI", kodeUkuran: "5", namaUkuran: "Kemeja Anak No 5" },
+        { kelompokUkuran: "ANAK_LAKI", kodeUkuran: "6", namaUkuran: "Kemeja Anak No 6" },
+        { kelompokUkuran: "ANAK_LAKI", kodeUkuran: "7", namaUkuran: "Kemeja Anak No 7" },
+        { kelompokUkuran: "ANAK_LAKI", kodeUkuran: "8", namaUkuran: "Kemeja Anak No 8" },
+        { kelompokUkuran: "ANAK_LAKI", kodeUkuran: "9", namaUkuran: "Kemeja Anak No 9" },
+        { kelompokUkuran: "ANAK_LAKI", kodeUkuran: "10", namaUkuran: "Kemeja Anak No 10" },
       ];
-
-      for (const sz of sizes) {
-        const ukObj = await prisma.masterPerlengkapanUkuran.upsert({
-          where: { barangId_kodeUkuran: { barangId: itemObj.id, kodeUkuran: sz.kodeUkuran } },
-          update: { ...sz, barangId: itemObj.id },
-          create: { ...sz, barangId: itemObj.id },
-        });
-
-        await Promise.all(gudangList.map(gdg =>
-          prisma.stokGudangItem.upsert({
-            where: { gudangId_ukuranId: { gudangId: gdg.id, ukuranId: ukObj.id } },
-            update: { stokTersedia: 100, ambangBatasMin: 15 },
-            create: { gudangId: gdg.id, ukuranId: ukObj.id, stokTersedia: 100, ambangBatasMin: 15 },
-          })
-        ));
-      }
+    } else if (it.code === "SRG-PRM") {
+      sizes = [
+        { kelompokUkuran: "KAIN", kodeUkuran: "KAIN", namaUkuran: "Bahan Kain (Belum Jadi)" },
+        { kelompokUkuran: "DEWASA_PEREMPUAN", kodeUkuran: "S", namaUkuran: "Outer Dewasa S" },
+        { kelompokUkuran: "DEWASA_PEREMPUAN", kodeUkuran: "M", namaUkuran: "Outer Dewasa M" },
+        { kelompokUkuran: "DEWASA_PEREMPUAN", kodeUkuran: "L", namaUkuran: "Outer Dewasa L" },
+        { kelompokUkuran: "DEWASA_PEREMPUAN", kodeUkuran: "XL", namaUkuran: "Outer Dewasa XL" },
+      ];
     } else {
+      sizes = [
+        { kelompokUkuran: "STANDAR", kodeUkuran: "STD", namaUkuran: "Ukuran Standar" },
+      ];
+    }
+
+    for (const sz of sizes) {
       const ukObj = await prisma.masterPerlengkapanUkuran.upsert({
-        where: { barangId_kodeUkuran: { barangId: itemObj.id, kodeUkuran: "STD" } },
-        update: { kelompokUkuran: "STANDAR", namaUkuran: "Ukuran Standar" },
-        create: { barangId: itemObj.id, kelompokUkuran: "STANDAR", kodeUkuran: "STD", namaUkuran: "Ukuran Standar" },
+        where: { barangId_kodeUkuran: { barangId: itemObj.id, kodeUkuran: sz.kodeUkuran } },
+        update: { ...sz, barangId: itemObj.id },
+        create: { ...sz, barangId: itemObj.id },
       });
 
-      await Promise.all(gudangList.map(gdg =>
-        prisma.stokGudangItem.upsert({
+      for (const gdg of gudangList) {
+        await prisma.stokGudangItem.upsert({
           where: { gudangId_ukuranId: { gudangId: gdg.id, ukuranId: ukObj.id } },
-          update: { stokTersedia: 150, ambangBatasMin: 20 },
-          create: { gudangId: gdg.id, ukuranId: ukObj.id, stokTersedia: 150, ambangBatasMin: 20 },
-        })
-      ));
+          update: { stokTersedia: 100, ambangBatasMin: 15 },
+          create: { gudangId: gdg.id, ukuranId: ukObj.id, stokTersedia: 100, ambangBatasMin: 15 },
+        });
+      }
     }
   }
 
