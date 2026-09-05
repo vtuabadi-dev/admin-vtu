@@ -4,8 +4,9 @@ async function main() {
   console.log("=== SEEDING MASTER GUDANG & PERLENGKAPAN V2 ===");
 
   const gudangData = [
-    { kodeGudang: "GDG-SUB", namaGudang: "Gudang Utama Surabaya", alamat: "Jl. Raya Surabaya No. 12", penanggungJawab: "Admin Surabaya" },
-    { kodeGudang: "GDG-JKT", namaGudang: "Gudang Transit Jakarta", alamat: "Jl. Bandara Soekarno Hatta", penanggungJawab: "Admin Jakarta" },
+    { kodeGudang: "GDG-SUB", namaGudang: "Gudang Utama Surabaya (Kantor Surabaya)", alamat: "Jl. Raya Surabaya No. 12", penanggungJawab: "Admin Surabaya" },
+    { kodeGudang: "GDG-JKT", namaGudang: "Gudang Transit Jakarta (Kantor Jakarta)", alamat: "Jl. Bandara Soekarno Hatta", penanggungJawab: "Admin Jakarta" },
+    { kodeGudang: "GDG-MLG", namaGudang: "Gudang Cabang Malang (Kantor Malang)", alamat: "Jl. Raya Malang No. 88", penanggungJawab: "Admin Malang" },
     { kodeGudang: "GDG-BND", namaGudang: "Gudang Operasional Bandara", alamat: "Area Handling Bandara", penanggungJawab: "Tim Handling" },
   ];
 

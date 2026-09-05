@@ -10,12 +10,21 @@ import {
   AlertCircle,
   CheckSquare,
   Square,
+  Building,
 } from "lucide-react";
 import { Card } from "@/shared/components/ui/Card";
 import { Button } from "@/shared/components/ui/Button";
 import { Input } from "@/shared/components/ui/Input";
 import { Modal } from "@/shared/components/ui/Modal";
 import { cn, formatDateShort } from "@/shared/lib/utils";
+
+interface GudangItem {
+  id: string;
+  kodeGudang: string;
+  namaGudang: string;
+  alamat?: string;
+  penanggungJawab?: string;
+}
 
 interface JamaahPerlengkapan {
   id: string;
@@ -57,6 +66,10 @@ interface MasterItem {
     kelompokUkuran: string;
     kodeUkuran: string;
     namaUkuran: string;
+    stokGudang?: {
+      gudangId: string;
+      stokTersedia: number;
+    }[];
   }[];
 }
 
@@ -72,6 +85,7 @@ interface PackageItem {
 
 export default function PengambilanPerlengkapanPage() {
   const [packages, setPackages] = useState<PackageItem[]>([]);
+  const [gudangList, setGudangList] = useState<GudangItem[]>([]);
   const [masterItems, setMasterItems] = useState<MasterItem[]>([]);
   const [jamaahList, setJamaahList] = useState<JamaahPerlengkapan[]>([]);
   const [stats, setStats] = useState({
@@ -83,8 +97,9 @@ export default function PengambilanPerlengkapanPage() {
   });
   const [loading, setLoading] = useState(true);
 
-  // Filters
+  // Filters & Warehouse Selector
   const [selectedPaketId, setSelectedPaketId] = useState<string>("all");
+  const [selectedGudangId, setSelectedGudangId] = useState<string>("");
   const [selectedStatusTab, setSelectedStatusTab] = useState<string>("ALL");
   const [search, setSearch] = useState<string>("");
 
@@ -95,6 +110,7 @@ export default function PengambilanPerlengkapanPage() {
   const [editTanggal, setEditTanggal] = useState<string>("");
   const [editCatatan, setEditCatatan] = useState<string>("");
   const [itemCheckState, setItemCheckState] = useState<Record<string, boolean>>({});
+  const [itemSizeState, setItemSizeState] = useState<Record<string, string>>({});
   const [submittingEdit, setSubmittingEdit] = useState(false);
 
   const loadData = useCallback(async () => {
@@ -110,6 +126,11 @@ export default function PengambilanPerlengkapanPage() {
       const json = await res.json();
       if (json.success && json.data) {
         setPackages(json.data.packages || []);
+        const gList = json.data.gudangList || [];
+        setGudangList(gList);
+        if (gList.length > 0) {
+          setSelectedGudangId((prev) => prev || gList[0].id);
+        }
         setMasterItems(json.data.masterItems || []);
         setJamaahList(json.data.jamaah || []);
         setStats(json.data.stats || { total: 0, tanpa: 0, belumAmbil: 0, sebagian: 0, sudahAmbil: 0 });
@@ -171,6 +192,7 @@ export default function PengambilanPerlengkapanPage() {
       setSubmittingEdit(true);
       const itemsPayload = masterItems.map((m) => ({
         barangId: m.id,
+        kodeUkuran: itemSizeState[m.id] || undefined,
         status: itemCheckState[m.id] ? "SUDAH" : "BELUM",
       }));
 
@@ -179,6 +201,7 @@ export default function PengambilanPerlengkapanPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           jamaahId: selectedJamaah.id,
+          gudangId: selectedGudangId,
           statusPerlengkapan: editStatus,
           tanggalAmbilPerlengkapan:
             editStatus === "SUDAH_AMBIL" || editStatus === "SEBAGIAN" ? editTanggal : null,
@@ -513,6 +536,28 @@ export default function PengambilanPerlengkapanPage() {
                   </span>
                 </div>
               </div>
+            </div>
+
+            {/* Lokasi Kantor / Gudang Pengambilan Selector */}
+            <div className="p-3 bg-amber-500/10 rounded-xl border border-amber-300 dark:border-amber-700/70 space-y-1">
+              <label className="block text-xs font-black uppercase text-amber-900 dark:text-amber-200 flex items-center gap-1.5">
+                <Building className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                Lokasi Kantor / Gudang Pengambilan (Stok Berkurang)
+              </label>
+              <select
+                value={selectedGudangId}
+                onChange={(e) => setSelectedGudangId(e.target.value)}
+                className="w-full text-xs font-bold p-2.5 rounded-lg border border-amber-400 dark:border-amber-600 bg-white dark:bg-stone-900 text-stone-900 dark:text-stone-100 shadow-xs"
+              >
+                {gudangList.map((g) => (
+                  <option key={g.id} value={g.id}>
+                    {g.namaGudang} ({g.kodeGudang})
+                  </option>
+                ))}
+              </select>
+              <p className="text-[10px] text-amber-700 dark:text-amber-400 font-semibold">
+                *Stok perlengkapan akan otomatis dikurangkan dari lokasi kantor/gudang yang dipilih.
+              </p>
             </div>
 
             {/* Status Selection */}

@@ -1174,6 +1174,7 @@ model MasterGudang {
   updatedAt       DateTime        @updatedAt
 
   stokItems       StokGudangItem[]
+  mutasi          PerlengkapanMutasi[]
 
   @@map("master_gudang")
 }
@@ -1249,16 +1250,19 @@ model PaketPerlengkapanRule {
 }
 
 model PerlengkapanMutasi {
-  id         String             @id @default(cuid())
+  id         String              @id @default(cuid())
   barangId   String
-  barang     MasterPerlengkapan @relation(fields: [barangId], references: [id], onDelete: Cascade)
-  tipe       String             // "MASUK" | "KELUAR"
+  barang     MasterPerlengkapan  @relation(fields: [barangId], references: [id], onDelete: Cascade)
+  gudangId   String?
+  gudang     MasterGudang?       @relation(fields: [gudangId], references: [id], onDelete: SetNull)
+  tipe       String              // "MASUK" | "KELUAR"
   jumlah     Int
   keterangan String?
   petugas    String?
-  createdAt  DateTime           @default(now())
+  createdAt  DateTime            @default(now())
 
   @@index([barangId])
+  @@index([gudangId])
   @@map("perlengkapan_mutasi")
 }
 

@@ -27,11 +27,25 @@ export async function GET(request: NextRequest) {
       orderBy: { tanggalBerangkat: "desc" },
     });
 
-    // Master items for checklist with variants & properties
+    // Active warehouse list
+    const gudangList = await prisma.masterGudang.findMany({
+      where: { isActive: true },
+      orderBy: { kodeGudang: "asc" },
+    });
+
+    // Master items for checklist with variants & stock per warehouse
     const masterItems = await prisma.masterPerlengkapan.findMany({
       where: { isActive: true },
       include: {
-        ukuran: true,
+        ukuran: {
+          include: {
+            stokGudang: {
+              include: {
+                gudang: true,
+              },
+            },
+          },
+        },
       },
       orderBy: { name: "asc" },
     });
@@ -158,6 +172,7 @@ export async function GET(request: NextRequest) {
       success: true,
       data: {
         packages,
+        gudangList,
         masterItems,
         jamaah: filteredData,
         stats: {
@@ -182,7 +197,7 @@ export async function PUT(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { jamaahId, statusPerlengkapan, tanggalAmbilPerlengkapan, catatanPerlengkapan, items } = body;
+    const { jamaahId, gudangId, statusPerlengkapan, tanggalAmbilPerlengkapan, catatanPerlengkapan, items } = body;
 
     if (!jamaahId) {
       return NextResponse.json({ success: false, message: "Jamaah ID wajib diisi" }, { status: 400 });
@@ -227,25 +242,50 @@ export async function PUT(request: NextRequest) {
           },
         });
 
-        // Deduct inventory stock if newly checked as taken
+        // Deduct warehouse specific stock if newly checked as taken
         if (isNewlyTaken) {
-          const barang = await prisma.masterPerlengkapan.findUnique({ where: { id: it.barangId } });
-          if (barang && barang.stokTersedia > 0) {
-            await prisma.$transaction([
-              prisma.perlengkapanMutasi.create({
+          const barang = await prisma.masterPerlengkapan.findUnique({
+            where: { id: it.barangId },
+            include: { ukuran: true },
+          });
+
+          if (barang) {
+            const targetUkuran = it.kodeUkuran
+              ? barang.ukuran.find((u) => u.kodeUkuran === it.kodeUkuran) || barang.ukuran[0]
+              : barang.ukuran[0];
+
+            const gudangObj = gudangId
+              ? await prisma.masterGudang.findUnique({ where: { id: gudangId } })
+              : await prisma.masterGudang.findFirst({ where: { isActive: true } });
+
+            if (targetUkuran && gudangObj) {
+              await prisma.stokGudangItem.updateMany({
+                where: {
+                  gudangId: gudangObj.id,
+                  ukuranId: targetUkuran.id,
+                  stokTersedia: { gt: 0 },
+                },
+                data: {
+                  stokTersedia: { decrement: 1 },
+                },
+              });
+
+              await prisma.perlengkapanMutasi.create({
                 data: {
                   barangId: it.barangId,
+                  gudangId: gudangObj.id,
                   tipe: "KELUAR",
                   jumlah: 1,
-                  keterangan: `Pengambilan perlengkapan jamaah`,
+                  keterangan: `Pengambilan perlengkapan jamaah di ${gudangObj.namaGudang}`,
                   petugas: petugasName,
                 },
-              }),
-              prisma.masterPerlengkapan.update({
+              });
+
+              await prisma.masterPerlengkapan.update({
                 where: { id: it.barangId },
                 data: { stokTersedia: { decrement: 1 } },
-              }),
-            ]);
+              });
+            }
           }
         }
       }
