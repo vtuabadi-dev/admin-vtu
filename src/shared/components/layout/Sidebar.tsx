@@ -79,6 +79,10 @@ const adminNav: NavSection[] = [
             label: "Master Template Surat",
             href: "/admin/master/surat",
           },
+          {
+            label: "Master Perlengkapan",
+            href: "/admin/master/perlengkapan",
+          },
         ],
       },
     ],

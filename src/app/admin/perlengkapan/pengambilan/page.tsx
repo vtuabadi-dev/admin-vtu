@@ -22,6 +22,7 @@ interface JamaahPerlengkapan {
   registrationId: string;
   nomorPeserta: string;
   namaLengkap: string;
+  jenisKelamin?: string;
   nomorTelepon: string;
   nomorPaspor: string;
   statusPerlengkapan: string;
@@ -48,6 +49,15 @@ interface MasterItem {
   name: string;
   stokTersedia: number;
   satuan: string;
+  tipePengambilan?: "BEBAS_KAPAN_SAJA" | "SERENTAK_HARI_H";
+  sifatPerlengkapan?: "UMUM_WAJIB" | "PAKET_STANDAR" | "ADDON_KHUSUS";
+  genderTarget?: "ALL" | "LAKI_LAKI" | "PEREMPUAN";
+  ukuran?: {
+    id: string;
+    kelompokUkuran: string;
+    kodeUkuran: string;
+    namaUkuran: string;
+  }[];
 }
 
 interface PackageItem {
@@ -472,14 +482,26 @@ export default function PengambilanPerlengkapanPage() {
       >
         {selectedJamaah && (
           <form onSubmit={handleSaveEdit} className="space-y-4 pt-1">
-            {/* Jamaah info banner */}
+            {/* Jamaah info banner with Auto-Detected Gender */}
             <div className="p-3 bg-stone-100 dark:bg-stone-800/60 rounded-lg border border-stone-200 dark:border-stone-700/60">
               <div className="flex justify-between items-start">
                 <div>
-                  <h4 className="font-bold text-sm text-stone-900 dark:text-stone-100">
-                    {selectedJamaah.namaLengkap}
-                  </h4>
-                  <p className="text-xs text-stone-500 font-mono">
+                  <div className="flex items-center gap-2">
+                    <h4 className="font-bold text-sm text-stone-900 dark:text-stone-100">
+                      {selectedJamaah.namaLengkap}
+                    </h4>
+                    {/* Auto Detected Gender Badge */}
+                    {selectedJamaah.jenisKelamin?.toUpperCase().includes("P") ? (
+                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-pink-100 text-pink-800 dark:bg-pink-950 dark:text-pink-300 border border-pink-200">
+                        PEREMPUAN (OTOMATIS)
+                      </span>
+                    ) : (
+                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-300 border border-sky-200">
+                        LAKI-LAKI (OTOMATIS)
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-stone-500 font-mono mt-0.5">
                     ID Reg: <span className="font-bold text-amber-600">{selectedJamaah.registrationId}</span> | Grup: {selectedJamaah.groupName}
                   </p>
                 </div>
@@ -550,43 +572,55 @@ export default function PengambilanPerlengkapanPage() {
             </div>
 
             {/* Checklist of Master Items */}
-            {editStatus !== "TANPA" && (
-              <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <label className="text-xs font-bold text-stone-700 dark:text-stone-300">
-                    Checklist Item Perlengkapan Fisik
-                  </label>
-                  <div className="flex gap-2 text-[10px]">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const allTrue: Record<string, boolean> = {};
-                        masterItems.forEach((m) => (allTrue[m.id] = true));
-                        setItemCheckState(allTrue);
-                        setEditStatus("SUDAH_AMBIL");
-                      }}
-                      className="text-emerald-600 font-bold hover:underline"
-                    >
-                      Pilih Semua
-                    </button>
-                    <span>|</span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const allFalse: Record<string, boolean> = {};
-                        masterItems.forEach((m) => (allFalse[m.id] = false));
-                        setItemCheckState(allFalse);
-                        setEditStatus("BELUM_AMBIL");
-                      }}
-                      className="text-stone-500 font-bold hover:underline"
-                    >
-                      Kosongkan
-                    </button>
-                  </div>
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-xs font-bold text-stone-700 dark:text-stone-300">
+                  Checklist Item Perlengkapan (Sesuai Gender &amp; Paket)
+                </label>
+                <div className="flex gap-2 text-[10px]">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const allTrue: Record<string, boolean> = {};
+                      masterItems.forEach((m) => (allTrue[m.id] = true));
+                      setItemCheckState(allTrue);
+                      setEditStatus("SUDAH_AMBIL");
+                    }}
+                    className="text-emerald-600 font-bold hover:underline"
+                  >
+                    Pilih Semua
+                  </button>
+                  <span>|</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const allFalse: Record<string, boolean> = {};
+                      masterItems.forEach((m) => (allFalse[m.id] = false));
+                      setItemCheckState(allFalse);
+                      setEditStatus("BELUM_AMBIL");
+                    }}
+                    className="text-stone-500 font-bold hover:underline"
+                  >
+                    Kosongkan
+                  </button>
                 </div>
+              </div>
 
-                <div className="space-y-1.5 max-h-48 overflow-y-auto p-2 bg-stone-50 dark:bg-stone-900 rounded-lg border border-stone-200 dark:border-stone-800">
-                  {masterItems.map((item) => {
+              <div className="space-y-1.5 max-h-56 overflow-y-auto p-2 bg-stone-50 dark:bg-stone-900 rounded-lg border border-stone-200 dark:border-stone-800">
+                {masterItems
+                  .filter((item) => {
+                    const isFemale = selectedJamaah.jenisKelamin?.toUpperCase().includes("P");
+                    // Gender filtering
+                    if (isFemale && item.genderTarget === "LAKI_LAKI") return false;
+                    if (!isFemale && item.genderTarget === "PEREMPUAN") return false;
+
+                    // If TANPA status, only show Universal Mandatory items (Buku Doa, Slayer, Tas Serut, ID Card)
+                    if (editStatus === "TANPA" && item.sifatPerlengkapan !== "UMUM_WAJIB") {
+                      return false;
+                    }
+                    return true;
+                  })
+                  .map((item) => {
                     const isChecked = !!itemCheckState[item.id];
                     return (
                       <div
@@ -608,17 +642,42 @@ export default function PengambilanPerlengkapanPage() {
                           <div>
                             <span className="font-semibold">{item.name}</span>
                             <span className="ml-1.5 text-[10px] font-mono text-stone-400">({item.code})</span>
+
+                            {/* Property Badges */}
+                            <div className="flex gap-1.5 mt-0.5">
+                              {item.sifatPerlengkapan === "UMUM_WAJIB" && (
+                                <span className="text-[9px] font-black px-1.5 py-0.2 bg-emerald-600 text-white rounded">WAJIB UMUM</span>
+                              )}
+                              {item.tipePengambilan === "SERENTAK_HARI_H" && (
+                                <span className="text-[9px] font-bold px-1.5 py-0.2 bg-purple-100 text-purple-800 rounded">HARI H</span>
+                              )}
+                            </div>
                           </div>
                         </div>
-                        <span className="text-[10px] font-bold text-stone-400">
-                          Stok: {item.stokTersedia} {item.satuan}
-                        </span>
+
+                        {/* Size Selection Dropdown for Seragam / Items with Variants */}
+                        {(item.ukuran || []).length > 0 ? (
+                          <select
+                            onClick={(e) => e.stopPropagation()}
+                            className="text-[11px] font-bold p-1 rounded border border-stone-300 dark:border-stone-700 bg-white dark:bg-stone-800"
+                          >
+                            <option value="">Pilih Ukuran...</option>
+                            {item.ukuran?.map((u) => (
+                              <option key={u.id} value={u.kodeUkuran}>
+                                Ukuran: {u.namaUkuran}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <span className="text-[10px] font-bold text-stone-400">
+                            Stok: {item.stokTersedia} {item.satuan}
+                          </span>
+                        )}
                       </div>
                     );
                   })}
-                </div>
               </div>
-            )}
+            </div>
 
             {/* Tanggal Pengambilan & Catatan */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

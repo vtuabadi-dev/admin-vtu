@@ -27,9 +27,12 @@ export async function GET(request: NextRequest) {
       orderBy: { tanggalBerangkat: "desc" },
     });
 
-    // Master items for checklist
+    // Master items for checklist with variants & properties
     const masterItems = await prisma.masterPerlengkapan.findMany({
       where: { isActive: true },
+      include: {
+        ukuran: true,
+      },
       orderBy: { name: "asc" },
     });
 
@@ -124,6 +127,7 @@ export async function GET(request: NextRequest) {
         registrationId: j.registrationId,
         nomorPeserta: j.nomorPeserta,
         namaLengkap: j.namaLengkap,
+        jenisKelamin: j.jenisKelamin, // "L" | "P" | "LAKI_LAKI" | "PEREMPUAN"
         nomorTelepon: j.nomorTelepon,
         nomorPaspor: j.nomorPaspor,
         statusPerlengkapan: effectiveStatus,

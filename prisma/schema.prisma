@@ -1146,21 +1146,106 @@ model MasterPackageType {
   @@map("master_package_types")
 }
 
-model MasterPerlengkapan {
-  id           String   @id @default(cuid())
-  code         String   @unique
-  name         String
-  stokTersedia Int      @default(0)
-  stokMinimum  Int      @default(10)
-  satuan       String   @default("pcs")
-  isActive     Boolean  @default(true)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+enum TipePengambilanPerlengkapan {
+  BEBAS_KAPAN_SAJA
+  SERENTAK_HARI_H
+}
 
-  mutasi       PerlengkapanMutasi[]
-  pengambilan  PengambilanPerlengkapanItem[]
+enum SifatPerlengkapan {
+  UMUM_WAJIB
+  PAKET_STANDAR
+  ADDON_KHUSUS
+}
+
+enum GenderTarget {
+  ALL
+  LAKI_LAKI
+  PEREMPUAN
+}
+
+model MasterGudang {
+  id              String          @id @default(cuid())
+  kodeGudang      String          @unique
+  namaGudang      String
+  alamat          String?
+  penanggungJawab String?
+  isActive        Boolean         @default(true)
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  stokItems       StokGudangItem[]
+
+  @@map("master_gudang")
+}
+
+model MasterPerlengkapan {
+  id                String                       @id @default(cuid())
+  code              String                       @unique
+  name              String
+  stokTersedia      Int                          @default(0)
+  stokMinimum       Int                          @default(10)
+  satuan            String                       @default("pcs")
+  tipePengambilan   TipePengambilanPerlengkapan  @default(BEBAS_KAPAN_SAJA)
+  sifatPerlengkapan SifatPerlengkapan            @default(PAKET_STANDAR)
+  genderTarget      GenderTarget                 @default(ALL)
+  isActive          Boolean                      @default(true)
+  createdAt         DateTime                     @default(now())
+  updatedAt         DateTime                     @updatedAt
+
+  mutasi            PerlengkapanMutasi[]
+  pengambilan       PengambilanPerlengkapanItem[]
+  ukuran            MasterPerlengkapanUkuran[]
+  rules             PaketPerlengkapanRule[]
 
   @@map("master_perlengkapan")
+}
+
+model MasterPerlengkapanUkuran {
+  id             String             @id @default(cuid())
+  barangId       String
+  barang         MasterPerlengkapan @relation(fields: [barangId], references: [id], onDelete: Cascade)
+  kelompokUkuran String             @default("STANDAR") // "ANAK_LAKI" | "DEWASA_LAKI" | "DEWASA_PEREMPUAN" | "STANDAR"
+  kodeUkuran     String             // e.g. "3".."10", "S".."XXL", "4L", "STD"
+  namaUkuran     String
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  stokGudang     StokGudangItem[]
+
+  @@unique([barangId, kodeUkuran])
+  @@index([barangId])
+  @@map("master_perlengkapan_ukuran")
+}
+
+model StokGudangItem {
+  id             String                   @id @default(cuid())
+  gudangId       String
+  gudang         MasterGudang             @relation(fields: [gudangId], references: [id], onDelete: Cascade)
+  ukuranId       String
+  ukuran         MasterPerlengkapanUkuran @relation(fields: [ukuranId], references: [id], onDelete: Cascade)
+  stokTersedia   Int                      @default(0)
+  ambangBatasMin Int                      @default(10)
+  createdAt      DateTime                 @default(now())
+  updatedAt      DateTime                 @updatedAt
+
+  @@unique([gudangId, ukuranId])
+  @@index([gudangId])
+  @@index([ukuranId])
+  @@map("stok_gudang_items")
+}
+
+model PaketPerlengkapanRule {
+  id               String             @id @default(cuid())
+  startingPoint    String             @default("ALL") // "SUB" | "JKT" | "PLUS" | "ALL"
+  barangId         String
+  barang           MasterPerlengkapan @relation(fields: [barangId], references: [id], onDelete: Cascade)
+  wajibPilihUkuran Boolean            @default(false)
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+
+  @@unique([startingPoint, barangId])
+  @@index([barangId])
+  @@map("paket_perlengkapan_rules")
 }
 
 model PerlengkapanMutasi {

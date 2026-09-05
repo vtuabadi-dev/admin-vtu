@@ -3,27 +3,31 @@ import type { NextRequest } from "next/server";
 import { auth } from "@/server/auth";
 import { prisma } from "@/server/db/client";
 
-const DEFAULT_ITEMS = [
-  { code: "KPR-24", name: "Koper Bagasi 24 Inch VTU", stokTersedia: 150, stokMinimum: 25, satuan: "pcs" },
-  { code: "KPR-20", name: "Koper Kabin 20 Inch VTU", stokTersedia: 150, stokMinimum: 25, satuan: "pcs" },
-  { code: "TAS-PSP", name: "Tas Paspor & Selempang VTU", stokTersedia: 200, stokMinimum: 30, satuan: "pcs" },
-  { code: "IHR-PRI", name: "Kain Ihram Pria (Set 2 Lembar)", stokTersedia: 120, stokMinimum: 25, satuan: "set" },
-  { code: "MKN-WAN", name: "Mukena & Bergo Wanita VTU", stokTersedia: 130, stokMinimum: 25, satuan: "set" },
-  { code: "BTK-SRG", name: "Bahan Kain Batik Seragam VTU", stokTersedia: 300, stokMinimum: 40, satuan: "meter" },
-  { code: "SBK-IHR", name: "Sabuk Ihram Gesper Putih", stokTersedia: 100, stokMinimum: 20, satuan: "pcs" },
-  { code: "BK-DOA", name: "Buku Doa & Dzikir Panduan Umroh", stokTersedia: 250, stokMinimum: 50, satuan: "buku" },
-  { code: "TAG-ID", name: "Tali Koper & ID Card Gantung", stokTersedia: 400, stokMinimum: 50, satuan: "pcs" },
-];
-
-export async function GET(_request: NextRequest) {
+export async function GET(request: NextRequest) {
   const session = await auth();
   if (!session?.user) {
     return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
   }
 
+  const { searchParams } = request.nextUrl;
+  const gudangId = searchParams.get("gudangId") || undefined;
+
   try {
-    let items = await prisma.masterPerlengkapan.findMany({
+    const gudangList = await prisma.masterGudang.findMany({
+      where: { isActive: true },
+      orderBy: { kodeGudang: "asc" }
+    });
+
+    const items = await prisma.masterPerlengkapan.findMany({
+      where: { isActive: true },
       include: {
+        ukuran: {
+          include: {
+            stokGudang: {
+              include: { gudang: true }
+            }
+          }
+        },
         mutasi: {
           orderBy: { createdAt: "desc" },
           take: 5,
@@ -31,24 +35,6 @@ export async function GET(_request: NextRequest) {
       },
       orderBy: { name: "asc" },
     });
-
-    // Auto-seed if empty
-    if (items.length === 0) {
-      for (const item of DEFAULT_ITEMS) {
-        await prisma.masterPerlengkapan.create({
-          data: item,
-        });
-      }
-      items = await prisma.masterPerlengkapan.findMany({
-        include: {
-          mutasi: {
-            orderBy: { createdAt: "desc" },
-            take: 5,
-          },
-        },
-        orderBy: { name: "asc" },
-      });
-    }
 
     const recentMutasi = await prisma.perlengkapanMutasi.findMany({
       include: {
@@ -58,13 +44,28 @@ export async function GET(_request: NextRequest) {
       take: 20,
     });
 
+    // Compute stats
     const totalJenis = items.length;
-    const totalStokFisik = items.reduce((acc, it) => acc + it.stokTersedia, 0);
-    const stokKritisCount = items.filter((it) => it.stokTersedia <= it.stokMinimum).length;
+    let totalStokFisik = 0;
+    let stokKritisCount = 0;
+
+    items.forEach((it) => {
+      let itemTotal = 0;
+      (it.ukuran || []).forEach((u) => {
+        (u.stokGudang || []).forEach((sg) => {
+          if (!gudangId || sg.gudangId === gudangId) {
+            itemTotal += sg.stokTersedia;
+          }
+        });
+      });
+      totalStokFisik += itemTotal;
+      if (itemTotal <= it.stokMinimum) stokKritisCount++;
+    });
 
     return NextResponse.json({
       success: true,
       data: {
+        gudangList,
         items,
         recentMutasi,
         stats: {
@@ -89,32 +90,8 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { action } = body;
 
-    if (action === "create") {
-      const { code, name, stokTersedia, stokMinimum, satuan } = body;
-      if (!code || !name) {
-        return NextResponse.json({ success: false, message: "Kode dan Nama Barang wajib diisi" }, { status: 400 });
-      }
-
-      const existing = await prisma.masterPerlengkapan.findUnique({ where: { code } });
-      if (existing) {
-        return NextResponse.json({ success: false, message: "Kode barang sudah terdaftar" }, { status: 400 });
-      }
-
-      const newItem = await prisma.masterPerlengkapan.create({
-        data: {
-          code: code.trim().toUpperCase(),
-          name: name.trim(),
-          stokTersedia: Number(stokTersedia) || 0,
-          stokMinimum: Number(stokMinimum) || 10,
-          satuan: satuan || "pcs",
-        },
-      });
-
-      return NextResponse.json({ success: true, data: newItem });
-    }
-
     if (action === "mutasi") {
-      const { barangId, tipe, jumlah, keterangan, petugas } = body;
+      const { barangId, tipe, jumlah, keterangan, petugas, gudangId, ukuranId } = body;
       if (!barangId || !tipe || !jumlah) {
         return NextResponse.json({ success: false, message: "Data mutasi tidak lengkap" }, { status: 400 });
       }
@@ -129,14 +106,29 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ success: false, message: "Barang tidak ditemukan" }, { status: 404 });
       }
 
-      if (tipe === "KELUAR" && barang.stokTersedia < qty) {
-        return NextResponse.json({
-          success: false,
-          message: `Stok tidak mencukupi. Stok saat ini: ${barang.stokTersedia} ${barang.satuan}`,
-        }, { status: 400 });
+      // If specific warehouse & size variant is selected for mutation
+      if (gudangId && ukuranId) {
+        const stokItem = await prisma.stokGudangItem.findUnique({
+          where: { gudangId_ukuranId: { gudangId, ukuranId } }
+        });
+
+        if (tipe === "KELUAR" && (!stokItem || stokItem.stokTersedia < qty)) {
+          return NextResponse.json({
+            success: false,
+            message: `Stok pada gudang tidak mencukupi. Stok saat ini: ${stokItem?.stokTersedia || 0}`,
+          }, { status: 400 });
+        }
+
+        const newStokGudang = tipe === "MASUK" ? ((stokItem?.stokTersedia || 0) + qty) : ((stokItem?.stokTersedia || 0) - qty);
+
+        await prisma.stokGudangItem.upsert({
+          where: { gudangId_ukuranId: { gudangId, ukuranId } },
+          update: { stokTersedia: newStokGudang },
+          create: { gudangId, ukuranId, stokTersedia: newStokGudang, ambangBatasMin: 10 }
+        });
       }
 
-      const newStok = tipe === "MASUK" ? barang.stokTersedia + qty : barang.stokTersedia - qty;
+      const newStokTotal = tipe === "MASUK" ? barang.stokTersedia + qty : Math.max(0, barang.stokTersedia - qty);
 
       const [mutasiResult, updatedBarang] = await prisma.$transaction([
         prisma.perlengkapanMutasi.create({
@@ -150,31 +142,11 @@ export async function POST(request: NextRequest) {
         }),
         prisma.masterPerlengkapan.update({
           where: { id: barangId },
-          data: { stokTersedia: newStok },
+          data: { stokTersedia: newStokTotal },
         }),
       ]);
 
       return NextResponse.json({ success: true, data: { mutasi: mutasiResult, barang: updatedBarang } });
-    }
-
-    if (action === "update") {
-      const { id, name, stokMinimum, satuan, stokTersedia } = body;
-      if (!id) {
-        return NextResponse.json({ success: false, message: "ID Barang wajib disertakan" }, { status: 400 });
-      }
-
-      const updateData: any = {};
-      if (name !== undefined) updateData.name = name;
-      if (stokMinimum !== undefined) updateData.stokMinimum = Number(stokMinimum);
-      if (satuan !== undefined) updateData.satuan = satuan;
-      if (stokTersedia !== undefined) updateData.stokTersedia = Number(stokTersedia);
-
-      const updated = await prisma.masterPerlengkapan.update({
-        where: { id },
-        data: updateData,
-      });
-
-      return NextResponse.json({ success: true, data: updated });
     }
 
     return NextResponse.json({ success: false, message: "Aksi tidak dikenali" }, { status: 400 });
