@@ -14,20 +14,26 @@ export function formatCurrency(amount: number): string {
   }).format(amount);
 }
 
-export function formatDate(date: string | Date): string {
+export function formatDate(date?: string | Date | null): string {
+  if (!date) return "-";
+  const d = new Date(date);
+  if (isNaN(d.getTime())) return "-";
   return new Intl.DateTimeFormat("id-ID", {
     year: "numeric",
     month: "long",
     day: "numeric",
-  }).format(new Date(date));
+  }).format(d);
 }
 
-export function formatDateShort(date: string | Date): string {
+export function formatDateShort(date?: string | Date | null): string {
+  if (!date) return "-";
+  const d = new Date(date);
+  if (isNaN(d.getTime())) return "-";
   return new Intl.DateTimeFormat("id-ID", {
     year: "numeric",
     month: "short",
     day: "numeric",
-  }).format(new Date(date));
+  }).format(d);
 }
 
 export function formatNumberWithDots(val: string | number): string {

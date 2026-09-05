@@ -53,8 +53,10 @@ interface MasterItem {
 interface PackageItem {
   id: string;
   namaPaket: string;
-  kodeKeberangkatan: string;
-  tanggalKeberangkatan: string;
+  kodeKeberangkatan?: string;
+  kodeIndividu?: string;
+  tanggalBerangkat?: string;
+  tanggalKeberangkatan?: string;
   status: string;
 }
 
@@ -125,8 +127,9 @@ export default function PengambilanPerlengkapanPage() {
 
     // Populate checklist map
     const checks: Record<string, boolean> = {};
-    for (const item of masterItems) {
-      const match = j.checklist.find((c) => c.barangId === item.id);
+    const checklist = j.checklist || [];
+    for (const item of (masterItems || [])) {
+      const match = checklist.find((c) => c?.barangId === item.id);
       checks[item.id] = match ? match.status === "SUDAH" : j.statusPerlengkapan === "SUDAH_AMBIL";
     }
     setItemCheckState(checks);
@@ -333,7 +336,7 @@ export default function PengambilanPerlengkapanPage() {
             <option value="all">Semua Paket Keberangkatan</option>
             {packages.map((pkg) => (
               <option key={pkg.id} value={pkg.id}>
-                {pkg.namaPaket} ({formatDateShort(pkg.tanggalKeberangkatan)})
+                {pkg.namaPaket} ({formatDateShort(pkg.tanggalBerangkat || pkg.tanggalKeberangkatan)})
               </option>
             ))}
           </select>
@@ -381,8 +384,9 @@ export default function PengambilanPerlengkapanPage() {
                 </tr>
               ) : (
                 filteredJamaah.map((j, idx) => {
-                  const itemsCheckedCount = j.checklist.filter((c) => c.status === "SUDAH").length;
-                  const totalMaster = masterItems.length;
+                  const checklist = j.checklist || [];
+                  const itemsCheckedCount = checklist.filter((c) => c?.status === "SUDAH").length;
+                  const totalMaster = (masterItems || []).length;
 
                   return (
                     <tr key={j.id} className="hover:bg-amber-50/30 dark:hover:bg-amber-950/20 transition-colors">
