@@ -27,12 +27,11 @@ function mapKeberangkatan(row: any): Keberangkatan {
     parsedHotelOptions = [];
   }
 
-  const activePaxCount = (row.groups as any[])?.reduce(
-    (sum: number, g: any) => sum + (g.anggota?.length || 0),
-    0
-  ) ?? row.terisi ?? 0;
+  const activePaxCount = (row.groups !== undefined && Array.isArray(row.groups))
+    ? row.groups.reduce((sum: number, g: any) => sum + (g.anggota?.length || 0), 0)
+    : (row.terisi ?? 0);
 
-  if (row.id && row.terisi !== activePaxCount) {
+  if (row.id && row.groups !== undefined && Array.isArray(row.groups) && row.groups.length > 0 && row.terisi !== activePaxCount) {
     prisma.keberangkatan.update({
       where: { id: row.id },
       data: { terisi: activePaxCount },

@@ -500,7 +500,7 @@ function resolveJamaahCityTourThoif(activePackage: any, groupObj: any, j: any): 
 function ManifestPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const urlPaketId = searchParams.get("paketId") || "";
+  const urlPaketId = searchParams.get("paketId") || searchParams.get("paketid") || searchParams.get("paket_id") || searchParams.get("id") || "";
   const fromSource = searchParams.get("from") || "";
 
   const storeKeberangkatan = useOperationalStore((s) => s.keberangkatanList);
@@ -768,15 +768,20 @@ function ManifestPageContent() {
   const activePackageJamaah = useMemo(() => {
     if (!activePackage) return [];
     const jamaahIds = new Set(activePackage.jamaahIds || []);
-    // Also include jamaah whose groupId belongs to a registration group under this package
+
+    const relatedPkgIds = new Set([
+      activePackage.id,
+      ...keberangkatanList.filter((k) => k.parentKeberangkatanId === activePackage.id || (activePackage.parentKeberangkatanId && k.id === activePackage.parentKeberangkatanId)).map((k) => k.id)
+    ]);
+
     const packageGroupIds = new Set(
-      groups.filter((g) => g.paketKeberangkatanId === activePackage.id).map((g) => g.id)
+      groups.filter((g) => relatedPkgIds.has(g.paketKeberangkatanId)).map((g) => g.id)
     );
 
     return allJamaah
       .filter((j) => (jamaahIds.has(j.id) || packageGroupIds.has(j.groupId)) && j.status !== "batal")
       .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-  }, [activePackage, allJamaah, groups]);
+  }, [activePackage, allJamaah, groups, keberangkatanList]);
 
   // Filtered Jamaah by search query
   const filteredActiveJamaah = useMemo(() => {

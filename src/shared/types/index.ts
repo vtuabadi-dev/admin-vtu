@@ -80,6 +80,8 @@ export interface RegistrationGroup {
   status: "active" | "completed" | "cancelled";
   hotelUpgrade?: string;
   roomUpgrade?: string;
+  isKeretaCepat?: boolean;
+  isCityTourThoif?: boolean;
   /** Anggota jamaah dalam grup ini */
   anggotaIds: string[];
   invoices?: Invoice[];
@@ -120,6 +122,8 @@ export interface Jamaah {
   statusPerlengkapan?: "TANPA" | "BELUM_AMBIL" | "SEBAGIAN" | "SUDAH_AMBIL" | string;
   tanggalAmbilPerlengkapan?: string | null;
   catatanPerlengkapan?: string | null;
+  isKeretaCepat?: boolean;
+  isCityTourThoif?: boolean;
   /** Hotel assignment — determines manifest grouping */
   hotelMekkah: string;
   hotelMadinah: string;

@@ -35,6 +35,8 @@ function mapJamaah(row: any): Jamaah {
     statusPerlengkapan: row.statusPerlengkapan || "BELUM_AMBIL",
     tanggalAmbilPerlengkapan: row.tanggalAmbilPerlengkapan ? row.tanggalAmbilPerlengkapan.toISOString() : null,
     catatanPerlengkapan: row.catatanPerlengkapan || null,
+    isKeretaCepat: row.isKeretaCepat ?? undefined,
+    isCityTourThoif: row.isCityTourThoif ?? undefined,
     hotelMekkah: row.hotelMekkah,
     hotelMadinah: row.hotelMadinah,
     dokumen: (row.dokumen ?? []).map(dokumenRepo.mapDokumen),

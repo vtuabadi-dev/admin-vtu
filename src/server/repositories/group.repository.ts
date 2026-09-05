@@ -22,6 +22,8 @@ function mapGroup(row: any): RegistrationGroup {
     status: row.status,
     hotelUpgrade: req?.hotelUpgrade || row.hotelUpgrade || undefined,
     roomUpgrade: req?.roomUpgrade || row.roomUpgrade || undefined,
+    isKeretaCepat: row.isKeretaCepat ?? undefined,
+    isCityTourThoif: row.isCityTourThoif ?? undefined,
     anggotaIds: row.anggota?.map((a: any) => a.id) ?? [],
     invoices: (row.invoices ?? []).map(mapInvoice),
     createdAt: row.createdAt.toISOString(),
