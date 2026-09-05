@@ -412,6 +412,8 @@ model RegistrationGroup {
   totalPembayaran      Int         @default(0)
   sisaPembayaran       Int
   status               GroupStatus @default(active)
+  isKeretaCepat        Boolean?
+  isCityTourThoif      Boolean?
   tenantId             String?
   createdAt            DateTime    @default(now())
   updatedAt            DateTime    @updatedAt
@@ -461,6 +463,8 @@ model Jamaah {
   statusPerlengkapan String       @default("BELUM_AMBIL") // "TANPA" | "BELUM_AMBIL" | "SEBAGIAN" | "SUDAH_AMBIL"
   tanggalAmbilPerlengkapan DateTime?
   catatanPerlengkapan String?
+  isKeretaCepat      Boolean?
+  isCityTourThoif    Boolean?
   hotelMekkah        String
   hotelMadinah       String
   userId             String?
@@ -727,6 +731,8 @@ model ManifestRow {
   nomorKursi   String?
   nomorKamar   String?
   catatan      String?
+  isKeretaCepat Boolean?
+  isCityTourThoif Boolean?
 
   // Relations
   manifest Manifest @relation(fields: [manifestId], references: [id], onDelete: Cascade)

@@ -407,6 +407,94 @@ function resolveSystemStatusPerlengkapan(activePackage: any, groupObj: any, j: a
   return { status: "BELUM_AMBIL", isAddon: false, keterangan: "Termasuk Paket • Belum Diambil" };
 }
 
+function resolveJamaahKeretaCepat(activePackage: any, groupObj: any, j: any): boolean {
+  // 1. Direct Jamaah override if manually set
+  if (j?.isKeretaCepat !== undefined && j?.isKeretaCepat !== null) {
+    return Boolean(j.isKeretaCepat);
+  }
+
+  // 2. Direct Group snapshot (set at registration time)
+  if (groupObj?.isKeretaCepat !== undefined && groupObj?.isKeretaCepat !== null) {
+    return Boolean(groupObj.isKeretaCepat);
+  }
+  if (groupObj?.snapshotInclude && Array.isArray(groupObj.snapshotInclude)) {
+    return groupObj.snapshotInclude.some((inc: string) => /kereta|fast train|haramain/i.test(inc));
+  }
+
+  // 3. Invoice items / Addons
+  if (groupObj?.invoices && Array.isArray(groupObj.invoices)) {
+    for (const inv of groupObj.invoices) {
+      if (inv.items && Array.isArray(inv.items)) {
+        const hasItem = inv.items.some((item: any) =>
+          /kereta|fast train|haramain/i.test(`${item.deskripsi || ""} ${item.kategori || ""}`)
+        );
+        if (hasItem) return true;
+      }
+    }
+  }
+
+  // 4. Registration Request / Package Inclusions Snapshot Comparison
+  const packageHasKC = (activePackage?.include && Array.isArray(activePackage.include) &&
+    activePackage.include.some((inc: string) => /kereta|fast train|haramain/i.test(inc))) ||
+    activePackage?.isAdaKeretaCepat === "ya";
+
+  if (!packageHasKC) return false;
+
+  // Package has Kereta Cepat now. Did this Jamaah/Group register BEFORE or AFTER KC was added?
+  const regTime = new Date(groupObj?.createdAt || j?.createdAt || 0).getTime();
+  const pkgUpdatedTime = new Date(activePackage?.updatedAt || activePackage?.createdAt || 0).getTime();
+
+  // If Jamaah registered significantly before the package update date, they registered under old version without KC
+  if (regTime > 0 && pkgUpdatedTime > 0 && regTime < pkgUpdatedTime - 300000) {
+    return false;
+  }
+
+  return true;
+}
+
+function resolveJamaahCityTourThoif(activePackage: any, groupObj: any, j: any): boolean {
+  // 1. Direct Jamaah override if manually set
+  if (j?.isThoif !== undefined && j?.isThoif !== null) {
+    return Boolean(j.isThoif);
+  }
+
+  // 2. Direct Group snapshot (set at registration time)
+  if (groupObj?.isThoif !== undefined && groupObj?.isThoif !== null) {
+    return Boolean(groupObj.isThoif);
+  }
+  if (groupObj?.snapshotInclude && Array.isArray(groupObj.snapshotInclude)) {
+    return groupObj.snapshotInclude.some((inc: string) => /thoif|taif|ta'if/i.test(inc));
+  }
+
+  // 3. Invoice items / Addons
+  if (groupObj?.invoices && Array.isArray(groupObj.invoices)) {
+    for (const inv of groupObj.invoices) {
+      if (inv.items && Array.isArray(inv.items)) {
+        const hasItem = inv.items.some((item: any) =>
+          /thoif|taif|ta'if/i.test(`${item.deskripsi || ""} ${item.kategori || ""}`)
+        );
+        if (hasItem) return true;
+      }
+    }
+  }
+
+  // 4. Package Inclusions Snapshot Comparison
+  const packageHasThoif = (activePackage?.include && Array.isArray(activePackage.include) &&
+    activePackage.include.some((inc: string) => /thoif|taif|ta'if/i.test(inc))) ||
+    activePackage?.isAdaThoif === "ya";
+
+  if (!packageHasThoif) return false;
+
+  const regTime = new Date(groupObj?.createdAt || j?.createdAt || 0).getTime();
+  const pkgUpdatedTime = new Date(activePackage?.updatedAt || activePackage?.createdAt || 0).getTime();
+
+  if (regTime > 0 && pkgUpdatedTime > 0 && regTime < pkgUpdatedTime - 300000) {
+    return false;
+  }
+
+  return true;
+}
+
 // ── Main Page Component Content ──────────────────────────────
 
 function ManifestPageContent() {
@@ -1343,6 +1431,12 @@ function ManifestPageContent() {
                         <th className="px-3 py-3 font-extrabold uppercase tracking-wider text-[10px] text-stone-800 dark:text-stone-100 border-r border-stone-300/80 dark:border-stone-700/80 min-w-[155px] shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
                           KLASTER &amp; PERLENGKAPAN
                         </th>
+                        <th className="px-3 py-3 font-extrabold uppercase tracking-wider text-[10px] text-stone-800 dark:text-stone-100 border-r border-stone-300/80 dark:border-stone-700/80 w-28 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
+                          KERETA CEPAT
+                        </th>
+                        <th className="px-3 py-3 font-extrabold uppercase tracking-wider text-[10px] text-stone-800 dark:text-stone-100 border-r border-stone-300/80 dark:border-stone-700/80 w-32 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
+                          CITY TOUR THOIF
+                        </th>
                         <th className="px-3 py-3 font-extrabold uppercase tracking-wider text-[10px] text-stone-800 dark:text-stone-100 border-r border-stone-300/80 dark:border-stone-700/80 min-w-[130px] shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
                           HOTEL MAKKAH
                         </th>
@@ -1586,6 +1680,34 @@ function ManifestPageContent() {
                                       </div>
                                     );
                                   })()}
+                                </td>
+
+                                {/* KERETA CEPAT */}
+                                <td className={`px-3 py-2.5 text-center ${cellBorder}`}>
+                                  {resolveJamaahKeretaCepat(activePackage, group.groupObj, j) ? (
+                                    <span
+                                      className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 font-extrabold text-xs shadow-2xs mx-auto border border-emerald-300 dark:border-emerald-700 select-none"
+                                      title="Terdaftar dengan layanan Kereta Cepat Haramain"
+                                    >
+                                      ✓
+                                    </span>
+                                  ) : (
+                                    <span className="text-stone-300 dark:text-stone-700 font-mono select-none">—</span>
+                                  )}
+                                </td>
+
+                                {/* CITY TOUR THOIF */}
+                                <td className={`px-3 py-2.5 text-center ${cellBorder}`}>
+                                  {resolveJamaahCityTourThoif(activePackage, group.groupObj, j) ? (
+                                    <span
+                                      className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 font-extrabold text-xs shadow-2xs mx-auto border border-emerald-300 dark:border-emerald-700 select-none"
+                                      title="Terdaftar dengan layanan City Tour Thoif"
+                                    >
+                                      ✓
+                                    </span>
+                                  ) : (
+                                    <span className="text-stone-300 dark:text-stone-700 font-mono select-none">—</span>
+                                  )}
                                 </td>
 
                                 {/* HOTEL MAKKAH */}

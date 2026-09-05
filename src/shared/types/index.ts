@@ -416,6 +416,8 @@ export interface ManifestRow {
   nomorKursi?: string;
   nomorKamar?: string;
   catatan?: string;
+  isKeretaCepat?: boolean;
+  isCityTourThoif?: boolean;
 }
 
 /** TODO: Multi-tenant — add tenantId: string */
