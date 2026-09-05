@@ -2572,22 +2572,22 @@ export default function RegisterPage() {
                   </div>
                 </div>
 
-                {/* Section F: PERNYATAAN PERSETUJUAN (SIGNATURE BOX) */}
+                {/* Section F: PERNYATAAN PERSETUJUAN (SIGNATURE PREVIEW BOX) */}
                 <div className="space-y-3 pt-2">
                   <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900 bg-slate-100 px-3 py-1.5 rounded-md border-l-4 border-slate-800">
                     F. PERNYATAAN PERSETUJUAN
                   </h3>
-                  <div className="max-w-xs mx-auto border border-slate-300 rounded-xl overflow-hidden text-xs shadow-sm">
-                    <div className="bg-slate-100 font-bold p-2 text-center border-b border-slate-300 text-slate-800">
-                      PENDAFTAR / KETUA ROMBONGAN
+                  <div className="max-w-sm mx-auto border-2 border-[#D4AF37] rounded-2xl overflow-hidden text-xs shadow-lg bg-white">
+                    <div className="bg-[#FAF3E0] font-black p-2.5 text-center border-b-2 border-[#D4AF37] text-[#4A3000] tracking-wider uppercase">
+                      ✍️ PENDAFTAR / KETUA ROMBONGAN
                     </div>
-                    <div className="p-3 text-center space-y-2 bg-white">
-                      <div className="h-24 flex items-center justify-center border border-dashed border-slate-300 rounded-lg bg-slate-50">
+                    <div className="p-4 text-center space-y-2 bg-white">
+                      <div className="h-28 flex items-center justify-center border-2 border-dashed border-amber-300 rounded-xl bg-white p-2 shadow-inner">
                         {activeSignatureSrc ? (
                           <img
                             src={activeSignatureSrc}
                             alt="Tanda Tangan Digital"
-                            className="max-h-20 max-w-full object-contain mx-auto"
+                            className="max-h-24 max-w-full object-contain mx-auto bg-white"
                             onError={(e) => {
                               if (signaturePath && !signaturePath.startsWith("data:")) {
                                 (e.target as HTMLImageElement).src = `/api/storage/download?path=${encodeURIComponent(signaturePath)}`;
@@ -2595,13 +2595,15 @@ export default function RegisterPage() {
                             }}
                           />
                         ) : (
-                          <span className="text-[10px] text-slate-400 italic">[Tanda Tangan Digital]</span>
+                          <span className="text-xs text-slate-400 font-bold italic">[Tanda Tangan Digital Belum Disimpan]</span>
                         )}
                       </div>
-                      <p className="font-bold uppercase text-slate-900 pt-1">({namaPerwakilan || "NAMA PENDAFTAR"})</p>
+                      <p className="font-black uppercase text-slate-950 text-sm tracking-wide pt-1">
+                        ({namaPerwakilan || "NAMA PENDAFTAR"})
+                      </p>
                     </div>
                   </div>
-                  <p className="text-[11px] italic text-center text-slate-500 pt-1">
+                  <p className="text-[11px] italic font-semibold text-center text-slate-600 pt-1">
                     Catatan: Data paspor dan dokumen lainnya dapat dilengkapi pada tahap administrasi berikutnya.
                   </p>
                 </div>
