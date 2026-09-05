@@ -153,7 +153,7 @@ export async function POST(req: Request) {
           data: {
             registrationId: `${kodeRegistrasi}-1`,
             groupId: group.id,
-            nomorPeserta: `PST-${baseSeq}-1`,
+            nomorPeserta: `PST-${seqStr}-1`,
             namaLengkap: (firstMember.nama || "KETUA ROMBONGAN").toUpperCase(),
             namaAyah: "-",
             jenisKelamin: jkLeader,
@@ -163,7 +163,7 @@ export async function POST(req: Request) {
             nomorPaspor: leaderPasporNo,
             masaBerlakuPaspor: leaderPasporExpiry,
             nomorTelepon: firstMember.noTelp || "-",
-            email: `pst-${baseSeq}-1@jamaah.vtu.id`,
+            email: `pst-${seqStr}-1@jamaah.vtu.id`,
             alamat: firstMember.alamat || "-",
             provinsi: firstMember.provinsi || "DKI JAKARTA",
             kota: firstMember.kota || "JAKARTA",
@@ -201,7 +201,7 @@ export async function POST(req: Request) {
           const m = members[i]!;
           totalJamaahImported++;
           const mSeq = i + 1;
-          const memberNoPeserta = `PST-${baseSeq}-${mSeq}`;
+          const memberNoPeserta = `PST-${seqStr}-${mSeq}`;
           const memberRegistrationId = `${kodeRegistrasi}-${mSeq}`;
           const mJk: JenisKelamin = (m.jenisKelamin?.toUpperCase() === "P" || m.jenisKelamin?.toUpperCase() === "PEREMPUAN") ? "P" : "L";
           const mHasPaspor = m.jenisIdentitas?.toUpperCase() === "PASPOR" || Boolean(m.noId && m.noId.length < 12);
