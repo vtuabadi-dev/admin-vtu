@@ -77,6 +77,65 @@ function resolveDocumentImageUrl(url?: string | null): string {
   return `/api/storage/download?id=${encodeURIComponent(url)}`;
 }
 
+function buildPicWaReminderUrl(row: any, matrix: any[]): { waUrl: string | null; formattedPhone: string; tooltipText: string } {
+  if (!row) return { waUrl: null, formattedPhone: "", tooltipText: "Data jamaah tidak valid" };
+
+  const groupMembers = row.groupId
+    ? matrix.filter((r) => r.groupId === row.groupId)
+    : [row];
+
+  const picJamaah =
+    groupMembers.find(
+      (m) =>
+        (row.ketuaGroupId && m.jamaahId === row.ketuaGroupId) ||
+        m.nomorPeserta?.endsWith("-1") ||
+        m.registrationId?.endsWith("-1")
+    ) ||
+    groupMembers[0] ||
+    row;
+
+  const rawPhone = picJamaah.nomorTelepon || row.nomorTelepon || "";
+  const picName = picJamaah.namaLengkap || row.namaLengkap || "Bpk/Ibu Jamaah";
+
+  let digits = rawPhone.replace(/\D/g, "");
+  if (digits.startsWith("0")) {
+    digits = "62" + digits.slice(1);
+  } else if (digits.startsWith("8")) {
+    digits = "62" + digits;
+  }
+
+  if (!digits || digits.length < 8) {
+    return { waUrl: null, formattedPhone: "", tooltipText: `No HP PIC (${picName}) tidak tersedia` };
+  }
+
+  const groupLabel = row.groupName && row.groupName !== "-" ? row.groupName : (row.kodeRegistrasi || row.registrationId || "VTU");
+
+  const membersWithMissing = groupMembers.filter(
+    (m) => m.dynamicReq?.missingRequirements && m.dynamicReq.missingRequirements.length > 0
+  );
+
+  let text = `Assalamu'alaikum Wr. Wb. Bpk/Ibu *${picName}*,\n\n`;
+  text += `Kami dari VTU Abadi menginfokan pengingat kelengkapan dokumen pendaftaran Umroh untuk rombongan *${groupLabel}*:\n\n`;
+
+  if (membersWithMissing.length === 0) {
+    text += `Alhamdulillah seluruh dokumen pendaftaran jamaah dalam rombongan telah *LENGKAP*. Terima kasih! 🙏`;
+  } else {
+    text += `📋 *Daftar Jamaah & Dokumen Belum Lengkap:*\n\n`;
+    membersWithMissing.forEach((m, idx) => {
+      const missing = m.dynamicReq.missingRequirements.join(", ");
+      const idReg = m.nomorPeserta || m.registrationId || "";
+      text += `${idx + 1}. *${m.namaLengkap}*${idReg ? ` (${idReg})` : ""}\n`;
+      text += `   • Belum Lengkap: _${missing}_\n\n`;
+    });
+    text += `Mohon untuk dapat melengkapi dokumen tersebut melalui sistem VTU Abadi. Terima kasih! 🙏`;
+  }
+
+  const waUrl = `https://wa.me/${digits}?text=${encodeURIComponent(text)}`;
+  const tooltipText = `Kirim WhatsApp Reminder ke PIC (${picName}: ${digits})`;
+
+  return { waUrl, formattedPhone: digits, tooltipText };
+}
+
 interface OcrFieldEdit {
   key: string;
   label: string;
@@ -197,13 +256,14 @@ export default function DokumenPage() {
 
   // Shared data - initialized from store if available for 0ms instant display
   const [keberangkatanList, setKeberangkatanList] = useState<Keberangkatan[]>(storeKbrList);
-  const [groups, setGroups] = useState<Record<string, { namaGroup: string; kodeRegistrasi: string; paketId: string; createdAt?: string; updatedAt?: string }>>(() => {
-    const groupMap: Record<string, { namaGroup: string; kodeRegistrasi: string; paketId: string; createdAt?: string; updatedAt?: string }> = {};
+  const [groups, setGroups] = useState<Record<string, { namaGroup: string; kodeRegistrasi: string; paketId: string; ketuaGroupId?: string; createdAt?: string; updatedAt?: string }>>(() => {
+    const groupMap: Record<string, { namaGroup: string; kodeRegistrasi: string; paketId: string; ketuaGroupId?: string; createdAt?: string; updatedAt?: string }> = {};
     (storeGroupList ?? []).forEach((g: any) => {
       groupMap[g.id] = {
         namaGroup: g.namaGroup,
         kodeRegistrasi: g.kodeRegistrasi,
         paketId: g.paketKeberangkatanId,
+        ketuaGroupId: g.ketuaGroupId,
         createdAt: g.createdAt,
         updatedAt: g.updatedAt,
       };
@@ -302,12 +362,13 @@ export default function DokumenPage() {
           const json = await groupsRes.json();
           const groupList = json.data ?? [];
           setStoreGroupList(groupList);
-          const groupMap: Record<string, { namaGroup: string; kodeRegistrasi: string; paketId: string; createdAt?: string; updatedAt?: string }> = {};
+          const groupMap: Record<string, { namaGroup: string; kodeRegistrasi: string; paketId: string; ketuaGroupId?: string; createdAt?: string; updatedAt?: string }> = {};
           groupList.forEach((g: any) => {
             groupMap[g.id] = {
               namaGroup: g.namaGroup,
               kodeRegistrasi: g.kodeRegistrasi,
               paketId: g.paketKeberangkatanId,
+              ketuaGroupId: g.ketuaGroupId,
               createdAt: g.createdAt,
               updatedAt: g.updatedAt,
             };
@@ -373,8 +434,10 @@ export default function DokumenPage() {
         groupId: j.groupId,
         groupName: g?.namaGroup || "-",
         kodeRegistrasi: g?.kodeRegistrasi || "-",
+        ketuaGroupId: g?.ketuaGroupId || null,
         gender: j.gender,
         tanggalLahir: j.tanggalLahir,
+        nomorTelepon: j.nomorTelepon || j.telepon || j.noHp || "",
         dokumen: mappedDocs,
         dynamicReq,
         completionPercentage: dynamicReq.percentage,
@@ -1572,15 +1635,48 @@ export default function DokumenPage() {
                                   </div>
                                 </td>
                                 <td className="px-3 py-2.5 text-center">
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="h-7 text-[10px] font-bold gap-1 border-stone-300 dark:border-stone-700 hover:bg-stone-100 dark:hover:bg-stone-850"
-                                    onClick={() => handleGoToUpload(row)}
-                                  >
-                                    <Edit3 className="h-3.5 w-3.5" />
-                                    Lengkapi Data
-                                  </Button>
+                                  <div className="flex items-center justify-center gap-1.5 min-w-[200px]">
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="h-7 text-[10px] font-bold gap-1 border-stone-300 dark:border-stone-700 hover:bg-stone-100 dark:hover:bg-stone-850"
+                                      onClick={() => handleGoToUpload(row)}
+                                    >
+                                      <Edit3 className="h-3.5 w-3.5" />
+                                      Lengkapi Data
+                                    </Button>
+
+                                    {(() => {
+                                      const { waUrl, tooltipText } = buildPicWaReminderUrl(row, completionMatrix);
+                                      if (waUrl) {
+                                        return (
+                                          <a
+                                            href={waUrl}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            title={tooltipText}
+                                            className="inline-flex items-center justify-center h-7 px-2.5 text-[10px] font-bold gap-1 rounded-md bg-emerald-600 hover:bg-emerald-700 text-white transition-colors shadow-sm"
+                                          >
+                                            <Send className="h-3 w-3" />
+                                            Reminder
+                                          </a>
+                                        );
+                                      }
+                                      return (
+                                        <span title={tooltipText}>
+                                          <Button
+                                            size="sm"
+                                            variant="outline"
+                                            disabled
+                                            className="h-7 text-[10px] font-bold gap-1 opacity-50 cursor-not-allowed"
+                                          >
+                                            <Send className="h-3 w-3" />
+                                            Reminder
+                                          </Button>
+                                        </span>
+                                      );
+                                    })()}
+                                  </div>
                                 </td>
                               </tr>
                             ))}
