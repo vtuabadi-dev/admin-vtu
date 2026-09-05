@@ -357,26 +357,43 @@ export function Sidebar({ role, mobileOpen = false, onMobileClose }: SidebarProp
                         <button
                           onClick={() => toggleGroup(item.label)}
                           className={cn(
-                            "w-full flex items-center gap-2.5 rounded-2xl px-3 py-2.5 text-xs font-bold transition-all text-left border shadow-xs",
-                            active && (!collapsed || mobileOpen)
+                            "w-full flex items-center gap-2.5 rounded-2xl px-3 py-2.5 text-xs font-bold transition-all text-left border shadow-xs relative overflow-hidden",
+                            isExpanded && (!collapsed || mobileOpen)
+                              ? "bg-gradient-to-r from-[#0E4334] via-[#125A47] to-[#0E4334] text-[#F5D061] border-[#F5D061] shadow-xl ring-2 ring-[#D4AF37]/40"
+                              : active && (!collapsed || mobileOpen)
                               ? "bg-[#0E4334] text-[#F5D061] border-[#D4AF37]/60 shadow-md"
                               : "bg-[#062118]/60 text-emerald-100/90 hover:bg-[#0E4334]/80 hover:text-white border-[#D4AF37]/20",
                             collapsed && !mobileOpen && "justify-center px-2"
                           )}
                           title={collapsed && !mobileOpen ? item.label : undefined}
                         >
-                          <div className="flex h-7 w-7 items-center justify-center rounded-xl bg-[#D4AF37]/20 border border-[#D4AF37]/40 text-[#F5D061] shrink-0">
+                          <div
+                            className={cn(
+                              "flex h-7 w-7 items-center justify-center rounded-xl border shrink-0 transition-all",
+                              isExpanded && (!collapsed || mobileOpen)
+                                ? "bg-gradient-to-tr from-[#F5D061] via-[#D4AF37] to-[#B8860B] text-slate-950 border-[#F5D061] shadow-md font-black"
+                                : "bg-[#D4AF37]/20 border-[#D4AF37]/40 text-[#F5D061]"
+                            )}
+                          >
                             <item.icon className="h-4 w-4" />
                           </div>
                           {(!collapsed || mobileOpen) && (
                             <>
-                              <span className="flex-1 font-bold text-white tracking-wide">
+                              <span
+                                className={cn(
+                                  "flex-1 tracking-wide transition-colors",
+                                  isExpanded ? "font-extrabold text-[#F5D061]" : "font-bold text-white"
+                                )}
+                              >
                                 {item.label}
                               </span>
+                              {isExpanded && (
+                                <span className="h-2 w-2 rounded-full bg-[#F5D061] animate-pulse shadow-[0_0_8px_#F5D061] shrink-0" />
+                              )}
                               <ChevronDown
                                 className={cn(
                                   "h-4 w-4 shrink-0 text-[#F5D061] transition-transform duration-200",
-                                  isExpanded && "rotate-180"
+                                  isExpanded && "rotate-180 scale-110"
                                 )}
                               />
                             </>
