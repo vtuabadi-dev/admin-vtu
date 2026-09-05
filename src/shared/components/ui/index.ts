@@ -9,4 +9,5 @@ export { SearchableSelect } from "./SearchableSelect";
 export { BankSelect } from "./BankSelect";
 export { Tabs } from "./Tabs";
 export { StatCard } from "./StatCard";
-export { AccordionSection } from "./Accordion";
+export { CurrencyInput, formatNumberWithDots, parseDotsToNumber } from "./CurrencyInput";
+

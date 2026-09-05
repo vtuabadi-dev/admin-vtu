@@ -43,6 +43,7 @@ import { resolveDocumentImageUrl, sortGroupMembers } from "@/shared/lib/document
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/components/ui/Card";
 import { Button } from "@/shared/components/ui/Button";
 import { Input } from "@/shared/components/ui/Input";
+import { CurrencyInput } from "@/shared/components/ui/CurrencyInput";
 import { Select } from "@/shared/components/ui/Select";
 import { Modal } from "@/shared/components/ui/Modal";
 
@@ -217,11 +218,10 @@ function CreateInvoiceModal({
             <label className="text-xs font-bold uppercase tracking-wider text-foreground">
               2. Nominal Tagihan Invoice (Rp)
             </label>
-            <Input
-              type="number"
+            <CurrencyInput
               placeholder="Masukkan nominal tagihan"
-              value={nominal || ""}
-              onChange={(e) => setNominal(Number(e.target.value))}
+              value={nominal}
+              onChange={(val) => setNominal(val)}
               className="mt-1 font-bold text-base"
             />
           </div>
@@ -1863,16 +1863,15 @@ function PaymentReviewTabContent() {
 
                   {/* Nominal Pembayaran Input */}
                   <div>
-                    <div className="flex justify-between items-center">
+                    <div className="flex justify-between items-center mb-1">
                       <label className="text-[11px] font-bold text-foreground">Nominal Invoice / Pembayaran (Rp)</label>
                       <span className="text-[10px] text-amber-600 font-extrabold">{formatCurrency(formNominal)}</span>
                     </div>
-                    <Input
-                      type="number"
-                      value={formNominal || ""}
-                      onChange={(e) => setFormNominal(Number(e.target.value))}
-                      className="h-9 font-mono font-bold text-sm text-foreground mt-1"
-                      placeholder="Masukkan nominal..."
+                    <CurrencyInput
+                      value={formNominal}
+                      onChange={(val) => setFormNominal(val)}
+                      className="h-9 font-mono font-bold text-sm text-foreground"
+                      placeholder="0"
                     />
                   </div>
 
@@ -3888,12 +3887,11 @@ export default function LaporanPembayaranPage() {
                     </div>
 
                     <div>
-                      <label className="text-sm font-medium">Nominal Pembayaran</label>
-                      <Input
-                        type="number"
+                      <label className="text-sm font-medium mb-1 block">Nominal Pembayaran</label>
+                      <CurrencyInput
                         placeholder="Masukkan nominal"
-                        value={nominal || ""}
-                        onChange={(e) => setNominal(Number(e.target.value))}
+                        value={nominal}
+                        onChange={(val) => setNominal(val)}
                       />
                     </div>
 
@@ -3927,21 +3925,20 @@ export default function LaporanPembayaranPage() {
                             Bagi Rata
                           </Button>
                         </div>
-                        <div className="max-h-32 overflow-y-auto space-y-1 rounded-md border p-2">
+                        <div className="max-h-36 overflow-y-auto space-y-1.5 rounded-md border p-2">
                           {activeAnggota.map((a) => (
                             <div key={a.id} className="flex items-center gap-2 text-sm">
                               <span className="flex-1 truncate">{a.namaLengkap}</span>
-                              <input
-                                type="number"
-                                className="w-24 rounded border px-2 py-0.5 text-xs text-right"
+                              <CurrencyInput
                                 placeholder="0"
-                                value={alokasi[a.id] || ""}
-                                onChange={(e) => {
+                                value={alokasi[a.id] || 0}
+                                onChange={(val) => {
                                   setAlokasi((prev) => ({
                                     ...prev,
-                                    [a.id]: Number(e.target.value),
+                                    [a.id]: val,
                                   }));
                                 }}
+                                className="w-32 h-7 text-xs"
                               />
                             </div>
                           ))}
