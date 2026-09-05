@@ -94,12 +94,37 @@ export async function POST(req: Request) {
 
     const groupEntries = Array.from(groupMap.entries());
 
+    // Query highest current sequence for GRP-YYYY-NNNN
+    const year = new Date().getFullYear();
+    const [latestReq, latestGroup] = await Promise.all([
+      prisma.registrationRequest.findFirst({
+        where: { kodeRegistrasi: { startsWith: `GRP-${year}-` } },
+        orderBy: { kodeRegistrasi: "desc" },
+        select: { kodeRegistrasi: true },
+      }),
+      prisma.registrationGroup.findFirst({
+        where: { kodeRegistrasi: { startsWith: `GRP-${year}-` } },
+        orderBy: { kodeRegistrasi: "desc" },
+        select: { kodeRegistrasi: true },
+      }),
+    ]);
+
+    let maxSeq = 0;
+    for (const item of [latestReq, latestGroup]) {
+      if (item?.kodeRegistrasi) {
+        const parts = item.kodeRegistrasi.split("-");
+        const num = parseInt(parts[2] || "0", 10);
+        if (!isNaN(num) && num > maxSeq) maxSeq = num;
+      }
+    }
+
     // Process each group inside transaction
     await prisma.$transaction(async (tx) => {
       for (const [groupKey, members] of groupEntries) {
         totalGroupImported++;
-        const baseSeq = String(Date.now()).slice(-5) + String(totalGroupImported).padStart(2, "0");
-        const kodeRegistrasi = `GRP-2026-${baseSeq}`;
+        const nextSeq = maxSeq + totalGroupImported;
+        const seqStr = nextSeq.toString().padStart(4, "0");
+        const kodeRegistrasi = `GRP-${year}-${seqStr}`;
         const firstMember = members[0]!;
 
         const jkLeader: JenisKelamin = (firstMember.jenisKelamin?.toUpperCase() === "P" || firstMember.jenisKelamin?.toUpperCase() === "PEREMPUAN") ? "P" : "L";
@@ -112,7 +137,7 @@ export async function POST(req: Request) {
             kodeRegistrasi,
             namaGroup: cleanGroupTitle(groupKey, members.length),
             paketKeberangkatanId: keberangkatanId,
-            ketuaGroupId: `TEMP-LEADER-${baseSeq}`,
+            ketuaGroupId: `TEMP-LEADER-${seqStr}`,
             jumlahAnggota: members.length,
             totalTagihan: members.length * 35000000,
             sisaPembayaran: members.length * 35000000,
