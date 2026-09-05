@@ -149,8 +149,20 @@ export function getOcrConfidenceVariant(confidence?: number): "success" | "warni
 export function calculateAge(birthDate: string | Date | null | undefined): number | null {
   if (!birthDate) return null;
   try {
+    if (typeof birthDate === "string") {
+      const parts = birthDate.split("-");
+      if (parts.length === 3 && parts[0].length === 4) {
+        const yearNum = parseInt(parts[0], 10);
+        if (isNaN(yearNum) || yearNum < 1900 || yearNum > new Date().getFullYear()) {
+          return null;
+        }
+      } else {
+        return null;
+      }
+    }
     const d = typeof birthDate === "string" ? new Date(birthDate) : birthDate;
     if (isNaN(d.getTime())) return null;
+    if (d.getFullYear() < 1900 || d.getFullYear() > new Date().getFullYear()) return null;
     const today = new Date();
     let age = today.getFullYear() - d.getFullYear();
     const m = today.getMonth() - d.getMonth();

@@ -116,8 +116,22 @@ interface MemberForm {
 
 function calculateAge(birthDateStr?: string): { age: number; category: string; isLansia: boolean } | null {
   if (!birthDateStr) return null;
+
+  // Pastikan format tanggal lengkap YYYY-MM-DD dengan tahun 4-digit yang valid (>= 1900 & <= tahun sekarang)
+  const parts = birthDateStr.split("-");
+  if (parts.length === 3 && parts[0].length === 4) {
+    const yearNum = parseInt(parts[0], 10);
+    if (isNaN(yearNum) || yearNum < 1900 || yearNum > new Date().getFullYear()) {
+      return null;
+    }
+  } else {
+    return null;
+  }
+
   const birthDate = new Date(birthDateStr);
   if (isNaN(birthDate.getTime())) return null;
+  if (birthDate.getFullYear() < 1900 || birthDate.getFullYear() > new Date().getFullYear()) return null;
+
   const today = new Date();
   let age = today.getFullYear() - birthDate.getFullYear();
   const m = today.getMonth() - birthDate.getMonth();
