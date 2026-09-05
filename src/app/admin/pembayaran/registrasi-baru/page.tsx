@@ -12,6 +12,7 @@ import {
   Modal,
 } from "@/shared/components/ui";
 import { formatDate } from "@/shared/lib/utils";
+import { resolveDocumentImageUrl } from "@/shared/lib/document-utils";
 import {
   CheckCircle2,
   XCircle,
@@ -491,32 +492,33 @@ export default function RegistrasiBaruPage() {
             {(() => {
               const notes = detailTarget.catatanAdmin || "";
               const match = notes.match(/\[Bukti DP Uploaded[^\]]*\]:\s*(\S+)/);
-              const buktiUrl = match ? match[1] : null;
+              const rawUrl = match ? match[1] : null;
+              const resolvedUrl = resolveDocumentImageUrl(rawUrl);
 
               return (
                 <div className="space-y-3 pt-2 border-t">
                   <h4 className="text-sm font-semibold text-gray-900 flex items-center justify-between">
                     <span>Bukti Transfer DP Jamaah</span>
-                    {buktiUrl && (
+                    {resolvedUrl && (
                       <span className="text-xs text-green-700 bg-green-50 px-2 py-0.5 rounded font-medium border border-green-200">
                         Sudah Diunggah
                       </span>
                     )}
                   </h4>
 
-                  {buktiUrl ? (
+                  {resolvedUrl ? (
                     <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 space-y-2">
                       <div className="max-h-56 overflow-hidden rounded-lg border border-blue-200 bg-white flex items-center justify-center p-2">
                         <img
-                          src={buktiUrl}
+                          src={resolvedUrl}
                           alt="Bukti Transfer DP"
                           className="max-h-52 object-contain rounded"
                         />
                       </div>
                       <div className="flex justify-between items-center text-xs">
-                        <span className="text-blue-900 font-medium truncate max-w-[200px]">{buktiUrl}</span>
+                        <span className="text-blue-900 font-medium truncate max-w-[200px]">{rawUrl}</span>
                         <a
-                          href={buktiUrl}
+                          href={resolvedUrl}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="px-2.5 py-1 bg-blue-600 text-white rounded font-medium hover:bg-blue-700 transition-colors"

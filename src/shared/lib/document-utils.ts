@@ -323,3 +323,36 @@ export function computeDynamicDocumentRequirements(
   };
 }
 
+export function resolveDocumentImageUrl(url?: string | null): string {
+  if (!url) return "";
+  const trimmed = url.trim();
+  if (
+    !trimmed ||
+    trimmed === "null" ||
+    trimmed === "undefined" ||
+    trimmed === "-" ||
+    trimmed === "File" ||
+    trimmed === "received" ||
+    trimmed === "Bayar" ||
+    trimmed === "Tunai"
+  ) {
+    return "";
+  }
+  if (
+    trimmed.startsWith("http://") ||
+    trimmed.startsWith("https://") ||
+    trimmed.startsWith("data:") ||
+    trimmed.startsWith("blob:")
+  ) {
+    return trimmed;
+  }
+  if (trimmed.startsWith("/")) {
+    return trimmed;
+  }
+  if (trimmed.startsWith("uploads/")) {
+    return `/${trimmed}`;
+  }
+  return `/api/storage/download?id=${encodeURIComponent(trimmed)}`;
+}
+
+

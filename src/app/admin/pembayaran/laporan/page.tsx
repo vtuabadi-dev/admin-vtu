@@ -39,6 +39,7 @@ import {
 } from "lucide-react";
 import { downloadInvoicePdf, getInvoicePdfBase64, type InvoiceOrderItem } from "@/shared/lib/invoice-pdf";
 import { resolveHotelForKlaster } from "@/shared/lib/hotel-utils";
+import { resolveDocumentImageUrl } from "@/shared/lib/document-utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/components/ui/Card";
 import { Button } from "@/shared/components/ui/Button";
 import { Input } from "@/shared/components/ui/Input";
@@ -1669,7 +1670,7 @@ function PaymentReviewTabContent() {
                                   className="h-7 w-7 p-0 rounded-full text-amber-600 hover:bg-amber-500/10 hover:text-amber-700"
                                   title="Lihat Bukti Transfer"
                                   onClick={() => {
-                                    setPreviewImageUrl(p.buktiUrl);
+                                    setPreviewImageUrl(resolveDocumentImageUrl(p.buktiUrl));
                                     setZoomLevel(1);
                                   }}
                                 >
@@ -2136,7 +2137,7 @@ function PaymentReviewTabContent() {
                         variant="outline"
                         className="h-7 text-[11px] font-bold border-amber-500/40 text-amber-700 dark:text-amber-300"
                         onClick={() => {
-                          setPreviewImageUrl(selectedPayment.buktiUrl);
+                          setPreviewImageUrl(resolveDocumentImageUrl(selectedPayment.buktiUrl));
                           setZoomLevel(1);
                         }}
                       >
@@ -2721,7 +2722,7 @@ function PaymentReviewTabContent() {
 
             {previewImageUrl && (
               <a
-                href={previewImageUrl}
+                href={resolveDocumentImageUrl(previewImageUrl)}
                 target="_blank"
                 rel="noreferrer"
                 className="inline-flex items-center gap-1 text-xs font-bold text-amber-600 hover:underline"
@@ -2734,7 +2735,7 @@ function PaymentReviewTabContent() {
           <div className="max-h-[60vh] overflow-auto flex items-center justify-center p-4 bg-muted/20 rounded-xl border">
             {previewImageUrl && (
               <img
-                src={previewImageUrl}
+                src={resolveDocumentImageUrl(previewImageUrl)}
                 alt="Bukti Transfer"
                 style={{ transform: `scale(${zoomLevel})`, transformOrigin: "center center" }}
                 className="transition-transform duration-200 rounded-lg shadow-md max-w-full h-auto object-contain"
