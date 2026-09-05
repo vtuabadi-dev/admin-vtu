@@ -76,6 +76,21 @@ async function main() {
         { kelompokUkuran: "DEWASA_PEREMPUAN", kodeUkuran: "L", namaUkuran: "Outer Dewasa L" },
         { kelompokUkuran: "DEWASA_PEREMPUAN", kodeUkuran: "XL", namaUkuran: "Outer Dewasa XL" },
       ];
+    } else if (it.code === "IHR-PRI") {
+      sizes = [
+        { kelompokUkuran: "ANAK_LAKI", kodeUkuran: "TK", namaUkuran: "Ihram Ukuran TK" },
+        { kelompokUkuran: "ANAK_LAKI", kodeUkuran: "SD", namaUkuran: "Ihram Ukuran SD" },
+        { kelompokUkuran: "ANAK_LAKI", kodeUkuran: "SMP", namaUkuran: "Ihram Ukuran SMP" },
+        { kelompokUkuran: "DEWASA_LAKI", kodeUkuran: "DEWASA", namaUkuran: "Ihram Ukuran Dewasa" },
+      ];
+      // Clean up old STD size for IHR-PRI
+      const oldStdUkuran = await prisma.masterPerlengkapanUkuran.findFirst({
+        where: { barangId: itemObj.id, kodeUkuran: "STD" },
+      });
+      if (oldStdUkuran) {
+        await prisma.stokGudangItem.deleteMany({ where: { ukuranId: oldStdUkuran.id } });
+        await prisma.masterPerlengkapanUkuran.delete({ where: { id: oldStdUkuran.id } });
+      }
     } else {
       sizes = [
         { kelompokUkuran: "STANDAR", kodeUkuran: "STD", namaUkuran: "Ukuran Standar" },

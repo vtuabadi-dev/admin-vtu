@@ -418,17 +418,19 @@ export default function MasterPerlengkapanPage() {
                     {/* Varian Ukuran */}
                     <td className="px-4 py-3.5">
                       <div className="flex flex-wrap gap-1">
-                        {(b.ukuran || []).length === 0 ? (
-                          <span className="text-stone-400 italic text-[11px]">Ukuran Standar</span>
+                        {(b.ukuran || []).filter((u) => u.kodeUkuran !== "STD").length === 0 ? (
+                          <span className="text-stone-400 font-mono text-[11px]">-</span>
                         ) : (
-                          b.ukuran?.map((u) => (
-                            <span
-                              key={u.id}
-                              className="px-2 py-0.5 bg-stone-100 dark:bg-stone-800 rounded font-mono font-bold text-[10px] text-stone-800 dark:text-stone-200 border border-stone-200 dark:border-stone-700"
-                            >
-                              {u.kodeUkuran}
-                            </span>
-                          ))
+                          b.ukuran
+                            ?.filter((u) => u.kodeUkuran !== "STD")
+                            .map((u) => (
+                              <span
+                                key={u.id}
+                                className="px-2 py-0.5 bg-stone-100 dark:bg-stone-800 rounded font-mono font-bold text-[10px] text-stone-800 dark:text-stone-200 border border-stone-200 dark:border-stone-700"
+                              >
+                                {u.kodeUkuran}
+                              </span>
+                            ))
                         )}
                       </div>
                     </td>

@@ -395,8 +395,9 @@ export default function PengambilanPerlengkapanPage() {
               ) : (
                 filteredJamaah.map((j, idx) => {
                   const checklist = j.checklist || [];
-                  const itemsCheckedCount = checklist.filter((c) => c?.status === "SUDAH").length;
-                  const totalMaster = (masterItems || []).length;
+                  const activeMasterItems = (masterItems || []).filter((it) => it.tipePengambilan !== "SERENTAK_HARI_H");
+                  const itemsCheckedCount = checklist.filter((c) => c?.status === "SUDAH" && activeMasterItems.some((a) => a.id === c?.barangId)).length;
+                  const totalMaster = activeMasterItems.length;
 
                   return (
                     <tr key={j.id} className="hover:bg-amber-50/30 dark:hover:bg-amber-950/20 transition-colors">
@@ -609,12 +610,15 @@ export default function PengambilanPerlengkapanPage() {
               <div className="space-y-1.5 max-h-56 overflow-y-auto p-2 bg-stone-50 dark:bg-stone-900 rounded-lg border border-stone-200 dark:border-stone-800">
                 {masterItems
                   .filter((item) => {
+                    // Exclude Hari H items from Admin pre-departure checklist form
+                    if (item.tipePengambilan === "SERENTAK_HARI_H") return false;
+
                     const isFemale = selectedJamaah.jenisKelamin?.toUpperCase().includes("P");
                     // Gender filtering
                     if (isFemale && item.genderTarget === "LAKI_LAKI") return false;
                     if (!isFemale && item.genderTarget === "PEREMPUAN") return false;
 
-                    // If TANPA status, only show Universal Mandatory items (Buku Doa, Slayer, Tas Serut, ID Card)
+                    // If TANPA status, only show Universal Mandatory items
                     if (editStatus === "TANPA" && item.sifatPerlengkapan !== "UMUM_WAJIB") {
                       return false;
                     }
