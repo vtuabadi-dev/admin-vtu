@@ -94,6 +94,9 @@ export async function POST(
       const namaGroup = `GRUP ${reg.namaPerwakilan}`;
       const paket = await tx.keberangkatan.findUniqueOrThrow({ where: { id: reg.paketId } });
       const totalTagihan = paket.hargaPaket * reg.paxCount;
+      const pkgInc = Array.isArray(paket.include) ? paket.include : [];
+      const hasKC = pkgInc.some((inc: string) => /kereta|fast train|haramain/i.test(inc));
+      const hasThoif = pkgInc.some((inc: string) => /thoif|taif|ta'if/i.test(inc));
 
       const group = await tx.registrationGroup.create({
         data: {
@@ -106,12 +109,21 @@ export async function POST(
           totalPembayaran: 0,
           sisaPembayaran: totalTagihan,
           status: "active",
+          isKeretaCepat: hasKC,
+          isCityTourThoif: hasThoif,
         },
       });
 
-      // 3. Update Jamaah records with groupId (userId will be set after user creation)
+      // 3. Update Jamaah records with groupId & inclusion snapshot
       for (const j of jamaahRecords) {
-        await tx.jamaah.update({ where: { id: j.id }, data: { groupId: group.id } });
+        await tx.jamaah.update({
+          where: { id: j.id },
+          data: {
+            groupId: group.id,
+            isKeretaCepat: hasKC,
+            isCityTourThoif: hasThoif,
+          },
+        });
       }
 
       // 4. Create User accounts with temp passwords

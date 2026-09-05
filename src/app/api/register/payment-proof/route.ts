@@ -151,6 +151,8 @@ export async function POST(request: NextRequest) {
             hotelMekkah: "",
             hotelMadinah: "",
             syaratDisetujui: reg.termsAccepted ?? true,
+            isKeretaCepat: Array.isArray(reg.keberangkatan?.include) && reg.keberangkatan.include.some((inc: string) => /kereta|fast train|haramain/i.test(inc)),
+            isCityTourThoif: Array.isArray(reg.keberangkatan?.include) && reg.keberangkatan.include.some((inc: string) => /thoif|taif|ta'if/i.test(inc)),
           },
         });
       }
@@ -160,6 +162,7 @@ export async function POST(request: NextRequest) {
     if (!group) {
       const ketua = createdJamaah[0];
       const totalTagihan = (reg.keberangkatan?.hargaPaket || 0) * (reg.paxCount || memberList.length || 1);
+      const pkgInc = Array.isArray(reg.keberangkatan?.include) ? reg.keberangkatan.include : [];
       group = await prisma.registrationGroup.create({
         data: {
           kodeRegistrasi: reg.kodeRegistrasi,
@@ -171,6 +174,8 @@ export async function POST(request: NextRequest) {
           totalPembayaran: 0,
           sisaPembayaran: totalTagihan,
           status: "active",
+          isKeretaCepat: pkgInc.some((inc: string) => /kereta|fast train|haramain/i.test(inc)),
+          isCityTourThoif: pkgInc.some((inc: string) => /thoif|taif|ta'if/i.test(inc)),
         },
       });
 

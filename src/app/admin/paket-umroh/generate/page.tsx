@@ -10,7 +10,7 @@ import {
   MOCK_LANDING_PATTERN, 
   MOCK_KLASTER
 } from "@/shared/lib/mock-data";
-import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X, Split, Layers, Tag } from "lucide-react";
+import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X, Split, Layers, Tag, Edit3 } from "lucide-react";
 import { generateVtuGroupCode } from "@/shared/lib/group-code.helper";
 import { PairingCanvas } from "./components/PairingCanvas";
 import { useOperationalStore } from "@/stores/operational-store";
@@ -46,8 +46,9 @@ export default function GeneratePaketPage() {
   // Tab path selection
   const [pathMode, setPathMode] = useState<"manual" | "ocr">("manual");
 
-  // Mode Generator (Buat Paket Baru vs Pecah Starting Point)
-  const [generateMode, setGenerateMode] = useState<"new" | "split">("new");
+  // Mode Generator (Buat Paket Baru vs Pecah Starting Point vs Edit Spesifikasi)
+  const [generateMode, setGenerateMode] = useState<"new" | "split" | "edit">("new");
+  const [selectedEditPackageId, setSelectedEditPackageId] = useState<string>("");
   const [splitType, setSplitType] = useState<"starting_point" | "promo">("starting_point");
   const [promoLabel, setPromoLabel] = useState<string>("");
   const [existingGroupsData, setExistingGroupsData] = useState<{ groups: any[]; individuals: any[] }>({ groups: [], individuals: [] });
@@ -421,6 +422,127 @@ export default function GeneratePaketPage() {
   useEffect(() => {
     fetchExistingGroups();
   }, [fetchExistingGroups]);
+
+  const handleSelectPackageForEdit = async (pkgId: string) => {
+    setSelectedEditPackageId(pkgId);
+    if (!pkgId) return;
+    try {
+      setFetching(true);
+      const res = await fetch(`/api/keberangkatan/${pkgId}`);
+      const json = await res.json();
+      if (json.success && json.data) {
+        const pkg = json.data;
+        const incArray = Array.isArray(pkg.include) ? pkg.include : [];
+        const hasKC = incArray.some((inc: string) => /kereta|fast train|haramain/i.test(inc)) ? "ya" : "tidak";
+        const hasThoif = incArray.some((inc: string) => /thoif|taif|ta'if/i.test(inc)) ? "ya" : "tidak";
+        const hasPerlengkapan = incArray.some((inc: string) => /perlengkapan/i.test(inc)) ? "ya" : "tidak";
+
+        setFormData(prev => ({
+          ...prev,
+          namaPaket: pkg.namaPaket || "",
+          kodePaket: pkg.kode || pkg.kodeIndividu || "",
+          hargaBase: String(pkg.hargaPaket || ""),
+          durasiHari: String(pkg.durationDays || pkg.durasiHari || "9"),
+          kapasitas: String(pkg.maxSeat || pkg.kuota || "45"),
+          targetMaterialisasi: String(pkg.targetMaterialisasi || "30"),
+          startingPointId: pkg.startingPointId || "",
+          landingPatternId: pkg.routeId || "",
+          maskapaiId: pkg.maskapaiId || "",
+          hotelMekkahId: pkg.hotelMekkahId || "",
+          hotelMadinahId: pkg.hotelMadinahId || "",
+          jenisPaketId: pkg.packageTypeId || "",
+          isAdaKeretaCepat: hasKC,
+          isAdaThoif: hasThoif,
+          isAdaPerlengkapan: hasPerlengkapan,
+        }));
+
+        if (pkg.tanggalBerangkat) {
+          const depStr = new Date(pkg.tanggalBerangkat).toISOString().split("T")[0]!;
+          const arrStr = pkg.tanggalPulang ? new Date(pkg.tanggalPulang).toISOString().split("T")[0]! : "";
+          setDepartureDateRows([
+            { departureDate: depStr, arrivalDate: arrStr, source: "Manual", status: "Generated", isManualOverride: false },
+            { departureDate: "", arrivalDate: "", source: "-", status: "-", isManualOverride: false },
+          ]);
+        }
+      }
+    } catch (err) {
+      console.error("Gagal memuat detail paket untuk diedit:", err);
+    } finally {
+      setFetching(false);
+    }
+  };
+
+  const handleUpdatePackage = async () => {
+    scrollToTop();
+    if (!selectedEditPackageId) {
+      alert("Mohon pilih paket yang akan dirubah spesifikasinya terlebih dahulu.");
+      return;
+    }
+    setLoading(true);
+
+    let basePrice = Number(formData.hargaBase || 0);
+    if (formData.isAdaKlaster === "ya" && clusterConfigs) {
+      const firstClusterPrice = Object.values(clusterConfigs).find(c => Number(c.hargaBase) > 0)?.hargaBase;
+      if (firstClusterPrice) {
+        basePrice = Number(firstClusterPrice);
+      }
+    }
+
+    const includeList = ["Tiket Pesawat PP", "Visa Umroh", "Hotel Mekkah & Madinah", "Handling & Bus AC"];
+    if (formData.isAdaPerlengkapan === "ya") includeList.push("Perlengkapan Umroh");
+    if (formData.isAdaKeretaCepat === "ya") includeList.push("Kereta Cepat Haramain");
+    if (formData.isAdaThoif === "ya") includeList.push("City Tour Thoif");
+
+    const firstDepDate = departureDates[0] ? new Date(departureDates[0]) : undefined;
+    let firstArrDate: Date | undefined = undefined;
+    if (firstDepDate) {
+      firstArrDate = new Date(firstDepDate);
+      firstArrDate.setDate(firstArrDate.getDate() + (parseInt(formData.durasiHari, 10) || 9) - 1);
+    }
+
+    const payload: any = {
+      namaPaket: formData.namaPaket,
+      hargaPaket: basePrice > 0 ? basePrice : undefined,
+      durasiHari: Number(formData.durasiHari || 9),
+      kuota: Number(formData.kapasitas || 45),
+      maxSeat: Number(formData.kapasitas || 45),
+      targetMaterialisasi: Number(formData.targetMaterialisasi || 30),
+      startingPointId: formData.startingPointId || undefined,
+      packageTypeId: formData.jenisPaketId || undefined,
+      maskapaiId: formData.maskapaiId || undefined,
+      hotelMekkahId: formData.hotelMekkahId || undefined,
+      hotelMadinahId: formData.hotelMadinahId || undefined,
+      include: includeList,
+    };
+
+    if (firstDepDate) payload.tanggalBerangkat = firstDepDate.toISOString();
+    if (firstArrDate) payload.tanggalPulang = firstArrDate.toISOString();
+
+    try {
+      const res = await fetch(`/api/keberangkatan/${selectedEditPackageId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const resJson = await res.json();
+      if (resJson.success) {
+        setGeneratedResult({
+          count: 1,
+          items: [{ name: formData.namaPaket, code: formData.kodePaket, date: departureDates[0] || "" }],
+        });
+        setSuccess(true);
+        useOperationalStore.getState().setIsLoaded(false);
+        useOperationalStore.getState().loadAllData();
+        fetchExistingGroups();
+      } else {
+        alert(`Gagal merubah spesifikasi paket: ${resJson.message || "Terjadi kesalahan"}`);
+      }
+    } catch (err: any) {
+      alert(`Terjadi kesalahan: ${err?.message || err}`);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Reset selected Rute In-Out if not valid for the selected package type
   useEffect(() => {
@@ -1650,11 +1772,17 @@ export default function GeneratePaketPage() {
             <Button variant="outline" onClick={() => router.push("/admin/paket-umroh")} className="bg-white border-stone-300 text-slate-800 hover:bg-stone-50 font-bold">Batal</Button>
             <Button 
               id="field-submitBtn" 
-              onClick={handleGenerate} 
-              disabled={loading || fetching}
+              onClick={() => {
+                if (generateMode === "edit") {
+                  handleUpdatePackage();
+                } else {
+                  handleGenerate();
+                }
+              }} 
+              disabled={loading || fetching || (generateMode === "edit" && !selectedEditPackageId)}
               className="px-6 font-bold bg-emerald-700 hover:bg-emerald-800 text-white"
             >
-              {loading ? "Memproses..." : `Generate ${departureDates.length > 0 ? departureDates.length : ""} Paket`}
+              {loading ? "Memproses..." : generateMode === "edit" ? "Simpan Perubahan Spesifikasi Paket" : `Generate ${departureDates.length > 0 ? departureDates.length : ""} Paket`}
             </Button>
           </div>
         </div>
@@ -2207,16 +2335,18 @@ export default function GeneratePaketPage() {
           <Button 
             id="field-submitBtnHeader" 
             onClick={() => {
-              if (generateMode === "split" && selectedParentGroup) {
+              if (generateMode === "edit") {
+                handleUpdatePackage();
+              } else if (generateMode === "split" && selectedParentGroup) {
                 setShowPairingCanvas(true);
               } else {
                 handleGenerate();
               }
             }} 
-            disabled={loading || fetching || (generateMode === "split" && (!selectedParentGroupId || (selectedParentGroup && departureDates.length !== selectedParentGroup.dateCount)))}
-            className={cn(generateMode === "split" ? "bg-amber-600 hover:bg-amber-500 text-white font-bold" : "bg-emerald-700 hover:bg-emerald-800 text-white font-bold")}
+            disabled={loading || fetching || (generateMode === "split" && (!selectedParentGroupId || (selectedParentGroup && departureDates.length !== selectedParentGroup.dateCount))) || (generateMode === "edit" && !selectedEditPackageId)}
+            className={cn(generateMode === "split" ? "bg-amber-600 hover:bg-amber-500 text-white font-bold" : generateMode === "edit" ? "bg-blue-600 hover:bg-blue-700 text-white font-bold" : "bg-emerald-700 hover:bg-emerald-800 text-white font-bold")}
           >
-            {loading ? "Memproses..." : generateMode === "split" ? `Lanjut Canvas Pairing (${departureDates.length} Tanggal)` : `Generate ${departureDates.length > 0 ? departureDates.length : ""} Paket`}
+            {loading ? "Memproses..." : generateMode === "edit" ? "Simpan Perubahan Spesifikasi Paket" : generateMode === "split" ? `Lanjut Canvas Pairing (${departureDates.length} Tanggal)` : `Generate ${departureDates.length > 0 ? departureDates.length : ""} Paket`}
           </Button>
         </div>
       </div>
@@ -2230,7 +2360,7 @@ export default function GeneratePaketPage() {
           <span className="text-[11px] text-stone-500 font-medium">Pilih alur pembuatan paket yang sesuai</span>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <button
             type="button"
             onClick={() => {
@@ -2249,7 +2379,7 @@ export default function GeneratePaketPage() {
             </div>
             <div>
               <div className="font-extrabold text-sm text-slate-950 flex items-center gap-1.5">
-                📦 Buat Paket Baru (Fresh Single Starting Point)
+                📦 Buat Paket Baru
               </div>
               <p className="text-xs text-stone-600 mt-1 leading-relaxed font-medium">
                 Membuat paket keberangkatan baru dari nol untuk 1 Starting Point pertama (Jalur Manual / OCR).
@@ -2272,14 +2402,69 @@ export default function GeneratePaketPage() {
             </div>
             <div>
               <div className="font-extrabold text-sm text-slate-950 flex items-center gap-1.5">
-                🔀 Split Paket (Pecahan Paket / Multi-Variant)
+                🔀 Split Paket (Variant)
               </div>
               <p className="text-xs text-stone-600 mt-1 leading-relaxed font-medium">
-                Membuat pecahan paket dari Paket Utama, baik karena menambah Starting Point baru (misal Surabaya, Medan) maupun membuat Promo (Early Bird, Flash Sale, Diskon Group) dengan nama/label promo tersendiri.
+                Membuat pecahan paket dari Paket Utama, baik menambah Starting Point baru maupun membuat Variant Promo.
+              </p>
+            </div>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setGenerateMode("edit");
+              setShowPairingCanvas(false);
+            }}
+            className={cn(
+              "p-4 rounded-xl border text-left transition-all flex items-start gap-3.5",
+              generateMode === "edit"
+                ? "bg-blue-50/90 border-2 border-blue-600 text-blue-950 shadow-xs ring-1 ring-blue-500"
+                : "bg-stone-50/80 border-stone-200 text-stone-700 hover:bg-stone-100"
+            )}
+          >
+            <div className={cn("p-2.5 rounded-xl shrink-0 mt-0.5", generateMode === "edit" ? "bg-blue-600 text-white shadow-xs" : "bg-stone-200 text-stone-600")}>
+              <Edit3 className="h-5 w-5" />
+            </div>
+            <div>
+              <div className="font-extrabold text-sm text-slate-950 flex items-center gap-1.5">
+                📝 Perubahan Paket (Edit Spesifikasi)
+              </div>
+              <p className="text-xs text-stone-600 mt-1 leading-relaxed font-medium">
+                Merubah spesifikasi paket eksisting (klaster, hotel, harga, perlengkapan, Kereta Cepat & City Tour).
               </p>
             </div>
           </button>
         </div>
+
+        {/* Selected Edit Package Selector when in "edit" mode */}
+        {generateMode === "edit" && (
+          <div className="mt-4 p-4 bg-blue-50 dark:bg-blue-950/40 border border-blue-300 dark:border-blue-700/60 rounded-xl space-y-3">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold text-blue-900 dark:text-blue-200 flex items-center gap-1.5">
+                <Edit3 className="h-4 w-4 text-blue-600" /> Langkah 1: Pilih Paket yang Akan Dirubah Spesifikasinya
+              </label>
+              <span className="text-[11px] text-blue-700 font-medium">Auto-fill spesifikasi paket eksisting</span>
+            </div>
+            <select
+              value={selectedEditPackageId}
+              onChange={(e) => handleSelectPackageForEdit(e.target.value)}
+              className="w-full h-10 px-3 text-xs bg-white dark:bg-card border border-blue-300 dark:border-blue-700 rounded-lg font-medium text-slate-900 focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">-- Pilih Paket untuk Diedit / Dirubah Spesifikasinya --</option>
+              {existingGroupsData.individuals.map((pkg: any) => (
+                <option key={pkg.id} value={pkg.id}>
+                  {pkg.kodeGrup} - {pkg.namaPaket} ({pkg.dates?.[0] || "-"}) [{pkg.startingCity}]
+                </option>
+              ))}
+            </select>
+            {selectedEditPackageId && (
+              <div className="p-2.5 bg-blue-100/70 border border-blue-300 rounded-lg text-xs font-semibold text-blue-950 flex items-center justify-between">
+                <span>✓ Data paket berhasil dimuat ke wizard form. Anda dapat merubah spesifikasi (harga, hotel, perlengkapan, Kereta Cepat, City Tour) di bawah ini.</span>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Selected Parent Group Selector when in "split" mode */}
         {generateMode === "split" && (

@@ -185,6 +185,8 @@ export const keberangkatanRepo = {
     if (data.hotelMadinahId !== undefined) updateData.hotelMadinahId = data.hotelMadinahId;
     if (data.startingPointId !== undefined) updateData.startingPointId = data.startingPointId;
     if (data.packageTypeId !== undefined) updateData.packageTypeId = data.packageTypeId;
+    if (data.include !== undefined) updateData.include = data.include;
+    if (data.exclude !== undefined) updateData.exclude = data.exclude;
 
     if (data.driveFolderIds !== undefined || data.tourLeader !== undefined || data.muthowif !== undefined || data.flightDetails !== undefined) {
       const existing = await prisma.keberangkatan.findUnique({ where: { id }, select: { driveFolderIds: true } });
