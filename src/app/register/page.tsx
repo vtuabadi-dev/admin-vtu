@@ -808,11 +808,35 @@ export default function RegisterPage() {
   };
 
   // Canvas Drawing Handlers
+  const resetCanvasPaper = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  }, []);
+
+  // Initialize canvas paper background when Step 6 is active
+  useEffect(() => {
+    if (step === 6 && signatureMode === "draw") {
+      const timer = setTimeout(() => {
+        resetCanvasPaper();
+      }, 50);
+      return () => clearTimeout(timer);
+    }
+  }, [step, signatureMode, resetCanvasPaper]);
+
   const startDrawingCanvas = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
+
+    if (!hasDrawnOnCanvas) {
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
 
     const rect = canvas.getBoundingClientRect();
     let clientX = 0;
@@ -828,8 +852,8 @@ export default function RegisterPage() {
       clientY = (e as React.MouseEvent<HTMLCanvasElement>).clientY;
     }
 
-    ctx.strokeStyle = "#0f172a";
-    ctx.lineWidth = 2.5;
+    ctx.strokeStyle = "#0b1329";
+    ctx.lineWidth = 3;
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
     ctx.beginPath();
@@ -868,11 +892,7 @@ export default function RegisterPage() {
   };
 
   const clearCanvasSignature = () => {
-    const canvas = canvasRef.current;
-    if (canvas) {
-      const ctx = canvas.getContext("2d");
-      if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
-    }
+    resetCanvasPaper();
     setHasDrawnOnCanvas(false);
     clearSignature();
   };
@@ -2291,16 +2311,16 @@ export default function RegisterPage() {
                   </button>
                 </div>
               ) : signatureMode === "draw" ? (
-                /* Canvas Drawing Pad (White Paper Canvas inside Dark Green Box) */
+                /* Canvas Drawing Pad (White Paper Canvas with Gold Border) */
                 <div className="space-y-4 max-w-lg mx-auto">
                   <p className="text-xs sm:text-sm font-extrabold text-amber-300 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
                     Gunakan Jari / Mouse / Stylus untuk membuat Tanda Tangan di bawah ini:
                   </p>
-                  <div className="bg-white rounded-2xl border-2 border-dashed border-emerald-400/80 p-2 shadow-inner relative touch-none overflow-hidden">
+                  <div className="bg-white rounded-2xl border-4 border-[#D4AF37] p-2.5 shadow-[0_10px_30px_rgba(0,0,0,0.5)] relative touch-none overflow-hidden max-w-lg mx-auto">
                     <canvas
                       ref={canvasRef}
-                      width={450}
-                      height={200}
+                      width={480}
+                      height={220}
                       onMouseDown={startDrawingCanvas}
                       onMouseMove={drawCanvas}
                       onMouseUp={stopDrawingCanvas}
@@ -2308,12 +2328,18 @@ export default function RegisterPage() {
                       onTouchStart={startDrawingCanvas}
                       onTouchMove={drawCanvas}
                       onTouchEnd={stopDrawingCanvas}
-                      className="w-full h-48 bg-white rounded-xl cursor-crosshair block"
+                      className="w-full h-52 bg-white rounded-xl cursor-crosshair block touch-none border border-amber-200"
                     />
                     {!hasDrawnOnCanvas && (
-                      <span className="absolute inset-0 flex items-center justify-center pointer-events-none text-slate-400 text-xs sm:text-sm font-medium italic">
-                        (Coret/Tanda tangan di area ini)
-                      </span>
+                      <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none bg-white/80 backdrop-blur-[0.5px]">
+                        <PenTool className="w-8 h-8 text-[#D4AF37] mb-1.5 opacity-80" />
+                        <span className="text-slate-800 text-xs sm:text-sm font-black tracking-wide">
+                          ✍️ Area Tanda Tangan Digital
+                        </span>
+                        <span className="text-[11px] text-slate-500 font-bold mt-0.5">
+                          (Goreskan tanda tangan Anda di sini)
+                        </span>
+                      </div>
                     )}
                   </div>
 
