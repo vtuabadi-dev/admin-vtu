@@ -231,9 +231,9 @@ export function Sidebar({ role, mobileOpen = false, onMobileClose }: SidebarProp
           }))
           .filter((section) => section.items.length > 0);
 
-  // Auto-expand parent when a child route is active
+  // Auto-expand parent when a child route is active (single accordion mode)
   useEffect(() => {
-    const next = new Set(expanded);
+    let activeParentLabel: string | null = null;
     for (const section of sections) {
       for (const item of section.items) {
         if (item.children) {
@@ -242,24 +242,24 @@ export function Sidebar({ role, mobileOpen = false, onMobileClose }: SidebarProp
             return pathname === childPath || pathname.startsWith(childPath + "/");
           });
           if (hasActiveChild) {
-            next.add(item.label);
+            activeParentLabel = item.label;
+            break;
           }
         }
       }
     }
-    setExpanded(next);
+    if (activeParentLabel) {
+      setExpanded(new Set([activeParentLabel]));
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname]);
 
   function toggleGroup(label: string) {
     setExpanded((prev) => {
-      const next = new Set(prev);
-      if (next.has(label)) {
-        next.delete(label);
-      } else {
-        next.add(label);
+      if (prev.has(label)) {
+        return new Set();
       }
-      return next;
+      return new Set([label]);
     });
   }
 
