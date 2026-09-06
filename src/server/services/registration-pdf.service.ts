@@ -334,18 +334,18 @@ export async function generateRegistrationPdf(data: PdfData): Promise<Buffer> {
       // ── PAGE 2 ONWARDS — SYARAT & KETENTUAN LENGKAP OPERASIONAL (64+ POIN) ──
       doc.addPage({ size: [612, 936], margin: 40 });
 
-      // Function to draw Kop Surat on new page and return proper top Y position (155pt)
+      // Function to draw Kop Surat on new page and return proper top Y position (184pt — diturunkan 1 cm / ~28.5pt dari 155pt)
       const startNewTermsPage = (): number => {
         let newY = 40;
         if (hasKopSurat && kopBuffer) {
           try {
             doc.image(kopBuffer, 40, 20, { width: PAGE_W });
-            newY = 155; // SAFELY BELOW KOP SURAT IMAGE!
+            newY = 184; // Diturunkan 1 cm (~28.5pt dari 155pt) agar konten tidak bertabrakan dengan garis bawah kop surat
           } catch {
-            newY = 50;
+            newY = 60;
           }
         } else {
-          newY = 50;
+          newY = 60;
         }
         return newY;
       };

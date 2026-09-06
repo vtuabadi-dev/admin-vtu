@@ -13,6 +13,9 @@ import {
   ShieldCheck,
   UserCheck,
   Building,
+  Check,
+  X,
+  Sparkles,
 } from "lucide-react";
 import { Card } from "@/shared/components/ui/Card";
 import { Button } from "@/shared/components/ui/Button";
@@ -72,20 +75,97 @@ export default function MasterPerlengkapanPage() {
   const [picGudang, setPicGudang] = useState("");
   const [submittingGudang, setSubmittingGudang] = useState(false);
 
-  // Ukuran Modal
-  const [ukuranModalOpen, setUkuranModalOpen] = useState(false);
-  const [selectedBarangForUkuran, setSelectedBarangForUkuran] = useState<BarangItem | null>(null);
-  const [kelompokUkuran, setKelompokUkuran] = useState("DEWASA_LAKI");
-  const [kodeUkuran, setKodeUkuran] = useState("");
-  const [namaUkuran, setNamaUkuran] = useState("");
-  const [submittingUkuran, setSubmittingUkuran] = useState(false);
+  // Model Presets untuk Varian Ukuran VTU
+  const VARIANT_PRESETS = [
+    {
+      id: "dewasa-laki",
+      label: "Dewasa Laki-Laki",
+      icon: "👔",
+      desc: "Kemeja S - 4L",
+      items: [
+        { kodeUkuran: "S", namaUkuran: "Kemeja Dewasa S", kelompokUkuran: "DEWASA_LAKI" },
+        { kodeUkuran: "M", namaUkuran: "Kemeja Dewasa M", kelompokUkuran: "DEWASA_LAKI" },
+        { kodeUkuran: "L", namaUkuran: "Kemeja Dewasa L", kelompokUkuran: "DEWASA_LAKI" },
+        { kodeUkuran: "XL", namaUkuran: "Kemeja Dewasa XL", kelompokUkuran: "DEWASA_LAKI" },
+        { kodeUkuran: "XXL", namaUkuran: "Kemeja Dewasa XXL", kelompokUkuran: "DEWASA_LAKI" },
+        { kodeUkuran: "4L", namaUkuran: "Kemeja Dewasa 4L", kelompokUkuran: "DEWASA_LAKI" },
+      ],
+    },
+    {
+      id: "dewasa-perempuan",
+      label: "Dewasa Perempuan",
+      icon: "👗",
+      desc: "Outer/Gamis S - XL",
+      items: [
+        { kodeUkuran: "S", namaUkuran: "Outer Dewasa S", kelompokUkuran: "DEWASA_PEREMPUAN" },
+        { kodeUkuran: "M", namaUkuran: "Outer Dewasa M", kelompokUkuran: "DEWASA_PEREMPUAN" },
+        { kodeUkuran: "L", namaUkuran: "Outer Dewasa L", kelompokUkuran: "DEWASA_PEREMPUAN" },
+        { kodeUkuran: "XL", namaUkuran: "Outer Dewasa XL", kelompokUkuran: "DEWASA_PEREMPUAN" },
+      ],
+    },
+    {
+      id: "anak-laki",
+      label: "Anak-Anak",
+      icon: "👦",
+      desc: "Kemeja Anak No 3 - 10",
+      items: [
+        { kodeUkuran: "3", namaUkuran: "Kemeja Anak No 3", kelompokUkuran: "ANAK_LAKI" },
+        { kodeUkuran: "4", namaUkuran: "Kemeja Anak No 4", kelompokUkuran: "ANAK_LAKI" },
+        { kodeUkuran: "5", namaUkuran: "Kemeja Anak No 5", kelompokUkuran: "ANAK_LAKI" },
+        { kodeUkuran: "6", namaUkuran: "Kemeja Anak No 6", kelompokUkuran: "ANAK_LAKI" },
+        { kodeUkuran: "7", namaUkuran: "Kemeja Anak No 7", kelompokUkuran: "ANAK_LAKI" },
+        { kodeUkuran: "8", namaUkuran: "Kemeja Anak No 8", kelompokUkuran: "ANAK_LAKI" },
+        { kodeUkuran: "9", namaUkuran: "Kemeja Anak No 9", kelompokUkuran: "ANAK_LAKI" },
+        { kodeUkuran: "10", namaUkuran: "Kemeja Anak No 10", kelompokUkuran: "ANAK_LAKI" },
+      ],
+    },
+    {
+      id: "ihram-pria",
+      label: "Kain Ihram Pria",
+      icon: "🕋",
+      desc: "TK, SD, SMP, Dewasa",
+      items: [
+        { kodeUkuran: "TK", namaUkuran: "Ihram Ukuran TK", kelompokUkuran: "ANAK_LAKI" },
+        { kodeUkuran: "SD", namaUkuran: "Ihram Ukuran SD", kelompokUkuran: "ANAK_LAKI" },
+        { kodeUkuran: "SMP", namaUkuran: "Ihram Ukuran SMP", kelompokUkuran: "ANAK_LAKI" },
+        { kodeUkuran: "DEWASA", namaUkuran: "Ihram Ukuran Dewasa", kelompokUkuran: "DEWASA_LAKI" },
+      ],
+    },
+    {
+      id: "bahan-kain",
+      label: "Bahan Kain Belum Jadi",
+      icon: "🧵",
+      desc: "Bahan Kain Saja",
+      items: [
+        { kodeUkuran: "KAIN", namaUkuran: "Bahan Kain (Belum Jadi)", kelompokUkuran: "KAIN" },
+      ],
+    },
+  ];
+
+  // Edit Barang & Konfigurasi Varian Modal States
+  const [barangModalOpen, setBarangModalOpen] = useState(false);
+  const [selectedBarang, setSelectedBarang] = useState<BarangItem | null>(null);
+  const [barangName, setBarangName] = useState("");
+  const [barangSatuan, setBarangSatuan] = useState("");
+  const [tipePengambilan, setTipePengambilan] = useState<"BEBAS_KAPAN_SAJA" | "SERENTAK_HARI_H">("BEBAS_KAPAN_SAJA");
+  const [sifatPerlengkapan, setSifatPerlengkapan] = useState<"UMUM_WAJIB" | "PAKET_STANDAR" | "ADDON_KHUSUS">("PAKET_STANDAR");
+  const [genderTarget, setGenderTarget] = useState<"ALL" | "LAKI_LAKI" | "PEREMPUAN">("ALL");
+  const [barangIsActive, setBarangIsActive] = useState(true);
+
+  // Variant Mode States
+  const [hasVariants, setHasVariants] = useState(false);
+  const [variantList, setVariantList] = useState<{ id?: string; kodeUkuran: string; namaUkuran: string; kelompokUkuran: string }[]>([]);
+  const [customKode, setCustomKode] = useState("");
+  const [customNama, setCustomNama] = useState("");
+  const [customKelompok, setCustomKelompok] = useState("DEWASA_LAKI");
+  const [submittingBarang, setSubmittingBarang] = useState(false);
 
   const loadData = useCallback(async () => {
     try {
       setLoading(true);
       const [resGudang, resBarang] = await Promise.all([
         fetch("/api/master/gudang"),
-        fetch("/api/master/perlengkapan/ukuran"),
+        fetch("/api/master/perlengkapan"),
       ]);
 
       if (resGudang.ok) {
@@ -95,18 +175,26 @@ export default function MasterPerlengkapanPage() {
 
       if (resBarang.ok) {
         const jsonB = await resBarang.json();
-        if (jsonB.success) {
-          // Group variants by barang
-          const map = new Map<string, BarangItem>();
-          (jsonB.data || []).forEach((u: UkuranItem & { barang: BarangItem }) => {
-            if (u.barang) {
-              if (!map.has(u.barang.id)) {
-                map.set(u.barang.id, { ...u.barang, ukuran: [] });
+        if (jsonB.success && Array.isArray(jsonB.data)) {
+          setBarangList(jsonB.data);
+        }
+      } else {
+        // Fallback to legacy ukuran endpoint
+        const resUkuran = await fetch("/api/master/perlengkapan/ukuran");
+        if (resUkuran.ok) {
+          const jsonU = await resUkuran.json();
+          if (jsonU.success) {
+            const map = new Map<string, BarangItem>();
+            (jsonU.data || []).forEach((u: UkuranItem & { barang: BarangItem }) => {
+              if (u.barang) {
+                if (!map.has(u.barang.id)) {
+                  map.set(u.barang.id, { ...u.barang, ukuran: [] });
+                }
+                map.get(u.barang.id)?.ukuran?.push(u);
               }
-              map.get(u.barang.id)?.ukuran?.push(u);
-            }
-          });
-          setBarangList(Array.from(map.values()));
+            });
+            setBarangList(Array.from(map.values()));
+          }
         }
       }
     } catch (err) {
@@ -119,6 +207,113 @@ export default function MasterPerlengkapanPage() {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  // Open modal edit barang & varian
+  const openEditBarangModal = (b: BarangItem) => {
+    setSelectedBarang(b);
+    setBarangName(b.name);
+    setBarangSatuan(b.satuan || "pcs");
+    setTipePengambilan(b.tipePengambilan || "BEBAS_KAPAN_SAJA");
+    setSifatPerlengkapan(b.sifatPerlengkapan || "PAKET_STANDAR");
+    setGenderTarget(b.genderTarget || "ALL");
+    setBarangIsActive(b.isActive !== false);
+
+    const customVariants = (b.ukuran || []).filter((u) => u.kodeUkuran !== "STD");
+    setHasVariants(customVariants.length > 0);
+    setVariantList(
+      customVariants.map((u) => ({
+        id: u.id,
+        kodeUkuran: u.kodeUkuran,
+        namaUkuran: u.namaUkuran,
+        kelompokUkuran: u.kelompokUkuran || "STANDAR",
+      }))
+    );
+    setCustomKode("");
+    setCustomNama("");
+    setCustomKelompok("DEWASA_LAKI");
+    setBarangModalOpen(true);
+  };
+
+  // Preset model varian handler
+  const applyPreset = (presetItems: typeof VARIANT_PRESETS[0]["items"]) => {
+    setVariantList((prev) => {
+      const existingCodes = new Set(prev.map((p) => p.kodeUkuran.trim().toUpperCase()));
+      const toAdd = presetItems.filter(
+        (item) => !existingCodes.has(item.kodeUkuran.trim().toUpperCase())
+      );
+      return [...prev, ...toAdd];
+    });
+  };
+
+  // Custom variant handlers
+  const addCustomVariant = () => {
+    if (!customKode.trim()) return;
+    const cleanCode = customKode.trim().toUpperCase();
+    if (variantList.some((v) => v.kodeUkuran.toUpperCase() === cleanCode)) {
+      alert(`Kode varian "${cleanCode}" sudah ada di dalam daftar.`);
+      return;
+    }
+    const cleanName = customNama.trim() || `${barangName} Ukuran ${cleanCode}`;
+    setVariantList((prev) => [
+      ...prev,
+      {
+        kodeUkuran: cleanCode,
+        namaUkuran: cleanName,
+        kelompokUkuran: customKelompok,
+      },
+    ]);
+    setCustomKode("");
+    setCustomNama("");
+  };
+
+  const removeVariant = (kodeUkuran: string) => {
+    setVariantList((prev) => prev.filter((v) => v.kodeUkuran !== kodeUkuran));
+  };
+
+  // Handle Save Barang & Variants
+  const handleSaveBarang = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedBarang || !barangName.trim()) return;
+
+    if (hasVariants && variantList.length === 0) {
+      const proceed = confirm(
+        "Mode varian diaktifkan tetapi belum ada daftar varian yang dimasukkan. Simpan tanpa varian (ukuran standar)?"
+      );
+      if (!proceed) return;
+    }
+
+    try {
+      setSubmittingBarang(true);
+      const res = await fetch("/api/master/perlengkapan", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: selectedBarang.id,
+          name: barangName,
+          satuan: barangSatuan,
+          tipePengambilan,
+          sifatPerlengkapan,
+          genderTarget,
+          isActive: barangIsActive,
+          hasVariants,
+          variants: variantList,
+        }),
+      });
+
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        alert(json.message || "Gagal menyimpan data perlengkapan");
+        return;
+      }
+
+      setBarangModalOpen(false);
+      await loadData();
+    } catch (err: any) {
+      alert("Terjadi kesalahan: " + err.message);
+    } finally {
+      setSubmittingBarang(false);
+    }
+  };
 
   // Handle Save Gudang
   const handleSaveGudang = async (e: React.FormEvent) => {
@@ -155,40 +350,6 @@ export default function MasterPerlengkapanPage() {
       alert("Terjadi kesalahan: " + err.message);
     } finally {
       setSubmittingGudang(false);
-    }
-  };
-
-  // Handle Add Ukuran
-  const handleSaveUkuran = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedBarangForUkuran || !kodeUkuran || !namaUkuran) return;
-
-    try {
-      setSubmittingUkuran(true);
-      const res = await fetch("/api/master/perlengkapan/ukuran", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          barangId: selectedBarangForUkuran.id,
-          kelompokUkuran,
-          kodeUkuran,
-          namaUkuran,
-          initialStockPerGudang: 100,
-        }),
-      });
-
-      const json = await res.json();
-      if (!res.ok || !json.success) {
-        alert(json.message || "Gagal menambahkan varian ukuran");
-        return;
-      }
-
-      setUkuranModalOpen(false);
-      loadData();
-    } catch (err: any) {
-      alert("Terjadi kesalahan: " + err.message);
-    } finally {
-      setSubmittingUkuran(false);
     }
   };
 
@@ -438,15 +599,11 @@ export default function MasterPerlengkapanPage() {
                       <Button
                         size="sm"
                         variant="outline"
-                        onClick={() => {
-                          setSelectedBarangForUkuran(b);
-                          setKodeUkuran("");
-                          setNamaUkuran("");
-                          setUkuranModalOpen(true);
-                        }}
-                        className="h-7 text-[10px] font-bold px-2"
+                        onClick={() => openEditBarangModal(b)}
+                        className="h-7 text-[11px] font-bold px-2.5 flex items-center gap-1.5 border-stone-300 dark:border-stone-700 hover:border-amber-500 hover:text-amber-600 dark:hover:text-amber-400 mx-auto transition-colors"
                       >
-                        + Varian
+                        <SlidersHorizontal className="h-3.5 w-3.5" />
+                        Edit &amp; Atur
                       </Button>
                     </td>
                   </tr>
@@ -586,71 +743,430 @@ export default function MasterPerlengkapanPage() {
         </form>
       </Modal>
 
-      {/* Modal Add Ukuran / Varian */}
+      {/* Modal Edit Kriteria & Konfigurasi Varian Ukuran */}
       <Modal
-        isOpen={ukuranModalOpen}
-        onClose={() => setUkuranModalOpen(false)}
-        title={`Tambah Varian Ukuran: ${selectedBarangForUkuran?.name || ""}`}
+        size="xl"
+        isOpen={barangModalOpen}
+        onClose={() => setBarangModalOpen(false)}
+        title={`Edit Kriteria & Varian: ${selectedBarang?.name || ""}`}
+        className="max-w-5xl max-h-[90vh] overflow-y-auto"
       >
-        <form onSubmit={handleSaveUkuran} className="space-y-4 pt-1">
-          <div>
-            <label className="block text-xs font-bold text-stone-700 dark:text-stone-300 mb-1">
-              Kelompok Ukuran
-            </label>
-            <select
-              value={kelompokUkuran}
-              onChange={(e) => setKelompokUkuran(e.target.value)}
-              className="w-full text-xs font-semibold p-2 rounded-lg border border-stone-300 dark:border-stone-700 bg-white dark:bg-stone-900"
-            >
-              <option value="ANAK_LAKI">Anak Laki-Laki (Kemeja No 3-10)</option>
-              <option value="DEWASA_LAKI">Dewasa Laki-Laki (Kemeja S, M, L, XL, XXL, 4L)</option>
-              <option value="DEWASA_PEREMPUAN">Dewasa Perempuan (Outer S, M, L, XL)</option>
-              <option value="STANDAR">Ukuran Standar</option>
-            </select>
+        <form onSubmit={handleSaveBarang} className="space-y-6 pt-2">
+          {/* Top banner / item identity */}
+          <div className="flex flex-wrap items-center justify-between gap-2 p-3 bg-stone-50 dark:bg-stone-850 rounded-xl border border-stone-200 dark:border-stone-800">
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-stone-500 font-semibold">Kode Item:</span>
+              <span className="font-mono font-bold text-xs px-2.5 py-1 rounded bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800/80">
+                {selectedBarang?.code}
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-stone-500 font-semibold">Status Master:</span>
+              <button
+                type="button"
+                onClick={() => setBarangIsActive(!barangIsActive)}
+                className={cn(
+                  "px-2.5 py-0.5 rounded-full text-[11px] font-bold transition-colors flex items-center gap-1.5",
+                  barangIsActive
+                    ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800"
+                    : "bg-stone-200 text-stone-600 dark:bg-stone-800 dark:text-stone-400"
+                )}
+              >
+                <span className={cn("h-2 w-2 rounded-full", barangIsActive ? "bg-emerald-500 animate-pulse" : "bg-stone-400")} />
+                {barangIsActive ? "Item Aktif" : "Item Non-Aktif"}
+              </button>
+            </div>
           </div>
 
-          <div>
-            <label className="block text-xs font-bold text-stone-700 dark:text-stone-300 mb-1">
-              Kode Ukuran (Singkat)
-            </label>
-            <Input
-              value={kodeUkuran}
-              onChange={(e) => setKodeUkuran(e.target.value)}
-              placeholder="cth: S / M / L / XL / 4L / 3 / 4"
-              required
-              className="text-xs font-mono font-bold"
-            />
+          {/* 2-Column Grid Layout */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            {/* Left Column: Kriteria Perlengkapan (5 cols) */}
+            <div className="lg:col-span-5 space-y-4 p-4 rounded-xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 shadow-sm">
+              <div className="flex items-center gap-2 pb-2 border-b border-stone-100 dark:border-stone-800">
+                <SlidersHorizontal className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                <h3 className="text-xs font-black uppercase tracking-wider text-stone-800 dark:text-stone-200">
+                  1. Kriteria &amp; Karakteristik Barang
+                </h3>
+              </div>
+
+              {/* Nama Perlengkapan */}
+              <div>
+                <label className="block text-xs font-bold text-stone-700 dark:text-stone-300 mb-1">
+                  Nama Perlengkapan <span className="text-rose-500">*</span>
+                </label>
+                <Input
+                  value={barangName}
+                  onChange={(e) => setBarangName(e.target.value)}
+                  placeholder="cth: Koper Bagasi Besar 24 Inch"
+                  required
+                  className="text-xs font-bold"
+                />
+              </div>
+
+              {/* Satuan */}
+              <div>
+                <label className="block text-xs font-bold text-stone-700 dark:text-stone-300 mb-1">
+                  Satuan Barang <span className="text-rose-500">*</span>
+                </label>
+                <Input
+                  value={barangSatuan}
+                  onChange={(e) => setBarangSatuan(e.target.value)}
+                  placeholder="cth: pcs, set, buku, pasang"
+                  required
+                  className="text-xs"
+                />
+              </div>
+
+              {/* Sifat Perlengkapan */}
+              <div>
+                <label className="block text-xs font-bold text-stone-700 dark:text-stone-300 mb-1.5">
+                  Sifat Perlengkapan
+                </label>
+                <div className="grid grid-cols-1 gap-1.5">
+                  {[
+                    {
+                      id: "PAKET_STANDAR",
+                      label: "Paket Standar",
+                      desc: "Diberikan pada seluruh jamaah paket standar",
+                      activeBg: "bg-stone-100 dark:bg-stone-800 border-stone-600 dark:border-stone-400",
+                    },
+                    {
+                      id: "UMUM_WAJIB",
+                      label: "Wajib Umum (All Jamaah)",
+                      desc: "Wajib bagi semua jamaah (termasuk paket tanpa perlengkapan)",
+                      activeBg: "bg-emerald-50 dark:bg-emerald-950/60 border-emerald-600 text-emerald-900 dark:text-emerald-200",
+                    },
+                    {
+                      id: "ADDON_KHUSUS",
+                      label: "Add-On Khusus",
+                      desc: "Tambahan khusus (misal: Paket Surabaya/Spesifik)",
+                      activeBg: "bg-amber-50 dark:bg-amber-950/60 border-amber-600 text-amber-900 dark:text-amber-200",
+                    },
+                  ].map((sifat) => {
+                    const isSelected = sifatPerlengkapan === sifat.id;
+                    return (
+                      <button
+                        key={sifat.id}
+                        type="button"
+                        onClick={() => setSifatPerlengkapan(sifat.id as any)}
+                        className={cn(
+                          "w-full text-left p-2.5 rounded-lg border text-xs transition-all flex items-start justify-between",
+                          isSelected
+                            ? `${sifat.activeBg} shadow-sm font-bold ring-1 ring-stone-400 dark:ring-stone-600`
+                            : "border-stone-200 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-850"
+                        )}
+                      >
+                        <div>
+                          <div className="font-bold">{sifat.label}</div>
+                          <div className="text-[10px] text-stone-500 font-normal leading-tight mt-0.5">
+                            {sifat.desc}
+                          </div>
+                        </div>
+                        {isSelected && <Check className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400 mt-0.5" />}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Waktu Pengambilan */}
+              <div>
+                <label className="block text-xs font-bold text-stone-700 dark:text-stone-300 mb-1.5">
+                  Waktu Pengambilan
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setTipePengambilan("BEBAS_KAPAN_SAJA")}
+                    className={cn(
+                      "p-2.5 rounded-lg border text-xs font-bold transition-all text-center",
+                      tipePengambilan === "BEBAS_KAPAN_SAJA"
+                        ? "bg-blue-50 dark:bg-blue-950/60 border-blue-600 text-blue-800 dark:text-blue-300 shadow-sm ring-1 ring-blue-500"
+                        : "border-stone-200 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-850 text-stone-600 dark:text-stone-400"
+                    )}
+                  >
+                    Bebas Kapan Saja
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTipePengambilan("SERENTAK_HARI_H")}
+                    className={cn(
+                      "p-2.5 rounded-lg border text-xs font-bold transition-all text-center",
+                      tipePengambilan === "SERENTAK_HARI_H"
+                        ? "bg-purple-50 dark:bg-purple-950/60 border-purple-600 text-purple-800 dark:text-purple-300 shadow-sm ring-1 ring-purple-500"
+                        : "border-stone-200 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-850 text-stone-600 dark:text-stone-400"
+                    )}
+                  >
+                    Serentak Hari H
+                  </button>
+                </div>
+              </div>
+
+              {/* Target Gender */}
+              <div>
+                <label className="block text-xs font-bold text-stone-700 dark:text-stone-300 mb-1.5">
+                  Target Gender Penerima
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { id: "ALL", label: "Semua Gender" },
+                    { id: "LAKI_LAKI", label: "Laki-Laki" },
+                    { id: "PEREMPUAN", label: "Perempuan" },
+                  ].map((g) => (
+                    <button
+                      key={g.id}
+                      type="button"
+                      onClick={() => setGenderTarget(g.id as any)}
+                      className={cn(
+                        "p-2 rounded-lg border text-xs font-bold transition-all text-center",
+                        genderTarget === g.id
+                          ? "bg-amber-500 text-white border-amber-600 shadow-sm"
+                          : "border-stone-200 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-850 text-stone-600 dark:text-stone-400"
+                      )}
+                    >
+                      {g.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Right Column: Konfigurasi Model Varian Ukuran (7 cols) */}
+            <div className="lg:col-span-7 space-y-4 p-4 rounded-xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 shadow-sm flex flex-col">
+              {/* Header with Toggle Switch */}
+              <div className="flex items-center justify-between pb-3 border-b border-stone-200 dark:border-stone-800">
+                <div className="flex items-center gap-2">
+                  <Ruler className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                  <div>
+                    <h3 className="text-xs font-black uppercase tracking-wider text-stone-800 dark:text-stone-200">
+                      2. Konfigurasi Varian Ukuran
+                    </h3>
+                    <p className="text-[11px] text-stone-500">
+                      Menentukan apakah barang ini memiliki variasi ukuran atau bertipe ukuran standar.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Toggle Switch */}
+                <div className="flex items-center gap-2 bg-stone-100 dark:bg-stone-800 p-1 rounded-xl border border-stone-200 dark:border-stone-700">
+                  <span className={cn("text-[11px] font-bold px-1.5", hasVariants ? "text-stone-400" : "text-stone-900 dark:text-stone-100")}>
+                    Tidak
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setHasVariants(!hasVariants)}
+                    className={cn(
+                      "w-11 h-6 rounded-full transition-colors relative focus:outline-none focus:ring-2 focus:ring-amber-500/50",
+                      hasVariants ? "bg-amber-600" : "bg-stone-300 dark:bg-stone-600"
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        "absolute top-0.5 left-0.5 bg-white w-5 h-5 rounded-full shadow-md transition-transform duration-200 ease-in-out",
+                        hasVariants ? "transform translate-x-5" : "transform translate-x-0"
+                      )}
+                    />
+                  </button>
+                  <span className={cn("text-[11px] font-bold px-1.5", hasVariants ? "text-amber-600 dark:text-amber-400" : "text-stone-400")}>
+                    Ada Varian
+                  </span>
+                </div>
+              </div>
+
+              {/* Mode OFF: Standar (Tanpa Varian) */}
+              {!hasVariants ? (
+                <div className="flex-1 flex flex-col items-center justify-center p-6 text-center border border-dashed border-stone-200 dark:border-stone-800 rounded-xl bg-stone-50/50 dark:bg-stone-850/50 space-y-3 my-auto">
+                  <div className="p-3 bg-stone-100 dark:bg-stone-800 text-stone-500 rounded-full">
+                    <Package className="h-8 w-8 text-stone-400" />
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-stone-800 dark:text-stone-200 text-sm">
+                      Barang Standar (Tanpa Varian Ukuran)
+                    </h4>
+                    <p className="text-xs text-stone-500 max-w-md mt-1 leading-relaxed">
+                      Barang ini tidak memerlukan varian ukuran. Pada form serah terima/pengambilan jamaah, barang akan langsung dialokasikan <strong className="text-stone-700 dark:text-stone-300">tanpa ada dropdown pilihan ukuran varian</strong> karena tidak memiliki varian lain.
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setHasVariants(true)}
+                    className="text-xs font-bold border-amber-300 dark:border-amber-700 text-amber-700 dark:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-950/40 mt-2"
+                  >
+                    <Plus className="h-3.5 w-3.5 mr-1.5" />
+                    Aktifkan Mode Varian
+                  </Button>
+                </div>
+              ) : (
+                /* Mode ON: Penentuan Model Varian */
+                <div className="space-y-4 flex-1">
+                  {/* Step A: Quick Preset Templates */}
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-bold text-stone-700 dark:text-stone-300 flex items-center gap-1.5">
+                        <Sparkles className="h-3.5 w-3.5 text-amber-500" />
+                        Pilih Model Varian Cepat (Template):
+                      </span>
+                      <span className="text-[10px] text-stone-400">Klik untuk langsung memasukkan opsi</span>
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                      {VARIANT_PRESETS.map((preset) => (
+                        <button
+                          key={preset.id}
+                          type="button"
+                          onClick={() => applyPreset(preset.items)}
+                          className="p-2.5 rounded-lg border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-850 hover:border-amber-500 hover:bg-amber-50/40 dark:hover:bg-amber-950/20 text-left transition-all group"
+                        >
+                          <div className="flex items-center gap-1.5 font-bold text-xs text-stone-800 dark:text-stone-200 group-hover:text-amber-600 dark:group-hover:text-amber-400">
+                            <span>{preset.icon}</span>
+                            <span className="truncate">{preset.label}</span>
+                          </div>
+                          <div className="text-[10px] text-stone-500 mt-0.5 truncate">
+                            {preset.desc}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Step B: Daftar Varian Aktif (Chips) */}
+                  <div className="p-3 bg-stone-50 dark:bg-stone-850 rounded-xl border border-stone-200 dark:border-stone-800 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-stone-700 dark:text-stone-300">
+                        Varian yang Digunakan ({variantList.length} varian):
+                      </span>
+                      {variantList.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setVariantList([])}
+                          className="text-[10px] font-bold text-rose-600 dark:text-rose-400 hover:underline"
+                        >
+                          Hapus Semua
+                        </button>
+                      )}
+                    </div>
+
+                    {variantList.length === 0 ? (
+                      <p className="text-xs text-stone-400 italic py-2 text-center">
+                        Belum ada varian ukuran yang ditentukan. Pilih model preset di atas atau tambah varian kustom di bawah.
+                      </p>
+                    ) : (
+                      <div className="flex flex-wrap gap-1.5 max-h-40 overflow-y-auto pr-1">
+                        {variantList.map((v) => (
+                          <span
+                            key={v.kodeUkuran}
+                            className="inline-flex items-center gap-1.5 pl-2.5 pr-1.5 py-1 rounded-lg bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 shadow-sm text-xs font-semibold text-stone-800 dark:text-stone-200"
+                          >
+                            <span className="font-mono font-bold text-amber-600 dark:text-amber-400">{v.kodeUkuran}</span>
+                            <span className="text-[10px] text-stone-500 truncate max-w-[120px]">({v.namaUkuran})</span>
+                            <button
+                              type="button"
+                              onClick={() => removeVariant(v.kodeUkuran)}
+                              className="h-4 w-4 rounded-full flex items-center justify-center hover:bg-stone-100 dark:hover:bg-stone-700 text-stone-400 hover:text-rose-500"
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Step C: Tambah Varian Kustom */}
+                  <div className="p-3 border border-stone-200 dark:border-stone-800 rounded-xl space-y-2 bg-white dark:bg-stone-900">
+                    <span className="text-xs font-bold text-stone-700 dark:text-stone-300 block">
+                      + Tambah Varian Manual / Kustom:
+                    </span>
+                    <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-end">
+                      <div className="sm:col-span-3">
+                        <label className="block text-[10px] font-bold text-stone-500 mb-1">
+                          Kelompok
+                        </label>
+                        <select
+                          value={customKelompok}
+                          onChange={(e) => setCustomKelompok(e.target.value)}
+                          className="w-full text-xs font-medium p-1.5 rounded-lg border border-stone-300 dark:border-stone-700 bg-white dark:bg-stone-800"
+                        >
+                          <option value="DEWASA_LAKI">Dewasa Laki</option>
+                          <option value="DEWASA_PEREMPUAN">Dewasa Perempuan</option>
+                          <option value="ANAK_LAKI">Anak-Anak</option>
+                          <option value="KAIN">Bahan Kain</option>
+                          <option value="STANDAR">Lainnya</option>
+                        </select>
+                      </div>
+
+                      <div className="sm:col-span-3">
+                        <label className="block text-[10px] font-bold text-stone-500 mb-1">
+                          Kode (Singkat)
+                        </label>
+                        <Input
+                          value={customKode}
+                          onChange={(e) => setCustomKode(e.target.value)}
+                          placeholder="cth: 3L / XXL"
+                          className="text-xs font-mono font-bold h-8"
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              addCustomVariant();
+                            }
+                          }}
+                        />
+                      </div>
+
+                      <div className="sm:col-span-4">
+                        <label className="block text-[10px] font-bold text-stone-500 mb-1">
+                          Nama Label Lengkap
+                        </label>
+                        <Input
+                          value={customNama}
+                          onChange={(e) => setCustomNama(e.target.value)}
+                          placeholder="cth: Kemeja Ukuran 3L"
+                          className="text-xs h-8"
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              addCustomVariant();
+                            }
+                          }}
+                        />
+                      </div>
+
+                      <div className="sm:col-span-2">
+                        <Button
+                          type="button"
+                          size="sm"
+                          onClick={addCustomVariant}
+                          className="w-full h-8 text-xs font-bold bg-stone-800 hover:bg-stone-900 text-white dark:bg-stone-700 dark:hover:bg-stone-600"
+                        >
+                          Tambah
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
 
-          <div>
-            <label className="block text-xs font-bold text-stone-700 dark:text-stone-300 mb-1">
-              Nama Label Ukuran Lengkap
-            </label>
-            <Input
-              value={namaUkuran}
-              onChange={(e) => setNamaUkuran(e.target.value)}
-              placeholder="cth: Dewasa Laki Kemeja Ukuran XL"
-              required
-              className="text-xs"
-            />
-          </div>
-
-          <div className="flex justify-end gap-2 pt-3 border-t border-stone-200 dark:border-stone-800">
+          {/* Dialog Action Buttons */}
+          <div className="flex justify-end gap-2 pt-4 border-t border-stone-200 dark:border-stone-800">
             <Button
               type="button"
               variant="outline"
               size="sm"
-              onClick={() => setUkuranModalOpen(false)}
+              onClick={() => setBarangModalOpen(false)}
             >
               Batal
             </Button>
             <Button
               type="submit"
               size="sm"
-              disabled={submittingUkuran}
-              className="bg-amber-600 hover:bg-amber-700 text-white font-bold"
+              disabled={submittingBarang}
+              className="bg-amber-600 hover:bg-amber-700 text-white font-bold px-5"
             >
-              {submittingUkuran ? "Menyimpan..." : "Tambah Varian Ukuran"}
+              {submittingBarang ? "Menyimpan Perubahan..." : "Simpan Kriteria & Varian"}
             </Button>
           </div>
         </form>

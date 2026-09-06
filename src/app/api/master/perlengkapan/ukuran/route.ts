@@ -82,3 +82,32 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: false, message: (error as Error).message }, { status: 500 });
   }
 }
+
+export async function DELETE(request: NextRequest) {
+  const session = await auth();
+  if (!session?.user) {
+    return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
+  }
+
+  const { searchParams } = request.nextUrl;
+  const id = searchParams.get("id");
+
+  if (!id) {
+    return NextResponse.json({ success: false, message: "ID varian ukuran wajib disertakan" }, { status: 400 });
+  }
+
+  try {
+    // Delete associated warehouse stocks first
+    await prisma.stokGudangItem.deleteMany({
+      where: { ukuranId: id },
+    });
+
+    await prisma.masterPerlengkapanUkuran.delete({
+      where: { id },
+    });
+
+    return NextResponse.json({ success: true, message: "Varian ukuran berhasil dihapus" });
+  } catch (error) {
+    return NextResponse.json({ success: false, message: (error as Error).message }, { status: 500 });
+  }
+}
