@@ -307,7 +307,15 @@ export default function MasterPerlengkapanPage() {
       }
 
       setBarangModalOpen(false);
-      await loadData();
+
+      // Instant UI update from API response without waiting
+      if (json.data) {
+        setBarangList((prev) =>
+          prev.map((b) => (b.id === json.data.id ? json.data : b))
+        );
+      }
+
+      loadData();
     } catch (err: any) {
       alert("Terjadi kesalahan: " + err.message);
     } finally {
@@ -526,7 +534,23 @@ export default function MasterPerlengkapanPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-stone-200 dark:divide-stone-800 font-medium">
-                {barangList.map((b, idx) => (
+                {loading && barangList.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} className="px-4 py-12 text-center">
+                      <div className="flex flex-col items-center justify-center gap-2">
+                        <RefreshCw className="h-5 w-5 animate-spin text-amber-600 dark:text-amber-400" />
+                        <span className="text-xs font-semibold text-stone-500">Memuat data perlengkapan...</span>
+                      </div>
+                    </td>
+                  </tr>
+                ) : barangList.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} className="px-4 py-8 text-center text-stone-400 italic">
+                      Tidak ada data perlengkapan ditemukan.
+                    </td>
+                  </tr>
+                ) : (
+                  barangList.map((b, idx) => (
                   <tr key={b.id} className="hover:bg-amber-50/20 dark:hover:bg-amber-950/20 transition-colors">
                     <td className="px-4 py-3.5 text-center text-stone-400 font-mono">{idx + 1}</td>
                     <td className="px-4 py-3.5 font-mono font-bold text-amber-700 dark:text-amber-400">{b.code}</td>
@@ -607,7 +631,7 @@ export default function MasterPerlengkapanPage() {
                       </Button>
                     </td>
                   </tr>
-                ))}
+                )))}
               </tbody>
             </table>
           </div>

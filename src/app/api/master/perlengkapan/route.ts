@@ -14,14 +14,21 @@ export async function GET(_request: NextRequest) {
 
   try {
     const items = await prisma.masterPerlengkapan.findMany({
-      include: {
+      select: {
+        id: true,
+        code: true,
+        name: true,
+        satuan: true,
+        tipePengambilan: true,
+        sifatPerlengkapan: true,
+        genderTarget: true,
+        isActive: true,
         ukuran: {
-          include: {
-            stokGudang: {
-              include: {
-                gudang: true,
-              },
-            },
+          select: {
+            id: true,
+            kodeUkuran: true,
+            namaUkuran: true,
+            kelompokUkuran: true,
           },
           orderBy: {
             kodeUkuran: "asc",
@@ -256,12 +263,21 @@ export async function PUT(request: NextRequest) {
     // Fetch fresh updated item OUTSIDE the transaction for fastest transaction close
     const result = await prisma.masterPerlengkapan.findUnique({
       where: { id },
-      include: {
+      select: {
+        id: true,
+        code: true,
+        name: true,
+        satuan: true,
+        tipePengambilan: true,
+        sifatPerlengkapan: true,
+        genderTarget: true,
+        isActive: true,
         ukuran: {
-          include: {
-            stokGudang: {
-              include: { gudang: true },
-            },
+          select: {
+            id: true,
+            kodeUkuran: true,
+            namaUkuran: true,
+            kelompokUkuran: true,
           },
           orderBy: { kodeUkuran: "asc" },
         },
