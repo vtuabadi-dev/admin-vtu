@@ -293,3 +293,85 @@ export async function PUT(request: NextRequest) {
     );
   }
 }
+
+// DELETE /api/master/perlengkapan?id=...
+// Deletes a MasterPerlengkapan item along with its variants and dependent records safely
+export async function DELETE(request: NextRequest) {
+  const session = await auth();
+  if (!session?.user) {
+    return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
+  }
+
+  const { searchParams } = request.nextUrl;
+  const id = searchParams.get("id");
+
+  if (!id) {
+    return NextResponse.json(
+      { success: false, message: "ID perlengkapan wajib disertakan" },
+      { status: 400 }
+    );
+  }
+
+  try {
+    const existing = await prisma.masterPerlengkapan.findUnique({
+      where: { id },
+      include: {
+        ukuran: true,
+      },
+    });
+
+    if (!existing) {
+      return NextResponse.json(
+        { success: false, message: "Data perlengkapan tidak ditemukan" },
+        { status: 404 }
+      );
+    }
+
+    // Execute safe cascading delete inside transaction
+    await prisma.$transaction(
+      async (tx) => {
+        const ukuranIds = existing.ukuran.map((u) => u.id);
+        if (ukuranIds.length > 0) {
+          await tx.stokGudangItem.deleteMany({
+            where: { ukuranId: { in: ukuranIds } },
+          });
+          await tx.masterPerlengkapanUkuran.deleteMany({
+            where: { id: { in: ukuranIds } },
+          });
+        }
+
+        await tx.paketPerlengkapanRule.deleteMany({
+          where: { barangId: id },
+        });
+
+        await tx.perlengkapanMutasi.deleteMany({
+          where: { barangId: id },
+        });
+
+        await tx.pengambilanPerlengkapanItem.deleteMany({
+          where: { barangId: id },
+        });
+
+        await tx.masterPerlengkapan.delete({
+          where: { id },
+        });
+      },
+      {
+        maxWait: 10000,
+        timeout: 20000,
+      }
+    );
+
+    return NextResponse.json({
+      success: true,
+      message: `Barang "${existing.name}" (${existing.code}) berhasil dihapus`,
+    });
+  } catch (error) {
+    console.error("DELETE /api/master/perlengkapan error:", error);
+    return NextResponse.json(
+      { success: false, message: (error as Error).message },
+      { status: 500 }
+    );
+  }
+}
+

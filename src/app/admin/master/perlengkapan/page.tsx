@@ -16,6 +16,8 @@ import {
   Check,
   X,
   Sparkles,
+  Trash2,
+  AlertTriangle,
 } from "lucide-react";
 import { Card } from "@/shared/components/ui/Card";
 import { Button } from "@/shared/components/ui/Button";
@@ -159,6 +161,11 @@ export default function MasterPerlengkapanPage() {
   const [customNama, setCustomNama] = useState("");
   const [customKelompok, setCustomKelompok] = useState("DEWASA_LAKI");
   const [submittingBarang, setSubmittingBarang] = useState(false);
+
+  // Delete Barang Modal States
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [barangToDelete, setBarangToDelete] = useState<BarangItem | null>(null);
+  const [deletingBarang, setDeletingBarang] = useState(false);
 
   const loadData = useCallback(async () => {
     try {
@@ -320,6 +327,34 @@ export default function MasterPerlengkapanPage() {
       alert("Terjadi kesalahan: " + err.message);
     } finally {
       setSubmittingBarang(false);
+    }
+  };
+
+  // Handle Delete Barang
+  const handleDeleteBarang = async () => {
+    if (!barangToDelete) return;
+
+    try {
+      setDeletingBarang(true);
+      const res = await fetch(`/api/master/perlengkapan?id=${barangToDelete.id}`, {
+        method: "DELETE",
+      });
+
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        alert(json.message || "Gagal menghapus data perlengkapan");
+        return;
+      }
+
+      // Instant optimistic UI update
+      setBarangList((prev) => prev.filter((b) => b.id !== barangToDelete.id));
+      setDeleteModalOpen(false);
+      setBarangToDelete(null);
+      loadData();
+    } catch (err: any) {
+      alert("Terjadi kesalahan: " + err.message);
+    } finally {
+      setDeletingBarang(false);
     }
   };
 
@@ -530,7 +565,7 @@ export default function MasterPerlengkapanPage() {
                   <th className="px-4 py-3 w-36 text-center">Sifat Perlengkapan</th>
                   <th className="px-4 py-3 w-32 text-center">Target Gender</th>
                   <th className="px-4 py-3">Varian Ukuran Tersedia</th>
-                  <th className="px-4 py-3 w-24 text-center">Aksi</th>
+                  <th className="px-4 py-3 w-36 text-center">Aksi</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-stone-200 dark:divide-stone-800 font-medium">
@@ -620,15 +655,31 @@ export default function MasterPerlengkapanPage() {
                       </div>
                     </td>
                     <td className="px-4 py-3.5 text-center">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => openEditBarangModal(b)}
-                        className="h-7 text-[11px] font-bold px-2.5 flex items-center gap-1.5 border-stone-300 dark:border-stone-700 hover:border-amber-500 hover:text-amber-600 dark:hover:text-amber-400 mx-auto transition-colors"
-                      >
-                        <SlidersHorizontal className="h-3.5 w-3.5" />
-                        Edit &amp; Atur
-                      </Button>
+                      <div className="flex items-center justify-center gap-1.5">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => openEditBarangModal(b)}
+                          className="h-7 text-[11px] font-bold px-2.5 flex items-center gap-1.5 border-stone-300 dark:border-stone-700 hover:border-amber-500 hover:text-amber-600 dark:hover:text-amber-400 transition-colors"
+                          title="Edit Kriteria & Varian"
+                        >
+                          <SlidersHorizontal className="h-3 w-3" />
+                          Edit &amp; Atur
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            setBarangToDelete(b);
+                            setDeleteModalOpen(true);
+                          }}
+                          className="h-7 text-[11px] font-bold px-2 flex items-center gap-1 text-rose-600 dark:text-rose-400 border-stone-300 dark:border-stone-700 hover:bg-rose-50 dark:hover:bg-rose-950/40 hover:border-rose-300 dark:hover:border-rose-800 transition-colors"
+                          title="Hapus Daftar Barang"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                          Hapus
+                        </Button>
+                      </div>
                     </td>
                   </tr>
                 )))}
@@ -1194,6 +1245,89 @@ export default function MasterPerlengkapanPage() {
             </Button>
           </div>
         </form>
+      </Modal>
+
+      {/* Modal Konfirmasi Hapus Barang */}
+      <Modal
+        size="default"
+        isOpen={deleteModalOpen}
+        onClose={() => !deletingBarang && setDeleteModalOpen(false)}
+        title="Hapus Daftar Perlengkapan"
+      >
+        <div className="space-y-4 pt-2">
+          <div className="p-3 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 rounded-xl flex items-start gap-3">
+            <div className="p-2 bg-rose-100 dark:bg-rose-900/50 rounded-lg text-rose-600 dark:text-rose-400 mt-0.5 shrink-0">
+              <AlertTriangle className="h-5 w-5" />
+            </div>
+            <div className="space-y-1">
+              <h4 className="text-sm font-bold text-rose-900 dark:text-rose-200">
+                Peringatan: Tindakan ini permanen
+              </h4>
+              <p className="text-xs text-rose-700 dark:text-rose-300 leading-relaxed">
+                Menghapus barang ini juga akan membersihkan varian ukuran terkait dan aturan paket yang terhubung secara otomatis.
+              </p>
+            </div>
+          </div>
+
+          {barangToDelete && (
+            <div className="p-3.5 bg-stone-50 dark:bg-stone-850 rounded-xl border border-stone-200 dark:border-stone-800 space-y-2">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-stone-500 font-medium">Kode Item:</span>
+                <span className="font-mono font-bold px-2 py-0.5 rounded bg-stone-200 dark:bg-stone-700 text-stone-800 dark:text-stone-200">
+                  {barangToDelete.code}
+                </span>
+              </div>
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-stone-500 font-medium">Nama Perlengkapan:</span>
+                <span className="font-bold text-stone-900 dark:text-stone-100">
+                  {barangToDelete.name}
+                </span>
+              </div>
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-stone-500 font-medium">Satuan:</span>
+                <span className="font-semibold text-stone-700 dark:text-stone-300">
+                  {barangToDelete.satuan}
+                </span>
+              </div>
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-stone-500 font-medium">Jumlah Varian Ukuran:</span>
+                <span className="font-semibold text-stone-700 dark:text-stone-300">
+                  {barangToDelete.ukuran?.length || 0} varian
+                </span>
+              </div>
+            </div>
+          )}
+
+          <p className="text-xs text-stone-600 dark:text-stone-400">
+            Apakah Anda yakin ingin menghapus data perlengkapan{" "}
+            <span className="font-bold text-stone-900 dark:text-stone-100">
+              "{barangToDelete?.name}"
+            </span>
+            ?
+          </p>
+
+          <div className="flex justify-end gap-2 pt-3 border-t border-stone-200 dark:border-stone-800">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={deletingBarang}
+              onClick={() => setDeleteModalOpen(false)}
+            >
+              Batal
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              disabled={deletingBarang}
+              onClick={handleDeleteBarang}
+              className="bg-rose-600 hover:bg-rose-700 text-white font-bold px-4 flex items-center gap-1.5"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              {deletingBarang ? "Menghapus..." : "Ya, Hapus Barang"}
+            </Button>
+          </div>
+        </div>
       </Modal>
     </div>
   );
