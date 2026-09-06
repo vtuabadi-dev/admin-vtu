@@ -289,6 +289,44 @@ export default function MasterPerlengkapanPage() {
       if (!proceed) return;
     }
 
+    // Backup current state for rollback if server error
+    const prevList = [...barangList];
+
+    // Optimistic UI update: instantly update table & close modal
+    const optimisticUkuran: UkuranItem[] = hasVariants
+      ? variantList.map((v) => ({
+          id: v.kodeUkuran,
+          barangId: selectedBarang.id,
+          kodeUkuran: v.kodeUkuran,
+          namaUkuran: v.namaUkuran,
+          kelompokUkuran: v.kelompokUkuran || "STANDAR",
+        }))
+      : [
+          {
+            id: "std",
+            barangId: selectedBarang.id,
+            kodeUkuran: "STD",
+            namaUkuran: "Ukuran Standar",
+            kelompokUkuran: "STANDAR",
+          },
+        ];
+
+    const optimisticItem: BarangItem = {
+      ...selectedBarang,
+      name: barangName.trim(),
+      satuan: barangSatuan.trim(),
+      tipePengambilan,
+      sifatPerlengkapan,
+      genderTarget,
+      isActive: barangIsActive,
+      ukuran: optimisticUkuran,
+    };
+
+    setBarangList((prev) =>
+      prev.map((b) => (b.id === selectedBarang.id ? optimisticItem : b))
+    );
+    setBarangModalOpen(false);
+
     try {
       setSubmittingBarang(true);
       const res = await fetch("/api/master/perlengkapan", {
@@ -309,21 +347,20 @@ export default function MasterPerlengkapanPage() {
 
       const json = await res.json();
       if (!res.ok || !json.success) {
+        // Rollback on server failure
+        setBarangList(prevList);
         alert(json.message || "Gagal menyimpan data perlengkapan");
         return;
       }
 
-      setBarangModalOpen(false);
-
-      // Instant UI update from API response without waiting
+      // Sync with fresh server data
       if (json.data) {
         setBarangList((prev) =>
           prev.map((b) => (b.id === json.data.id ? json.data : b))
         );
       }
-
-      loadData();
     } catch (err: any) {
+      setBarangList(prevList);
       alert("Terjadi kesalahan: " + err.message);
     } finally {
       setSubmittingBarang(false);

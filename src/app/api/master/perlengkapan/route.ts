@@ -98,167 +98,149 @@ export async function PUT(request: NextRequest) {
       where: { isActive: true },
     });
 
-    // Execute updates in a transaction with extended timeout for serverless Supabase connection
-    await prisma.$transaction(
-      async (tx) => {
-        // 1. Update criteria
-        await tx.masterPerlengkapan.update({
-          where: { id },
+    // 1. Update criteria directly
+    await prisma.masterPerlengkapan.update({
+      where: { id },
+      data: {
+        name: name.trim(),
+        ...(satuan ? { satuan: satuan.trim() } : {}),
+        ...(tipePengambilan && Object.values(TipePengambilanPerlengkapan).includes(tipePengambilan)
+          ? { tipePengambilan }
+          : {}),
+        ...(sifatPerlengkapan && Object.values(SifatPerlengkapan).includes(sifatPerlengkapan)
+          ? { sifatPerlengkapan }
+          : {}),
+        ...(genderTarget && Object.values(GenderTarget).includes(genderTarget)
+          ? { genderTarget }
+          : {}),
+        ...(typeof isActive === "boolean" ? { isActive } : {}),
+      },
+    });
+
+    // 2. Handle Variants Sync
+    if (hasVariants === false) {
+      // Non-variant mode: delete all custom variants and ensure a single STD variant exists
+      const nonStdUkuran = existing.ukuran.filter((u) => u.kodeUkuran !== "STD");
+      if (nonStdUkuran.length > 0) {
+        const nonStdIds = nonStdUkuran.map((u) => u.id);
+        await prisma.stokGudangItem.deleteMany({
+          where: { ukuranId: { in: nonStdIds } },
+        });
+        await prisma.masterPerlengkapanUkuran.deleteMany({
+          where: { id: { in: nonStdIds } },
+        });
+      }
+
+      // Ensure STD exists
+      let stdUkuran = existing.ukuran.find((u) => u.kodeUkuran === "STD");
+      if (!stdUkuran) {
+        stdUkuran = await prisma.masterPerlengkapanUkuran.create({
           data: {
-            name: name.trim(),
-            ...(satuan ? { satuan: satuan.trim() } : {}),
-            ...(tipePengambilan && Object.values(TipePengambilanPerlengkapan).includes(tipePengambilan)
-              ? { tipePengambilan }
-              : {}),
-            ...(sifatPerlengkapan && Object.values(SifatPerlengkapan).includes(sifatPerlengkapan)
-              ? { sifatPerlengkapan }
-              : {}),
-            ...(genderTarget && Object.values(GenderTarget).includes(genderTarget)
-              ? { genderTarget }
-              : {}),
-            ...(typeof isActive === "boolean" ? { isActive } : {}),
+            barangId: id,
+            kodeUkuran: "STD",
+            namaUkuran: "Ukuran Standar",
+            kelompokUkuran: "STANDAR",
           },
         });
 
-        // 2. Handle Variants Sync
-        if (hasVariants === false) {
-          // Non-variant mode: delete all custom variants and ensure a single STD variant exists
-          const nonStdUkuran = existing.ukuran.filter((u) => u.kodeUkuran !== "STD");
-          if (nonStdUkuran.length > 0) {
-            const nonStdIds = nonStdUkuran.map((u) => u.id);
-            // Delete associated stock records first
-            await tx.stokGudangItem.deleteMany({
-              where: { ukuranId: { in: nonStdIds } },
+        // Seed stock records for each warehouse in a single batch query
+        if (activeGudangList.length > 0) {
+          await prisma.stokGudangItem.createMany({
+            data: activeGudangList.map((g) => ({
+              gudangId: g.id,
+              ukuranId: stdUkuran!.id,
+              stokTersedia: 50,
+              ambangBatasMin: 10,
+            })),
+            skipDuplicates: true,
+          });
+        }
+      }
+    } else if (hasVariants === true) {
+      // Variant mode: delete STD variant if it exists and we have custom variants
+      const incomingVariants: {
+        id?: string;
+        kodeUkuran: string;
+        namaUkuran: string;
+        kelompokUkuran?: string;
+      }[] = Array.isArray(variants) ? variants : [];
+
+      // Remove STD variant when custom variants exist
+      if (incomingVariants.length > 0) {
+        const stdUkuran = existing.ukuran.find((u) => u.kodeUkuran === "STD");
+        if (stdUkuran) {
+          await prisma.stokGudangItem.deleteMany({
+            where: { ukuranId: stdUkuran.id },
+          });
+          await prisma.masterPerlengkapanUkuran.delete({
+            where: { id: stdUkuran.id },
+          });
+        }
+      }
+
+      // Determine which variants to keep or delete
+      const incomingCodes = new Set(incomingVariants.map((v) => v.kodeUkuran.trim().toUpperCase()));
+      const toDeleteUkuran = existing.ukuran.filter(
+        (u) => u.kodeUkuran !== "STD" && !incomingCodes.has(u.kodeUkuran.trim().toUpperCase())
+      );
+
+      if (toDeleteUkuran.length > 0) {
+        const toDeleteIds = toDeleteUkuran.map((u) => u.id);
+        await prisma.stokGudangItem.deleteMany({
+          where: { ukuranId: { in: toDeleteIds } },
+        });
+        await prisma.masterPerlengkapanUkuran.deleteMany({
+          where: { id: { in: toDeleteIds } },
+        });
+      }
+
+      // Upsert incoming variants
+      const savedUkuranIds: string[] = [];
+      for (const v of incomingVariants) {
+        const cleanCode = v.kodeUkuran.trim();
+        const cleanName = v.namaUkuran.trim() || cleanCode;
+        const cleanKelompok = v.kelompokUkuran || "STANDAR";
+
+        const uk = await prisma.masterPerlengkapanUkuran.upsert({
+          where: {
+            barangId_kodeUkuran: {
+              barangId: id,
+              kodeUkuran: cleanCode,
+            },
+          },
+          update: {
+            namaUkuran: cleanName,
+            kelompokUkuran: cleanKelompok,
+          },
+          create: {
+            barangId: id,
+            kodeUkuran: cleanCode,
+            namaUkuran: cleanName,
+            kelompokUkuran: cleanKelompok,
+          },
+        });
+        savedUkuranIds.push(uk.id);
+      }
+
+      // Seed warehouse stock in a single batch query
+      if (activeGudangList.length > 0 && savedUkuranIds.length > 0) {
+        const stockData = [];
+        for (const ukId of savedUkuranIds) {
+          for (const gdg of activeGudangList) {
+            stockData.push({
+              gudangId: gdg.id,
+              ukuranId: ukId,
+              stokTersedia: 50,
+              ambangBatasMin: 10,
             });
-            // Delete non-std variants
-            await tx.masterPerlengkapanUkuran.deleteMany({
-              where: { id: { in: nonStdIds } },
-            });
-          }
-
-          // Ensure STD exists
-          let stdUkuran = existing.ukuran.find((u) => u.kodeUkuran === "STD");
-          if (!stdUkuran) {
-            stdUkuran = await tx.masterPerlengkapanUkuran.create({
-              data: {
-                barangId: id,
-                kodeUkuran: "STD",
-                namaUkuran: "Ukuran Standar",
-                kelompokUkuran: "STANDAR",
-              },
-            });
-
-            // Seed stock records for each warehouse in parallel
-            if (activeGudangList.length > 0) {
-              await Promise.all(
-                activeGudangList.map((g) =>
-                  tx.stokGudangItem.upsert({
-                    where: { gudangId_ukuranId: { gudangId: g.id, ukuranId: stdUkuran!.id } },
-                    update: {},
-                    create: {
-                      gudangId: g.id,
-                      ukuranId: stdUkuran!.id,
-                      stokTersedia: 50,
-                      ambangBatasMin: 10,
-                    },
-                  })
-                )
-              );
-            }
-          }
-        } else if (hasVariants === true) {
-          // Variant mode: delete STD variant if it exists and we have custom variants
-          const incomingVariants: {
-            id?: string;
-            kodeUkuran: string;
-            namaUkuran: string;
-            kelompokUkuran?: string;
-          }[] = Array.isArray(variants) ? variants : [];
-
-          // Remove STD variant when custom variants exist
-          if (incomingVariants.length > 0) {
-            const stdUkuran = existing.ukuran.find((u) => u.kodeUkuran === "STD");
-            if (stdUkuran) {
-              await tx.stokGudangItem.deleteMany({
-                where: { ukuranId: stdUkuran.id },
-              });
-              await tx.masterPerlengkapanUkuran.delete({
-                where: { id: stdUkuran.id },
-              });
-            }
-          }
-
-          // Determine which variants to keep or delete
-          const incomingCodes = new Set(incomingVariants.map((v) => v.kodeUkuran.trim().toUpperCase()));
-          const toDeleteUkuran = existing.ukuran.filter(
-            (u) => u.kodeUkuran !== "STD" && !incomingCodes.has(u.kodeUkuran.trim().toUpperCase())
-          );
-
-          if (toDeleteUkuran.length > 0) {
-            const toDeleteIds = toDeleteUkuran.map((u) => u.id);
-            await tx.stokGudangItem.deleteMany({
-              where: { ukuranId: { in: toDeleteIds } },
-            });
-            await tx.masterPerlengkapanUkuran.deleteMany({
-              where: { id: { in: toDeleteIds } },
-            });
-          }
-
-          // Upsert incoming variants
-          for (const v of incomingVariants) {
-            const cleanCode = v.kodeUkuran.trim();
-            const cleanName = v.namaUkuran.trim() || cleanCode;
-            const cleanKelompok = v.kelompokUkuran || "STANDAR";
-
-            const uk = await tx.masterPerlengkapanUkuran.upsert({
-              where: {
-                barangId_kodeUkuran: {
-                  barangId: id,
-                  kodeUkuran: cleanCode,
-                },
-              },
-              update: {
-                namaUkuran: cleanName,
-                kelompokUkuran: cleanKelompok,
-              },
-              create: {
-                barangId: id,
-                kodeUkuran: cleanCode,
-                namaUkuran: cleanName,
-                kelompokUkuran: cleanKelompok,
-              },
-            });
-
-            // Seed warehouse stock in parallel if needed
-            if (activeGudangList.length > 0) {
-              await Promise.all(
-                activeGudangList.map((gdg) =>
-                  tx.stokGudangItem.upsert({
-                    where: {
-                      gudangId_ukuranId: {
-                        gudangId: gdg.id,
-                        ukuranId: uk.id,
-                      },
-                    },
-                    update: {},
-                    create: {
-                      gudangId: gdg.id,
-                      ukuranId: uk.id,
-                      stokTersedia: 50,
-                      ambangBatasMin: 10,
-                    },
-                  })
-                )
-              );
-            }
           }
         }
-      },
-      {
-        maxWait: 10000,
-        timeout: 25000,
+        await prisma.stokGudangItem.createMany({
+          data: stockData,
+          skipDuplicates: true,
+        });
       }
-    );
+    }
 
     // Fetch fresh updated item OUTSIDE the transaction for fastest transaction close
     const result = await prisma.masterPerlengkapan.findUnique({
