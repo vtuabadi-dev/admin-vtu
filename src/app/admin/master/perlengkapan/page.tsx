@@ -1301,7 +1301,7 @@ export default function MasterPerlengkapanPage() {
           <p className="text-xs text-stone-600 dark:text-stone-400">
             Apakah Anda yakin ingin menghapus data perlengkapan{" "}
             <span className="font-bold text-stone-900 dark:text-stone-100">
-              "{barangToDelete?.name}"
+              &ldquo;{barangToDelete?.name}&rdquo;
             </span>
             ?
           </p>
