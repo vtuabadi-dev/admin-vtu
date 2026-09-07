@@ -116,6 +116,11 @@ export default function UserManagementPage() {
     inviteUrl: string;
   } | null>(null);
   const [copiedToken, setCopiedToken] = useState(false);
+  const [emailGateway, setEmailGateway] = useState<{
+    isConfigured: boolean;
+    activeProvider: string;
+    senderEmail: string;
+  } | null>(null);
 
   const fetchUsers = async () => {
     try {
@@ -124,7 +129,7 @@ export default function UserManagementPage() {
       const res = await fetch("/api/admin/users");
       const json = await res.json();
       if (!json.success) throw new Error(json.message);
-      setUsers(json.data);
+      setUsers(json.data || []);
     } catch (err: any) {
       setError(err.message || "Gagal memuat daftar user.");
     } finally {
@@ -134,6 +139,14 @@ export default function UserManagementPage() {
 
   useEffect(() => {
     fetchUsers();
+    fetch("/api/admin/users/email-gateway-status")
+      .then((res) => res.json())
+      .then((json) => {
+        if (json.success && json.data) {
+          setEmailGateway(json.data);
+        }
+      })
+      .catch(() => {});
   }, []);
 
   const handleCreateUser = async (e: React.FormEvent) => {
@@ -435,14 +448,31 @@ export default function UserManagementPage() {
 
             <CardContent className="p-4 space-y-4">
               {/* Info Banner for Invites */}
-              <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-xs flex items-start gap-2.5 text-amber-900 dark:text-amber-300">
-                <div className="p-1 bg-amber-500/20 rounded-lg text-amber-700 shrink-0 mt-0.5">
+              <div className="p-3.5 bg-amber-500/10 border border-amber-500/20 rounded-xl text-xs flex items-start gap-3 text-amber-900 dark:text-amber-300">
+                <div className="p-1.5 bg-amber-500/20 rounded-lg text-amber-700 shrink-0 mt-0.5">
                   <Info className="w-4 h-4" />
                 </div>
-                <div className="space-y-0.5">
-                  <p className="font-bold">Panduan Pengiriman Undangan Pengelola</p>
-                  <p className="text-[11px] text-muted-foreground leading-relaxed">
-                    Jika calon pengelola belum menerima email undangan otomatis di inbox/spam, Anda dapat langsung menggunakan tombol <strong className="text-emerald-700 dark:text-emerald-300 font-bold">&quot;Kirim WA&quot;</strong> atau <strong className="text-amber-700 dark:text-amber-400 font-bold">&quot;Salin Link&quot;</strong> di bawah untuk membagikan tautan aktivasi akun secara instan.
+                <div className="space-y-1 flex-1">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <p className="font-bold text-slate-900 dark:text-white">Status Pengiriman Undangan Akun Pengelola</p>
+                    {emailGateway && (
+                      <span
+                        className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold border ${
+                          emailGateway.isConfigured
+                            ? "bg-emerald-100 text-emerald-800 border-emerald-300"
+                            : "bg-amber-100 text-amber-900 border-amber-300"
+                        }`}
+                      >
+                        {emailGateway.isConfigured ? `✓ Email Gateway: ${emailGateway.activeProvider}` : "⚠️ Server Email Gateway: Belum Disetting"}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[11.5px] text-muted-foreground leading-relaxed">
+                    {emailGateway?.isConfigured ? (
+                      <>Email otomatis terkirim melalui <strong>{emailGateway.activeProvider}</strong> ({emailGateway.senderEmail}). Anda juga dapat menggunakan tombol <strong className="text-emerald-700 dark:text-emerald-300 font-bold">&quot;Kirim WA&quot;</strong> di bawah untuk mengirim undangan ke WhatsApp.</>
+                    ) : (
+                      <>Server Vercel belum memiliki variabel <code className="bg-muted px-1 py-0.5 rounded font-mono text-[10.5px]">GMAIL_USER</code> &amp; <code className="bg-muted px-1 py-0.5 rounded font-mono text-[10.5px]">GMAIL_APP_PASSWORD</code>, sehingga email otomatis belum terkirim keluar. Silakan klik tombol hijau <strong className="text-emerald-700 dark:text-emerald-300 font-bold">&quot;Kirim WA&quot;</strong> atau <strong className="text-amber-700 dark:text-amber-400 font-bold">&quot;Salin Link&quot;</strong> pada tabel di bawah untuk mengirimkan tautan aktivasi akun langsung ke WhatsApp calon admin.</>
+                    )}
                   </p>
                 </div>
               </div>

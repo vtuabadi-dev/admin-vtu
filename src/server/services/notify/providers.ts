@@ -74,11 +74,37 @@ export function createResendProvider(apiKey?: string): NotificationProvider {
         const resend = new Resend(key);
         const fromEmail = process.env.RESEND_FROM_EMAIL || "VTU Abadi Travel <onboarding@resend.dev>";
 
+        const htmlParagraphs = message.body
+          .split("\n\n")
+          .map((p) => `<p style="margin: 0 0 14px; line-height: 1.6; color: #334155; font-size: 14px;">${p.replace(/\n/g, "<br/>")}</p>`)
+          .join("");
+
+        const styledHtml = `
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; padding: 24px 12px; margin: 0;">
+  <div style="max-width: 580px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);">
+    <div style="background-color: #0f172a; padding: 20px 24px;">
+      <h2 style="color: #ffffff; margin: 0; font-size: 18px; font-weight: 700; letter-spacing: 0.5px;">VTU TRAVEL SYSTEM</h2>
+      <p style="color: #10b981; margin: 4px 0 0; font-size: 12px; font-weight: 600;">Sistem Informasi &amp; Operasional Manajemen</p>
+    </div>
+    <div style="padding: 28px 24px;">
+      ${htmlParagraphs}
+    </div>
+    <div style="background-color: #f1f5f9; padding: 16px 24px; text-align: center; border-top: 1px solid #e2e8f0;">
+      <p style="color: #64748b; font-size: 11px; margin: 0;">&copy; PT VAUZA TAMMA ABADI &bull; Notifikasi Resmi Sistem Operasional</p>
+    </div>
+  </div>
+</body>
+</html>`;
+
         const payload: any = {
           from: fromEmail,
           to: message.recipient,
           subject: message.subject ?? "Konfirmasi Registrasi Jamaah Umroh",
           text: message.body,
+          html: styledHtml,
         };
 
         if (message.attachments && message.attachments.length > 0) {
@@ -147,11 +173,37 @@ export function createNodemailerProvider(): NotificationProvider {
 
         const fromAddress = process.env.SMTP_FROM || process.env.GMAIL_FROM || `VTU ABADI Travel <${user}>`;
 
+        const htmlParagraphs = message.body
+          .split("\n\n")
+          .map((p) => `<p style="margin: 0 0 14px; line-height: 1.6; color: #334155; font-size: 14px;">${p.replace(/\n/g, "<br/>")}</p>`)
+          .join("");
+
+        const styledHtml = `
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; padding: 24px 12px; margin: 0;">
+  <div style="max-width: 580px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);">
+    <div style="background-color: #0f172a; padding: 20px 24px;">
+      <h2 style="color: #ffffff; margin: 0; font-size: 18px; font-weight: 700; letter-spacing: 0.5px;">VTU TRAVEL SYSTEM</h2>
+      <p style="color: #10b981; margin: 4px 0 0; font-size: 12px; font-weight: 600;">Sistem Informasi &amp; Operasional Manajemen</p>
+    </div>
+    <div style="padding: 28px 24px;">
+      ${htmlParagraphs}
+    </div>
+    <div style="background-color: #f1f5f9; padding: 16px 24px; text-align: center; border-top: 1px solid #e2e8f0;">
+      <p style="color: #64748b; font-size: 11px; margin: 0;">&copy; PT VAUZA TAMMA ABADI &bull; Notifikasi Resmi Sistem Operasional</p>
+    </div>
+  </div>
+</body>
+</html>`;
+
         const mailOptions: any = {
           from: fromAddress,
           to: message.recipient,
           subject: message.subject ?? "Konfirmasi Registrasi Jamaah Umroh",
           text: message.body,
+          html: styledHtml,
         };
 
         if (message.attachments && message.attachments.length > 0) {
