@@ -341,13 +341,6 @@ export const pembayaranRepo = {
                 kecamatan: true,
                 kelurahan: true,
                 createdAt: true,
-                dokumen: {
-                  select: {
-                    jenis: true,
-                    manualData: true,
-                    ocrData: true,
-                  },
-                },
               },
               orderBy: [{ registrationId: "asc" }, { createdAt: "asc" }],
             },
@@ -362,13 +355,6 @@ export const pembayaranRepo = {
                 kota: true,
                 kecamatan: true,
                 kelurahan: true,
-                dokumen: {
-                  select: {
-                    jenis: true,
-                    manualData: true,
-                    ocrData: true,
-                  },
-                },
               },
             },
           },

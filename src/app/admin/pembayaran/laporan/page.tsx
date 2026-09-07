@@ -566,6 +566,139 @@ function PaymentReviewTabContent() {
   const [newOrderName, setNewOrderName] = useState("");
   const [newOrderType, setNewOrderType] = useState<"penambahan" | "pengurangan">("penambahan");
   const [newOrderNominal, setNewOrderNominal] = useState<number>(0);
+  const [newOrderQty, setNewOrderQty] = useState<number>(1);
+  const [isOrderCustomJenisMode, setIsOrderCustomJenisMode] = useState<boolean>(false);
+
+  // Master lists for Additional Charges and Discounts
+  const [masterTambahanOptions, setMasterTambahanOptions] = useState<string[]>(getInitialTambahanOptions);
+  const [masterPotonganOptions, setMasterPotonganOptions] = useState<string[]>(getInitialPotonganOptions);
+  const [showManageJenisModal, setShowManageJenisModal] = useState(false);
+  const [tempNewJenis, setTempNewJenis] = useState("");
+  const [editingJenisIndex, setEditingJenisIndex] = useState<number | null>(null);
+  const [editingJenisText, setEditingJenisText] = useState("");
+
+  const saveTambahanOptions = (opts: string[]) => {
+    setMasterTambahanOptions(opts);
+    if (typeof window !== "undefined") {
+      try { localStorage.setItem("vtu_master_tambahan_opts", JSON.stringify(opts)); } catch {}
+    }
+  };
+
+  const savePotonganOptions = (opts: string[]) => {
+    setMasterPotonganOptions(opts);
+    if (typeof window !== "undefined") {
+      try { localStorage.setItem("vtu_master_potongan_opts", JSON.stringify(opts)); } catch {}
+    }
+  };
+
+  async function handleAddNewMasterJenisOrder() {
+    if (!tempNewJenis.trim()) return;
+    const name = tempNewJenis.trim();
+    if (newOrderType === "penambahan") {
+      if (!masterTambahanOptions.includes(name)) {
+        saveTambahanOptions([...masterTambahanOptions, name]);
+      }
+      setNewOrderName(name);
+    } else {
+      if (!masterPotonganOptions.includes(name)) {
+        savePotonganOptions([...masterPotonganOptions, name]);
+      }
+      setNewOrderName(name);
+    }
+    setTempNewJenis("");
+
+    try {
+      await fetch("/api/admin/pembayaran/billing-options", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ kategori: newOrderType === "penambahan" ? "tambahan" : "potongan", nama: name }),
+      });
+    } catch (err) {
+      console.warn("[BillingOptions] Save error:", err);
+    }
+  }
+
+  async function handleSaveEditMasterJenisOrder(idx: number) {
+    if (!editingJenisText.trim()) return;
+    const name = editingJenisText.trim();
+    const isTambahan = newOrderType === "penambahan";
+    const oldName = isTambahan ? masterTambahanOptions[idx] : masterPotonganOptions[idx];
+
+    if (isTambahan) {
+      const updated = [...masterTambahanOptions];
+      updated[idx] = name;
+      saveTambahanOptions(updated);
+      if (newOrderName === oldName) setNewOrderName(name);
+    } else {
+      const updated = [...masterPotonganOptions];
+      updated[idx] = name;
+      savePotonganOptions(updated);
+      if (newOrderName === oldName) setNewOrderName(name);
+    }
+    setEditingJenisIndex(null);
+    setEditingJenisText("");
+
+    try {
+      await fetch("/api/admin/pembayaran/billing-options", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ oldNama: oldName, newNama: name, kategori: isTambahan ? "tambahan" : "potongan" }),
+      });
+    } catch (err) {
+      console.warn("[BillingOptions] Edit error:", err);
+    }
+  }
+
+  async function handleDeleteMasterJenisOrder(optName: string) {
+    const isTambahan = newOrderType === "penambahan";
+    if (isTambahan) {
+      const updated = masterTambahanOptions.filter((o) => o !== optName);
+      saveTambahanOptions(updated);
+      if (newOrderName === optName) setNewOrderName(updated[0] || "");
+    } else {
+      const updated = masterPotonganOptions.filter((o) => o !== optName);
+      savePotonganOptions(updated);
+      if (newOrderName === optName) setNewOrderName(updated[0] || "");
+    }
+
+    try {
+      await fetch("/api/admin/pembayaran/billing-options", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nama: optName, kategori: isTambahan ? "tambahan" : "potongan" }),
+      });
+    } catch (err) {
+      console.warn("[BillingOptions] Delete error:", err);
+    }
+  }
+
+  function handleResetMasterDefaultsOrder() {
+    if (newOrderType === "penambahan") {
+      saveTambahanOptions(DEFAULT_TAMBAHAN_OPTIONS);
+      setNewOrderName(DEFAULT_TAMBAHAN_OPTIONS[0] ?? "");
+    } else {
+      savePotonganOptions(DEFAULT_POTONGAN_OPTIONS);
+      setNewOrderName(DEFAULT_POTONGAN_OPTIONS[0] ?? "");
+    }
+  }
+
+  useEffect(() => {
+    fetch("/api/admin/pembayaran/billing-options")
+      .then((res) => res.json())
+      .then((json) => {
+        if (json.success && json.data) {
+          if (Array.isArray(json.data.tambahan) && json.data.tambahan.length > 0) {
+            setMasterTambahanOptions(json.data.tambahan);
+            try { localStorage.setItem("vtu_master_tambahan_opts", JSON.stringify(json.data.tambahan)); } catch {}
+          }
+          if (Array.isArray(json.data.potongan) && json.data.potongan.length > 0) {
+            setMasterPotonganOptions(json.data.potongan);
+            try { localStorage.setItem("vtu_master_potongan_opts", JSON.stringify(json.data.potongan)); } catch {}
+          }
+        }
+      })
+      .catch((err) => console.warn("[BillingOptions] Fetch error:", err));
+  }, []);
 
   // Reject State
   const [rejectTarget, setRejectTarget] = useState<any | null>(null);
@@ -692,6 +825,26 @@ function PaymentReviewTabContent() {
       tglBerangkatFormatted: tglBerangkat.toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" }),
     };
   }, [selectedPayment]);
+
+  const maxOrderQtyLimit = useMemo(() => {
+    return (
+      availableAnggota.length ||
+      selectedPayment?.group?.jumlahAnggota ||
+      selectedPayment?.group?.anggota?.length ||
+      1
+    );
+  }, [availableAnggota.length, selectedPayment]);
+
+  useEffect(() => {
+    if (showAddOrderModal) {
+      if (newOrderType === "penambahan") {
+        setNewOrderName(masterTambahanOptions[0] || "");
+      } else {
+        setNewOrderName(masterPotonganOptions[0] || "");
+      }
+      setIsOrderCustomJenisMode(false);
+    }
+  }, [newOrderType, showAddOrderModal, masterTambahanOptions, masterPotonganOptions]);
 
   // When a payment row is clicked to create/view invoice
   const handleSelectPayment = (payment: any) => {
@@ -832,19 +985,29 @@ function PaymentReviewTabContent() {
       : new Date().toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });
     const bank = p.bankPengirim || formBank || "Bank Transfer";
 
-    const totalBeban = orderItems
+    // Adjust order items qty proporsional berdasarkan jumlah anggota terpilih (split invoice)
+    const totalAnggotaWa = availableAnggota.length || p.group?.jumlahAnggota || p.group?.anggota?.length || 1;
+    const splitPaxWa = selectedAnggota.length > 0 ? selectedAnggota.length : totalAnggotaWa;
+    const adjustedOrderItemsWa = orderItems.map((it) => {
+      const origQty = it.qty || 1;
+      const adjQty = Math.max(1, Math.round((origQty / totalAnggotaWa) * splitPaxWa));
+      const satuan = it.hargaSatuan || (it.nominal / origQty);
+      return { ...it, qty: adjQty, nominal: satuan * adjQty, hargaSatuan: satuan };
+    });
+
+    const totalBeban = adjustedOrderItemsWa
       .filter((it) => it.tipe === "penambahan")
       .reduce((sum, it) => sum + (it.nominal || 0), 0);
-    const totalDiskon = orderItems
+    const totalDiskon = adjustedOrderItemsWa
       .filter((it) => it.tipe === "pengurangan")
       .reduce((sum, it) => sum + (it.nominal || 0), 0);
     const tagihanBase = p.group?.totalTagihan || p.jumlah || nominal || 0;
     const tagihanDisesuaikan = Math.max(0, tagihanBase + totalBeban - totalDiskon);
 
-    const orderLines = orderItems.length > 0 ? [
+    const orderLines = adjustedOrderItemsWa.length > 0 ? [
       ``,
       `📋 *Rincian Tambahan Layanan / Penyesuaian:*`,
-      ...orderItems.map((item) => `• [${item.tipe === "penambahan" ? "+" : "-"}] ${item.nama}: Rp ${item.nominal.toLocaleString("id-ID")}`),
+      ...adjustedOrderItemsWa.map((item) => `• [${item.tipe === "penambahan" ? "+" : "-"}] ${item.nama} (${item.qty}x @ Rp ${(item.hargaSatuan || item.nominal).toLocaleString("id-ID")}): Rp ${item.nominal.toLocaleString("id-ID")}`),
       `*Total Tagihan Disesuaikan:* Rp ${tagihanDisesuaikan.toLocaleString("id-ID")}`,
     ] : [];
 
@@ -919,10 +1082,22 @@ function PaymentReviewTabContent() {
       ? rawTgl.toLocaleDateString("id-ID", { day: "2-digit", month: "2-digit", year: "numeric" })
       : new Date().toLocaleDateString("id-ID", { day: "2-digit", month: "2-digit", year: "numeric" });
 
-    const totalBeban = orderItems
+    // Adjust order items qty proporsional berdasarkan jumlah anggota terpilih (split invoice)
+    const membersToInclude = selectedAnggota.length > 0 ? selectedAnggota : (availableAnggota.length > 0 ? availableAnggota : [p.namaGroup || "Jamaah"]);
+    const totalAnggotaPdf = availableAnggota.length || p.group?.jumlahAnggota || p.group?.anggota?.length || 1;
+    const splitPaxPdf = membersToInclude.length || totalAnggotaPdf;
+
+    const adjustedOrderItemsPdf = orderItems.map((it) => {
+      const origQty = it.qty || 1;
+      const adjQty = Math.max(1, Math.round((origQty / totalAnggotaPdf) * splitPaxPdf));
+      const satuan = it.hargaSatuan || (it.nominal / origQty);
+      return { ...it, qty: adjQty, nominal: satuan * adjQty, hargaSatuan: satuan };
+    });
+
+    const totalBeban = adjustedOrderItemsPdf
       .filter((it) => it.tipe === "penambahan")
       .reduce((sum, it) => sum + (it.nominal || 0), 0);
-    const totalDiskon = orderItems
+    const totalDiskon = adjustedOrderItemsPdf
       .filter((it) => it.tipe === "pengurangan")
       .reduce((sum, it) => sum + (it.nominal || 0), 0);
 
@@ -950,8 +1125,6 @@ function PaymentReviewTabContent() {
       });
     }
 
-    const membersToInclude = selectedAnggota.length > 0 ? selectedAnggota : (availableAnggota.length > 0 ? availableAnggota : [p.namaGroup || "Jamaah"]);
-
     const resolvedPersonName = formatInvoicePersonName(
       p.namaGroup || p.group?.namaGroup,
       p.group?.ketuaGroup?.namaLengkap || p.ketuaGroup?.namaLengkap
@@ -968,7 +1141,7 @@ function PaymentReviewTabContent() {
       kodeRegistrasi: p.kodeRegistrasi || p.group?.kodeRegistrasi || "-",
       namaPaket: p.group?.keberangkatan?.namaPaket || formCatatan || "PAKET UMROH 10 H SBY ( JED.C )",
       tipePaket: p.group?.keberangkatan?.packageType?.name || "SILVER",
-      jumlahPax: membersToInclude.length || p.group?.paxCount || 2,
+      jumlahPax: splitPaxPdf,
       hargaSatuanPaket: p.group?.keberangkatan?.hargaPaket || 37400000,
       tanggalBerangkat: p.group?.keberangkatan?.tanggalBerangkat
         ? new Date(p.group.keberangkatan.tanggalBerangkat).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })
@@ -976,7 +1149,7 @@ function PaymentReviewTabContent() {
       hotelMekkah: formHotelMekkah || p.group?.keberangkatan?.hotelMekkah || "GRAND AL MASSA",
       hotelMadinah: formHotelMadinah || p.group?.keberangkatan?.hotelMadinah || "DURRAT AL EIMAN",
       anggota: membersToInclude,
-      orderItems: orderItems,
+      orderItems: adjustedOrderItemsPdf,
       paymentHistory: history,
       totalTagihan: totalTagihanBase,
       totalPembayaran: totalBayarVal + (p.status === "verified" ? 0 : nominal),
@@ -1322,12 +1495,22 @@ function PaymentReviewTabContent() {
     return <LoadingSkeleton variant="table" />;
   }
 
-  // Calculate group financial summaries with order adjustments
-  const totalBebanTambahan = orderItems
+  // Calculate group financial summaries with order adjustments — qty adjusted for split
+  const displayTotalAnggota = availableAnggota.length || selectedPayment?.group?.jumlahAnggota || 1;
+  const displaySplitPax = selectedAnggota.length > 0 ? selectedAnggota.length : displayTotalAnggota;
+
+  const adjustedOrderItemsDisplay = orderItems.map((it) => {
+    const origQty = it.qty || 1;
+    const adjQty = Math.max(1, Math.round((origQty / displayTotalAnggota) * displaySplitPax));
+    const satuan = it.hargaSatuan || (it.nominal / origQty);
+    return { ...it, qty: adjQty, nominal: satuan * adjQty, hargaSatuan: satuan };
+  });
+
+  const totalBebanTambahan = adjustedOrderItemsDisplay
     .filter((it) => it.tipe === "penambahan")
     .reduce((sum, it) => sum + (it.nominal || 0), 0);
 
-  const totalPengurangan = orderItems
+  const totalPengurangan = adjustedOrderItemsDisplay
     .filter((it) => it.tipe === "pengurangan")
     .reduce((sum, it) => sum + (it.nominal || 0), 0);
 
@@ -2029,13 +2212,13 @@ function PaymentReviewTabContent() {
                             </span>
                           </td>
                           <td className="py-2 px-2.5 text-center font-mono font-bold text-slate-700 dark:text-slate-300">
-                            {selectedPayment.group?.jumlahAnggota || availableAnggota.length || 1} Pax
+                            {displaySplitPax} Pax
                           </td>
                           <td className="py-2 px-2.5 text-right font-mono tabular-nums text-stone-600 dark:text-stone-400">
-                            {formatCurrency(selectedPayment.group?.keberangkatan?.hargaPaket || (groupTotalTagihanBase / Math.max(1, selectedPayment.group?.jumlahAnggota || 1)))}
+                            {formatCurrency(selectedPayment.group?.keberangkatan?.hargaPaket || (groupTotalTagihanBase / Math.max(1, displayTotalAnggota)))}
                           </td>
                           <td className="py-2 px-2.5 text-right font-mono font-bold text-emerald-700 dark:text-emerald-400 tabular-nums">
-                            {formatCurrency(groupTotalTagihanBase)}
+                            {formatCurrency((selectedPayment.group?.keberangkatan?.hargaPaket || (groupTotalTagihanBase / Math.max(1, displayTotalAnggota))) * displaySplitPax)}
                           </td>
                           <td className="py-2 px-2.5 text-center">
                             <span className="text-stone-300 dark:text-stone-700 select-none">—</span>
@@ -2043,7 +2226,7 @@ function PaymentReviewTabContent() {
                         </tr>
 
                         {/* Dynamic Order Items (Tambahan / Potongan) */}
-                        {orderItems.map((item) => {
+                        {adjustedOrderItemsDisplay.map((item) => {
                           const isPotongan = item.tipe === "pengurangan";
                           return (
                             <tr key={item.id} className="hover:bg-muted/30 transition-colors">
@@ -2064,10 +2247,10 @@ function PaymentReviewTabContent() {
                                 )}
                               </td>
                               <td className="py-2 px-2.5 text-center font-mono font-bold text-slate-700 dark:text-slate-300">
-                                1 Item
+                                {item.qty} Pax
                               </td>
                               <td className="py-2 px-2.5 text-right font-mono tabular-nums text-stone-600 dark:text-stone-400">
-                                {formatCurrency(item.nominal)}
+                                {formatCurrency(item.hargaSatuan || (item.nominal / (item.qty || 1)))}
                               </td>
                               <td className={`py-2 px-2.5 text-right font-mono font-bold tabular-nums ${
                                 isPotongan ? "text-amber-600 dark:text-amber-400" : "text-emerald-700 dark:text-emerald-400"
@@ -2751,34 +2934,111 @@ function PaymentReviewTabContent() {
         size="sm"
       >
         <div className="space-y-4 pt-1">
+          {/* 1. Kategori Switcher */}
           <div>
-            <label className="text-xs font-bold text-foreground block mb-1">
+            <label className="text-xs font-bold text-foreground block mb-1.5 uppercase tracking-wider">
               Kategori Item
             </label>
-            <select
-              className="w-full rounded-md border border-input bg-background px-3 py-2 text-xs"
-              value={newOrderType}
-              onChange={(e) => setNewOrderType(e.target.value as "penambahan" | "pengurangan")}
-            >
-              <option value="penambahan">+ Tambahan Biaya / Tagihan</option>
-              <option value="pengurangan">- Potongan Biaya / Diskon</option>
-            </select>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setNewOrderType("penambahan")}
+                className={`p-2.5 rounded-lg border text-xs font-bold transition-all cursor-pointer ${
+                  newOrderType === "penambahan"
+                    ? "border-emerald-500 bg-emerald-500/15 text-emerald-800 dark:text-emerald-300 shadow-xs"
+                    : "border-stone-200 dark:border-stone-800 text-muted-foreground hover:bg-muted/50"
+                }`}
+              >
+                + Tambahan Tagihan
+              </button>
+              <button
+                type="button"
+                onClick={() => setNewOrderType("pengurangan")}
+                className={`p-2.5 rounded-lg border text-xs font-bold transition-all cursor-pointer ${
+                  newOrderType === "pengurangan"
+                    ? "border-amber-500 bg-amber-500/15 text-amber-800 dark:text-amber-300 shadow-xs"
+                    : "border-stone-200 dark:border-stone-800 text-muted-foreground hover:bg-muted/50"
+                }`}
+              >
+                - Potongan / Diskon
+              </button>
+            </div>
           </div>
 
+          {/* 2. Searchable / Selectable Jenis Item */}
           <div>
-            <label className="text-xs font-bold text-foreground block mb-1">
-              Deskripsi Item
-            </label>
-            <Input
-              placeholder={newOrderType === "penambahan" ? "Contoh: Kereta Cepat Haramain" : "Contoh: Diskon Promo Special"}
-              value={newOrderName}
-              onChange={(e) => setNewOrderName(e.target.value)}
-            />
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-xs font-bold text-foreground">
+                {newOrderType === "penambahan" ? "Jenis Tambahan Tagihan" : "Jenis Potongan / Diskon"}
+              </label>
+              <button
+                type="button"
+                onClick={() => setShowManageJenisModal(true)}
+                className="p-1 rounded-md text-amber-600 dark:text-amber-400 hover:bg-amber-500/15 transition-colors cursor-pointer"
+                title="⚙️ Kelola, Tambah, Edit, atau Hapus Daftar Opsi Jenis"
+              >
+                <Settings2 className="h-4 w-4" />
+              </button>
+            </div>
+
+            {isOrderCustomJenisMode ? (
+              <div className="space-y-1.5">
+                <div className="flex gap-2">
+                  <Input
+                    placeholder={
+                      newOrderType === "penambahan"
+                        ? "Ketik jenis tambahan baru..."
+                        : "Ketik jenis potongan baru..."
+                    }
+                    value={newOrderName}
+                    onChange={(e) => setNewOrderName(e.target.value)}
+                    autoFocus
+                  />
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="text-xs shrink-0"
+                    onClick={() => {
+                      setIsOrderCustomJenisMode(false);
+                      const opts = newOrderType === "penambahan" ? masterTambahanOptions : masterPotonganOptions;
+                      if (opts[0]) setNewOrderName(opts[0]);
+                    }}
+                  >
+                    Batal
+                  </Button>
+                </div>
+                <p className="text-[10px] text-muted-foreground">
+                  ✨ Jenis baru ini akan otomatis tersimpan sebagai opsi pilihan berikutnya.
+                </p>
+              </div>
+            ) : (
+              <select
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-xs ring-offset-background focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+                value={newOrderName}
+                onChange={(e) => {
+                  if (e.target.value === "__ADD_NEW__") {
+                    setIsOrderCustomJenisMode(true);
+                    setNewOrderName("");
+                  } else {
+                    setNewOrderName(e.target.value);
+                  }
+                }}
+              >
+                {(newOrderType === "penambahan" ? masterTambahanOptions : masterPotonganOptions).map((opt: string) => (
+                  <option key={opt} value={opt}>
+                    {opt}
+                  </option>
+                ))}
+                <option value="__ADD_NEW__">➕ + Tambah Jenis Baru...</option>
+              </select>
+            )}
           </div>
 
+          {/* 3. Nominal Input */}
           <div>
             <label className="text-xs font-bold text-foreground block mb-1">
-              Nominal (Rp)
+              Nominal Per Unit / Pax (Rp)
             </label>
             <Input
               type="number"
@@ -2788,6 +3048,45 @@ function PaymentReviewTabContent() {
             />
           </div>
 
+          {/* 4. Quantity Input with Max Limit */}
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-xs font-bold text-foreground">
+                Quantity (Jumlah Pax)
+              </label>
+              <span className="text-[10px] font-bold text-amber-700 dark:text-amber-300 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/30">
+                Maksimal: {maxOrderQtyLimit} Jamaah
+              </span>
+            </div>
+            <Input
+              type="number"
+              min={1}
+              max={maxOrderQtyLimit}
+              placeholder="1"
+              value={newOrderQty}
+              onChange={(e) => {
+                const val = parseInt(e.target.value, 10);
+                if (isNaN(val) || val < 1) setNewOrderQty(1);
+                else if (val > maxOrderQtyLimit) setNewOrderQty(maxOrderQtyLimit);
+                else setNewOrderQty(val);
+              }}
+            />
+            <p className="mt-1 text-[10px] text-muted-foreground">
+              Dibatasi sesuai jumlah {maxOrderQtyLimit} jamaah terdaftar di grup ini.
+            </p>
+          </div>
+
+          {/* Subtotal Preview */}
+          {newOrderNominal > 0 && (
+            <div className="p-2.5 rounded-lg bg-stone-100 dark:bg-stone-900 border text-xs flex justify-between items-center">
+              <span className="text-muted-foreground font-medium">Subtotal Tambahan/Potongan:</span>
+              <span className="font-mono font-bold text-amber-600 dark:text-amber-400 text-sm">
+                {formatCurrency(newOrderNominal * newOrderQty)}
+              </span>
+            </div>
+          )}
+
+          {/* Actions */}
           <div className="flex justify-end gap-2 pt-2 border-t">
             <Button
               type="button"
@@ -2803,23 +3102,153 @@ function PaymentReviewTabContent() {
               className="font-bold bg-amber-500 hover:bg-amber-600 text-slate-950"
               onClick={() => {
                 if (!newOrderName.trim() || newOrderNominal <= 0) return;
+                const trimmedName = newOrderName.trim();
+                const isPotongan = newOrderType === "pengurangan";
+
+                if (!isPotongan) {
+                  if (!masterTambahanOptions.includes(trimmedName)) {
+                    saveTambahanOptions([...masterTambahanOptions, trimmedName]);
+                  }
+                } else {
+                  if (!masterPotonganOptions.includes(trimmedName)) {
+                    savePotonganOptions([...masterPotonganOptions, trimmedName]);
+                  }
+                }
+
+                const qty = Math.min(Math.max(1, newOrderQty), maxOrderQtyLimit);
+                const totalNominal = newOrderNominal * qty;
+
                 setOrderItems((prev) => [
                   ...prev,
                   {
-                    id: `item-${Date.now()}`,
-                    nama: newOrderName.trim(),
-                    nominal: newOrderNominal,
+                    id: `item-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+                    nama: trimmedName,
+                    nominal: totalNominal,
+                    qty: qty,
+                    hargaSatuan: newOrderNominal,
                     tipe: newOrderType,
-                    kategori: newOrderType === "pengurangan" ? "potongan" : "tambahan",
+                    kategori: isPotongan ? "potongan" : "tambahan",
                   },
                 ]);
-                setNewOrderName("");
                 setNewOrderNominal(0);
+                setNewOrderQty(1);
+                setIsOrderCustomJenisMode(false);
                 setShowAddOrderModal(false);
               }}
               disabled={!newOrderName.trim() || newOrderNominal <= 0}
             >
               Simpan Item
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Modal Kelola Master Jenis Item (Edit / Hapus / Tambah Opsi) */}
+      <Modal
+        open={showManageJenisModal}
+        onClose={() => setShowManageJenisModal(false)}
+        title={`Kelola Master Opsi — ${newOrderType === "penambahan" ? "Tambahan Tagihan" : "Potongan / Diskon"}`}
+        size="sm"
+      >
+        <div className="space-y-4 pt-1">
+          <p className="text-xs text-muted-foreground">
+            Ubah nama atau hapus opsi jenis {newOrderType === "penambahan" ? "tambahan tagihan" : "potongan"} yang kurang sesuai. Perubahan tersimpan secara otomatis.
+          </p>
+
+          <div className="flex gap-2">
+            <Input
+              placeholder={newOrderType === "penambahan" ? "Tambah opsi tambahan..." : "Tambah opsi potongan..."}
+              value={tempNewJenis}
+              onChange={(e) => setTempNewJenis(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleAddNewMasterJenisOrder()}
+            />
+            <Button
+              type="button"
+              size="sm"
+              onClick={handleAddNewMasterJenisOrder}
+              disabled={!tempNewJenis.trim()}
+              className="bg-amber-600 hover:bg-amber-700 text-white shrink-0"
+            >
+              <Plus className="h-4 w-4 mr-1" /> Tambah
+            </Button>
+          </div>
+
+          <div className="space-y-1.5 max-h-60 overflow-y-auto pr-1">
+            {(newOrderType === "penambahan" ? masterTambahanOptions : masterPotonganOptions).map((opt: string, idx: number) => (
+              <div
+                key={`${opt}-${idx}`}
+                className="flex items-center justify-between p-2 rounded-lg bg-stone-100 dark:bg-stone-900 border text-xs"
+              >
+                {editingJenisIndex === idx ? (
+                  <div className="flex items-center gap-1.5 w-full">
+                    <Input
+                      value={editingJenisText}
+                      onChange={(e) => setEditingJenisText(e.target.value)}
+                      className="h-7 text-xs"
+                      autoFocus
+                    />
+                    <Button
+                      type="button"
+                      size="sm"
+                      className="h-7 px-2 text-[11px]"
+                      onClick={() => handleSaveEditMasterJenisOrder(idx)}
+                    >
+                      Simpan
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 px-2 text-[11px]"
+                      onClick={() => setEditingJenisIndex(null)}
+                    >
+                      Batal
+                    </Button>
+                  </div>
+                ) : (
+                  <>
+                    <span className="font-medium text-foreground truncate">{opt}</span>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingJenisIndex(idx);
+                          setEditingJenisText(opt);
+                        }}
+                        className="p-1 text-stone-400 hover:text-amber-600 transition-colors cursor-pointer"
+                        title="Edit Nama Jenis"
+                      >
+                        <Edit3 className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteMasterJenisOrder(opt)}
+                        className="p-1 text-stone-400 hover:text-destructive transition-colors cursor-pointer"
+                        title="Hapus Jenis Ini"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            ))}
+          </div>
+
+          <div className="flex justify-between items-center pt-2 border-t text-xs">
+            <button
+              type="button"
+              onClick={handleResetMasterDefaultsOrder}
+              className="text-stone-500 hover:text-foreground text-[11px] underline cursor-pointer"
+            >
+              Reset ke Opsi Standar Sistem
+            </button>
+            <Button
+              type="button"
+              size="sm"
+              onClick={() => setShowManageJenisModal(false)}
+            >
+              Selesai
             </Button>
           </div>
         </div>
@@ -3018,9 +3447,31 @@ export default function LaporanPembayaranPage() {
     }
   }
 
+  // Alokasi
+  const [alokasi, setAlokasi] = useState<Record<string, number>>({});
+
+  // Success modal
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [successData, setSuccessData] = useState<{ invoiceNumber: string; amount: number } | null>(null);
+
+  // Active split item
+  const activeSplit = splitConfig?.splits.find((s) => s.id === activeSplitId) ?? null;
+  // Anggota filtered by active split
+  const activeAnggota = activeSplit
+    ? groupData?.anggota.filter((a) => activeSplit.anggotaIds.includes(a.id)) ?? []
+    : groupData?.anggota ?? [];
+  // Pembayaran filtered by active split (if split exists)
+  const activePembayaran = activeSplit
+    ? groupData?.pembayaran.filter((p) =>
+        p.alokasi.some((alok) => activeSplit.anggotaIds.includes(alok.jamaahId))
+      ) ?? []
+    : groupData?.pembayaran ?? [];
+
   const maxQtyLimit = useMemo(() => {
+    // Saat split aktif, limit qty = jumlah anggota di split tersebut
+    if (activeSplit) return activeSplit.anggotaIds.length || 1;
     return groupData?.jumlahAnggota || 1;
-  }, [groupData?.jumlahAnggota]);
+  }, [groupData?.jumlahAnggota, activeSplit]);
 
   useEffect(() => {
     if (newBillingKategori === "tambahan") {
@@ -3031,17 +3482,28 @@ export default function LaporanPembayaranPage() {
     setIsCustomJenisMode(false);
   }, [newBillingKategori, masterTambahanOptions, masterPotonganOptions]);
 
+  // Adjust billing items qty proporsional berdasarkan split yang aktif
+  const adjustedBillingItems = useMemo(() => {
+    if (!activeSplit || !groupData) return billingItems;
+    const totalAnggota = groupData.jumlahAnggota || 1;
+    const splitPax = activeSplit.anggotaIds.length || 1;
+    return billingItems.map((item) => {
+      const adjQty = Math.max(1, Math.round((item.qty / totalAnggota) * splitPax));
+      return { ...item, qty: adjQty };
+    });
+  }, [billingItems, activeSplit, groupData]);
+
   const totalTambahan = useMemo(() => {
-    return billingItems
+    return adjustedBillingItems
       .filter((i) => i.kategori === "tambahan")
       .reduce((sum, i) => sum + i.nominal * i.qty, 0);
-  }, [billingItems]);
+  }, [adjustedBillingItems]);
 
   const totalPotongan = useMemo(() => {
-    return billingItems
+    return adjustedBillingItems
       .filter((i) => i.kategori === "potongan")
       .reduce((sum, i) => sum + i.nominal * i.qty, 0);
-  }, [billingItems]);
+  }, [adjustedBillingItems]);
 
   const calculatedTotalTagihan = useMemo(() => {
     const base = groupData?.totalTagihan || 0;
@@ -3096,26 +3558,6 @@ export default function LaporanPembayaranPage() {
     };
     reader.readAsDataURL(file);
   }
-
-  // Alokasi
-  const [alokasi, setAlokasi] = useState<Record<string, number>>({});
-
-  // Success modal
-  const [showSuccess, setShowSuccess] = useState(false);
-  const [successData, setSuccessData] = useState<{ invoiceNumber: string; amount: number } | null>(null);
-
-  // Active split item
-  const activeSplit = splitConfig?.splits.find((s) => s.id === activeSplitId) ?? null;
-  // Anggota filtered by active split
-  const activeAnggota = activeSplit
-    ? groupData?.anggota.filter((a) => activeSplit.anggotaIds.includes(a.id)) ?? []
-    : groupData?.anggota ?? [];
-  // Pembayaran filtered by active split (if split exists)
-  const activePembayaran = activeSplit
-    ? groupData?.pembayaran.filter((p) =>
-        p.alokasi.some((alok) => activeSplit.anggotaIds.includes(alok.jamaahId))
-      ) ?? []
-    : groupData?.pembayaran ?? [];
 
   async function handleCari() {
     setError("");
@@ -3403,7 +3845,7 @@ export default function LaporanPembayaranPage() {
                             </tr>
                           </thead>
                           <tbody className="divide-y">
-                            {billingItems.map((item) => {
+                            {adjustedBillingItems.map((item) => {
                               const itemTotal = item.nominal * item.qty;
                               return (
                                 <tr key={item.id} className="hover:bg-muted/30 transition-colors">

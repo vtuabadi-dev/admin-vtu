@@ -259,7 +259,21 @@ export const groupRepo = {
         ],
       },
       include: {
-        anggota: { include: { dokumen: true } },
+        anggota: {
+          include: {
+            dokumen: {
+              select: {
+                id: true,
+                jenis: true,
+                fileUrl: true,
+                status: true,
+                dataStatus: true,
+                catatan: true,
+                uploadedAt: true,
+              },
+            },
+          },
+        },
         pembayaran: { include: { alokasi: true } },
         invoices: { include: { items: true } },
         keberangkatan: true,
@@ -280,7 +294,21 @@ export const groupRepo = {
         include: {
           group: {
             include: {
-              anggota: { include: { dokumen: true } },
+              anggota: {
+                include: {
+                  dokumen: {
+                    select: {
+                      id: true,
+                      jenis: true,
+                      fileUrl: true,
+                      status: true,
+                      dataStatus: true,
+                      catatan: true,
+                      uploadedAt: true,
+                    },
+                  },
+                },
+              },
               pembayaran: { include: { alokasi: true } },
               invoices: { include: { items: true } },
             },
