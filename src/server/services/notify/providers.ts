@@ -242,3 +242,84 @@ export function createNodemailerProvider(): NotificationProvider {
   };
 }
 
+// Supabase Auth Email Provider — uses Supabase Auth REST API to send invites using Supabase built-in SMTP
+export function createSupabaseEmailProvider(): NotificationProvider {
+  let supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || "";
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY || "";
+
+  // Auto infer Supabase URL from DATABASE_URL if not directly set
+  if (!supabaseUrl && process.env.DATABASE_URL) {
+    const match = process.env.DATABASE_URL.match(/postgres\.([a-zA-Z0-9_-]+):/);
+    if (match && match[1]) {
+      supabaseUrl = `https://${match[1]}.supabase.co`;
+    }
+  }
+
+  return {
+    name: "supabase",
+    channels: ["email"] as NotificationChannel[],
+
+    async send(message: NotificationMessage): Promise<NotificationResult> {
+      if (!supabaseUrl || !serviceRoleKey) {
+        console.warn("[notify:supabase] SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY missing — fallback to mock provider");
+        return createMockProvider().send(message);
+      }
+
+      try {
+        const cleanUrl = supabaseUrl.replace(/\/$/, "");
+        const inviteEndpoint = `${cleanUrl}/auth/v1/invite`;
+
+        const res = await fetch(inviteEndpoint, {
+          method: "POST",
+          headers: {
+            apikey: serviceRoleKey,
+            Authorization: `Bearer ${serviceRoleKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            email: message.recipient,
+            data: {
+              subject: message.subject,
+              body: message.body,
+              ...(message.templateVars || {}),
+            },
+          }),
+        });
+
+        if (!res.ok) {
+          const errText = await res.text().catch(() => "");
+          throw new Error(`Supabase Auth Invite API returned ${res.status}: ${errText}`);
+        }
+
+        const data = await res.json().catch(() => ({}));
+        console.log(`[notify:supabase] Invite email dispatched via Supabase to ${message.recipient}`);
+
+        return {
+          success: true,
+          messageId: data.id || `supabase-${Date.now()}`,
+          channel: "email",
+          sentAt: new Date().toISOString(),
+          retryable: false,
+        };
+      } catch (err: any) {
+        console.error("[notify:supabase] Supabase email dispatch failed:", err?.message || err);
+        return {
+          success: false,
+          error: err?.message || "Supabase email dispatch failed",
+          channel: "email",
+          sentAt: new Date().toISOString(),
+          retryable: true,
+        };
+      }
+    },
+
+    async healthCheck() {
+      return {
+        ok: !!(supabaseUrl && serviceRoleKey),
+        detail: supabaseUrl && serviceRoleKey ? `Supabase email configured for ${supabaseUrl}` : "SUPABASE_SERVICE_ROLE_KEY missing",
+      };
+    },
+  };
+}
+
+

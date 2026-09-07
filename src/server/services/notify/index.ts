@@ -1,5 +1,5 @@
 import type { NotificationProvider, NotificationMessage, NotificationResult } from "./types";
-import { createMockProvider, createConsoleProvider, createResendProvider, createNodemailerProvider } from "./providers";
+import { createMockProvider, createConsoleProvider, createResendProvider, createNodemailerProvider, createSupabaseEmailProvider } from "./providers";
 
 let _provider: NotificationProvider | null = null;
 
@@ -10,9 +10,14 @@ export function getNotificationProvider(): NotificationProvider {
     _provider = createNodemailerProvider();
   } else if (process.env.RESEND_API_KEY) {
     _provider = createResendProvider();
+  } else if (process.env.SUPABASE_SERVICE_ROLE_KEY && (process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || process.env.DATABASE_URL)) {
+    _provider = createSupabaseEmailProvider();
   } else {
     const configured = process.env.NOTIFICATION_PROVIDER ?? "nodemailer";
     switch (configured) {
+      case "supabase":
+        _provider = createSupabaseEmailProvider();
+        break;
       case "nodemailer":
       case "smtp":
       case "gmail":

@@ -12,10 +12,19 @@ export async function GET() {
   const hasGmail = Boolean(process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD);
   const hasSmtp = Boolean(process.env.SMTP_USER && process.env.SMTP_PASS);
   const hasResend = Boolean(process.env.RESEND_API_KEY);
+  const hasSupabase = Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY && (process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || process.env.DATABASE_URL));
 
-  const isConfigured = hasGmail || hasSmtp || hasResend;
-  const activeProvider = hasGmail ? "Gmail SMTP" : hasSmtp ? "Custom SMTP" : hasResend ? "Resend API" : "Belum Dikonfigurasi (Mock)";
-  const senderEmail = process.env.GMAIL_USER || process.env.SMTP_USER || process.env.RESEND_FROM_EMAIL || "-";
+  const isConfigured = hasGmail || hasSmtp || hasResend || hasSupabase;
+  const activeProvider = hasGmail
+    ? "Gmail SMTP"
+    : hasSmtp
+    ? "Custom SMTP"
+    : hasResend
+    ? "Resend API"
+    : hasSupabase
+    ? "Supabase Auth Email"
+    : "Belum Dikonfigurasi";
+  const senderEmail = process.env.GMAIL_USER || process.env.SMTP_USER || process.env.RESEND_FROM_EMAIL || (hasSupabase ? "Supabase Built-in Mailer" : "-");
 
   return NextResponse.json({
     success: true,
@@ -26,6 +35,7 @@ export async function GET() {
       hasGmail,
       hasSmtp,
       hasResend,
+      hasSupabase,
     },
   });
 }
