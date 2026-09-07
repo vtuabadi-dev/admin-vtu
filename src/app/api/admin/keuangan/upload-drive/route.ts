@@ -135,6 +135,7 @@ export async function POST(req: NextRequest) {
         url: driveUrl,
         fileId: fileId,
         targetFolderId,
+        isWaitLabel,
         docType,
         category: cleanCategory,
       },
