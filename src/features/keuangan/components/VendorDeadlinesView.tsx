@@ -196,9 +196,15 @@ export const VendorDeadlinesView: React.FC<VendorDeadlinesViewProps> = ({
                 <div className="space-y-1.5 flex-1">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-sm font-bold text-slate-900">{exp.vendorName}</span>
-                    <span className="text-[10px] font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
-                      {grp ? grp.name : 'Operasional Umum'}
-                    </span>
+                    {grp ? (
+                      <span className="text-[10px] font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+                        {grp.name}
+                      </span>
+                    ) : (
+                      <span className="text-[10px] font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded border border-amber-300">
+                        ⏳ WAIT LABEL
+                      </span>
+                    )}
                     <span className="text-[10px] font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
                       {exp.category}
                     </span>

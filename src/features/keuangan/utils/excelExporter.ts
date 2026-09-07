@@ -15,7 +15,7 @@ export const exportExpensesToExcel = (
       'No': idx + 1,
       'Tanggal Transaksi': exp.transactionDate,
       'Keterangan Pengeluaran': exp.title,
-      'Grup Keberangkatan': grp ? grp.name : 'Operasional Umum',
+      'Grup Keberangkatan': grp ? grp.name : 'WAIT LABEL',
       'Kode Grup': grp ? grp.code : '-',
       'Kategori': exp.category,
       'Nama Vendor / Supplier': exp.vendorName,

@@ -79,7 +79,7 @@ export const exportExpensesToPDF = (
   // Table Data
   const tableRows = expenses.map((exp, idx) => {
     const group = groups.find((g) => g.id === exp.groupId);
-    const grpName = group ? group.name : 'Operasional Umum';
+    const grpName = group ? group.name : 'WAIT LABEL';
     return [
       (idx + 1).toString(),
       formatTanggalIndo(exp.transactionDate),

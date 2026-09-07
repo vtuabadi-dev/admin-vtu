@@ -68,7 +68,7 @@ export const getDeadlineNotifications = (expenses: ExpenseRecord[], groups: Depa
       expenseId: expense.id,
       title: expense.title,
       vendorName: expense.vendorName,
-      groupName: linkedGroup ? linkedGroup.name : 'Operasional Umum',
+      groupName: linkedGroup ? linkedGroup.name : 'WAIT LABEL',
       amount: expense.amount,
       remainingAmount: remaining,
       deadline: expense.paymentDeadline,

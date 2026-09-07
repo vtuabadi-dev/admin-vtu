@@ -316,7 +316,7 @@ export const ExpenseModal: React.FC<ExpenseModalProps> = ({
       id: expenseToEdit?.id || `exp-${Date.now()}`,
       title,
       groupId: groupId || undefined,
-      groupName: linkedGroup ? linkedGroup.name : 'Operasional Umum',
+      groupName: linkedGroup ? linkedGroup.name : 'WAIT LABEL',
       category,
       vendorName,
       amount: Number(amount),
@@ -369,19 +369,38 @@ export const ExpenseModal: React.FC<ExpenseModalProps> = ({
           {/* Group & Category */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block font-bold text-slate-700 mb-1">Kaitkan Keberangkatan Grup</label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block font-bold text-slate-700">Kaitkan Keberangkatan Grup</label>
+                {!groupId ? (
+                  <span className="text-[10px] font-bold text-amber-800 bg-amber-100 border border-amber-300 px-2 py-0.5 rounded-full flex items-center gap-1">
+                    ⏳ WAIT LABEL
+                  </span>
+                ) : (
+                  <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 border border-emerald-300 px-2 py-0.5 rounded-full flex items-center gap-1">
+                    ✓ Terkait Paket
+                  </span>
+                )}
+              </div>
               <select
                 value={groupId}
                 onChange={(e) => setGroupId(e.target.value)}
                 className="w-full px-3 py-2 border border-slate-300 rounded-xl font-medium text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
               >
-                <option value="">Operasional Umum (Non-Grup)</option>
+                <option value="">⏳ WAIT LABEL (Belum Terkait Paket)</option>
                 {groups.map((g) => (
                   <option key={g.id} value={g.id}>
                     {g.name} ({g.code})
                   </option>
                 ))}
               </select>
+              {!groupId && (
+                <p className="text-[11px] text-amber-700 mt-1 flex items-start gap-1">
+                  <span>ℹ️</span>
+                  <span>
+                    <strong>Status WAIT LABEL:</strong> Berkas bukti tersimpan di folder <code>WAIT LABEL</code> Google Drive dan dapat dikaitkan ke paket keberangkatan kapan saja.
+                  </span>
+                </p>
+              )}
             </div>
 
             <div>

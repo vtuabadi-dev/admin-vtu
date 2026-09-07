@@ -124,7 +124,7 @@ export const ExpenseLedger: React.FC<ExpenseLedgerProps> = ({
             className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500"
           >
             <option value="ALL">Semua Keberangkatan Grup</option>
-            <option value="GENERAL">Operasional Umum (Non-Grup)</option>
+            <option value="GENERAL">⏳ WAIT LABEL (Belum Terkait Paket)</option>
             {groups.map((g) => (
               <option key={g.id} value={g.id}>
                 {g.name} ({g.code})
@@ -250,9 +250,24 @@ export const ExpenseLedger: React.FC<ExpenseLedgerProps> = ({
                             {exp.category}
                           </span>
                         </div>
-                        <div className="text-[11px] text-slate-500 font-medium">
-                          {linkedGroup ? linkedGroup.name : 'Operasional Umum'}
-                        </div>
+                        {linkedGroup ? (
+                          <div className="text-[11px] text-slate-700 font-medium">
+                            {linkedGroup.name}
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-800 bg-amber-100 border border-amber-300 px-2 py-0.5 rounded">
+                              ⏳ WAIT LABEL
+                            </span>
+                            <button
+                              onClick={() => onEditExpense(exp)}
+                              className="text-[10px] font-bold text-emerald-700 hover:text-emerald-900 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 px-1.5 py-0.5 rounded transition-colors"
+                              title="Klik untuk mengaitkan pengeluaran ini ke paket keberangkatan"
+                            >
+                              + Kaitkan Paket
+                            </button>
+                          </div>
+                        )}
                       </td>
 
                       {/* Amount */}
