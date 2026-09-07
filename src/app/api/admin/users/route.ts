@@ -21,6 +21,7 @@ export async function GET(_request: NextRequest) {
         id: true,
         name: true,
         email: true,
+        phone: true,
         role: true,
         secondaryRoles: true,
         mustChangePassword: true,
@@ -47,13 +48,14 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { name, email, role, secondaryRoles } = body;
+    const { name, email, phone, role, secondaryRoles } = body;
 
     if (!name || !email || !role) {
       return NextResponse.json({ success: false, message: "Nama lengkap, email, dan role wajib diisi" }, { status: 400 });
     }
 
     const normalizedEmail = String(email).toLowerCase().trim();
+    const cleanPhone = phone && typeof phone === "string" && phone.trim() ? phone.trim() : null;
 
     // Check duplicate email
     const existing = await prisma.user.findUnique({ where: { email: normalizedEmail } });
@@ -79,6 +81,7 @@ export async function POST(request: NextRequest) {
       data: {
         name,
         email: normalizedEmail,
+        phone: cleanPhone,
         passwordHash,
         role: role as OperationalRole,
         secondaryRoles: validSecondaryRoles,
@@ -91,6 +94,7 @@ export async function POST(request: NextRequest) {
         id: true,
         name: true,
         email: true,
+        phone: true,
         role: true,
         secondaryRoles: true,
         mustChangePassword: true,

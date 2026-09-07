@@ -18,7 +18,7 @@ export async function PATCH(
   try {
     const { id } = params;
     const body = await request.json();
-    const { name, email, role, secondaryRoles } = body;
+    const { name, email, phone, role, secondaryRoles } = body;
 
     const existingUser = await prisma.user.findUnique({ where: { id } });
     if (!existingUser) {
@@ -28,12 +28,16 @@ export async function PATCH(
     const updateData: {
       name?: string;
       email?: string;
+      phone?: string | null;
       role?: OperationalRole;
       secondaryRoles?: string[];
     } = {};
 
     if (name && typeof name === "string") updateData.name = name;
     if (email && typeof email === "string") updateData.email = email.toLowerCase().trim();
+    if (phone !== undefined) {
+      updateData.phone = typeof phone === "string" && phone.trim() ? phone.trim() : null;
+    }
     if (role && typeof role === "string") updateData.role = role as OperationalRole;
     if (Array.isArray(secondaryRoles)) {
       const targetRole = updateData.role || existingUser.role;
@@ -49,6 +53,7 @@ export async function PATCH(
         id: true,
         name: true,
         email: true,
+        phone: true,
         role: true,
         secondaryRoles: true,
         mustChangePassword: true,

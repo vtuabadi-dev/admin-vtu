@@ -27,6 +27,7 @@ interface UserItem {
   id: string;
   name: string;
   email: string;
+  phone?: string | null;
   role: OperationalRole;
   secondaryRoles?: string[];
   mustChangePassword: boolean;
@@ -34,6 +35,17 @@ interface UserItem {
   inviteToken?: string;
   inviteExpires?: string;
   createdAt: string;
+}
+
+function formatWhatsAppNumber(phone?: string | null): string | null {
+  if (!phone) return null;
+  let cleaned = phone.replace(/[^0-9]/g, "");
+  if (cleaned.startsWith("0")) {
+    cleaned = "62" + cleaned.slice(1);
+  } else if (cleaned.startsWith("8")) {
+    cleaned = "62" + cleaned;
+  }
+  return cleaned.length >= 9 ? cleaned : null;
 }
 
 const ROLE_LABELS: Record<OperationalRole, string> = {
@@ -79,6 +91,7 @@ export default function UserManagementPage() {
   const [formData, setFormData] = useState({
     name: "",
     email: "",
+    phone: "",
     role: "admin_operasional" as OperationalRole,
     secondaryRoles: [] as string[],
   });
@@ -89,11 +102,17 @@ export default function UserManagementPage() {
   const [editingUser, setEditingUser] = useState<UserItem | null>(null);
   const [editFormData, setEditFormData] = useState({
     name: "",
+    phone: "",
     role: "admin_operasional" as OperationalRole,
     secondaryRoles: [] as string[],
   });
   const [editSubmitting, setEditSubmitting] = useState(false);
   const [editFormError, setEditFormError] = useState<string | null>(null);
+
+  // Quick WhatsApp Phone Prompt Modal (if admin has no phone set yet)
+  const [phonePromptUser, setPhonePromptUser] = useState<{ user: UserItem; directUrl?: string } | null>(null);
+  const [phonePromptInput, setPhonePromptInput] = useState("");
+  const [savingPhonePrompt, setSavingPhonePrompt] = useState(false);
 
   // Modal Add Custom Role State
   const [isAddRoleModalOpen, setIsAddRoleModalOpen] = useState(false);
@@ -112,6 +131,7 @@ export default function UserManagementPage() {
   const [createdInvite, setCreatedInvite] = useState<{
     name: string;
     email: string;
+    phone?: string | null;
     role: string;
     inviteUrl: string;
   } | null>(null);
@@ -166,6 +186,7 @@ export default function UserManagementPage() {
       setFormData({
         name: "",
         email: "",
+        phone: "",
         role: "admin_operasional",
         secondaryRoles: [],
       });
@@ -175,6 +196,7 @@ export default function UserManagementPage() {
       setCreatedInvite({
         name: json.data.name,
         email: json.data.email,
+        phone: json.data.phone || null,
         role: ROLE_LABELS[json.data.role as OperationalRole] || json.data.role,
         inviteUrl: json.inviteUrl || `${window.location.origin}/setup-password?token=${json.data.inviteToken}`,
       });
@@ -191,6 +213,7 @@ export default function UserManagementPage() {
     setEditingUser(user);
     setEditFormData({
       name: user.name,
+      phone: user.phone || "",
       role: user.role,
       secondaryRoles: user.secondaryRoles || [],
     });
@@ -243,6 +266,7 @@ export default function UserManagementPage() {
       setCreatedInvite({
         name: user.name,
         email: user.email,
+        phone: json.data?.phone || user.phone || null,
         role: ROLE_LABELS[user.role] || user.role,
         inviteUrl: json.inviteUrl,
       });
@@ -255,7 +279,17 @@ export default function UserManagementPage() {
     }
   };
 
-  const handleSendViaWhatsApp = async (user: UserItem, directUrl?: string) => {
+  const handleSendViaWhatsApp = async (user: UserItem, directUrl?: string, overridePhone?: string | null) => {
+    const targetPhone = overridePhone !== undefined ? overridePhone : user.phone;
+    const formattedPhone = formatWhatsAppNumber(targetPhone);
+
+    // If user has no phone set and no override was explicitly passed, prompt Super Admin to input it
+    if (!formattedPhone && overridePhone === undefined) {
+      setPhonePromptUser({ user, directUrl });
+      setPhonePromptInput("");
+      return;
+    }
+
     let finalUrl = directUrl;
     const isExpired = Boolean(user.isInvitePending && user.inviteExpires && new Date(user.inviteExpires) < new Date());
 
@@ -288,7 +322,46 @@ export default function UserManagementPage() {
 
     const roleLabel = ROLE_LABELS[user.role] || user.role;
     const waMsg = `Assalamu'alaikum Wr. Wb. ${user.name},\n\nAnda telah diundang oleh Super Admin sebagai pengelola sistem VTU Travel (${roleLabel}).\n\nSilakan klik tautan resmi di bawah ini untuk mengatur password akun masuk Anda (tautan berlaku 72 jam):\n${finalUrl}\n\nTerima kasih,\nPT VAUZA TAMMA ABADI\nSistem Operasional Travel`;
-    window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(waMsg)}`, "_blank");
+
+    if (formattedPhone) {
+      window.open(`https://api.whatsapp.com/send?phone=${formattedPhone}&text=${encodeURIComponent(waMsg)}`, "_blank");
+    } else {
+      window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(waMsg)}`, "_blank");
+    }
+  };
+
+  const handleSavePhoneAndSendWA = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!phonePromptUser) return;
+    const rawInput = phonePromptInput.trim();
+    const cleanPhone = formatWhatsAppNumber(rawInput);
+    if (!cleanPhone) {
+      alert("Nomor WhatsApp tidak valid. Masukkan nomor minimal 9 digit (contoh: 08123456789).");
+      return;
+    }
+
+    try {
+      setSavingPhonePrompt(true);
+      const res = await fetch(`/api/admin/users/${phonePromptUser.user.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone: rawInput }),
+      });
+      const json = await res.json();
+      if (!json.success) throw new Error(json.message);
+
+      const targetUser = phonePromptUser.user;
+      const directUrl = phonePromptUser.directUrl;
+      setPhonePromptUser(null);
+      fetchUsers();
+
+      // Trigger direct WhatsApp sending with newly saved phone
+      handleSendViaWhatsApp(targetUser, directUrl, cleanPhone);
+    } catch (err: any) {
+      alert(err.message || "Gagal menyimpan nomor WhatsApp.");
+    } finally {
+      setSavingPhonePrompt(false);
+    }
   };
 
   const handleCreateRole = async (e: React.FormEvent) => {
@@ -496,7 +569,7 @@ export default function UserManagementPage() {
                     <thead className="bg-muted/50 text-xs text-muted-foreground uppercase border-b">
                       <tr>
                         <th className="px-4 py-3">Nama Lengkap</th>
-                        <th className="px-4 py-3">Email Login</th>
+                        <th className="px-4 py-3">Kontak (Email &amp; WA)</th>
                         <th className="px-4 py-3">Role / Hak Akses</th>
                         <th className="px-4 py-3 text-center">Status Akun</th>
                         <th className="px-4 py-3">Tanggal Dibuat</th>
@@ -523,8 +596,17 @@ export default function UserManagementPage() {
                         return (
                           <tr key={user.id} className="hover:bg-muted/30 transition-colors">
                             <td className="px-4 py-3 font-semibold text-foreground">{user.name}</td>
-                            <td className="px-4 py-3 text-muted-foreground font-mono">
-                              {user.email}
+                            <td className="px-4 py-3">
+                              <p className="text-muted-foreground font-mono">{user.email}</p>
+                              {user.phone ? (
+                                <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-mono font-semibold flex items-center gap-1 mt-0.5">
+                                  <span>WA:</span> {user.phone}
+                                </p>
+                              ) : (
+                                <p className="text-[10.5px] text-slate-400 italic mt-0.5">
+                                  Belum ada nomor WA
+                                </p>
+                              )}
                             </td>
                             <td className="px-4 py-3">
                               <div className="flex flex-wrap items-center gap-1.5">
@@ -723,6 +805,20 @@ export default function UserManagementPage() {
               </div>
 
               <div className="space-y-1.5">
+                <label className="font-bold text-foreground">Nomor WhatsApp / Telepon (Opsional)</label>
+                <Input
+                  type="tel"
+                  value={formData.phone}
+                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                  placeholder="Contoh: 081234567890"
+                  className="h-9 text-xs font-mono"
+                />
+                <p className="text-[10.5px] text-muted-foreground">
+                  Digunakan agar tombol &quot;Kirim WA&quot; langsung membuka chat ke nomor pengelola.
+                </p>
+              </div>
+
+              <div className="space-y-1.5">
                 <label className="font-bold text-foreground">Role Utama (Primary Role) *</label>
                 <select
                   value={formData.role}
@@ -833,6 +929,17 @@ export default function UserManagementPage() {
 
             <form onSubmit={handleUpdateUser} className="space-y-4 text-xs">
               <div className="space-y-1.5">
+                <label className="font-bold text-foreground">Nomor WhatsApp / Telepon</label>
+                <Input
+                  type="tel"
+                  value={editFormData.phone}
+                  onChange={(e) => setEditFormData({ ...editFormData, phone: e.target.value })}
+                  placeholder="Contoh: 081234567890"
+                  className="h-9 text-xs font-mono"
+                />
+              </div>
+
+              <div className="space-y-1.5">
                 <label className="font-bold text-foreground">Role Utama (Primary Role) *</label>
                 <select
                   value={editFormData.role}
@@ -910,6 +1017,95 @@ export default function UserManagementPage() {
         </div>
       )}
 
+      {/* Quick Phone Prompt Modal for direct WhatsApp */}
+      {phonePromptUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="w-full max-w-md bg-card rounded-xl border shadow-2xl p-6 space-y-4 animate-in fade-in-0 zoom-in-95">
+            <div className="flex items-center justify-between border-b pb-3">
+              <h3 className="text-base font-bold flex items-center gap-2 text-foreground">
+                <Send className="h-5 w-5 text-emerald-600" />
+                Kirim Undangan WA Langsung
+              </h3>
+              <button
+                onClick={() => setPhonePromptUser(null)}
+                className="text-muted-foreground hover:text-foreground cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              Akun <strong>{phonePromptUser.user.name}</strong> ({phonePromptUser.user.email}) belum memiliki nomor telepon. Masukkan nomor WhatsApp pengelola agar sistem dapat langsung membuka chat WhatsApp ke nomor tersebut.
+            </p>
+
+            <form onSubmit={handleSavePhoneAndSendWA} className="space-y-4 text-xs">
+              <div className="space-y-1.5">
+                <label className="font-bold text-foreground">Nomor WhatsApp Calon Admin *</label>
+                <Input
+                  type="tel"
+                  required
+                  autoFocus
+                  value={phonePromptInput}
+                  onChange={(e) => setPhonePromptInput(e.target.value)}
+                  placeholder="Contoh: 081234567890"
+                  className="h-9 text-xs font-mono"
+                />
+                <p className="text-[10.5px] text-muted-foreground">
+                  Format: 08xxx atau 628xxx (otomatis disanitasi). Nomor ini juga akan tersimpan di data pengelola.
+                </p>
+              </div>
+
+              <div className="flex justify-between items-center pt-3 border-t gap-2">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="text-[11px] text-slate-500 hover:text-slate-900 dark:hover:text-white px-2"
+                  onClick={() => {
+                    const target = phonePromptUser.user;
+                    const directUrl = phonePromptUser.directUrl;
+                    setPhonePromptUser(null);
+                    // Open WhatsApp without phone parameter (fallback to manual contact picker)
+                    handleSendViaWhatsApp(target, directUrl, null);
+                  }}
+                >
+                  Lewati (Pilih Manual)
+                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPhonePromptUser(null)}
+                    disabled={savingPhonePrompt}
+                  >
+                    Batal
+                  </Button>
+                  <Button
+                    type="submit"
+                    size="sm"
+                    disabled={savingPhonePrompt}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold gap-1.5"
+                  >
+                    {savingPhonePrompt ? (
+                      <>
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        Menyimpan...
+                      </>
+                    ) : (
+                      <>
+                        <Send className="h-3.5 w-3.5" />
+                        Simpan &amp; Buka WA
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* Modal Copy Created Invite Link */}
       {createdInvite && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
@@ -930,7 +1126,7 @@ export default function UserManagementPage() {
             <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-lg text-xs space-y-1 text-emerald-900 dark:text-emerald-300">
               <p className="font-bold">Undangan telah dikirimkan ke email {createdInvite.email}</p>
               <p className="text-[11px] opacity-90">
-                Email otomatis berisi tautan penyiapan password telah dikirimkan. Anda juga dapat menyalin tautan di bawah ini untuk dikirimkan secara manual via WhatsApp / Telegram.
+                Email otomatis berisi tautan penyiapan password telah dikirimkan. Anda juga dapat mengirimkan tautan aktivasi langsung via WhatsApp di bawah ini.
               </p>
             </div>
 
@@ -939,6 +1135,12 @@ export default function UserManagementPage() {
                 <span className="text-muted-foreground">Nama Pengelola:</span>
                 <span className="font-bold text-foreground">{createdInvite.name}</span>
               </div>
+              {createdInvite.phone && (
+                <div className="flex justify-between items-center bg-muted/40 p-2 rounded border">
+                  <span className="text-muted-foreground">Nomor WhatsApp:</span>
+                  <span className="font-bold text-emerald-600 font-mono">{createdInvite.phone}</span>
+                </div>
+              )}
               <div className="flex justify-between items-center bg-muted/40 p-2 rounded border">
                 <span className="text-muted-foreground">Role Akses:</span>
                 <span className="font-bold text-emerald-600">{createdInvite.role}</span>
@@ -975,8 +1177,13 @@ export default function UserManagementPage() {
                       variant="outline"
                       className="h-8 px-3 font-bold gap-1.5 shrink-0 border-emerald-500/40 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/10 text-xs"
                       onClick={() => {
-                        const waMsg = `Assalamu'alaikum Wr. Wb. ${createdInvite.name},\n\nBerikut adalah tautan undangan Anda sebagai pengelola sistem VTU (${createdInvite.role}).\n\nSilakan atur password akun Anda melalui tautan di bawah ini (berlaku 72 jam):\n${createdInvite.inviteUrl}`;
-                        window.open(`https://web.whatsapp.com/send?text=${encodeURIComponent(waMsg)}`, "_blank");
+                        const waMsg = `Assalamu'alaikum Wr. Wb. ${createdInvite.name},\n\nBerikut adalah tautan undangan Anda sebagai pengelola sistem VTU (${createdInvite.role}).\n\nSilakan atur password akun Anda melalui tautan di bawah ini (berlaku 72 jam):\n${createdInvite.inviteUrl}\n\nTerima kasih,\nPT VAUZA TAMMA ABADI\nSistem Operasional Travel`;
+                        const cleanPhone = formatWhatsAppNumber(createdInvite.phone);
+                        if (cleanPhone) {
+                          window.open(`https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodeURIComponent(waMsg)}`, "_blank");
+                        } else {
+                          window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(waMsg)}`, "_blank");
+                        }
                       }}
                     >
                       <Send className="w-3.5 h-3.5 text-emerald-600" />

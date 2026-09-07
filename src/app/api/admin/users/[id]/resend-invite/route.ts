@@ -50,6 +50,7 @@ export async function POST(
         id: true,
         name: true,
         email: true,
+        phone: true,
         role: true,
         inviteToken: true,
         inviteExpires: true,
