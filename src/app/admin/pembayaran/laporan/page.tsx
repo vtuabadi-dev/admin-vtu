@@ -47,7 +47,7 @@ import { CurrencyInput } from "@/shared/components/ui/CurrencyInput";
 import { Select } from "@/shared/components/ui/Select";
 import { Modal } from "@/shared/components/ui/Modal";
 
-export interface BillingItem {
+interface BillingItem {
   id: string;
   nama: string;
   kategori: "utama" | "tambahan" | "potongan";
@@ -55,6 +55,7 @@ export interface BillingItem {
   qty: number;
   catatan?: string;
   isDefault?: boolean;
+  allocatedJamaah?: string[];
 }
 import { StatusBadge, Badge } from "@/shared/components/ui/Badge";
 import { EmptyState } from "@/shared/components/EmptyState";
@@ -400,9 +401,118 @@ function SplitInvoiceModal({
 
 
 
+const ROOM_TYPE_OPTIONS = [
+  { value: "Quad", label: "Quad (4 Pax)", badgeClass: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800" },
+  { value: "Quad Family", label: "Quad Family (4 Pax)", badgeClass: "bg-teal-500/10 text-teal-700 dark:text-teal-300 border-teal-300 dark:border-teal-800" },
+  { value: "Triple", label: "Triple (3 Pax)", badgeClass: "bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-800" },
+  { value: "Double", label: "Double (2 Pax)", badgeClass: "bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border-indigo-300 dark:border-indigo-800" },
+  { value: "Mix", label: "Mix (Diatur Travel)", badgeClass: "bg-slate-500/10 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-800" },
+  { value: "Single", label: "Single (1 Pax)", badgeClass: "bg-purple-500/10 text-purple-700 dark:text-purple-300 border-purple-300 dark:border-purple-800" },
+];
+
+function getRoomTypeBadgeStyle(roomType?: string): string {
+  const norm = (roomType || "quad").toLowerCase().trim();
+  if (norm.includes("double")) return "bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border-indigo-300 dark:border-indigo-800";
+  if (norm.includes("triple")) return "bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-800";
+  if (norm.includes("family")) return "bg-teal-500/10 text-teal-700 dark:text-teal-300 border-teal-300 dark:border-teal-800";
+  if (norm.includes("single")) return "bg-purple-500/10 text-purple-700 dark:text-purple-300 border-purple-300 dark:border-purple-800";
+  if (norm.includes("mix")) return "bg-slate-500/10 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-800";
+  return "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800";
+}
+
+function isRoomUpgradeItem(name: string): boolean {
+  const lower = name.toLowerCase();
+  return (
+    lower.includes("kamar") ||
+    lower.includes("upgrade kamar") ||
+    lower.includes("double") ||
+    lower.includes("triple") ||
+    lower.includes("single") ||
+    lower.includes("room")
+  );
+}
+
+function detectRoomTypeFromName(name: string): string {
+  const lower = name.toLowerCase();
+  if (lower.includes("double")) return "Double";
+  if (lower.includes("triple")) return "Triple";
+  if (lower.includes("single")) return "Single";
+  if (lower.includes("family")) return "Quad Family";
+  if (lower.includes("mix")) return "Mix";
+  if (lower.includes("quad")) return "Quad";
+  return "Double";
+}
+
+function getPackageUpgradePrice(paymentOrGroup: any, itemNameOrRoomType: string): number {
+  if (!itemNameOrRoomType) return 0;
+  const lower = itemNameOrRoomType.toLowerCase().trim();
+
+  // Resolve keberangkatan / package info
+  const kbr = paymentOrGroup?.keberangkatan || paymentOrGroup?.group?.keberangkatan || paymentOrGroup?.paketKeberangkatan;
+  const targetKlaster = typeof resolveKlasterName === "function" ? resolveKlasterName(paymentOrGroup) : "";
+
+  let upgradeDouble = 2500000;
+  let upgradeTriple = 1500000;
+  let foundInPackage = false;
+
+  // Cek hotelOptions (array of clusters)
+  let hotelOptions = kbr?.hotelOptions || paymentOrGroup?.hotelOptions || paymentOrGroup?.group?.hotelOptions;
+  if (typeof hotelOptions === "string") {
+    try {
+      hotelOptions = JSON.parse(hotelOptions);
+    } catch {}
+  }
+
+  if (Array.isArray(hotelOptions) && hotelOptions.length > 0) {
+    // Cari cluster yang sesuai dengan pilihan jamaah/grup
+    let activeCluster = hotelOptions.find(
+      (c: any) => c && targetKlaster && c.clusterName && c.clusterName.toLowerCase() === targetKlaster.toLowerCase()
+    );
+    if (!activeCluster) {
+      // Fallback ke cluster pertama yang punya upgradeDouble / upgradeTriple
+      activeCluster = hotelOptions.find((c: any) => c && (Number(c.upgradeDouble) > 0 || Number(c.upgradeTriple) > 0)) || hotelOptions[0];
+    }
+    if (activeCluster) {
+      if (activeCluster.upgradeDouble !== undefined && activeCluster.upgradeDouble !== null && Number(activeCluster.upgradeDouble) > 0) {
+        upgradeDouble = Number(activeCluster.upgradeDouble);
+        foundInPackage = true;
+      }
+      if (activeCluster.upgradeTriple !== undefined && activeCluster.upgradeTriple !== null && Number(activeCluster.upgradeTriple) > 0) {
+        upgradeTriple = Number(activeCluster.upgradeTriple);
+        foundInPackage = true;
+      }
+    }
+  }
+
+  // Cek direct properties jika ada (cth: kbr.upgradeDouble, group.upgradeDouble, dsb)
+  if (!foundInPackage) {
+    if (kbr?.upgradeDouble && Number(kbr.upgradeDouble) > 0) upgradeDouble = Number(kbr.upgradeDouble);
+    if (kbr?.upgradeTriple && Number(kbr.upgradeTriple) > 0) upgradeTriple = Number(kbr.upgradeTriple);
+    if (paymentOrGroup?.group?.upgradeDouble && Number(paymentOrGroup.group.upgradeDouble) > 0) upgradeDouble = Number(paymentOrGroup.group.upgradeDouble);
+    if (paymentOrGroup?.group?.upgradeTriple && Number(paymentOrGroup.group.upgradeTriple) > 0) upgradeTriple = Number(paymentOrGroup.group.upgradeTriple);
+  }
+
+  if (lower.includes("double") || lower === "double") {
+    return upgradeDouble;
+  }
+  if (lower.includes("triple") || lower === "triple") {
+    return upgradeTriple;
+  }
+  if (lower.includes("single") || lower === "single") {
+    return Math.round(upgradeDouble * 1.5);
+  }
+  if (lower.includes("family") || lower === "quad family") {
+    return Math.round(upgradeTriple * 0.8);
+  }
+
+  return 0;
+}
+
 const DEFAULT_TAMBAHAN_OPTIONS = [
   "Upgrade Kamar Double",
+  "Upgrade Kamar Triple",
   "Upgrade Kamar Single",
+  "Upgrade Kamar Quad Family",
   "Tiket Kereta Cepat Haramain (Mekkah - Madinah)",
   "Upgrade Hotel Bintang 5",
   "Paspor Express & Penanganan Dokumen",
@@ -558,6 +668,7 @@ function PaymentReviewTabContent() {
   const [formAlamat, setFormAlamat] = useState("");
   const [selectedAnggota, setSelectedAnggota] = useState<string[]>([]);
   const [availableAnggota, setAvailableAnggota] = useState<string[]>([]);
+  const [memberRoomTypes, setMemberRoomTypes] = useState<Record<string, string>>({});
   const [submittingInvoice, setSubmittingInvoice] = useState(false);
 
   // Order Items / Adjustments (Beban Tambahan & Pengurangan Biaya)
@@ -567,7 +678,13 @@ function PaymentReviewTabContent() {
   const [newOrderType, setNewOrderType] = useState<"penambahan" | "pengurangan">("penambahan");
   const [newOrderNominal, setNewOrderNominal] = useState<number>(0);
   const [newOrderQty, setNewOrderQty] = useState<number>(1);
+  const [newOrderAllocatedMembers, setNewOrderAllocatedMembers] = useState<string[]>([]);
   const [isOrderCustomJenisMode, setIsOrderCustomJenisMode] = useState<boolean>(false);
+
+  // Re-allocate modal state (Ubah alokasi kamar dari tabel)
+  const [showReallocateModal, setShowReallocateModal] = useState(false);
+  const [reallocatingItem, setReallocatingItem] = useState<InvoiceOrderItem | null>(null);
+  const [tempReallocatedMembers, setTempReallocatedMembers] = useState<string[]>([]);
 
   // Master lists for Additional Charges and Discounts
   const [masterTambahanOptions, setMasterTambahanOptions] = useState<string[]>(getInitialTambahanOptions);
@@ -838,11 +955,13 @@ function PaymentReviewTabContent() {
   useEffect(() => {
     if (showAddOrderModal) {
       if (newOrderType === "penambahan") {
-        setNewOrderName(masterTambahanOptions[0] || "");
+        const defaultName = masterTambahanOptions[0] || "";
+        setNewOrderName(defaultName);
       } else {
         setNewOrderName(masterPotonganOptions[0] || "");
       }
       setIsOrderCustomJenisMode(false);
+      setNewOrderAllocatedMembers([]);
     }
   }, [newOrderType, showAddOrderModal, masterTambahanOptions, masterPotonganOptions]);
 
@@ -910,18 +1029,27 @@ function PaymentReviewTabContent() {
     const alamat = getManifestAlamat(payment.group || payment);
     setFormAlamat(alamat);
 
-    // Anggota List & Split Support
+    // Anggota List & Split Support + Room Types Initialization
     const memberNames: string[] = [];
+    const initialRoomTypes: Record<string, string> = {};
+    const defaultGroupRoom = detectRoomTypeFromName(payment.group?.roomUpgrade || payment.roomUpgrade || "Quad");
+
     if (payment.group?.anggota && payment.group.anggota.length > 0) {
       const sorted = sortGroupMembers(payment.group.anggota);
       sorted.forEach((m: any) => {
-        if (m.namaLengkap) memberNames.push(m.namaLengkap);
+        if (m.namaLengkap) {
+          memberNames.push(m.namaLengkap);
+          const mRoom = m.tipeKamar || m.roomType || defaultGroupRoom;
+          initialRoomTypes[m.namaLengkap] = detectRoomTypeFromName(mRoom);
+        }
       });
     } else if (payment.namaGroup) {
       memberNames.push(payment.namaGroup);
+      initialRoomTypes[payment.namaGroup] = defaultGroupRoom;
     }
     setAvailableAnggota(memberNames);
     setSelectedAnggota(memberNames);
+    setMemberRoomTypes(initialRoomTypes);
   };
 
   const handleApprove = useCallback(async (payment: any) => {
@@ -990,9 +1118,20 @@ function PaymentReviewTabContent() {
     const splitPaxWa = selectedAnggota.length > 0 ? selectedAnggota.length : totalAnggotaWa;
     const adjustedOrderItemsWa = orderItems.map((it) => {
       const origQty = it.qty || 1;
-      const adjQty = Math.max(1, Math.round((origQty / totalAnggotaWa) * splitPaxWa));
+      const activeAllocated = it.allocatedJamaah
+        ? it.allocatedJamaah.filter((n) => selectedAnggota.length === 0 || selectedAnggota.includes(n))
+        : undefined;
+      const adjQty = it.allocatedJamaah
+        ? Math.max(1, activeAllocated?.length || 1)
+        : Math.max(1, Math.round((origQty / totalAnggotaWa) * splitPaxWa));
       const satuan = it.hargaSatuan || (it.nominal / origQty);
-      return { ...it, qty: adjQty, nominal: satuan * adjQty, hargaSatuan: satuan };
+      return {
+        ...it,
+        qty: adjQty,
+        nominal: satuan * adjQty,
+        hargaSatuan: satuan,
+        allocatedJamaah: activeAllocated && activeAllocated.length > 0 ? activeAllocated : it.allocatedJamaah,
+      };
     });
 
     const totalBeban = adjustedOrderItemsWa
@@ -1007,7 +1146,10 @@ function PaymentReviewTabContent() {
     const orderLines = adjustedOrderItemsWa.length > 0 ? [
       ``,
       `📋 *Rincian Tambahan Layanan / Penyesuaian:*`,
-      ...adjustedOrderItemsWa.map((item) => `• [${item.tipe === "penambahan" ? "+" : "-"}] ${item.nama} (${item.qty}x @ Rp ${(item.hargaSatuan || item.nominal).toLocaleString("id-ID")}): Rp ${item.nominal.toLocaleString("id-ID")}`),
+      ...adjustedOrderItemsWa.map((item) => {
+        const allocText = item.allocatedJamaah && item.allocatedJamaah.length > 0 ? ` (Peruntukan: ${item.allocatedJamaah.join(", ")})` : "";
+        return `• [${item.tipe === "penambahan" ? "+" : "-"}] ${item.nama}${allocText} (${item.qty}x @ Rp ${(item.hargaSatuan || (item.nominal / (item.qty || 1))).toLocaleString("id-ID")}): Rp ${item.nominal.toLocaleString("id-ID")}`;
+      }),
       `*Total Tagihan Disesuaikan:* Rp ${tagihanDisesuaikan.toLocaleString("id-ID")}`,
     ] : [];
 
@@ -1074,7 +1216,7 @@ function PaymentReviewTabContent() {
       `*Finance & Operational Team — VTU ABADI Travel*`,
       `🌐 https://vtuabadi.com`,
     ].join("\n");
-  }, [formJenis, formBank, orderItems, customWaInvoiceTemplate]);
+  }, [formJenis, formBank, orderItems, customWaInvoiceTemplate, selectedAnggota, availableAnggota]);
 
   const getInvoicePdfPayload = useCallback((p: any, invNum: string, nominal: number) => {
     const rawTgl = p.tanggal ? new Date(p.tanggal) : new Date();
@@ -1089,9 +1231,20 @@ function PaymentReviewTabContent() {
 
     const adjustedOrderItemsPdf = orderItems.map((it) => {
       const origQty = it.qty || 1;
-      const adjQty = Math.max(1, Math.round((origQty / totalAnggotaPdf) * splitPaxPdf));
+      const activeAllocated = it.allocatedJamaah
+        ? it.allocatedJamaah.filter((n) => membersToInclude.includes(n))
+        : undefined;
+      const adjQty = it.allocatedJamaah
+        ? Math.max(1, activeAllocated?.length || 1)
+        : Math.max(1, Math.round((origQty / totalAnggotaPdf) * splitPaxPdf));
       const satuan = it.hargaSatuan || (it.nominal / origQty);
-      return { ...it, qty: adjQty, nominal: satuan * adjQty, hargaSatuan: satuan };
+      return {
+        ...it,
+        qty: adjQty,
+        nominal: satuan * adjQty,
+        hargaSatuan: satuan,
+        allocatedJamaah: activeAllocated && activeAllocated.length > 0 ? activeAllocated : it.allocatedJamaah,
+      };
     });
 
     const totalBeban = adjustedOrderItemsPdf
@@ -1501,9 +1654,20 @@ function PaymentReviewTabContent() {
 
   const adjustedOrderItemsDisplay = orderItems.map((it) => {
     const origQty = it.qty || 1;
-    const adjQty = Math.max(1, Math.round((origQty / displayTotalAnggota) * displaySplitPax));
+    const activeAllocated = it.allocatedJamaah
+      ? it.allocatedJamaah.filter((n) => selectedAnggota.length === 0 || selectedAnggota.includes(n))
+      : undefined;
+    const adjQty = it.allocatedJamaah
+      ? Math.max(1, activeAllocated?.length || 1)
+      : Math.max(1, Math.round((origQty / displayTotalAnggota) * displaySplitPax));
     const satuan = it.hargaSatuan || (it.nominal / origQty);
-    return { ...it, qty: adjQty, nominal: satuan * adjQty, hargaSatuan: satuan };
+    return {
+      ...it,
+      qty: adjQty,
+      nominal: satuan * adjQty,
+      hargaSatuan: satuan,
+      allocatedJamaah: activeAllocated && activeAllocated.length > 0 ? activeAllocated : it.allocatedJamaah,
+    };
   });
 
   const totalBebanTambahan = adjustedOrderItemsDisplay
@@ -2096,35 +2260,59 @@ function PaymentReviewTabContent() {
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-1 gap-1.5 bg-background p-2 rounded-lg border max-h-36 overflow-y-auto">
+                      <div className="grid grid-cols-1 gap-1.5 bg-background p-2 rounded-lg border max-h-48 overflow-y-auto">
                         {availableAnggota.map((nama, idx) => {
                           const isChecked = selectedAnggota.includes(nama);
+                          const currentRoom = memberRoomTypes[nama] || "Quad";
+                          const badgeStyle = getRoomTypeBadgeStyle(currentRoom);
+
                           return (
-                            <label
+                            <div
                               key={nama + idx}
-                              className={`flex items-center gap-2 p-1.5 rounded text-xs cursor-pointer transition-colors ${
+                              className={`flex items-center justify-between gap-2 p-1.5 rounded text-xs transition-colors ${
                                 isChecked ? "bg-primary/5 font-semibold text-foreground" : "text-muted-foreground hover:bg-muted"
                               }`}
                             >
-                              <input
-                                type="checkbox"
-                                checked={isChecked}
-                                onChange={(e) => {
-                                  if (e.target.checked) {
-                                    setSelectedAnggota((prev) => [...prev, nama]);
-                                  } else {
-                                    setSelectedAnggota((prev) => prev.filter((n) => n !== nama));
-                                  }
-                                }}
-                                className="rounded text-primary focus:ring-primary h-3.5 w-3.5"
-                              />
-                              <span>{idx + 1}. {nama}</span>
-                            </label>
+                              <label className="flex items-center gap-2 cursor-pointer flex-1 min-w-0">
+                                <input
+                                  type="checkbox"
+                                  checked={isChecked}
+                                  onChange={(e) => {
+                                    if (e.target.checked) {
+                                      setSelectedAnggota((prev) => [...prev, nama]);
+                                    } else {
+                                      setSelectedAnggota((prev) => prev.filter((n) => n !== nama));
+                                    }
+                                  }}
+                                  className="rounded text-primary focus:ring-primary h-3.5 w-3.5 shrink-0"
+                                />
+                                <span className="truncate">{idx + 1}. {nama}</span>
+                              </label>
+
+                              {/* Interactive Room Type Badge & Selector */}
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                <select
+                                  value={currentRoom}
+                                  onChange={(e) => {
+                                    const newRoom = e.target.value;
+                                    setMemberRoomTypes((prev) => ({ ...prev, [nama]: newRoom }));
+                                  }}
+                                  className={`text-[10px] font-bold px-2 py-0.5 rounded-md border cursor-pointer bg-background transition-all hover:scale-102 ${badgeStyle}`}
+                                  title={`Tipe Kamar: ${currentRoom} (Klik untuk ubah)`}
+                                >
+                                  {ROOM_TYPE_OPTIONS.map((opt) => (
+                                    <option key={opt.value} value={opt.value}>
+                                      🛏️ {opt.label}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+                            </div>
                           );
                         })}
                       </div>
                       <p className="text-[9.5px] text-muted-foreground">
-                        💡 Centang nama anggota yang ditagihkan. Jika jamaah meminta invoice split, centang anggota terkait saja.
+                        💡 Centang nama anggota yang ditagihkan. Anda juga dapat menentukan tipe kamar per-jamaah (Quad, Double, Triple, Mix, dll).
                       </p>
                     </div>
                   )}
@@ -2181,7 +2369,16 @@ function PaymentReviewTabContent() {
                       size="sm"
                       variant="outline"
                       className="h-7 text-xs font-bold border-amber-500/40 hover:bg-amber-500/10 text-amber-600 dark:text-amber-400 gap-1.5"
-                      onClick={() => setShowAddOrderModal(true)}
+                      onClick={() => {
+                        const defaultOpt = masterTambahanOptions[0] || "Upgrade Kamar Double";
+                        setNewOrderName(defaultOpt);
+                        setNewOrderType("penambahan");
+                        setNewOrderNominal(getPackageUpgradePrice(selectedPayment, defaultOpt));
+                        setNewOrderQty(1);
+                        setNewOrderAllocatedMembers([]);
+                        setIsOrderCustomJenisMode(false);
+                        setShowAddOrderModal(true);
+                      }}
                     >
                       <PlusCircle className="w-3.5 h-3.5" />
                       Tambah Item
@@ -2233,6 +2430,36 @@ function PaymentReviewTabContent() {
                               <td className="py-2 px-2.5 font-medium text-foreground">
                                 <div>
                                   <p>{item.nama}</p>
+                                  {item.allocatedJamaah && item.allocatedJamaah.length > 0 ? (
+                                    <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                                      <span className="text-[9.5px] font-semibold text-amber-700 dark:text-amber-300 bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20">
+                                        🛏️ Peruntukan: {item.allocatedJamaah.join(", ")}
+                                      </span>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setReallocatingItem(item);
+                                          setTempReallocatedMembers(item.allocatedJamaah || []);
+                                          setShowReallocateModal(true);
+                                        }}
+                                        className="text-[9.5px] text-primary hover:underline font-bold cursor-pointer"
+                                      >
+                                        Ubah
+                                      </button>
+                                    </div>
+                                  ) : isRoomUpgradeItem(item.nama) ? (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setReallocatingItem(item);
+                                        setTempReallocatedMembers([]);
+                                        setShowReallocateModal(true);
+                                      }}
+                                      className="text-[9.5px] text-amber-600 dark:text-amber-400 hover:underline font-bold cursor-pointer block mt-0.5"
+                                    >
+                                      + Atur Alokasi Jamaah
+                                    </button>
+                                  ) : null}
                                 </div>
                               </td>
                               <td className="py-2 px-2.5">
@@ -2262,7 +2489,19 @@ function PaymentReviewTabContent() {
                                   size="sm"
                                   variant="ghost"
                                   className="h-6 w-6 p-0 text-destructive hover:bg-destructive/10"
-                                  onClick={() => setOrderItems((prev) => prev.filter((i) => i.id !== item.id))}
+                                  onClick={() => {
+                                    if (item.allocatedJamaah && item.allocatedJamaah.length > 0) {
+                                      const defaultGroupRoom = detectRoomTypeFromName(selectedPayment?.group?.roomUpgrade || selectedPayment?.roomUpgrade || "Quad");
+                                      setMemberRoomTypes((prev) => {
+                                        const updated = { ...prev };
+                                        item.allocatedJamaah?.forEach((n) => {
+                                          updated[n] = defaultGroupRoom;
+                                        });
+                                        return updated;
+                                      });
+                                    }
+                                    setOrderItems((prev) => prev.filter((i) => i.id !== item.id));
+                                  }}
                                 >
                                   <Trash2 className="h-3.5 w-3.5" />
                                 </Button>
@@ -2942,7 +3181,12 @@ function PaymentReviewTabContent() {
             <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
-                onClick={() => setNewOrderType("penambahan")}
+                onClick={() => {
+                  setNewOrderType("penambahan");
+                  const defaultOpt = masterTambahanOptions[0] || "";
+                  setNewOrderName(defaultOpt);
+                  setNewOrderNominal(getPackageUpgradePrice(selectedPayment, defaultOpt));
+                }}
                 className={`p-2.5 rounded-lg border text-xs font-bold transition-all cursor-pointer ${
                   newOrderType === "penambahan"
                     ? "border-emerald-500 bg-emerald-500/15 text-emerald-800 dark:text-emerald-300 shadow-xs"
@@ -2953,7 +3197,12 @@ function PaymentReviewTabContent() {
               </button>
               <button
                 type="button"
-                onClick={() => setNewOrderType("pengurangan")}
+                onClick={() => {
+                  setNewOrderType("pengurangan");
+                  const defaultOpt = masterPotonganOptions[0] || "";
+                  setNewOrderName(defaultOpt);
+                  setNewOrderNominal(0);
+                }}
                 className={`p-2.5 rounded-lg border text-xs font-bold transition-all cursor-pointer ${
                   newOrderType === "pengurangan"
                     ? "border-amber-500 bg-amber-500/15 text-amber-800 dark:text-amber-300 shadow-xs"
@@ -2991,7 +3240,16 @@ function PaymentReviewTabContent() {
                         : "Ketik jenis potongan baru..."
                     }
                     value={newOrderName}
-                    onChange={(e) => setNewOrderName(e.target.value)}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setNewOrderName(val);
+                      if (newOrderType === "penambahan" && isRoomUpgradeItem(val)) {
+                        const price = getPackageUpgradePrice(selectedPayment, val);
+                        if (price > 0 && newOrderNominal === 0) {
+                          setNewOrderNominal(price);
+                        }
+                      }
+                    }}
                     autoFocus
                   />
                   <Button
@@ -3002,7 +3260,13 @@ function PaymentReviewTabContent() {
                     onClick={() => {
                       setIsOrderCustomJenisMode(false);
                       const opts = newOrderType === "penambahan" ? masterTambahanOptions : masterPotonganOptions;
-                      if (opts[0]) setNewOrderName(opts[0]);
+                      const optVal = opts[0] || "";
+                      setNewOrderName(optVal);
+                      if (newOrderType === "penambahan") {
+                        setNewOrderNominal(getPackageUpgradePrice(selectedPayment, optVal));
+                      } else {
+                        setNewOrderNominal(0);
+                      }
                     }}
                   >
                     Batal
@@ -3017,11 +3281,17 @@ function PaymentReviewTabContent() {
                 className="w-full rounded-md border border-input bg-background px-3 py-2 text-xs ring-offset-background focus:outline-none focus:ring-2 focus:ring-amber-500/50"
                 value={newOrderName}
                 onChange={(e) => {
-                  if (e.target.value === "__ADD_NEW__") {
+                  const val = e.target.value;
+                  if (val === "__ADD_NEW__") {
                     setIsOrderCustomJenisMode(true);
                     setNewOrderName("");
+                    setNewOrderNominal(0);
                   } else {
-                    setNewOrderName(e.target.value);
+                    setNewOrderName(val);
+                    if (newOrderType === "penambahan") {
+                      const price = getPackageUpgradePrice(selectedPayment, val);
+                      setNewOrderNominal(price);
+                    }
                   }
                 }}
               >
@@ -3048,7 +3318,57 @@ function PaymentReviewTabContent() {
             />
           </div>
 
-          {/* 4. Quantity Input with Max Limit */}
+          {/* 4. Room Upgrade Allocation Section (Khusus Tambahan Upgrade Kamar) */}
+          {newOrderType === "penambahan" && isRoomUpgradeItem(newOrderName) && (
+            <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-amber-900 dark:text-amber-200 flex items-center gap-1.5">
+                  🛏️ Alokasikan Kamar ke Jamaah:
+                </label>
+                <span className="text-[10px] font-bold text-amber-700 dark:text-amber-300 bg-amber-500/20 px-2 py-0.5 rounded">
+                  {newOrderAllocatedMembers.length} Jamaah Terpilih
+                </span>
+              </div>
+              <p className="text-[10px] text-muted-foreground">
+                Centang jamaah dari invoice ini yang mendapatkan kamar {detectRoomTypeFromName(newOrderName)}. (Quantity otomatis tersinkron).
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-36 overflow-y-auto bg-background p-2 rounded-md border">
+                {(selectedAnggota.length > 0 ? selectedAnggota : availableAnggota).map((nama, idx) => {
+                  const isAllocated = newOrderAllocatedMembers.includes(nama);
+                  return (
+                    <label
+                      key={nama + idx}
+                      className={`flex items-center gap-2 p-1.5 rounded text-xs cursor-pointer transition-colors ${
+                        isAllocated
+                          ? "bg-amber-500/15 font-bold text-amber-900 dark:text-amber-200 border border-amber-500/30"
+                          : "text-muted-foreground hover:bg-muted"
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isAllocated}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            const updated = [...newOrderAllocatedMembers, nama];
+                            setNewOrderAllocatedMembers(updated);
+                            setNewOrderQty(Math.max(1, updated.length));
+                          } else {
+                            const updated = newOrderAllocatedMembers.filter((n) => n !== nama);
+                            setNewOrderAllocatedMembers(updated);
+                            setNewOrderQty(Math.max(1, updated.length));
+                          }
+                        }}
+                        className="rounded text-amber-600 focus:ring-amber-500 h-3.5 w-3.5 shrink-0"
+                      />
+                      <span className="truncate">{nama}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* 5. Quantity Input with Max Limit */}
           <div>
             <div className="flex items-center justify-between mb-1">
               <label className="text-xs font-bold text-foreground">
@@ -3117,6 +3437,8 @@ function PaymentReviewTabContent() {
 
                 const qty = Math.min(Math.max(1, newOrderQty), maxOrderQtyLimit);
                 const totalNominal = newOrderNominal * qty;
+                const isRoomUpgrade = !isPotongan && isRoomUpgradeItem(trimmedName);
+                const allocated = isRoomUpgrade && newOrderAllocatedMembers.length > 0 ? newOrderAllocatedMembers : undefined;
 
                 setOrderItems((prev) => [
                   ...prev,
@@ -3128,16 +3450,135 @@ function PaymentReviewTabContent() {
                     hargaSatuan: newOrderNominal,
                     tipe: newOrderType,
                     kategori: isPotongan ? "potongan" : "tambahan",
+                    allocatedJamaah: allocated,
                   },
                 ]);
+
+                // Otomatis update tipe kamar jamaah jika ini adalah upgrade kamar
+                if (isRoomUpgrade && allocated && allocated.length > 0) {
+                  const detectedRoom = detectRoomTypeFromName(trimmedName);
+                  setMemberRoomTypes((prev) => {
+                    const updated = { ...prev };
+                    allocated.forEach((n) => {
+                      updated[n] = detectedRoom;
+                    });
+                    return updated;
+                  });
+                }
+
                 setNewOrderNominal(0);
                 setNewOrderQty(1);
+                setNewOrderAllocatedMembers([]);
                 setIsOrderCustomJenisMode(false);
                 setShowAddOrderModal(false);
               }}
               disabled={!newOrderName.trim() || newOrderNominal <= 0}
             >
               Simpan Item
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Modal Re-alokasi Upgrade Kamar ke Jamaah (Tab 1) */}
+      <Modal
+        open={showReallocateModal}
+        onClose={() => {
+          setShowReallocateModal(false);
+          setReallocatingItem(null);
+        }}
+        title={`Atur Alokasi Jamaah — ${reallocatingItem?.nama || "Upgrade Kamar"}`}
+        size="sm"
+      >
+        <div className="space-y-3 pt-1">
+          <p className="text-xs text-muted-foreground">
+            Pilih nama jamaah dari invoice ini yang mendapatkan peruntukan kamar <strong>{reallocatingItem ? detectRoomTypeFromName(reallocatingItem.nama) : ""}</strong>:
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-48 overflow-y-auto bg-background p-2.5 rounded-lg border">
+            {(selectedAnggota.length > 0 ? selectedAnggota : availableAnggota).map((nama, idx) => {
+              const isChecked = tempReallocatedMembers.includes(nama);
+              return (
+                <label
+                  key={nama + idx}
+                  className={`flex items-center gap-2 p-1.5 rounded text-xs cursor-pointer transition-colors ${
+                    isChecked
+                      ? "bg-amber-500/15 font-bold text-amber-900 dark:text-amber-200 border border-amber-500/30"
+                      : "text-muted-foreground hover:bg-muted"
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={isChecked}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setTempReallocatedMembers((prev) => [...prev, nama]);
+                      } else {
+                        setTempReallocatedMembers((prev) => prev.filter((n) => n !== nama));
+                      }
+                    }}
+                    className="rounded text-amber-600 focus:ring-amber-500 h-3.5 w-3.5 shrink-0"
+                  />
+                  <span className="truncate">{nama}</span>
+                </label>
+              );
+            })}
+          </div>
+
+          <div className="flex justify-end gap-2 pt-2 border-t">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setShowReallocateModal(false);
+                setReallocatingItem(null);
+              }}
+            >
+              Batal
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              className="font-bold bg-amber-500 hover:bg-amber-600 text-slate-950"
+              onClick={() => {
+                if (!reallocatingItem) return;
+                const newAlloc = tempReallocatedMembers;
+                const newQty = Math.max(1, newAlloc.length);
+                const targetRoom = detectRoomTypeFromName(reallocatingItem.nama);
+                const defaultGroupRoom = detectRoomTypeFromName(selectedPayment?.group?.roomUpgrade || selectedPayment?.roomUpgrade || "Quad");
+
+                setOrderItems((prev) =>
+                  prev.map((it) =>
+                    it.id === reallocatingItem.id
+                      ? {
+                          ...it,
+                          allocatedJamaah: newAlloc.length > 0 ? newAlloc : undefined,
+                          qty: newAlloc.length > 0 ? newQty : (it.qty || 1),
+                          nominal: (it.hargaSatuan || (it.nominal / (it.qty || 1))) * (newAlloc.length > 0 ? newQty : (it.qty || 1)),
+                        }
+                      : it
+                  )
+                );
+
+                // Update member room types
+                setMemberRoomTypes((prev) => {
+                  const updated = { ...prev };
+                  // Reset previous allocated members
+                  reallocatingItem.allocatedJamaah?.forEach((n) => {
+                    updated[n] = defaultGroupRoom;
+                  });
+                  // Set new allocated members
+                  newAlloc.forEach((n) => {
+                    updated[n] = targetRoom;
+                  });
+                  return updated;
+                });
+
+                setShowReallocateModal(false);
+                setReallocatingItem(null);
+              }}
+            >
+              Simpan Alokasi ({tempReallocatedMembers.length} Jamaah)
             </Button>
           </div>
         </div>
@@ -3301,13 +3742,14 @@ export default function LaporanPembayaranPage() {
   const [waTransferFile, setWaTransferFile] = useState<File | null>(null);
   const [isDraggingWa, setIsDraggingWa] = useState(false);
 
-  // Billing Breakdown Items state (Rincian Tagihan & Potongan)
+// Billing Breakdown Items state (Rincian Tagihan & Potongan)
   const [billingItems, setBillingItems] = useState<BillingItem[]>([]);
   const [showAddItemModal, setShowAddItemModal] = useState(false);
   const [newBillingNama, setNewBillingNama] = useState("");
   const [newBillingKategori, setNewBillingKategori] = useState<"tambahan" | "potongan">("tambahan");
   const [newBillingNominal, setNewBillingNominal] = useState(0);
   const [newBillingQty, setNewBillingQty] = useState<number>(1);
+  const [newBillingAllocatedMembers, setNewBillingAllocatedMembers] = useState<string[]>([]);
   const [isCustomJenisMode, setIsCustomJenisMode] = useState<boolean>(false);
 
 
@@ -3480,7 +3922,8 @@ export default function LaporanPembayaranPage() {
       setNewBillingNama(masterPotonganOptions[0] || "");
     }
     setIsCustomJenisMode(false);
-  }, [newBillingKategori, masterTambahanOptions, masterPotonganOptions]);
+    setNewBillingAllocatedMembers([]);
+  }, [newBillingKategori, masterTambahanOptions, masterPotonganOptions, showAddItemModal]);
 
   // Adjust billing items qty proporsional berdasarkan split yang aktif
   const adjustedBillingItems = useMemo(() => {
@@ -3488,10 +3931,19 @@ export default function LaporanPembayaranPage() {
     const totalAnggota = groupData.jumlahAnggota || 1;
     const splitPax = activeSplit.anggotaIds.length || 1;
     return billingItems.map((item) => {
-      const adjQty = Math.max(1, Math.round((item.qty / totalAnggota) * splitPax));
-      return { ...item, qty: adjQty };
+      const activeAllocated = item.allocatedJamaah
+        ? item.allocatedJamaah.filter((n) => activeAnggota.some((a) => a.namaLengkap === n || a.id === n))
+        : undefined;
+      const adjQty = item.allocatedJamaah
+        ? Math.max(1, activeAllocated?.length || 1)
+        : Math.max(1, Math.round((item.qty / totalAnggota) * splitPax));
+      return {
+        ...item,
+        qty: adjQty,
+        allocatedJamaah: activeAllocated && activeAllocated.length > 0 ? activeAllocated : item.allocatedJamaah,
+      };
     });
-  }, [billingItems, activeSplit, groupData]);
+  }, [billingItems, activeSplit, groupData, activeAnggota]);
 
   const totalTambahan = useMemo(() => {
     return adjustedBillingItems
@@ -3519,8 +3971,9 @@ export default function LaporanPembayaranPage() {
     if (!newBillingNama.trim() || newBillingNominal <= 0) return;
 
     const trimmedName = newBillingNama.trim();
+    const isPotongan = newBillingKategori === "potongan";
 
-    if (newBillingKategori === "tambahan") {
+    if (!isPotongan) {
       if (!masterTambahanOptions.includes(trimmedName)) {
         setMasterTambahanOptions((prev) => [...prev, trimmedName]);
       }
@@ -3530,17 +3983,22 @@ export default function LaporanPembayaranPage() {
       }
     }
 
+    const isRoomUpgrade = !isPotongan && isRoomUpgradeItem(trimmedName);
+    const allocated = isRoomUpgrade && newBillingAllocatedMembers.length > 0 ? newBillingAllocatedMembers : undefined;
+
     const newItem: BillingItem = {
       id: `bill-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
       nama: trimmedName,
       kategori: newBillingKategori,
       nominal: newBillingNominal,
       qty: Math.min(Math.max(1, newBillingQty), maxQtyLimit),
+      allocatedJamaah: allocated,
     };
 
     setBillingItems((prev) => [...prev, newItem]);
     setNewBillingNominal(0);
     setNewBillingQty(1);
+    setNewBillingAllocatedMembers([]);
     setIsCustomJenisMode(false);
     setShowAddItemModal(false);
   }
@@ -3824,7 +4282,16 @@ export default function LaporanPembayaranPage() {
                           size="sm"
                           variant="outline"
                           className="h-7 text-xs font-bold border-amber-500/40 hover:bg-amber-500/10 text-amber-600 dark:text-amber-400"
-                          onClick={() => setShowAddItemModal(true)}
+                          onClick={() => {
+                            const defaultOpt = masterTambahanOptions[0] || "Upgrade Kamar Double";
+                            setNewBillingNama(defaultOpt);
+                            setNewBillingKategori("tambahan");
+                            setNewBillingNominal(getPackageUpgradePrice(groupData, defaultOpt));
+                            setNewBillingQty(1);
+                            setNewBillingAllocatedMembers([]);
+                            setIsCustomJenisMode(false);
+                            setShowAddItemModal(true);
+                          }}
                         >
                           <PlusCircle className="mr-1.5 h-3.5 w-3.5" />
                           Tambah Item
@@ -3852,6 +4319,11 @@ export default function LaporanPembayaranPage() {
                                   <td className="p-2 font-medium">
                                     <div>
                                       <p className="text-foreground">{item.nama}</p>
+                                      {item.allocatedJamaah && item.allocatedJamaah.length > 0 && (
+                                        <span className="inline-block text-[9.5px] font-semibold text-amber-700 dark:text-amber-300 bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20 mt-0.5">
+                                          🛏️ Peruntukan: {item.allocatedJamaah.join(", ")}
+                                        </span>
+                                      )}
                                       {item.catatan && (
                                         <p className="text-[10px] text-muted-foreground">{item.catatan}</p>
                                       )}
@@ -4205,7 +4677,12 @@ export default function LaporanPembayaranPage() {
             <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
-                onClick={() => setNewBillingKategori("tambahan")}
+                onClick={() => {
+                  setNewBillingKategori("tambahan");
+                  const defaultOpt = masterTambahanOptions[0] || "";
+                  setNewBillingNama(defaultOpt);
+                  setNewBillingNominal(getPackageUpgradePrice(groupData, defaultOpt));
+                }}
                 className={`p-2.5 rounded-lg border text-xs font-bold transition-all cursor-pointer ${
                   newBillingKategori === "tambahan"
                     ? "border-emerald-500 bg-emerald-500/15 text-emerald-800 dark:text-emerald-300 shadow-xs"
@@ -4216,7 +4693,12 @@ export default function LaporanPembayaranPage() {
               </button>
               <button
                 type="button"
-                onClick={() => setNewBillingKategori("potongan")}
+                onClick={() => {
+                  setNewBillingKategori("potongan");
+                  const defaultOpt = masterPotonganOptions[0] || "";
+                  setNewBillingNama(defaultOpt);
+                  setNewBillingNominal(0);
+                }}
                 className={`p-2.5 rounded-lg border text-xs font-bold transition-all cursor-pointer ${
                   newBillingKategori === "potongan"
                     ? "border-amber-500 bg-amber-500/15 text-amber-800 dark:text-amber-300 shadow-xs"
@@ -4254,7 +4736,16 @@ export default function LaporanPembayaranPage() {
                         : "Ketik jenis potongan baru..."
                     }
                     value={newBillingNama}
-                    onChange={(e) => setNewBillingNama(e.target.value)}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setNewBillingNama(val);
+                      if (newBillingKategori === "tambahan" && isRoomUpgradeItem(val)) {
+                        const price = getPackageUpgradePrice(groupData, val);
+                        if (price > 0 && newBillingNominal === 0) {
+                          setNewBillingNominal(price);
+                        }
+                      }
+                    }}
                     autoFocus
                   />
                   <Button
@@ -4265,7 +4756,13 @@ export default function LaporanPembayaranPage() {
                     onClick={() => {
                       setIsCustomJenisMode(false);
                       const opts = newBillingKategori === "tambahan" ? masterTambahanOptions : masterPotonganOptions;
-                      if (opts[0]) setNewBillingNama(opts[0]);
+                      const optVal = opts[0] || "";
+                      setNewBillingNama(optVal);
+                      if (newBillingKategori === "tambahan") {
+                        setNewBillingNominal(getPackageUpgradePrice(groupData, optVal));
+                      } else {
+                        setNewBillingNominal(0);
+                      }
                     }}
                   >
                     Batal
@@ -4280,11 +4777,17 @@ export default function LaporanPembayaranPage() {
                 className="w-full rounded-md border border-input bg-background px-3 py-2 text-xs ring-offset-background focus:outline-none focus:ring-2 focus:ring-amber-500/50"
                 value={newBillingNama}
                 onChange={(e) => {
-                  if (e.target.value === "__ADD_NEW__") {
+                  const val = e.target.value;
+                  if (val === "__ADD_NEW__") {
                     setIsCustomJenisMode(true);
                     setNewBillingNama("");
+                    setNewBillingNominal(0);
                   } else {
-                    setNewBillingNama(e.target.value);
+                    setNewBillingNama(val);
+                    if (newBillingKategori === "tambahan") {
+                      const price = getPackageUpgradePrice(groupData, val);
+                      setNewBillingNominal(price);
+                    }
                   }
                 }}
               >
@@ -4311,7 +4814,58 @@ export default function LaporanPembayaranPage() {
             />
           </div>
 
-          {/* 4. Quantity Input with Max Limit */}
+          {/* 4. Room Upgrade Allocation Section (Khusus Tambahan Upgrade Kamar) */}
+          {newBillingKategori === "tambahan" && isRoomUpgradeItem(newBillingNama) && (
+            <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-amber-900 dark:text-amber-200 flex items-center gap-1.5">
+                  🛏️ Alokasikan Kamar ke Jamaah:
+                </label>
+                <span className="text-[10px] font-bold text-amber-700 dark:text-amber-300 bg-amber-500/20 px-2 py-0.5 rounded">
+                  {newBillingAllocatedMembers.length} Jamaah Terpilih
+                </span>
+              </div>
+              <p className="text-[10px] text-muted-foreground">
+                Centang jamaah yang mendapatkan kamar {detectRoomTypeFromName(newBillingNama)}. (Quantity otomatis tersinkron).
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-36 overflow-y-auto bg-background p-2 rounded-md border">
+                {(activeAnggota.length > 0 ? activeAnggota : (groupData?.anggota || [])).map((a, idx) => {
+                  const nama = a.namaLengkap;
+                  const isAllocated = newBillingAllocatedMembers.includes(nama);
+                  return (
+                    <label
+                      key={a.id || nama + idx}
+                      className={`flex items-center gap-2 p-1.5 rounded text-xs cursor-pointer transition-colors ${
+                        isAllocated
+                          ? "bg-amber-500/15 font-bold text-amber-900 dark:text-amber-200 border border-amber-500/30"
+                          : "text-muted-foreground hover:bg-muted"
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isAllocated}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            const updated = [...newBillingAllocatedMembers, nama];
+                            setNewBillingAllocatedMembers(updated);
+                            setNewBillingQty(Math.max(1, updated.length));
+                          } else {
+                            const updated = newBillingAllocatedMembers.filter((n) => n !== nama);
+                            setNewBillingAllocatedMembers(updated);
+                            setNewBillingQty(Math.max(1, updated.length));
+                          }
+                        }}
+                        className="rounded text-amber-600 focus:ring-amber-500 h-3.5 w-3.5 shrink-0"
+                      />
+                      <span className="truncate">{nama}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* 5. Quantity Input with Max Limit */}
           <div>
             <div className="flex items-center justify-between mb-1">
               <label className="text-xs font-bold text-foreground">

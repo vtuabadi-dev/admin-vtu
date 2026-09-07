@@ -7,6 +7,9 @@ import {
   Loader2,
   CheckCircle2,
   Plus,
+  Eye,
+  ExternalLink,
+  FileText,
 } from 'lucide-react';
 import { DepartureGroup, ExpenseCategory, ExpenseRecord, PaymentStatus } from '../types';
 import { SAR_TO_IDR } from '../utils/formatters';
@@ -69,17 +72,37 @@ export const ExpenseModal: React.FC<ExpenseModalProps> = ({
   const [invoiceFileName, setInvoiceFileName] = useState<string | undefined>(
     expenseToEdit?.invoiceFileName
   );
+  const [invoiceDriveUrl, setInvoiceDriveUrl] = useState<string | undefined>(
+    expenseToEdit?.invoiceDriveUrl
+  );
+  const [isUploadingInvoice, setIsUploadingInvoice] = useState(false);
+  const [isDraggingInvoice, setIsDraggingInvoice] = useState(false);
+
   const [transferProofImage, setTransferProofImage] = useState<string | undefined>(
     expenseToEdit?.transferProofImage
   );
   const [transferProofFileName, setTransferProofFileName] = useState<string | undefined>(
     expenseToEdit?.transferProofFileName
   );
+  const [transferProofDriveUrl, setTransferProofDriveUrl] = useState<string | undefined>(
+    expenseToEdit?.transferProofDriveUrl
+  );
+  const [isUploadingTransferProof, setIsUploadingTransferProof] = useState(false);
+  const [isDraggingTransfer, setIsDraggingTransfer] = useState(false);
+
   const [notes, setNotes] = useState(expenseToEdit?.notes || '');
 
   // AI Scanner state
   const [isScanningAI, setIsScanningAI] = useState(false);
   const [scanMessage, setScanMessage] = useState<string | null>(null);
+
+  // File Review Lightbox state
+  const [previewDoc, setPreviewDoc] = useState<{
+    url?: string;
+    title: string;
+    fileName?: string;
+    driveUrl?: string;
+  } | null>(null);
 
   if (!isOpen) return null;
 
@@ -88,30 +111,123 @@ export const ExpenseModal: React.FC<ExpenseModalProps> = ({
     setAmount(Math.round(valSar * SAR_TO_IDR));
   };
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  // Helper upload file directly to Google Drive Hierarchy
+  const uploadFileToGoogleDrive = async (file: File, docType: 'invoice' | 'transfer_proof') => {
+    const isInvoice = docType === 'invoice';
+    try {
+      if (isInvoice) setIsUploadingInvoice(true);
+      else setIsUploadingTransferProof(true);
 
-    setInvoiceFileName(file.name);
+      const linkedGroup = groups.find((g) => g.id === groupId);
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('docType', docType);
+      formData.append('category', category || 'Operasional');
+      if (linkedGroup?.departureDate) {
+        formData.append('departureDate', linkedGroup.departureDate);
+      }
+      if (linkedGroup?.name) {
+        formData.append('packageName', linkedGroup.name);
+      }
+      formData.append('transactionDate', transactionDate || new Date().toISOString().slice(0, 10));
+
+      const res = await fetch('/api/admin/keuangan/upload-drive', {
+        method: 'POST',
+        body: formData,
+      });
+      const json = await res.json();
+      if (json.success && json.data) {
+        if (isInvoice) {
+          if (json.data.url) setInvoiceDriveUrl(json.data.url);
+          if (json.data.fileName) setInvoiceFileName(json.data.fileName);
+        } else {
+          if (json.data.url) setTransferProofDriveUrl(json.data.url);
+          if (json.data.fileName) setTransferProofFileName(json.data.fileName);
+        }
+      }
+    } catch (err) {
+      console.warn('[Google Drive Upload Warning]', err);
+    } finally {
+      if (isInvoice) setIsUploadingInvoice(false);
+      else setIsUploadingTransferProof(false);
+    }
+  };
+
+  // Core file processor (Supports Local Explorer, WhatsApp Desktop/Web, Drag & Drop, Paste)
+  const processAndSetFile = (file: File, docType: 'invoice' | 'transfer_proof') => {
+    const isInvoice = docType === 'invoice';
+    const originalName = file.name || (isInvoice ? 'invoice.jpg' : 'bukti-tf.jpg');
+
+    if (isInvoice) {
+      setInvoiceFileName(originalName);
+    } else {
+      setTransferProofFileName(originalName);
+    }
+
     const reader = new FileReader();
     reader.onload = () => {
       const result = reader.result as string;
-      setInvoiceImage(result);
+      if (isInvoice) {
+        setInvoiceImage(result);
+      } else {
+        setTransferProofImage(result);
+      }
     };
     reader.readAsDataURL(file);
+
+    // Auto sync to Google Drive
+    uploadFileToGoogleDrive(file, docType);
+  };
+
+  const extractFileFromDataTransfer = (dataTransfer: DataTransfer): File | null => {
+    // 1. Standard files array (File explorer or dragged from WhatsApp)
+    if (dataTransfer.files && dataTransfer.files.length > 0) {
+      const f = dataTransfer.files[0];
+      if (f) return f;
+    }
+    // 2. DataTransfer items check (WhatsApp Web / Chrome blobs)
+    if (dataTransfer.items && dataTransfer.items.length > 0) {
+      for (let i = 0; i < dataTransfer.items.length; i++) {
+        const item = dataTransfer.items[i];
+        if (item && item.kind === 'file') {
+          const file = item.getAsFile();
+          if (file) return file;
+        }
+      }
+    }
+    return null;
+  };
+
+  const handleInvoiceDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingInvoice(false);
+    const file = extractFileFromDataTransfer(e.dataTransfer);
+    if (file) {
+      processAndSetFile(file, 'invoice');
+    }
+  };
+
+  const handleTransferDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingTransfer(false);
+    const file = extractFileFromDataTransfer(e.dataTransfer);
+    if (file) {
+      processAndSetFile(file, 'transfer_proof');
+    }
+  };
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    processAndSetFile(file, 'invoice');
   };
 
   const handleTransferProofUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
-    setTransferProofFileName(file.name);
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = reader.result as string;
-      setTransferProofImage(result);
-    };
-    reader.readAsDataURL(file);
+    processAndSetFile(file, 'transfer_proof');
   };
 
   const handleAiScanInvoice = async () => {
@@ -157,7 +273,7 @@ export const ExpenseModal: React.FC<ExpenseModalProps> = ({
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title || !vendorName || amount <= 0) {
       alert('Mohon lengkapi judul, nama vendor, dan nominal pengeluaran.');
@@ -165,6 +281,36 @@ export const ExpenseModal: React.FC<ExpenseModalProps> = ({
     }
 
     const linkedGroup = groups.find((g) => g.id === groupId);
+    let finalInvoiceFileName = invoiceFileName;
+    let finalTransferProofFileName = transferProofFileName;
+
+    // Relokasi otomatis dari WAIT LABEL ke folder Paket jika sebelumnya non-paket dan sekarang diikatkan ke paket
+    const wasUnlinked = expenseToEdit && (!expenseToEdit.groupId || expenseToEdit.groupId === '');
+    const isNowLinked = Boolean(groupId && linkedGroup);
+
+    if (wasUnlinked && isNowLinked && (invoiceDriveUrl || transferProofDriveUrl)) {
+      try {
+        const relocateRes = await fetch('/api/admin/keuangan/relocate-drive', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            invoiceDriveUrl,
+            transferProofDriveUrl,
+            category,
+            departureDate: linkedGroup?.departureDate,
+            packageName: linkedGroup?.name,
+            transactionDate,
+          }),
+        });
+        const relocateJson = await relocateRes.json();
+        if (relocateJson.success && relocateJson.data) {
+          if (relocateJson.data.invoiceNewName) finalInvoiceFileName = relocateJson.data.invoiceNewName;
+          if (relocateJson.data.transferNewName) finalTransferProofFileName = relocateJson.data.transferNewName;
+        }
+      } catch (relocateErr) {
+        console.warn('[Relocate Drive Warning]', relocateErr);
+      }
+    }
 
     const record: ExpenseRecord = {
       id: expenseToEdit?.id || `exp-${Date.now()}`,
@@ -181,9 +327,11 @@ export const ExpenseModal: React.FC<ExpenseModalProps> = ({
       transactionDate,
       invoiceNumber,
       invoiceImage,
-      invoiceFileName,
+      invoiceFileName: finalInvoiceFileName,
+      invoiceDriveUrl,
       transferProofImage,
-      transferProofFileName,
+      transferProofFileName: finalTransferProofFileName,
+      transferProofDriveUrl,
       notes,
       createdAt: expenseToEdit?.createdAt || new Date().toISOString().slice(0, 10),
     };
@@ -416,13 +564,13 @@ export const ExpenseModal: React.FC<ExpenseModalProps> = ({
             </div>
           </div>
 
-          {/* File Attachments Grid (Bukti Invoice & Bukti Transfer) */}
+          {/* File Attachments Grid (Bukti Invoice & Bukti Transfer) with WhatsApp Drag & Drop & Checkmark UI */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {/* 1. Invoice Attachment Upload & AI Scan button */}
-            <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+            {/* 1. Bukti Invoice / Tagihan */}
+            <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
               <div className="flex items-center justify-between">
                 <label className="font-bold text-slate-700 text-xs flex items-center gap-1.5">
-                  <Upload className="w-3.5 h-3.5 text-amber-500" /> Bukti Invoice / Tagihan
+                  <Receipt className="w-3.5 h-3.5 text-amber-500" /> Bukti Invoice / Tagihan
                 </label>
 
                 {invoiceImage && (
@@ -445,105 +593,236 @@ export const ExpenseModal: React.FC<ExpenseModalProps> = ({
                 )}
               </div>
 
-              <div className="flex items-center gap-2">
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleImageUpload}
-                  id="invoice-upload-file"
-                  className="hidden"
-                />
-                <label
-                  htmlFor="invoice-upload-file"
-                  className="px-3 py-1.5 bg-white border border-slate-300 hover:border-amber-500 rounded-lg text-slate-700 font-semibold cursor-pointer transition-colors shadow-sm text-xs flex items-center gap-1.5"
+              {/* Hidden File Input */}
+              <input
+                type="file"
+                accept="image/*,application/pdf"
+                onChange={handleImageUpload}
+                id="invoice-upload-file"
+                className="hidden"
+              />
+
+              {/* Dropzone Container */}
+              {invoiceImage || invoiceFileName ? (
+                /* Tampilan Kolom Tanda Cawang (Centang Hijau) Ketika File Sudah Masuk */
+                <div className="p-2.5 bg-emerald-500/10 border-2 border-emerald-500/40 rounded-xl flex items-center justify-between gap-2 transition-all">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className="p-1 bg-emerald-500/20 text-emerald-600 rounded-full shrink-0">
+                      <CheckCircle2 className="w-5 h-5 text-emerald-600 stroke-[2.5]" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-xs font-bold text-emerald-950 dark:text-emerald-200 truncate" title={invoiceFileName}>
+                        {invoiceFileName || 'Invoice Terlampir'}
+                      </p>
+                      <p className="text-[10px] text-emerald-700 font-medium flex items-center gap-1">
+                        {isUploadingInvoice ? (
+                          <>
+                            <Loader2 className="w-2.5 h-2.5 animate-spin text-amber-600" />
+                            <span className="text-amber-700 font-bold">Sinkronisasi ke Drive...</span>
+                          </>
+                        ) : invoiceDriveUrl ? (
+                          '✓ Tersimpan di Google Drive'
+                        ) : (
+                          '✓ File Bukti Invoice Siap'
+                        )}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setPreviewDoc({
+                          url: invoiceImage,
+                          title: 'Bukti Invoice / Tagihan',
+                          fileName: invoiceFileName,
+                          driveUrl: invoiceDriveUrl,
+                        })
+                      }
+                      className="p-1.5 bg-white hover:bg-amber-50 text-amber-700 border border-amber-300 rounded transition-colors shadow-2xs flex items-center gap-1 text-[10px] font-bold"
+                      title="Lihat / Review File Invoice"
+                    >
+                      <Eye className="w-3.5 h-3.5" />
+                      <span>Lihat</span>
+                    </button>
+                    <label
+                      htmlFor="invoice-upload-file"
+                      className="px-2 py-1 text-[10px] font-bold bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 rounded cursor-pointer transition-colors shadow-2xs"
+                    >
+                      Ganti
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setInvoiceImage(undefined);
+                        setInvoiceFileName(undefined);
+                        setInvoiceDriveUrl(undefined);
+                      }}
+                      className="p-1 hover:bg-rose-100 text-rose-600 rounded transition-colors"
+                      title="Hapus file"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                /* Dropzone Kosong: Drag & Drop (Supports WA & Local Files) */
+                <div
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setIsDraggingInvoice(true);
+                  }}
+                  onDragLeave={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setIsDraggingInvoice(false);
+                  }}
+                  onDrop={handleInvoiceDrop}
+                  onPaste={(e) => {
+                    const file = e.clipboardData.files?.[0];
+                    if (file) {
+                      processAndSetFile(file, 'invoice');
+                    }
+                  }}
+                  className={`border-2 border-dashed rounded-xl p-3 text-center transition-all cursor-pointer ${
+                    isDraggingInvoice
+                      ? 'border-amber-500 bg-amber-500/15 scale-[1.01]'
+                      : 'border-slate-300 hover:border-amber-500 bg-white hover:bg-amber-50/30'
+                  }`}
+                  onClick={() => document.getElementById('invoice-upload-file')?.click()}
                 >
-                  <Upload className="w-3.5 h-3.5 text-slate-500" />
-                  <span>{invoiceFileName ? 'Ganti File' : 'Upload Invoice'}</span>
-                </label>
-
-                {invoiceFileName && (
-                  <span className="text-[11px] text-slate-500 truncate max-w-[120px]">
-                    {invoiceFileName}
-                  </span>
-                )}
-              </div>
-
-              {/* Preview Thumbnail */}
-              {invoiceImage && (
-                <div className="relative w-20 h-20 rounded-lg overflow-hidden border border-slate-300 bg-white group mt-1">
-                  <img
-                    src={invoiceImage}
-                    alt="Preview Invoice"
-                    className="w-full h-full object-cover"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setInvoiceImage(undefined);
-                      setInvoiceFileName(undefined);
-                    }}
-                    className="absolute top-1 right-1 p-0.5 bg-rose-600 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-                  >
-                    <X className="w-3 h-3" />
-                  </button>
+                  <div className="flex flex-col items-center justify-center gap-1 text-slate-500">
+                    <Upload className={`w-5 h-5 ${isDraggingInvoice ? 'text-amber-600 animate-bounce' : 'text-slate-400'}`} />
+                    <p className="text-[11px] font-semibold text-slate-700">
+                      Tarik &amp; lepas file (bisa dari WA)
+                    </p>
+                    <p className="text-[10px] text-slate-400">
+                      atau <span className="text-amber-600 font-bold underline">klik untuk upload</span>
+                    </p>
+                  </div>
                 </div>
               )}
             </div>
 
-            {/* 2. Bukti Transfer (Bukti TF) Upload */}
-            <div className="p-3.5 bg-amber-50/50 border border-amber-200 rounded-xl space-y-2">
+            {/* 2. Bukti Transfer (Bukti TF) */}
+            <div className="p-3 bg-amber-50/40 border border-amber-200 rounded-xl space-y-2">
               <div className="flex items-center justify-between">
                 <label className="font-bold text-slate-800 text-xs flex items-center gap-1.5">
                   <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Bukti Transfer (Bukti TF)
                 </label>
-                {transferProofImage && (
-                  <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded">
-                    Terlampir
-                  </span>
-                )}
               </div>
 
-              <div className="flex items-center gap-2">
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleTransferProofUpload}
-                  id="transfer-proof-upload-file"
-                  className="hidden"
-                />
-                <label
-                  htmlFor="transfer-proof-upload-file"
-                  className="px-3 py-1.5 bg-white border border-amber-300 hover:border-amber-500 rounded-lg text-slate-800 font-semibold cursor-pointer transition-colors shadow-sm text-xs flex items-center gap-1.5"
+              {/* Hidden File Input */}
+              <input
+                type="file"
+                accept="image/*,application/pdf"
+                onChange={handleTransferProofUpload}
+                id="transfer-proof-upload-file"
+                className="hidden"
+              />
+
+              {/* Dropzone Container */}
+              {transferProofImage || transferProofFileName ? (
+                /* Tampilan Kolom Tanda Cawang (Centang Hijau) Ketika File Sudah Masuk */
+                <div className="p-2.5 bg-emerald-500/10 border-2 border-emerald-500/40 rounded-xl flex items-center justify-between gap-2 transition-all">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className="p-1 bg-emerald-500/20 text-emerald-600 rounded-full shrink-0">
+                      <CheckCircle2 className="w-5 h-5 text-emerald-600 stroke-[2.5]" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-xs font-bold text-emerald-950 dark:text-emerald-200 truncate" title={transferProofFileName}>
+                        {transferProofFileName || 'Bukti TF Terlampir'}
+                      </p>
+                      <p className="text-[10px] text-emerald-700 font-medium flex items-center gap-1">
+                        {isUploadingTransferProof ? (
+                          <>
+                            <Loader2 className="w-2.5 h-2.5 animate-spin text-amber-600" />
+                            <span className="text-amber-700 font-bold">Sinkronisasi ke Drive...</span>
+                          </>
+                        ) : transferProofDriveUrl ? (
+                          '✓ Tersimpan di Google Drive'
+                        ) : (
+                          '✓ File Bukti TF Siap'
+                        )}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setPreviewDoc({
+                          url: transferProofImage,
+                          title: 'Bukti Transfer (TF)',
+                          fileName: transferProofFileName,
+                          driveUrl: transferProofDriveUrl,
+                        })
+                      }
+                      className="p-1.5 bg-white hover:bg-emerald-50 text-emerald-700 border border-emerald-300 rounded transition-colors shadow-2xs flex items-center gap-1 text-[10px] font-bold"
+                      title="Lihat / Review File Bukti TF"
+                    >
+                      <Eye className="w-3.5 h-3.5" />
+                      <span>Lihat</span>
+                    </button>
+                    <label
+                      htmlFor="transfer-proof-upload-file"
+                      className="px-2 py-1 text-[10px] font-bold bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 rounded cursor-pointer transition-colors shadow-2xs"
+                    >
+                      Ganti
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setTransferProofImage(undefined);
+                        setTransferProofFileName(undefined);
+                        setTransferProofDriveUrl(undefined);
+                      }}
+                      className="p-1 hover:bg-rose-100 text-rose-600 rounded transition-colors"
+                      title="Hapus file"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                /* Dropzone Kosong: Drag & Drop (Supports WA & Local Files) */
+                <div
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setIsDraggingTransfer(true);
+                  }}
+                  onDragLeave={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setIsDraggingTransfer(false);
+                  }}
+                  onDrop={handleTransferDrop}
+                  onPaste={(e) => {
+                    const file = e.clipboardData.files?.[0];
+                    if (file) {
+                      processAndSetFile(file, 'transfer_proof');
+                    }
+                  }}
+                  className={`border-2 border-dashed rounded-xl p-3 text-center transition-all cursor-pointer ${
+                    isDraggingTransfer
+                      ? 'border-emerald-500 bg-emerald-500/15 scale-[1.01]'
+                      : 'border-amber-300 hover:border-emerald-500 bg-white hover:bg-emerald-50/30'
+                  }`}
+                  onClick={() => document.getElementById('transfer-proof-upload-file')?.click()}
                 >
-                  <Upload className="w-3.5 h-3.5 text-amber-600" />
-                  <span>{transferProofFileName ? 'Ganti Bukti TF' : 'Upload Bukti TF'}</span>
-                </label>
-
-                {transferProofFileName && (
-                  <span className="text-[11px] text-slate-600 truncate max-w-[120px]">
-                    {transferProofFileName}
-                  </span>
-                )}
-              </div>
-
-              {/* Preview Thumbnail for Transfer Proof */}
-              {transferProofImage && (
-                <div className="relative w-20 h-20 rounded-lg overflow-hidden border border-emerald-400 bg-slate-900 group mt-1">
-                  <img
-                    src={transferProofImage}
-                    alt="Preview Bukti TF"
-                    className="w-full h-full object-cover"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setTransferProofImage(undefined);
-                      setTransferProofFileName(undefined);
-                    }}
-                    className="absolute top-1 right-1 p-0.5 bg-rose-600 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-                  >
-                    <X className="w-3 h-3" />
-                  </button>
+                  <div className="flex flex-col items-center justify-center gap-1 text-slate-500">
+                    <Upload className={`w-5 h-5 ${isDraggingTransfer ? 'text-emerald-600 animate-bounce' : 'text-slate-400'}`} />
+                    <p className="text-[11px] font-semibold text-slate-700">
+                      Tarik &amp; lepas file (bisa dari WA)
+                    </p>
+                    <p className="text-[10px] text-slate-400">
+                      atau <span className="text-amber-600 font-bold underline">klik untuk upload</span>
+                    </p>
+                  </div>
                 </div>
               )}
             </div>
@@ -630,6 +909,65 @@ export const ExpenseModal: React.FC<ExpenseModalProps> = ({
               >
                 Simpan &amp; Gunakan Kategori
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Lightbox Review File Terupload */}
+      {previewDoc && (
+        <div className="fixed inset-0 z-70 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-700 rounded-2xl max-w-2xl w-full shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
+            {/* Header Review */}
+            <div className="p-3.5 bg-slate-800 border-b border-slate-700 flex items-center justify-between text-white">
+              <div className="min-w-0">
+                <h4 className="font-bold text-xs text-amber-400 truncate">{previewDoc.title}</h4>
+                <p className="text-[11px] text-slate-300 truncate">{previewDoc.fileName || 'Review Dokumen Terlampir'}</p>
+              </div>
+              <div className="flex items-center gap-2">
+                {previewDoc.driveUrl && (
+                  <a
+                    href={previewDoc.driveUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="px-2.5 py-1 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-bold transition-colors flex items-center gap-1.5 shadow-sm"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" />
+                    <span>Google Drive</span>
+                  </a>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setPreviewDoc(null)}
+                  className="p-1 hover:bg-slate-700 rounded-lg text-slate-400 hover:text-white transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Content Review Preview */}
+            <div className="p-4 overflow-auto flex-1 bg-slate-950 flex items-center justify-center min-h-[300px]">
+              {previewDoc.url ? (
+                previewDoc.url.startsWith('data:application/pdf') ? (
+                  <iframe
+                    src={previewDoc.url}
+                    className="w-full h-[60vh] rounded border border-slate-800"
+                    title="Review PDF"
+                  />
+                ) : (
+                  <img
+                    src={previewDoc.url}
+                    alt={previewDoc.title}
+                    className="max-w-full max-h-[60vh] object-contain rounded-lg border border-slate-800 shadow-xl"
+                  />
+                )
+              ) : (
+                <div className="text-center text-slate-400 p-8 space-y-2">
+                  <FileText className="w-12 h-12 mx-auto text-slate-600" />
+                  <p className="text-xs">Preview visual file tidak tersedia.</p>
+                </div>
+              )}
             </div>
           </div>
         </div>

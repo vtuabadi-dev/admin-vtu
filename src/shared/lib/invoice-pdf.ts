@@ -15,6 +15,7 @@ export interface InvoiceOrderItem {
   nominal: number;
   qty?: number;
   hargaSatuan?: number;
+  allocatedJamaah?: string[]; // Daftar nama jamaah yang menerima alokasi (misal upgrade kamar)
 }
 
 export interface InvoicePaymentRecord {
@@ -417,6 +418,26 @@ export function generateInvoicePdf(data: InvoicePdfData): jsPDF {
       fmtRp(subtotalBase),
     ],
   ];
+
+  if (data.orderItems && data.orderItems.length > 0) {
+    data.orderItems.forEach((it, idx) => {
+      const isPotongan = it.tipe === "pengurangan";
+      const sign = isPotongan ? "- " : "";
+      const nominal = it.nominal || 0;
+      const itQty = it.qty || 1;
+      const unit = it.hargaSatuan || (nominal / itQty);
+      const desc = it.allocatedJamaah && it.allocatedJamaah.length > 0
+        ? `${it.nama}\n(Peruntukan: ${it.allocatedJamaah.join(", ")})`
+        : it.nama;
+      table1Rows.push([
+        `${idx + 2}`,
+        desc,
+        fmtRp(unit),
+        `${itQty} Pax`,
+        `${sign}${fmtRp(nominal)}`,
+      ]);
+    });
+  }
 
   autoTable(doc, {
     startY: t1Y + 4.5,

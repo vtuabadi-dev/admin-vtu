@@ -435,6 +435,50 @@ export async function createHotelVideoFolderHierarchy(
   return hotelFolderId;
 }
 
+export const KEUANGAN_ROOT_FOLDER_ID = process.env.GOOGLE_DRIVE_KEUANGAN_FOLDER_ID || "1HHj6X5Zsu_t8Nwp676kmDDfy7uEGf0pb";
+
+export async function createKeuanganExpenseFolderHierarchy(
+  year: number,
+  monthName?: string,
+  packageName?: string,
+  docType: "invoice" | "transfer_proof" = "invoice"
+): Promise<{ targetFolderId: string; packageFolderId: string; invoiceFolderId: string; transferFolderId: string; isWaitLabel: boolean }> {
+  if (!isGoogleDriveConfigured()) {
+    throw new Error(
+      "[Keuangan Drive Error] Google Drive belum dikonfigurasi. Pastikan variabel GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, dan GOOGLE_REFRESH_TOKEN aktif."
+    );
+  }
+
+  const rootId = KEUANGAN_ROOT_FOLDER_ID;
+  const yearId = await getOrCreateFolder(String(year), rootId);
+
+  // Cek apakah pengeluaran belum terikat paket (Operasional Umum / Non-Paket / WAIT LABEL)
+  const isWaitLabel = !packageName || packageName === "OPERASIONAL UMUM" || packageName.toUpperCase().includes("WAIT LABEL") || !monthName;
+
+  let targetParentFolderId: string;
+  if (isWaitLabel) {
+    targetParentFolderId = await getOrCreateFolder("WAIT LABEL", yearId);
+  } else {
+    const monthId = await getOrCreateMonthFolder(monthName, yearId);
+    targetParentFolderId = await getOrCreateFolder(packageName, monthId);
+  }
+
+  const [invoiceFolderId, transferFolderId] = await Promise.all([
+    getOrCreateFolder("BUKTI INVOICE", targetParentFolderId),
+    getOrCreateFolder("BUKTI TF", targetParentFolderId),
+  ]);
+
+  const targetFolderId = docType === "invoice" ? invoiceFolderId : transferFolderId;
+
+  return {
+    targetFolderId,
+    packageFolderId: targetParentFolderId,
+    invoiceFolderId,
+    transferFolderId,
+    isWaitLabel,
+  };
+}
+
 export function createGoogleDriveAdapter(): StorageAdapter {
   const folderId = getGoogleDriveFolderId();
 

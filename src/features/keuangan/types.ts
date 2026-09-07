@@ -35,8 +35,10 @@ export interface ExpenseRecord {
   invoiceNumber?: string;
   invoiceImage?: string; // Base64 or Data URL
   invoiceFileName?: string;
+  invoiceDriveUrl?: string;
   transferProofImage?: string; // Base64 or Data URL for Bukti Transfer / Bukti Bayar
   transferProofFileName?: string;
+  transferProofDriveUrl?: string;
   notes?: string;
   createdBy?: string;
   createdAt: string;

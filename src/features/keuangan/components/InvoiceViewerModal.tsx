@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Download, Printer, FileText, CheckCircle2, Image } from 'lucide-react';
+import { X, Download, Printer, FileText, CheckCircle2, Image, ExternalLink } from 'lucide-react';
 import { ExpenseRecord } from '../types';
 import { formatRupiah, formatTanggalIndo } from '../utils/formatters';
 
@@ -107,6 +107,17 @@ export const InvoiceViewerModal: React.FC<InvoiceViewerModalProps> = ({
           </div>
 
           <div className="flex items-center gap-2">
+            {(activeDoc === 'transfer' ? expense.transferProofDriveUrl : expense.invoiceDriveUrl) && (
+              <a
+                href={activeDoc === 'transfer' ? expense.transferProofDriveUrl : expense.invoiceDriveUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="p-2 bg-blue-600/30 hover:bg-blue-600/50 text-blue-300 rounded-lg text-xs font-semibold border border-blue-500/40 transition-colors flex items-center gap-1.5"
+                title="Buka File di Google Drive"
+              >
+                <ExternalLink className="w-4 h-4 text-blue-400" /> Drive
+              </a>
+            )}
             <button
               onClick={handlePrint}
               disabled={!currentImage}
