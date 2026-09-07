@@ -442,7 +442,7 @@ export default function UserManagementPage() {
                 <div className="space-y-0.5">
                   <p className="font-bold">Panduan Pengiriman Undangan Pengelola</p>
                   <p className="text-[11px] text-muted-foreground leading-relaxed">
-                    Jika calon pengelola belum menerima email undangan otomatis di inbox/spam, Anda dapat langsung menggunakan tombol <strong className="text-emerald-700 dark:text-emerald-300 font-bold">"Kirim WA"</strong> atau <strong className="text-amber-700 dark:text-amber-400 font-bold">"Salin Link"</strong> di bawah untuk membagikan tautan aktivasi akun secara instan.
+                    Jika calon pengelola belum menerima email undangan otomatis di inbox/spam, Anda dapat langsung menggunakan tombol <strong className="text-emerald-700 dark:text-emerald-300 font-bold">&quot;Kirim WA&quot;</strong> atau <strong className="text-amber-700 dark:text-amber-400 font-bold">&quot;Salin Link&quot;</strong> di bawah untuk membagikan tautan aktivasi akun secara instan.
                   </p>
                 </div>
               </div>
