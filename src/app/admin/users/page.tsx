@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Users, Shield, UserPlus, Loader2, RefreshCw, Copy, Check, Mail, Send, ShieldPlus, Edit3, ExternalLink, Clock } from "lucide-react";
+import { Users, Shield, UserPlus, Loader2, RefreshCw, Copy, Check, Mail, Send, ShieldPlus, Edit3, ExternalLink, Clock, Info } from "lucide-react";
 import { Button } from "@/shared/components/ui/Button";
 import { Input } from "@/shared/components/ui/Input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/components/ui/Card";
@@ -242,6 +242,42 @@ export default function UserManagementPage() {
     }
   };
 
+  const handleSendViaWhatsApp = async (user: UserItem, directUrl?: string) => {
+    let finalUrl = directUrl;
+    const isExpired = Boolean(user.isInvitePending && user.inviteExpires && new Date(user.inviteExpires) < new Date());
+
+    if (isExpired || !finalUrl) {
+      try {
+        setResendingId(user.id);
+        const res = await fetch(`/api/admin/users/${user.id}/resend-invite`, {
+          method: "POST",
+        });
+        const json = await res.json();
+        if (json.success && json.inviteUrl) {
+          finalUrl = json.inviteUrl;
+          fetchUsers();
+        }
+      } catch (e) {
+        console.warn("[WA Resend Warning]", e);
+      } finally {
+        setResendingId(null);
+      }
+    }
+
+    if (!finalUrl && user.inviteToken) {
+      finalUrl = `${window.location.origin}/setup-password?token=${user.inviteToken}`;
+    }
+
+    if (!finalUrl) {
+      alert("Tautan undangan belum tersedia. Silakan klik 'Kirim Ulang' terlebih dahulu.");
+      return;
+    }
+
+    const roleLabel = ROLE_LABELS[user.role] || user.role;
+    const waMsg = `Assalamu'alaikum Wr. Wb. ${user.name},\n\nAnda telah diundang oleh Super Admin sebagai pengelola sistem VTU Travel (${roleLabel}).\n\nSilakan klik tautan resmi di bawah ini untuk mengatur password akun masuk Anda (tautan berlaku 72 jam):\n${finalUrl}\n\nTerima kasih,\nPT VAUZA TAMMA ABADI\nSistem Operasional Travel`;
+    window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(waMsg)}`, "_blank");
+  };
+
   const handleCreateRole = async (e: React.FormEvent) => {
     e.preventDefault();
     setRoleFormError(null);
@@ -397,14 +433,27 @@ export default function UserManagementPage() {
               <CardTitle className="text-base font-bold">Daftar Akun Pengguna &amp; Status Undangan</CardTitle>
             </CardHeader>
 
-            <CardContent className="p-0">
+            <CardContent className="p-4 space-y-4">
+              {/* Info Banner for Invites */}
+              <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-xs flex items-start gap-2.5 text-amber-900 dark:text-amber-300">
+                <div className="p-1 bg-amber-500/20 rounded-lg text-amber-700 shrink-0 mt-0.5">
+                  <Info className="w-4 h-4" />
+                </div>
+                <div className="space-y-0.5">
+                  <p className="font-bold">Panduan Pengiriman Undangan Pengelola</p>
+                  <p className="text-[11px] text-muted-foreground leading-relaxed">
+                    Jika calon pengelola belum menerima email undangan otomatis di inbox/spam, Anda dapat langsung menggunakan tombol <strong className="text-emerald-700 dark:text-emerald-300 font-bold">"Kirim WA"</strong> atau <strong className="text-amber-700 dark:text-amber-400 font-bold">"Salin Link"</strong> di bawah untuk membagikan tautan aktivasi akun secara instan.
+                  </p>
+                </div>
+              </div>
+
               {loading ? (
                 <div className="flex h-32 items-center justify-center">
                   <Loader2 className="h-6 w-6 animate-spin text-primary mr-2" />
                   <span className="text-sm text-muted-foreground">Memuat data user...</span>
                 </div>
               ) : error ? (
-                <div className="p-4 rounded-lg bg-destructive/10 text-destructive text-sm m-4">
+                <div className="p-4 rounded-lg bg-destructive/10 text-destructive text-sm">
                   {error}
                 </div>
               ) : users.length === 0 ? (
@@ -412,7 +461,7 @@ export default function UserManagementPage() {
                   Belum ada user terdaftar.
                 </div>
               ) : (
-                <div className="overflow-x-auto">
+                <div className="overflow-x-auto rounded-lg border">
                   <table className="w-full text-sm text-left">
                     <thead className="bg-muted/50 text-xs text-muted-foreground uppercase border-b">
                       <tr>
@@ -506,28 +555,47 @@ export default function UserManagementPage() {
                             </td>
                             <td className="px-4 py-3 text-center">
                               <div className="flex items-center justify-center gap-1.5 flex-wrap">
-                                {(user.isInvitePending || isExpired) && inviteUrl && (
+                                {(user.isInvitePending || isExpired) && (
                                   <>
                                     <Button
                                       size="sm"
                                       variant="outline"
-                                      className="h-7 text-[10.5px] font-bold border-blue-500/40 text-blue-700 dark:text-blue-300 hover:bg-blue-500/10 gap-1 shadow-2xs"
-                                      onClick={() => window.open(inviteUrl, "_blank")}
-                                      title="Buka Link Undangan Setup Password di Tab Baru"
+                                      className="h-7 text-[10.5px] font-bold border-emerald-500/50 text-emerald-700 dark:text-emerald-300 bg-emerald-50/50 hover:bg-emerald-100/80 dark:hover:bg-emerald-950/50 gap-1 shadow-2xs"
+                                      onClick={() => handleSendViaWhatsApp(user, inviteUrl || undefined)}
+                                      disabled={resendingId === user.id}
+                                      title="Kirim Pesan Undangan & Link Aktivasi langsung ke WhatsApp"
                                     >
-                                      <ExternalLink className="w-3 h-3 text-blue-600" />
-                                      Buka Link
+                                      {resendingId === user.id ? (
+                                        <Loader2 className="w-3 h-3 animate-spin text-emerald-600" />
+                                      ) : (
+                                        <Send className="w-3 h-3 text-emerald-600" />
+                                      )}
+                                      Kirim WA
                                     </Button>
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      className="h-7 text-[10.5px] font-bold border-amber-500/40 text-amber-700 dark:text-amber-300 hover:bg-amber-500/10 gap-1 shadow-2xs"
-                                      onClick={() => handleCopyLink(inviteUrl)}
-                                      title="Salin Link Undangan ke Clipboard"
-                                    >
-                                      <Copy className="w-3 h-3 text-amber-600" />
-                                      Salin Link
-                                    </Button>
+                                    {inviteUrl && (
+                                      <>
+                                        <Button
+                                          size="sm"
+                                          variant="outline"
+                                          className="h-7 text-[10.5px] font-bold border-blue-500/40 text-blue-700 dark:text-blue-300 hover:bg-blue-500/10 gap-1 shadow-2xs"
+                                          onClick={() => window.open(inviteUrl, "_blank")}
+                                          title="Buka Link Undangan Setup Password di Tab Baru"
+                                        >
+                                          <ExternalLink className="w-3 h-3 text-blue-600" />
+                                          Buka Link
+                                        </Button>
+                                        <Button
+                                          size="sm"
+                                          variant="outline"
+                                          className="h-7 text-[10.5px] font-bold border-amber-500/40 text-amber-700 dark:text-amber-300 hover:bg-amber-500/10 gap-1 shadow-2xs"
+                                          onClick={() => handleCopyLink(inviteUrl)}
+                                          title="Salin Link Undangan ke Clipboard"
+                                        >
+                                          <Copy className="w-3 h-3 text-amber-600" />
+                                          Salin Link
+                                        </Button>
+                                      </>
+                                    )}
                                   </>
                                 )}
                                 {(user.isInvitePending || isExpired) && (
@@ -542,7 +610,7 @@ export default function UserManagementPage() {
                                     {resendingId === user.id ? (
                                       <Loader2 className="w-3 h-3 animate-spin" />
                                     ) : (
-                                      <Send className="w-3 h-3 text-purple-600" />
+                                      <Mail className="w-3 h-3 text-purple-600" />
                                     )}
                                     Kirim Ulang
                                   </Button>

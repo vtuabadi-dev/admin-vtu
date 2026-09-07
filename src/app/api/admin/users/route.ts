@@ -101,19 +101,21 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // Determine host origin for invite URL (Prefer production domain to prevent Vercel Preview SSO redirect)
-    let origin = process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL || "";
-    if (!origin || origin.includes("localhost")) {
-      origin = request.headers.get("origin") || request.nextUrl.origin || "https://vtu-admin-830zrfv1l-vtuabadi.vercel.app";
+    // Determine host origin dynamically from incoming request headers
+    const proto = request.headers.get("x-forwarded-proto") || (request.url.startsWith("https") ? "https" : "http");
+    const host = request.headers.get("x-forwarded-host") || request.headers.get("host") || request.nextUrl.host;
+    let origin = `${proto}://${host}`;
+    if (!origin || origin.includes("localhost") || origin.includes("127.0.0.1")) {
+      origin = process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL || origin;
     }
-    // Clean trailing slash
     origin = origin.replace(/\/$/, "");
 
     const inviteUrl = `${origin}/setup-password?token=${inviteToken}`;
 
     // Dispatch invitation email via notification service
+    let emailStatus = { success: false, detail: "mock" };
     try {
-      await sendNotification({
+      const notifRes = await sendNotification({
         channel: "email",
         recipient: normalizedEmail,
         subject: "Undangan Pengelola Sistem VTU — Atur Password Akun Anda",
@@ -130,7 +132,9 @@ Terima kasih,
 PT VAUZA TAMMA ABADI
 Sistem Operasional Travel`,
       });
-    } catch (emailErr) {
+      emailStatus = { success: notifRes.success, detail: notifRes.messageId || "sent" };
+    } catch (emailErr: any) {
+      emailStatus = { success: false, detail: emailErr?.message || "failed" };
       console.warn("[INVITE EMAIL FAILED]", emailErr);
     }
 
@@ -139,7 +143,8 @@ Sistem Operasional Travel`,
         success: true,
         data: newUser,
         inviteUrl,
-        message: "Admin baru berhasil dibuat dan undangan telah dikirim",
+        emailStatus,
+        message: "Admin baru berhasil dibuat dan tautan undangan siap dibagikan",
       },
       { status: 201 }
     );

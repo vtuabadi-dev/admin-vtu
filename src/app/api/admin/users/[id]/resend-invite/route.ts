@@ -57,18 +57,21 @@ export async function POST(
       },
     });
 
-    // Determine host origin for invite URL (Prefer production domain to prevent Vercel Preview SSO redirect)
-    let origin = process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL || "";
-    if (!origin || origin.includes("localhost")) {
-      origin = request.headers.get("origin") || request.nextUrl.origin || "https://vtu-admin-830zrfv1l-vtuabadi.vercel.app";
+    // Determine host origin dynamically from incoming request headers
+    const proto = request.headers.get("x-forwarded-proto") || (request.url.startsWith("https") ? "https" : "http");
+    const host = request.headers.get("x-forwarded-host") || request.headers.get("host") || request.nextUrl.host;
+    let origin = `${proto}://${host}`;
+    if (!origin || origin.includes("localhost") || origin.includes("127.0.0.1")) {
+      origin = process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL || origin;
     }
     origin = origin.replace(/\/$/, "");
 
     const inviteUrl = `${origin}/setup-password?token=${inviteToken}`;
 
     // Dispatch invitation email via notification service
+    let emailStatus = { success: false, detail: "mock" };
     try {
-      await sendNotification({
+      const notifRes = await sendNotification({
         channel: "email",
         recipient: user.email,
         subject: "Undangan Pengelola Sistem VTU (Kirim Ulang) — Atur Password Akun Anda",
@@ -85,14 +88,17 @@ Terima kasih,
 PT VAUZA TAMMA ABADI
 Sistem Operasional Travel`,
       });
-    } catch (emailErr) {
+      emailStatus = { success: notifRes.success, detail: notifRes.messageId || "sent" };
+    } catch (emailErr: any) {
+      emailStatus = { success: false, detail: emailErr?.message || "failed" };
       console.warn("[RESEND INVITE EMAIL WARNING]", emailErr);
     }
 
     return NextResponse.json({
       success: true,
-      message: `Link undangan berhasil dikirim ulang ke ${user.email}`,
+      message: `Link undangan terbaru berhasil dibuat dan dikirim ke ${user.email}`,
       inviteUrl,
+      emailStatus,
       data: updatedUser,
     });
   } catch (error) {
