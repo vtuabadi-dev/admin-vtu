@@ -14,17 +14,17 @@ export async function GET() {
   const hasResend = Boolean(process.env.RESEND_API_KEY);
   const hasSupabase = Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY && (process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || process.env.DATABASE_URL));
 
-  const isConfigured = hasGmail || hasSmtp || hasResend || hasSupabase;
-  const activeProvider = hasGmail
+  const isConfigured = hasSupabase || hasResend || hasGmail || hasSmtp;
+  const activeProvider = hasSupabase
+    ? "Supabase Auth Mailer"
+    : hasResend
+    ? "Resend API"
+    : hasGmail
     ? "Gmail SMTP"
     : hasSmtp
     ? "Custom SMTP"
-    : hasResend
-    ? "Resend API"
-    : hasSupabase
-    ? "Supabase Auth Email"
     : "Belum Dikonfigurasi";
-  const senderEmail = process.env.GMAIL_USER || process.env.SMTP_USER || process.env.RESEND_FROM_EMAIL || (hasSupabase ? "Supabase Built-in Mailer" : "-");
+  const senderEmail = hasSupabase ? "Supabase Built-in Mailer" : (process.env.RESEND_FROM_EMAIL || process.env.GMAIL_USER || process.env.SMTP_USER || "-");
 
   return NextResponse.json({
     success: true,

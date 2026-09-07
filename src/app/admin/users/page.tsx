@@ -469,9 +469,9 @@ export default function UserManagementPage() {
                   </div>
                   <p className="text-[11.5px] text-muted-foreground leading-relaxed">
                     {emailGateway?.isConfigured ? (
-                      <>Email otomatis terkirim melalui <strong>{emailGateway.activeProvider}</strong> ({emailGateway.senderEmail}). Anda juga dapat menggunakan tombol <strong className="text-emerald-700 dark:text-emerald-300 font-bold">&quot;Kirim WA&quot;</strong> di bawah untuk mengirim undangan ke WhatsApp.</>
+                      <>Email otomatis terkirim melalui <strong>{emailGateway.activeProvider}</strong> ({emailGateway.senderEmail}). Anda juga dapat menggunakan tombol <strong className="text-emerald-700 dark:text-emerald-300 font-bold">&quot;Kirim WA&quot;</strong> di bawah untuk mengirim undangan ke WhatsApp calon admin.</>
                     ) : (
-                      <>Server Vercel belum memiliki variabel <code className="bg-muted px-1 py-0.5 rounded font-mono text-[10.5px]">GMAIL_USER</code> &amp; <code className="bg-muted px-1 py-0.5 rounded font-mono text-[10.5px]">GMAIL_APP_PASSWORD</code>, sehingga email otomatis belum terkirim keluar. Silakan klik tombol hijau <strong className="text-emerald-700 dark:text-emerald-300 font-bold">&quot;Kirim WA&quot;</strong> atau <strong className="text-amber-700 dark:text-amber-400 font-bold">&quot;Salin Link&quot;</strong> pada tabel di bawah untuk mengirimkan tautan aktivasi akun langsung ke WhatsApp calon admin.</>
+                      <>Email otomatis menggunakan <strong>Supabase Auth Mailer</strong> (memerlukan environment variable <code className="bg-muted px-1 py-0.5 rounded font-mono text-[10.5px]">SUPABASE_SERVICE_ROLE_KEY</code> di Vercel). Saat ini Anda dapat langsung menggunakan tombol hijau <strong className="text-emerald-700 dark:text-emerald-300 font-bold">&quot;Kirim WA&quot;</strong> atau <strong className="text-amber-700 dark:text-amber-400 font-bold">&quot;Salin Link&quot;</strong> pada tabel di bawah untuk mengirim tautan aktivasi akun secara instan ke calon admin.</>
                     )}
                   </p>
                 </div>
