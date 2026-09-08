@@ -76,7 +76,7 @@ export function ManifestPembayaranTable({
   searchQuery,
 }: ManifestPembayaranTableProps) {
   const [exporting, setExporting] = useState(false);
-  const [viewMode, setViewMode] = useState<"all" | "group">("all");
+  const [viewMode, setViewMode] = useState<"all" | "group">("group");
 
   // Group lookup map
   const groupMap = useMemo(() => {
