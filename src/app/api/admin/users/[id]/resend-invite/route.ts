@@ -58,12 +58,15 @@ export async function POST(
       },
     });
 
-    // Determine host origin dynamically from incoming request headers
-    const proto = request.headers.get("x-forwarded-proto") || (request.url.startsWith("https") ? "https" : "http");
-    const host = request.headers.get("x-forwarded-host") || request.headers.get("host") || request.nextUrl.host;
-    let origin = `${proto}://${host}`;
+    // Determine host origin (prefer canonical production domain)
+    let origin = process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL || "";
     if (!origin || origin.includes("localhost") || origin.includes("127.0.0.1")) {
-      origin = process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL || origin;
+      const proto = request.headers.get("x-forwarded-proto") || (request.url.startsWith("https") ? "https" : "http");
+      const host = request.headers.get("x-forwarded-host") || request.headers.get("host") || request.nextUrl.host;
+      origin = `${proto}://${host}`;
+    }
+    if (origin.includes("vercel.app") && !origin.includes("admin-vtuabadi.vercel.app")) {
+      origin = "https://admin-vtuabadi.vercel.app";
     }
     origin = origin.replace(/\/$/, "");
 

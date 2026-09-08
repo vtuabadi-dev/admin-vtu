@@ -312,7 +312,11 @@ export default function UserManagementPage() {
     }
 
     if (!finalUrl && user.inviteToken) {
-      finalUrl = `${window.location.origin}/setup-password?token=${user.inviteToken}`;
+      let clientOrigin = window.location.origin;
+      if (clientOrigin.includes("vercel.app") && !clientOrigin.includes("admin-vtuabadi.vercel.app")) {
+        clientOrigin = "https://admin-vtuabadi.vercel.app";
+      }
+      finalUrl = `${clientOrigin}/setup-password?token=${user.inviteToken}`;
     }
 
     if (!finalUrl) {
