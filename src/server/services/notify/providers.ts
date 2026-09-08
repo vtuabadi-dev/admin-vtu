@@ -175,7 +175,22 @@ export function createNodemailerProvider(): NotificationProvider {
 
         const htmlParagraphs = message.body
           .split("\n\n")
-          .map((p) => `<p style="margin: 0 0 14px; line-height: 1.6; color: #334155; font-size: 14px;">${p.replace(/\n/g, "<br/>")}</p>`)
+          .map((p) => {
+            const withLinks = p.replace(/(https?:\/\/[^\s]+)/g, (url) => {
+              if (url.includes("/setup-password")) {
+                return `<div style="text-align: center; margin: 24px 0;">
+                  <a href="${url}" target="_blank" style="display: inline-block; background-color: #059669; color: #ffffff; text-decoration: none; padding: 14px 28px; border-radius: 8px; font-weight: 700; font-size: 14px; letter-spacing: 0.3px; box-shadow: 0 4px 6px -1px rgba(5, 150, 105, 0.3);">
+                    👉 Atur Password Akun Anda Sekarang
+                  </a>
+                  <p style="font-size: 11px; color: #64748b; word-break: break-all; margin: 10px 0 0 0;">
+                    Atau salin tautan berikut ke browser: <br/><a href="${url}" style="color: #2563eb; text-decoration: underline;">${url}</a>
+                  </p>
+                </div>`;
+              }
+              return `<a href="${url}" style="color: #2563eb; text-decoration: underline;" target="_blank">${url}</a>`;
+            });
+            return `<p style="margin: 0 0 14px; line-height: 1.6; color: #334155; font-size: 14px;">${withLinks.replace(/\n/g, "<br/>")}</p>`;
+          })
           .join("");
 
         const styledHtml = `
