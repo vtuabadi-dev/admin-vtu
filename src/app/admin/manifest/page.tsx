@@ -569,18 +569,21 @@ function ManifestPageContent() {
     }
   }, [urlType]);
 
+  const [hasAutoSelected, setHasAutoSelected] = useState(false);
+
   // Auto-select active package when opening Manifest Pembayaran without specific paketId
   useEffect(() => {
-    if (urlType === "pembayaran" && !urlPaketId && !selectedKeberangkatan && keberangkatanList.length > 0) {
+    if (urlType === "pembayaran" && !urlPaketId && !selectedKeberangkatan && keberangkatanList.length > 0 && !hasAutoSelected) {
       const activePkg =
         keberangkatanList.find(
           (k) => (k.jamaahIds && k.jamaahIds.length > 0) || k.status === "terjadwal" || k.status === "proses"
         ) || keberangkatanList[0];
       if (activePkg) {
         setSelectedKeberangkatan(activePkg.id);
+        setHasAutoSelected(true);
       }
     }
-  }, [urlType, urlPaketId, selectedKeberangkatan, keberangkatanList]);
+  }, [urlType, urlPaketId, selectedKeberangkatan, keberangkatanList, hasAutoSelected]);
 
   // Hydrate local state from store if store populates after mount
   useEffect(() => {
