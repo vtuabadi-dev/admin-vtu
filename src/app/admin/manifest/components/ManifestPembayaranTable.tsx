@@ -751,7 +751,7 @@ PT VAUZA TAMMA ABADI`;
                 <th className="px-3 py-2.5 min-w-[110px] text-center border-r-2 border-teal-600 dark:border-teal-500">STATUS PEMBAYARAN</th>
 
                 {/* Group 2: Detail Item Tagihan Sub-columns */}
-                <th className="px-3 py-2.5 min-w-[120px] text-right border-r border-stone-200 dark:border-stone-800 bg-amber-50/50 dark:bg-amber-950/20">BIAYA PAKET</th>
+                <th className="px-3 py-2.5 min-w-[120px] text-right border-l-2 border-teal-600 dark:border-teal-500 border-r border-stone-200 dark:border-stone-800 bg-amber-50/50 dark:bg-amber-950/20">BIAYA PAKET</th>
                 <th className="px-3 py-2.5 min-w-[110px] text-right border-r border-stone-200 dark:border-stone-800 bg-amber-50/50 dark:bg-amber-950/20">UPGRADE</th>
                 <th className="px-3 py-2.5 min-w-[105px] text-right border-r border-stone-200 dark:border-stone-800 bg-amber-50/50 dark:bg-amber-950/20">KERETA CEPAT</th>
                 <th className="px-3 py-2.5 min-w-[105px] text-right border-r border-stone-200 dark:border-stone-800 bg-amber-50/50 dark:bg-amber-950/20">THOIF</th>
@@ -761,13 +761,13 @@ PT VAUZA TAMMA ABADI`;
                 <th className="px-3 py-2.5 min-w-[95px] text-right border-r-2 border-amber-600 dark:border-amber-500 bg-amber-50/50 dark:bg-amber-950/20">TAMBAHAN</th>
 
                 {/* Group 3: Detail Diskon Sub-columns */}
-                <th className="px-3 py-2.5 min-w-[105px] text-right border-r border-stone-200 dark:border-stone-800 bg-rose-50/50 dark:bg-rose-950/20">DISKON PROMO</th>
+                <th className="px-3 py-2.5 min-w-[105px] text-right border-l-2 border-amber-600 dark:border-amber-500 border-r border-stone-200 dark:border-stone-800 bg-rose-50/50 dark:bg-rose-950/20">DISKON PROMO</th>
                 <th className="px-3 py-2.5 min-w-[110px] text-right border-r border-stone-200 dark:border-stone-800 bg-rose-50/50 dark:bg-rose-950/20">POTONGAN ONGKIR</th>
                 <th className="px-3 py-2.5 min-w-[115px] text-right border-r border-stone-200 dark:border-stone-800 bg-rose-50/50 dark:bg-rose-950/20 text-rose-700 dark:text-rose-400 font-bold">TOTAL POTONGAN</th>
                 <th className="px-3 py-2.5 min-w-[120px] text-right border-r-2 border-rose-600 dark:border-rose-500 bg-rose-50/70 dark:bg-rose-950/30 font-black text-stone-900 dark:text-white">NET TAGIHAN</th>
 
                 {/* Regular Scrolling: Keterangan */}
-                <th className="px-3 py-2.5 min-w-[150px] border-r border-stone-200 dark:border-stone-800 bg-stone-100 dark:bg-stone-900 font-sans">
+                <th className="px-3 py-2.5 min-w-[150px] border-l-2 border-rose-600 dark:border-rose-500 border-r border-stone-200 dark:border-stone-800 bg-stone-100 dark:bg-stone-900 font-sans">
                   KETERANGAN
                 </th>
 
@@ -869,8 +869,8 @@ PT VAUZA TAMMA ABADI`;
                         )}
                       </td>
 
-                      {/* Detail: Biaya Paket */}
-                      <td className={cn("px-3 py-2.5 text-right border-r border-stone-200 dark:border-stone-800 bg-amber-50/20 dark:bg-amber-950/10", rowBorderClass)}>
+                      {/* Detail: Biaya Paket (Solid Teal Left Border) */}
+                      <td className={cn("px-3 py-2.5 text-right border-l-2 border-teal-600 dark:border-teal-500 border-r border-stone-200 dark:border-stone-800 bg-amber-50/20 dark:bg-amber-950/10", rowBorderClass)}>
                         Rp {r.biayaPaket.toLocaleString("id-ID")}
                       </td>
 
@@ -939,8 +939,8 @@ PT VAUZA TAMMA ABADI`;
                         )}
                       </td>
 
-                      {/* Diskon Promo */}
-                      <td className={cn("px-3 py-2.5 text-right border-r border-stone-200 dark:border-stone-800 bg-rose-50/20 dark:bg-rose-950/10 text-rose-700 dark:text-rose-400", rowBorderClass)}>
+                      {/* Diskon Promo (Solid Amber Left Border) */}
+                      <td className={cn("px-3 py-2.5 text-right border-l-2 border-amber-600 dark:border-amber-500 border-r border-stone-200 dark:border-stone-800 bg-rose-50/20 dark:bg-rose-950/10 text-rose-700 dark:text-rose-400", rowBorderClass)}>
                         {r.diskonPromo > 0 ? (
                           <span>-Rp {r.diskonPromo.toLocaleString("id-ID")}</span>
                         ) : (
@@ -971,8 +971,8 @@ PT VAUZA TAMMA ABADI`;
                         Rp {r.netTagihan.toLocaleString("id-ID")}
                       </td>
 
-                      {/* Regular Scroll: Keterangan */}
-                      <td className={cn("px-3 py-2.5 border-r border-stone-200 dark:border-stone-800 font-sans text-stone-600 dark:text-stone-300 text-[11px] min-w-[150px]", scrollCellBg, rowBorderClass)}>
+                      {/* Regular Scroll: Keterangan (Solid Rose Left Border) */}
+                      <td className={cn("px-3 py-2.5 border-l-2 border-rose-600 dark:border-rose-500 border-r border-stone-200 dark:border-stone-800 font-sans text-stone-600 dark:text-stone-300 text-[11px] min-w-[150px]", scrollCellBg, rowBorderClass)}>
                         {r.keterangan}
                       </td>
 
@@ -1039,8 +1039,8 @@ PT VAUZA TAMMA ABADI`;
                     {summaryKPI.countLunas} LUNAS
                   </td>
 
-                  {/* Detail Totals */}
-                  <td className="px-3 py-3 text-right border-r border-stone-200 dark:border-stone-800 bg-amber-50/50 dark:bg-amber-950/20">
+                  {/* Detail Totals (Solid Teal Left Border) */}
+                  <td className="px-3 py-3 text-right border-l-2 border-teal-600 dark:border-teal-500 border-r border-stone-200 dark:border-stone-800 bg-amber-50/50 dark:bg-amber-950/20">
                     Rp {summaryKPI.sumBiayaPaket.toLocaleString("id-ID")}
                   </td>
                   <td className="px-3 py-3 text-right border-r border-stone-200 dark:border-stone-800 bg-amber-50/50 dark:bg-amber-950/20">
@@ -1066,8 +1066,8 @@ PT VAUZA TAMMA ABADI`;
                     Rp {summaryKPI.sumTambahan.toLocaleString("id-ID")}
                   </td>
 
-                  {/* Diskon Totals */}
-                  <td className="px-3 py-3 text-right border-r border-stone-200 dark:border-stone-800 bg-rose-50/50 dark:bg-rose-950/20 text-rose-700 dark:text-rose-400">
+                  {/* Diskon Totals (Solid Amber Left Border) */}
+                  <td className="px-3 py-3 text-right border-l-2 border-amber-600 dark:border-amber-500 border-r border-stone-200 dark:border-stone-800 bg-rose-50/50 dark:bg-rose-950/20 text-rose-700 dark:text-rose-400">
                     -Rp {summaryKPI.sumDiskonPromo.toLocaleString("id-ID")}
                   </td>
                   <td className="px-3 py-3 text-right border-r border-stone-200 dark:border-stone-800 bg-rose-50/50 dark:bg-rose-950/20 text-rose-700 dark:text-rose-400">
@@ -1081,8 +1081,8 @@ PT VAUZA TAMMA ABADI`;
                     Rp {summaryKPI.totalOmset.toLocaleString("id-ID")}
                   </td>
 
-                  {/* Regular Scroll: Keterangan Footer */}
-                  <td className="px-3 py-3 border-r border-stone-200 dark:border-stone-800 font-sans text-[10px] text-muted-foreground min-w-[150px]">
+                  {/* Regular Scroll: Keterangan Footer (Solid Rose Left Border) */}
+                  <td className="px-3 py-3 border-l-2 border-rose-600 dark:border-rose-500 border-r border-stone-200 dark:border-stone-800 font-sans text-[10px] text-muted-foreground min-w-[150px]">
                     REKAP
                   </td>
 
