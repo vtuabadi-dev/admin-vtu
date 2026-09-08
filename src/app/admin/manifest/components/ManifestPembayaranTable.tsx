@@ -685,7 +685,7 @@ PT VAUZA TAMMA ABADI`;
                 {/* Fixed Sticky Left Group Header (No + Nama) */}
                 <th
                   colSpan={2}
-                  className="bg-slate-900 border-r-2 border-slate-700 px-3 py-2 text-center sticky left-0 z-40 shadow-[4px_0_8px_-2px_rgba(0,0,0,0.3)]"
+                  className="bg-slate-900 border-r-2 border-stone-500 dark:border-stone-600 px-3 py-2 text-center sticky left-0 z-40 shadow-[4px_0_8px_-2px_rgba(0,0,0,0.3)]"
                 >
                   IDENTITAS JAMAAH
                 </th>
@@ -693,7 +693,7 @@ PT VAUZA TAMMA ABADI`;
                 {/* Status & Kas Group Header (Teal) */}
                 <th
                   colSpan={5}
-                  className="bg-gradient-to-r from-teal-700 to-teal-800 border-r border-teal-900/60 px-3 py-2 text-center"
+                  className="bg-gradient-to-r from-teal-700 to-teal-800 border-r-2 border-teal-500 dark:border-teal-400 px-3 py-2 text-center"
                 >
                   STATUS &amp; RINGKASAN PEMBAYARAN
                 </th>
@@ -701,7 +701,7 @@ PT VAUZA TAMMA ABADI`;
                 {/* Detail Rincian Item Tagihan Header (Peach / Orange) */}
                 <th
                   colSpan={8}
-                  className="bg-gradient-to-r from-amber-600 to-amber-700 border-r border-amber-800/60 px-3 py-2 text-center"
+                  className="bg-gradient-to-r from-amber-600 to-amber-700 border-r-2 border-amber-500 dark:border-amber-400 px-3 py-2 text-center"
                 >
                   DETAIL RINCIAN ITEM TAGIHAN
                 </th>
@@ -709,7 +709,7 @@ PT VAUZA TAMMA ABADI`;
                 {/* Detail Potongan & Diskon Header (Rose / Pink) */}
                 <th
                   colSpan={4}
-                  className="bg-gradient-to-r from-rose-700 to-rose-800 border-r border-rose-900/60 px-3 py-2 text-center"
+                  className="bg-gradient-to-r from-rose-700 to-rose-800 border-r-2 border-rose-500 dark:border-rose-400 px-3 py-2 text-center"
                 >
                   DETAIL POTONGAN &amp; DISKON
                 </th>
@@ -725,7 +725,7 @@ PT VAUZA TAMMA ABADI`;
                 {/* Aksi Group Header (Sticky Right) */}
                 <th
                   colSpan={1}
-                  className="bg-slate-900 px-2 py-2 text-center sticky right-0 z-40 shadow-[-4px_0_8px_-2px_rgba(0,0,0,0.3)] border-l border-slate-700"
+                  className="bg-slate-900 px-2 py-2 text-center sticky right-0 z-40 shadow-[-4px_0_8px_-2px_rgba(0,0,0,0.3)] border-l-2 border-stone-500 dark:border-stone-600"
                 >
                   AKSI
                 </th>
@@ -739,7 +739,7 @@ PT VAUZA TAMMA ABADI`;
                 </th>
 
                 {/* Sticky Left: Nama Jamaah */}
-                <th className="px-3 py-2.5 min-w-[220px] max-w-[280px] border-r-2 border-stone-300 dark:border-stone-700 sticky left-[48px] z-40 bg-stone-100 dark:bg-stone-900 shadow-[4px_0_8px_-2px_rgba(0,0,0,0.12)]">
+                <th className="px-3 py-2.5 min-w-[220px] max-w-[280px] border-r-2 border-stone-400 dark:border-stone-600 sticky left-[48px] z-40 bg-stone-100 dark:bg-stone-900 shadow-[4px_0_8px_-2px_rgba(0,0,0,0.12)]">
                   NAMA JAMAAH
                 </th>
 
@@ -748,7 +748,7 @@ PT VAUZA TAMMA ABADI`;
                 <th className="px-3 py-2.5 min-w-[125px] text-right border-r border-stone-200 dark:border-stone-800">TOTAL TAGIHAN</th>
                 <th className="px-3 py-2.5 min-w-[125px] text-right border-r border-stone-200 dark:border-stone-800">TOTAL PEMBAYARAN</th>
                 <th className="px-3 py-2.5 min-w-[120px] text-right border-r border-stone-200 dark:border-stone-800">KURANG BAYAR</th>
-                <th className="px-3 py-2.5 min-w-[110px] text-center border-r-2 border-teal-600/60 dark:border-teal-700">STATUS PEMBAYARAN</th>
+                <th className="px-3 py-2.5 min-w-[110px] text-center border-r-2 border-teal-600 dark:border-teal-500">STATUS PEMBAYARAN</th>
 
                 {/* Group 2: Detail Item Tagihan Sub-columns */}
                 <th className="px-3 py-2.5 min-w-[120px] text-right border-r border-stone-200 dark:border-stone-800 bg-amber-50/50 dark:bg-amber-950/20">BIAYA PAKET</th>
@@ -758,13 +758,13 @@ PT VAUZA TAMMA ABADI`;
                 <th className="px-3 py-2.5 min-w-[95px] text-right border-r border-stone-200 dark:border-stone-800 bg-amber-50/50 dark:bg-amber-950/20">PASPOR</th>
                 <th className="px-3 py-2.5 min-w-[95px] text-right border-r border-stone-200 dark:border-stone-800 bg-amber-50/50 dark:bg-amber-950/20">KURSI RODA</th>
                 <th className="px-3 py-2.5 min-w-[90px] text-right border-r border-stone-200 dark:border-stone-800 bg-amber-50/50 dark:bg-amber-950/20">ONGKIR</th>
-                <th className="px-3 py-2.5 min-w-[95px] text-right border-r-2 border-amber-500/60 dark:border-amber-700 bg-amber-50/50 dark:bg-amber-950/20">TAMBAHAN</th>
+                <th className="px-3 py-2.5 min-w-[95px] text-right border-r-2 border-amber-600 dark:border-amber-500 bg-amber-50/50 dark:bg-amber-950/20">TAMBAHAN</th>
 
                 {/* Group 3: Detail Diskon Sub-columns */}
                 <th className="px-3 py-2.5 min-w-[105px] text-right border-r border-stone-200 dark:border-stone-800 bg-rose-50/50 dark:bg-rose-950/20">DISKON PROMO</th>
                 <th className="px-3 py-2.5 min-w-[110px] text-right border-r border-stone-200 dark:border-stone-800 bg-rose-50/50 dark:bg-rose-950/20">POTONGAN ONGKIR</th>
                 <th className="px-3 py-2.5 min-w-[115px] text-right border-r border-stone-200 dark:border-stone-800 bg-rose-50/50 dark:bg-rose-950/20 text-rose-700 dark:text-rose-400 font-bold">TOTAL POTONGAN</th>
-                <th className="px-3 py-2.5 min-w-[120px] text-right border-r-2 border-rose-600/60 dark:border-rose-700 bg-rose-50/70 dark:bg-rose-950/30 font-black text-stone-900 dark:text-white">NET TAGIHAN</th>
+                <th className="px-3 py-2.5 min-w-[120px] text-right border-r-2 border-rose-600 dark:border-rose-500 bg-rose-50/70 dark:bg-rose-950/30 font-black text-stone-900 dark:text-white">NET TAGIHAN</th>
 
                 {/* Regular Scrolling: Keterangan */}
                 <th className="px-3 py-2.5 min-w-[150px] border-r border-stone-200 dark:border-stone-800 bg-stone-100 dark:bg-stone-900 font-sans">
@@ -772,7 +772,7 @@ PT VAUZA TAMMA ABADI`;
                 </th>
 
                 {/* Sticky Right: Aksi */}
-                <th className="px-2 py-2.5 w-[80px] min-w-[80px] max-w-[80px] text-center sticky right-0 z-40 bg-stone-100 dark:bg-stone-900 shadow-[-4px_0_8px_-2px_rgba(0,0,0,0.12)] border-l border-stone-300 dark:border-stone-700">
+                <th className="px-2 py-2.5 w-[80px] min-w-[80px] max-w-[80px] text-center sticky right-0 z-40 bg-stone-100 dark:bg-stone-900 shadow-[-4px_0_8px_-2px_rgba(0,0,0,0.12)] border-l-2 border-stone-400 dark:border-stone-600">
                   AKSI
                 </th>
               </tr>
@@ -812,7 +812,7 @@ PT VAUZA TAMMA ABADI`;
                       </td>
 
                       {/* Sticky Left: Nama Jamaah (100% Solid Opaque, locked offset at left-[48px]) */}
-                      <td className={cn("px-3 py-2.5 border-r-2 border-stone-300 dark:border-stone-700 sticky left-[48px] z-20 shadow-[4px_0_8px_-2px_rgba(0,0,0,0.08)] min-w-[220px] max-w-[280px]", stickyCellBg, rowBorderClass)}>
+                      <td className={cn("px-3 py-2.5 border-r-2 border-stone-400 dark:border-stone-600 sticky left-[48px] z-20 shadow-[4px_0_8px_-2px_rgba(0,0,0,0.08)] min-w-[220px] max-w-[280px]", stickyCellBg, rowBorderClass)}>
                         <div className="font-sans font-bold text-stone-900 dark:text-white leading-tight">
                           {r.namaLengkap}
                         </div>
@@ -850,8 +850,8 @@ PT VAUZA TAMMA ABADI`;
                         )}
                       </td>
 
-                      {/* Status Pembayaran */}
-                      <td className={cn("px-3 py-2.5 text-center border-r-2 border-teal-600/60 dark:border-teal-700 font-sans", scrollCellBg, rowBorderClass)}>
+                      {/* Status Pembayaran (Solid Teal Right Border) */}
+                      <td className={cn("px-3 py-2.5 text-center border-r-2 border-teal-600 dark:border-teal-500 font-sans", scrollCellBg, rowBorderClass)}>
                         {r.statusPembayaran === "LUNAS" && (
                           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700">
                             <CheckCircle2 className="w-2.5 h-2.5" /> LUNAS
@@ -930,8 +930,8 @@ PT VAUZA TAMMA ABADI`;
                         )}
                       </td>
 
-                      {/* Detail: Tambahan */}
-                      <td className={cn("px-3 py-2.5 text-right border-r-2 border-amber-500/60 dark:border-amber-700 bg-amber-50/20 dark:bg-amber-950/10", rowBorderClass)}>
+                      {/* Detail: Tambahan (Solid Amber Right Border) */}
+                      <td className={cn("px-3 py-2.5 text-right border-r-2 border-amber-600 dark:border-amber-500 bg-amber-50/20 dark:bg-amber-950/10", rowBorderClass)}>
                         {r.tambahanLain > 0 ? (
                           <span>Rp {r.tambahanLain.toLocaleString("id-ID")}</span>
                         ) : (
@@ -966,8 +966,8 @@ PT VAUZA TAMMA ABADI`;
                         )}
                       </td>
 
-                      {/* Net Tagihan */}
-                      <td className={cn("px-3 py-2.5 text-right border-r-2 border-rose-600/60 dark:border-rose-700 bg-rose-50/40 dark:bg-rose-950/20 font-black text-stone-900 dark:text-white", rowBorderClass)}>
+                      {/* Net Tagihan (Solid Rose Right Border) */}
+                      <td className={cn("px-3 py-2.5 text-right border-r-2 border-rose-600 dark:border-rose-500 bg-rose-50/40 dark:bg-rose-950/20 font-black text-stone-900 dark:text-white", rowBorderClass)}>
                         Rp {r.netTagihan.toLocaleString("id-ID")}
                       </td>
 
@@ -977,7 +977,7 @@ PT VAUZA TAMMA ABADI`;
                       </td>
 
                       {/* Sticky Right: Aksi (100% Solid Opaque, locked width, clean border) */}
-                      <td className={cn("px-2 py-2.5 text-center sticky right-0 z-20 shadow-[-4px_0_8px_-2px_rgba(0,0,0,0.08)] border-l border-stone-300 dark:border-stone-700 w-[80px] min-w-[80px] max-w-[80px]", stickyCellBg, rowBorderClass)}>
+                      <td className={cn("px-2 py-2.5 text-center sticky right-0 z-20 shadow-[-4px_0_8px_-2px_rgba(0,0,0,0.08)] border-l-2 border-stone-400 dark:border-stone-600 w-[80px] min-w-[80px] max-w-[80px]", stickyCellBg, rowBorderClass)}>
                         <div className="flex items-center justify-center gap-1.5">
                           {r.invoiceId ? (
                             <button
@@ -1021,7 +1021,7 @@ PT VAUZA TAMMA ABADI`;
                     ∑
                   </td>
                   {/* Sticky Left: Total Pax */}
-                  <td className="px-3 py-3 border-r-2 border-stone-300 dark:border-stone-700 sticky left-[48px] z-40 bg-stone-100 dark:bg-stone-900 font-sans shadow-[4px_0_8px_-2px_rgba(0,0,0,0.12)] min-w-[220px] max-w-[280px]">
+                  <td className="px-3 py-3 border-r-2 border-stone-400 dark:border-stone-600 sticky left-[48px] z-40 bg-stone-100 dark:bg-stone-900 font-sans shadow-[4px_0_8px_-2px_rgba(0,0,0,0.12)] min-w-[220px] max-w-[280px]">
                     TOTAL {filteredRows.length} PAX
                   </td>
                   <td className="px-3 py-3 border-r border-stone-200 dark:border-stone-800 font-sans text-[11px] text-muted-foreground">-</td>
@@ -1034,7 +1034,8 @@ PT VAUZA TAMMA ABADI`;
                   <td className="px-3 py-3 text-right border-r border-stone-200 dark:border-stone-800 font-black text-rose-600 dark:text-rose-400">
                     Rp {summaryKPI.totalKurangBayar.toLocaleString("id-ID")}
                   </td>
-                  <td className="px-3 py-3 text-center border-r-2 border-teal-600/60 dark:border-teal-700 font-sans text-[10px]">
+                  {/* Status Pembayaran Footer (Solid Teal Right Border) */}
+                  <td className="px-3 py-3 text-center border-r-2 border-teal-600 dark:border-teal-500 font-sans text-[10px]">
                     {summaryKPI.countLunas} LUNAS
                   </td>
 
@@ -1060,7 +1061,8 @@ PT VAUZA TAMMA ABADI`;
                   <td className="px-3 py-3 text-right border-r border-stone-200 dark:border-stone-800 bg-amber-50/50 dark:bg-amber-950/20">
                     Rp {summaryKPI.sumOngkir.toLocaleString("id-ID")}
                   </td>
-                  <td className="px-3 py-3 text-right border-r-2 border-amber-500/60 dark:border-amber-700 bg-amber-50/50 dark:bg-amber-950/20">
+                  {/* Detail Tambahan Footer (Solid Amber Right Border) */}
+                  <td className="px-3 py-3 text-right border-r-2 border-amber-600 dark:border-amber-500 bg-amber-50/50 dark:bg-amber-950/20">
                     Rp {summaryKPI.sumTambahan.toLocaleString("id-ID")}
                   </td>
 
@@ -1074,7 +1076,8 @@ PT VAUZA TAMMA ABADI`;
                   <td className="px-3 py-3 text-right border-r border-stone-200 dark:border-stone-800 bg-rose-50/50 dark:bg-rose-950/20 text-rose-700 dark:text-rose-400 font-bold">
                     -Rp {summaryKPI.sumTotalPotongan.toLocaleString("id-ID")}
                   </td>
-                  <td className="px-3 py-3 text-right border-r-2 border-rose-600/60 dark:border-rose-700 bg-rose-50/70 dark:bg-rose-950/30 font-black text-stone-900 dark:text-white">
+                  {/* Net Tagihan Footer (Solid Rose Right Border) */}
+                  <td className="px-3 py-3 text-right border-r-2 border-rose-600 dark:border-rose-500 bg-rose-50/70 dark:bg-rose-950/30 font-black text-stone-900 dark:text-white">
                     Rp {summaryKPI.totalOmset.toLocaleString("id-ID")}
                   </td>
 
@@ -1083,8 +1086,8 @@ PT VAUZA TAMMA ABADI`;
                     REKAP
                   </td>
 
-                  {/* Sticky Right: Aksi Footer */}
-                  <td className="px-2 py-3 text-center sticky right-0 z-40 bg-stone-100 dark:bg-stone-900 shadow-[-4px_0_8px_-2px_rgba(0,0,0,0.12)] border-l border-stone-300 dark:border-stone-700 w-[80px] min-w-[80px] max-w-[80px]">
+                  {/* Sticky Right: Aksi Footer (Solid Left Border) */}
+                  <td className="px-2 py-3 text-center sticky right-0 z-40 bg-stone-100 dark:bg-stone-900 shadow-[-4px_0_8px_-2px_rgba(0,0,0,0.12)] border-l-2 border-stone-400 dark:border-stone-600 w-[80px] min-w-[80px] max-w-[80px]">
                     -
                   </td>
                 </tr>
