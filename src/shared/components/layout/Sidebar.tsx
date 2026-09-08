@@ -156,6 +156,7 @@ const adminNav: NavSection[] = [
         icon: FileText,
         children: [
           { label: "Semua Manifest", href: "/admin/manifest" },
+          { label: "Manifest Pembayaran", href: "/admin/manifest?type=pembayaran" },
           { label: "Manifest Visa", href: "/admin/manifest?type=visa" },
           { label: "Manifest Blockseat", href: "/admin/manifest?type=blockseat" },
           { label: "Manifest Hotel", href: "/admin/rooming" },

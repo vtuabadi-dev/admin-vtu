@@ -6,6 +6,7 @@ const MANIFEST_TYPE_LABELS: Record<ManifestType, string> = {
   siskopatuh: "Manifest SISKOPATUH",
   hotel: "Manifest Hotel",
   rooming: "Manifest Rooming",
+  pembayaran: "Manifest Pembayaran",
 };
 
 export function getManifestTypeLabel(type: ManifestType): string {

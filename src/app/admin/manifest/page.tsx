@@ -20,6 +20,7 @@ import {
   Split,
   Tag,
   Layers,
+  CreditCard,
 } from "lucide-react";
 import { Card, CardContent } from "@/shared/components/ui/Card";
 import { Button } from "@/shared/components/ui/Button";
@@ -34,6 +35,7 @@ import { useOperationalStore } from "@/stores/operational-store";
 import { extractFilesFromEvent } from "@/shared/lib/file-drop-utils";
 import { resolveHotelForKlaster } from "@/shared/lib/hotel-utils";
 import { hasPackageTourLeader } from "@/shared/lib/file-standardization";
+import { ManifestPembayaranTable } from "./components/ManifestPembayaranTable";
 
 // ── Helper Utilities ─────────────────────────────────────────
 
@@ -547,12 +549,25 @@ function ManifestPageContent() {
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
   const [bulkDeleteConfirmText, setBulkDeleteConfirmText] = useState("");
 
+  const urlType = searchParams.get("type") || "";
+  const [activeManifestView, setActiveManifestView] = useState<"operasional" | "pembayaran">(
+    urlType === "pembayaran" ? "pembayaran" : "operasional"
+  );
+
   // Sync state if URL search param changes
   useEffect(() => {
     if (urlPaketId) {
       setSelectedKeberangkatan(urlPaketId);
     }
   }, [urlPaketId]);
+
+  useEffect(() => {
+    if (urlType === "pembayaran") {
+      setActiveManifestView("pembayaran");
+    } else if (urlType === "operasional" || urlType === "all" || !urlType) {
+      setActiveManifestView(urlType === "pembayaran" ? "pembayaran" : "operasional");
+    }
+  }, [urlType]);
 
   // Hydrate local state from store if store populates after mount
   useEffect(() => {
@@ -1302,13 +1317,64 @@ function ManifestPageContent() {
               </CardContent>
             </Card>
 
-            {/* NOTION-STYLE MASTER TABLE */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between px-1">
-                <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                  <Sparkles className="h-3.5 w-3.5 text-amber-500" />
-                  Data Jamaah Manifest Paket ({filteredActiveJamaah.length} Pax)
-                </p>
+            {/* VIEW MODE TABS: OPERASIONAL VS PEMBAYARAN & RINCIAN TAGIHAN */}
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-stone-200 dark:border-stone-800 pb-2">
+              <div className="flex items-center gap-1.5 p-1 bg-stone-100 dark:bg-stone-900 rounded-xl border border-stone-200 dark:border-stone-800">
+                <button
+                  onClick={() => {
+                    setActiveManifestView("operasional");
+                    router.push(`/admin/manifest?paketId=${activePackage.id}&type=operasional`);
+                  }}
+                  className={cn(
+                    "px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer",
+                    activeManifestView === "operasional"
+                      ? "bg-white dark:bg-stone-800 text-stone-900 dark:text-white shadow-sm border border-stone-200 dark:border-stone-700"
+                      : "text-stone-500 hover:text-stone-900 dark:hover:text-stone-200"
+                  )}
+                >
+                  <Plane className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                  <span>Manifest Operasional (SOT)</span>
+                  <span className="text-[10px] px-1.5 py-0.2 bg-stone-200 dark:bg-stone-700 rounded-full font-mono">
+                    {filteredActiveJamaah.length} Pax
+                  </span>
+                </button>
+                <button
+                  onClick={() => {
+                    setActiveManifestView("pembayaran");
+                    router.push(`/admin/manifest?paketId=${activePackage.id}&type=pembayaran`);
+                  }}
+                  className={cn(
+                    "px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer",
+                    activeManifestView === "pembayaran"
+                      ? "bg-white dark:bg-stone-800 text-emerald-700 dark:text-emerald-300 shadow-sm border border-emerald-300 dark:border-emerald-700"
+                      : "text-stone-500 hover:text-stone-900 dark:hover:text-stone-200"
+                  )}
+                >
+                  <CreditCard className="w-3.5 h-3.5 text-amber-500" />
+                  <span>Manifest Pembayaran &amp; Rincian Tagihan</span>
+                  <span className="text-[10px] px-1.5 py-0.2 bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 rounded-full font-bold">
+                    Keuangan
+                  </span>
+                </button>
+              </div>
+            </div>
+
+            {/* CONDITIONAL RENDER: FINANCIAL BREAKDOWN VS OPERATIONAL TABLE */}
+            {activeManifestView === "pembayaran" ? (
+              <ManifestPembayaranTable
+                activePackage={activePackage}
+                jamaahList={filteredActiveJamaah}
+                groups={groups}
+                searchQuery={searchQuery}
+              />
+            ) : (
+              /* NOTION-STYLE MASTER TABLE */
+              <div className="space-y-2">
+                <div className="flex items-center justify-between px-1">
+                  <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                    <Sparkles className="h-3.5 w-3.5 text-amber-500" />
+                    Data Jamaah Manifest Paket ({filteredActiveJamaah.length} Pax)
+                  </p>
                 <div className="flex items-center gap-3">
                   {/* Select Mode / Multi Delete Button */}
                   {isSelectMode ? (
@@ -1828,6 +1894,7 @@ function ManifestPageContent() {
                 </div>
               </div>
             </div>
+            )}
           </div>
         ) : (
           /* SKELETON LOADER FOR ACTIVE PACKAGE MANIFEST VIEW */

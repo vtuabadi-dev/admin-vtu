@@ -85,6 +85,7 @@ export interface RegistrationGroup {
   /** Anggota jamaah dalam grup ini */
   anggotaIds: string[];
   invoices?: Invoice[];
+  pembayaran?: Pembayaran[];
   createdAt: string;
   updatedAt: string;
 }
@@ -595,7 +596,7 @@ export interface JamaahProgress {
 // SYSTEM 4: MANIFEST GENERATOR ENGINE
 // ============================================================
 
-export type ManifestType = "visa" | "blockseat" | "siskopatuh" | "hotel" | "rooming";
+export type ManifestType = "visa" | "blockseat" | "siskopatuh" | "hotel" | "rooming" | "pembayaran";
 
 export interface ManifestGeneratorConfig {
   type: ManifestType;

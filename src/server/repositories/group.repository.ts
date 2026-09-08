@@ -26,6 +26,7 @@ function mapGroup(row: any): RegistrationGroup {
     isCityTourThoif: row.isCityTourThoif ?? undefined,
     anggotaIds: row.anggota?.map((a: any) => a.id) ?? [],
     invoices: (row.invoices ?? []).map(mapInvoice),
+    pembayaran: (row.pembayaran ?? []).map(mapPembayaran),
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
@@ -104,6 +105,7 @@ export const groupRepo = {
           anggota: true,
           registrationRequests: { select: { hotelUpgrade: true, roomUpgrade: true } },
           invoices: { include: { items: true } },
+          pembayaran: { include: { alokasi: true } },
         },
         take: params?.limit,
         skip: params?.offset,
@@ -121,6 +123,7 @@ export const groupRepo = {
         anggota: true,
         registrationRequests: { select: { hotelUpgrade: true, roomUpgrade: true } },
         invoices: { include: { items: true } },
+        pembayaran: { include: { alokasi: true } },
       },
     });
     return row ? mapGroup(row) : null;
