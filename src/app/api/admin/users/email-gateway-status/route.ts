@@ -9,22 +9,28 @@ export async function GET() {
     return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
   }
 
-  const hasGmail = Boolean(process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD);
+  const hasGmail = Boolean(process.env.GMAIL_USER && (process.env.GMAIL_APP_PASSWORD || process.env.SMTP_PASS));
   const hasSmtp = Boolean(process.env.SMTP_USER && process.env.SMTP_PASS);
-  const hasResend = Boolean(process.env.RESEND_API_KEY);
   const hasSupabase = Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY && (process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || process.env.DATABASE_URL));
+  const hasResend = Boolean(process.env.RESEND_API_KEY);
 
-  const isConfigured = hasSupabase || hasResend || hasGmail || hasSmtp;
-  const activeProvider = hasSupabase
-    ? "Supabase Auth Mailer"
-    : hasResend
-    ? "Resend API"
-    : hasGmail
+  const isConfigured = hasGmail || hasSmtp || hasSupabase || hasResend;
+  const activeProvider = hasGmail
     ? "Gmail SMTP"
     : hasSmtp
     ? "Custom SMTP"
+    : hasSupabase
+    ? "Supabase Auth Mailer"
+    : hasResend
+    ? "Resend API"
     : "Belum Dikonfigurasi";
-  const senderEmail = hasSupabase ? "Supabase Built-in Mailer" : (process.env.RESEND_FROM_EMAIL || process.env.GMAIL_USER || process.env.SMTP_USER || "-");
+  const senderEmail = hasGmail
+    ? (process.env.GMAIL_USER || "-")
+    : hasSmtp
+    ? (process.env.SMTP_USER || "-")
+    : hasSupabase
+    ? "Supabase Built-in Mailer"
+    : (process.env.RESEND_FROM_EMAIL || "-");
 
   return NextResponse.json({
     success: true,

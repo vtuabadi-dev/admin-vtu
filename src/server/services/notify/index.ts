@@ -6,22 +6,24 @@ let _provider: NotificationProvider | null = null;
 export function getNotificationProvider(): NotificationProvider {
   if (_provider) return _provider;
 
-  if (process.env.SUPABASE_SERVICE_ROLE_KEY && (process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || process.env.DATABASE_URL)) {
+  if (process.env.GMAIL_USER && (process.env.GMAIL_APP_PASSWORD || process.env.SMTP_PASS)) {
+    _provider = createNodemailerProvider();
+  } else if (process.env.SMTP_USER && process.env.SMTP_PASS) {
+    _provider = createNodemailerProvider();
+  } else if (process.env.SUPABASE_SERVICE_ROLE_KEY && (process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || process.env.DATABASE_URL)) {
     _provider = createSupabaseEmailProvider();
   } else if (process.env.RESEND_API_KEY) {
     _provider = createResendProvider();
-  } else if (process.env.GMAIL_USER || process.env.SMTP_USER) {
-    _provider = createNodemailerProvider();
   } else {
-    const configured = process.env.NOTIFICATION_PROVIDER ?? "supabase";
+    const configured = process.env.NOTIFICATION_PROVIDER ?? "mock";
     switch (configured) {
-      case "supabase":
-        _provider = createSupabaseEmailProvider();
-        break;
       case "nodemailer":
       case "smtp":
       case "gmail":
         _provider = createNodemailerProvider();
+        break;
+      case "supabase":
+        _provider = createSupabaseEmailProvider();
         break;
       case "console":
         _provider = createConsoleProvider();
