@@ -779,7 +779,7 @@ PT VAUZA TAMMA ABADI`;
             </thead>
 
             {/* ── TABLE BODY ───────────────────────────────────────── */}
-            <tbody className="divide-y divide-stone-200 dark:divide-stone-800 font-mono text-xs">
+            <tbody className="font-mono text-xs">
               {filteredRows.length === 0 ? (
                 <tr>
                   <td colSpan={21} className="py-12 text-center text-muted-foreground font-sans text-xs">
@@ -793,15 +793,26 @@ PT VAUZA TAMMA ABADI`;
                   const stickyCellBg = isEven ? "bg-white dark:bg-stone-900" : "bg-slate-50 dark:bg-[#1c1917]";
                   const scrollCellBg = isEven ? "bg-white dark:bg-card" : "bg-stone-50/70 dark:bg-stone-900/40";
 
+                  // Group boundary detection: identify the last member of each registration group/family
+                  const nextRow = filteredRows[rowIdx + 1];
+                  const currentGroupKey = r.groupId || (r.registrationId ? r.registrationId.replace(/-\d+$/, "") : r.jamaahId);
+                  const nextGroupKey = nextRow ? (nextRow.groupId || (nextRow.registrationId ? nextRow.registrationId.replace(/-\d+$/, "") : nextRow.jamaahId)) : null;
+                  const isLastInGroup = currentGroupKey !== nextGroupKey;
+
+                  // Bright, high-contrast separator line between different registration groups
+                  const rowBorderClass = isLastInGroup
+                    ? "border-b-[2.5px] border-b-amber-500 dark:border-b-amber-400 shadow-[0_1px_0_rgba(245,158,11,0.25)]"
+                    : "border-b border-stone-200/80 dark:border-stone-800/80";
+
                   return (
                     <tr key={r.jamaahId} className="hover:bg-amber-50/50 dark:hover:bg-stone-800/60 transition-colors group">
                       {/* Sticky Left: No (100% Solid Opaque) */}
-                      <td className={cn("px-2 py-2.5 text-center font-bold text-stone-600 dark:text-stone-400 border-r border-stone-200 dark:border-stone-800 sticky left-0 z-20 w-[48px] min-w-[48px] max-w-[48px]", stickyCellBg)}>
+                      <td className={cn("px-2 py-2.5 text-center font-bold text-stone-600 dark:text-stone-400 border-r border-stone-200 dark:border-stone-800 sticky left-0 z-20 w-[48px] min-w-[48px] max-w-[48px]", stickyCellBg, rowBorderClass)}>
                         {r.nomorUrut}
                       </td>
 
                       {/* Sticky Left: Nama Jamaah (100% Solid Opaque, locked offset at left-[48px]) */}
-                      <td className={cn("px-3 py-2.5 border-r-2 border-stone-300 dark:border-stone-700 sticky left-[48px] z-20 shadow-[4px_0_8px_-2px_rgba(0,0,0,0.08)] min-w-[220px] max-w-[280px]", stickyCellBg)}>
+                      <td className={cn("px-3 py-2.5 border-r-2 border-stone-300 dark:border-stone-700 sticky left-[48px] z-20 shadow-[4px_0_8px_-2px_rgba(0,0,0,0.08)] min-w-[220px] max-w-[280px]", stickyCellBg, rowBorderClass)}>
                         <div className="font-sans font-bold text-stone-900 dark:text-white leading-tight">
                           {r.namaLengkap}
                         </div>
@@ -812,24 +823,24 @@ PT VAUZA TAMMA ABADI`;
                       </td>
 
                       {/* No Invoice */}
-                      <td className={cn("px-3 py-2.5 border-r border-stone-200 dark:border-stone-800 font-sans", scrollCellBg)}>
+                      <td className={cn("px-3 py-2.5 border-r border-stone-200 dark:border-stone-800 font-sans", scrollCellBg, rowBorderClass)}>
                         <span className="font-mono text-xs font-semibold text-slate-800 dark:text-slate-200">
                           {r.nomorInvoice}
                         </span>
                       </td>
 
                       {/* Total Tagihan */}
-                      <td className={cn("px-3 py-2.5 text-right border-r border-stone-200 dark:border-stone-800 font-medium text-stone-800 dark:text-stone-200", scrollCellBg)}>
+                      <td className={cn("px-3 py-2.5 text-right border-r border-stone-200 dark:border-stone-800 font-medium text-stone-800 dark:text-stone-200", scrollCellBg, rowBorderClass)}>
                         Rp {r.totalTagihan.toLocaleString("id-ID")}
                       </td>
 
                       {/* Total Pembayaran */}
-                      <td className={cn("px-3 py-2.5 text-right border-r border-stone-200 dark:border-stone-800 font-semibold text-emerald-700 dark:text-emerald-400", scrollCellBg)}>
+                      <td className={cn("px-3 py-2.5 text-right border-r border-stone-200 dark:border-stone-800 font-semibold text-emerald-700 dark:text-emerald-400", scrollCellBg, rowBorderClass)}>
                         Rp {r.totalPembayaran.toLocaleString("id-ID")}
                       </td>
 
                       {/* Kurang Bayar */}
-                      <td className={cn("px-3 py-2.5 text-right border-r border-stone-200 dark:border-stone-800", scrollCellBg)}>
+                      <td className={cn("px-3 py-2.5 text-right border-r border-stone-200 dark:border-stone-800", scrollCellBg, rowBorderClass)}>
                         {r.kurangBayar === 0 ? (
                           <span className="text-emerald-600 dark:text-emerald-400 font-bold">Rp -</span>
                         ) : (
@@ -840,7 +851,7 @@ PT VAUZA TAMMA ABADI`;
                       </td>
 
                       {/* Status Pembayaran */}
-                      <td className={cn("px-3 py-2.5 text-center border-r-2 border-teal-600/60 dark:border-teal-700 font-sans", scrollCellBg)}>
+                      <td className={cn("px-3 py-2.5 text-center border-r-2 border-teal-600/60 dark:border-teal-700 font-sans", scrollCellBg, rowBorderClass)}>
                         {r.statusPembayaran === "LUNAS" && (
                           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700">
                             <CheckCircle2 className="w-2.5 h-2.5" /> LUNAS
@@ -859,12 +870,12 @@ PT VAUZA TAMMA ABADI`;
                       </td>
 
                       {/* Detail: Biaya Paket */}
-                      <td className="px-3 py-2.5 text-right border-r border-stone-200 dark:border-stone-800 bg-amber-50/20 dark:bg-amber-950/10">
+                      <td className={cn("px-3 py-2.5 text-right border-r border-stone-200 dark:border-stone-800 bg-amber-50/20 dark:bg-amber-950/10", rowBorderClass)}>
                         Rp {r.biayaPaket.toLocaleString("id-ID")}
                       </td>
 
                       {/* Detail: Upgrade Kamar */}
-                      <td className="px-3 py-2.5 text-right border-r border-stone-200 dark:border-stone-800 bg-amber-50/20 dark:bg-amber-950/10">
+                      <td className={cn("px-3 py-2.5 text-right border-r border-stone-200 dark:border-stone-800 bg-amber-50/20 dark:bg-amber-950/10", rowBorderClass)}>
                         {r.upgradeKamar > 0 ? (
                           <span className="text-amber-700 dark:text-amber-300 font-medium">
                             Rp {r.upgradeKamar.toLocaleString("id-ID")}
@@ -875,7 +886,7 @@ PT VAUZA TAMMA ABADI`;
                       </td>
 
                       {/* Detail: Kereta Cepat */}
-                      <td className="px-3 py-2.5 text-right border-r border-stone-200 dark:border-stone-800 bg-amber-50/20 dark:bg-amber-950/10">
+                      <td className={cn("px-3 py-2.5 text-right border-r border-stone-200 dark:border-stone-800 bg-amber-50/20 dark:bg-amber-950/10", rowBorderClass)}>
                         {r.keretaCepat > 0 ? (
                           <span>Rp {r.keretaCepat.toLocaleString("id-ID")}</span>
                         ) : (
@@ -884,7 +895,7 @@ PT VAUZA TAMMA ABADI`;
                       </td>
 
                       {/* Detail: Thoif */}
-                      <td className="px-3 py-2.5 text-right border-r border-stone-200 dark:border-stone-800 bg-amber-50/20 dark:bg-amber-950/10">
+                      <td className={cn("px-3 py-2.5 text-right border-r border-stone-200 dark:border-stone-800 bg-amber-50/20 dark:bg-amber-950/10", rowBorderClass)}>
                         {r.cityTourThoif > 0 ? (
                           <span>Rp {r.cityTourThoif.toLocaleString("id-ID")}</span>
                         ) : (
@@ -893,7 +904,7 @@ PT VAUZA TAMMA ABADI`;
                       </td>
 
                       {/* Detail: Paspor */}
-                      <td className="px-3 py-2.5 text-right border-r border-stone-200 dark:border-stone-800 bg-amber-50/20 dark:bg-amber-950/10">
+                      <td className={cn("px-3 py-2.5 text-right border-r border-stone-200 dark:border-stone-800 bg-amber-50/20 dark:bg-amber-950/10", rowBorderClass)}>
                         {r.paspor > 0 ? (
                           <span>Rp {r.paspor.toLocaleString("id-ID")}</span>
                         ) : (
@@ -902,7 +913,7 @@ PT VAUZA TAMMA ABADI`;
                       </td>
 
                       {/* Detail: Kursi Roda */}
-                      <td className="px-3 py-2.5 text-right border-r border-stone-200 dark:border-stone-800 bg-amber-50/20 dark:bg-amber-950/10">
+                      <td className={cn("px-3 py-2.5 text-right border-r border-stone-200 dark:border-stone-800 bg-amber-50/20 dark:bg-amber-950/10", rowBorderClass)}>
                         {r.kursiRoda > 0 ? (
                           <span>Rp {r.kursiRoda.toLocaleString("id-ID")}</span>
                         ) : (
@@ -911,7 +922,7 @@ PT VAUZA TAMMA ABADI`;
                       </td>
 
                       {/* Detail: Ongkir */}
-                      <td className="px-3 py-2.5 text-right border-r border-stone-200 dark:border-stone-800 bg-amber-50/20 dark:bg-amber-950/10">
+                      <td className={cn("px-3 py-2.5 text-right border-r border-stone-200 dark:border-stone-800 bg-amber-50/20 dark:bg-amber-950/10", rowBorderClass)}>
                         {r.ongkir > 0 ? (
                           <span>Rp {r.ongkir.toLocaleString("id-ID")}</span>
                         ) : (
@@ -920,7 +931,7 @@ PT VAUZA TAMMA ABADI`;
                       </td>
 
                       {/* Detail: Tambahan */}
-                      <td className="px-3 py-2.5 text-right border-r-2 border-amber-500/60 dark:border-amber-700 bg-amber-50/20 dark:bg-amber-950/10">
+                      <td className={cn("px-3 py-2.5 text-right border-r-2 border-amber-500/60 dark:border-amber-700 bg-amber-50/20 dark:bg-amber-950/10", rowBorderClass)}>
                         {r.tambahanLain > 0 ? (
                           <span>Rp {r.tambahanLain.toLocaleString("id-ID")}</span>
                         ) : (
@@ -929,7 +940,7 @@ PT VAUZA TAMMA ABADI`;
                       </td>
 
                       {/* Diskon Promo */}
-                      <td className="px-3 py-2.5 text-right border-r border-stone-200 dark:border-stone-800 bg-rose-50/20 dark:bg-rose-950/10 text-rose-700 dark:text-rose-400">
+                      <td className={cn("px-3 py-2.5 text-right border-r border-stone-200 dark:border-stone-800 bg-rose-50/20 dark:bg-rose-950/10 text-rose-700 dark:text-rose-400", rowBorderClass)}>
                         {r.diskonPromo > 0 ? (
                           <span>-Rp {r.diskonPromo.toLocaleString("id-ID")}</span>
                         ) : (
@@ -938,7 +949,7 @@ PT VAUZA TAMMA ABADI`;
                       </td>
 
                       {/* Potongan Ongkir */}
-                      <td className="px-3 py-2.5 text-right border-r border-stone-200 dark:border-stone-800 bg-rose-50/20 dark:bg-rose-950/10 text-rose-700 dark:text-rose-400">
+                      <td className={cn("px-3 py-2.5 text-right border-r border-stone-200 dark:border-stone-800 bg-rose-50/20 dark:bg-rose-950/10 text-rose-700 dark:text-rose-400", rowBorderClass)}>
                         {r.potonganOngkir > 0 ? (
                           <span>-Rp {r.potonganOngkir.toLocaleString("id-ID")}</span>
                         ) : (
@@ -947,7 +958,7 @@ PT VAUZA TAMMA ABADI`;
                       </td>
 
                       {/* Total Potongan */}
-                      <td className="px-3 py-2.5 text-right border-r border-stone-200 dark:border-stone-800 bg-rose-50/20 dark:bg-rose-950/10 text-rose-700 dark:text-rose-400 font-bold">
+                      <td className={cn("px-3 py-2.5 text-right border-r border-stone-200 dark:border-stone-800 bg-rose-50/20 dark:bg-rose-950/10 text-rose-700 dark:text-rose-400 font-bold", rowBorderClass)}>
                         {r.totalPotongan > 0 ? (
                           <span>-Rp {r.totalPotongan.toLocaleString("id-ID")}</span>
                         ) : (
@@ -956,17 +967,17 @@ PT VAUZA TAMMA ABADI`;
                       </td>
 
                       {/* Net Tagihan */}
-                      <td className="px-3 py-2.5 text-right border-r-2 border-rose-600/60 dark:border-rose-700 bg-rose-50/40 dark:bg-rose-950/20 font-black text-stone-900 dark:text-white">
+                      <td className={cn("px-3 py-2.5 text-right border-r-2 border-rose-600/60 dark:border-rose-700 bg-rose-50/40 dark:bg-rose-950/20 font-black text-stone-900 dark:text-white", rowBorderClass)}>
                         Rp {r.netTagihan.toLocaleString("id-ID")}
                       </td>
 
                       {/* Regular Scroll: Keterangan */}
-                      <td className={cn("px-3 py-2.5 border-r border-stone-200 dark:border-stone-800 font-sans text-stone-600 dark:text-stone-300 text-[11px] min-w-[150px]", scrollCellBg)}>
+                      <td className={cn("px-3 py-2.5 border-r border-stone-200 dark:border-stone-800 font-sans text-stone-600 dark:text-stone-300 text-[11px] min-w-[150px]", scrollCellBg, rowBorderClass)}>
                         {r.keterangan}
                       </td>
 
                       {/* Sticky Right: Aksi (100% Solid Opaque, locked width, clean border) */}
-                      <td className={cn("px-2 py-2.5 text-center sticky right-0 z-20 shadow-[-4px_0_8px_-2px_rgba(0,0,0,0.08)] border-l border-stone-300 dark:border-stone-700 w-[80px] min-w-[80px] max-w-[80px]", stickyCellBg)}>
+                      <td className={cn("px-2 py-2.5 text-center sticky right-0 z-20 shadow-[-4px_0_8px_-2px_rgba(0,0,0,0.08)] border-l border-stone-300 dark:border-stone-700 w-[80px] min-w-[80px] max-w-[80px]", stickyCellBg, rowBorderClass)}>
                         <div className="flex items-center justify-center gap-1.5">
                           {r.invoiceId ? (
                             <button
