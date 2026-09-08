@@ -12,6 +12,8 @@ import {
   CheckCircle2,
   Clock,
   Sparkles,
+  Users,
+  Layers,
 } from "lucide-react";
 import { Button } from "@/shared/components/ui/Button";
 import { cn } from "@/shared/lib/utils";
@@ -61,6 +63,10 @@ export interface JamaahFinancialRow {
 
   // Blok 4: Keterangan
   keterangan: string;
+
+  // Metadata grup tambahan jika dalam group mode
+  paxCount?: number;
+  memberNames?: string[];
 }
 
 export function ManifestPembayaranTable({
@@ -70,6 +76,7 @@ export function ManifestPembayaranTable({
   searchQuery,
 }: ManifestPembayaranTableProps) {
   const [exporting, setExporting] = useState(false);
+  const [viewMode, setViewMode] = useState<"all" | "group">("all");
 
   // Group lookup map
   const groupMap = useMemo(() => {
@@ -272,19 +279,126 @@ export function ManifestPembayaranTable({
     });
   }, [activePackage, jamaahList, groupMap]);
 
+  // Group Financial Rows (Aggregated per Registration Group / PIC)
+  const groupFinancialRows = useMemo(() => {
+    const grouped = new Map<string, JamaahFinancialRow[]>();
+
+    financialRows.forEach((row) => {
+      const key =
+        row.groupId || (row.registrationId ? row.registrationId.replace(/-\d+$/, "") : row.jamaahId);
+      if (!grouped.has(key)) {
+        grouped.set(key, []);
+      }
+      grouped.get(key)!.push(row);
+    });
+
+    let groupIdx = 1;
+    const result: JamaahFinancialRow[] = [];
+
+    grouped.forEach((members, gKey) => {
+      if (!members || members.length === 0) return;
+      const g = groupMap.get(gKey) || null;
+      const picMember = members[0];
+      if (!picMember) return;
+
+      const picName = (g as any)?.namaPic || (g as any)?.namaKontak || picMember.namaLengkap;
+      const picPhone = (g as any)?.nomorTelepon || (g as any)?.noHp || (g as any)?.telepon || picMember.phone;
+      const groupCode =
+        g?.kodeRegistrasi || (picMember.registrationId ? picMember.registrationId.replace(/-\d+$/, "") : gKey);
+
+      // Aggregate financials across all members in this group
+      const totalTagihan = members.reduce((sum, m) => sum + m.totalTagihan, 0);
+      const totalPembayaran = members.reduce((sum, m) => sum + m.totalPembayaran, 0);
+      const kurangBayar = Math.max(0, totalTagihan - totalPembayaran);
+
+      let statusPembayaran: "LUNAS" | "CICILAN" | "BELUM BAYAR" = "BELUM BAYAR";
+      if (totalTagihan > 0 && kurangBayar === 0 && totalPembayaran >= totalTagihan) {
+        statusPembayaran = "LUNAS";
+      } else if (totalPembayaran > 0 && kurangBayar > 0) {
+        statusPembayaran = "CICILAN";
+      }
+
+      const biayaPaket = members.reduce((sum, m) => sum + m.biayaPaket, 0);
+      const upgradeKamar = members.reduce((sum, m) => sum + m.upgradeKamar, 0);
+      const keretaCepat = members.reduce((sum, m) => sum + m.keretaCepat, 0);
+      const cityTourThoif = members.reduce((sum, m) => sum + m.cityTourThoif, 0);
+      const paspor = members.reduce((sum, m) => sum + m.paspor, 0);
+      const kursiRoda = members.reduce((sum, m) => sum + m.kursiRoda, 0);
+      const ongkir = members.reduce((sum, m) => sum + m.ongkir, 0);
+      const tambahanLain = members.reduce((sum, m) => sum + m.tambahanLain, 0);
+      const diskonPromo = members.reduce((sum, m) => sum + m.diskonPromo, 0);
+      const potonganOngkir = members.reduce((sum, m) => sum + m.potonganOngkir, 0);
+      const totalPotongan = members.reduce((sum, m) => sum + m.totalPotongan, 0);
+      const netTagihan = members.reduce((sum, m) => sum + m.netTagihan, 0);
+
+      const uniqueKeterangan =
+        Array.from(new Set(members.map((m) => m.keterangan).filter((k) => k && k !== "-"))).join(
+          ", "
+        ) || "-";
+
+      const memberNames = members.map((m) => m.namaLengkap);
+
+      result.push({
+        nomorUrut: groupIdx++,
+        jamaahId: picMember.jamaahId,
+        namaLengkap: picName,
+        registrationId: groupCode,
+        nomorPaspor: picMember.nomorPaspor,
+        phone: picPhone,
+        groupId: gKey,
+        groupName: g?.namaGroup || `Grup ${picName}`,
+        nomorInvoice: picMember.nomorInvoice,
+        invoiceId: picMember.invoiceId,
+        totalTagihan,
+        totalPembayaran,
+        kurangBayar,
+        statusPembayaran,
+        biayaPaket,
+        upgradeKamar,
+        upgradeKamarLabel: picMember.upgradeKamarLabel,
+        keretaCepat,
+        cityTourThoif,
+        paspor,
+        kursiRoda,
+        ongkir,
+        tambahanLain,
+        diskonPromo,
+        potonganOngkir,
+        totalPotongan,
+        netTagihan,
+        keterangan: uniqueKeterangan,
+        paxCount: members.length,
+        memberNames,
+      });
+    });
+
+    return result;
+  }, [financialRows, groupMap]);
+
+  // Active base rows based on toggle viewMode
+  const rawDisplayRows = viewMode === "group" ? groupFinancialRows : financialRows;
+
   // Filter by search query
   const filteredRows = useMemo(() => {
-    if (!searchQuery.trim()) return financialRows;
+    if (!searchQuery.trim()) return rawDisplayRows;
     const q = searchQuery.toLowerCase().trim();
-    return financialRows.filter(
-      (r) =>
+    return rawDisplayRows.filter((r) => {
+      const matchBasic =
         r.namaLengkap.toLowerCase().includes(q) ||
         r.registrationId.toLowerCase().includes(q) ||
         r.nomorInvoice.toLowerCase().includes(q) ||
         r.nomorPaspor.toLowerCase().includes(q) ||
-        r.statusPembayaran.toLowerCase().includes(q)
-    );
-  }, [financialRows, searchQuery]);
+        r.statusPembayaran.toLowerCase().includes(q);
+
+      if (matchBasic) return true;
+
+      if (r.memberNames && Array.isArray(r.memberNames)) {
+        return r.memberNames.some((m) => m.toLowerCase().includes(q));
+      }
+
+      return false;
+    });
+  }, [rawDisplayRows, searchQuery]);
 
   // Totals & KPI Metrics
   const summaryKPI = useMemo(() => {
@@ -365,11 +479,18 @@ export function ManifestPembayaranTable({
       rawPhone = "62" + rawPhone;
     }
 
-    const text = `Assalamu'alaikum Wr. Wb. Bapak/Ibu ${row.namaLengkap},
+    const paxInfo = row.paxCount && row.paxCount > 1 ? ` (${row.paxCount} Pax)` : "";
+    const memberListText =
+      row.memberNames && row.memberNames.length > 1
+        ? `\n• Anggota: ${row.memberNames.join(", ")}`
+        : "";
 
-Berikut rincian status tagihan & pembayaran keberangkatan Umroh Anda di VTU ABADI Travel:
+    const text = `Assalamu'alaikum Wr. Wb. Bapak/Ibu ${row.namaLengkap}${viewMode === "group" ? ` (PIC Rombongan ${row.groupName})` : ""},
+
+Berikut rincian status tagihan & pembayaran keberangkatan Umroh Anda${paxInfo} di VTU ABADI Travel:
 • Paket: ${activePackage.namaPaket || activePackage.kode}
-• No. Invoice: ${row.nomorInvoice}
+• Kode Registrasi: ${row.registrationId}
+• No. Invoice: ${row.nomorInvoice}${memberListText}
 • Total Tagihan: Rp ${row.netTagihan.toLocaleString("id-ID")}
 • Total Pembayaran: Rp ${row.totalPembayaran.toLocaleString("id-ID")}
 • Kurang Bayar (Sisa): Rp ${row.kurangBayar.toLocaleString("id-ID")}
@@ -388,19 +509,23 @@ PT VAUZA TAMMA ABADI`;
       setExporting(true);
       const ExcelJS = (await import("exceljs")).default || (await import("exceljs"));
       const workbook = new ExcelJS.Workbook();
-      const sheet = workbook.addWorksheet("Manifest Pembayaran");
+      const sheet = workbook.addWorksheet(viewMode === "group" ? "Manifest Grup" : "Manifest Jamaah");
 
       // Title & Meta Info
       sheet.addRow(["PT VAUZA TAMMA ABADI — SISTEM OPERASIONAL TRAVEL"]);
-      sheet.addRow(["MASTER MANIFEST PEMBAYARAN & DETAIL RINCIAN ITEM TAGIHAN"]);
       sheet.addRow([
-        `Paket: ${activePackage.namaPaket || activePackage.kode} | Berangkat: ${activePackage.tanggalBerangkat || "-"} | Total: ${filteredRows.length} Pax`,
+        viewMode === "group"
+          ? "MASTER MANIFEST PEMBAYARAN & DETAIL RINCIAN TAGIHAN (RINGKASAN PER GRUP / PIC)"
+          : "MASTER MANIFEST PEMBAYARAN & DETAIL RINCIAN ITEM TAGIHAN",
+      ]);
+      sheet.addRow([
+        `Paket: ${activePackage.namaPaket || activePackage.kode} | Berangkat: ${activePackage.tanggalBerangkat || "-"} | Total: ${filteredRows.length} ${viewMode === "group" ? "Grup" : "Pax"}`,
       ]);
       sheet.addRow([]); // Blank line
 
       // Row 5: Grouped Top Header
       const groupHeaderRow = sheet.addRow([
-        "IDENTITAS JAMAAH",
+        viewMode === "group" ? "IDENTITAS PIC / GRUP" : "IDENTITAS JAMAAH",
         "",
         "STATUS & RINGKASAN PEMBAYARAN",
         "",
@@ -425,7 +550,7 @@ PT VAUZA TAMMA ABADI`;
       // Row 6: Detailed Sub Headers
       const subHeaderRow = sheet.addRow([
         "NO",
-        "NAMA JAMAAH",
+        viewMode === "group" ? "NAMA PIC / GRUP (PAX)" : "NAMA JAMAAH",
         "NO INVOICE TERAKHIR",
         "TOTAL TAGIHAN",
         "TOTAL PEMBAYARAN",
@@ -635,7 +760,9 @@ PT VAUZA TAMMA ABADI`;
               <span className="text-slate-500 font-bold">•</span>
               <span className="text-lg font-black text-amber-400">{summaryKPI.countCicilan} Cicilan</span>
             </div>
-            <p className="text-[10px] text-slate-400 mt-0.5">Dari Total {filteredRows.length} Jamaah Terdaftar</p>
+            <p className="text-[10px] text-slate-400 mt-0.5">
+              Dari Total {financialRows.length} Jamaah ({groupFinancialRows.length} Rombongan)
+            </p>
           </div>
           <div className="w-10 h-10 rounded-xl bg-teal-500/20 text-teal-400 flex items-center justify-center">
             <Clock className="w-5 h-5" />
@@ -643,15 +770,56 @@ PT VAUZA TAMMA ABADI`;
         </div>
       </div>
 
-      {/* ── ACTION TOOLBAR ────────────────────────────────────────── */}
-      <div className="flex flex-wrap items-center justify-between gap-3 px-1">
-        <div className="flex items-center gap-2 text-xs text-muted-foreground font-semibold">
-          <Sparkles className="w-4 h-4 text-amber-500" />
-          <span>
-            Rincian Finansial &amp; Tagihan: <strong className="text-foreground">{filteredRows.length} Pax Terfilter</strong>
-          </span>
+      {/* ── ACTION TOOLBAR & VIEW MODE SWITCH ──────────────────────── */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-card p-3 rounded-xl border border-stone-200 dark:border-stone-800 shadow-xs">
+        {/* Left: Indicator & Segmented Toggle Switch (Saklar) */}
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-2 text-xs text-muted-foreground font-semibold">
+            <Sparkles className="w-4 h-4 text-amber-500 shrink-0" />
+            <span>
+              Tampilan Data: <strong className="text-foreground">{filteredRows.length} {viewMode === "group" ? "Grup / PIC" : "Pax Jamaah"}</strong>
+            </span>
+          </div>
+
+          {/* SAKLAR TOGGLE MODE */}
+          <div className="inline-flex items-center p-0.5 bg-stone-100 dark:bg-stone-900 border border-stone-200 dark:border-stone-800 rounded-lg shadow-inner">
+            <button
+              type="button"
+              onClick={() => setViewMode("all")}
+              className={cn(
+                "flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-md transition-all",
+                viewMode === "all"
+                  ? "bg-white dark:bg-stone-800 text-teal-800 dark:text-teal-300 shadow-xs border border-stone-200/80 dark:border-stone-700"
+                  : "text-stone-500 hover:text-stone-800 dark:hover:text-stone-300"
+              )}
+            >
+              <Users className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />
+              <span>Semua Jamaah</span>
+              <span className="ml-0.5 px-1.5 py-0.2 rounded-full text-[10px] bg-stone-200/80 dark:bg-stone-700 text-stone-700 dark:text-stone-300">
+                {financialRows.length}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setViewMode("group")}
+              className={cn(
+                "flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-md transition-all",
+                viewMode === "group"
+                  ? "bg-white dark:bg-stone-800 text-amber-800 dark:text-amber-300 shadow-xs border border-stone-200/80 dark:border-stone-700"
+                  : "text-stone-500 hover:text-stone-800 dark:hover:text-stone-300"
+              )}
+            >
+              <Layers className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+              <span>Per Grup (PIC)</span>
+              <span className="ml-0.5 px-1.5 py-0.2 rounded-full text-[10px] bg-amber-100 dark:bg-amber-950/80 text-amber-800 dark:text-amber-300">
+                {groupFinancialRows.length}
+              </span>
+            </button>
+          </div>
         </div>
 
+        {/* Right: Export & Print Buttons */}
         <div className="flex items-center gap-2.5">
           <Button
             variant="outline"
@@ -661,7 +829,11 @@ PT VAUZA TAMMA ABADI`;
             className="h-8 text-xs font-bold bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-700/60 shadow-xs"
           >
             <FileSpreadsheet className="w-3.5 h-3.5 mr-1.5 text-emerald-600 dark:text-emerald-400" />
-            {exporting ? "Membuat Excel..." : "Export Excel Manifest Pembayaran"}
+            {exporting
+              ? "Membuat Excel..."
+              : viewMode === "group"
+              ? "Export Excel (Ringkasan Grup)"
+              : "Export Excel (Semua Jamaah)"}
           </Button>
           <Button
             variant="outline"
@@ -687,7 +859,7 @@ PT VAUZA TAMMA ABADI`;
                   colSpan={2}
                   className="bg-slate-900 border-r-2 border-r-stone-500 dark:border-r-stone-600 px-3 py-2 text-center sticky left-0 z-40 shadow-[4px_0_8px_-2px_rgba(0,0,0,0.3)]"
                 >
-                  IDENTITAS JAMAAH
+                  {viewMode === "group" ? "IDENTITAS PIC & GRUP" : "IDENTITAS JAMAAH"}
                 </th>
 
                 {/* Status & Kas Group Header (Teal) */}
@@ -738,9 +910,9 @@ PT VAUZA TAMMA ABADI`;
                   NO
                 </th>
 
-                {/* Sticky Left: Nama Jamaah */}
+                {/* Sticky Left: Nama Jamaah / PIC */}
                 <th className="px-3 py-2.5 min-w-[220px] max-w-[280px] border-r-2 border-r-stone-400 dark:border-r-stone-600 sticky left-[48px] z-40 bg-stone-100 dark:bg-stone-900 shadow-[4px_0_8px_-2px_rgba(0,0,0,0.12)]">
-                  NAMA JAMAAH
+                  {viewMode === "group" ? "NAMA PIC & GRUP" : "NAMA JAMAAH"}
                 </th>
 
                 {/* Group 1: Status & Kas Sub-columns */}
@@ -783,7 +955,7 @@ PT VAUZA TAMMA ABADI`;
               {filteredRows.length === 0 ? (
                 <tr>
                   <td colSpan={21} className="py-12 text-center text-muted-foreground font-sans text-xs">
-                    Tidak ditemukan data pembayaran jamaah yang sesuai dengan pencarian.
+                    Tidak ditemukan data pembayaran yang sesuai dengan pencarian.
                   </td>
                 </tr>
               ) : (
@@ -793,11 +965,11 @@ PT VAUZA TAMMA ABADI`;
                   const stickyCellBg = isEven ? "bg-white dark:bg-stone-900" : "bg-slate-50 dark:bg-[#1c1917]";
                   const scrollCellBg = isEven ? "bg-white dark:bg-card" : "bg-stone-50/70 dark:bg-stone-900/40";
 
-                  // Group boundary detection: identify the last member of each registration group/family
+                  // Group boundary detection: identify the last member of each registration group/family (in all mode)
                   const nextRow = filteredRows[rowIdx + 1];
                   const currentGroupKey = r.groupId || (r.registrationId ? r.registrationId.replace(/-\d+$/, "") : r.jamaahId);
                   const nextGroupKey = nextRow ? (nextRow.groupId || (nextRow.registrationId ? nextRow.registrationId.replace(/-\d+$/, "") : nextRow.jamaahId)) : null;
-                  const isLastInGroup = currentGroupKey !== nextGroupKey;
+                  const isLastInGroup = viewMode === "all" && currentGroupKey !== nextGroupKey;
 
                   // Bright, high-contrast separator line between different registration groups
                   const rowBorderClass = isLastInGroup
@@ -811,15 +983,39 @@ PT VAUZA TAMMA ABADI`;
                         {r.nomorUrut}
                       </td>
 
-                      {/* Sticky Left: Nama Jamaah (100% Solid Opaque, locked offset at left-[48px]) */}
+                      {/* Sticky Left: Nama Jamaah / PIC (100% Solid Opaque, locked offset at left-[48px]) */}
                       <td className={cn("px-3 py-2.5 border-r-2 border-r-stone-400 dark:border-r-stone-600 sticky left-[48px] z-20 shadow-[4px_0_8px_-2px_rgba(0,0,0,0.08)] min-w-[220px] max-w-[280px]", stickyCellBg, rowBorderClass)}>
-                        <div className="font-sans font-bold text-stone-900 dark:text-white leading-tight">
-                          {r.namaLengkap}
-                        </div>
-                        <div className="text-[10px] text-muted-foreground flex items-center gap-1.5 mt-0.5">
-                          <span className="font-mono text-emerald-600 dark:text-emerald-400 font-medium">{r.registrationId}</span>
-                          {r.nomorPaspor !== "-" && <span>• Paspor: {r.nomorPaspor}</span>}
-                        </div>
+                        {viewMode === "group" ? (
+                          <div>
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="font-sans font-black text-stone-900 dark:text-white leading-tight">
+                                {r.namaLengkap}
+                              </span>
+                              <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-black bg-amber-100 text-amber-900 dark:bg-amber-950/80 dark:text-amber-300 border border-amber-300 dark:border-amber-700 shrink-0">
+                                {r.paxCount || 1} Pax
+                              </span>
+                            </div>
+                            <div className="text-[10px] text-muted-foreground flex items-center gap-1.5 mt-0.5">
+                              <span className="font-mono text-emerald-600 dark:text-emerald-400 font-bold">{r.registrationId}</span>
+                              <span className="text-stone-400 dark:text-stone-500">• PIC Rombongan</span>
+                            </div>
+                            {r.memberNames && r.memberNames.length > 1 && (
+                              <div className="text-[10px] text-stone-500 dark:text-stone-400 truncate max-w-[260px] mt-0.5" title={r.memberNames.join(", ")}>
+                                Anggota: {r.memberNames.join(", ")}
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <div>
+                            <div className="font-sans font-bold text-stone-900 dark:text-white leading-tight">
+                              {r.namaLengkap}
+                            </div>
+                            <div className="text-[10px] text-muted-foreground flex items-center gap-1.5 mt-0.5">
+                              <span className="font-mono text-emerald-600 dark:text-emerald-400 font-medium">{r.registrationId}</span>
+                              {r.nomorPaspor !== "-" && <span>• Paspor: {r.nomorPaspor}</span>}
+                            </div>
+                          </div>
+                        )}
                       </td>
 
                       {/* No Invoice */}
@@ -1020,9 +1216,9 @@ PT VAUZA TAMMA ABADI`;
                   <td className="px-2 py-3 text-center border-r border-r-stone-200 dark:border-r-stone-800 sticky left-0 z-40 bg-stone-100 dark:bg-stone-900 w-[48px] min-w-[48px] max-w-[48px]">
                     ∑
                   </td>
-                  {/* Sticky Left: Total Pax */}
+                  {/* Sticky Left: Total Pax / Grup */}
                   <td className="px-3 py-3 border-r-2 border-r-stone-400 dark:border-r-stone-600 sticky left-[48px] z-40 bg-stone-100 dark:bg-stone-900 font-sans shadow-[4px_0_8px_-2px_rgba(0,0,0,0.12)] min-w-[220px] max-w-[280px]">
-                    TOTAL {filteredRows.length} PAX
+                    TOTAL {filteredRows.length} {viewMode === "group" ? "GRUP" : "PAX"}
                   </td>
                   <td className="px-3 py-3 border-r border-r-stone-200 dark:border-r-stone-800 font-sans text-[11px] text-muted-foreground">-</td>
                   <td className="px-3 py-3 text-right border-r border-r-stone-200 dark:border-r-stone-800 font-black text-amber-600 dark:text-amber-400">
