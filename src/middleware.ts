@@ -7,6 +7,7 @@ const PUBLIC_PATHS = [
   "/register",
   "/track",
   "/reset-password",
+  "/setup-password",
   "/api/auth",
   "/api/health",
   "/api/track",
