@@ -197,7 +197,7 @@ export function SearchableSelect({
             size === "sm" ? "h-9 text-xs px-3" : "h-11 text-sm px-3.5",
             isPortal
               ? "bg-[#2D1B0E] border-2 border-[#D4AF37] text-white placeholder:text-[#D4AF37]/60 focus:ring-2 focus:ring-[#F5D061]/50 focus:border-[#F5D061]"
-              : "border border-stone-300 bg-white text-slate-950 placeholder:text-stone-400 placeholder:font-normal focus:ring-2 focus:ring-emerald-600 focus:border-emerald-600",
+              : "border border-stone-300 dark:border-stone-700 bg-white dark:bg-stone-900 text-slate-950 dark:text-white placeholder:text-stone-400 placeholder:font-normal focus:ring-2 focus:ring-emerald-600 focus:border-emerald-600",
             open && (isPortal ? "border-[#F5D061] ring-2 ring-[#F5D061]/50" : "border-emerald-600 ring-2 ring-emerald-500")
           )}
         />
@@ -210,7 +210,9 @@ export function SearchableSelect({
               onClick={handleClear}
               className={cn(
                 "p-1 rounded-full transition-colors cursor-pointer",
-                isPortal ? "text-[#D4AF37] hover:text-[#F5D061] hover:bg-[#3D2513]" : "text-stone-400 hover:text-stone-700 hover:bg-stone-100"
+                isPortal
+                  ? "text-[#D4AF37] hover:text-[#F5D061] hover:bg-[#3D2513]"
+                  : "text-stone-400 hover:text-stone-700 dark:hover:text-stone-200 hover:bg-stone-100 dark:hover:bg-stone-800"
               )}
               title="Hapus / Reset"
             >
@@ -231,13 +233,13 @@ export function SearchableSelect({
             }}
             className={cn(
               "p-0.5 transition-colors cursor-pointer",
-              isPortal ? "text-[#D4AF37] hover:text-[#F5D061]" : "text-stone-400 hover:text-stone-600"
+              isPortal ? "text-[#D4AF37] hover:text-[#F5D061]" : "text-stone-400 hover:text-stone-600 dark:hover:text-stone-300"
             )}
           >
             <ChevronDown
               className={cn(
                 "h-4 w-4 transition-transform duration-200",
-                open && (isPortal ? "rotate-180 text-[#F5D061]" : "rotate-180 text-emerald-600")
+                open && (isPortal ? "rotate-180 text-[#F5D061]" : "rotate-180 text-emerald-600 dark:text-emerald-400")
               )}
             />
           </button>
@@ -248,11 +250,13 @@ export function SearchableSelect({
       {open && (
         <div className={cn(
           "absolute z-50 mt-1 w-full overflow-hidden rounded-xl border-2 shadow-2xl animate-in fade-in-0 zoom-in-95",
-          isPortal ? "border-[#D4AF37] bg-[#2D1B0E] text-white" : "border-stone-200 bg-white text-slate-900"
+          isPortal
+            ? "border-[#D4AF37] bg-[#2D1B0E] text-white"
+            : "border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 text-slate-900 dark:text-white"
         )}>
           <div ref={listRef} className={cn("overflow-y-auto p-1.5 space-y-1", maxHeight)}>
             {filteredOptions.length === 0 ? (
-              <div className={cn("py-4 text-center text-xs font-medium", isPortal ? "text-amber-200/70" : "text-stone-500")}>
+              <div className={cn("py-4 text-center text-xs font-medium", isPortal ? "text-amber-200/70" : "text-stone-500 dark:text-stone-400")}>
                 Tidak ada data yang cocok dengan &quot;{query}&quot;
               </div>
             ) : (
@@ -274,10 +278,10 @@ export function SearchableSelect({
                           ? "bg-[#3D2513] text-amber-200 font-bold"
                           : "text-white font-semibold hover:bg-[#3D2513]"
                         : isSelected
-                        ? "bg-emerald-50 text-emerald-950 font-extrabold border border-emerald-300 shadow-2xs"
+                        ? "bg-emerald-50 dark:bg-emerald-950/80 text-emerald-950 dark:text-emerald-200 font-extrabold border border-emerald-300 dark:border-emerald-700 shadow-2xs"
                         : isHighlighted
-                        ? "bg-stone-100 text-slate-950 font-bold"
-                        : "text-slate-800 font-semibold hover:bg-stone-50"
+                        ? "bg-stone-100 dark:bg-stone-800 text-slate-950 dark:text-white font-bold"
+                        : "text-slate-800 dark:text-stone-200 font-semibold hover:bg-stone-50 dark:hover:bg-stone-800/60"
                     )}
                   >
                     <div className="flex flex-col truncate pr-2">
@@ -285,13 +289,15 @@ export function SearchableSelect({
                       {opt.sublabel && (
                         <span className={cn(
                           "text-[10px] font-normal truncate mt-0.5",
-                          isPortal ? (isSelected ? "text-slate-800 font-bold" : "text-amber-200/70") : "text-stone-500"
+                          isPortal
+                            ? (isSelected ? "text-slate-800 font-bold" : "text-amber-200/70")
+                            : (isSelected ? "text-emerald-700 dark:text-emerald-300 font-medium" : "text-stone-500 dark:text-stone-400")
                         )}>
                           {opt.sublabel}
                         </span>
                       )}
                     </div>
-                    {isSelected && <Check className={cn("h-4 w-4 shrink-0 font-black", isPortal ? "text-slate-950" : "text-emerald-700")} />}
+                    {isSelected && <Check className={cn("h-4 w-4 shrink-0 font-black", isPortal ? "text-slate-950" : "text-emerald-700 dark:text-emerald-400")} />}
                   </button>
                 );
               })

@@ -26,6 +26,7 @@ import { Card, CardContent } from "@/shared/components/ui/Card";
 import { Button } from "@/shared/components/ui/Button";
 import { Input } from "@/shared/components/ui/Input";
 import { Select } from "@/shared/components/ui/Select";
+import { SearchableSelect } from "@/shared/components/ui/SearchableSelect";
 import { StatusBadge } from "@/shared/components/ui/Badge";
 import { Modal } from "@/shared/components/ui/Modal";
 import { ErrorState } from "@/shared/components/ui/ErrorState";
@@ -1216,37 +1217,45 @@ function ManifestPageContent() {
         </div>
       </div>
 
-      {/* Package Selector */}
+      {/* Package Selector (Searchable Picker Model) */}
       <Card>
         <CardContent className="p-4">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <div className="flex items-center gap-3 w-full sm:w-auto flex-1 max-w-xl">
-              <Select
+            <div className="flex items-center gap-3 w-full sm:w-auto flex-1 max-w-2xl">
+              <SearchableSelect
                 options={keberangkatanList.map((k) => ({
                   value: k.id,
-                  label: `${k.kode} — ${formatPackageTitleShort(k.namaPaket || k.paketUmroh?.namaPaket || "-")} (${formatDateShort(k.tanggalBerangkat)})`,
+                  label: `${k.kode} — ${formatPackageTitleShort(k.namaPaket || k.paketUmroh?.namaPaket || "-")}`,
+                  sublabel: `📅 Berangkat: ${formatDateShort(k.tanggalBerangkat)} • ✈️ Maskapai: ${getAirlineCode(k.maskapai)} • 👥 ${k.jamaahIds?.length || 0} Pax`,
                 }))}
-                placeholder="-- Pilih Paket Keberangkatan Aktif --"
+                placeholder="🔍 Ketik atau cari paket keberangkatan aktif..."
                 value={selectedKeberangkatan}
-                onChange={(e) => {
-                  const newId = e.target.value;
+                onChange={(newId) => {
                   setSelectedKeberangkatan(newId);
                   const typeQuery = activeManifestView === "pembayaran" ? "&type=pembayaran" : "";
-                  router.push(newId ? `/admin/manifest?paketId=${newId}${typeQuery}` : (activeManifestView === "pembayaran" ? "/admin/manifest?type=pembayaran" : "/admin/manifest"));
+                  router.push(
+                    newId
+                      ? `/admin/manifest?paketId=${newId}${typeQuery}`
+                      : activeManifestView === "pembayaran"
+                      ? "/admin/manifest?type=pembayaran"
+                      : "/admin/manifest"
+                  );
                 }}
                 className="w-full"
               />
               {selectedKeberangkatan && (
                 <Button
-                  variant="ghost"
+                  variant="outline"
                   size="sm"
                   onClick={() => {
                     setSelectedKeberangkatan("");
                     router.push(activeManifestView === "pembayaran" ? "/admin/manifest?type=pembayaran" : "/admin/manifest");
                   }}
+                  className="h-11 px-3 text-xs shrink-0 font-medium text-stone-600 dark:text-stone-300"
                   title="Tampilkan Semua Manifest"
                 >
-                  <X className="h-4 w-4 text-muted-foreground" />
+                  <X className="h-4 w-4 mr-1 text-muted-foreground" />
+                  Semua
                 </Button>
               )}
             </div>
@@ -1259,13 +1268,14 @@ function ManifestPageContent() {
                     placeholder="Cari jamaah, NIK, paspor, kota..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-8 h-8 text-xs"
+                    className="pl-8 h-11 text-xs"
                   />
                 </div>
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => window.print()}
+                  className="h-11 text-xs"
                   title="Cetak Manifest"
                 >
                   <Printer className="h-3.5 w-3.5 mr-1" />
