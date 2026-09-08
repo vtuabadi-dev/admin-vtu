@@ -14,10 +14,13 @@ import {
   Sparkles,
   Users,
   Layers,
+  Receipt,
+  Calendar,
 } from "lucide-react";
 import { Button } from "@/shared/components/ui/Button";
-import { cn, getWhatsAppUrl } from "@/shared/lib/utils";
-import type { Jamaah, RegistrationGroup, Keberangkatan } from "@/shared/types";
+import { Modal } from "@/shared/components/ui/Modal";
+import { cn, getWhatsAppUrl, formatDate } from "@/shared/lib/utils";
+import type { Jamaah, RegistrationGroup, Keberangkatan, Pembayaran } from "@/shared/types";
 
 export interface ManifestPembayaranTableProps {
   activePackage: Keberangkatan;
@@ -67,6 +70,7 @@ export interface JamaahFinancialRow {
   // Metadata grup tambahan jika dalam group mode
   paxCount?: number;
   memberNames?: string[];
+  payments?: Pembayaran[];
 }
 
 export function ManifestPembayaranTable({
@@ -77,6 +81,7 @@ export function ManifestPembayaranTable({
 }: ManifestPembayaranTableProps) {
   const [exporting, setExporting] = useState(false);
   const [viewMode, setViewMode] = useState<"all" | "group">("group");
+  const [selectedDetailRow, setSelectedDetailRow] = useState<JamaahFinancialRow | null>(null);
 
   // Group lookup map
   const groupMap = useMemo(() => {
@@ -341,6 +346,7 @@ export function ManifestPembayaranTable({
           totalPotongan: draft.totalPotongan,
           netTagihan: draft.netTagihan,
           keterangan: draft.keterangan,
+          payments: g?.pembayaran || [],
         });
       });
 
@@ -452,6 +458,7 @@ export function ManifestPembayaranTable({
         keterangan: uniqueKeterangan,
         paxCount: members.length,
         memberNames,
+        payments: g?.pembayaran || [],
       });
     });
 
@@ -1258,28 +1265,20 @@ PT VAUZA TAMMA ABADI`;
                       {/* Sticky Right: Aksi (100% Solid Opaque, locked width, clean border) */}
                       <td className={cn("px-2 py-2.5 text-center sticky right-0 z-20 shadow-[-4px_0_8px_-2px_rgba(0,0,0,0.08)] border-l-2 border-l-stone-400 dark:border-l-stone-600 w-[80px] min-w-[80px] max-w-[80px]", stickyCellBg, rowBorderClass)}>
                         <div className="flex items-center justify-center gap-1.5">
-                          {r.invoiceId ? (
-                            <button
-                              onClick={() => window.open(`/invoice/${r.invoiceId}`, "_blank")}
-                              title="Buka Invoice PDF"
-                              className="p-1 rounded-md text-stone-600 hover:text-emerald-700 hover:bg-emerald-50 dark:text-stone-400 dark:hover:text-emerald-300 dark:hover:bg-stone-800 transition-colors"
-                            >
-                              <ExternalLink className="w-3.5 h-3.5" />
-                            </button>
-                          ) : (
-                            <button
-                              onClick={() => window.open(`/admin/pembayaran/${r.groupId}`, "_blank")}
-                              title="Buka Detail Pembayaran"
-                              className="p-1 rounded-md text-stone-600 hover:text-emerald-700 hover:bg-emerald-50 dark:text-stone-400 dark:hover:text-emerald-300 dark:hover:bg-stone-800 transition-colors"
-                            >
-                              <CreditCard className="w-3.5 h-3.5" />
-                            </button>
-                          )}
+                          <button
+                            type="button"
+                            onClick={() => setSelectedDetailRow(r)}
+                            title="Buka Detail & Riwayat Pembayaran"
+                            className="p-1 rounded-md text-stone-600 hover:text-emerald-700 hover:bg-emerald-50 dark:text-stone-400 dark:hover:text-emerald-300 dark:hover:bg-stone-800 transition-colors cursor-pointer"
+                          >
+                            <CreditCard className="w-3.5 h-3.5" />
+                          </button>
 
                           <button
+                            type="button"
                             onClick={() => handleSendWhatsApp(r)}
                             title="Kirim Rincian via WhatsApp"
-                            className="p-1 rounded-md text-emerald-600 hover:text-emerald-700 hover:bg-emerald-100 dark:text-emerald-400 dark:hover:bg-emerald-950/80 transition-colors"
+                            className="p-1 rounded-md text-emerald-600 hover:text-emerald-700 hover:bg-emerald-100 dark:text-emerald-400 dark:hover:bg-emerald-950/80 transition-colors cursor-pointer"
                           >
                             <MessageCircle className="w-3.5 h-3.5" />
                           </button>
@@ -1375,6 +1374,204 @@ PT VAUZA TAMMA ABADI`;
           </table>
         </div>
       </div>
+
+      {/* ── MODAL: POP-UP JENDELA RIWAYAT PEMBAYARAN ───────────────── */}
+      <Modal
+        open={!!selectedDetailRow}
+        onClose={() => setSelectedDetailRow(null)}
+        size="lg"
+        title="Riwayat & Rincian Pembayaran"
+        description={`Detail transaksi dan histori pembayaran untuk ${selectedDetailRow?.namaLengkap || "Jamaah"}`}
+      >
+        {selectedDetailRow && (
+          <div className="space-y-4 pt-1">
+            {/* Header Info Banner */}
+            <div className="p-4 rounded-xl bg-stone-900/90 border border-stone-800 space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-stone-800 pb-3">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-amber-400 uppercase font-mono px-2 py-0.5 rounded bg-amber-500/10 border border-amber-500/20">
+                      {selectedDetailRow.registrationId}
+                    </span>
+                    <span className="text-xs text-stone-400 font-mono">
+                      {selectedDetailRow.nomorInvoice}
+                    </span>
+                  </div>
+                  <h3 className="text-base font-extrabold text-white mt-1.5 flex items-center gap-2">
+                    <span>{selectedDetailRow.namaLengkap}</span>
+                    {selectedDetailRow.paxCount && selectedDetailRow.paxCount > 1 && (
+                      <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-teal-500/20 text-teal-300 border border-teal-500/30">
+                        {selectedDetailRow.paxCount} Pax
+                      </span>
+                    )}
+                  </h3>
+                  {selectedDetailRow.memberNames && selectedDetailRow.memberNames.length > 1 && (
+                    <p className="text-xs text-stone-400 mt-0.5">
+                      Anggota: {selectedDetailRow.memberNames.join(", ")}
+                    </p>
+                  )}
+                </div>
+
+                <div className="text-left sm:text-right">
+                  <span className="text-[10px] uppercase font-bold text-stone-400">Status Pembayaran</span>
+                  <div className="mt-0.5">
+                    <span
+                      className={cn(
+                        "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold",
+                        selectedDetailRow.statusPembayaran === "LUNAS"
+                          ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/40"
+                          : selectedDetailRow.statusPembayaran === "CICILAN"
+                          ? "bg-amber-500/20 text-amber-400 border border-amber-500/40"
+                          : "bg-red-500/20 text-red-400 border border-red-500/40"
+                      )}
+                    >
+                      {selectedDetailRow.statusPembayaran === "LUNAS" ? (
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                      ) : selectedDetailRow.statusPembayaran === "CICILAN" ? (
+                        <Clock className="w-3.5 h-3.5" />
+                      ) : (
+                        <AlertCircle className="w-3.5 h-3.5" />
+                      )}
+                      {selectedDetailRow.statusPembayaran}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* 3 Metric Cards */}
+              <div className="grid grid-cols-3 gap-3 pt-1">
+                <div className="p-3 bg-stone-950/60 rounded-lg border border-stone-800">
+                  <span className="text-[10px] font-semibold text-stone-400 uppercase">Total Tagihan</span>
+                  <p className="text-sm font-bold text-stone-200 font-mono mt-0.5">
+                    Rp {selectedDetailRow.netTagihan.toLocaleString("id-ID")}
+                  </p>
+                </div>
+                <div className="p-3 bg-stone-950/60 rounded-lg border border-stone-800">
+                  <span className="text-[10px] font-semibold text-emerald-400 uppercase">Total Terbayar</span>
+                  <p className="text-sm font-bold text-emerald-400 font-mono mt-0.5">
+                    Rp {selectedDetailRow.totalPembayaran.toLocaleString("id-ID")}
+                  </p>
+                </div>
+                <div className="p-3 bg-stone-950/60 rounded-lg border border-stone-800">
+                  <span className="text-[10px] font-semibold text-rose-400 uppercase">Sisa Kurang Bayar</span>
+                  <p className="text-sm font-bold text-rose-400 font-mono mt-0.5">
+                    Rp {selectedDetailRow.kurangBayar.toLocaleString("id-ID")}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Tabel Riwayat Pembayaran */}
+            <div className="space-y-2">
+              <h4 className="text-xs font-bold text-stone-300 uppercase tracking-wider flex items-center gap-1.5">
+                <Receipt className="w-4 h-4 text-amber-500" />
+                <span>Daftar Transaksi Pembayaran Masuk</span>
+              </h4>
+
+              {(!selectedDetailRow.payments || selectedDetailRow.payments.length === 0) ? (
+                <div className="p-8 text-center border border-dashed border-stone-800 rounded-xl bg-stone-950/40 space-y-2">
+                  <Receipt className="w-8 h-8 text-stone-600 mx-auto" />
+                  <p className="text-xs text-stone-400 font-medium">
+                    Belum ada riwayat transaksi pembayaran tercatat untuk rombongan ini.
+                  </p>
+                </div>
+              ) : (
+                <div className="border border-stone-800 rounded-xl overflow-hidden shadow-xs">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs text-left">
+                      <thead className="bg-stone-900 text-stone-400 font-bold border-b border-stone-800">
+                        <tr>
+                          <th className="px-3 py-2.5 text-center w-10">#</th>
+                          <th className="px-3 py-2.5">Tanggal Bayar</th>
+                          <th className="px-3 py-2.5">Metode</th>
+                          <th className="px-3 py-2.5">Keterangan / Bank</th>
+                          <th className="px-3 py-2.5 text-center">Status</th>
+                          <th className="px-3 py-2.5 text-right">Nominal Bayar</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-stone-800 bg-stone-950/80">
+                        {selectedDetailRow.payments.map((p, pIdx) => {
+                          const isVerified = p.status === "verified";
+                          return (
+                            <tr key={p.id || pIdx} className="hover:bg-stone-900/50 transition-colors">
+                              <td className="px-3 py-2.5 text-center font-mono text-stone-500">
+                                {pIdx + 1}
+                              </td>
+                              <td className="px-3 py-2.5 font-medium text-stone-200">
+                                {formatDate(p.tanggal || (p as any).createdAt)}
+                              </td>
+                              <td className="px-3 py-2.5">
+                                <span className="uppercase font-semibold text-[11px] px-2 py-0.5 rounded bg-stone-800 text-stone-300 border border-stone-700">
+                                  {p.metode || "Transfer"}
+                                </span>
+                              </td>
+                              <td className="px-3 py-2.5 text-stone-400">
+                                {p.bankPengirim ? `${p.bankPengirim} (${p.nomorRekening || "-"})` : (p.catatan || "-")}
+                              </td>
+                              <td className="px-3 py-2.5 text-center">
+                                <span
+                                  className={cn(
+                                    "text-[10px] font-bold px-2 py-0.5 rounded-full",
+                                    isVerified
+                                      ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30"
+                                      : p.status === "rejected"
+                                      ? "bg-red-500/10 text-red-400 border border-red-500/30"
+                                      : "bg-amber-500/10 text-amber-400 border border-amber-500/30"
+                                  )}
+                                >
+                                  {isVerified ? "Terverifikasi" : p.status === "rejected" ? "Ditolak" : "Pending"}
+                                </span>
+                              </td>
+                              <td className="px-3 py-2.5 text-right font-mono font-bold text-emerald-400">
+                                Rp {Number(p.jumlah || 0).toLocaleString("id-ID")}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                      <tfoot className="bg-stone-900 border-t border-stone-800 font-bold">
+                        <tr>
+                          <td colSpan={5} className="px-3 py-2.5 text-right text-stone-300">
+                            TOTAL PEMBAYARAN:
+                          </td>
+                          <td className="px-3 py-2.5 text-right font-mono text-emerald-400">
+                            Rp {selectedDetailRow.totalPembayaran.toLocaleString("id-ID")}
+                          </td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Actions */}
+            <div className="flex items-center justify-between pt-3 border-t border-stone-800">
+              <div>
+                {selectedDetailRow.invoiceId && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => window.open(`/invoice/${selectedDetailRow.invoiceId}`, "_blank")}
+                    className="text-xs font-bold gap-1.5 text-teal-400 border-teal-500/30 hover:bg-teal-500/10"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" />
+                    Buka Invoice PDF
+                  </Button>
+                )}
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setSelectedDetailRow(null)}
+                className="text-xs font-bold"
+              >
+                Tutup
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
     </div>
   );
 }
