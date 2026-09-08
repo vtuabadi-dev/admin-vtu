@@ -15,7 +15,6 @@ import {
   Users,
   Layers,
   Receipt,
-  Calendar,
 } from "lucide-react";
 import { Button } from "@/shared/components/ui/Button";
 import { Modal } from "@/shared/components/ui/Modal";
