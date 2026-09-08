@@ -569,6 +569,19 @@ function ManifestPageContent() {
     }
   }, [urlType]);
 
+  // Auto-select active package when opening Manifest Pembayaran without specific paketId
+  useEffect(() => {
+    if (urlType === "pembayaran" && !urlPaketId && !selectedKeberangkatan && keberangkatanList.length > 0) {
+      const activePkg =
+        keberangkatanList.find(
+          (k) => (k.jamaahIds && k.jamaahIds.length > 0) || k.status === "terjadwal" || k.status === "proses"
+        ) || keberangkatanList[0];
+      if (activePkg) {
+        setSelectedKeberangkatan(activePkg.id);
+      }
+    }
+  }, [urlType, urlPaketId, selectedKeberangkatan, keberangkatanList]);
+
   // Hydrate local state from store if store populates after mount
   useEffect(() => {
     if (storeKeberangkatan.length > 0 && keberangkatanList.length === 0) {
@@ -1207,8 +1220,10 @@ function ManifestPageContent() {
                 placeholder="-- Pilih Paket Keberangkatan Aktif --"
                 value={selectedKeberangkatan}
                 onChange={(e) => {
-                  setSelectedKeberangkatan(e.target.value);
-                  router.push(e.target.value ? `/admin/manifest?paketId=${e.target.value}` : "/admin/manifest");
+                  const newId = e.target.value;
+                  setSelectedKeberangkatan(newId);
+                  const typeQuery = activeManifestView === "pembayaran" ? "&type=pembayaran" : "";
+                  router.push(newId ? `/admin/manifest?paketId=${newId}${typeQuery}` : (activeManifestView === "pembayaran" ? "/admin/manifest?type=pembayaran" : "/admin/manifest"));
                 }}
                 className="w-full"
               />
@@ -1218,7 +1233,7 @@ function ManifestPageContent() {
                   size="sm"
                   onClick={() => {
                     setSelectedKeberangkatan("");
-                    router.push("/admin/manifest");
+                    router.push(activeManifestView === "pembayaran" ? "/admin/manifest?type=pembayaran" : "/admin/manifest");
                   }}
                   title="Tampilkan Semua Manifest"
                 >
@@ -1923,14 +1938,52 @@ function ManifestPageContent() {
       ) : (
         /* MANIFEST CARDS VIEW (All Manifests Summary List) */
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-base font-bold text-foreground flex items-center gap-2">
-              <Layers className="h-4 w-4 text-amber-500" />
-              Daftar Paket Keberangkatan & Manifest
-            </h2>
-            <span className="text-xs text-muted-foreground font-mono">
-              Total {keberangkatanList.length} Paket
-            </span>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-stone-900/60 p-4 rounded-xl border border-stone-800">
+            <div>
+              <h2 className="text-base font-bold text-foreground flex items-center gap-2">
+                <Layers className="h-4 w-4 text-amber-500" />
+                {activeManifestView === "pembayaran"
+                  ? "Pilih Paket untuk Melihat Manifest Pembayaran & Rincian Tagihan"
+                  : "Daftar Paket Keberangkatan & Manifest"}
+              </h2>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {activeManifestView === "pembayaran"
+                  ? "Pilih salah satu paket di bawah ini untuk membuka detail rincian tagihan & rekapan kas jamaah"
+                  : `Total ${keberangkatanList.length} Paket Keberangkatan Terdaftar`}
+              </p>
+            </div>
+            <div className="flex items-center gap-1.5 p-1 bg-stone-950 rounded-lg border border-stone-800 shrink-0">
+              <button
+                onClick={() => {
+                  setActiveManifestView("operasional");
+                  router.push("/admin/manifest");
+                }}
+                className={cn(
+                  "px-3 py-1.5 rounded-md text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer",
+                  activeManifestView === "operasional"
+                    ? "bg-stone-800 text-white shadow-xs border border-stone-700"
+                    : "text-stone-400 hover:text-white"
+                )}
+              >
+                <Plane className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Manifest Operasional</span>
+              </button>
+              <button
+                onClick={() => {
+                  setActiveManifestView("pembayaran");
+                  router.push("/admin/manifest?type=pembayaran");
+                }}
+                className={cn(
+                  "px-3 py-1.5 rounded-md text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer",
+                  activeManifestView === "pembayaran"
+                    ? "bg-emerald-950 text-emerald-300 shadow-xs border border-emerald-700/60"
+                    : "text-stone-400 hover:text-white"
+                )}
+              >
+                <CreditCard className="w-3.5 h-3.5 text-amber-400" />
+                <span>Manifest Pembayaran</span>
+              </button>
+            </div>
           </div>
 
           {loading ? (
@@ -1987,7 +2040,8 @@ function ManifestPageContent() {
                           <div
                             onClick={() => {
                               setSelectedKeberangkatan(parent.id);
-                              router.push(`/admin/manifest?paketId=${parent.id}`);
+                              const typeQuery = activeManifestView === "pembayaran" ? "&type=pembayaran" : "";
+                              router.push(`/admin/manifest?paketId=${parent.id}${typeQuery}`);
                             }}
                             className="p-5 bg-gradient-to-r from-teal-950 via-teal-900/80 to-emerald-950 border border-teal-500/40 hover:border-teal-300/80 text-white rounded-xl shadow-[inset_0_1px_1px_rgba(94,234,212,0.3)] transition-all cursor-pointer group hover:shadow-[0_0_25px_rgba(20,184,166,0.25)]"
                           >
@@ -2080,7 +2134,8 @@ function ManifestPageContent() {
                                     key={child.id}
                                     onClick={() => {
                                       setSelectedKeberangkatan(child.id);
-                                      router.push(`/admin/manifest?paketId=${child.id}`);
+                                      const typeQuery = activeManifestView === "pembayaran" ? "&type=pembayaran" : "";
+                                      router.push(`/admin/manifest?paketId=${child.id}${typeQuery}`);
                                     }}
                                     className="p-4 bg-gradient-to-r from-teal-950/90 via-slate-900/90 to-teal-950/90 border border-teal-500/30 hover:border-teal-400/60 text-white rounded-xl shadow-xs transition-all cursor-pointer flex flex-col md:flex-row md:items-center justify-between gap-4 group hover:shadow-[0_0_15px_rgba(20,184,166,0.15)]"
                                   >
