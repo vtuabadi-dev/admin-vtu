@@ -576,7 +576,13 @@ function ManifestPageContent() {
     if (urlType === "pembayaran" && !urlPaketId && !selectedKeberangkatan && keberangkatanList.length > 0 && !hasAutoSelected) {
       const activePkg =
         keberangkatanList.find(
-          (k) => (k.jamaahIds && k.jamaahIds.length > 0) || k.status === "terjadwal" || k.status === "proses"
+          (k) =>
+            (k.jamaahIds && k.jamaahIds.length > 0) ||
+            k.status === "scheduled" ||
+            k.status === "preparing" ||
+            k.status === "ready" ||
+            k.status === "AVAILABLE" ||
+            k.status === "FULL_SEAT"
         ) || keberangkatanList[0];
       if (activePkg) {
         setSelectedKeberangkatan(activePkg.id);
