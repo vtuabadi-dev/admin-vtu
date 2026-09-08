@@ -85,11 +85,43 @@ export function ManifestPembayaranTable({
     return map;
   }, [groups]);
 
-  // Compute financial rows per jamaah
+  // Compute financial rows per jamaah with Sequential Waterfall Payment Allocation (FIFO per group)
   const financialRows: JamaahFinancialRow[] = useMemo(() => {
-    return jamaahList.map((j, idx) => {
-      const g = groupMap.get(j.groupId) || null;
-      const groupMembersCount = g?.jumlahAnggota || g?.anggotaIds?.length || 1;
+    // 1. Group jamaah preserving package order
+    const groupOrderList: string[] = [];
+    const jamaahByGroup = new Map<string, Jamaah[]>();
+
+    jamaahList.forEach((j) => {
+      const gKey = j.groupId || (j.registrationId ? j.registrationId.replace(/-\d+$/, "") : j.id);
+      if (!jamaahByGroup.has(gKey)) {
+        groupOrderList.push(gKey);
+        jamaahByGroup.set(gKey, []);
+      }
+      jamaahByGroup.get(gKey)!.push(j);
+    });
+
+    // 2. Ensure each group is sorted sequentially by unique member index (-1, -2, -3 ...)
+    jamaahByGroup.forEach((members) => {
+      members.sort((a, b) => {
+        const getSeq = (j: Jamaah) => {
+          const match = (j.registrationId || "").match(/-(\d+)$/);
+          if (match && match[1]) return parseInt(match[1], 10);
+          return parseInt(j.nomorPeserta || "0", 10) || 0;
+        };
+        return getSeq(a) - getSeq(b);
+      });
+    });
+
+    const rows: JamaahFinancialRow[] = [];
+    let overallNomorUrut = 1;
+
+    // 3. Process each group sequentially
+    groupOrderList.forEach((gKey) => {
+      const members = jamaahByGroup.get(gKey) || [];
+      if (members.length === 0) return;
+
+      const g = groupMap.get(gKey) || null;
+      const groupMembersCount = members.length || g?.jumlahAnggota || g?.anggotaIds?.length || 1;
 
       // Extract invoices & payments
       const invoices = g?.invoices || [];
@@ -98,185 +130,236 @@ export function ManifestPembayaranTable({
 
       const nomorInvoice =
         latestInvoice?.nomorInvoice ||
-        (g?.kodeRegistrasi ? `INV/${g.kodeRegistrasi}` : `INV-${j.nomorPeserta || idx + 1}`);
+        (g?.kodeRegistrasi ? `INV/${g.kodeRegistrasi}` : `INV-${gKey}`);
 
-      // Base Package Price
-      const roomType = String(g?.roomUpgrade || (j as any).tipeKamar || "quad").toLowerCase();
-      const baseQuad = Number((activePackage as any).hargaQuad || activePackage.hargaPaket || 33900000);
-      let biayaPaket = baseQuad;
-      let upgradeKamar = 0;
-      let upgradeKamarLabel = "";
+      // Pass 1: Compute item-level charges and netTagihan per member
+      const memberDrafts = members.map((j) => {
+        // Base Package Price
+        const roomType = String(g?.roomUpgrade || (j as any).tipeKamar || "quad").toLowerCase();
+        const baseQuad = Number((activePackage as any).hargaQuad || activePackage.hargaPaket || 33900000);
+        let biayaPaket = baseQuad;
+        let upgradeKamar = 0;
+        let upgradeKamarLabel = "";
 
-      if (roomType.includes("double")) {
-        const doublePrice = Number((activePackage as any).hargaDouble || baseQuad + 4000000);
-        upgradeKamar = doublePrice - baseQuad;
-        upgradeKamarLabel = "Upgrade Double";
-      } else if (roomType.includes("triple")) {
-        const triplePrice = Number((activePackage as any).hargaTriple || baseQuad + 2000000);
-        upgradeKamar = triplePrice - baseQuad;
-        upgradeKamarLabel = "Upgrade Triple";
-      } else if (roomType.includes("single")) {
-        const singlePrice = Number((activePackage as any).hargaSingle || baseQuad + 8000000);
-        upgradeKamar = singlePrice - baseQuad;
-        upgradeKamarLabel = "Upgrade Single";
-      }
+        if (roomType.includes("double")) {
+          const doublePrice = Number((activePackage as any).hargaDouble || baseQuad + 4000000);
+          upgradeKamar = doublePrice - baseQuad;
+          upgradeKamarLabel = "Upgrade Double";
+        } else if (roomType.includes("triple")) {
+          const triplePrice = Number((activePackage as any).hargaTriple || baseQuad + 2000000);
+          upgradeKamar = triplePrice - baseQuad;
+          upgradeKamarLabel = "Upgrade Triple";
+        } else if (roomType.includes("single")) {
+          const singlePrice = Number((activePackage as any).hargaSingle || baseQuad + 8000000);
+          upgradeKamar = singlePrice - baseQuad;
+          upgradeKamarLabel = "Upgrade Single";
+        }
 
-      // Check item-level breakdown from invoices if present
-      let keretaCepat = 0;
-      let cityTourThoif = 0;
-      let paspor = 0;
-      let kursiRoda = 0;
-      let ongkir = 0;
-      let tambahanLain = 0;
-      let diskonPromo = 0;
-      let potonganOngkir = 0;
+        let keretaCepat = 0;
+        let cityTourThoif = 0;
+        let paspor = 0;
+        let kursiRoda = 0;
+        let ongkir = 0;
+        let tambahanLain = 0;
+        let diskonPromo = 0;
+        let potonganOngkir = 0;
 
-      // Scan all invoice items for group
-      activeInvoices.forEach((inv) => {
-        (inv.items || []).forEach((item) => {
-          if (item.status === "cancelled") return;
-          const text = `${item.kategori || ""} ${item.deskripsi || ""}`.toLowerCase();
-          const itemVal = Math.round(Number(item.jumlah || 0) / groupMembersCount);
+        activeInvoices.forEach((inv) => {
+          (inv.items || []).forEach((item) => {
+            if (item.status === "cancelled") return;
+            const text = `${item.kategori || ""} ${item.deskripsi || ""}`.toLowerCase();
+            const itemVal = Math.round(Number(item.jumlah || 0) / groupMembersCount);
 
-          if (text.includes("kereta") || text.includes("fast train") || text.includes("haramain")) {
-            keretaCepat += itemVal;
-          } else if (text.includes("thoif") || text.includes("taif")) {
-            cityTourThoif += itemVal;
-          } else if (text.includes("paspor")) {
-            paspor += itemVal;
-          } else if (text.includes("kursi roda") || text.includes("wheelchair")) {
-            kursiRoda += itemVal;
-          } else if (text.includes("ongkir") || text.includes("ongkos kirim") || text.includes("ekspedisi")) {
-            if (itemVal < 0) potonganOngkir += Math.abs(itemVal);
-            else ongkir += itemVal;
-          } else if (text.includes("diskon") || text.includes("promo") || text.includes("voucher") || itemVal < 0) {
-            diskonPromo += Math.abs(itemVal);
-          } else if (text.includes("upgrade kamar") || text.includes("double") || text.includes("triple")) {
-            if (upgradeKamar === 0) upgradeKamar = itemVal;
-          } else if (text.includes("paket umroh") || text.includes("biaya paket")) {
-            biayaPaket = itemVal;
-          } else {
-            if (itemVal > 0) tambahanLain += itemVal;
-          }
+            if (text.includes("kereta") || text.includes("fast train") || text.includes("haramain")) {
+              keretaCepat += itemVal;
+            } else if (text.includes("thoif") || text.includes("taif")) {
+              cityTourThoif += itemVal;
+            } else if (text.includes("paspor")) {
+              paspor += itemVal;
+            } else if (text.includes("kursi roda") || text.includes("wheelchair")) {
+              kursiRoda += itemVal;
+            } else if (text.includes("ongkir") || text.includes("ongkos kirim") || text.includes("ekspedisi")) {
+              if (itemVal < 0) potonganOngkir += Math.abs(itemVal);
+              else ongkir += itemVal;
+            } else if (text.includes("diskon") || text.includes("promo") || text.includes("voucher") || itemVal < 0) {
+              diskonPromo += Math.abs(itemVal);
+            } else if (text.includes("upgrade kamar") || text.includes("double") || text.includes("triple")) {
+              if (upgradeKamar === 0) upgradeKamar = itemVal;
+            } else if (text.includes("paket umroh") || text.includes("biaya paket")) {
+              biayaPaket = itemVal;
+            } else {
+              if (itemVal > 0) tambahanLain += itemVal;
+            }
+          });
         });
+
+        if (keretaCepat === 0 && (g?.isKeretaCepat || (j as any)?.isKeretaCepat)) {
+          keretaCepat = 1250000;
+        }
+        if (cityTourThoif === 0 && (g?.isCityTourThoif || (j as any)?.isCityTourThoif)) {
+          cityTourThoif = 750000;
+        }
+
+        const totalPotongan = diskonPromo + potonganOngkir;
+        let netTagihan =
+          biayaPaket +
+          upgradeKamar +
+          keretaCepat +
+          cityTourThoif +
+          paspor +
+          kursiRoda +
+          ongkir +
+          tambahanLain -
+          totalPotongan;
+
+        if (g?.totalTagihan && g.totalTagihan > 0) {
+          netTagihan = Math.round(g.totalTagihan / groupMembersCount);
+        }
+
+        const totalTagihan = netTagihan + totalPotongan;
+
+        const sotName =
+          (j.dokumen && Array.isArray(j.dokumen)
+            ? j.dokumen.find((d: any) => d.jenis === "paspor")?.manualData?.namaLengkap ||
+              j.dokumen.find((d: any) => d.jenis === "paspor")?.ocrData?.namaLengkap ||
+              j.dokumen.find((d: any) => d.jenis === "ktp")?.manualData?.namaLengkap ||
+              j.dokumen.find((d: any) => d.jenis === "ktp")?.ocrData?.namaLengkap
+            : null) ||
+          j.namaLengkap ||
+          "-";
+
+        const phone =
+          (j as any).phone ||
+          (j as any).nomorTelepon ||
+          (j as any).noHp ||
+          (j as any).telepon ||
+          (j as any).noTelepon ||
+          "";
+
+        const keterangan =
+          upgradeKamarLabel ||
+          (totalPotongan > 0 ? `Diskon Rp ${totalPotongan.toLocaleString("id-ID")}` : "") ||
+          "-";
+
+        return {
+          jamaah: j,
+          sotName,
+          phone,
+          biayaPaket,
+          upgradeKamar,
+          upgradeKamarLabel,
+          keretaCepat,
+          cityTourThoif,
+          paspor,
+          kursiRoda,
+          ongkir,
+          tambahanLain,
+          diskonPromo,
+          potonganOngkir,
+          totalPotongan,
+          netTagihan,
+          totalTagihan,
+          keterangan,
+        };
       });
 
-      // If group has isKeretaCepat / isCityTourThoif flags and no invoice item was found
-      if (keretaCepat === 0 && (g?.isKeretaCepat || (j as any)?.isKeretaCepat)) {
-        keretaCepat = 1250000;
-      }
-      if (cityTourThoif === 0 && (g?.isCityTourThoif || (j as any)?.isCityTourThoif)) {
-        cityTourThoif = 750000;
-      }
-
-      // Total Potongan
-      const totalPotongan = diskonPromo + potonganOngkir;
-
-      // Net Tagihan per Jamaah
-      let netTagihan =
-        biayaPaket +
-        upgradeKamar +
-        keretaCepat +
-        cityTourThoif +
-        paspor +
-        kursiRoda +
-        ongkir +
-        tambahanLain -
-        totalPotongan;
-
-      // If group has totalTagihan recorded, reconcile member proportion
-      if (g?.totalTagihan && g.totalTagihan > 0) {
-        netTagihan = Math.round(g.totalTagihan / groupMembersCount);
-      }
-
-      const totalTagihan = netTagihan + totalPotongan;
-
-      // Calculate Total Pembayaran (verified cash in)
-      let totalPembayaran = 0;
+      // Pass 2: Sequential Waterfall Payment Allocation (Urutan Unik -1, -2, -3...)
       const payments = g?.pembayaran || [];
       const verifiedPayments = payments.filter((p) => p.status === "verified");
 
+      let totalGroupVerifiedCash = 0;
       verifiedPayments.forEach((p) => {
-        // Check if there is a specific allocation for this jamaah
-        const alloc = (p.alokasi || []).find((a) => a.jamaahId === j.id);
-        if (alloc && alloc.jumlah) {
-          totalPembayaran += Number(alloc.jumlah);
-        } else {
-          totalPembayaran += Math.round(Number(p.jumlah || 0) / groupMembersCount);
-        }
+        totalGroupVerifiedCash += Number(p.jumlah || 0);
       });
 
-      // Fallback if payments array was empty but group.totalPembayaran is stored
-      if (totalPembayaran === 0 && g?.totalPembayaran && g.totalPembayaran > 0) {
-        totalPembayaran = Math.round(g.totalPembayaran / groupMembersCount);
+      if (totalGroupVerifiedCash === 0 && g?.totalPembayaran && g.totalPembayaran > 0) {
+        totalGroupVerifiedCash = Number(g.totalPembayaran);
       }
 
-      // Kurang Bayar
-      const kurangBayar = Math.max(0, netTagihan - totalPembayaran);
+      // Check explicit direct allocations if defined
+      let unallocatedPool = totalGroupVerifiedCash;
+      const directAllocMap = new Map<string, number>();
 
-      // Status
-      let statusPembayaran: "LUNAS" | "CICILAN" | "BELUM BAYAR" = "BELUM BAYAR";
-      if (netTagihan > 0 && kurangBayar === 0 && totalPembayaran >= netTagihan) {
-        statusPembayaran = "LUNAS";
-      } else if (totalPembayaran > 0 && kurangBayar > 0) {
-        statusPembayaran = "CICILAN";
+      verifiedPayments.forEach((p) => {
+        (p.alokasi || []).forEach((a) => {
+          if (a.jamaahId && a.jumlah) {
+            const current = directAllocMap.get(a.jamaahId) || 0;
+            const amt = Number(a.jumlah);
+            directAllocMap.set(a.jamaahId, current + amt);
+            unallocatedPool -= amt;
+          }
+        });
+      });
+      unallocatedPool = Math.max(0, unallocatedPool);
+
+      // Allocate pool sequentially to members in order of sequence (-1, -2, -3)
+      const groupRows: JamaahFinancialRow[] = [];
+      memberDrafts.forEach((draft) => {
+        const directAlloc = directAllocMap.get(draft.jamaah.id) || 0;
+        const remainingNeeded = Math.max(0, draft.netTagihan - directAlloc);
+        const allocatedFromPool = Math.min(unallocatedPool, remainingNeeded);
+        unallocatedPool -= allocatedFromPool;
+
+        const totalPembayaran = directAlloc + allocatedFromPool;
+        const kurangBayar = Math.max(0, draft.netTagihan - totalPembayaran);
+
+        let statusPembayaran: "LUNAS" | "CICILAN" | "BELUM BAYAR" = "BELUM BAYAR";
+        if (draft.netTagihan > 0 && kurangBayar === 0 && totalPembayaran >= draft.netTagihan) {
+          statusPembayaran = "LUNAS";
+        } else if (totalPembayaran > 0 && kurangBayar > 0) {
+          statusPembayaran = "CICILAN";
+        }
+
+        groupRows.push({
+          nomorUrut: overallNomorUrut++,
+          jamaahId: draft.jamaah.id,
+          namaLengkap: draft.sotName,
+          registrationId:
+            draft.jamaah.registrationId ||
+            (g?.kodeRegistrasi ? `${g.kodeRegistrasi}-${overallNomorUrut}` : "-"),
+          nomorPaspor: draft.jamaah.nomorPaspor || "-",
+          phone: draft.phone,
+          groupId: gKey,
+          groupName: g?.namaGroup || "Grup Jamaah",
+          nomorInvoice,
+          invoiceId: latestInvoice?.id,
+          totalTagihan: draft.totalTagihan,
+          totalPembayaran,
+          kurangBayar,
+          statusPembayaran,
+          biayaPaket: draft.biayaPaket,
+          upgradeKamar: draft.upgradeKamar,
+          upgradeKamarLabel: draft.upgradeKamarLabel,
+          keretaCepat: draft.keretaCepat,
+          cityTourThoif: draft.cityTourThoif,
+          paspor: draft.paspor,
+          kursiRoda: draft.kursiRoda,
+          ongkir: draft.ongkir,
+          tambahanLain: draft.tambahanLain,
+          diskonPromo: draft.diskonPromo,
+          potonganOngkir: draft.potonganOngkir,
+          totalPotongan: draft.totalPotongan,
+          netTagihan: draft.netTagihan,
+          keterangan: draft.keterangan,
+        });
+      });
+
+      // If any surplus pool remains (e.g. overpayment), credit to the last member
+      if (unallocatedPool > 0 && groupRows.length > 0) {
+        const last = groupRows[groupRows.length - 1];
+        if (last) {
+          last.totalPembayaran += unallocatedPool;
+          last.kurangBayar = Math.max(0, last.netTagihan - last.totalPembayaran);
+          if (last.totalPembayaran >= last.netTagihan) {
+            last.statusPembayaran = "LUNAS";
+          }
+        }
       }
 
-      // SOT Name & Phone
-      const sotName =
-        (j.dokumen && Array.isArray(j.dokumen)
-          ? j.dokumen.find((d: any) => d.jenis === "paspor")?.manualData?.namaLengkap ||
-            j.dokumen.find((d: any) => d.jenis === "paspor")?.ocrData?.namaLengkap ||
-            j.dokumen.find((d: any) => d.jenis === "ktp")?.manualData?.namaLengkap ||
-            j.dokumen.find((d: any) => d.jenis === "ktp")?.ocrData?.namaLengkap
-          : null) ||
-        j.namaLengkap ||
-        "-";
-
-      const phone =
-        (j as any).phone ||
-        (j as any).nomorTelepon ||
-        (j as any).noHp ||
-        (j as any).telepon ||
-        (j as any).noTelepon ||
-        "";
-
-      const keterangan =
-        upgradeKamarLabel ||
-        (totalPotongan > 0 ? `Diskon Rp ${totalPotongan.toLocaleString("id-ID")}` : "") ||
-        "-";
-
-      return {
-        nomorUrut: idx + 1,
-        jamaahId: j.id,
-        namaLengkap: sotName,
-        registrationId: j.registrationId || (g?.kodeRegistrasi ? `${g.kodeRegistrasi}-${idx + 1}` : "-"),
-        nomorPaspor: j.nomorPaspor || "-",
-        phone,
-        groupId: j.groupId,
-        groupName: g?.namaGroup || "Grup Jamaah",
-        nomorInvoice,
-        invoiceId: latestInvoice?.id,
-        totalTagihan,
-        totalPembayaran,
-        kurangBayar,
-        statusPembayaran,
-        biayaPaket,
-        upgradeKamar,
-        upgradeKamarLabel,
-        keretaCepat,
-        cityTourThoif,
-        paspor,
-        kursiRoda,
-        ongkir,
-        tambahanLain,
-        diskonPromo,
-        potonganOngkir,
-        totalPotongan,
-        netTagihan,
-        keterangan,
-      };
+      rows.push(...groupRows);
     });
+
+    return rows;
   }, [activePackage, jamaahList, groupMap]);
 
   // Group Financial Rows (Aggregated per Registration Group / PIC)
