@@ -178,3 +178,30 @@ export function normalizeToIsoDate(dateStr: string): string {
   return clean;
 }
 
+/**
+ * Generates a WhatsApp dispatch URL tailored for desktop vs mobile environments.
+ * On Desktop: Uses direct `https://web.whatsapp.com/send?phone=...&text=...` to bypass intermediate landing pages and directly open/switch chat with pre-filled text.
+ * On Mobile: Uses `https://api.whatsapp.com/send?phone=...&text=...` to trigger native app deep-link protocols.
+ */
+export function getWhatsAppUrl(phone?: string | null, text?: string): string {
+  const isMobile =
+    typeof navigator !== "undefined" &&
+    /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
+  let cleanPhone = (phone || "").replace(/[^0-9]/g, "");
+  if (cleanPhone.startsWith("0")) {
+    cleanPhone = "62" + cleanPhone.slice(1);
+  } else if (cleanPhone && !cleanPhone.startsWith("62")) {
+    cleanPhone = "62" + cleanPhone;
+  }
+
+  const encodedText = text ? encodeURIComponent(text) : "";
+  const baseUrl = isMobile ? "https://api.whatsapp.com/send" : "https://web.whatsapp.com/send";
+
+  const params: string[] = [];
+  if (cleanPhone) params.push(`phone=${cleanPhone}`);
+  if (encodedText) params.push(`text=${encodedText}`);
+
+  return params.length > 0 ? `${baseUrl}?${params.join("&")}` : baseUrl;
+}
+

@@ -40,7 +40,7 @@ import {
   type DynamicDocRequirement,
 } from "@/shared/lib/document-utils";
 import type { DokumenItem, DokumenJenis, Keberangkatan } from "@/shared/types";
-import { formatDate, formatDateShort, cn } from "@/shared/lib/utils";
+import { formatDate, formatDateShort, cn, getWhatsAppUrl } from "@/shared/lib/utils";
 import { extractFilesFromEvent } from "@/shared/lib/file-drop-utils";
 
 // ============================================================
@@ -130,7 +130,7 @@ function buildPicWaReminderUrl(row: any, matrix: any[]): { waUrl: string | null;
     text += `Mohon untuk dapat melengkapi dokumen tersebut melalui sistem VTU Abadi. Terima kasih! 🙏`;
   }
 
-  const waUrl = `https://wa.me/${digits}?text=${encodeURIComponent(text)}`;
+  const waUrl = getWhatsAppUrl(digits, text);
   const tooltipText = `Kirim WhatsApp Reminder ke PIC (${picName}: ${digits})`;
 
   return { waUrl, formattedPhone: digits, tooltipText };

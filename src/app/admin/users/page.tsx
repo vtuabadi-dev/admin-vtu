@@ -6,7 +6,7 @@ import { Button } from "@/shared/components/ui/Button";
 import { Input } from "@/shared/components/ui/Input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/components/ui/Card";
 import { Badge } from "@/shared/components/ui/Badge";
-import { formatDate } from "@/shared/lib/utils";
+import { formatDate, getWhatsAppUrl } from "@/shared/lib/utils";
 import type { OperationalRole } from "@/shared/types";
 import { RolePermissionMatrix } from "./components/RolePermissionMatrix";
 import { ModulePermissionEditor } from "./components/ModulePermissionEditor";
@@ -327,11 +327,8 @@ export default function UserManagementPage() {
     const roleLabel = ROLE_LABELS[user.role] || user.role;
     const waMsg = `Assalamu'alaikum Wr. Wb. ${user.name},\n\nAnda telah diundang oleh Super Admin sebagai pengelola sistem VTU Travel (${roleLabel}).\n\nSilakan klik tautan resmi di bawah ini untuk mengatur password akun masuk Anda (tautan berlaku 72 jam):\n${finalUrl}\n\nTerima kasih,\nPT VAUZA TAMMA ABADI\nSistem Operasional Travel`;
 
-    if (formattedPhone) {
-      window.open(`https://api.whatsapp.com/send?phone=${formattedPhone}&text=${encodeURIComponent(waMsg)}`, "_blank");
-    } else {
-      window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(waMsg)}`, "_blank");
-    }
+    const waUrl = getWhatsAppUrl(formattedPhone, waMsg);
+    window.open(waUrl, "_blank");
   };
 
   const handleSavePhoneAndSendWA = async (e: React.FormEvent) => {
@@ -1183,11 +1180,8 @@ export default function UserManagementPage() {
                       onClick={() => {
                         const waMsg = `Assalamu'alaikum Wr. Wb. ${createdInvite.name},\n\nBerikut adalah tautan undangan Anda sebagai pengelola sistem VTU (${createdInvite.role}).\n\nSilakan atur password akun Anda melalui tautan di bawah ini (berlaku 72 jam):\n${createdInvite.inviteUrl}\n\nTerima kasih,\nPT VAUZA TAMMA ABADI\nSistem Operasional Travel`;
                         const cleanPhone = formatWhatsAppNumber(createdInvite.phone);
-                        if (cleanPhone) {
-                          window.open(`https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodeURIComponent(waMsg)}`, "_blank");
-                        } else {
-                          window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(waMsg)}`, "_blank");
-                        }
+                        const waUrl = getWhatsAppUrl(cleanPhone, waMsg);
+                        window.open(waUrl, "_blank");
                       }}
                     >
                       <Send className="w-3.5 h-3.5 text-emerald-600" />

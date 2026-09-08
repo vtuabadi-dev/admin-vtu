@@ -16,7 +16,7 @@ import {
   Layers,
 } from "lucide-react";
 import { Button } from "@/shared/components/ui/Button";
-import { cn } from "@/shared/lib/utils";
+import { cn, getWhatsAppUrl } from "@/shared/lib/utils";
 import type { Jamaah, RegistrationGroup, Keberangkatan } from "@/shared/types";
 
 export interface ManifestPembayaranTableProps {
@@ -582,7 +582,7 @@ Berikut rincian status tagihan & pembayaran keberangkatan Umroh Anda${paxInfo} d
 Mohon konfirmasi jika ada pertanyaan. Terima kasih.
 PT VAUZA TAMMA ABADI`;
 
-    const waUrl = `https://api.whatsapp.com/send?phone=${rawPhone}&text=${encodeURIComponent(text)}`;
+    const waUrl = getWhatsAppUrl(rawPhone, text);
     window.open(waUrl, "_blank");
   };
 

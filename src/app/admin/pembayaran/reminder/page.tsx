@@ -24,7 +24,7 @@ import { Input } from "@/shared/components/ui/Input";
 import { Modal } from "@/shared/components/ui/Modal";
 import { getAllPaymentSummaries, getKeberangkatanList } from "@/server/actions/api";
 import type { GroupPaymentSummary, Keberangkatan } from "@/shared/types";
-import { formatDate } from "@/shared/lib/utils";
+import { formatDate, getWhatsAppUrl } from "@/shared/lib/utils";
 
 export interface ReminderStage {
   id: string;
@@ -862,9 +862,7 @@ Mohon segera diselesaikan. Terima kasih.
                       ? (g.anggota[0] as any).noHp || (g.anggota[0] as any).telepon || ""
                       : "";
                   const cleanPhone = firstPhone.replace(/[^0-9]/g, "").replace(/^0/, "62");
-                  const waUrl = cleanPhone
-                    ? `https://wa.me/${cleanPhone}?text=${encodeURIComponent(messageText)}`
-                    : `https://api.whatsapp.com/send?text=${encodeURIComponent(messageText)}`;
+                  const waUrl = getWhatsAppUrl(cleanPhone, messageText);
 
                   return (
                     <div

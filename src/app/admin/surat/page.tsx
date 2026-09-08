@@ -32,7 +32,7 @@ import { Input } from "@/shared/components/ui/Input";
 import { Select } from "@/shared/components/ui/Select";
 import { Badge } from "@/shared/components/ui/Badge";
 import { Modal } from "@/shared/components/ui/Modal";
-import { formatDate, formatDateShort, cn } from "@/shared/lib/utils";
+import { formatDate, formatDateShort, cn, getWhatsAppUrl } from "@/shared/lib/utils";
 import { useOperationalStore } from "@/stores/operational-store";
 import { KOP_SURAT_BASE64 } from "@/server/assets/kop-surat";
 import {
@@ -391,9 +391,7 @@ ${verificationUrl}
 
 Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Terima kasih.`.trim();
 
-    const waUrl = cleanPhone
-      ? `https://wa.me/${cleanPhone}?text=${encodeURIComponent(msg)}`
-      : `https://wa.me/?text=${encodeURIComponent(msg)}`;
+    const waUrl = getWhatsAppUrl(cleanPhone, msg);
     window.open(waUrl, "_blank");
   };
 

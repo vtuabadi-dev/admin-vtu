@@ -6,6 +6,7 @@ import { Badge } from "@/shared/components/ui/Badge";
 import { Button } from "@/shared/components/ui/Button";
 import { Modal } from "@/shared/components/ui/Modal";
 import { Input } from "@/shared/components/ui/Input";
+import { getWhatsAppUrl } from "@/shared/lib/utils";
 import {
   HeartHandshake,
   Phone,
@@ -421,7 +422,7 @@ export default function AdminBadalUmrohPage() {
                         <td className="px-4 py-3">
                           <div className="font-bold text-foreground">{item.namaPemohon}</div>
                           <a
-                            href={`https://wa.me/${item.nomorWhatsapp.replace(/[^0-9]/g, "")}?text=${encodeURIComponent(`Assalamu'alaikum Bpk/Ibu ${item.namaPemohon}, mengenai pendaftaran Badal Umroh atas nama ${item.namaAlmarhum}...`)}`}
+                            href={getWhatsAppUrl(item.nomorWhatsapp, `Assalamu'alaikum Bpk/Ibu ${item.namaPemohon}, mengenai pendaftaran Badal Umroh atas nama ${item.namaAlmarhum}...`)}
                             target="_blank"
                             rel="noreferrer"
                             className="text-emerald-600 hover:underline inline-flex items-center gap-1 text-[11px] font-semibold pt-0.5"
@@ -584,7 +585,7 @@ export default function AdminBadalUmrohPage() {
                         <td className="px-4 py-3">
                           <div className="font-semibold text-foreground">{item.namaPemohon}</div>
                           <a
-                            href={`https://wa.me/${item.nomorWhatsapp.replace(/[^0-9]/g, "")}`}
+                            href={getWhatsAppUrl(item.nomorWhatsapp)}
                             target="_blank"
                             rel="noreferrer"
                             className="text-emerald-600 hover:underline inline-flex items-center gap-1 text-[11px] font-semibold"
@@ -685,9 +686,10 @@ export default function AdminBadalUmrohPage() {
                             </Button>
                             
                             <a
-                              href={`https://wa.me/${item.nomorWhatsapp.replace(/[^0-9]/g, "")}?text=${encodeURIComponent(
+                              href={getWhatsAppUrl(
+                                item.nomorWhatsapp,
                                 `Assalamu'alaikum Bpk/Ibu ${item.namaPemohon}, berikut kami sampaikan status Badal Umroh atas nama Almarhum/ah: ${item.namaAlmarhum}.\nStatus: ${item.status}\nPetugas: ${item.petugasBadal || "-"}\n${item.sertifikatUrl ? `Sertifikat: ${item.sertifikatUrl}\n` : ""}${item.videoUrl ? `Video Pelaksanaan: ${item.videoUrl}` : ""}`
-                              )}`}
+                              )}
                               target="_blank"
                               rel="noreferrer"
                               className="p-2 text-emerald-600 hover:text-emerald-800 hover:bg-emerald-50 rounded-md transition-colors"

@@ -75,7 +75,7 @@ import type {
   InvoiceSplitConfig,
   InvoiceSplitItem,
 } from "@/shared/types";
-import { formatCurrency, formatDate, formatInvoicePersonName, getManifestAlamat } from "@/shared/lib/utils";
+import { formatCurrency, formatDate, formatInvoicePersonName, getManifestAlamat, getWhatsAppUrl } from "@/shared/lib/utils";
 
 const metodeOptions = [
   { value: "transfer", label: "Transfer" },
@@ -1429,12 +1429,7 @@ function PaymentReviewTabContent() {
     const cleanPhone = rawPhone.replace(/[^0-9]/g, "").replace(/^0/, "62");
     const msg = generateInvoiceMessage(currentTarget, invNum, nom);
 
-    const isMobile = typeof navigator !== "undefined" && /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-    const waUrl = cleanPhone
-      ? isMobile
-        ? `https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodeURIComponent(msg)}`
-        : `https://web.whatsapp.com/send?phone=${cleanPhone}&text=${encodeURIComponent(msg)}`
-      : `https://web.whatsapp.com/send?text=${encodeURIComponent(msg)}`;
+    const waUrl = getWhatsAppUrl(cleanPhone, msg);
 
     // Buka tab WhatsApp Web secara langsung
     window.open(waUrl, "_blank");
