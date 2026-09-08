@@ -868,26 +868,9 @@ PT VAUZA TAMMA ABADI`;
           <div className="inline-flex items-center p-0.5 bg-stone-100 dark:bg-stone-900 border border-stone-200 dark:border-stone-800 rounded-lg shadow-inner">
             <button
               type="button"
-              onClick={() => setViewMode("all")}
-              className={cn(
-                "flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-md transition-all",
-                viewMode === "all"
-                  ? "bg-white dark:bg-stone-800 text-teal-800 dark:text-teal-300 shadow-xs border border-stone-200/80 dark:border-stone-700"
-                  : "text-stone-500 hover:text-stone-800 dark:hover:text-stone-300"
-              )}
-            >
-              <Users className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />
-              <span>Semua Jamaah</span>
-              <span className="ml-0.5 px-1.5 py-0.2 rounded-full text-[10px] bg-stone-200/80 dark:bg-stone-700 text-stone-700 dark:text-stone-300">
-                {financialRows.length}
-              </span>
-            </button>
-
-            <button
-              type="button"
               onClick={() => setViewMode("group")}
               className={cn(
-                "flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-md transition-all",
+                "flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-md transition-all cursor-pointer",
                 viewMode === "group"
                   ? "bg-white dark:bg-stone-800 text-amber-800 dark:text-amber-300 shadow-xs border border-stone-200/80 dark:border-stone-700"
                   : "text-stone-500 hover:text-stone-800 dark:hover:text-stone-300"
@@ -897,6 +880,23 @@ PT VAUZA TAMMA ABADI`;
               <span>Per Grup (PIC)</span>
               <span className="ml-0.5 px-1.5 py-0.2 rounded-full text-[10px] bg-amber-100 dark:bg-amber-950/80 text-amber-800 dark:text-amber-300">
                 {groupFinancialRows.length}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setViewMode("all")}
+              className={cn(
+                "flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-md transition-all cursor-pointer",
+                viewMode === "all"
+                  ? "bg-white dark:bg-stone-800 text-teal-800 dark:text-teal-300 shadow-xs border border-stone-200/80 dark:border-stone-700"
+                  : "text-stone-500 hover:text-stone-800 dark:hover:text-stone-300"
+              )}
+            >
+              <Users className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />
+              <span>Semua Jamaah</span>
+              <span className="ml-0.5 px-1.5 py-0.2 rounded-full text-[10px] bg-stone-200/80 dark:bg-stone-700 text-stone-700 dark:text-stone-300">
+                {financialRows.length}
               </span>
             </button>
           </div>
