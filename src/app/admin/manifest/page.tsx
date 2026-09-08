@@ -518,6 +518,7 @@ function ManifestPageContent() {
   const [groups, setGroups] = useState<RegistrationGroup[]>(storeGroups);
   const [allJamaah, setAllJamaah] = useState<Jamaah[]>(storeJamaah);
   const [selectedKeberangkatan, setSelectedKeberangkatan] = useState<string>(urlPaketId);
+  const [selectedMonthTab, setSelectedMonthTab] = useState<string>("ALL");
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(storeKeberangkatan.length === 0);
   const [error, setError] = useState<Error | null>(null);
@@ -801,6 +802,18 @@ function ManifestPageContent() {
 
     return Array.from(map.values()).sort((a, b) => a.yearMonthSortKey - b.yearMonthSortKey);
   }, [groupedPackageTree]);
+
+  // Filtered groupedByMonth based on selectedMonthTab
+  const displayedMonthGroups = useMemo(() => {
+    if (!groupedByMonth || groupedByMonth.length === 0) return [];
+    if (selectedMonthTab === "ALL") return groupedByMonth;
+    return groupedByMonth.filter((g) => g.label === selectedMonthTab);
+  }, [groupedByMonth, selectedMonthTab]);
+
+  const totalAllPackagesCount = useMemo(() => {
+    if (!groupedByMonth) return 0;
+    return groupedByMonth.reduce((acc, g) => acc + g.items.length, 0);
+  }, [groupedByMonth]);
 
   // Jamaah belonging to the active package
   const activePackageJamaah = useMemo(() => {
@@ -2005,6 +2018,63 @@ function ManifestPageContent() {
             </div>
           </div>
 
+          {/* Month Filter Tabs (Only shown when no specific package is selected in the top filter) */}
+          {groupedByMonth.length > 0 && (
+            <div className="flex items-center gap-2 overflow-x-auto pb-1 pt-1 no-scrollbar scroll-smooth">
+              <div className="flex items-center gap-1.5 p-1 bg-stone-900/90 dark:bg-stone-900/90 backdrop-blur-md rounded-xl border border-stone-800 shadow-md">
+                <button
+                  type="button"
+                  onClick={() => setSelectedMonthTab("ALL")}
+                  className={cn(
+                    "px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-2 cursor-pointer whitespace-nowrap",
+                    selectedMonthTab === "ALL"
+                      ? "bg-gradient-to-r from-teal-600 to-emerald-600 text-white shadow-md shadow-teal-950/50 border border-teal-400/40"
+                      : "text-stone-400 hover:text-stone-200 hover:bg-stone-800/60"
+                  )}
+                >
+                  <CalendarDays className={cn("w-3.5 h-3.5", selectedMonthTab === "ALL" ? "text-amber-300" : "text-stone-400")} />
+                  <span>Semua Bulan</span>
+                  <span
+                    className={cn(
+                      "text-[10px] px-1.5 py-0.5 rounded-full font-mono font-semibold",
+                      selectedMonthTab === "ALL" ? "bg-white/20 text-white" : "bg-stone-800 text-stone-400"
+                    )}
+                  >
+                    {totalAllPackagesCount} Paket
+                  </span>
+                </button>
+
+                {groupedByMonth.map(({ label, items }) => {
+                  const isActive = selectedMonthTab === label;
+                  return (
+                    <button
+                      key={label}
+                      type="button"
+                      onClick={() => setSelectedMonthTab(label)}
+                      className={cn(
+                        "px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-2 cursor-pointer whitespace-nowrap",
+                        isActive
+                          ? "bg-gradient-to-r from-teal-600 to-emerald-600 text-white shadow-md shadow-teal-950/50 border border-teal-400/40"
+                          : "text-stone-400 hover:text-stone-200 hover:bg-stone-800/60"
+                      )}
+                    >
+                      <CalendarDays className={cn("w-3.5 h-3.5", isActive ? "text-amber-300" : "text-stone-400")} />
+                      <span>{label}</span>
+                      <span
+                        className={cn(
+                          "text-[10px] px-1.5 py-0.5 rounded-full font-mono font-semibold",
+                          isActive ? "bg-white/20 text-white" : "bg-stone-800 text-stone-400"
+                        )}
+                      >
+                        {items.length} Paket
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {loading ? (
             <div className="flex h-40 items-center justify-center text-sm text-muted-foreground">
               Memuat data manifest...
@@ -2013,13 +2083,13 @@ function ManifestPageContent() {
             <div className="flex h-40 items-center justify-center">
               <ErrorState onRetry={loadAllData} message={error.message} />
             </div>
-          ) : groupedByMonth.length === 0 ? (
+          ) : displayedMonthGroups.length === 0 ? (
             <div className="flex h-40 items-center justify-center text-sm text-muted-foreground border rounded-xl bg-card">
-              Belum ada data paket keberangkatan terdaftar.
+              Tidak ada data paket keberangkatan untuk pilihan bulan ini.
             </div>
           ) : (
             <div className="space-y-8">
-              {groupedByMonth.map(({ label, items }) => (
+              {displayedMonthGroups.map(({ label, items }) => (
                 <div key={label} className="space-y-4">
                   {/* Aesthetic Month Divider Line with Center Badge */}
                   <div className="relative flex items-center justify-center my-6 py-2">
