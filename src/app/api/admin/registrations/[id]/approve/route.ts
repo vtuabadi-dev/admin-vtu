@@ -15,12 +15,17 @@ function generateTempPassword(): string {
 }
 
 async function generateRegistrationId(kodeRegistrasi: string, index: number): Promise<string> {
+  const parts = kodeRegistrasi.split("-");
+  if (parts.length >= 3 && parts[0] === "GRP") {
+    const year = parts[1];
+    const seq = parts[2]!.slice(0, 4).padStart(4, "0");
+    return `GRP-${year}-${seq}-${index + 1}`;
+  }
   return `${kodeRegistrasi}-${index + 1}`;
 }
 
 async function generateNomorPeserta(kodeRegistrasi: string, index: number): Promise<string> {
-  // Single Identifier Standard: Unify nomorPeserta with registrationId format (GRP-YYYY-SEQ-INDEX)
-  return `${kodeRegistrasi}-${index + 1}`;
+  return generateRegistrationId(kodeRegistrasi, index);
 }
 
 export async function POST(

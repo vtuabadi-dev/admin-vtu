@@ -39,7 +39,7 @@ async function generateKodeRegistrasi(): Promise<string> {
   }
 
   const nextSeq = maxSeq + 1;
-  const next = nextSeq.toString().padStart(5, "0");
+  const next = nextSeq.toString().slice(0, 4).padStart(4, "0");
   return `GRP-${year}-${next}`;
 }
 

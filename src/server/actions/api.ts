@@ -142,17 +142,30 @@ export async function createInvoice(data: {
   nominal: number;
   jatuhTempo?: string;
   catatan?: string;
+  kategori?: "PEMBAYARAN" | "PINDAH_PAKET" | "TAMBAH_JAMAAH" | "PEMBATALAN" | "REFUND_MURNI";
+  subKategori?: string;
+  scopePembatalan?: "SEBAGIAN" | "SELURUH";
+  refundStatus?: "NON_REFUND" | "WITH_REFUND";
+  jamaahTargetIds?: string[];
 }) {
-  const nomorInvoice =
-    data.nomorInvoice ||
-    `INV-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${String(Math.floor(Math.random() * 9000) + 1000)}`;
+  const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+  const randomSuffix = String(Math.floor(Math.random() * 9000) + 1000);
+  
+  let prefix = "INV";
+  if (data.kategori === "PEMBATALAN") prefix = "CN-CANCEL";
+  else if (data.kategori === "REFUND_MURNI") prefix = "REF";
+  else if (data.kategori === "PINDAH_PAKET") prefix = "INV-PAKET";
+  else if (data.kategori === "TAMBAH_JAMAAH") prefix = "INV-PAX";
+
+  const nomorInvoice = data.nomorInvoice || `${prefix}-${dateStr}-${randomSuffix}`;
+  const tipe = data.subKategori || (data.kategori ? data.kategori.toLowerCase() : "pelunasan");
 
   const created = await prisma.invoice.create({
     data: {
       id: nomorInvoice,
       groupId: data.groupId,
       nomorInvoice,
-      tipe: "pelunasan",
+      tipe: tipe as any,
       jumlah: data.nominal,
       sisaTagihan: data.nominal,
       status: "unpaid",
