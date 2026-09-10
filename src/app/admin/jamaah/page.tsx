@@ -276,9 +276,20 @@ export default function JamaahListPage() {
                     ),
                   },
                   {
+                    key: "registrationId",
+                    header: "ID Registrasi",
+                    accessor: (row: any) => (
+                      <span className="font-mono text-xs font-semibold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                        {row.registrationId || row.nomorPeserta}
+                      </span>
+                    ),
+                  },
+                  {
                     key: "nomorPeserta",
                     header: "No. Peserta",
-                    accessor: (row: any) => row.nomorPeserta,
+                    accessor: (row: any) => (
+                      <span className="font-mono text-xs text-slate-600">{row.nomorPeserta}</span>
+                    ),
                   },
                   {
                     key: "paspor",

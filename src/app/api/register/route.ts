@@ -33,12 +33,13 @@ async function generateKodeRegistrasi(): Promise<string> {
     if (item?.kodeRegistrasi) {
       const parts = item.kodeRegistrasi.split("-");
       const num = parseInt(parts[2] || "0", 10);
-      if (!isNaN(num) && num > maxSeq) maxSeq = num;
+      // Filter out large mock/timestamp IDs (>= 100000) to keep clean sequence
+      if (!isNaN(num) && num > maxSeq && num < 100000) maxSeq = num;
     }
   }
 
   const nextSeq = maxSeq + 1;
-  const next = nextSeq.toString().padStart(4, "0");
+  const next = nextSeq.toString().padStart(5, "0");
   return `GRP-${year}-${next}`;
 }
 

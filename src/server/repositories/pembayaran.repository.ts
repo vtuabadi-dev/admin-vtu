@@ -172,10 +172,6 @@ export const pembayaranRepo = {
             where: { kodeRegistrasi: reg.kodeRegistrasi },
           });
 
-          const parts = reg.kodeRegistrasi.split("-");
-          const year = parts[1] ?? new Date().getFullYear().toString();
-          const seq = parts[2] ?? "00001";
-
           const memberList = (reg.members && reg.members.length > 0)
             ? (reg.members as any[]).sort((a, b) => (a.urutan || 0) - (b.urutan || 0))
             : [{ namaLengkap: reg.namaPerwakilan, jenisKelamin: "L", tempatLahir: "-", tanggalLahir: "2000-01-01", urutan: 1 }];
@@ -209,7 +205,7 @@ export const pembayaranRepo = {
                 data: {
                   registrationId: regId,
                   groupId: group.id,
-                  nomorPeserta: `PS/${year}/${seq}/${i + 1}`,
+                  nomorPeserta: regId,
                   namaLengkap: m.namaLengkap || (i === 0 ? reg.namaPerwakilan : `Anggota ${i + 1}`),
                   namaAyah: "",
                   jenisKelamin: ((m.jenisKelamin) as any) || "L",

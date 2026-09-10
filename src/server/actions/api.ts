@@ -207,7 +207,7 @@ export async function getJamaahById(id: string) {
       if (member) {
         j = {
           id: member.id,
-          nomorPeserta: `PST-${member.id.slice(-6).toUpperCase()}`,
+          nomorPeserta: member.request?.kodeRegistrasi ? `${member.request.kodeRegistrasi}-1` : `GRP-2026-${member.id.slice(-6).toUpperCase()}`,
           namaLengkap: member.namaLengkap,
           jenisKelamin: member.jenisKelamin,
           tempatLahir: member.tempatLahir || "Jakarta",

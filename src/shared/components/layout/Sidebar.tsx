@@ -141,6 +141,7 @@ const adminNav: NavSection[] = [
         children: [
           { label: "Modul Keuangan Travel", href: "/admin/keuangan-travel" },
           { label: "Monitoring Pembayaran", href: "/admin/pembayaran" },
+          { label: "Review Registrasi Baru", href: "/admin/pembayaran/registrasi-baru" },
           { label: "Jadwal Reminder", href: "/admin/pembayaran/reminder" },
           { label: "Manajemen Invoice", href: "/admin/pembayaran/laporan" },
           { label: "Histori Pembayaran", href: "/admin/pembayaran/histori" },

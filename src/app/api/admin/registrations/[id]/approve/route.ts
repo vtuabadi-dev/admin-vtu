@@ -19,11 +19,8 @@ async function generateRegistrationId(kodeRegistrasi: string, index: number): Pr
 }
 
 async function generateNomorPeserta(kodeRegistrasi: string, index: number): Promise<string> {
-  // Remove GRP- prefix: GRP-2026-00001-1 → PS/2026/00001/1
-  const parts = kodeRegistrasi.split("-");
-  const year = parts[1] ?? new Date().getFullYear().toString();
-  const seq = parts[2] ?? "00001";
-  return `PS/${year}/${seq}/${index + 1}`;
+  // Single Identifier Standard: Unify nomorPeserta with registrationId format (GRP-YYYY-SEQ-INDEX)
+  return `${kodeRegistrasi}-${index + 1}`;
 }
 
 export async function POST(

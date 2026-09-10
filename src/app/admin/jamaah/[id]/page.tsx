@@ -309,7 +309,7 @@ export default function JamaahDetailPage() {
             variant="outline"
             size="sm"
             className="text-xs font-semibold"
-            onClick={() => router.push(`/admin/pembayaran/registrasi-baru`)}
+            onClick={() => router.push(jamaah.groupId ? `/admin/pembayaran/${jamaah.groupId}` : `/admin/pembayaran`)}
           >
             <CreditCard className="mr-1.5 h-4 w-4 text-blue-600" />
             Kelola Pembayaran
@@ -662,7 +662,7 @@ export default function JamaahDetailPage() {
                 variant="outline"
                 size="sm"
                 className="w-full justify-start text-xs font-semibold text-slate-700"
-                onClick={() => router.push(`/admin/pembayaran/registrasi-baru`)}
+                onClick={() => router.push(jamaah.groupId ? `/admin/pembayaran/${jamaah.groupId}` : `/admin/pembayaran`)}
               >
                 <CreditCard className="mr-2 h-4 w-4 text-blue-600" />
                 Verifikasi Pembayaran & Invoice
