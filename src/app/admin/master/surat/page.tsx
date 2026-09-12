@@ -1709,19 +1709,6 @@ Demikian Surat Tugas ini dibuat dengan sebenarnya agar dapat dipergunakan sebaga
                 )}
               </div>
 
-              {/* Bottom Save Button Container */}
-              <div className="flex justify-end pt-4 border-t">
-                <Button
-                  type="button"
-                  size="lg"
-                  onClick={handleSaveEditor}
-                  disabled={savingTemplate}
-                  className="text-sm font-bold bg-emerald-600 hover:bg-emerald-700 text-white px-8 shadow-md"
-                >
-                  <Save className="mr-2 h-4 w-4" />
-                  {savingTemplate ? "Menyimpan..." : "Simpan Konfigurasi"}
-                </Button>
-              </div>
             </div>
           )}
 
@@ -1866,19 +1853,6 @@ Demikian Surat Tugas ini dibuat dengan sebenarnya agar dapat dipergunakan sebaga
                 </div>
               </div>
 
-              {/* Footer in Editor Tab */}
-              <div className="flex justify-end pt-3 border-t">
-                <Button
-                  type="button"
-                  size="sm"
-                  onClick={handleSaveEditor}
-                  disabled={savingTemplate}
-                  className="text-xs bg-primary text-primary-foreground font-semibold"
-                >
-                  <Save className="mr-1.5 h-3.5 w-3.5" />
-                  {savingTemplate ? "Menyimpan..." : "Simpan Perubahan Konten"}
-                </Button>
-              </div>
             </div>
           )}
 
@@ -2009,39 +1983,27 @@ Demikian Surat Tugas ini dibuat dengan sebenarnya agar dapat dipergunakan sebaga
                 </div>
               </div>
 
-              <div className="flex justify-end pt-3 border-t">
-                <Button
-                  type="button"
-                  size="sm"
-                  onClick={handleSaveEditor}
-                  disabled={savingTemplate}
-                  className="text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-semibold"
-                >
-                  <Save className="mr-1.5 h-3.5 w-3.5" />
-                  {savingTemplate ? "Menyimpan..." : "Simpan Konfigurasi"}
-                </Button>
-              </div>
             </div>
           )}
 
-          {/* Bottom Back & Save Row */}
-          <div className="flex items-center justify-between pt-4 border-t mt-6">
+          {/* Bottom Back & Save Action Bar (Single Unified Source of Truth) */}
+          <div className="flex items-center justify-between pt-5 border-t mt-6">
             <button
               type="button"
               onClick={() => {
                 setEditingTemplate(null);
               }}
-              className="inline-flex items-center gap-1.5 text-xs font-bold text-muted-foreground hover:text-foreground"
+              className="inline-flex items-center gap-2 text-xs font-bold text-muted-foreground hover:text-foreground transition-colors"
             >
-              <ArrowLeft className="h-3.5 w-3.5" />
+              <ArrowLeft className="h-4 w-4" />
               Batal & Kembali ke Daftar
             </button>
             <Button
               type="button"
-              size="sm"
+              size="default"
               onClick={handleSaveEditor}
               disabled={savingTemplate}
-              className="text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-semibold gap-1.5 px-5 py-2"
+              className="text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm gap-2 px-6"
             >
               <Save className="h-4 w-4" />
               {savingTemplate ? "Menyimpan..." : "Simpan Konfigurasi"}
