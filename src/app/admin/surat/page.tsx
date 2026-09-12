@@ -987,6 +987,13 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
                       cleanKey.includes("pob") ||
                       (cleanKey.includes("kota") && cleanKey.includes("lahir"));
 
+                    const isKanimSelector =
+                      (p.inputType === "kantor_imigrasi" ||
+                        cleanKey === "kanim" ||
+                        cleanKey === "kantorimigrasi" ||
+                        (cleanKey.includes("imigrasi") && !cleanKey.includes("kota"))) &&
+                      !isKotaKanimField;
+
                     // Cleanse city display if office name was accidentally passed
                     const displayValue =
                       isKotaKanimField && (resolvedVal.includes("Kantor Imigrasi") || resolvedVal.includes("TPI"))
@@ -996,7 +1003,10 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
                     return (
                       <div
                         key={p.key}
-                        className="p-2.5 rounded-xl border border-stone-200/80 dark:border-stone-800/80 bg-card/60 shadow-2xs space-y-1.5 transition-all hover:border-primary/40"
+                        className={cn(
+                          "p-2.5 rounded-xl border border-stone-200/80 dark:border-stone-800/80 bg-card/60 shadow-2xs space-y-1.5 transition-all hover:border-primary/40",
+                          isKanimSelector && "relative z-30"
+                        )}
                       >
                         <div className="flex items-center justify-between">
                           <label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
@@ -1024,7 +1034,7 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
                           )}
                         </div>
 
-                        {p.inputType === "kantor_imigrasi" && !isKotaKanimField ? (
+                        {isKanimSelector ? (
                           <KantorImigrasiCombobox
                             value={resolvedVal}
                             onChange={(kanimNama, kanimKota) => {
