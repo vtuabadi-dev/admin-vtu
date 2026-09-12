@@ -28,6 +28,7 @@ import {
   Layers,
   FileCode,
   ArrowLeft,
+  ListFilter,
 } from "lucide-react";
 import { Card, CardContent } from "@/shared/components/ui/Card";
 import { Button } from "@/shared/components/ui/Button";
@@ -1618,37 +1619,42 @@ Demikian Surat Tugas ini dibuat dengan sebenarnya agar dapat dipergunakan sebaga
 
                           {/* Sub-row if manifest or select */}
                           {mapping.sourceType === "manifest" && (
-                            <div className="flex items-center gap-2 pt-1 p-2 rounded-lg bg-emerald-500/5 border border-emerald-500/20 text-xs">
-                              <span className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-300 shrink-0">
+                            <div className="w-full flex flex-col sm:flex-row sm:items-center gap-2 p-2 rounded-lg bg-emerald-500/5 border border-emerald-500/20 text-xs">
+                              <span className="text-[11px] font-bold text-emerald-700 dark:text-emerald-300 shrink-0 flex items-center gap-1">
+                                <Sparkles className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
                                 Field Manifest:
                               </span>
-                              <Select
-                                value={mapping.manifestField || MANIFEST_FIELD_OPTIONS[0]?.key || ""}
-                                onChange={(e) => {
-                                  const val = e.target.value;
-                                  setEditingTemplate((prev) => {
-                                    if (!prev) return null;
-                                    const updated = [...prev.placeholders];
-                                    const cur = updated[idx];
-                                    if (cur) updated[idx] = { ...cur, manifestField: val };
-                                    return { ...prev, placeholders: updated };
-                                  });
-                                }}
-                                options={MANIFEST_FIELD_OPTIONS.map((opt) => ({
-                                  value: opt.key,
-                                  label: `${opt.label} (${opt.group})`,
-                                }))}
-                                className="text-xs h-8 flex-1"
-                              />
+                              <div className="flex-1 w-full">
+                                <Select
+                                  value={mapping.manifestField || MANIFEST_FIELD_OPTIONS[0]?.key || ""}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    setEditingTemplate((prev) => {
+                                      if (!prev) return null;
+                                      const updated = [...prev.placeholders];
+                                      const cur = updated[idx];
+                                      if (cur) updated[idx] = { ...cur, manifestField: val };
+                                      return { ...prev, placeholders: updated };
+                                    });
+                                  }}
+                                  options={MANIFEST_FIELD_OPTIONS.map((opt) => ({
+                                    value: opt.key,
+                                    label: `${opt.label} (${opt.group})`,
+                                  }))}
+                                  className="text-xs h-8.5 w-full bg-background font-medium"
+                                />
+                              </div>
                             </div>
                           )}
 
                           {mapping.inputType === "select" && mapping.sourceType !== "manifest" && (
-                            <div className="flex items-center gap-2 pt-1 p-2 rounded-lg bg-blue-500/5 border border-blue-500/20 text-xs">
-                              <span className="text-[11px] font-semibold text-blue-700 dark:text-blue-300 shrink-0">
+                            <div className="w-full flex flex-col sm:flex-row sm:items-center gap-2.5 p-2.5 rounded-lg bg-blue-500/5 border border-blue-500/20 text-xs">
+                              <span className="text-[11px] font-bold text-blue-700 dark:text-blue-300 shrink-0 flex items-center gap-1.5">
+                                <ListFilter className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
                                 Opsi Pilihan (Koma):
                               </span>
-                              <Input
+                              <input
+                                type="text"
                                 value={(mapping.options || []).join(", ")}
                                 onChange={(e) => {
                                   const val = e.target.value;
@@ -1664,8 +1670,8 @@ Demikian Surat Tugas ini dibuat dengan sebenarnya agar dapat dipergunakan sebaga
                                     return { ...prev, placeholders: updated };
                                   });
                                 }}
-                                placeholder="Cth: Pria, Wanita"
-                                className="text-xs h-8 flex-1"
+                                placeholder="Cth: Permohonan Baru, Endorsement, Paspor Rusak, Paspor Hilang (pisahkan tiap pilihan dengan koma)"
+                                className="w-full flex-1 h-9 px-3 text-xs rounded-md border border-blue-300 dark:border-blue-700 bg-background text-foreground font-semibold focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 focus:outline-none transition-all shadow-sm placeholder:text-muted-foreground placeholder:font-normal"
                               />
                             </div>
                           )}

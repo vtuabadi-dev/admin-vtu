@@ -24,7 +24,7 @@ export function Select({
   ...props
 }: SelectProps) {
   return (
-    <div className="space-y-1">
+    <div className="space-y-1 w-full">
       {label && (
         <label
           htmlFor={id}
