@@ -6,6 +6,7 @@ import {
   renderAutocratMergedText,
   DEFAULT_SURAT_TEMPLATES,
   isSystemAutoPlaceholder,
+  formatMonthYear,
 } from "@/shared/lib/surat-autocrat-engine";
 import { searchKantorImigrasi, getKotaFromKanimName } from "@/shared/lib/kantor-imigrasi";
 
@@ -216,4 +217,33 @@ describe("Surat Autocrat Merge Engine", () => {
     });
     expect(customResolved.nama_lengkap).toBe("DR. H. MUCHAMAD ZAMRONI, M.SI");
   });
+
+  it("should format date into Indonesian 'MMMM YYYY' format accurately", () => {
+    expect(formatMonthYear("2026-09-15")).toBe("September 2026");
+    expect(formatMonthYear("2026-11-01")).toBe("November 2026");
+    expect(formatMonthYear("2027-01-20")).toBe("Januari 2027");
+    expect(formatMonthYear("Desember 2026")).toBe("Desember 2026");
+    expect(formatMonthYear(new Date(2026, 8, 15))).toBe("September 2026");
+  });
+
+  it("should resolve keberangkatan.bulanKeberangkatan in (MMMM YYYY) format from manifest", () => {
+    const template: any = {
+      ...DEFAULT_SURAT_TEMPLATES[0]!,
+      placeholders: [
+        {
+          key: "bulan_berangkat",
+          label: "Bulan Keberangkatan",
+          sourceType: "manifest",
+          manifestField: "keberangkatan.bulanKeberangkatan",
+        },
+      ],
+    };
+    const mockKeberangkatan = {
+      tanggalBerangkat: "2026-09-15",
+    };
+
+    const resolved = resolveAutocratFieldValues(template, null, mockKeberangkatan, {});
+    expect(resolved.bulan_berangkat).toBe("September 2026");
+  });
 });
+

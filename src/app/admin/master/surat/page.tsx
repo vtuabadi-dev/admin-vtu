@@ -354,11 +354,19 @@ Demikian Surat Tugas ini dibuat dengan sebenarnya agar dapat dipergunakan sebaga
             key: tag,
           });
         } else {
-          const matchedManifest = MANIFEST_FIELD_OPTIONS.find(
-            (opt) =>
-              opt.key.toLowerCase().includes(tag.toLowerCase()) ||
-              tag.toLowerCase().includes(opt.key.split(".")[1]?.toLowerCase() || "")
-          );
+          const cleanTag = tag.toLowerCase().replace(/[\s_\-\.]/g, "");
+          const matchedManifest = MANIFEST_FIELD_OPTIONS.find((opt) => {
+            const sub = (opt.key.split(".")[1] || "").toLowerCase().replace(/[\s_\-\.]/g, "");
+            const full = opt.key.toLowerCase().replace(/[\s_\-\.]/g, "");
+            const lbl = opt.label.toLowerCase().replace(/[\s_\-\.]/g, "");
+            return (
+              cleanTag.includes(sub) ||
+              sub.includes(cleanTag) ||
+              cleanTag.includes(full) ||
+              lbl.includes(cleanTag) ||
+              cleanTag.includes(lbl)
+            );
+          });
 
           let detectedType: SuratInputType = "text";
           const tagLower = tag.toLowerCase();
@@ -373,12 +381,13 @@ Demikian Surat Tugas ini dibuat dengan sebenarnya agar dapat dipergunakan sebaga
               detectedType = "kantor_imigrasi";
             }
           } else if (
-            tagLower.includes("tanggal") ||
-            tagLower.includes("tgl") ||
-            tagLower.includes("date") ||
-            tagLower.includes("lahir") ||
-            tagLower.includes("berangkat") ||
-            tagLower.includes("pulang")
+            (tagLower.includes("tanggal") ||
+              tagLower.includes("tgl") ||
+              tagLower.includes("date") ||
+              tagLower.includes("lahir") ||
+              tagLower.includes("berangkat") ||
+              tagLower.includes("pulang")) &&
+            !tagLower.includes("bulan")
           ) {
             detectedType = "date";
           } else if (
@@ -521,11 +530,19 @@ Demikian Surat Tugas ini dibuat dengan sebenarnya agar dapat dipergunakan sebaga
           key: tag,
         });
       } else {
-        const matchedManifest = MANIFEST_FIELD_OPTIONS.find(
-          (opt) =>
-            opt.key.toLowerCase().includes(tag.toLowerCase()) ||
-            tag.toLowerCase().includes(opt.key.split(".")[1]?.toLowerCase() || "")
-        );
+        const cleanTag = tag.toLowerCase().replace(/[\s_\-\.]/g, "");
+        const matchedManifest = MANIFEST_FIELD_OPTIONS.find((opt) => {
+          const sub = (opt.key.split(".")[1] || "").toLowerCase().replace(/[\s_\-\.]/g, "");
+          const full = opt.key.toLowerCase().replace(/[\s_\-\.]/g, "");
+          const lbl = opt.label.toLowerCase().replace(/[\s_\-\.]/g, "");
+          return (
+            cleanTag.includes(sub) ||
+            sub.includes(cleanTag) ||
+            cleanTag.includes(full) ||
+            lbl.includes(cleanTag) ||
+            cleanTag.includes(lbl)
+          );
+        });
         let detectedType: SuratInputType = "text";
         const tagLower = tag.toLowerCase();
 
@@ -539,12 +556,13 @@ Demikian Surat Tugas ini dibuat dengan sebenarnya agar dapat dipergunakan sebaga
             detectedType = "kantor_imigrasi";
           }
         } else if (
-          tagLower.includes("tanggal") ||
-          tagLower.includes("tgl") ||
-          tagLower.includes("date") ||
-          tagLower.includes("lahir") ||
-          tagLower.includes("berangkat") ||
-          tagLower.includes("pulang")
+          (tagLower.includes("tanggal") ||
+            tagLower.includes("tgl") ||
+            tagLower.includes("date") ||
+            tagLower.includes("lahir") ||
+            tagLower.includes("berangkat") ||
+            tagLower.includes("pulang")) &&
+          !tagLower.includes("bulan")
         ) {
           detectedType = "date";
         } else if (
@@ -775,11 +793,19 @@ Demikian Surat Tugas ini dibuat dengan sebenarnya agar dapat dipergunakan sebaga
       if (found) {
         newMappings.push({ ...found, key: tag });
       } else {
-        const matchedManifest = MANIFEST_FIELD_OPTIONS.find(
-          (opt) =>
-            opt.key.toLowerCase().includes(tag.toLowerCase()) ||
-            tag.toLowerCase().includes(opt.key.split(".")[1]?.toLowerCase() || "")
-        );
+        const cleanTag = tag.toLowerCase().replace(/[\s_\-\.]/g, "");
+        const matchedManifest = MANIFEST_FIELD_OPTIONS.find((opt) => {
+          const sub = (opt.key.split(".")[1] || "").toLowerCase().replace(/[\s_\-\.]/g, "");
+          const full = opt.key.toLowerCase().replace(/[\s_\-\.]/g, "");
+          const lbl = opt.label.toLowerCase().replace(/[\s_\-\.]/g, "");
+          return (
+            cleanTag.includes(sub) ||
+            sub.includes(cleanTag) ||
+            cleanTag.includes(full) ||
+            lbl.includes(cleanTag) ||
+            cleanTag.includes(lbl)
+          );
+        });
 
         let detectedType: SuratInputType = "text";
         const tagLower = tag.toLowerCase();
@@ -794,12 +820,13 @@ Demikian Surat Tugas ini dibuat dengan sebenarnya agar dapat dipergunakan sebaga
             detectedType = "kantor_imigrasi";
           }
         } else if (
-          tagLower.includes("tanggal") ||
-          tagLower.includes("tgl") ||
-          tagLower.includes("date") ||
-          tagLower.includes("lahir") ||
-          tagLower.includes("berangkat") ||
-          tagLower.includes("pulang")
+          (tagLower.includes("tanggal") ||
+            tagLower.includes("tgl") ||
+            tagLower.includes("date") ||
+            tagLower.includes("lahir") ||
+            tagLower.includes("berangkat") ||
+            tagLower.includes("pulang")) &&
+          !tagLower.includes("bulan")
         ) {
           detectedType = "date";
         } else if (

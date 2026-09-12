@@ -27,6 +27,54 @@ export function getTodayDateInfo(dateObj: Date = new Date()) {
   };
 }
 
+export const BULAN_INDONESIA = [
+  "Januari",
+  "Februari",
+  "Maret",
+  "April",
+  "Mei",
+  "Juni",
+  "Juli",
+  "Agustus",
+  "September",
+  "Oktober",
+  "November",
+  "Desember",
+];
+
+/**
+ * Formats a date or date string into 'MMMM YYYY' in Indonesian (e.g. 'September 2026', 'November 2026').
+ */
+export function formatMonthYear(dateVal?: string | Date | null): string {
+  if (!dateVal) return "";
+  if (typeof dateVal === "string") {
+    const trimmed = dateVal.trim();
+    // Check if already contains an Indonesian month name and year (e.g. 'September 2026')
+    const matchIndo = BULAN_INDONESIA.find((b) =>
+      new RegExp(`\\b${b}\\b`, "i").test(trimmed)
+    );
+    const yearMatch = trimmed.match(/\b(20\d\d)\b/);
+    if (matchIndo && yearMatch) {
+      return `${matchIndo} ${yearMatch[1]}`;
+    }
+
+    // Check if format starts with YYYY-MM or YYYY-MM-DD
+    const match = trimmed.match(/^(\d{4})-(\d{1,2})/);
+    if (match && match[1] && match[2]) {
+      const year = match[1];
+      const monthIdx = parseInt(match[2], 10) - 1;
+      if (monthIdx >= 0 && monthIdx < 12) {
+        return `${BULAN_INDONESIA[monthIdx]} ${year}`;
+      }
+    }
+  }
+  const d = typeof dateVal === "string" ? new Date(dateVal) : dateVal;
+  if (d instanceof Date && !isNaN(d.getTime())) {
+    return `${BULAN_INDONESIA[d.getMonth()]} ${d.getFullYear()}`;
+  }
+  return String(dateVal);
+}
+
 // ────────────────────────────────────────────────────────────
 // AVAILABLE MANIFEST FIELDS CATALOG FOR AUTOCRAT MAPPING
 // ────────────────────────────────────────────────────────────
@@ -48,6 +96,7 @@ export const MANIFEST_FIELD_OPTIONS: ManifestFieldOption[] = [
   { key: "keberangkatan.namaPaket", label: "Nama Paket Umroh", group: "Keberangkatan / Paket", sampleValue: "Paket Umroh Reguler Awal Musim 1448 H" },
   { key: "keberangkatan.kode", label: "Kode Keberangkatan / Manifest", group: "Keberangkatan / Paket", sampleValue: "KBR-2026-08-A" },
   { key: "keberangkatan.tanggalBerangkat", label: "Tanggal Keberangkatan", group: "Keberangkatan / Paket", sampleValue: "15 September 2026" },
+  { key: "keberangkatan.bulanKeberangkatan", label: "Bulan Keberangkatan (MMMM YYYY)", group: "Keberangkatan / Paket", sampleValue: "September 2026" },
   { key: "keberangkatan.tanggalPulang", label: "Tanggal Kepulangan", group: "Keberangkatan / Paket", sampleValue: "24 September 2026" },
   { key: "keberangkatan.programHari", label: "Durasi Program (Hari)", group: "Keberangkatan / Paket", sampleValue: "9 Hari" },
   { key: "keberangkatan.maskapai", label: "Maskapai Penerbangan", group: "Keberangkatan / Paket", sampleValue: "Saudia Airlines (SV 819)" },
@@ -855,6 +904,15 @@ export function resolveManifestFieldValue(
           : keberangkatan.departureDate
           ? formatDate(keberangkatan.departureDate)
           : "-";
+      case "bulanKeberangkatan":
+      case "bulan": {
+        const tgl =
+          keberangkatan.tanggalBerangkat ||
+          keberangkatan.departureDate ||
+          keberangkatan.bulan ||
+          keberangkatan.bulanKeberangkatan;
+        return tgl ? formatMonthYear(tgl) : "-";
+      }
       case "tanggalPulang":
         return keberangkatan.tanggalPulang
           ? formatDate(keberangkatan.tanggalPulang)
@@ -954,6 +1012,16 @@ function autoDetectManifestValue(
   }
   if (k.includes("tanggal_berangkat") || k === "tgl_berangkat") {
     return resolveManifestFieldValue("keberangkatan.tanggalBerangkat", jamaah, keberangkatan, today);
+  }
+  if (
+    k.includes("bulan_keberangkatan") ||
+    k.includes("bulankeberangkatan") ||
+    k.includes("bulan_berangkat") ||
+    k === "bulan_paket" ||
+    k === "bulan" ||
+    (k.includes("bulan") && (k.includes("berangkat") || k.includes("paket")))
+  ) {
+    return resolveManifestFieldValue("keberangkatan.bulanKeberangkatan", jamaah, keberangkatan, today);
   }
   if (k.includes("tanggal_pulang") || k === "tgl_pulang" || k.includes("tanggal_kembali")) {
     return resolveManifestFieldValue("keberangkatan.tanggalPulang", jamaah, keberangkatan, today);
