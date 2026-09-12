@@ -60,4 +60,23 @@ describe("Surat Autocrat Merge Engine", () => {
     expect(merged).toContain("NIK: 3515082103850001");
     expect(merged).toContain("Paket: Paket Umroh 9 Hari");
   });
+
+  it("should extract Autocrat <<tags>>, «guillemets», and tags with apostrophes like {{Nama Jama'ah}}", () => {
+    const text = "Kepada Yth. <<Nama Jama'ah>>, NIK: <<nik>>, Paket: «nama_paket», Dokumen: [[nomor_surat]].";
+    const tags = extractPlaceholdersFromText(text);
+    expect(tags).toEqual(["Nama Jama'ah", "nik", "nama_paket", "nomor_surat"]);
+  });
+
+  it("should render and replace Autocrat <<key>>, «key», and {{key}} correctly", () => {
+    const templateText = "Kepada Yth. <<Nama Jama'ah>> (NIK: {{nik}})\nPaket: «nama_paket»";
+    const resolvedValues = {
+      "Nama Jama'ah": "MUCHAMAD ZAMRONI",
+      "nik": "3515082103850001",
+      "nama_paket": "Paket Umroh Reguler",
+    };
+
+    const merged = renderAutocratMergedText(templateText, resolvedValues);
+    expect(merged).toContain("Kepada Yth. MUCHAMAD ZAMRONI (NIK: 3515082103850001)");
+    expect(merged).toContain("Paket: Paket Umroh Reguler");
+  });
 });

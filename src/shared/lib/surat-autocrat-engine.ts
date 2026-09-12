@@ -1,3 +1,4 @@
+import JSZip from "jszip";
 import type {
   SuratTemplate,
   GeneratedSuratLog,
@@ -30,33 +31,33 @@ export function getTodayDateInfo(dateObj: Date = new Date()) {
 // ────────────────────────────────────────────────────────────
 
 export const MANIFEST_FIELD_OPTIONS: ManifestFieldOption[] = [
-  // Jamaah group
+  // Jamaah personal
   { key: "jamaah.namaLengkap", label: "Nama Lengkap Jamaah", group: "Jamaah", sampleValue: "MUCHAMAD ZAMRONI" },
   { key: "jamaah.nik", label: "Nomor Induk Kependudukan (NIK)", group: "Jamaah", sampleValue: "3515082103850001" },
   { key: "jamaah.nomorPaspor", label: "Nomor Paspor", group: "Jamaah", sampleValue: "X1234567" },
-  { key: "jamaah.tempatLahir", label: "Tempat Lahir", group: "Jamaah", sampleValue: "Sidoarjo" },
+  { key: "jamaah.tempatLahir", label: "Tempat Lahir", group: "Jamaah", sampleValue: "SIDOARJO" },
   { key: "jamaah.tanggalLahir", label: "Tanggal Lahir (DD MMMM YYYY)", group: "Jamaah", sampleValue: "21 Maret 1985" },
   { key: "jamaah.jenisKelamin", label: "Jenis Kelamin (Laki-laki / Perempuan)", group: "Jamaah", sampleValue: "LAKI-LAKI" },
   { key: "jamaah.namaAyah", label: "Nama Ayah Kandung", group: "Jamaah", sampleValue: "H. AHMAD SOFWAN" },
-  { key: "jamaah.alamat", label: "Alamat Lengkap", group: "Jamaah", sampleValue: "Jl. Raya Taman No. 45, Sidoarjo, Jawa Timur" },
+  { key: "jamaah.alamat", label: "Alamat Domisili Lengkap", group: "Jamaah", sampleValue: "Jl. Raya Taman No. 45, Sidoarjo, Jawa Timur" },
   { key: "jamaah.nomorTelepon", label: "Nomor Telepon / WhatsApp", group: "Jamaah", sampleValue: "081234567890" },
-  { key: "jamaah.registrationId", label: "ID Registrasi / Nomor Peserta", group: "Jamaah", sampleValue: "REG-2026-0814" },
+  { key: "jamaah.registrationId", label: "Nomor Registrasi / Pendaftaran", group: "Jamaah", sampleValue: "REG-2026-0814" },
 
-  // Keberangkatan / Package group
+  // Keberangkatan & Paket
   { key: "keberangkatan.namaPaket", label: "Nama Paket Umroh", group: "Keberangkatan / Paket", sampleValue: "Paket Umroh Reguler Awal Musim 1448 H" },
   { key: "keberangkatan.kode", label: "Kode Keberangkatan / Manifest", group: "Keberangkatan / Paket", sampleValue: "KBR-2026-08-A" },
   { key: "keberangkatan.tanggalBerangkat", label: "Tanggal Keberangkatan", group: "Keberangkatan / Paket", sampleValue: "15 September 2026" },
   { key: "keberangkatan.tanggalPulang", label: "Tanggal Kepulangan", group: "Keberangkatan / Paket", sampleValue: "24 September 2026" },
-  { key: "keberangkatan.programHari", label: "Durasi Program Hari", group: "Keberangkatan / Paket", sampleValue: "9 Hari" },
-  { key: "keberangkatan.maskapai", label: "Maskapai Penerbangan", group: "Keberangkatan / Paket", sampleValue: "Saudia Airlines (SV)" },
+  { key: "keberangkatan.programHari", label: "Durasi Program (Hari)", group: "Keberangkatan / Paket", sampleValue: "9 Hari" },
+  { key: "keberangkatan.maskapai", label: "Maskapai Penerbangan", group: "Keberangkatan / Paket", sampleValue: "Saudia Airlines (SV 819)" },
   { key: "keberangkatan.hotelMekkah", label: "Hotel Mekkah", group: "Keberangkatan / Paket", sampleValue: "Pullman Zamzam Makkah (Bintang 5)" },
   { key: "keberangkatan.hotelMadinah", label: "Hotel Madinah", group: "Keberangkatan / Paket", sampleValue: "Rove Al Madinah (Bintang 4)" },
-  { key: "keberangkatan.startingPoint", label: "Bandara Keberangkatan (Starting Point)", group: "Keberangkatan / Paket", sampleValue: "Bandara Internasional Juanda (SUB)" },
+  { key: "keberangkatan.startingPoint", label: "Starting Point Keberangkatan", group: "Keberangkatan / Paket", sampleValue: "Bandara Juanda Surabaya (SUB)" },
 
-  // System & Today group
-  { key: "today.masehi", label: "Tanggal Hari Ini (Masehi)", group: "Tanggal & Sistem", sampleValue: "31 Agustus 2026" },
-  { key: "today.hijriyah", label: "Tanggal Hari Ini (Hijriyah)", group: "Tanggal & Sistem", sampleValue: "18 Safar 1448 H" },
-  { key: "today.bulanRomawi", label: "Bulan Romawi Saat Ini", group: "Tanggal & Sistem", sampleValue: "VIII" },
+  // Sistem & Perusahaan
+  { key: "today.masehi", label: "Tanggal Hari Ini (Masehi)", group: "Tanggal & Sistem", sampleValue: "12 September 2026" },
+  { key: "today.hijriyah", label: "Tanggal Hari Ini (Hijriyah)", group: "Tanggal & Sistem", sampleValue: "29 Safar 1448 H" },
+  { key: "today.bulanRomawi", label: "Bulan Romawi Saat Ini", group: "Tanggal & Sistem", sampleValue: "IX" },
   { key: "today.tahun", label: "Tahun Saat Ini", group: "Tanggal & Sistem", sampleValue: "2026" },
   { key: "vtu.pimpinan", label: "Nama Direktur / Pimpinan PPIU", group: "Tanggal & Sistem", sampleValue: "H. Fauzan Adzim, S.E." },
   { key: "vtu.jabatan", label: "Jabatan Penandatangan", group: "Tanggal & Sistem", sampleValue: "Direktur Utama" },
@@ -64,21 +65,87 @@ export const MANIFEST_FIELD_OPTIONS: ManifestFieldOption[] = [
 ];
 
 // ────────────────────────────────────────────────────────────
-// SCANNER FOR EXTRACTING {TAG} FROM TEMPLATE TEXT
+// SCANNER FOR EXTRACTING {TAG}, {{TAG}}, <<TAG>>, «TAG» FROM TEMPLATE TEXT
 // ────────────────────────────────────────────────────────────
 
 export function extractPlaceholdersFromText(text: string): string[] {
   if (!text) return [];
-  const regex = /\{+([a-zA-Z0-9_\-\.\s]+?)\}+/g;
   const tags = new Set<string>();
+
+  // 1. Curly braces: {tag}, {{tag}}, {{{tag}}}
+  const curlyRegex = /\{+([a-zA-Z0-9_\-\.\s\'\’]+?)\}+/g;
   let match: RegExpExecArray | null;
-  while ((match = regex.exec(text)) !== null) {
+  while ((match = curlyRegex.exec(text)) !== null) {
     const raw = match[1]?.trim();
     if (raw && raw.length > 0 && !raw.startsWith("/*") && !raw.startsWith("http")) {
       tags.add(raw);
     }
   }
+
+  // 2. Double angle brackets / Guillemets (Autocrat & Word Merge): <<tag>>, «tag»
+  const angleRegex = /(?:<<|«)+([a-zA-Z0-9_\-\.\s\'\’]+?)(?:>>|»)+/g;
+  while ((match = angleRegex.exec(text)) !== null) {
+    const raw = match[1]?.trim();
+    if (raw && raw.length > 0 && !raw.startsWith("/*") && !raw.startsWith("http")) {
+      tags.add(raw);
+    }
+  }
+
+  // 3. Double square brackets: [[tag]]
+  const bracketRegex = /\[\[([a-zA-Z0-9_\-\.\s\'\’]+?)\]\]/g;
+  while ((match = bracketRegex.exec(text)) !== null) {
+    const raw = match[1]?.trim();
+    if (raw && raw.length > 0 && !raw.startsWith("/*") && !raw.startsWith("http")) {
+      tags.add(raw);
+    }
+  }
+
   return Array.from(tags);
+}
+
+/**
+ * Asynchronously extracts all placeholders from a DOCX Word file using JSZip.
+ * Reads word/document.xml and headers/footers, stripping XML tags to parse tags cleanly.
+ */
+export async function extractPlaceholdersFromDocxFile(
+  fileData: File | Blob | ArrayBuffer | Uint8Array
+): Promise<{ tags: string[]; extractedText: string }> {
+  try {
+    const zip = await JSZip.loadAsync(fileData);
+    const xmlTargetPaths = [
+      "word/document.xml",
+      "word/header1.xml",
+      "word/header2.xml",
+      "word/header3.xml",
+      "word/footer1.xml",
+      "word/footer2.xml",
+      "word/footer3.xml",
+    ];
+
+    let combinedTextDirect = "";
+    let combinedTextSpaced = "";
+
+    for (const xmlPath of xmlTargetPaths) {
+      const xmlFile = zip.file(xmlPath);
+      if (xmlFile) {
+        const rawXml = await xmlFile.async("string");
+        combinedTextDirect += " " + rawXml.replace(/<[^>]+>/g, "");
+        combinedTextSpaced += " " + rawXml.replace(/<[^>]+>/g, " ");
+      }
+    }
+
+    const tagsDirect = extractPlaceholdersFromText(combinedTextDirect);
+    const tagsSpaced = extractPlaceholdersFromText(combinedTextSpaced);
+
+    const mergedTags = Array.from(new Set([...tagsDirect, ...tagsSpaced]));
+    return {
+      tags: mergedTags,
+      extractedText: combinedTextSpaced.replace(/\s+/g, " ").trim(),
+    };
+  } catch (err) {
+    console.error("[extractPlaceholdersFromDocxFile] Error parsing docx file:", err);
+    return { tags: [], extractedText: "" };
+  }
 }
 
 // ────────────────────────────────────────────────────────────
@@ -693,8 +760,8 @@ export function renderAutocratMergedText(templateText: string, resolvedValues: R
   Object.keys(resolvedValues).forEach((key) => {
     const val = resolvedValues[key] !== undefined ? String(resolvedValues[key]) : "";
     const escapedKey = escapeRegExp(key);
-    // Replace {key}, {{key}}, { key }, {{ key }} (case-insensitive)
-    const pattern = new RegExp(`\\{+\\s*${escapedKey}\\s*\\}+`, "gi");
+    // Replace {key}, {{key}}, <<key>>, «key», [[key]] (case-insensitive with optional surrounding spaces)
+    const pattern = new RegExp(`(?:\\{+|<<|«|\\[\\[)\\s*${escapedKey}\\s*(?:\\}+|>>|»|\\]\\])`, "gi");
     result = result.replace(pattern, val);
   });
 

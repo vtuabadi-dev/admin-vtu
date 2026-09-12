@@ -40,6 +40,7 @@ import {
   DEFAULT_SURAT_TEMPLATES,
   MANIFEST_FIELD_OPTIONS,
   extractPlaceholdersFromText,
+  extractPlaceholdersFromDocxFile,
   loadSavedSuratTemplates,
   saveSuratTemplates,
   resolveAutocratFieldValues,
@@ -51,6 +52,7 @@ import type {
   SuratKategori,
   SuratPlaceholderMapping,
   SuratInputType,
+  SuratAttachedFile,
 } from "@/shared/types/surat";
 import { KOP_SURAT_BASE64 } from "@/server/assets/kop-surat";
 
@@ -149,6 +151,13 @@ export default function MasterSuratPage() {
       kebutuhanNomorPerSurat: 1,
       formatNamaFile: "SK_{{Nama Pegawai}}",
       fileNameUploaded: "",
+      attachedFiles: [
+        {
+          index: 1,
+          fileName: "",
+          formatNamaFile: "SK_{{Nama Pegawai}}",
+        },
+      ],
       perihalDefault: "Surat Tugas Pelaksanaan Kegiatan Operasional",
       kopSuratType: "ppiu_vtu",
       lampiranDefault: "-",
@@ -201,29 +210,31 @@ Demikian Surat Tugas ini dibuat dengan sebenarnya agar dapat dipergunakan sebaga
       const firstKey = cloned.placeholders?.[0]?.key || "Nama Pegawai";
       cloned.formatNamaFile = `SK_{{${firstKey}}}`;
     }
+
+    // Initialize attachedFiles array matching jumlahTemplateTerlampir
+    const count = Math.max(1, cloned.jumlahTemplateTerlampir || 1);
+    if (!cloned.attachedFiles || cloned.attachedFiles.length === 0) {
+      cloned.attachedFiles = Array.from({ length: count }, (_, i) => ({
+        index: i + 1,
+        fileName: i === 0 ? cloned.fileNameUploaded || "" : "",
+        formatNamaFile: i === 0 ? cloned.formatNamaFile || "" : `${cloned.formatNamaFile || "Dokumen"}_Lampiran_${i + 1}`,
+      }));
+    } else if (cloned.attachedFiles.length < count) {
+      const current = [...cloned.attachedFiles];
+      while (current.length < count) {
+        const nextIdx = current.length + 1;
+        current.push({
+          index: nextIdx,
+          fileName: "",
+          formatNamaFile: `${cloned.formatNamaFile || "Dokumen"}_Lampiran_${nextIdx}`,
+        });
+      }
+      cloned.attachedFiles = current;
+    }
+
     setEditingTemplate(cloned);
     setEditorActiveTab("konfigurasi");
     setShowFormatHelper(false);
-  };
-
-  // Handle Add New Column in Konfigurasi Isian Data
-  const handleAddNewColumn = () => {
-    if (!editingTemplate) return;
-    const nextIdx = editingTemplate.placeholders.length + 1;
-    const newKey = `Variabel ${nextIdx}`;
-    const newMapping: SuratPlaceholderMapping = {
-      key: newKey,
-      label: `Kolom Isian ${nextIdx}`,
-      sourceType: "manual",
-      inputType: "text",
-      defaultValue: "",
-      required: true,
-    };
-    setEditingTemplate({
-      ...editingTemplate,
-      placeholders: [...editingTemplate.placeholders, newMapping],
-    });
-    showToast(`Kolom isian baru "{{${newKey}}}" berhasil ditambahkan`);
   };
 
   // Handle Remove Column in Konfigurasi Isian Data
@@ -240,22 +251,76 @@ Demikian Surat Tugas ini dibuat dengan sebenarnya agar dapat dipergunakan sebaga
     }
   };
 
-  // Handle File Upload directly in the Modal Card
-  const handleModalFileUpload = (file: File) => {
+  // Handle File Upload directly in the Modal Card per Document Index
+  const handleModalFileUpload = async (file: File, docIdx: number = 0) => {
     if (!editingTemplate) return;
     const fileName = file.name;
     const isDocx = fileName.endsWith(".docx") || fileName.endsWith(".doc");
 
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const content = (e.target?.result as string) || "";
-      const detectedTags = extractPlaceholdersFromText(content);
-      const currentMappings = [...editingTemplate.placeholders];
+    let content = "";
+    let detectedTags: string[] = [];
 
-      detectedTags.forEach((tag) => {
-        const exists = currentMappings.some(
-          (m) => m.key.toLowerCase() === tag.toLowerCase()
-        );
+    try {
+      if (isDocx) {
+        const res = await extractPlaceholdersFromDocxFile(file);
+        detectedTags = res.tags;
+        content = res.extractedText;
+      } else {
+        content = await file.text();
+        detectedTags = extractPlaceholdersFromText(content);
+      }
+    } catch (err) {
+      console.error("Error reading template file:", err);
+      showToast("Gagal membaca berkas template");
+      return;
+    }
+
+    setEditingTemplate((prev) => {
+      if (!prev) return null;
+      const count = Math.max(1, prev.jumlahTemplateTerlampir || 1);
+      const currentAttached: SuratAttachedFile[] =
+        prev.attachedFiles && prev.attachedFiles.length > 0
+          ? [...prev.attachedFiles]
+          : Array.from({ length: count }, (_, i) => ({
+              index: i + 1,
+              fileName: i === 0 ? prev.fileNameUploaded || "" : "",
+              formatNamaFile:
+                i === 0 ? prev.formatNamaFile || "" : `${prev.formatNamaFile || "Dokumen"}_Lampiran_${i + 1}`,
+              opsiNomorSurat: "same_as_template_1" as const,
+              content: "",
+            }));
+
+      while (currentAttached.length < count) {
+        const nextIdx = currentAttached.length + 1;
+        currentAttached.push({
+          index: nextIdx,
+          fileName: "",
+          formatNamaFile: `${prev.formatNamaFile || "Dokumen"}_Lampiran_${nextIdx}`,
+          opsiNomorSurat: "same_as_template_1" as const,
+          content: "",
+        });
+      }
+
+      currentAttached[docIdx] = {
+        ...currentAttached[docIdx],
+        index: docIdx + 1,
+        fileName: fileName,
+        content: content,
+      };
+
+      // Collect all text sources across template body + attached files
+      const allText = [
+        prev.templateContent,
+        prev.perihalDefault,
+        prev.tujuanDefault || "",
+        prev.kotaTujuanDefault || "",
+        ...currentAttached.map((f: SuratAttachedFile) => f.content || ""),
+      ].join(" ");
+      const allTags = extractPlaceholdersFromText(allText);
+
+      const currentMappings = [...prev.placeholders];
+      allTags.forEach((tag) => {
+        const exists = currentMappings.some((m) => m.key.toLowerCase() === tag.toLowerCase());
         if (!exists) {
           const matchedManifest = MANIFEST_FIELD_OPTIONS.find(
             (opt) =>
@@ -311,20 +376,174 @@ Demikian Surat Tugas ini dibuat dengan sebenarnya agar dapat dipergunakan sebaga
         }
       });
 
-      setEditingTemplate((prev) => {
-        if (!prev) return null;
-        return {
-          ...prev,
-          fileNameUploaded: fileName,
-          templateContent: isDocx && prev.templateContent ? prev.templateContent : (content || prev.templateContent),
-          placeholders: currentMappings,
-        };
-      });
+      return {
+        ...prev,
+        fileNameUploaded: docIdx === 0 ? fileName : prev.fileNameUploaded,
+        attachedFiles: currentAttached,
+        templateContent:
+          docIdx === 0 && (!isDocx || !prev.templateContent)
+            ? (content || prev.templateContent)
+            : prev.templateContent,
+        placeholders: currentMappings,
+      };
+    });
 
-      showToast(`File ${fileName} diunggah! Terdeteksi ${detectedTags.length} variabel.`);
-    };
+    showToast(`File Dokumen Ke-${docIdx + 1} (${fileName}) diunggah! Terdeteksi ${detectedTags.length} variabel.`);
+  };
 
-    reader.readAsText(file);
+  // Handle opsiNomorSurat change per document index
+  const handleOpsiNomorSuratChange = (val: string, docIdx: number) => {
+    setEditingTemplate((prev) => {
+      if (!prev) return null;
+      const count = Math.max(1, prev.jumlahTemplateTerlampir || 1);
+      const currentAttached =
+        prev.attachedFiles && prev.attachedFiles.length > 0
+          ? [...prev.attachedFiles]
+          : Array.from({ length: count }, (_, i) => ({
+              index: i + 1,
+              fileName: i === 0 ? prev.fileNameUploaded || "" : "",
+              formatNamaFile:
+                i === 0 ? prev.formatNamaFile || "" : `${prev.formatNamaFile || "Dokumen"}_Lampiran_${i + 1}`,
+              opsiNomorSurat: "same_as_template_1" as const,
+            }));
+
+      while (currentAttached.length < count) {
+        const nextIdx = currentAttached.length + 1;
+        currentAttached.push({
+          index: nextIdx,
+          fileName: "",
+          formatNamaFile: `${prev.formatNamaFile || "Dokumen"}_Lampiran_${nextIdx}`,
+          opsiNomorSurat: "same_as_template_1" as const,
+        });
+      }
+
+      currentAttached[docIdx] = {
+        ...currentAttached[docIdx],
+        index: docIdx + 1,
+        opsiNomorSurat: val as "same_as_template_1" | "new_number",
+      };
+
+      return {
+        ...prev,
+        attachedFiles: currentAttached,
+      };
+    });
+  };
+
+  // Handle Sync Placeholders explicitly from Template Surat
+  const handleSyncPlaceholdersFromTemplate = () => {
+    if (!editingTemplate) return;
+    const allText = [
+      editingTemplate.templateContent,
+      editingTemplate.perihalDefault,
+      editingTemplate.tujuanDefault || "",
+      editingTemplate.kotaTujuanDefault || "",
+      ...(editingTemplate.attachedFiles?.map((f) => f.content || "") || []),
+    ].join(" ");
+    const tags = extractPlaceholdersFromText(allText);
+
+    const existing = [...editingTemplate.placeholders];
+    const newMappings: SuratPlaceholderMapping[] = [];
+
+    tags.forEach((tag) => {
+      const found = existing.find((m) => m.key.toLowerCase() === tag.toLowerCase());
+      if (found) {
+        newMappings.push(found);
+      } else {
+        const matchedManifest = MANIFEST_FIELD_OPTIONS.find(
+          (opt) =>
+            opt.key.toLowerCase().includes(tag.toLowerCase()) ||
+            tag.toLowerCase().includes(opt.key.split(".")[1]?.toLowerCase() || "")
+        );
+        let detectedType: SuratInputType = "text";
+        const tagLower = tag.toLowerCase();
+        if (
+          tagLower.includes("tanggal") ||
+          tagLower.includes("tgl") ||
+          tagLower.includes("date") ||
+          tagLower.includes("lahir") ||
+          tagLower.includes("berangkat") ||
+          tagLower.includes("pulang")
+        ) {
+          detectedType = "date";
+        } else if (
+          tagLower.includes("kota") ||
+          tagLower.includes("tempat") ||
+          tagLower.includes("cabang") ||
+          tagLower.includes("city") ||
+          tagLower.includes("wilayah")
+        ) {
+          detectedType = "city";
+        } else if (
+          tagLower.includes("jumlah") ||
+          tagLower.includes("hari") ||
+          tagLower.includes("nominal") ||
+          tagLower.includes("biaya") ||
+          tagLower.includes("umur")
+        ) {
+          detectedType = "number";
+        } else if (
+          tagLower.includes("deskripsi") ||
+          tagLower.includes("keterangan") ||
+          tagLower.includes("alamat") ||
+          tagLower.includes("kronologi")
+        ) {
+          detectedType = "textarea";
+        }
+
+        newMappings.push({
+          key: tag,
+          label: tag.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
+          sourceType: matchedManifest ? "manifest" : "manual",
+          manifestField: matchedManifest ? matchedManifest.key : undefined,
+          inputType: detectedType,
+          defaultValue: "",
+          required: true,
+        });
+      }
+    });
+
+    setEditingTemplate({
+      ...editingTemplate,
+      placeholders: newMappings.length > 0 ? newMappings : existing,
+    });
+    showToast(`Berhasil menyinkronkan ${tags.length} variabel placeholder dari template surat!`);
+  };
+
+  // Handle formatNamaFile change per document index
+  const handleFormatNamaFileChange = (val: string, docIdx: number) => {
+    setEditingTemplate((prev) => {
+      if (!prev) return null;
+      const count = Math.max(1, prev.jumlahTemplateTerlampir || 1);
+      const currentAttached = prev.attachedFiles && prev.attachedFiles.length > 0
+        ? [...prev.attachedFiles]
+        : Array.from({ length: count }, (_, i) => ({
+            index: i + 1,
+            fileName: i === 0 ? prev.fileNameUploaded || "" : "",
+            formatNamaFile: i === 0 ? prev.formatNamaFile || "" : `${prev.formatNamaFile || "Dokumen"}_Lampiran_${i + 1}`,
+          }));
+
+      while (currentAttached.length < count) {
+        const nextIdx = currentAttached.length + 1;
+        currentAttached.push({
+          index: nextIdx,
+          fileName: "",
+          formatNamaFile: `${prev.formatNamaFile || "Dokumen"}_Lampiran_${nextIdx}`,
+        });
+      }
+
+      currentAttached[docIdx] = {
+        ...currentAttached[docIdx],
+        index: docIdx + 1,
+        formatNamaFile: val,
+      };
+
+      return {
+        ...prev,
+        formatNamaFile: docIdx === 0 ? val : prev.formatNamaFile,
+        attachedFiles: currentAttached,
+      };
+    });
   };
 
   // Handle duplicate template
@@ -415,10 +634,11 @@ Demikian Surat Tugas ini dibuat dengan sebenarnya agar dapat dipergunakan sebaga
     showToast(`Tag ${tagFormatted} berhasil disisipkan ke isi surat`);
   };
 
-  // Real-time Placeholder Syncer for Editor
+  // Real-time Placeholder Syncer for Editor & Attached Template Files
   const detectedTagsInEditing = useMemo(() => {
     if (!editingTemplate) return [];
-    const raw = `${editingTemplate.templateContent} ${editingTemplate.perihalDefault} ${editingTemplate.tujuanDefault || ""} ${editingTemplate.kotaTujuanDefault || ""}`;
+    const attachedTexts = (editingTemplate.attachedFiles || []).map((f) => f.content || "").join(" ");
+    const raw = `${editingTemplate.templateContent} ${editingTemplate.perihalDefault} ${editingTemplate.tujuanDefault || ""} ${editingTemplate.kotaTujuanDefault || ""} ${attachedTexts}`;
     return extractPlaceholdersFromText(raw);
   }, [editingTemplate]);
 
@@ -743,13 +963,40 @@ Demikian Surat Tugas ini dibuat dengan sebenarnya agar dapat dipergunakan sebaga
                   <Input
                     type="number"
                     min={1}
+                    max={10}
                     value={editingTemplate.jumlahTemplateTerlampir ?? 1}
-                    onChange={(e) =>
-                      setEditingTemplate({
-                        ...editingTemplate,
-                        jumlahTemplateTerlampir: parseInt(e.target.value, 10) || 1,
-                      })
-                    }
+                    onChange={(e) => {
+                      const newCount = Math.max(1, parseInt(e.target.value, 10) || 1);
+                      setEditingTemplate((prev) => {
+                        if (!prev) return null;
+                        const currentAttached =
+                          prev.attachedFiles && prev.attachedFiles.length > 0
+                            ? [...prev.attachedFiles]
+                            : Array.from({ length: prev.jumlahTemplateTerlampir || 1 }, (_, i) => ({
+                                index: i + 1,
+                                fileName: i === 0 ? prev.fileNameUploaded || "" : "",
+                                formatNamaFile:
+                                  i === 0 ? prev.formatNamaFile || "" : `${prev.formatNamaFile || "Dokumen"}_Lampiran_${i + 1}`,
+                              }));
+
+                        const adjusted = Array.from({ length: newCount }, (_, i) => {
+                          if (currentAttached[i]) {
+                            return { ...currentAttached[i], index: i + 1 };
+                          }
+                          return {
+                            index: i + 1,
+                            fileName: "",
+                            formatNamaFile: `${prev.formatNamaFile || "Dokumen"}_Lampiran_${i + 1}`,
+                          };
+                        });
+
+                        return {
+                          ...prev,
+                          jumlahTemplateTerlampir: newCount,
+                          attachedFiles: adjusted,
+                        };
+                      });
+                    }}
                     className="text-xs h-10 bg-background"
                   />
                 </div>
@@ -812,51 +1059,112 @@ Demikian Surat Tugas ini dibuat dengan sebenarnya agar dapat dipergunakan sebaga
                 </div>
               </div>
 
-              {/* Row 3: File Template Dokumen Ke-1 */}
-              <div className="p-4 rounded-xl border border-dashed border-stone-300 dark:border-stone-700 bg-muted/20 space-y-3">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                  <div>
-                    <label className="text-xs font-bold text-foreground block">
-                      File Template Dokumen Ke-1
+              {/* Row 3: Dynamic Upload File Template Dokumen (Sesuai Jumlah Template Terlampir) */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <label className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                      <Layers className="h-4 w-4 text-primary" />
+                      Dokumen Template Terlampir ({editingTemplate.jumlahTemplateTerlampir ?? 1} Dokumen)
                     </label>
-                    <span className="text-[11px] text-muted-foreground font-medium">
-                      (Upload File mendeteksi variabel otomatis!)
-                    </span>
+                    {(editingTemplate.jumlahTemplateTerlampir ?? 1) > 1 && (
+                      <Badge variant="outline" size="sm" className="text-[10px] bg-primary/10 text-primary border-primary/20">
+                        Multi-Template ({editingTemplate.jumlahTemplateTerlampir} Berkas)
+                      </Badge>
+                    )}
                   </div>
-
-                  <div className="relative inline-block">
-                    <input
-                      type="file"
-                      accept=".docx,.doc,.txt,.html,.json"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) handleModalFileUpload(file);
-                      }}
-                      className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
-                    />
-                    <Button type="button" size="sm" variant="outline" className="text-xs font-bold gap-1.5 pointer-events-none">
-                      <UploadCloud className="h-3.5 w-3.5 text-primary" />
-                      Pilih File Template
-                    </Button>
-                  </div>
+                  <span className="text-[11px] text-muted-foreground">
+                    Unggah file per dokumen template untuk mendeteksi variabel placeholder otomatis
+                  </span>
                 </div>
 
-                {editingTemplate.fileNameUploaded && (
-                  <p className="text-xs font-mono text-emerald-600 dark:text-emerald-400 font-bold">
-                    ✓ File Terpilih: {editingTemplate.fileNameUploaded}
-                  </p>
-                )}
+                <div className="grid grid-cols-1 gap-4">
+                  {Array.from({ length: Math.max(1, editingTemplate.jumlahTemplateTerlampir || 1) }).map((_, docIdx) => {
+                    const docNumber = docIdx + 1;
+                    const attached = editingTemplate.attachedFiles?.[docIdx];
+                    const fileName = attached?.fileName || (docIdx === 0 ? editingTemplate.fileNameUploaded : "");
+                    const formatName = attached?.formatNamaFile || (docIdx === 0 ? editingTemplate.formatNamaFile : "");
+                    const isMain = docIdx === 0;
 
-                <div className="space-y-1 pt-1">
-                  <label className="text-[11px] font-semibold text-muted-foreground">
-                    Format Nama File Hasil Generate
-                  </label>
-                  <Input
-                    value={editingTemplate.formatNamaFile || `SK_{{${editingTemplate.placeholders[0]?.key || "Nama"}}}`}
-                    onChange={(e) => setEditingTemplate({ ...editingTemplate, formatNamaFile: e.target.value })}
-                    placeholder="SK_{{Nama Pegawai}}"
-                    className="text-xs font-mono bg-background"
-                  />
+                    return (
+                      <div
+                        key={`template-doc-card-${docIdx}`}
+                        className="p-4 rounded-xl border border-stone-200 dark:border-stone-800 bg-stone-50/60 dark:bg-stone-900/30 space-y-3"
+                      >
+                        {/* Header with Title & Instruction */}
+                        <div>
+                          <label className="text-xs font-bold text-foreground">
+                            File Template Dokumen Ke-{docNumber}{" "}
+                            <span className="text-blue-600 dark:text-blue-400 font-normal text-xs ml-1">
+                              (Abaikan jika tidak ingin mengganti file lama)
+                            </span>
+                          </label>
+                        </div>
+
+                        {/* File Upload Row: [Pilih File] + File Name Status */}
+                        <div className="flex items-center gap-3">
+                          <label className="cursor-pointer inline-flex items-center justify-center rounded-lg border border-stone-300 dark:border-stone-700 bg-background px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted shadow-sm transition-colors">
+                            <span>Pilih File</span>
+                            <input
+                              type="file"
+                              accept=".docx,.doc,.txt,.html,.json"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) handleModalFileUpload(file, docIdx);
+                              }}
+                              className="sr-only"
+                            />
+                          </label>
+                          <span
+                            className={cn(
+                              "text-xs font-mono",
+                              fileName
+                                ? "text-emerald-600 dark:text-emerald-400 font-bold"
+                                : "text-muted-foreground"
+                            )}
+                          >
+                            {fileName ? `✓ ${fileName}` : "Tidak ada file yang dipilih"}
+                          </span>
+                        </div>
+
+                        {/* Opsi Penomoran Surat (For Document 2 and above, exactly matching Image 2!) */}
+                        {!isMain && (
+                          <div className="space-y-1 pt-1">
+                            <label className="text-[11px] font-semibold text-muted-foreground">
+                              Opsi Penomoran Surat
+                            </label>
+                            <Select
+                              value={attached?.opsiNomorSurat || "same_as_template_1"}
+                              onChange={(e) => handleOpsiNomorSuratChange(e.target.value, docIdx)}
+                              options={[
+                                { value: "same_as_template_1", label: "Gunakan Nomor yang Sama dengan Template Ke-1" },
+                                { value: "new_number", label: "Gunakan Nomor Berikutnya (Nomor Baru)" },
+                              ]}
+                              className="text-xs h-9 bg-background"
+                            />
+                          </div>
+                        )}
+
+                        {/* Format Nama File Hasil Generate */}
+                        <div className="space-y-1 pt-1">
+                          <label className="text-[11px] font-semibold text-muted-foreground">
+                            Format Nama File Hasil Generate
+                          </label>
+                          <Input
+                            value={
+                              formatName ||
+                              (isMain
+                                ? editingTemplate.formatNamaFile || `Surat_Rekom_TTD_{{${editingTemplate.placeholders[0]?.key || "Nama Jama'ah"}}}`
+                                : `Surat_Rekom_{{${editingTemplate.placeholders[0]?.key || "Nama Jama'ah"}}}`)
+                            }
+                            onChange={(e) => handleFormatNamaFileChange(e.target.value, docIdx)}
+                            placeholder={isMain ? "Surat_Rekom_TTD_{{Nama Jama'ah}}" : "Surat_Rekom_{{Nama Jama'ah}}"}
+                            className="text-xs font-mono bg-background"
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
 
@@ -955,48 +1263,87 @@ Demikian Surat Tugas ini dibuat dengan sebenarnya agar dapat dipergunakan sebaga
                 </div>
               </div>
 
-              {/* Row 5: Konfigurasi Isian Data (Dynamic Placeholder Columns) */}
+              {/* Row 5: Konfigurasi Isian Data (Dynamic Placeholder Columns Following Template) */}
               <div className="space-y-3 pt-2">
-                <div className="flex items-center justify-between border-b pb-2">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b pb-3 gap-2">
                   <div>
-                    <h3 className="text-xs font-extrabold text-foreground tracking-wide uppercase">
-                      Konfigurasi Isian Data
-                    </h3>
-                    <p className="text-[11px] text-muted-foreground">
-                      Tentukan nama kolom isian dan jenis input data untuk form Autocrat
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-xs font-extrabold text-foreground tracking-wide uppercase">
+                        Konfigurasi Isian Data
+                      </h3>
+                      <Badge
+                        variant="outline"
+                        className="text-[10px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 gap-1"
+                      >
+                        <CheckCircle2 className="h-3 w-3" />
+                        {editingTemplate.placeholders.length} Variabel Terdeteksi dari Template
+                      </Badge>
+                    </div>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">
+                      Kolom isian di bawah ini otomatis mengikuti placeholder yang terdeteksi di dalam template surat (&#123;&#123;tag&#125;&#125;, &lt;&lt;tag&gt;&gt;, &#123;tag&#125;).
                     </p>
                   </div>
 
-                  <Button
-                    type="button"
-                    size="sm"
-                    onClick={handleAddNewColumn}
-                    className="text-xs bg-blue-600 hover:bg-blue-700 text-white font-bold gap-1 shadow-sm"
-                  >
-                    <Plus className="h-3.5 w-3.5" />
-                    + Tambah Kolom
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={handleSyncPlaceholdersFromTemplate}
+                      className="text-xs font-semibold gap-1.5 hover:bg-muted"
+                      title="Pindai ulang seluruh placeholder dari isi template & dokumen berkas terlampir"
+                    >
+                      <RotateCcw className="h-3.5 w-3.5 text-primary" />
+                      Sinkronkan dari Template
+                    </Button>
+                  </div>
                 </div>
 
                 {editingTemplate.placeholders.length === 0 ? (
-                  <div className="p-6 text-center border border-dashed rounded-xl text-xs text-muted-foreground">
-                    Belum ada kolom isian data. Klik <strong>&quot;+ Tambah Kolom&quot;</strong> di atas.
+                  <div className="p-6 text-center border border-dashed rounded-xl text-xs text-muted-foreground space-y-1">
+                    <p>Belum ada variabel placeholder terdeteksi di dalam template surat ini.</p>
+                    <p className="text-[11px]">
+                      Tulis tag seperti <code className="text-primary font-bold">&#123;&#123;nama_lengkap&#125;&#125;</code> atau <code className="text-primary font-bold">&lt;&lt;nik&gt;&gt;</code> di Tab Editor Teks atau unggah file dokumen template Word (.docx).
+                    </p>
                   </div>
                 ) : (
                   <div className="space-y-3">
                     {editingTemplate.placeholders.map((mapping, idx) => {
                       const tagSyntax = `{{${mapping.key}}}`;
+                      const isTagInTemplate = detectedTagsInEditing.some(
+                        (t) => t.toLowerCase() === mapping.key.toLowerCase()
+                      );
+
                       return (
                         <div
                           key={`${mapping.key}-${idx}`}
                           className="p-3.5 rounded-xl border bg-stone-50/70 dark:bg-stone-900/40 space-y-2.5"
                         >
                           <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-center">
-                            {/* Nama Variabel Input */}
-                            <div className="sm:col-span-6 space-y-1">
-                              <label className="text-[11px] font-bold text-foreground">
-                                Nama Variabel #{idx + 1}
-                              </label>
+                            {/* Kolom Tag & Label Nama Form */}
+                            <div className="sm:col-span-6 space-y-1.5">
+                              <div className="flex items-center gap-2">
+                                <span className="text-[11px] font-bold text-foreground">
+                                  Variabel #{idx + 1}
+                                </span>
+                                <Badge
+                                  variant="outline"
+                                  className="font-mono text-[10px] font-bold text-primary bg-primary/10 border-primary/20 px-2 py-0.5"
+                                >
+                                  Tag Word: {tagSyntax}
+                                </Badge>
+                                {isTagInTemplate ? (
+                                  <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-0.5">
+                                    <CheckCircle2 className="h-3 w-3" />
+                                    Di Template
+                                  </span>
+                                ) : (
+                                  <span className="text-[10px] text-amber-600 dark:text-amber-400 font-medium italic">
+                                    (Tidak ada di template)
+                                  </span>
+                                )}
+                              </div>
+
                               <Input
                                 value={mapping.label || mapping.key}
                                 onChange={(e) => {
@@ -1009,22 +1356,18 @@ Demikian Surat Tugas ini dibuat dengan sebenarnya agar dapat dipergunakan sebaga
                                       updated[idx] = {
                                         ...cur,
                                         label: newLabel,
-                                        key: newLabel,
                                       };
                                     }
                                     return { ...prev, placeholders: updated };
                                   });
                                 }}
-                                placeholder="Cth: Nama Pegawai"
+                                placeholder="Cth: Nama Lengkap Jamaah"
                                 className="text-xs h-9 bg-background font-semibold"
                               />
-                              <p className="text-[10px] text-muted-foreground font-mono">
-                                Tag Word: <span className="text-primary font-bold">{tagSyntax}</span>
-                              </p>
                             </div>
 
                             {/* Jenis Kolom Isian Dropdown */}
-                            <div className="sm:col-span-4 space-y-1">
+                            <div className="sm:col-span-5 space-y-1.5">
                               <label className="text-[11px] font-bold text-foreground">
                                 Jenis Kolom Isian
                               </label>
@@ -1067,12 +1410,13 @@ Demikian Surat Tugas ini dibuat dengan sebenarnya agar dapat dipergunakan sebaga
                               />
                             </div>
 
-                            {/* Hapus Link */}
-                            <div className="sm:col-span-2 flex items-center justify-end pt-3 sm:pt-0">
+                            {/* Hapus if obsolete */}
+                            <div className="sm:col-span-1 flex items-center justify-end pt-2 sm:pt-0">
                               <button
                                 type="button"
                                 onClick={() => handleRemoveColumn(idx)}
-                                className="text-xs font-bold text-red-600 dark:text-red-400 hover:text-red-700 hover:underline shrink-0 px-2"
+                                className="text-[11px] font-bold text-stone-400 hover:text-red-600 dark:hover:text-red-400 hover:underline shrink-0 p-1"
+                                title="Hapus kolom variabel ini"
                               >
                                 Hapus
                               </button>

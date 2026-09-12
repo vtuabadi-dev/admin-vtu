@@ -22,6 +22,14 @@ export interface SuratPlaceholderMapping {
   required?: boolean;
 }
 
+export interface SuratAttachedFile {
+  index: number;              // 1, 2, 3...
+  fileName?: string;          // e.g. "Template_Surat_Rekomendasi_Paspor.docx"
+  formatNamaFile?: string;    // e.g. "Surat_Rekomendasi_{{nama_lengkap}}"
+  opsiNomorSurat?: "same_as_template_1" | "new_number"; // Opsi Penomoran Surat
+  content?: string;
+}
+
 export interface SuratTemplate {
   id: string;
   slug: string;              // e.g. "rekom-paspor", "cuti-pekerja", "cuti-sekolah", "keterangan", "tugas", "klaim-asuransi"
@@ -31,9 +39,10 @@ export interface SuratTemplate {
   kodeNomorDefault: string;  // e.g. "ST", "SR-PASPOR"
   formatNomor?: string;      // e.g. "[NOMOR]/ST/[BULAN]/[TAHUN]"
   kebutuhanNomorPerSurat?: number; // e.g. 1
-  jumlahTemplateTerlampir?: number; // e.g. 1
-  formatNamaFile?: string;   // e.g. "SK_{{Nama Pegawai}}" or "Surat_{{nama_lengkap}}"
-  fileNameUploaded?: string; // e.g. "Template_Surat_Tugas.docx"
+  jumlahTemplateTerlampir?: number; // e.g. 1, 2
+  formatNamaFile?: string;   // e.g. "SK_{{Nama Pegawai}}" or "Surat_{{nama_lengkap}}" (Document 1 format)
+  fileNameUploaded?: string; // e.g. "Template_Surat_Tugas.docx" (Document 1 file)
+  attachedFiles?: SuratAttachedFile[]; // List of attached template files (dynamic length)
   perihalDefault: string;    // e.g. "Surat Tugas Keberangkatan Umroh"
   kopSuratType: "ppiu_vtu" | "custom" | "none";
   lampiranDefault?: string;  // e.g. "1 (Satu) Berkas"
