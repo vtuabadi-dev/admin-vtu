@@ -173,6 +173,25 @@ export async function createInvoice(data: {
     },
   });
 
+  // Auto-Approve Registration Request if pending
+  try {
+    const group = await prisma.registrationGroup.findUnique({ where: { id: data.groupId } });
+    if (group?.kodeRegistrasi) {
+      const reg = await prisma.registrationRequest.findFirst({
+        where: { kodeRegistrasi: group.kodeRegistrasi, status: { in: ["PENDING_REVIEW", "DRAFT"] } },
+      });
+
+      if (reg) {
+        await prisma.registrationRequest.update({
+          where: { id: reg.id },
+          data: { status: "APPROVED" },
+        });
+      }
+    }
+  } catch (err) {
+    console.warn("Auto approve registration on invoice creation warning:", err);
+  }
+
   return created;
 }
 

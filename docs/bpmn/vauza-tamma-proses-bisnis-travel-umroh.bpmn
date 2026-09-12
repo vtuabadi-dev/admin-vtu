@@ -1,0 +1,1053 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+                  xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI"
+                  xmlns:dc="http://www.omg.org/spec/DD/20100524/DC"
+                  xmlns:di="http://www.omg.org/spec/DD/20100524/DI"
+                  xmlns:bioc="http://bpmn.io/schema/bpmn/biocolor/1.0"
+                  xmlns:color="http://www.omg.org/spec/BPMN/non-normative/color/1.0"
+                  id="Definitions_TravelUmroh"
+                  targetNamespace="http://bpmn.io/schema/bpmn"
+                  exporter="Camunda Modeler"
+                  exporterVersion="5.20.0">
+
+  <!-- COLLABORATION / POOL DEFINITION -->
+  <bpmn:collaboration id="Collaboration_Umroh">
+    <bpmn:participant id="Participant_VauzaTamma" 
+                      name="VAUZA TAMMA — PROSES BISNIS TRAVEL UMROH (End-to-End)" 
+                      processRef="Process_TravelUmroh" />
+    <bpmn:participant id="Participant_Telegram" name="Channel Telegram" />
+    <bpmn:participant id="Participant_GDS" name="Sistem Tiketing (GDS / Consolidator)" />
+    <bpmn:participant id="Participant_Nusuk" name="Nusuk / Muqeem" />
+    <bpmn:participant id="Participant_Drive" name="Google Drive (Otomatis per Paket)" />
+    
+    <!-- MESSAGE FLOWS TO EXTERNAL SYSTEMS -->
+    <bpmn:messageFlow id="MsgFlow_Telegram" sourceRef="Task_BroadcastTelegram" targetRef="Participant_Telegram" />
+    <bpmn:messageFlow id="MsgFlow_GDS" sourceRef="Task_PesanTiket" targetRef="Participant_GDS" />
+    <bpmn:messageFlow id="MsgFlow_Nusuk" sourceRef="Task_PengurusanVisa" targetRef="Participant_Nusuk" />
+    <bpmn:messageFlow id="MsgFlow_Drive_TL" sourceRef="Task_LaporanPerjalanan" targetRef="Participant_Drive" />
+    <bpmn:messageFlow id="MsgFlow_Drive_Finance" sourceRef="Task_RekapBayarVendor" targetRef="Participant_Drive" />
+    <bpmn:messageFlow id="MsgFlow_Drive_Mkt" sourceRef="Task_FollowUp" targetRef="Participant_Drive" />
+  </bpmn:collaboration>
+
+  <!-- PROCESS DEFINITION -->
+  <bpmn:process id="Process_TravelUmroh" isExecutable="false">
+    
+    <!-- LANESET -->
+    <bpmn:laneSet id="LaneSet_1">
+      <!-- 1. JAMAAH -->
+      <bpmn:lane id="Lane_Jamaah" name="JAMAAH">
+        <bpmn:flowNodeRef>StartEvent_Mulai</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_LihatPaket</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_DaftarOnline</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_UploadDokumen</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gateway_DataLengkap</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_Bayar</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_Berangkat</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_Ibadah</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_Kembali</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>EndEvent_Selesai</bpmn:flowNodeRef>
+      </bpmn:lane>
+
+      <!-- 2. MARKETING / SALES -->
+      <bpmn:lane id="Lane_Marketing" name="MARKETING / SALES">
+        <bpmn:flowNodeRef>Task_ListPaket</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_BroadcastTelegram</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_FollowUp</bpmn:flowNodeRef>
+      </bpmn:lane>
+
+      <!-- 3. ADMIN OPERASIONAL -->
+      <bpmn:lane id="Lane_AdminOps" name="ADMIN OPERASIONAL">
+        <bpmn:flowNodeRef>Task_TerimaNotifDaftar</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_CekKelengkapan</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gateway_Valid</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_InputManifest</bpmn:flowNodeRef>
+      </bpmn:lane>
+
+      <!-- 4. DOKUMEN & VISA -->
+      <bpmn:lane id="Lane_DokumenVisa" name="DOKUMEN &amp; VISA">
+        <bpmn:flowNodeRef>Task_OCRPasporKTP</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_RekapDokumen</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_PengurusanVisa</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gateway_StatusVisa</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_UpdateStatusManifest</bpmn:flowNodeRef>
+      </bpmn:lane>
+
+      <!-- 5. FINANCE -->
+      <bpmn:lane id="Lane_Finance" name="FINANCE">
+        <bpmn:flowNodeRef>Task_VerifikasiBayar</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gateway_BayarValid</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_UpdateManifestBayar</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_RekapBayarVendor</bpmn:flowNodeRef>
+      </bpmn:lane>
+
+      <!-- 6. TIKETING & VENDOR -->
+      <bpmn:lane id="Lane_TiketingVendor" name="TIKETING &amp; VENDOR">
+        <bpmn:flowNodeRef>Task_BlockSeat</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_PesanTiket</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_TerimaETicket</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_KonfirmasiJamaah</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_KoordinasiVendor</bpmn:flowNodeRef>
+      </bpmn:lane>
+
+      <!-- 7. TOUR LEADER / MUTAWIF -->
+      <bpmn:lane id="Lane_TourLeader" name="TOUR LEADER / MUTAWIF">
+        <bpmn:flowNodeRef>Task_Briefing</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_Pendampingan</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_LaporanPerjalanan</bpmn:flowNodeRef>
+      </bpmn:lane>
+    </bpmn:laneSet>
+
+    <!-- FLOW NODES: PHASE 1 MARKETING & PAKET -->
+    <bpmn:startEvent id="StartEvent_Mulai" name="Mulai">
+      <bpmn:outgoing>Flow_1</bpmn:outgoing>
+    </bpmn:startEvent>
+
+    <bpmn:userTask id="Task_LihatPaket" name="Melihat Informasi Paket Umroh">
+      <bpmn:incoming>Flow_1</bpmn:incoming>
+      <bpmn:incoming>Flow_BroadcastToJamaah</bpmn:incoming>
+      <bpmn:outgoing>Flow_2</bpmn:outgoing>
+    </bpmn:userTask>
+
+    <bpmn:userTask id="Task_ListPaket" name="Membuat &amp; Update List Paket">
+      <bpmn:outgoing>Flow_Mkt_1</bpmn:outgoing>
+      <bpmn:dataOutputAssociation id="DOA_Paket">
+        <bpmn:targetRef>DataStoreRef_Paket</bpmn:targetRef>
+      </bpmn:dataOutputAssociation>
+    </bpmn:userTask>
+
+    <bpmn:serviceTask id="Task_BroadcastTelegram" name="Broadcast Paket ke Telegram">
+      <bpmn:incoming>Flow_Mkt_1</bpmn:incoming>
+      <bpmn:outgoing>Flow_BroadcastToJamaah</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <!-- FLOW NODES: PHASE 2 PENDAFTARAN -->
+    <bpmn:userTask id="Task_DaftarOnline" name="Mengisi Formulir Pendaftaran (Online)">
+      <bpmn:incoming>Flow_2</bpmn:incoming>
+      <bpmn:incoming>Flow_DataLengkap_Tidak</bpmn:incoming>
+      <bpmn:incoming>Flow_Valid_Tidak</bpmn:incoming>
+      <bpmn:outgoing>Flow_3</bpmn:outgoing>
+      <bpmn:outgoing>Flow_NotifDaftar</bpmn:outgoing>
+      <bpmn:dataOutputAssociation id="DOA_Pendaftaran">
+        <bpmn:targetRef>DataStoreRef_Pendaftaran</bpmn:targetRef>
+      </bpmn:dataOutputAssociation>
+    </bpmn:userTask>
+
+    <bpmn:userTask id="Task_UploadDokumen" name="Upload Dokumen (Paspor, KTP, Foto)">
+      <bpmn:incoming>Flow_3</bpmn:incoming>
+      <bpmn:outgoing>Flow_4</bpmn:outgoing>
+    </bpmn:userTask>
+
+    <bpmn:exclusiveGateway id="Gateway_DataLengkap" name="Data Lengkap?">
+      <bpmn:incoming>Flow_4</bpmn:incoming>
+      <bpmn:outgoing>Flow_DataLengkap_Ya</bpmn:outgoing>
+      <bpmn:outgoing>Flow_DataLengkap_Tidak</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+
+    <bpmn:userTask id="Task_TerimaNotifDaftar" name="Menerima Notifikasi Pendaftaran">
+      <bpmn:incoming>Flow_NotifDaftar</bpmn:incoming>
+      <bpmn:outgoing>Flow_Ops_1</bpmn:outgoing>
+      <bpmn:property id="Prop_1" name="__targetRef_placeholder" />
+      <bpmn:dataInputAssociation id="DIA_Pendaftaran">
+        <bpmn:sourceRef>DataStoreRef_Pendaftaran</bpmn:sourceRef>
+        <bpmn:targetRef>Prop_1</bpmn:targetRef>
+      </bpmn:dataInputAssociation>
+    </bpmn:userTask>
+
+    <bpmn:userTask id="Task_CekKelengkapan" name="Cek Kelengkapan Data">
+      <bpmn:incoming>Flow_Ops_1</bpmn:incoming>
+      <bpmn:outgoing>Flow_Ops_2</bpmn:outgoing>
+    </bpmn:userTask>
+
+    <bpmn:exclusiveGateway id="Gateway_Valid" name="Valid?">
+      <bpmn:incoming>Flow_Ops_2</bpmn:incoming>
+      <bpmn:outgoing>Flow_Valid_Ya</bpmn:outgoing>
+      <bpmn:outgoing>Flow_Valid_Tidak</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+
+    <!-- FLOW NODES: PHASE 3 DOKUMEN & MANIFEST -->
+    <bpmn:userTask id="Task_InputManifest" name="Input ke Manifest">
+      <bpmn:incoming>Flow_Valid_Ya</bpmn:incoming>
+      <bpmn:outgoing>Flow_To_OCR</bpmn:outgoing>
+      <bpmn:dataOutputAssociation id="DOA_Manifest">
+        <bpmn:targetRef>DataStoreRef_Manifest</bpmn:targetRef>
+      </bpmn:dataOutputAssociation>
+    </bpmn:userTask>
+
+    <bpmn:serviceTask id="Task_OCRPasporKTP" name="OCR Paspor &amp; KTP (Ambil Data Otomatis)">
+      <bpmn:incoming>Flow_To_OCR</bpmn:incoming>
+      <bpmn:outgoing>Flow_OCR_To_Rekap</bpmn:outgoing>
+      <bpmn:outgoing>Flow_OCR_To_Finance</bpmn:outgoing>
+      <bpmn:dataOutputAssociation id="DOA_Paspor">
+        <bpmn:targetRef>DataObjectRef_Paspor</bpmn:targetRef>
+      </bpmn:dataOutputAssociation>
+      <bpmn:dataOutputAssociation id="DOA_KTP">
+        <bpmn:targetRef>DataObjectRef_KTP</bpmn:targetRef>
+      </bpmn:dataOutputAssociation>
+      <bpmn:dataOutputAssociation id="DOA_DataOCR">
+        <bpmn:targetRef>DataStoreRef_DataOCR</bpmn:targetRef>
+      </bpmn:dataOutputAssociation>
+    </bpmn:serviceTask>
+
+    <bpmn:userTask id="Task_RekapDokumen" name="Rekap Dokumen Jamaah">
+      <bpmn:incoming>Flow_OCR_To_Rekap</bpmn:incoming>
+      <bpmn:outgoing>Flow_Doc_To_Visa</bpmn:outgoing>
+    </bpmn:userTask>
+
+    <bpmn:userTask id="Task_PengurusanVisa" name="Pengurusan Visa (Nusuk)">
+      <bpmn:incoming>Flow_Doc_To_Visa</bpmn:incoming>
+      <bpmn:incoming>Flow_Visa_Tidak</bpmn:incoming>
+      <bpmn:outgoing>Flow_To_VisaGateway</bpmn:outgoing>
+    </bpmn:userTask>
+
+    <bpmn:exclusiveGateway id="Gateway_StatusVisa" name="Status Visa Disetujui?">
+      <bpmn:incoming>Flow_To_VisaGateway</bpmn:incoming>
+      <bpmn:outgoing>Flow_Visa_Ya</bpmn:outgoing>
+      <bpmn:outgoing>Flow_Visa_Tidak</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+
+    <bpmn:userTask id="Task_UpdateStatusManifest" name="Update Status di Manifest">
+      <bpmn:incoming>Flow_Visa_Ya</bpmn:incoming>
+      <bpmn:outgoing>Flow_Visa_To_Berangkat</bpmn:outgoing>
+      <bpmn:property id="Prop_EVisa" name="__targetRef_placeholder" />
+      <bpmn:dataInputAssociation id="DIA_EVisa">
+        <bpmn:sourceRef>DataObjectRef_EVisa</bpmn:sourceRef>
+        <bpmn:targetRef>Prop_EVisa</bpmn:targetRef>
+      </bpmn:dataInputAssociation>
+    </bpmn:userTask>
+
+    <!-- FLOW NODES: PHASE 4 PEMBAYARAN -->
+    <bpmn:userTask id="Task_Bayar" name="Melakukan Pembayaran">
+      <bpmn:incoming>Flow_DataLengkap_Ya</bpmn:incoming>
+      <bpmn:incoming>Flow_Bayar_Tidak</bpmn:incoming>
+      <bpmn:outgoing>Flow_To_VerifBayar</bpmn:outgoing>
+      <bpmn:dataOutputAssociation id="DOA_BuktiBayar">
+        <bpmn:targetRef>DataObjectRef_BuktiBayar</bpmn:targetRef>
+      </bpmn:dataOutputAssociation>
+    </bpmn:userTask>
+
+    <bpmn:userTask id="Task_VerifikasiBayar" name="Verifikasi Pembayaran">
+      <bpmn:incoming>Flow_To_VerifBayar</bpmn:incoming>
+      <bpmn:incoming>Flow_OCR_To_Finance</bpmn:incoming>
+      <bpmn:outgoing>Flow_To_BayarGateway</bpmn:outgoing>
+      <bpmn:property id="Prop_BuktiBayar" name="__targetRef_placeholder" />
+      <bpmn:dataInputAssociation id="DIA_BuktiBayar">
+        <bpmn:sourceRef>DataObjectRef_BuktiBayar</bpmn:sourceRef>
+        <bpmn:targetRef>Prop_BuktiBayar</bpmn:targetRef>
+      </bpmn:dataInputAssociation>
+    </bpmn:userTask>
+
+    <bpmn:exclusiveGateway id="Gateway_BayarValid" name="Pembayaran Valid?">
+      <bpmn:incoming>Flow_To_BayarGateway</bpmn:incoming>
+      <bpmn:outgoing>Flow_Bayar_Ya</bpmn:outgoing>
+      <bpmn:outgoing>Flow_Bayar_Tidak</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+
+    <bpmn:userTask id="Task_UpdateManifestBayar" name="Update Manifest Pembayaran">
+      <bpmn:incoming>Flow_Bayar_Ya</bpmn:incoming>
+      <bpmn:outgoing>Flow_Fin_To_RekapVendor</bpmn:outgoing>
+      <bpmn:dataOutputAssociation id="DOA_DataBayar">
+        <bpmn:targetRef>DataObjectRef_DataPembayaran</bpmn:targetRef>
+      </bpmn:dataOutputAssociation>
+      <bpmn:dataOutputAssociation id="DOA_DBBayar">
+        <bpmn:targetRef>DataStoreRef_Pembayaran</bpmn:targetRef>
+      </bpmn:dataOutputAssociation>
+    </bpmn:userTask>
+
+    <!-- FLOW NODES: PHASE 5 TIKETING & VENDOR -->
+    <bpmn:serviceTask id="Task_BlockSeat" name="Generate Manifest Block Seat">
+      <bpmn:incoming>Flow_Bayar_Ya</bpmn:incoming>
+      <bpmn:outgoing>Flow_BlockSeat_To_Pesan</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:userTask id="Task_PesanTiket" name="Pemesanan Tiket (Flight)">
+      <bpmn:incoming>Flow_BlockSeat_To_Pesan</bpmn:incoming>
+      <bpmn:outgoing>Flow_Pesan_To_Terima</bpmn:outgoing>
+    </bpmn:userTask>
+
+    <bpmn:userTask id="Task_TerimaETicket" name="Terima E-Ticket &amp; Itinerary">
+      <bpmn:incoming>Flow_Pesan_To_Terima</bpmn:incoming>
+      <bpmn:outgoing>Flow_Terima_To_Konf</bpmn:outgoing>
+      <bpmn:dataOutputAssociation id="DOA_ETicket">
+        <bpmn:targetRef>DataObjectRef_ETicket</bpmn:targetRef>
+      </bpmn:dataOutputAssociation>
+    </bpmn:userTask>
+
+    <bpmn:userTask id="Task_KonfirmasiJamaah" name="Konfirmasi ke Jamaah">
+      <bpmn:incoming>Flow_Terima_To_Konf</bpmn:incoming>
+      <bpmn:outgoing>Flow_Konf_To_Vendor</bpmn:outgoing>
+      <bpmn:outgoing>Flow_Konf_To_Briefing</bpmn:outgoing>
+    </bpmn:userTask>
+
+    <bpmn:userTask id="Task_KoordinasiVendor" name="Koordinasi Vendor (Hotel, Transport, dll)">
+      <bpmn:incoming>Flow_Konf_To_Vendor</bpmn:incoming>
+      <bpmn:outgoing>Flow_Vendor_To_RekapVendor</bpmn:outgoing>
+      <bpmn:dataOutputAssociation id="DOA_VoucherVendor">
+        <bpmn:targetRef>DataObjectRef_VoucherVendor</bpmn:targetRef>
+      </bpmn:dataOutputAssociation>
+    </bpmn:userTask>
+
+    <!-- FLOW NODES: PHASE 6 KEBERANGKATAN -->
+    <bpmn:userTask id="Task_Briefing" name="Briefing Jamaah">
+      <bpmn:incoming>Flow_Konf_To_Briefing</bpmn:incoming>
+      <bpmn:outgoing>Flow_Briefing_To_Berangkat</bpmn:outgoing>
+      <bpmn:outgoing>Flow_Briefing_To_Damping</bpmn:outgoing>
+      <bpmn:property id="Prop_ETicket" name="__targetRef_placeholder" />
+      <bpmn:dataInputAssociation id="DIA_ETicketBriefing">
+        <bpmn:sourceRef>DataObjectRef_ETicket</bpmn:sourceRef>
+        <bpmn:targetRef>Prop_ETicket</bpmn:targetRef>
+      </bpmn:dataInputAssociation>
+    </bpmn:userTask>
+
+    <bpmn:userTask id="Task_Berangkat" name="Berangkat Umroh">
+      <bpmn:incoming>Flow_Briefing_To_Berangkat</bpmn:incoming>
+      <bpmn:incoming>Flow_Visa_To_Berangkat</bpmn:incoming>
+      <bpmn:outgoing>Flow_Berangkat_To_Ibadah</bpmn:outgoing>
+    </bpmn:userTask>
+
+    <bpmn:userTask id="Task_Ibadah" name="Menjalankan Ibadah di Tanah Suci">
+      <bpmn:incoming>Flow_Berangkat_To_Ibadah</bpmn:incoming>
+      <bpmn:outgoing>Flow_Ibadah_To_Kembali</bpmn:outgoing>
+    </bpmn:userTask>
+
+    <bpmn:userTask id="Task_Pendampingan" name="Pendampingan Selama Perjalanan">
+      <bpmn:incoming>Flow_Briefing_To_Damping</bpmn:incoming>
+      <bpmn:outgoing>Flow_Damping_To_Laporan</bpmn:outgoing>
+    </bpmn:userTask>
+
+    <bpmn:userTask id="Task_LaporanPerjalanan" name="Laporan Perjalanan">
+      <bpmn:incoming>Flow_Damping_To_Laporan</bpmn:incoming>
+      <bpmn:dataOutputAssociation id="DOA_LaporanTL">
+        <bpmn:targetRef>DataObjectRef_LaporanTL</bpmn:targetRef>
+      </bpmn:dataOutputAssociation>
+    </bpmn:userTask>
+
+    <bpmn:userTask id="Task_RekapBayarVendor" name="Rekap Pembayaran Vendor">
+      <bpmn:incoming>Flow_Vendor_To_RekapVendor</bpmn:incoming>
+      <bpmn:incoming>Flow_Fin_To_RekapVendor</bpmn:incoming>
+      <bpmn:property id="Prop_Voucher" name="__targetRef_placeholder" />
+      <bpmn:dataInputAssociation id="DIA_VoucherRekap">
+        <bpmn:sourceRef>DataObjectRef_VoucherVendor</bpmn:sourceRef>
+        <bpmn:targetRef>Prop_Voucher</bpmn:targetRef>
+      </bpmn:dataInputAssociation>
+      <bpmn:dataOutputAssociation id="DOA_LapVendor">
+        <bpmn:targetRef>DataObjectRef_LaporanVendor</bpmn:targetRef>
+      </bpmn:dataOutputAssociation>
+      <bpmn:dataOutputAssociation id="DOA_LapKeu">
+        <bpmn:targetRef>DataObjectRef_LaporanKeuangan</bpmn:targetRef>
+      </bpmn:dataOutputAssociation>
+    </bpmn:userTask>
+
+    <bpmn:userTask id="Task_Kembali" name="Kembali ke Tanah Air">
+      <bpmn:incoming>Flow_Ibadah_To_Kembali</bpmn:incoming>
+      <bpmn:outgoing>Flow_Kembali_To_End</bpmn:outgoing>
+      <bpmn:outgoing>Flow_Kembali_To_FollowUp</bpmn:outgoing>
+    </bpmn:userTask>
+
+    <!-- FLOW NODES: PHASE 7 PASCA PERJALANAN -->
+    <bpmn:userTask id="Task_FollowUp" name="Follow Up Jamaah &amp; Testimoni">
+      <bpmn:incoming>Flow_Kembali_To_FollowUp</bpmn:incoming>
+      <bpmn:dataOutputAssociation id="DOA_LapFeedback">
+        <bpmn:targetRef>DataObjectRef_LaporanFeedback</bpmn:targetRef>
+      </bpmn:dataOutputAssociation>
+    </bpmn:userTask>
+
+    <bpmn:endEvent id="EndEvent_Selesai" name="Selesai">
+      <bpmn:incoming>Flow_Kembali_To_End</bpmn:incoming>
+    </bpmn:endEvent>
+
+    <!-- DATA OBJECTS -->
+    <bpmn:dataObject id="DO_Paspor" />
+    <bpmn:dataObjectReference id="DataObjectRef_Paspor" name="Paspor" dataObjectRef="DO_Paspor" />
+
+    <bpmn:dataObject id="DO_KTP" />
+    <bpmn:dataObjectReference id="DataObjectRef_KTP" name="KTP" dataObjectRef="DO_KTP" />
+
+    <bpmn:dataObject id="DO_BuktiBayar" />
+    <bpmn:dataObjectReference id="DataObjectRef_BuktiBayar" name="Bukti Pembayaran" dataObjectRef="DO_BuktiBayar" />
+
+    <bpmn:dataObject id="DO_DataBayar" />
+    <bpmn:dataObjectReference id="DataObjectRef_DataPembayaran" name="Data Pembayaran" dataObjectRef="DO_DataBayar" />
+
+    <bpmn:dataObject id="DO_EVisa" />
+    <bpmn:dataObjectReference id="DataObjectRef_EVisa" name="E-Visa" dataObjectRef="DO_EVisa" />
+
+    <bpmn:dataObject id="DO_ETicket" />
+    <bpmn:dataObjectReference id="DataObjectRef_ETicket" name="E-Ticket &amp; Itinerary" dataObjectRef="DO_ETicket" />
+
+    <bpmn:dataObject id="DO_VoucherVendor" />
+    <bpmn:dataObjectReference id="DataObjectRef_VoucherVendor" name="Voucher &amp; Konfirmasi Layanan" dataObjectRef="DO_VoucherVendor" />
+
+    <bpmn:dataObject id="DO_LapVendor" />
+    <bpmn:dataObjectReference id="DataObjectRef_LaporanVendor" name="Laporan Vendor" dataObjectRef="DO_LapVendor" />
+
+    <bpmn:dataObject id="DO_LapKeu" />
+    <bpmn:dataObjectReference id="DataObjectRef_LaporanKeuangan" name="Laporan Keuangan" dataObjectRef="DO_LapKeu" />
+
+    <bpmn:dataObject id="DO_LapTL" />
+    <bpmn:dataObjectReference id="DataObjectRef_LaporanTL" name="Laporan TL" dataObjectRef="DO_LapTL" />
+
+    <bpmn:dataObject id="DO_LapFeedback" />
+    <bpmn:dataObjectReference id="DataObjectRef_LaporanFeedback" name="Laporan Feedback" dataObjectRef="DO_LapFeedback" />
+
+    <!-- DATA STORES -->
+    <bpmn:dataStoreReference id="DataStoreRef_Paket" name="Database Paket" />
+    <bpmn:dataStoreReference id="DataStoreRef_Pendaftaran" name="Database Pendaftaran" />
+    <bpmn:dataStoreReference id="DataStoreRef_Manifest" name="Manifest Jamaah (SOT = Nama Paspor)" />
+    <bpmn:dataStoreReference id="DataStoreRef_DataOCR" name="Data OCR" />
+    <bpmn:dataStoreReference id="DataStoreRef_Pembayaran" name="Database Pembayaran" />
+
+    <!-- SEQUENCE FLOWS -->
+    <bpmn:sequenceFlow id="Flow_1" sourceRef="StartEvent_Mulai" targetRef="Task_LihatPaket" />
+    <bpmn:sequenceFlow id="Flow_Mkt_1" sourceRef="Task_ListPaket" targetRef="Task_BroadcastTelegram" />
+    <bpmn:sequenceFlow id="Flow_BroadcastToJamaah" sourceRef="Task_BroadcastTelegram" targetRef="Task_LihatPaket" />
+    <bpmn:sequenceFlow id="Flow_2" sourceRef="Task_LihatPaket" targetRef="Task_DaftarOnline" />
+    <bpmn:sequenceFlow id="Flow_3" sourceRef="Task_DaftarOnline" targetRef="Task_UploadDokumen" />
+    <bpmn:sequenceFlow id="Flow_NotifDaftar" sourceRef="Task_DaftarOnline" targetRef="Task_TerimaNotifDaftar" />
+    <bpmn:sequenceFlow id="Flow_4" sourceRef="Task_UploadDokumen" targetRef="Gateway_DataLengkap" />
+    <bpmn:sequenceFlow id="Flow_DataLengkap_Tidak" name="Tidak" sourceRef="Gateway_DataLengkap" targetRef="Task_DaftarOnline" />
+    <bpmn:sequenceFlow id="Flow_DataLengkap_Ya" name="Ya" sourceRef="Gateway_DataLengkap" targetRef="Task_Bayar" />
+    <bpmn:sequenceFlow id="Flow_Ops_1" sourceRef="Task_TerimaNotifDaftar" targetRef="Task_CekKelengkapan" />
+    <bpmn:sequenceFlow id="Flow_Ops_2" sourceRef="Task_CekKelengkapan" targetRef="Gateway_Valid" />
+    <bpmn:sequenceFlow id="Flow_Valid_Tidak" name="Tidak" sourceRef="Gateway_Valid" targetRef="Task_DaftarOnline" />
+    <bpmn:sequenceFlow id="Flow_Valid_Ya" name="Ya" sourceRef="Gateway_Valid" targetRef="Task_InputManifest" />
+    <bpmn:sequenceFlow id="Flow_To_OCR" sourceRef="Task_InputManifest" targetRef="Task_OCRPasporKTP" />
+    <bpmn:sequenceFlow id="Flow_OCR_To_Rekap" sourceRef="Task_OCRPasporKTP" targetRef="Task_RekapDokumen" />
+    <bpmn:sequenceFlow id="Flow_OCR_To_Finance" sourceRef="Task_OCRPasporKTP" targetRef="Task_VerifikasiBayar" />
+    <bpmn:sequenceFlow id="Flow_Doc_To_Visa" sourceRef="Task_RekapDokumen" targetRef="Task_PengurusanVisa" />
+    <bpmn:sequenceFlow id="Flow_To_VisaGateway" sourceRef="Task_PengurusanVisa" targetRef="Gateway_StatusVisa" />
+    <bpmn:sequenceFlow id="Flow_Visa_Tidak" name="Tidak" sourceRef="Gateway_StatusVisa" targetRef="Task_PengurusanVisa" />
+    <bpmn:sequenceFlow id="Flow_Visa_Ya" name="Ya" sourceRef="Gateway_StatusVisa" targetRef="Task_UpdateStatusManifest" />
+    <bpmn:sequenceFlow id="Flow_Visa_To_Berangkat" sourceRef="Task_UpdateStatusManifest" targetRef="Task_Berangkat" />
+    <bpmn:sequenceFlow id="Flow_To_VerifBayar" sourceRef="Task_Bayar" targetRef="Task_VerifikasiBayar" />
+    <bpmn:sequenceFlow id="Flow_To_BayarGateway" sourceRef="Task_VerifikasiBayar" targetRef="Gateway_BayarValid" />
+    <bpmn:sequenceFlow id="Flow_Bayar_Tidak" name="Tidak" sourceRef="Gateway_BayarValid" targetRef="Task_Bayar" />
+    <bpmn:sequenceFlow id="Flow_Bayar_Ya" name="Ya" sourceRef="Gateway_BayarValid" targetRef="Task_UpdateManifestBayar" />
+    <bpmn:sequenceFlow id="Flow_BlockSeat_To_Pesan" sourceRef="Task_BlockSeat" targetRef="Task_PesanTiket" />
+    <bpmn:sequenceFlow id="Flow_Pesan_To_Terima" sourceRef="Task_PesanTiket" targetRef="Task_TerimaETicket" />
+    <bpmn:sequenceFlow id="Flow_Terima_To_Konf" sourceRef="Task_TerimaETicket" targetRef="Task_KonfirmasiJamaah" />
+    <bpmn:sequenceFlow id="Flow_Konf_To_Vendor" sourceRef="Task_KonfirmasiJamaah" targetRef="Task_KoordinasiVendor" />
+    <bpmn:sequenceFlow id="Flow_Konf_To_Briefing" sourceRef="Task_KonfirmasiJamaah" targetRef="Task_Briefing" />
+    <bpmn:sequenceFlow id="Flow_Vendor_To_RekapVendor" sourceRef="Task_KoordinasiVendor" targetRef="Task_RekapBayarVendor" />
+    <bpmn:sequenceFlow id="Flow_Fin_To_RekapVendor" sourceRef="Task_UpdateManifestBayar" targetRef="Task_RekapBayarVendor" />
+    <bpmn:sequenceFlow id="Flow_Briefing_To_Berangkat" sourceRef="Task_Briefing" targetRef="Task_Berangkat" />
+    <bpmn:sequenceFlow id="Flow_Briefing_To_Damping" sourceRef="Task_Briefing" targetRef="Task_Pendampingan" />
+    <bpmn:sequenceFlow id="Flow_Berangkat_To_Ibadah" sourceRef="Task_Berangkat" targetRef="Task_Ibadah" />
+    <bpmn:sequenceFlow id="Flow_Ibadah_To_Kembali" sourceRef="Task_Ibadah" targetRef="Task_Kembali" />
+    <bpmn:sequenceFlow id="Flow_Damping_To_Laporan" sourceRef="Task_Pendampingan" targetRef="Task_LaporanPerjalanan" />
+    <bpmn:sequenceFlow id="Flow_Kembali_To_End" sourceRef="Task_Kembali" targetRef="EndEvent_Selesai" />
+    <bpmn:sequenceFlow id="Flow_Kembali_To_FollowUp" sourceRef="Task_Kembali" targetRef="Task_FollowUp" />
+
+  </bpmn:process>
+
+  <!-- DIAGRAM / VISUAL LAYOUT (BPMNDI) -->
+  <bpmndi:BPMNDiagram id="BPMNDiagram_1">
+    <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="Collaboration_Umroh">
+      
+      <!-- PARTICIPANT / POOL SHAPE -->
+      <bpmndi:BPMNShape id="Participant_VauzaTamma_di" bpmnElement="Participant_VauzaTamma" isHorizontal="true">
+        <dc:Bounds x="160" y="80" width="2880" height="1050" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+
+      <!-- LANES -->
+      <bpmndi:BPMNShape id="Lane_Jamaah_di" bpmnElement="Lane_Jamaah" isHorizontal="true" bioc:stroke="#1e88e5" bioc:fill="#bbdefb">
+        <dc:Bounds x="190" y="80" width="2850" height="150" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="Lane_Marketing_di" bpmnElement="Lane_Marketing" isHorizontal="true" bioc:stroke="#039be5" bioc:fill="#b3e5fc">
+        <dc:Bounds x="190" y="230" width="2850" height="150" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="Lane_AdminOps_di" bpmnElement="Lane_AdminOps" isHorizontal="true" bioc:stroke="#00897b" bioc:fill="#b2dfdb">
+        <dc:Bounds x="190" y="380" width="2850" height="150" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="Lane_DokumenVisa_di" bpmnElement="Lane_DokumenVisa" isHorizontal="true" bioc:stroke="#fbc02d" bioc:fill="#fff9c4">
+        <dc:Bounds x="190" y="530" width="2850" height="150" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="Lane_Finance_di" bpmnElement="Lane_Finance" isHorizontal="true" bioc:stroke="#d81b60" bioc:fill="#f8bbd0">
+        <dc:Bounds x="190" y="680" width="2850" height="150" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="Lane_TiketingVendor_di" bpmnElement="Lane_TiketingVendor" isHorizontal="true" bioc:stroke="#8e24aa" bioc:fill="#e1bee7">
+        <dc:Bounds x="190" y="830" width="2850" height="150" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="Lane_TourLeader_di" bpmnElement="Lane_TourLeader" isHorizontal="true" bioc:stroke="#0288d1" bioc:fill="#b3e5fc">
+        <dc:Bounds x="190" y="980" width="2850" height="150" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+
+      <!-- EXTERNAL PARTICIPANTS / SYSTEMS (BOTTOM) -->
+      <bpmndi:BPMNShape id="Participant_Telegram_di" bpmnElement="Participant_Telegram" isHorizontal="true" bioc:stroke="#0288d1" bioc:fill="#e1f5fe">
+        <dc:Bounds x="460" y="1180" width="160" height="60" />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="Participant_GDS_di" bpmnElement="Participant_GDS" isHorizontal="true" bioc:stroke="#5c6bc0" bioc:fill="#e8eaf6">
+        <dc:Bounds x="1940" y="1180" width="180" height="60" />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="Participant_Nusuk_di" bpmnElement="Participant_Nusuk" isHorizontal="true" bioc:stroke="#00897b" bioc:fill="#e0f2f1">
+        <dc:Bounds x="1560" y="1180" width="160" height="60" />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="Participant_Drive_di" bpmnElement="Participant_Drive" isHorizontal="true" bioc:stroke="#43a047" bioc:fill="#e8f5e9">
+        <dc:Bounds x="2540" y="1180" width="220" height="60" />
+      </bpmndi:BPMNShape>
+
+      <!-- NODES: LANE JAMAAH -->
+      <bpmndi:BPMNShape id="StartEvent_Mulai_di" bpmnElement="StartEvent_Mulai" bioc:stroke="#2e7d32" bioc:fill="#a5d6a7">
+        <dc:Bounds x="260" y="132" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="265" y="175" width="27" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="Task_LihatPaket_di" bpmnElement="Task_LihatPaket" bioc:stroke="#1565c0" bioc:fill="#e3f2fd">
+        <dc:Bounds x="350" y="115" width="130" height="70" />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="Task_DaftarOnline_di" bpmnElement="Task_DaftarOnline" bioc:stroke="#00897b" bioc:fill="#e8f8f5">
+        <dc:Bounds x="650" y="115" width="130" height="70" />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="Task_UploadDokumen_di" bpmnElement="Task_UploadDokumen" bioc:stroke="#00897b" bioc:fill="#e8f8f5">
+        <dc:Bounds x="830" y="115" width="130" height="70" />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="Gateway_DataLengkap_di" bpmnElement="Gateway_DataLengkap" isMarkerVisible="true" bioc:stroke="#e65100" bioc:fill="#fff3e0">
+        <dc:Bounds x="1000" y="125" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="987" y="182" width="76" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="Task_Bayar_di" bpmnElement="Task_Bayar" bioc:stroke="#c2185b" bioc:fill="#fce4ec">
+        <dc:Bounds x="1600" y="115" width="130" height="70" />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="DataObjectRef_BuktiBayar_di" bpmnElement="DataObjectRef_BuktiBayar" bioc:stroke="#37474f" bioc:fill="#ffffff">
+        <dc:Bounds x="1760" y="125" width="36" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1744" y="182" width="68" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="Task_Berangkat_di" bpmnElement="Task_Berangkat" bioc:stroke="#00838f" bioc:fill="#e0f7fa">
+        <dc:Bounds x="2420" y="115" width="120" height="70" />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="Task_Ibadah_di" bpmnElement="Task_Ibadah" bioc:stroke="#00838f" bioc:fill="#e0f7fa">
+        <dc:Bounds x="2580" y="115" width="130" height="70" />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="Task_Kembali_di" bpmnElement="Task_Kembali" bioc:stroke="#00838f" bioc:fill="#e0f7fa">
+        <dc:Bounds x="2750" y="115" width="120" height="70" />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="EndEvent_Selesai_di" bpmnElement="EndEvent_Selesai" bioc:stroke="#c62828" bioc:fill="#ffcdd2">
+        <dc:Bounds x="2910" y="132" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2910" y="175" width="37" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+
+      <!-- NODES: LANE MARKETING -->
+      <bpmndi:BPMNShape id="Task_ListPaket_di" bpmnElement="Task_ListPaket" bioc:stroke="#1565c0" bioc:fill="#e3f2fd">
+        <dc:Bounds x="260" y="265" width="130" height="70" />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="Task_BroadcastTelegram_di" bpmnElement="Task_BroadcastTelegram" bioc:stroke="#1565c0" bioc:fill="#e3f2fd">
+        <dc:Bounds x="430" y="265" width="130" height="70" />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="Task_FollowUp_di" bpmnElement="Task_FollowUp" bioc:stroke="#283593" bioc:fill="#e8eaf6">
+        <dc:Bounds x="2750" y="265" width="130" height="70" />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="DataObjectRef_LaporanFeedback_di" bpmnElement="DataObjectRef_LaporanFeedback" bioc:stroke="#37474f" bioc:fill="#ffffff">
+        <dc:Bounds x="2910" y="275" width="36" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2896" y="332" width="65" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+
+      <!-- NODES: LANE ADMIN OPERASIONAL -->
+      <bpmndi:BPMNShape id="Task_TerimaNotifDaftar_di" bpmnElement="Task_TerimaNotifDaftar" bioc:stroke="#00897b" bioc:fill="#e8f8f5">
+        <dc:Bounds x="650" y="415" width="130" height="70" />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="Task_CekKelengkapan_di" bpmnElement="Task_CekKelengkapan" bioc:stroke="#00897b" bioc:fill="#e8f8f5">
+        <dc:Bounds x="830" y="415" width="130" height="70" />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="Gateway_Valid_di" bpmnElement="Gateway_Valid" isMarkerVisible="true" bioc:stroke="#e65100" bioc:fill="#fff3e0">
+        <dc:Bounds x="1000" y="425" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1011" y="482" width="29" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="Task_InputManifest_di" bpmnElement="Task_InputManifest" bioc:stroke="#fbc02d" bioc:fill="#fff9c4">
+        <dc:Bounds x="1100" y="415" width="120" height="70" />
+      </bpmndi:BPMNShape>
+
+      <!-- NODES: LANE DOKUMEN & VISA -->
+      <bpmndi:BPMNShape id="Task_OCRPasporKTP_di" bpmnElement="Task_OCRPasporKTP" bioc:stroke="#fbc02d" bioc:fill="#fff9c4">
+        <dc:Bounds x="1200" y="565" width="140" height="70" />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="DataObjectRef_Paspor_di" bpmnElement="DataObjectRef_Paspor" bioc:stroke="#37474f" bioc:fill="#ffffff">
+        <dc:Bounds x="1205" y="645" width="36" height="45" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1205" y="693" width="36" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="DataObjectRef_KTP_di" bpmnElement="DataObjectRef_KTP" bioc:stroke="#37474f" bioc:fill="#ffffff">
+        <dc:Bounds x="1255" y="645" width="36" height="45" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1262" y="693" width="22" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="DataStoreRef_DataOCR_di" bpmnElement="DataStoreRef_DataOCR" bioc:stroke="#0288d1" bioc:fill="#e1f5fe">
+        <dc:Bounds x="1310" y="645" width="45" height="45" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1309" y="693" width="48" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="Task_RekapDokumen_di" bpmnElement="Task_RekapDokumen" bioc:stroke="#fbc02d" bioc:fill="#fff9c4">
+        <dc:Bounds x="1380" y="565" width="130" height="70" />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="Task_PengurusanVisa_di" bpmnElement="Task_PengurusanVisa" bioc:stroke="#fbc02d" bioc:fill="#fff9c4">
+        <dc:Bounds x="1550" y="565" width="130" height="70" />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="Gateway_StatusVisa_di" bpmnElement="Gateway_StatusVisa" isMarkerVisible="true" bioc:stroke="#e65100" bioc:fill="#fff3e0">
+        <dc:Bounds x="1720" y="575" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1717" y="632" width="57" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="DataObjectRef_EVisa_di" bpmnElement="DataObjectRef_EVisa" bioc:stroke="#37474f" bioc:fill="#ffffff">
+        <dc:Bounds x="1795" y="575" width="36" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1797" y="632" width="33" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="Task_UpdateStatusManifest_di" bpmnElement="Task_UpdateStatusManifest" bioc:stroke="#fbc02d" bioc:fill="#fff9c4">
+        <dc:Bounds x="1860" y="565" width="130" height="70" />
+      </bpmndi:BPMNShape>
+
+      <!-- NODES: LANE FINANCE -->
+      <bpmndi:BPMNShape id="Task_VerifikasiBayar_di" bpmnElement="Task_VerifikasiBayar" bioc:stroke="#c2185b" bioc:fill="#fce4ec">
+        <dc:Bounds x="1600" y="715" width="130" height="70" />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="Gateway_BayarValid_di" bpmnElement="Gateway_BayarValid" isMarkerVisible="true" bioc:stroke="#e65100" bioc:fill="#fff3e0">
+        <dc:Bounds x="1770" y="725" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1763" y="782" width="65" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="Task_UpdateManifestBayar_di" bpmnElement="Task_UpdateManifestBayar" bioc:stroke="#c2185b" bioc:fill="#fce4ec">
+        <dc:Bounds x="1860" y="715" width="130" height="70" />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="DataObjectRef_DataPembayaran_di" bpmnElement="DataObjectRef_DataPembayaran" bioc:stroke="#37474f" bioc:fill="#ffffff">
+        <dc:Bounds x="2020" y="725" width="36" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2004" y="782" width="69" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="Task_RekapBayarVendor_di" bpmnElement="Task_RekapBayarVendor" bioc:stroke="#c2185b" bioc:fill="#fce4ec">
+        <dc:Bounds x="2420" y="715" width="130" height="70" />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="DataObjectRef_LaporanVendor_di" bpmnElement="DataObjectRef_LaporanVendor" bioc:stroke="#37474f" bioc:fill="#ffffff">
+        <dc:Bounds x="2580" y="690" width="36" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2560" y="747" width="77" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="DataObjectRef_LaporanKeuangan_di" bpmnElement="DataObjectRef_LaporanKeuangan" bioc:stroke="#37474f" bioc:fill="#ffffff">
+        <dc:Bounds x="2580" y="755" width="36" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2556" y="812" width="85" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+
+      <!-- NODES: LANE TIKETING & VENDOR -->
+      <bpmndi:BPMNShape id="Task_BlockSeat_di" bpmnElement="Task_BlockSeat" bioc:stroke="#6a1b9a" bioc:fill="#f3e5f5">
+        <dc:Bounds x="1770" y="865" width="140" height="70" />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="Task_PesanTiket_di" bpmnElement="Task_PesanTiket" bioc:stroke="#6a1b9a" bioc:fill="#f3e5f5">
+        <dc:Bounds x="1950" y="865" width="130" height="70" />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="Task_TerimaETicket_di" bpmnElement="Task_TerimaETicket" bioc:stroke="#6a1b9a" bioc:fill="#f3e5f5">
+        <dc:Bounds x="2120" y="865" width="130" height="70" />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="Task_KonfirmasiJamaah_di" bpmnElement="Task_KonfirmasiJamaah" bioc:stroke="#6a1b9a" bioc:fill="#f3e5f5">
+        <dc:Bounds x="2280" y="865" width="130" height="70" />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="DataObjectRef_ETicket_di" bpmnElement="DataObjectRef_ETicket" bioc:stroke="#37474f" bioc:fill="#ffffff">
+        <dc:Bounds x="2270" y="940" width="36" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2262" y="997" width="53" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="Task_KoordinasiVendor_di" bpmnElement="Task_KoordinasiVendor" bioc:stroke="#6a1b9a" bioc:fill="#f3e5f5">
+        <dc:Bounds x="2440" y="865" width="140" height="70" />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="DataObjectRef_VoucherVendor_di" bpmnElement="DataObjectRef_VoucherVendor" bioc:stroke="#37474f" bioc:fill="#ffffff">
+        <dc:Bounds x="2610" y="940" width="36" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2597" y="997" width="63" height="40" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+
+      <!-- NODES: LANE TOUR LEADER -->
+      <bpmndi:BPMNShape id="Task_Briefing_di" bpmnElement="Task_Briefing" bioc:stroke="#0277bd" bioc:fill="#e1f5fe">
+        <dc:Bounds x="2280" y="1015" width="130" height="70" />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="Task_Pendampingan_di" bpmnElement="Task_Pendampingan" bioc:stroke="#0277bd" bioc:fill="#e1f5fe">
+        <dc:Bounds x="2450" y="1015" width="140" height="70" />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="Task_LaporanPerjalanan_di" bpmnElement="Task_LaporanPerjalanan" bioc:stroke="#0277bd" bioc:fill="#e1f5fe">
+        <dc:Bounds x="2630" y="1015" width="130" height="70" />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="DataObjectRef_LaporanTL_di" bpmnElement="DataObjectRef_LaporanTL" bioc:stroke="#37474f" bioc:fill="#ffffff">
+        <dc:Bounds x="2790" y="1025" width="36" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2780" y="1082" width="57" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+
+      <!-- DATA STORES AT BOTTOM -->
+      <bpmndi:BPMNShape id="DataStoreRef_Paket_di" bpmnElement="DataStoreRef_Paket" bioc:stroke="#0288d1" bioc:fill="#e1f5fe">
+        <dc:Bounds x="300" y="1185" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="287" y="1242" width="77" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="DataStoreRef_Pendaftaran_di" bpmnElement="DataStoreRef_Pendaftaran" bioc:stroke="#0288d1" bioc:fill="#e1f5fe">
+        <dc:Bounds x="690" y="1185" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="684" y="1242" width="63" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="DataStoreRef_Manifest_di" bpmnElement="DataStoreRef_Manifest" bioc:stroke="#0288d1" bioc:fill="#e1f5fe">
+        <dc:Bounds x="1135" y="1185" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1119" y="1242" width="82" height="40" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="DataStoreRef_Pembayaran_di" bpmnElement="DataStoreRef_Pembayaran" bioc:stroke="#0288d1" bioc:fill="#e1f5fe">
+        <dc:Bounds x="1800" y="1185" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1794" y="1242" width="63" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+
+      <!-- SEQUENCE FLOW EDGES -->
+      <bpmndi:BPMNEdge id="Flow_1_di" bpmnElement="Flow_1">
+        <di:waypoint x="296" y="150" />
+        <di:waypoint x="350" y="150" />
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="Flow_Mkt_1_di" bpmnElement="Flow_Mkt_1">
+        <di:waypoint x="390" y="300" />
+        <di:waypoint x="430" y="300" />
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="Flow_BroadcastToJamaah_di" bpmnElement="Flow_BroadcastToJamaah">
+        <di:waypoint x="495" y="265" />
+        <di:waypoint x="495" y="225" />
+        <di:waypoint x="415" y="225" />
+        <di:waypoint x="415" y="185" />
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="Flow_2_di" bpmnElement="Flow_2">
+        <di:waypoint x="480" y="150" />
+        <di:waypoint x="650" y="150" />
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="Flow_3_di" bpmnElement="Flow_3">
+        <di:waypoint x="780" y="150" />
+        <di:waypoint x="830" y="150" />
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="Flow_NotifDaftar_di" bpmnElement="Flow_NotifDaftar">
+        <di:waypoint x="715" y="185" />
+        <di:waypoint x="715" y="415" />
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="Flow_4_di" bpmnElement="Flow_4">
+        <di:waypoint x="960" y="150" />
+        <di:waypoint x="1000" y="150" />
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="Flow_DataLengkap_Tidak_di" bpmnElement="Flow_DataLengkap_Tidak">
+        <di:waypoint x="1025" y="125" />
+        <di:waypoint x="1025" y="95" />
+        <di:waypoint x="715" y="95" />
+        <di:waypoint x="715" y="115" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="857" y="77" width="26" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="Flow_DataLengkap_Ya_di" bpmnElement="Flow_DataLengkap_Ya">
+        <di:waypoint x="1050" y="150" />
+        <di:waypoint x="1600" y="150" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1319" y="132" width="13" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="Flow_Ops_1_di" bpmnElement="Flow_Ops_1">
+        <di:waypoint x="780" y="450" />
+        <di:waypoint x="830" y="450" />
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="Flow_Ops_2_di" bpmnElement="Flow_Ops_2">
+        <di:waypoint x="960" y="450" />
+        <di:waypoint x="1000" y="450" />
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="Flow_Valid_Tidak_di" bpmnElement="Flow_Valid_Tidak">
+        <di:waypoint x="1025" y="425" />
+        <di:waypoint x="1025" y="360" />
+        <di:waypoint x="740" y="360" />
+        <di:waypoint x="740" y="185" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="870" y="342" width="26" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="Flow_Valid_Ya_di" bpmnElement="Flow_Valid_Ya">
+        <di:waypoint x="1050" y="450" />
+        <di:waypoint x="1100" y="450" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1069" y="432" width="13" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="Flow_To_OCR_di" bpmnElement="Flow_To_OCR">
+        <di:waypoint x="1160" y="485" />
+        <di:waypoint x="1160" y="600" />
+        <di:waypoint x="1200" y="600" />
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="Flow_OCR_To_Rekap_di" bpmnElement="Flow_OCR_To_Rekap">
+        <di:waypoint x="1340" y="600" />
+        <di:waypoint x="1380" y="600" />
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="Flow_OCR_To_Finance_di" bpmnElement="Flow_OCR_To_Finance">
+        <di:waypoint x="1270" y="635" />
+        <di:waypoint x="1270" y="750" />
+        <di:waypoint x="1600" y="750" />
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="Flow_Doc_To_Visa_di" bpmnElement="Flow_Doc_To_Visa">
+        <di:waypoint x="1510" y="600" />
+        <di:waypoint x="1550" y="600" />
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="Flow_To_VisaGateway_di" bpmnElement="Flow_To_VisaGateway">
+        <di:waypoint x="1680" y="600" />
+        <di:waypoint x="1720" y="600" />
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="Flow_Visa_Tidak_di" bpmnElement="Flow_Visa_Tidak">
+        <di:waypoint x="1745" y="575" />
+        <di:waypoint x="1745" y="545" />
+        <di:waypoint x="1615" y="545" />
+        <di:waypoint x="1615" y="565" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1668" y="527" width="26" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="Flow_Visa_Ya_di" bpmnElement="Flow_Visa_Ya">
+        <di:waypoint x="1770" y="600" />
+        <di:waypoint x="1860" y="600" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1809" y="582" width="13" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="Flow_Visa_To_Berangkat_di" bpmnElement="Flow_Visa_To_Berangkat">
+        <di:waypoint x="1990" y="600" />
+        <di:waypoint x="2480" y="600" />
+        <di:waypoint x="2480" y="185" />
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="Flow_To_VerifBayar_di" bpmnElement="Flow_To_VerifBayar">
+        <di:waypoint x="1665" y="185" />
+        <di:waypoint x="1665" y="715" />
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="Flow_To_BayarGateway_di" bpmnElement="Flow_To_BayarGateway">
+        <di:waypoint x="1730" y="750" />
+        <di:waypoint x="1770" y="750" />
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="Flow_Bayar_Tidak_di" bpmnElement="Flow_Bayar_Tidak">
+        <di:waypoint x="1795" y="725" />
+        <di:waypoint x="1795" y="660" />
+        <di:waypoint x="1630" y="660" />
+        <di:waypoint x="1630" y="185" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1700" y="642" width="26" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="Flow_Bayar_Ya_di" bpmnElement="Flow_Bayar_Ya">
+        <di:waypoint x="1820" y="750" />
+        <di:waypoint x="1860" y="750" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1834" y="732" width="13" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="Flow_BlockSeat_To_Pesan_di" bpmnElement="Flow_BlockSeat_To_Pesan">
+        <di:waypoint x="1910" y="900" />
+        <di:waypoint x="1950" y="900" />
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="Flow_Pesan_To_Terima_di" bpmnElement="Flow_Pesan_To_Terima">
+        <di:waypoint x="2080" y="900" />
+        <di:waypoint x="2120" y="900" />
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="Flow_Terima_To_Konf_di" bpmnElement="Flow_Terima_To_Konf">
+        <di:waypoint x="2250" y="900" />
+        <di:waypoint x="2280" y="900" />
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="Flow_Konf_To_Vendor_di" bpmnElement="Flow_Konf_To_Vendor">
+        <di:waypoint x="2410" y="900" />
+        <di:waypoint x="2440" y="900" />
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="Flow_Konf_To_Briefing_di" bpmnElement="Flow_Konf_To_Briefing">
+        <di:waypoint x="2345" y="935" />
+        <di:waypoint x="2345" y="1015" />
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="Flow_Vendor_To_RekapVendor_di" bpmnElement="Flow_Vendor_To_RekapVendor">
+        <di:waypoint x="2510" y="865" />
+        <di:waypoint x="2510" y="825" />
+        <di:waypoint x="2470" y="825" />
+        <di:waypoint x="2470" y="785" />
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="Flow_Fin_To_RekapVendor_di" bpmnElement="Flow_Fin_To_RekapVendor">
+        <di:waypoint x="1990" y="750" />
+        <di:waypoint x="2420" y="750" />
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="Flow_Briefing_To_Berangkat_di" bpmnElement="Flow_Briefing_To_Berangkat">
+        <di:waypoint x="2380" y="1015" />
+        <di:waypoint x="2380" y="220" />
+        <di:waypoint x="2440" y="220" />
+        <di:waypoint x="2440" y="185" />
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="Flow_Briefing_To_Damping_di" bpmnElement="Flow_Briefing_To_Damping">
+        <di:waypoint x="2410" y="1050" />
+        <di:waypoint x="2450" y="1050" />
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="Flow_Berangkat_To_Ibadah_di" bpmnElement="Flow_Berangkat_To_Ibadah">
+        <di:waypoint x="2540" y="150" />
+        <di:waypoint x="2580" y="150" />
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="Flow_Ibadah_To_Kembali_di" bpmnElement="Flow_Ibadah_To_Kembali">
+        <di:waypoint x="2710" y="150" />
+        <di:waypoint x="2750" y="150" />
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="Flow_Damping_To_Laporan_di" bpmnElement="Flow_Damping_To_Laporan">
+        <di:waypoint x="2590" y="1050" />
+        <di:waypoint x="2630" y="1050" />
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="Flow_Kembali_To_End_di" bpmnElement="Flow_Kembali_To_End">
+        <di:waypoint x="2870" y="150" />
+        <di:waypoint x="2910" y="150" />
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="Flow_Kembali_To_FollowUp_di" bpmnElement="Flow_Kembali_To_FollowUp">
+        <di:waypoint x="2810" y="185" />
+        <di:waypoint x="2810" y="265" />
+      </bpmndi:BPMNEdge>
+
+      <!-- MESSAGE FLOW EDGES -->
+      <bpmndi:BPMNEdge id="MsgFlow_Telegram_di" bpmnElement="MsgFlow_Telegram" stroke="#0288d1" stroke-dasharray="4 2">
+        <di:waypoint x="495" y="335" />
+        <di:waypoint x="495" y="1180" />
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="MsgFlow_GDS_di" bpmnElement="MsgFlow_GDS" stroke="#5c6bc0" stroke-dasharray="4 2">
+        <di:waypoint x="2015" y="935" />
+        <di:waypoint x="2015" y="1180" />
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="MsgFlow_Nusuk_di" bpmnElement="MsgFlow_Nusuk" stroke="#00897b" stroke-dasharray="4 2">
+        <di:waypoint x="1615" y="635" />
+        <di:waypoint x="1615" y="1180" />
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="MsgFlow_Drive_TL_di" bpmnElement="MsgFlow_Drive_TL" stroke="#43a047" stroke-dasharray="4 2">
+        <di:waypoint x="2695" y="1085" />
+        <di:waypoint x="2695" y="1180" />
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="MsgFlow_Drive_Finance_di" bpmnElement="MsgFlow_Drive_Finance" stroke="#43a047" stroke-dasharray="4 2">
+        <di:waypoint x="2520" y="785" />
+        <di:waypoint x="2520" y="1140" />
+        <di:waypoint x="2600" y="1140" />
+        <di:waypoint x="2600" y="1180" />
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="MsgFlow_Drive_Mkt_di" bpmnElement="MsgFlow_Drive_Mkt" stroke="#43a047" stroke-dasharray="4 2">
+        <di:waypoint x="2815" y="335" />
+        <di:waypoint x="2815" y="1140" />
+        <di:waypoint x="2700" y="1140" />
+        <di:waypoint x="2700" y="1180" />
+      </bpmndi:BPMNEdge>
+
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>

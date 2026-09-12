@@ -44,7 +44,9 @@ import {
   resolveAutocratFieldValues,
   renderAutocratMergedText,
   getTodayDateInfo,
+  isSystemAutoPlaceholder,
 } from "@/shared/lib/surat-autocrat-engine";
+import { KantorImigrasiCombobox } from "@/shared/components/ui/KantorImigrasiCombobox";
 import type {
   SuratTemplate,
   GeneratedSuratLog,
@@ -252,9 +254,14 @@ function GenerateSuratPageContent() {
       activeTemplate,
       activeJamaah,
       activeKeberangkatan,
-      manualFormData
+      manualFormData,
+      {
+        nomorSurat: computedNomorSurat,
+        tanggalSurat: todayInfo.masehi,
+        tanggalHijriyah: todayInfo.hijriyah,
+      }
     );
-  }, [activeTemplate, activeJamaah, activeKeberangkatan, manualFormData]);
+  }, [activeTemplate, activeJamaah, activeKeberangkatan, manualFormData, computedNomorSurat, todayInfo]);
 
   // Rendered Body Text
   const renderedLetterBody = useMemo(() => {
@@ -781,13 +788,15 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
                       3. Kolom Isian Data Surat (Autocrat Tags)
                     </span>
                     <span className="text-[10px] text-muted-foreground">
-                      {activeTemplate.placeholders.length} Tag Terkonfigurasi
+                      {activeTemplate.placeholders.filter((p) => !isSystemAutoPlaceholder(p.key)).length} Tag Terkonfigurasi
                     </span>
                   </CardTitle>
                 </CardHeader>
 
                 <CardContent className="pt-4 space-y-3 max-h-[45vh] overflow-y-auto pr-1">
-                  {activeTemplate.placeholders.map((p) => {
+                  {activeTemplate.placeholders
+                    .filter((p) => !isSystemAutoPlaceholder(p.key))
+                    .map((p) => {
                     const isManifest = p.sourceType === "manifest";
                     const resolvedVal = resolvedFieldValues[p.key] || "";
 
@@ -811,7 +820,29 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
                           )}
                         </div>
 
-                        {p.inputType === "textarea" ? (
+                        {p.inputType === "kantor_imigrasi" ? (
+                          <KantorImigrasiCombobox
+                            value={resolvedVal}
+                            onChange={(kanimNama, kanimKota) => {
+                              const nextData = { ...manualFormData, [p.key]: kanimNama };
+                              if (kanimKota) {
+                                const kotaPlaceholder = activeTemplate.placeholders.find(
+                                  (pl) =>
+                                    pl.key !== p.key &&
+                                    (pl.key.toLowerCase().includes("kotakanim") ||
+                                      pl.key.toLowerCase().includes("kota_kanim") ||
+                                      pl.key.toLowerCase().includes("kota_imigrasi") ||
+                                      pl.key.toLowerCase() === "kota")
+                                );
+                                if (kotaPlaceholder && !manualFormData[kotaPlaceholder.key]) {
+                                  nextData[kotaPlaceholder.key] = kanimKota;
+                                }
+                              }
+                              setManualFormData(nextData);
+                            }}
+                            placeholder={p.placeholderHint || "Cari atau ketik Kantor Imigrasi / Layanan Paspor..."}
+                          />
+                        ) : p.inputType === "textarea" ? (
                           <textarea
                             rows={3}
                             value={resolvedVal}

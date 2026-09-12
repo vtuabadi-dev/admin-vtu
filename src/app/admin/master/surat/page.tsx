@@ -41,6 +41,7 @@ import {
   MANIFEST_FIELD_OPTIONS,
   extractPlaceholdersFromText,
   extractPlaceholdersFromDocxFile,
+  isSystemAutoPlaceholder,
   loadSavedSuratTemplates,
   saveSuratTemplates,
   resolveAutocratFieldValues,
@@ -340,6 +341,9 @@ Demikian Surat Tugas ini dibuat dengan sebenarnya agar dapat dipergunakan sebaga
       // 3. PRUNE old/stale placeholders that are no longer present in any attached template!
       const newMappings: SuratPlaceholderMapping[] = [];
       allTags.forEach((tag) => {
+        // Exclude system auto placeholders (e.g. Nomor Surat 1, Tanggal Surat) from manual fields
+        if (isSystemAutoPlaceholder(tag)) return;
+
         const existing = prev.placeholders.find(
           (m) => m.key.toLowerCase().trim() === tag.toLowerCase().trim()
         );
@@ -357,7 +361,17 @@ Demikian Surat Tugas ini dibuat dengan sebenarnya agar dapat dipergunakan sebaga
 
           let detectedType: SuratInputType = "text";
           const tagLower = tag.toLowerCase();
+
           if (
+            tagLower.includes("kanim") ||
+            tagLower.includes("imigrasi")
+          ) {
+            if (tagLower.includes("kota")) {
+              detectedType = "city";
+            } else {
+              detectedType = "kantor_imigrasi";
+            }
+          } else if (
             tagLower.includes("tanggal") ||
             tagLower.includes("tgl") ||
             tagLower.includes("date") ||
@@ -494,6 +508,9 @@ Demikian Surat Tugas ini dibuat dengan sebenarnya agar dapat dipergunakan sebaga
     const newMappings: SuratPlaceholderMapping[] = [];
 
     tags.forEach((tag) => {
+      // Exclude system auto placeholders (e.g. Nomor Surat 1, Tanggal Surat) from manual fields
+      if (isSystemAutoPlaceholder(tag)) return;
+
       const found = existing.find(
         (m) => m.key.toLowerCase().trim() === tag.toLowerCase().trim()
       );
@@ -510,7 +527,17 @@ Demikian Surat Tugas ini dibuat dengan sebenarnya agar dapat dipergunakan sebaga
         );
         let detectedType: SuratInputType = "text";
         const tagLower = tag.toLowerCase();
+
         if (
+          tagLower.includes("kanim") ||
+          tagLower.includes("imigrasi")
+        ) {
+          if (tagLower.includes("kota")) {
+            detectedType = "city";
+          } else {
+            detectedType = "kantor_imigrasi";
+          }
+        } else if (
           tagLower.includes("tanggal") ||
           tagLower.includes("tgl") ||
           tagLower.includes("date") ||
@@ -714,28 +741,33 @@ Demikian Surat Tugas ini dibuat dengan sebenarnya agar dapat dipergunakan sebaga
     return extractPlaceholdersFromText(textPieces.join("\n"));
   }, [editingTemplate]);
 
+  // System auto-tags extracted from template (e.g. Nomor Surat 1, Tanggal Surat)
+  const systemAutoTags = useMemo(() => {
+    return detectedTagsInEditing.filter((t) => isSystemAutoPlaceholder(t));
+  }, [detectedTagsInEditing]);
+
+  const editableTagsInEditing = useMemo(() => {
+    return detectedTagsInEditing.filter((t) => !isSystemAutoPlaceholder(t));
+  }, [detectedTagsInEditing]);
+
   // Synchronize placeholder mappings when tags change in template & prune stale placeholders
   useEffect(() => {
     if (!editingTemplate) return;
-    if (detectedTagsInEditing.length === 0) return;
-
-    const hasAttachedDocs = (editingTemplate.attachedFiles || []).some(
-      (f) => (f.content && f.content.trim().length > 0) || (f.fileName && f.fileName.trim().length > 0)
-    );
 
     const currentKeys = new Set(editingTemplate.placeholders.map((m) => m.key.toLowerCase().trim()));
-    const detectedLower = detectedTagsInEditing.map((t) => t.toLowerCase().trim());
+    const editableLower = editableTagsInEditing.map((t) => t.toLowerCase().trim());
 
-    const hasMissingTags = detectedLower.some((t) => !currentKeys.has(t));
-    const hasStaleTags =
-      hasAttachedDocs &&
-      editingTemplate.placeholders.some((m) => !detectedLower.includes(m.key.toLowerCase().trim()));
+    // Check if there are missing editable tags or any stale tags (including any system auto tags lingering in placeholders)
+    const hasMissingTags = editableLower.some((t) => !currentKeys.has(t));
+    const hasStaleTags = editingTemplate.placeholders.some(
+      (m) => isSystemAutoPlaceholder(m.key) || !editableLower.includes(m.key.toLowerCase().trim())
+    );
 
     if (!hasMissingTags && !hasStaleTags) return;
 
     const newMappings: SuratPlaceholderMapping[] = [];
 
-    detectedTagsInEditing.forEach((tag) => {
+    editableTagsInEditing.forEach((tag) => {
       const found = editingTemplate.placeholders.find(
         (m) => m.key.toLowerCase().trim() === tag.toLowerCase().trim()
       );
@@ -750,7 +782,17 @@ Demikian Surat Tugas ini dibuat dengan sebenarnya agar dapat dipergunakan sebaga
 
         let detectedType: SuratInputType = "text";
         const tagLower = tag.toLowerCase();
+
         if (
+          tagLower.includes("kanim") ||
+          tagLower.includes("imigrasi")
+        ) {
+          if (tagLower.includes("kota")) {
+            detectedType = "city";
+          } else {
+            detectedType = "kantor_imigrasi";
+          }
+        } else if (
           tagLower.includes("tanggal") ||
           tagLower.includes("tgl") ||
           tagLower.includes("date") ||
@@ -797,7 +839,7 @@ Demikian Surat Tugas ini dibuat dengan sebenarnya agar dapat dipergunakan sebaga
     });
 
     setEditingTemplate((prev) => (prev ? { ...prev, placeholders: newMappings } : null));
-  }, [detectedTagsInEditing, editingTemplate]);
+  }, [editableTagsInEditing, editingTemplate]);
 
   // Save edited template
   const handleSaveEditor = async () => {
@@ -1423,6 +1465,32 @@ Demikian Surat Tugas ini dibuat dengan sebenarnya agar dapat dipergunakan sebaga
                   </div>
                 </div>
 
+                {/* System-Generated Placeholders Banner */}
+                {systemAutoTags.length > 0 && (
+                  <div className="p-3.5 rounded-xl border border-blue-500/20 bg-blue-500/5 dark:bg-blue-950/20 text-xs space-y-1.5">
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="h-4 w-4 text-blue-600 dark:text-blue-400 shrink-0" />
+                      <span className="font-bold text-blue-900 dark:text-blue-200">
+                        {systemAutoTags.length} Variabel Otomatis Sistem (Tidak Memerlukan Input Manual)
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-blue-700/80 dark:text-blue-300/80">
+                      Tag berikut otomatis digenerate oleh sistem (Nomor Surat, Tanggal Surat, dll) saat cetak/generate surat:
+                    </p>
+                    <div className="flex flex-wrap gap-1.5 pt-1">
+                      {systemAutoTags.map((tag) => (
+                        <Badge
+                          key={tag}
+                          variant="secondary"
+                          className="font-mono text-[10px] bg-blue-100 dark:bg-blue-900/60 text-blue-800 dark:text-blue-200 border-blue-300 dark:border-blue-700"
+                        >
+                          &#123;&#123;{tag}&#125;&#125;
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {editingTemplate.placeholders.length === 0 ? (
                   <div className="p-6 text-center border border-dashed rounded-xl text-xs text-muted-foreground space-y-1">
                     <p>Belum ada variabel placeholder terdeteksi di dalam template surat ini.</p>
@@ -1528,6 +1596,7 @@ Demikian Surat Tugas ini dibuat dengan sebenarnya agar dapat dipergunakan sebaga
                                   { value: "number", label: "Angka / Nomor" },
                                   { value: "textarea", label: "Teks Panjang / Paragraf" },
                                   { value: "select", label: "Pilihan (Dropdown)" },
+                                  { value: "kantor_imigrasi", label: "Kantor Imigrasi / Layanan Paspor (Searchable)" },
                                   { value: "manifest", label: "Ambil dari Manifest (Otomatis)" },
                                 ]}
                                 className="text-xs h-9 bg-background"

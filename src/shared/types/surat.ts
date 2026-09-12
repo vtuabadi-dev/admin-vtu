@@ -8,7 +8,7 @@ export type SuratKategori =
 
 export type SuratFieldSourceType = "manifest" | "manual";
 
-export type SuratInputType = "text" | "date" | "city" | "number" | "select" | "textarea";
+export type SuratInputType = "text" | "date" | "city" | "number" | "select" | "textarea" | "kantor_imigrasi";
 
 export interface SuratPlaceholderMapping {
   key: string;               // e.g. "nama_lengkap" or "Nama Pegawai"
@@ -93,6 +93,6 @@ export interface GeneratedSuratLog {
 export interface ManifestFieldOption {
   key: string;               // e.g. "jamaah.namaLengkap"
   label: string;             // e.g. "Nama Lengkap Jamaah"
-  group: "Jamaah" | "Keberangkatan / Paket" | "Tanggal & Sistem";
+  group: "Jamaah" | "Keberangkatan / Paket" | "Tanggal & Sistem" | "Dokumen & Paspor";
   sampleValue: string;
 }

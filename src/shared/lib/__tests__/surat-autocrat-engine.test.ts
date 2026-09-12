@@ -5,7 +5,9 @@ import {
   resolveAutocratFieldValues,
   renderAutocratMergedText,
   DEFAULT_SURAT_TEMPLATES,
+  isSystemAutoPlaceholder,
 } from "@/shared/lib/surat-autocrat-engine";
+import { searchKantorImigrasi } from "@/shared/lib/kantor-imigrasi";
 
 describe("Surat Autocrat Merge Engine", () => {
   it("should extract {placeholders} and {{placeholders}} from template text accurately", () => {
@@ -115,5 +117,61 @@ describe("Surat Autocrat Merge Engine", () => {
     const merged = renderAutocratMergedText(templateText, resolvedValues);
     expect(merged).toContain("Kepada Yth. MUCHAMAD ZAMRONI (NIK: 3515082103850001)");
     expect(merged).toContain("Paket: Paket Umroh Reguler");
+  });
+
+  it("should correctly identify system auto placeholders (Nomor Surat, Tanggal Surat, etc.)", () => {
+    // True cases: system-managed tags
+    expect(isSystemAutoPlaceholder("Nomor Surat")).toBe(true);
+    expect(isSystemAutoPlaceholder("Nomor Surat 1")).toBe(true);
+    expect(isSystemAutoPlaceholder("Nomor Surat 2")).toBe(true);
+    expect(isSystemAutoPlaceholder("no_surat")).toBe(true);
+    expect(isSystemAutoPlaceholder("nomor")).toBe(true);
+    expect(isSystemAutoPlaceholder("Tanggal Surat")).toBe(true);
+    expect(isSystemAutoPlaceholder("tanggal_surat")).toBe(true);
+    expect(isSystemAutoPlaceholder("Tanggal Hari Ini")).toBe(true);
+    expect(isSystemAutoPlaceholder("today")).toBe(true);
+    expect(isSystemAutoPlaceholder("tanggal_hijriyah")).toBe(true);
+
+    // False cases: manual user input / manifest fields
+    expect(isSystemAutoPlaceholder("Nama Jama'ah")).toBe(false);
+    expect(isSystemAutoPlaceholder("nama_lengkap")).toBe(false);
+    expect(isSystemAutoPlaceholder("nik")).toBe(false);
+    expect(isSystemAutoPlaceholder("kantor_imigrasi")).toBe(false);
+    expect(isSystemAutoPlaceholder("kanim")).toBe(false);
+    expect(isSystemAutoPlaceholder("kota_kanim")).toBe(false);
+  });
+
+  it("should resolve systemOverrides for Nomor Surat and Tanggal Surat without manual inputs", () => {
+    const template = {
+      ...DEFAULT_SURAT_TEMPLATES[0]!,
+      templateContent: "Nomor: {{Nomor Surat}}\nTanggal: {{Tanggal Surat}}\nNama: {{nama_lengkap}}",
+    };
+    const overrides = {
+      nomorSurat: "001/SR-PASPOR/VTU/IX/2026",
+      tanggalSurat: "12 September 2026",
+    };
+
+    const resolved = resolveAutocratFieldValues(
+      template,
+      null,
+      null,
+      {},
+      overrides
+    );
+
+    expect(resolved["Nomor Surat"]).toBe("001/SR-PASPOR/VTU/IX/2026");
+    expect(resolved["Tanggal Surat"]).toBe("12 September 2026");
+  });
+
+  it("should provide searchable Kantor Imigrasi and Layanan Paspor list", () => {
+    const surabayaResults = searchKantorImigrasi("Surabaya");
+    expect(surabayaResults.length).toBeGreaterThanOrEqual(1);
+    expect(surabayaResults[0]?.nama).toContain("Surabaya");
+
+    const soekarnoHattaResults = searchKantorImigrasi("Soekarno Hatta");
+    expect(soekarnoHattaResults.length).toBeGreaterThanOrEqual(1);
+
+    const mppResults = searchKantorImigrasi("MPP");
+    expect(mppResults.length).toBeGreaterThanOrEqual(1);
   });
 });

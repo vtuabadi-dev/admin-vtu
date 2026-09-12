@@ -5,6 +5,7 @@ import type {
   ManifestFieldOption,
 } from "@/shared/types/surat";
 import { formatDate } from "@/shared/lib/utils";
+import { DAFTAR_KANTOR_IMIGRASI, getKotaFromKanimName } from "@/shared/lib/kantor-imigrasi";
 
 // ────────────────────────────────────────────────────────────
 // ROMAN MONTHS & DATE UTILITIES
@@ -62,6 +63,10 @@ export const MANIFEST_FIELD_OPTIONS: ManifestFieldOption[] = [
   { key: "vtu.pimpinan", label: "Nama Direktur / Pimpinan PPIU", group: "Tanggal & Sistem", sampleValue: "H. Fauzan Adzim, S.E." },
   { key: "vtu.jabatan", label: "Jabatan Penandatangan", group: "Tanggal & Sistem", sampleValue: "Direktur Utama" },
   { key: "vtu.noIzin", label: "Nomor Izin PPIU Resmi", group: "Tanggal & Sistem", sampleValue: "Izin Kemenag RI No. U.400 Tahun 2021" },
+
+  // Dokumen Keimigrasian & Layanan Paspor
+  { key: "imigrasi.kanim", label: "Kantor Imigrasi / Layanan Paspor", group: "Dokumen & Paspor", sampleValue: "Kantor Imigrasi Kelas I Khusus TPI Surabaya" },
+  { key: "imigrasi.kotaKanim", label: "Kota Kantor Imigrasi", group: "Dokumen & Paspor", sampleValue: "Surabaya" },
 ];
 
 // ────────────────────────────────────────────────────────────
@@ -598,23 +603,129 @@ Besar harapan kami kiranya permohonan klaim ini dapat segera diproses sesuai ket
 // AUTOCRAT ENGINE: RESOLVE VALUES FROM MANIFEST & FORM DATA
 // ────────────────────────────────────────────────────────────
 
+/**
+ * Detects whether a placeholder tag is managed automatically by the system
+ * (e.g. Nomor Surat, Nomor Surat 1, Tanggal Surat, Tanggal Hari Ini, Today, Hijriyah).
+ * These tags should NOT be displayed in manual form inputs.
+ */
+export function isSystemAutoPlaceholder(rawKey: string): boolean {
+  if (!rawKey) return false;
+  const k = rawKey.toLowerCase().trim().replace(/[\s_\-\.]/g, "");
+
+  // Nomor surat variants
+  if (
+    k.startsWith("nomorsurat") ||
+    k.startsWith("nosurat") ||
+    k === "nomor" ||
+    k === "no" ||
+    k.startsWith("nomorsurattugas") ||
+    k.startsWith("nosurattugas")
+  ) {
+    return true;
+  }
+
+  // Tanggal surat / tanggal hari ini variants
+  if (
+    k === "tanggalsurat" ||
+    k === "tglsurat" ||
+    k === "tanggalhariini" ||
+    k === "tglhariini" ||
+    k === "tanggal" ||
+    k === "tgl" ||
+    k === "today" ||
+    k === "tanggalhijriyah" ||
+    k === "tglhijriyah" ||
+    k === "bulanromawi" ||
+    k === "tahun"
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
 export function resolveAutocratFieldValues(
   template: SuratTemplate,
   jamaah: any | null,
   keberangkatan: any | null,
-  manualFormData: Record<string, any> = {}
+  manualFormData: Record<string, any> = {},
+  systemOverrides: {
+    nomorSurat?: string;
+    nomorSurat2?: string;
+    tanggalSurat?: string;
+    tanggalHijriyah?: string;
+  } = {}
 ): Record<string, string> {
   const today = getTodayDateInfo();
   const values: Record<string, string> = {};
 
-  // Extract all placeholders in template
-  const detectedKeys = extractPlaceholdersFromText(
-    `${template.templateContent} ${template.perihalDefault} ${template.tujuanDefault || ""} ${template.kotaTujuanDefault || ""}`
-  );
+  // Extract all placeholders across template sources
+  const textSources = [
+    template.templateContent,
+    template.perihalDefault,
+    template.tujuanDefault || "",
+    template.kotaTujuanDefault || "",
+    ...(template.attachedFiles?.map((f) => f.content || "") || []),
+    ...(template.attachedFiles?.map((f) => f.formatNamaFile || "") || []),
+    template.formatNamaFile || "",
+    ...template.placeholders.map((p) => `{${p.key}}`),
+  ].join("\n");
+
+  const detectedKeys = extractPlaceholdersFromText(textSources);
 
   detectedKeys.forEach((key) => {
-    // Check if mapping exists in template.placeholders
-    const mapping = template.placeholders.find((p) => p.key.toLowerCase() === key.toLowerCase());
+    const cleanK = key.toLowerCase().trim().replace(/[\s_\-\.]/g, "");
+
+    // 1. System auto-resolved variables
+    if (cleanK === "nomorsurat2" || cleanK === "nosurat2") {
+      values[key] =
+        systemOverrides.nomorSurat2 ||
+        systemOverrides.nomorSurat ||
+        `002/${template.kodeNomorDefault || "SR-PASPOR"}/VTU/${today.romanMonth}/${today.year}`;
+      return;
+    }
+    if (
+      cleanK.startsWith("nomorsurat") ||
+      cleanK.startsWith("nosurat") ||
+      cleanK === "nomor" ||
+      cleanK === "no" ||
+      cleanK.startsWith("nomorsurattugas") ||
+      cleanK.startsWith("nosurattugas")
+    ) {
+      values[key] =
+        systemOverrides.nomorSurat ||
+        `001/${template.kodeNomorDefault || "SR-PASPOR"}/VTU/${today.romanMonth}/${today.year}`;
+      return;
+    }
+    if (
+      cleanK === "tanggalsurat" ||
+      cleanK === "tglsurat" ||
+      cleanK === "tanggalhariini" ||
+      cleanK === "tglhariini" ||
+      cleanK === "tanggal" ||
+      cleanK === "tgl" ||
+      cleanK === "today"
+    ) {
+      values[key] = systemOverrides.tanggalSurat || today.masehi;
+      return;
+    }
+    if (cleanK === "tanggalhijriyah" || cleanK === "tglhijriyah") {
+      values[key] = systemOverrides.tanggalHijriyah || today.hijriyah;
+      return;
+    }
+    if (cleanK === "bulanromawi") {
+      values[key] = today.bulanRomawi;
+      return;
+    }
+    if (cleanK === "tahun") {
+      values[key] = String(today.year);
+      return;
+    }
+
+    // 2. Check if mapping exists in template.placeholders
+    const mapping = template.placeholders.find(
+      (p) => p.key.toLowerCase().trim() === key.toLowerCase().trim()
+    );
 
     if (mapping) {
       if (mapping.sourceType === "manifest" && mapping.manifestField) {
@@ -625,7 +736,7 @@ export function resolveAutocratFieldValues(
         values[key] = manualFormData[key] !== undefined ? String(manualFormData[key]) : (mapping.defaultValue ?? "");
       }
     } else {
-      // Smart Auto-detection based on key name if not explicitly configured in mapping!
+      // Smart Auto-detection based on key name if not explicitly configured in mapping
       values[key] = autoDetectManifestValue(key, jamaah, keberangkatan, today, manualFormData);
     }
   });
@@ -809,6 +920,13 @@ function autoDetectManifestValue(
   }
   if (k.includes("tanggal_hari_ini") || k === "today") {
     return today.masehi;
+  }
+  if (k.includes("kanim") || k.includes("imigrasi")) {
+    if (k.includes("kota")) {
+      const parentKanim = manualFormData["kantor_imigrasi"] || manualFormData["kanim"] || "";
+      return manualFormData[key] || getKotaFromKanimName(parentKanim) || "Surabaya";
+    }
+    return manualFormData[key] || DAFTAR_KANTOR_IMIGRASI[0]?.nama || "Kantor Imigrasi Kelas I Khusus TPI Surabaya";
   }
 
   return manualFormData[key] || "";
