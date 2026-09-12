@@ -224,13 +224,16 @@ export function toTitleCase(str?: string | null): string {
     .toLowerCase()
     .split(/\s+/)
     .map((word) => {
-      // Handle slashes such as RT/RW or 005/002
+      // Handle slashes such as RT/RW or 005/002 or RT.001/RW.003
       if (word.includes("/")) {
         return word
           .split("/")
           .map((sub) => {
             const cleanSub = sub.replace(/[^a-zA-Z0-9]/g, "");
             if (uppercaseAcronyms.has(cleanSub)) return sub.toUpperCase();
+            if (/^(rt|rw)[\.\d]/i.test(sub)) {
+              return sub.replace(/^(rt|rw)/i, (m) => m.toUpperCase());
+            }
             return sub.replace(/(?:^|[\-\(\).])([a-z])/g, (m) => m.toUpperCase());
           })
           .join("/");
@@ -239,6 +242,10 @@ export function toTitleCase(str?: string | null): string {
       const cleanWord = word.replace(/[^a-zA-Z0-9]/g, "");
       if (uppercaseAcronyms.has(cleanWord)) {
         return word.toUpperCase();
+      }
+
+      if (/^(rt|rw)[\.\d]/i.test(word)) {
+        return word.replace(/^(rt|rw)/i, (m) => m.toUpperCase());
       }
 
       return word.replace(/(?:^|[\-\/\(\).])([a-z])/g, (m) => m.toUpperCase());

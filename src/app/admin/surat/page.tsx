@@ -1084,7 +1084,7 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
                         ) : p.inputType === "textarea" ? (
                           <textarea
                             rows={3}
-                            value={resolvedVal}
+                            value={resolvedVal === "-" ? "" : resolvedVal}
                             onChange={(e) =>
                               setManualFormData({ ...manualFormData, [p.key]: e.target.value })
                             }
@@ -1094,7 +1094,7 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
                         ) : p.inputType === "select" && validOptions.length > 0 ? (
                           isSearchableSelect ? (
                             <SearchableSelect
-                              value={resolvedVal}
+                              value={resolvedVal === "-" ? "" : resolvedVal}
                               onChange={(val) =>
                                 setManualFormData({ ...manualFormData, [p.key]: val })
                               }
@@ -1107,7 +1107,7 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
                             />
                           ) : (
                             <Select
-                              value={resolvedVal}
+                              value={resolvedVal === "-" ? "" : resolvedVal}
                               onChange={(e) =>
                                 setManualFormData({ ...manualFormData, [p.key]: e.target.value })
                               }
@@ -1118,13 +1118,11 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
                         ) : (
                           <Input
                             type={
-                              p.inputType === "date" && !isTempatField && !isKotaKanimField
-                                ? "date"
-                                : p.inputType === "number"
+                              p.inputType === "number"
                                 ? "number"
                                 : "text"
                             }
-                            value={displayValue}
+                            value={displayValue === "-" ? "" : displayValue}
                             onChange={(e) =>
                               setManualFormData({ ...manualFormData, [p.key]: e.target.value })
                             }

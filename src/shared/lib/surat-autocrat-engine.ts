@@ -828,11 +828,25 @@ export function resolveAutocratFieldValues(
         } else if (mapping.manifestField === "imigrasi.kanim") {
           values[key] = manualFormData[key] || DAFTAR_KANTOR_IMIGRASI[0]?.nama || "Kantor Imigrasi Kelas I Khusus TPI Surabaya";
         } else {
+          // Intelligent auto-correction for misconfigured manifestField
+          let effectiveField = mapping.manifestField;
+          const cleanKKey = key.toLowerCase().replace(/[\s_\-\.]/g, "");
+          const cleanLKey = (mapping.label || "").toLowerCase().replace(/[\s_\-\.]/g, "");
+          if ((cleanKKey.includes("bulan") || cleanLKey.includes("bulan")) && !effectiveField.startsWith("keberangkatan.")) {
+            effectiveField = "keberangkatan.bulanKeberangkatan";
+          } else if ((cleanKKey.includes("tanggallahir") || cleanLKey.includes("tanggallahir")) && effectiveField !== "jamaah.tanggalLahir") {
+            effectiveField = "jamaah.tanggalLahir";
+          } else if ((cleanKKey.includes("tempatlahir") || cleanLKey.includes("tempatlahir")) && effectiveField !== "jamaah.tempatLahir") {
+            effectiveField = "jamaah.tempatLahir";
+          } else if ((cleanKKey.includes("alamat") || cleanLKey.includes("alamat")) && effectiveField !== "jamaah.alamat") {
+            effectiveField = "jamaah.alamat";
+          }
+
           // If the admin edited this field in the form, use their manual edit! Otherwise resolve from manifest.
           values[key] =
             manualFormData[key] !== undefined && String(manualFormData[key]).trim() !== ""
               ? String(manualFormData[key])
-              : resolveManifestFieldValue(mapping.manifestField, jamaah, keberangkatan, today);
+              : resolveManifestFieldValue(effectiveField, jamaah, keberangkatan, today);
         }
       } else {
         // Manual form data priority -> auto-lookup kota if empty -> defaultValue -> empty string
@@ -891,7 +905,12 @@ export function resolveManifestFieldValue(
       case "namaLengkap":
         return toTitleCase(jamaah.namaLengkap || jamaah.name || "");
       case "nik":
-        return jamaah.nik || "-";
+        return (
+          jamaah.nik ||
+          jamaah.dokumen?.find?.((d: any) => d.jenis === "ktp")?.manualData?.nik ||
+          jamaah.dokumen?.find?.((d: any) => d.jenis === "ktp")?.ocrData?.nik ||
+          "-"
+        );
       case "nomorPaspor":
         return (
           jamaah.nomorPaspor ||
@@ -900,20 +919,78 @@ export function resolveManifestFieldValue(
           jamaah.dokumen?.find?.((d: any) => d.jenis === "paspor")?.manualData?.nomorPaspor ||
           "-"
         );
-      case "tempatLahir":
-        return toTitleCase(jamaah.tempatLahir || jamaah.pob || "-");
-      case "tanggalLahir":
-        return jamaah.tanggalLahir ? formatDate(jamaah.tanggalLahir) : (jamaah.dob ? formatDate(jamaah.dob) : "-");
-      case "jenisKelamin":
-        return jamaah.jenisKelamin === "L" || jamaah.jenisKelamin === "LAKI-LAKI"
+      case "tempatLahir": {
+        const direct = jamaah.tempatLahir && jamaah.tempatLahir.trim() !== "-" ? jamaah.tempatLahir : "";
+        const pob = jamaah.pob && jamaah.pob.trim() !== "-" ? jamaah.pob : "";
+        const docKtp = jamaah.dokumen?.find?.((d: any) => d.jenis === "ktp" || d.jenis === "paspor");
+        const docTempat = docKtp?.manualData?.tempatLahir || docKtp?.ocrData?.tempatLahir || "";
+        const finalTempat = direct || pob || docTempat || "-";
+        return finalTempat === "-" ? "-" : toTitleCase(finalTempat);
+      }
+      case "tanggalLahir": {
+        const direct = jamaah.tanggalLahir && jamaah.tanggalLahir !== "-" ? jamaah.tanggalLahir : null;
+        const dob = jamaah.dob && jamaah.dob !== "-" ? jamaah.dob : null;
+        const docKtp = jamaah.dokumen?.find?.((d: any) => d.jenis === "ktp" || d.jenis === "paspor");
+        const docTgl = docKtp?.manualData?.tanggalLahir || docKtp?.ocrData?.tanggalLahir;
+        const effectiveDate = direct || dob || docTgl;
+        return effectiveDate ? formatDate(effectiveDate) : "-";
+      }
+      case "jenisKelamin": {
+        const rawJk =
+          jamaah.jenisKelamin ||
+          jamaah.gender ||
+          jamaah.dokumen?.find?.((d: any) => d.jenis === "ktp")?.manualData?.jenisKelamin ||
+          jamaah.dokumen?.find?.((d: any) => d.jenis === "ktp")?.ocrData?.jenisKelamin;
+        return rawJk === "L" || rawJk === "LAKI-LAKI"
           ? "LAKI-LAKI"
-          : jamaah.jenisKelamin === "P" || jamaah.jenisKelamin === "PEREMPUAN"
+          : rawJk === "P" || rawJk === "PEREMPUAN"
           ? "PEREMPUAN"
           : "-";
+      }
       case "namaAyah":
         return toTitleCase(jamaah.namaAyah || jamaah.ayahKandung || jamaah.fatherName || "-");
-      case "alamat":
-        return toTitleCase(jamaah.alamat || jamaah.address || "-");
+      case "alamat": {
+        const directAlamat =
+          jamaah.alamat && jamaah.alamat.trim() !== "-" && jamaah.alamat.trim() !== ""
+            ? jamaah.alamat
+            : "";
+        const alamatLengkap =
+          jamaah.alamatLengkap && jamaah.alamatLengkap.trim() !== "-"
+            ? jamaah.alamatLengkap
+            : "";
+        const address =
+          jamaah.address && jamaah.address.trim() !== "-" ? jamaah.address : "";
+
+        // Check KTP document manualData and ocrData
+        const ktpDoc = jamaah.dokumen?.find?.((d: any) => d.jenis === "ktp");
+        const ktpAlamatLengkap =
+          ktpDoc?.manualData?.alamatLengkap || ktpDoc?.ocrData?.alamatLengkap;
+        const ktpAlamat =
+          ktpDoc?.manualData?.alamat || ktpDoc?.ocrData?.alamat;
+
+        // Check any document with address
+        const anyDocAlamat = jamaah.dokumen?.reduce?.((found: string, d: any) => {
+          if (found) return found;
+          return (
+            d.manualData?.alamatLengkap ||
+            d.manualData?.alamat ||
+            d.ocrData?.alamatLengkap ||
+            d.ocrData?.alamat ||
+            ""
+          );
+        }, "");
+
+        const rawResult =
+          directAlamat ||
+          alamatLengkap ||
+          ktpAlamatLengkap ||
+          ktpAlamat ||
+          address ||
+          anyDocAlamat ||
+          (jamaah.kota && jamaah.kota !== "-" ? `${jamaah.kota}, ${jamaah.provinsi || ""}`.trim() : "-");
+
+        return rawResult === "-" ? "-" : toTitleCase(rawResult);
+      }
       case "nomorTelepon":
         return jamaah.nomorTelepon || jamaah.noHp || jamaah.phone || "-";
       case "registrationId":
@@ -925,26 +1002,27 @@ export function resolveManifestFieldValue(
 
   // Keberangkatan fields
   if (fieldKey.startsWith("keberangkatan.")) {
-    if (!keberangkatan) return "";
+    if (!keberangkatan && !jamaah?.group?.keberangkatan && !jamaah?.keberangkatan) return "";
+    const effectiveKeb = keberangkatan || jamaah?.group?.keberangkatan || jamaah?.keberangkatan;
     const subKey = fieldKey.replace("keberangkatan.", "");
     switch (subKey) {
       case "namaPaket":
-        return keberangkatan.namaPaket || keberangkatan.paketUmroh?.namaPaket || keberangkatan.name || "-";
+        return effectiveKeb.namaPaket || effectiveKeb.paketUmroh?.namaPaket || effectiveKeb.name || "-";
       case "kode":
-        return keberangkatan.kode || keberangkatan.kodePaket || "-";
+        return effectiveKeb.kode || effectiveKeb.kodePaket || "-";
       case "tanggalBerangkat":
-        return keberangkatan.tanggalBerangkat
-          ? formatDate(keberangkatan.tanggalBerangkat)
-          : keberangkatan.departureDate
-          ? formatDate(keberangkatan.departureDate)
+        return effectiveKeb.tanggalBerangkat
+          ? formatDate(effectiveKeb.tanggalBerangkat)
+          : effectiveKeb.departureDate
+          ? formatDate(effectiveKeb.departureDate)
           : "-";
       case "bulanKeberangkatan":
       case "bulan": {
         const tgl =
-          keberangkatan.tanggalBerangkat ||
-          keberangkatan.departureDate ||
-          keberangkatan.bulan ||
-          keberangkatan.bulanKeberangkatan;
+          effectiveKeb.tanggalBerangkat ||
+          effectiveKeb.departureDate ||
+          effectiveKeb.bulan ||
+          effectiveKeb.bulanKeberangkatan;
         return tgl ? formatMonthYear(tgl) : "-";
       }
       case "tanggalPulang":

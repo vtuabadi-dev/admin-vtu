@@ -315,5 +315,48 @@ describe("Surat Autocrat Merge Engine", () => {
     expect(resolved.tempat_lahir).toBe("Jakarta Selatan");
     expect(resolved.alamat).toBe("Dsn Kauman, 010/006, Kalipare, Kec. Kalipare, Kab. Malang");
   });
+
+  it("should fallback to KTP document data when jamaah.alamat is dash or empty", () => {
+    const template = DEFAULT_SURAT_TEMPLATES[0]!;
+    const mockJamaahWithKtpDoc = {
+      namaLengkap: "Muchamad Zamroni",
+      alamat: "-",
+      dokumen: [
+        {
+          jenis: "ktp",
+          manualData: {
+            alamatLengkap: "JL. ARIES MUNANDAR II / 17, RT.001/RW.003, Kel. KIDUL DALEM, Kec. KLOJEN, KOTA MALANG",
+            tanggalLahir: "1992-08-12",
+          },
+        },
+      ],
+    };
+
+    const resolved = resolveAutocratFieldValues(template, mockJamaahWithKtpDoc, null, {});
+    expect(resolved.alamat).toBe("Jl. Aries Munandar II / 17, RT.001/RW.003, Kel. Kidul Dalem, Kec. Klojen, Kota Malang");
+  });
+
+  it("should auto-correct misconfigured Bulan Keberangkatan manifestField to keberangkatan.bulanKeberangkatan", () => {
+    const template: any = {
+      id: "test-tpl",
+      nama: "Test Surat",
+      placeholders: [
+        {
+          key: "Bulan Keberangkatan",
+          label: "Bulan Keberangkatan",
+          sourceType: "manifest",
+          manifestField: "jamaah.namaLengkap", // Misconfigured accidentally
+        },
+      ],
+      templateContent: "Bulan: {{Bulan Keberangkatan}}",
+    };
+
+    const mockKeberangkatan = {
+      tanggalBerangkat: "2026-06-17",
+    };
+
+    const resolved = resolveAutocratFieldValues(template, null, mockKeberangkatan, {});
+    expect(resolved["Bulan Keberangkatan"]).toBe("Juni 2026");
+  });
 });
 
