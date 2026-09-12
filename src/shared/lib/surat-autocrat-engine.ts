@@ -745,8 +745,11 @@ export function resolveAutocratFieldValues(
         } else if (mapping.manifestField === "imigrasi.kanim") {
           values[key] = manualFormData[key] || DAFTAR_KANTOR_IMIGRASI[0]?.nama || "Kantor Imigrasi Kelas I Khusus TPI Surabaya";
         } else {
-          // Resolve from manifest / jamaah / keberangkatan
-          values[key] = resolveManifestFieldValue(mapping.manifestField, jamaah, keberangkatan, today);
+          // If the admin edited this field in the form, use their manual edit! Otherwise resolve from manifest.
+          values[key] =
+            manualFormData[key] !== undefined && String(manualFormData[key]).trim() !== ""
+              ? String(manualFormData[key])
+              : resolveManifestFieldValue(mapping.manifestField, jamaah, keberangkatan, today);
         }
       } else {
         // Manual form data priority -> auto-lookup kota if empty -> defaultValue -> empty string

@@ -201,4 +201,19 @@ describe("Surat Autocrat Merge Engine", () => {
     expect(resolved.kantor_imigrasi).toBe("Kantor Imigrasi Kelas II Non TPI Sidoarjo");
     expect(resolved.kota_kanim).toBe("Sidoarjo");
   });
+
+  it("should auto-fill manifest fields by default while still allowing manual edits to override them", () => {
+    const template = DEFAULT_SURAT_TEMPLATES[0]!; // has nama_lengkap as manifest field
+    const mockJamaah = { namaLengkap: "Muchamad Zamroni" };
+
+    // Case 1: No manual edit -> auto-fills from manifest
+    const defaultResolved = resolveAutocratFieldValues(template, mockJamaah, null, {});
+    expect(defaultResolved.nama_lengkap).toBe("MUCHAMAD ZAMRONI");
+
+    // Case 2: Admin edits the field in form -> manual edit overrides manifest!
+    const customResolved = resolveAutocratFieldValues(template, mockJamaah, null, {
+      nama_lengkap: "DR. H. MUCHAMAD ZAMRONI, M.SI",
+    });
+    expect(customResolved.nama_lengkap).toBe("DR. H. MUCHAMAD ZAMRONI, M.SI");
+  });
 });
