@@ -729,11 +729,52 @@ export function resolveAutocratFieldValues(
 
     if (mapping) {
       if (mapping.sourceType === "manifest" && mapping.manifestField) {
-        // Resolve from manifest / jamaah / keberangkatan
-        values[key] = resolveManifestFieldValue(mapping.manifestField, jamaah, keberangkatan, today);
+        if (mapping.manifestField === "imigrasi.kotaKanim") {
+          // VLOOKUP city from chosen kanim in manualFormData or default
+          let parentKanim = "";
+          for (const [mk, mv] of Object.entries(manualFormData)) {
+            const cleanMk = mk.toLowerCase().replace(/[\s_\-\.]/g, "");
+            if ((cleanMk.includes("kanim") || cleanMk.includes("imigrasi") || cleanMk.includes("kantor")) && !cleanMk.includes("kota")) {
+              if (typeof mv === "string" && mv.trim()) {
+                parentKanim = mv;
+                break;
+              }
+            }
+          }
+          values[key] = manualFormData[key] || (parentKanim ? getKotaFromKanimName(parentKanim) : "") || "Surabaya";
+        } else if (mapping.manifestField === "imigrasi.kanim") {
+          values[key] = manualFormData[key] || DAFTAR_KANTOR_IMIGRASI[0]?.nama || "Kantor Imigrasi Kelas I Khusus TPI Surabaya";
+        } else {
+          // Resolve from manifest / jamaah / keberangkatan
+          values[key] = resolveManifestFieldValue(mapping.manifestField, jamaah, keberangkatan, today);
+        }
       } else {
-        // Manual form data priority -> defaultValue -> empty string
-        values[key] = manualFormData[key] !== undefined ? String(manualFormData[key]) : (mapping.defaultValue ?? "");
+        // Manual form data priority -> auto-lookup kota if empty -> defaultValue -> empty string
+        let val = manualFormData[key];
+        const cleanKey = key.toLowerCase().replace(/[\s_\-\.]/g, "");
+        if (
+          (!val || !String(val).trim()) &&
+          (cleanKey.includes("kotakanim") ||
+            cleanKey.includes("kotaimigrasi") ||
+            cleanKey.includes("kotakantor") ||
+            (cleanKey.includes("kota") && !cleanKey.includes("lahir") && !cleanKey.includes("tujuan")))
+        ) {
+          let parentKanim = "";
+          for (const [mk, mv] of Object.entries(manualFormData)) {
+            const cleanMk = mk.toLowerCase().replace(/[\s_\-\.]/g, "");
+            if ((cleanMk.includes("kanim") || cleanMk.includes("imigrasi") || cleanMk.includes("kantor")) && !cleanMk.includes("kota")) {
+              if (typeof mv === "string" && mv.trim()) {
+                parentKanim = mv;
+                break;
+              }
+            }
+          }
+          if (parentKanim) {
+            val = getKotaFromKanimName(parentKanim);
+          }
+        }
+
+        values[key] = val !== undefined ? String(val) : (mapping.defaultValue ?? "");
       }
     } else {
       // Smart Auto-detection based on key name if not explicitly configured in mapping
@@ -845,6 +886,14 @@ export function resolveManifestFieldValue(
   if (fieldKey === "vtu.jabatan") return "Direktur Utama";
   if (fieldKey === "vtu.noIzin") return "Izin Kemenag RI No. U.400 Tahun 2021";
 
+  // Imigrasi fields
+  if (fieldKey === "imigrasi.kanim") {
+    return DAFTAR_KANTOR_IMIGRASI[0]?.nama || "Kantor Imigrasi Kelas I Khusus TPI Surabaya";
+  }
+  if (fieldKey === "imigrasi.kotaKanim") {
+    return "Surabaya";
+  }
+
   return "";
 }
 
@@ -923,8 +972,17 @@ function autoDetectManifestValue(
   }
   if (k.includes("kanim") || k.includes("imigrasi")) {
     if (k.includes("kota")) {
-      const parentKanim = manualFormData["kantor_imigrasi"] || manualFormData["kanim"] || "";
-      return manualFormData[key] || getKotaFromKanimName(parentKanim) || "Surabaya";
+      let parentKanim = "";
+      for (const [mk, mv] of Object.entries(manualFormData)) {
+        const cleanMk = mk.toLowerCase().replace(/[\s_\-\.]/g, "");
+        if ((cleanMk.includes("kanim") || cleanMk.includes("imigrasi") || cleanMk.includes("kantor")) && !cleanMk.includes("kota")) {
+          if (typeof mv === "string" && mv.trim()) {
+            parentKanim = mv;
+            break;
+          }
+        }
+      }
+      return manualFormData[key] || (parentKanim ? getKotaFromKanimName(parentKanim) : "") || "Surabaya";
     }
     return manualFormData[key] || DAFTAR_KANTOR_IMIGRASI[0]?.nama || "Kantor Imigrasi Kelas I Khusus TPI Surabaya";
   }

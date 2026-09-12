@@ -47,6 +47,7 @@ import {
   isSystemAutoPlaceholder,
 } from "@/shared/lib/surat-autocrat-engine";
 import { KantorImigrasiCombobox } from "@/shared/components/ui/KantorImigrasiCombobox";
+import { getKotaFromKanimName } from "@/shared/lib/kantor-imigrasi";
 import type {
   SuratTemplate,
   GeneratedSuratLog,
@@ -800,6 +801,16 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
                     const isManifest = p.sourceType === "manifest";
                     const resolvedVal = resolvedFieldValues[p.key] || "";
 
+                    const cleanKey = p.key.toLowerCase().replace(/[\s_\-\.]/g, "");
+                    const cleanLabel = (p.label || "").toLowerCase().replace(/[\s_\-\.]/g, "");
+                    const isKotaKanimField =
+                      cleanKey.includes("kotakanim") ||
+                      cleanKey.includes("kotaimigrasi") ||
+                      cleanKey.includes("kotakantor") ||
+                      cleanLabel.includes("kotakanim") ||
+                      cleanLabel.includes("kotaimigrasi") ||
+                      (cleanKey.includes("kota") && !cleanKey.includes("lahir") && !cleanKey.includes("paket"));
+
                     return (
                       <div key={p.key} className="space-y-1">
                         <div className="flex items-center justify-between">
@@ -813,6 +824,14 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
                               <CheckCircle2 className="h-3 w-3" />
                               Otomatis Manifest
                             </span>
+                          ) : isKotaKanimField ? (
+                            <span
+                              className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded flex items-center gap-1"
+                              title="Kota ini otomatis terisi saat memilih Kantor Imigrasi"
+                            >
+                              <Sparkles className="h-3 w-3" />
+                              Auto VLOOKUP Kanim
+                            </span>
                           ) : (
                             <span className="text-[10px] font-semibold text-blue-600 dark:text-blue-400 bg-blue-500/10 px-1.5 py-0.5 rounded">
                               Input Form
@@ -825,18 +844,30 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
                             value={resolvedVal}
                             onChange={(kanimNama, kanimKota) => {
                               const nextData = { ...manualFormData, [p.key]: kanimNama };
-                              if (kanimKota) {
-                                const kotaPlaceholder = activeTemplate.placeholders.find(
-                                  (pl) =>
-                                    pl.key !== p.key &&
-                                    (pl.key.toLowerCase().includes("kotakanim") ||
-                                      pl.key.toLowerCase().includes("kota_kanim") ||
-                                      pl.key.toLowerCase().includes("kota_imigrasi") ||
-                                      pl.key.toLowerCase() === "kota")
-                                );
-                                if (kotaPlaceholder && !manualFormData[kotaPlaceholder.key]) {
-                                  nextData[kotaPlaceholder.key] = kanimKota;
-                                }
+                              const effectiveKota = kanimKota || getKotaFromKanimName(kanimNama);
+
+                              if (effectiveKota) {
+                                // VLOOKUP: Automatically fill all matching kota kanim/imigrasi placeholders in template
+                                activeTemplate.placeholders.forEach((pl) => {
+                                  if (pl.key === p.key) return;
+                                  const k = pl.key.toLowerCase().replace(/[\s_\-\.]/g, "");
+                                  const lbl = (pl.label || "").toLowerCase().replace(/[\s_\-\.]/g, "");
+                                  if (
+                                    k.includes("kotakanim") ||
+                                    k.includes("kotaimigrasi") ||
+                                    k.includes("kotakantor") ||
+                                    k.includes("kotatujuan") ||
+                                    lbl.includes("kotakanim") ||
+                                    lbl.includes("kotaimigrasi") ||
+                                    lbl.includes("kotakantor") ||
+                                    (k.includes("kota") && !k.includes("lahir") && !k.includes("paket"))
+                                  ) {
+                                    nextData[pl.key] = effectiveKota;
+                                  }
+                                });
+
+                                // Also update header kota tujuan
+                                setCustomKotaTujuan(effectiveKota);
                               }
                               setManualFormData(nextData);
                             }}
@@ -868,10 +899,15 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
                             onChange={(e) =>
                               setManualFormData({ ...manualFormData, [p.key]: e.target.value })
                             }
-                            placeholder={p.placeholderHint || `Masukkan ${p.label}...`}
+                            placeholder={
+                              p.placeholderHint ||
+                              (isKotaKanimField
+                                ? "Otomatis terisi saat memilih Kantor Imigrasi..."
+                                : `Masukkan ${p.label}...`)
+                            }
                             className={cn(
                               "text-xs h-8",
-                              isManifest && "bg-muted/40 font-medium text-foreground"
+                              (isManifest || isKotaKanimField) && "bg-muted/40 font-medium text-foreground"
                             )}
                           />
                         )}

@@ -186,25 +186,6 @@ export function searchKantorImigrasi(query: string): KantorImigrasiItem[] {
   });
 }
 
-/**
- * Mengambil nama kota otomatis dari nama Kanim yang dipilih
- */
-export function getKotaFromKanimName(kanimName: string): string {
-  if (!kanimName) return "";
-  const found = DAFTAR_KANTOR_IMIGRASI.find(
-    (k) => k.nama.toLowerCase() === kanimName.toLowerCase() || k.shortLabel.toLowerCase() === kanimName.toLowerCase()
-  );
-  if (found) return found.kota;
-
-  // Fallback regex matching
-  for (const item of DAFTAR_KANTOR_IMIGRASI) {
-    if (kanimName.toLowerCase().includes(item.kota.toLowerCase())) {
-      return item.kota;
-    }
-  }
-  return "";
-}
-
 const KANIM_STORAGE_KEY = "vtu_kantor_imigrasi_cache_v1";
 
 /**
@@ -228,6 +209,53 @@ export function getStoredKantorImigrasiList(): KantorImigrasiItem[] {
     console.warn("Failed to load stored kanim list:", err);
   }
   return DAFTAR_KANTOR_IMIGRASI;
+}
+
+/**
+ * Mengambil nama kota otomatis dari nama Kanim yang dipilih (VLOOKUP ke database & direktori Kanim)
+ */
+export function getKotaFromKanimName(kanimName: string, customList?: KantorImigrasiItem[]): string {
+  if (!kanimName || !kanimName.trim()) return "";
+  const list = customList && customList.length > 0 ? customList : getStoredKantorImigrasiList();
+  const clean = kanimName.toLowerCase().trim();
+
+  // 1. Exact match by nama or shortLabel
+  const exact = list.find(
+    (k) => k.nama.toLowerCase().trim() === clean || k.shortLabel.toLowerCase().trim() === clean
+  );
+  if (exact) return exact.kota;
+
+  // 2. Partial match: if kanimName contains the item's full name or shortLabel, or vice versa
+  const partial = list.find(
+    (k) =>
+      clean.includes(k.nama.toLowerCase().trim()) ||
+      clean.includes(k.shortLabel.toLowerCase().trim()) ||
+      k.nama.toLowerCase().trim().includes(clean)
+  );
+  if (partial) return partial.kota;
+
+  // 3. Check if kanimName mentions any known kota in the directory
+  for (const item of list) {
+    if (item.kota && clean.includes(item.kota.toLowerCase().trim())) {
+      return item.kota;
+    }
+  }
+
+  // 4. Heuristic: extract location name from commonly used suffixes
+  // e.g. "Kantor Imigrasi Kotabaru" -> "Kotabaru", "Kantor Imigrasi Kelas II Nunukan" -> "Nunukan"
+  const cleanedText = kanimName.replace(
+    /Kantor|Imigrasi|Kelas|Khusus|Non|TPI|Unit|Layanan|Paspor|ULP|MPP|Mal|Pelayanan|Publik|Kab\.|Kota|I|II|III/gi,
+    " "
+  ).trim();
+  const words = cleanedText.split(/\s+/).filter((w) => w.length > 2);
+  if (words.length > 0) {
+    const candidate = words[words.length - 1];
+    if (candidate) {
+      return candidate.charAt(0).toUpperCase() + candidate.slice(1);
+    }
+  }
+
+  return "";
 }
 
 /**

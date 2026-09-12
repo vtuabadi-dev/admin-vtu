@@ -7,7 +7,7 @@ import {
   DEFAULT_SURAT_TEMPLATES,
   isSystemAutoPlaceholder,
 } from "@/shared/lib/surat-autocrat-engine";
-import { searchKantorImigrasi } from "@/shared/lib/kantor-imigrasi";
+import { searchKantorImigrasi, getKotaFromKanimName } from "@/shared/lib/kantor-imigrasi";
 
 describe("Surat Autocrat Merge Engine", () => {
   it("should extract {placeholders} and {{placeholders}} from template text accurately", () => {
@@ -173,5 +173,32 @@ describe("Surat Autocrat Merge Engine", () => {
 
     const mppResults = searchKantorImigrasi("MPP");
     expect(mppResults.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("should accurately lookup kota from kanim name via getKotaFromKanimName", () => {
+    expect(getKotaFromKanimName("Kantor Imigrasi Kelas I Khusus TPI Surabaya")).toBe("Surabaya");
+    expect(getKotaFromKanimName("Kantor Imigrasi Kelas II Non TPI Sidoarjo")).toBe("Sidoarjo");
+    expect(getKotaFromKanimName("Kantor Imigrasi Kelas I Khusus TPI Soekarno-Hatta")).toBe("Tangerang");
+    expect(getKotaFromKanimName("Kanim Kelas I TPI Surakarta (Solo)")).toBe("Surakarta");
+    expect(getKotaFromKanimName("Mal Pelayanan Publik (MPP) Siola Surabaya")).toBe("Surabaya");
+  });
+
+  it("should auto-fill kota_kanim via VLOOKUP when admin fills kantor_imigrasi in manual form", () => {
+    const template = {
+      ...DEFAULT_SURAT_TEMPLATES[0]!,
+      templateContent: "Kantor: {{kantor_imigrasi}}\nKota: {{kota_kanim}}",
+      placeholders: [
+        { key: "kantor_imigrasi", label: "Kantor Imigrasi", sourceType: "manual" as const, inputType: "kantor_imigrasi" as const },
+        { key: "kota_kanim", label: "Kota Kantor Imigrasi", sourceType: "manual" as const, inputType: "city" as const },
+      ],
+    };
+
+    // When admin selects a kanim and leaves kota_kanim empty:
+    const resolved = resolveAutocratFieldValues(template, null, null, {
+      kantor_imigrasi: "Kantor Imigrasi Kelas II Non TPI Sidoarjo",
+    });
+
+    expect(resolved.kantor_imigrasi).toBe("Kantor Imigrasi Kelas II Non TPI Sidoarjo");
+    expect(resolved.kota_kanim).toBe("Sidoarjo");
   });
 });
