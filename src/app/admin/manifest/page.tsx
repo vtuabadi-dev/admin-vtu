@@ -1016,6 +1016,18 @@ function ManifestPageContent() {
           else if (/idregister|register/i.test(str) && !colMap.idRegister) colMap.idRegister = colIdx;
           else if (/noid|nik/i.test(str) && !colMap.noId) colMap.noId = colIdx;
           else if (/jenisid|identitas/i.test(str) && !colMap.jenisIdentitas) colMap.jenisIdentitas = colIdx;
+          // Manifest Pembayaran Headers
+          else if (/noinvoice|invoice/i.test(str) && !colMap.noInvoice) colMap.noInvoice = colIdx;
+          else if (/biayapaket|tarifpaket|hargapaket/i.test(str) && !colMap.biayaPaket) colMap.biayaPaket = colIdx;
+          else if (/upgradekamar|kamarupg/i.test(str) && !colMap.upgradeKamar) colMap.upgradeKamar = colIdx;
+          else if (/addons|biayalain|tambahan/i.test(str) && !colMap.addOns) colMap.addOns = colIdx;
+          else if (/diskon|potongan/i.test(str) && !colMap.diskon) colMap.diskon = colIdx;
+          else if (/totaltagihan|tagihan/i.test(str) && !colMap.totalTagihan) colMap.totalTagihan = colIdx;
+          else if (/sudahbayar|totalpembayaran|bayar|danamasuk/i.test(str) && !colMap.totalPembayaran) colMap.totalPembayaran = colIdx;
+          else if (/sisatagihan|kurangbayar|sisa/i.test(str) && !colMap.kurangBayar) colMap.kurangBayar = colIdx;
+          else if (/statuspembayaran|statusbayar/i.test(str) && !colMap.statusPembayaran) colMap.statusPembayaran = colIdx;
+          else if (/metodepembayaran|metodebayar/i.test(str) && !colMap.metodePembayaran) colMap.metodePembayaran = colIdx;
+          else if (/keteranganpembayaran|ketbayar/i.test(str) && !colMap.keteranganPembayaran) colMap.keteranganPembayaran = colIdx;
         });
       }
 
@@ -1065,6 +1077,19 @@ function ManifestPageContent() {
         const provinsi = provinsiInput || deriveProvinsi(provinsiInput, kota);
         const alamat = getValByKey("alamat", 22);
 
+        // Payment fields (Columns 23..33)
+        const noInvoice = getValByKey("noInvoice", 23);
+        const biayaPaket = getValByKey("biayaPaket", 24);
+        const upgradeKamar = getValByKey("upgradeKamar", 25);
+        const addOns = getValByKey("addOns", 26);
+        const diskon = getValByKey("diskon", 27);
+        const totalTagihan = getValByKey("totalTagihan", 28);
+        const totalPembayaran = getValByKey("totalPembayaran", 29);
+        const kurangBayar = getValByKey("kurangBayar", 30);
+        const statusPembayaran = getValByKey("statusPembayaran", 31);
+        const metodePembayaran = getValByKey("metodePembayaran", 32);
+        const keteranganPembayaran = getValByKey("keteranganPembayaran", 33);
+
         parsedRows.push({
           rombongan,
           noJamaah: getValByKey("noJamaah", 2),
@@ -1088,6 +1113,18 @@ function ManifestPageContent() {
           kota,
           provinsi,
           alamat,
+          // Financial fields
+          noInvoice,
+          biayaPaket,
+          upgradeKamar,
+          addOns,
+          diskon,
+          totalTagihan,
+          totalPembayaran,
+          kurangBayar,
+          statusPembayaran,
+          metodePembayaran,
+          keteranganPembayaran,
         });
       });
 
@@ -2399,29 +2436,66 @@ function ManifestPageContent() {
                 </span>
               </div>
 
-              <div className="max-h-60 overflow-y-auto border border-stone-200 dark:border-stone-800 rounded-lg text-xs">
+              <div className="max-h-64 overflow-y-auto border border-stone-200 dark:border-stone-800 rounded-lg text-xs">
                 <table className="w-full border-collapse text-left">
                   <thead className="bg-stone-100 dark:bg-stone-900 sticky top-0 font-bold border-b text-[11px] text-stone-700 dark:text-stone-300">
                     <tr>
-                      <th className="p-2 border-r">NO</th>
-                      <th className="p-2 border-r min-w-[150px]">ROMBONGAN</th>
-                      <th className="p-2 border-r">NAMA</th>
-                      <th className="p-2 border-r">NO ID</th>
-                      <th className="p-2 border-r">KOTA/KAB</th>
-                      <th className="p-2 border-r">PROVINSI</th>
-                      <th className="p-2">ALAMAT</th>
+                      <th className="p-2 border-r text-center w-10">NO</th>
+                      <th className="p-2 border-r min-w-[120px]">ROMBONGAN</th>
+                      <th className="p-2 border-r min-w-[150px]">NAMA JAMAAH</th>
+                      <th className="p-2 border-r min-w-[130px]">HOTEL & KAMAR</th>
+                      <th className="p-2 border-r min-w-[140px]">TAGIHAN & PEMBAYARAN</th>
+                      <th className="p-2 border-r min-w-[110px]">NO PASPOR / ID</th>
+                      <th className="p-2 min-w-[130px]">KOTA / PROVINSI</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y text-stone-700 dark:text-stone-300">
                     {excelPreviewRows.map((r, i) => (
                       <tr key={i} className="hover:bg-stone-50 dark:hover:bg-stone-850">
-                        <td className="p-2 text-center font-mono">{i + 1}</td>
+                        <td className="p-2 text-center font-mono text-[11px]">{i + 1}</td>
                         <td className="p-2 font-mono text-[11px] font-bold text-amber-700 dark:text-amber-400">{r.rombongan || "-"}</td>
-                        <td className="p-2 font-bold text-stone-900 dark:text-white">{r.nama}</td>
-                        <td className="p-2 font-mono">{r.noId || "-"}</td>
-                        <td className="p-2 font-semibold text-stone-800 dark:text-stone-200">{r.kota || "JAKARTA SELATAN"}</td>
-                        <td className="p-2 font-bold uppercase text-amber-800 dark:text-amber-300 text-[10px]">{r.provinsi || r.pulau || "DKI JAKARTA"}</td>
-                        <td className="p-2 truncate max-w-[180px]">{r.alamat || "-"}</td>
+                        <td className="p-2 font-bold text-stone-900 dark:text-white">
+                          <div>{r.nama}</div>
+                          {r.noTelp && <div className="text-[10px] font-mono text-stone-500 font-normal">{r.noTelp}</div>}
+                        </td>
+                        <td className="p-2 text-[11px]">
+                          <span className="inline-block px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 font-semibold text-[10px]">
+                            {r.kamar || "QUAD"}
+                          </span>
+                          <div className="text-[10px] text-muted-foreground truncate max-w-[140px] mt-0.5" title={`${r.hotelMekkah || '-'} / ${r.hotelMadinah || '-'}`}>
+                            {r.hotelMekkah || r.hotelMadinah ? `${r.hotelMekkah || '-'} | ${r.hotelMadinah || '-'}` : "-"}
+                          </div>
+                        </td>
+                        <td className="p-2 text-[11px]">
+                          {r.totalTagihan || r.biayaPaket ? (
+                            <div>
+                              <div className="font-semibold text-emerald-700 dark:text-emerald-400">
+                                Rp {Number(String(r.totalTagihan || r.biayaPaket).replace(/[^0-9]/g, "") || 0).toLocaleString("id-ID")}
+                              </div>
+                              {r.statusPembayaran && (
+                                <span className={`inline-block mt-0.5 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${
+                                  /lunas/i.test(r.statusPembayaran) 
+                                    ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
+                                    : /sebagian|cicil/i.test(r.statusPembayaran)
+                                    ? "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300"
+                                    : "bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300"
+                                }`}>
+                                  {r.statusPembayaran}
+                                </span>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-stone-400 text-[10px] italic">Standar Paket</span>
+                          )}
+                        </td>
+                        <td className="p-2 font-mono text-[11px]">
+                          <div className="font-semibold text-stone-800 dark:text-stone-200">{r.noPaspor || "-"}</div>
+                          <div className="text-[10px] text-stone-500">{r.noId || "-"}</div>
+                        </td>
+                        <td className="p-2 text-[11px]">
+                          <div className="font-semibold text-stone-800 dark:text-stone-200">{r.kota || "JAKARTA SELATAN"}</div>
+                          <div className="text-[10px] font-bold uppercase text-amber-800 dark:text-amber-300">{r.provinsi || "DKI JAKARTA"}</div>
+                        </td>
                       </tr>
                     ))}
                   </tbody>

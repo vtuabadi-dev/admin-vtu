@@ -26,6 +26,17 @@ export interface ExcelImportRowInput {
   kota?: string;
   provinsi?: string;
   alamat?: string;
+  noInvoice?: string;
+  biayaPaket?: number | string;
+  upgradeKamar?: number | string;
+  addOns?: number | string;
+  diskon?: number | string;
+  totalTagihan?: number | string;
+  totalPembayaran?: number | string;
+  kurangBayar?: number | string;
+  statusPembayaran?: string;
+  metodePembayaran?: string;
+  keteranganPembayaran?: string;
 }
 
 function parseDateInput(input?: string): Date {
@@ -131,6 +142,40 @@ export async function POST(req: Request) {
         const hasPaspor = firstMember.jenisIdentitas?.toUpperCase() === "PASPOR" || Boolean(firstMember.noId && firstMember.noId.length < 12);
         const registeredStatus: StatusJamaah = "registered";
 
+        const toNum = (v: any) => {
+          if (!v) return 0;
+          if (typeof v === "number") return v;
+          const clean = String(v).replace(/[^0-9]/g, "");
+          return clean ? parseInt(clean, 10) : 0;
+        };
+
+        const defaultPrice = Number((keberangkatan as any).hargaPaket || (keberangkatan as any).hargaQuad || 35000000);
+        let groupTagihan = 0;
+        let groupPembayaran = 0;
+        let groupSisa = 0;
+        let customInvoiceNo = "";
+        let customMetode = "";
+        let customKeterangan = "";
+
+        members.forEach((m) => {
+          const t = toNum(m.totalTagihan);
+          const p = toNum(m.totalPembayaran);
+          const s = toNum(m.kurangBayar);
+          const itemTagihan = t > 0 ? t : defaultPrice;
+          groupTagihan += itemTagihan;
+          groupPembayaran += p;
+          groupSisa += s > 0 ? s : Math.max(0, itemTagihan - p);
+          if (m.noInvoice && !customInvoiceNo) customInvoiceNo = m.noInvoice;
+          if (m.metodePembayaran && !customMetode) customMetode = m.metodePembayaran;
+          if (m.keteranganPembayaran && !customKeterangan) customKeterangan = m.keteranganPembayaran;
+        });
+
+        if (groupSisa === 0 && groupPembayaran >= groupTagihan) {
+          groupSisa = 0;
+        } else if (groupSisa === 0 && groupTagihan > groupPembayaran) {
+          groupSisa = groupTagihan - groupPembayaran;
+        }
+
         // 1. Create RegistrationGroup with temporary ketuaGroupId
         const group = await tx.registrationGroup.create({
           data: {
@@ -139,11 +184,46 @@ export async function POST(req: Request) {
             paketKeberangkatanId: keberangkatanId,
             ketuaGroupId: `TEMP-LEADER-${seqStr}`,
             jumlahAnggota: members.length,
-            totalTagihan: members.length * 35000000,
-            sisaPembayaran: members.length * 35000000,
+            totalTagihan: groupTagihan,
+            totalPembayaran: groupPembayaran,
+            sisaPembayaran: groupSisa,
             status: "active",
           },
         });
+
+        // Create Invoice & verified Pembayaran if financial data present
+        const invoiceNo = customInvoiceNo || `INV/${kodeRegistrasi}`;
+        const invoice = await tx.invoice.create({
+          data: {
+            nomorInvoice: invoiceNo,
+            groupId: group.id,
+            tipe: groupSisa === 0 ? "pelunasan" : "cicilan",
+            jumlah: groupTagihan,
+            sisaTagihan: groupSisa,
+            status: groupSisa === 0 ? "paid" : groupPembayaran > 0 ? "partial" : "unpaid",
+            jatuhTempo: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+          },
+        });
+
+        if (groupPembayaran > 0) {
+          let metodeEnum: "transfer" | "cash" | "virtual_account" | "qris" = "transfer";
+          const cleanMet = (customMetode || "").toLowerCase();
+          if (cleanMet.includes("cash") || cleanMet.includes("tunai")) metodeEnum = "cash";
+          else if (cleanMet.includes("qris")) metodeEnum = "qris";
+          else if (cleanMet.includes("va") || cleanMet.includes("virtual")) metodeEnum = "virtual_account";
+
+          await tx.pembayaran.create({
+            data: {
+              groupId: group.id,
+              invoiceId: invoice.id,
+              jumlah: groupPembayaran,
+              metode: metodeEnum,
+              tanggal: new Date(),
+              status: "verified",
+              catatan: customKeterangan || `Impor manifest pembayaran (${groupPembayaran >= groupTagihan ? "Lunas" : "Cicilan"})`,
+            },
+          });
+        }
 
         // 2. Create leader Jamaah
         const leaderPasporNo = firstMember.noPaspor || (hasPaspor ? (firstMember.noId || "-") : "-");
@@ -182,6 +262,7 @@ export async function POST(req: Request) {
                   tanggalDikeluarkan: firstMember.tglDikeluarkan || "-",
                   tanggalHabis: firstMember.tglHabis || "-",
                   kotaPaspor: firstMember.kotaPaspor || "-",
+                  kamar: firstMember.kamar || "-",
                 },
               },
             },
@@ -241,6 +322,7 @@ export async function POST(req: Request) {
                     tanggalDikeluarkan: m.tglDikeluarkan || "-",
                     tanggalHabis: m.tglHabis || "-",
                     kotaPaspor: m.kotaPaspor || "-",
+                    kamar: m.kamar || firstMember.kamar || "-",
                   },
                 },
               },
