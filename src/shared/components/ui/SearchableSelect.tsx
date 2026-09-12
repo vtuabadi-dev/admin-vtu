@@ -31,6 +31,7 @@ export function SearchableSelect({
   value,
   onChange,
   placeholder = "-- Pilih --",
+  searchPlaceholder,
   disabled = false,
   className,
   size = "md",
@@ -91,6 +92,7 @@ export function SearchableSelect({
   // Filter options based on query when open
   const filteredOptions = options.filter((opt) => {
     if (!open || !query.trim()) return true;
+    if (selectedOption && query === selectedOption.label) return true;
     const term = query.toLowerCase();
     const labelMatch = opt.label.toLowerCase().includes(term);
     const subMatch = opt.sublabel?.toLowerCase().includes(term);
@@ -168,7 +170,7 @@ export function SearchableSelect({
   const isPortal = variant === "portal";
 
   return (
-    <div ref={containerRef} className={cn("relative w-full", className)}>
+    <div ref={containerRef} className={cn("relative w-full", open && "z-30", className)}>
       {/* In-Place Direct Input */}
       <div className="relative flex items-center">
         <input
@@ -177,10 +179,12 @@ export function SearchableSelect({
           type="text"
           disabled={disabled}
           value={query}
-          placeholder={placeholder}
-          onFocus={() => {
+          placeholder={open && searchPlaceholder ? searchPlaceholder : placeholder}
+          onFocus={(e) => {
             setOpen(true);
-            setHighlightedIndex(0);
+            const idx = options.findIndex((opt) => opt.value === value);
+            setHighlightedIndex(idx >= 0 ? idx : 0);
+            e.currentTarget.select();
           }}
           onChange={(e) => {
             const val = e.target.value;
@@ -229,6 +233,8 @@ export function SearchableSelect({
               } else {
                 inputRef.current?.focus();
                 setOpen(true);
+                const idx = options.findIndex((opt) => opt.value === value);
+                setHighlightedIndex(idx >= 0 ? idx : 0);
               }
             }}
             className={cn(

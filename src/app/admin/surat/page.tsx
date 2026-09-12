@@ -47,6 +47,7 @@ import {
   isSystemAutoPlaceholder,
 } from "@/shared/lib/surat-autocrat-engine";
 import { KantorImigrasiCombobox } from "@/shared/components/ui/KantorImigrasiCombobox";
+import { SearchableSelect } from "@/shared/components/ui/SearchableSelect";
 import { getKotaFromKanimName } from "@/shared/lib/kantor-imigrasi";
 import type {
   SuratTemplate,
@@ -193,13 +194,53 @@ function GenerateSuratPageContent() {
   const availableJamaahList = useMemo(() => {
     if (!storeJamaah || storeJamaah.length === 0) return [];
     if (!selectedPackageId) return storeJamaah;
-    return storeJamaah.filter((j: any) => {
+    const activePkg = storeKbrList.find((k: any) => k.id === selectedPackageId);
+    const pkgJamaahIds = new Set<string>(activePkg?.jamaahIds || []);
+
+    const filtered = storeJamaah.filter((j: any) => {
+      if (pkgJamaahIds.has(j.id)) return true;
       if (j.group?.keberangkatanId === selectedPackageId) return true;
+      if (j.group?.paketKeberangkatanId === selectedPackageId) return true;
       if (j.keberangkatanId === selectedPackageId) return true;
       if (j.packageId === selectedPackageId) return true;
-      return true; // fallback allow selection
+      return false;
     });
-  }, [storeJamaah, selectedPackageId]);
+    return filtered.length > 0 ? filtered : storeJamaah;
+  }, [storeJamaah, selectedPackageId, storeKbrList]);
+
+  // Memoized Searchable Options for Paket Keberangkatan
+  const packageOptions = useMemo(() => {
+    return storeKbrList.map((k: any) => {
+      const kode = k.kode || k.kodePaket || "KBR";
+      const nama = k.namaPaket || k.name || "Paket Keberangkatan";
+      const tgl = k.tanggalBerangkat || k.departureDate ? formatDateShort(k.tanggalBerangkat || k.departureDate) : "-";
+      const count = k.jamaahIds?.length || k.totalJamaah || k.jamaahCount || 0;
+      return {
+        value: k.id,
+        label: `${kode} — ${nama}`,
+        sublabel: `Berangkat: ${tgl} • ${count > 0 ? `${count} Jamaah` : "Jadwal Aktif"}`,
+      };
+    });
+  }, [storeKbrList]);
+
+  // Memoized Searchable Options for Jamaah Penerima Surat
+  const jamaahOptions = useMemo(() => {
+    return availableJamaahList.map((j: any) => {
+      const nama = (j.namaLengkap || j.name || "").toUpperCase();
+      const paspor = j.nomorPaspor || j.passportNumber || "-";
+      const nik = j.nik || "-";
+      const birth = j.tempatLahir
+        ? `${j.tempatLahir}${j.tanggalLahir ? `, ${formatDateShort(j.tanggalLahir)}` : ""}`
+        : j.tanggalLahir
+        ? formatDateShort(j.tanggalLahir)
+        : "-";
+      return {
+        value: j.id,
+        label: nama,
+        sublabel: `Paspor: ${paspor} • NIK: ${nik} • Lahir: ${birth}`,
+      };
+    });
+  }, [availableJamaahList]);
 
   // Active Selected Jamaah Object
   const activeJamaah = useMemo(() => {
@@ -656,44 +697,68 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
                 </CardHeader>
 
                 <CardContent className="pt-4 space-y-3.5">
-                  {/* Select Keberangkatan */}
+                  {/* Select Keberangkatan (Searchable Combobox) */}
                   <div>
-                    <label className="text-xs font-semibold text-foreground flex items-center gap-1">
-                      Paket Keberangkatan
+                    <label className="text-xs font-semibold text-foreground flex items-center justify-between mb-1">
+                      <span className="flex items-center gap-1.5">
+                        <Plane className="h-3.5 w-3.5 text-primary" />
+                        Paket Keberangkatan
+                      </span>
+                      <span className="text-[11px] text-muted-foreground font-normal">
+                        {storeKbrList.length} Paket Terdaftar
+                      </span>
                     </label>
-                    <Select
+                    <SearchableSelect
                       value={selectedPackageId}
-                      onChange={(e) => setSelectedPackageId(e.target.value)}
-                      options={[
-                        { value: "", label: "-- Pilih Paket Keberangkatan --" },
-                        ...storeKbrList.map((k: any) => ({
-                          value: k.id,
-                          label: `${k.kode || k.kodePaket || "KBR"} — ${k.namaPaket || k.name} (${formatDateShort(k.tanggalBerangkat || k.departureDate)})`,
-                        })),
-                      ]}
-                      className="text-xs mt-1"
+                      onChange={(val) => {
+                        setSelectedPackageId(val);
+                        setSelectedJamaahId("");
+                      }}
+                      placeholder="Cari atau pilih paket keberangkatan..."
+                      searchPlaceholder="Ketik nama paket, kode, tanggal..."
+                      options={packageOptions}
+                      size="sm"
                     />
                   </div>
 
-                  {/* Select Jamaah */}
+                  {/* Select Jamaah (Searchable Combobox) */}
                   <div>
-                    <label className="text-xs font-semibold text-foreground flex items-center justify-between">
-                      <span>Pilih Jamaah Penerima Surat</span>
-                      <span className="text-[11px] text-muted-foreground">
+                    <label className="text-xs font-semibold text-foreground flex items-center justify-between mb-1">
+                      <span className="flex items-center gap-1.5">
+                        <User className="h-3.5 w-3.5 text-primary" />
+                        Pilih Jamaah Penerima Surat
+                      </span>
+                      <span className="text-[11px] text-muted-foreground font-normal">
                         {availableJamaahList.length} Jamaah Tersedia
                       </span>
                     </label>
-                    <Select
+                    <SearchableSelect
                       value={selectedJamaahId}
-                      onChange={(e) => setSelectedJamaahId(e.target.value)}
-                      options={[
-                        { value: "", label: "-- Pilih Jamaah dari Manifest --" },
-                        ...availableJamaahList.map((j: any) => ({
-                          value: j.id,
-                          label: `${(j.namaLengkap || j.name || "").toUpperCase()} (Paspor: ${j.nomorPaspor || j.passportNumber || "-"}) — NIK: ${j.nik || "-"}`,
-                        })),
-                      ]}
-                      className="text-xs mt-1"
+                      onChange={(val) => {
+                        setSelectedJamaahId(val);
+                        if (val && !selectedPackageId) {
+                          const jam = storeJamaah.find((j: any) => j.id === val) as any;
+                          if (jam) {
+                            const jamPkgId =
+                              jam.group?.keberangkatanId ||
+                              jam.group?.paketKeberangkatanId ||
+                              jam.keberangkatanId ||
+                              jam.packageId;
+                            if (jamPkgId) {
+                              setSelectedPackageId(jamPkgId);
+                            }
+                          }
+                        }
+                      }}
+                      placeholder={
+                        availableJamaahList.length === 0
+                          ? "Belum ada jamaah pada paket ini"
+                          : "Cari nama jamaah, NIK, nomor paspor, kota lahir..."
+                      }
+                      searchPlaceholder="Ketik nama jamaah, paspor, NIK..."
+                      options={jamaahOptions}
+                      disabled={availableJamaahList.length === 0}
+                      size="sm"
                     />
                   </div>
 
