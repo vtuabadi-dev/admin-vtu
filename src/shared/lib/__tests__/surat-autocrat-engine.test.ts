@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   extractPlaceholdersFromText,
+  extractDocxTextFromXml,
   resolveAutocratFieldValues,
   renderAutocratMergedText,
   DEFAULT_SURAT_TEMPLATES,
@@ -65,6 +66,42 @@ describe("Surat Autocrat Merge Engine", () => {
     const text = "Kepada Yth. <<Nama Jama'ah>>, NIK: <<nik>>, Paket: «nama_paket», Dokumen: [[nomor_surat]].";
     const tags = extractPlaceholdersFromText(text);
     expect(tags).toEqual(["Nama Jama'ah", "nik", "nama_paket", "nomor_surat"]);
+  });
+
+  it("should parse docx XML with split runs and XML entities into clean tags", () => {
+    // Word frequently splits runs inside a paragraph and encodes < and > as &lt; and &gt;
+    const wordXml = `
+      <w:p>
+        <w:r><w:t>&lt;&lt;Nama</w:t></w:r>
+        <w:r><w:t> Jama'ah&gt;&gt;</w:t></w:r>
+      </w:p>
+      <w:p>
+        <w:r><w:t>&lt;&lt;nik&gt;&gt;</w:t></w:r>
+      </w:p>
+    `;
+    const parsedText = extractDocxTextFromXml(wordXml);
+    expect(parsedText).toContain("<<Nama Jama'ah>>");
+    expect(parsedText).toContain("<<nik>>");
+
+    const tags = extractPlaceholdersFromText(parsedText);
+    expect(tags).toEqual(["Nama Jama'ah", "nik"]);
+  });
+
+  it("should deduplicate shared placeholders between Template Dokumen 1 and Dokumen 2", () => {
+    const doc1Text = "Dokumen 1: <<Nama Jama'ah>>, <<NIK>>, <<nomor_paspor>>";
+    const doc2Text = "Dokumen 2: <<Nama Jama'ah>>, <<nik>>, <<alamat>>";
+
+    const combinedText = `${doc1Text}\n${doc2Text}`;
+    const tags = extractPlaceholdersFromText(combinedText);
+
+    // Should contain unique tags without duplicating "Nama Jama'ah" or "nik" (case-insensitive)
+    expect(tags).toHaveLength(4);
+    expect(tags.map(t => t.toLowerCase())).toEqual([
+      "nama jama'ah",
+      "nik",
+      "nomor_paspor",
+      "alamat",
+    ]);
   });
 
   it("should render and replace Autocrat <<key>>, «key», and {{key}} correctly", () => {

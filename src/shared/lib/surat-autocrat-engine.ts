@@ -68,39 +68,105 @@ export const MANIFEST_FIELD_OPTIONS: ManifestFieldOption[] = [
 // SCANNER FOR EXTRACTING {TAG}, {{TAG}}, <<TAG>>, «TAG» FROM TEMPLATE TEXT
 // ────────────────────────────────────────────────────────────
 
-export function extractPlaceholdersFromText(text: string): string[] {
-  if (!text) return [];
-  const tags = new Set<string>();
+/**
+ * Decodes standard XML entities and characters commonly present in Word XML.
+ */
+export function decodeWordXmlEntities(str: string): string {
+  if (!str) return "";
+  return str
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;|&#39;/g, "'")
+    .replace(/&laquo;|&#171;/g, "«")
+    .replace(/&raquo;|&#187;/g, "»")
+    .replace(/&nbsp;|&#160;/g, " ")
+    .replace(/&amp;/g, "&");
+}
 
-  // 1. Curly braces: {tag}, {{tag}}, {{{tag}}}
-  const curlyRegex = /\{+([a-zA-Z0-9_\-\.\s\'\’]+?)\}+/g;
-  let match: RegExpExecArray | null;
-  while ((match = curlyRegex.exec(text)) !== null) {
-    const raw = match[1]?.trim();
-    if (raw && raw.length > 0 && !raw.startsWith("/*") && !raw.startsWith("http")) {
-      tags.add(raw);
+/**
+ * Parses raw Word XML (from document.xml, headers, footers) into clean text.
+ * Paragraphs (<w:p>) contain runs (<w:r>) with text (<w:t>).
+ * Word often splits a placeholder tag across multiple <w:r> runs.
+ * Joining all <w:t> nodes within each paragraph seamlessly repairs split tags like:
+ * <w:t>&lt;&lt;Nama</w:t><w:t> Jama'ah&gt;&gt;</w:t> -> "<<Nama Jama'ah>>".
+ */
+export function extractDocxTextFromXml(rawXml: string): string {
+  if (!rawXml) return "";
+
+  // 1. Extract by paragraph <w:p>
+  const pMatches = rawXml.match(/<w:p[\s>][\s\S]*?<\/w:p>/g);
+  if (pMatches && pMatches.length > 0) {
+    const paragraphs: string[] = [];
+    for (const p of pMatches) {
+      // Find all text tags <w:t> or <w:t xml:space="preserve">
+      const tMatches = p.match(/<w:t[\s>][\s\S]*?<\/w:t>/g);
+      if (tMatches && tMatches.length > 0) {
+        const paragraphText = tMatches
+          .map((t) => t.replace(/<[^>]+>/g, ""))
+          .join("");
+        paragraphs.push(decodeWordXmlEntities(paragraphText));
+      }
+    }
+    if (paragraphs.length > 0) {
+      return paragraphs.join("\n");
     }
   }
 
-  // 2. Double angle brackets / Guillemets (Autocrat & Word Merge): <<tag>>, «tag»
-  const angleRegex = /(?:<<|«)+([a-zA-Z0-9_\-\.\s\'\’]+?)(?:>>|»)+/g;
-  while ((match = angleRegex.exec(text)) !== null) {
-    const raw = match[1]?.trim();
-    if (raw && raw.length > 0 && !raw.startsWith("/*") && !raw.startsWith("http")) {
-      tags.add(raw);
+  // Fallback: extract all <w:t> directly
+  const allT = rawXml.match(/<w:t[\s>][\s\S]*?<\/w:t>/g);
+  if (allT && allT.length > 0) {
+    const fallbackText = allT.map((t) => t.replace(/<[^>]+>/g, "")).join(" ");
+    return decodeWordXmlEntities(fallbackText);
+  }
+
+  // Last fallback: strip all tags and decode entities
+  return decodeWordXmlEntities(rawXml.replace(/<[^>]+>/g, " "));
+}
+
+export function extractPlaceholdersFromText(text: string): string[] {
+  if (!text) return [];
+
+  // Map canonical lowercased tag -> display tag to guarantee 100% deduplication
+  const tagMap = new Map<string, string>();
+
+  const registerTag = (raw: string) => {
+    const cleaned = raw.trim();
+    if (
+      !cleaned ||
+      cleaned.length === 0 ||
+      cleaned.startsWith("/*") ||
+      cleaned.startsWith("http://") ||
+      cleaned.startsWith("https://")
+    ) {
+      return;
     }
+    const lower = cleaned.toLowerCase();
+    if (!tagMap.has(lower)) {
+      tagMap.set(lower, cleaned);
+    }
+  };
+
+  // 1. Double/single curly braces: {tag}, {{tag}}, {{{tag}}}
+  const curlyRegex = /\{+([a-zA-Z0-9_\-\.\s\'\’\:\/]+?)\}+/g;
+  let match: RegExpExecArray | null;
+  while ((match = curlyRegex.exec(text)) !== null) {
+    if (match[1]) registerTag(match[1]);
+  }
+
+  // 2. Double angle brackets / Guillemets / Autocrat tags: <<tag>>, «tag»
+  const angleRegex = /(?:<<|«)+([a-zA-Z0-9_\-\.\s\'\’\:\/]+?)(?:>>|»)+/g;
+  while ((match = angleRegex.exec(text)) !== null) {
+    if (match[1]) registerTag(match[1]);
   }
 
   // 3. Double square brackets: [[tag]]
-  const bracketRegex = /\[\[([a-zA-Z0-9_\-\.\s\'\’]+?)\]\]/g;
+  const bracketRegex = /\[\[([a-zA-Z0-9_\-\.\s\'\’\:\/]+?)\]\]/g;
   while ((match = bracketRegex.exec(text)) !== null) {
-    const raw = match[1]?.trim();
-    if (raw && raw.length > 0 && !raw.startsWith("/*") && !raw.startsWith("http")) {
-      tags.add(raw);
-    }
+    if (match[1]) registerTag(match[1]);
   }
 
-  return Array.from(tags);
+  return Array.from(tagMap.values());
 }
 
 /**
@@ -112,35 +178,38 @@ export async function extractPlaceholdersFromDocxFile(
 ): Promise<{ tags: string[]; extractedText: string }> {
   try {
     const zip = await JSZip.loadAsync(fileData);
-    const xmlTargetPaths = [
-      "word/document.xml",
-      "word/header1.xml",
-      "word/header2.xml",
-      "word/header3.xml",
-      "word/footer1.xml",
-      "word/footer2.xml",
-      "word/footer3.xml",
-    ];
 
-    let combinedTextDirect = "";
-    let combinedTextSpaced = "";
+    // Find all XML files inside the word/ directory (document, headers, footers, footnotes, endnotes)
+    const xmlFilePaths = Object.keys(zip.files).filter(
+      (path) => path.startsWith("word/") && path.endsWith(".xml") && !path.includes("[Content_Types]")
+    );
 
-    for (const xmlPath of xmlTargetPaths) {
+    // Ensure word/document.xml is processed first
+    xmlFilePaths.sort((a, b) => {
+      if (a === "word/document.xml") return -1;
+      if (b === "word/document.xml") return 1;
+      return a.localeCompare(b);
+    });
+
+    const textPieces: string[] = [];
+
+    for (const xmlPath of xmlFilePaths) {
       const xmlFile = zip.file(xmlPath);
       if (xmlFile) {
         const rawXml = await xmlFile.async("string");
-        combinedTextDirect += " " + rawXml.replace(/<[^>]+>/g, "");
-        combinedTextSpaced += " " + rawXml.replace(/<[^>]+>/g, " ");
+        const parsed = extractDocxTextFromXml(rawXml);
+        if (parsed.trim()) {
+          textPieces.push(parsed);
+        }
       }
     }
 
-    const tagsDirect = extractPlaceholdersFromText(combinedTextDirect);
-    const tagsSpaced = extractPlaceholdersFromText(combinedTextSpaced);
+    const combinedText = textPieces.join("\n\n");
+    const tags = extractPlaceholdersFromText(combinedText);
 
-    const mergedTags = Array.from(new Set([...tagsDirect, ...tagsSpaced]));
     return {
-      tags: mergedTags,
-      extractedText: combinedTextSpaced.replace(/\s+/g, " ").trim(),
+      tags,
+      extractedText: combinedText,
     };
   } catch (err) {
     console.error("[extractPlaceholdersFromDocxFile] Error parsing docx file:", err);

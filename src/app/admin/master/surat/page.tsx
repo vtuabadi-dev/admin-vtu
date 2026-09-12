@@ -308,20 +308,47 @@ Demikian Surat Tugas ini dibuat dengan sebenarnya agar dapat dipergunakan sebaga
         content: content,
       };
 
-      // Collect all text sources across template body + attached files
-      const allText = [
-        prev.templateContent,
-        prev.perihalDefault,
-        prev.tujuanDefault || "",
-        prev.kotaTujuanDefault || "",
-        ...currentAttached.map((f: SuratAttachedFile) => f.content || ""),
-      ].join(" ");
-      const allTags = extractPlaceholdersFromText(allText);
+      // Determine if template has attached files with content/filename
+      const hasAttachedDocs = currentAttached.some(
+        (f) => (f.content && f.content.trim().length > 0) || (f.fileName && f.fileName.trim().length > 0)
+      );
 
-      const currentMappings = [...prev.placeholders];
+      // Collect all text sources across template body + attached files.
+      // CRITICAL: If attached document files exist (e.g. Dokumen 1, Dokumen 2 .docx),
+      // they supersede the hardcoded default dummy templateContent!
+      // Do NOT include prev.templateContent to prevent dummy variables from bloating the configuration.
+      const textSources: string[] = [];
+      if (hasAttachedDocs) {
+        textSources.push(...currentAttached.map((f: SuratAttachedFile) => f.content || ""));
+      } else {
+        textSources.push(prev.templateContent);
+      }
+
+      textSources.push(
+        prev.formatNamaFile || "",
+        ...currentAttached.map((f: SuratAttachedFile) => f.formatNamaFile || ""),
+        prev.perihalDefault || "",
+        prev.tujuanDefault || "",
+        prev.kotaTujuanDefault || ""
+      );
+
+      const allTags = extractPlaceholdersFromText(textSources.join("\n"));
+
+      // Deduplicate tags and build clean placeholder mappings:
+      // 1. Keep existing customized mapping for tags that still exist.
+      // 2. Add new mapping for newly detected tags with auto-mapping to manifest.
+      // 3. PRUNE old/stale placeholders that are no longer present in any attached template!
+      const newMappings: SuratPlaceholderMapping[] = [];
       allTags.forEach((tag) => {
-        const exists = currentMappings.some((m) => m.key.toLowerCase() === tag.toLowerCase());
-        if (!exists) {
+        const existing = prev.placeholders.find(
+          (m) => m.key.toLowerCase().trim() === tag.toLowerCase().trim()
+        );
+        if (existing) {
+          newMappings.push({
+            ...existing,
+            key: tag,
+          });
+        } else {
           const matchedManifest = MANIFEST_FIELD_OPTIONS.find(
             (opt) =>
               opt.key.toLowerCase().includes(tag.toLowerCase()) ||
@@ -364,7 +391,7 @@ Demikian Surat Tugas ini dibuat dengan sebenarnya agar dapat dipergunakan sebaga
             detectedType = "textarea";
           }
 
-          currentMappings.push({
+          newMappings.push({
             key: tag,
             label: tag.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
             sourceType: matchedManifest ? "manifest" : "manual",
@@ -384,7 +411,7 @@ Demikian Surat Tugas ini dibuat dengan sebenarnya agar dapat dipergunakan sebaga
           docIdx === 0 && (!isDocx || !prev.templateContent)
             ? (content || prev.templateContent)
             : prev.templateContent,
-        placeholders: currentMappings,
+        placeholders: newMappings.length > 0 ? newMappings : prev.placeholders,
       };
     });
 
@@ -433,22 +460,48 @@ Demikian Surat Tugas ini dibuat dengan sebenarnya agar dapat dipergunakan sebaga
   // Handle Sync Placeholders explicitly from Template Surat
   const handleSyncPlaceholdersFromTemplate = () => {
     if (!editingTemplate) return;
-    const allText = [
-      editingTemplate.templateContent,
-      editingTemplate.perihalDefault,
+
+    const hasAttachedDocs = (editingTemplate.attachedFiles || []).some(
+      (f) => (f.content && f.content.trim().length > 0) || (f.fileName && f.fileName.trim().length > 0)
+    );
+
+    const textPieces: string[] = [];
+    if (hasAttachedDocs) {
+      textPieces.push(
+        ...(editingTemplate.attachedFiles?.map((f) => f.content || "") || [])
+      );
+    } else {
+      textPieces.push(editingTemplate.templateContent);
+    }
+
+    textPieces.push(
+      editingTemplate.formatNamaFile || "",
+      ...(editingTemplate.attachedFiles?.map((f) => f.formatNamaFile || "") || []),
+      editingTemplate.perihalDefault || "",
       editingTemplate.tujuanDefault || "",
-      editingTemplate.kotaTujuanDefault || "",
-      ...(editingTemplate.attachedFiles?.map((f) => f.content || "") || []),
-    ].join(" ");
+      editingTemplate.kotaTujuanDefault || ""
+    );
+
+    const allText = textPieces.join("\n");
     const tags = extractPlaceholdersFromText(allText);
+
+    if (tags.length === 0) {
+      showToast("Tidak ada tag placeholder terdeteksi di dalam template berkas saat ini");
+      return;
+    }
 
     const existing = [...editingTemplate.placeholders];
     const newMappings: SuratPlaceholderMapping[] = [];
 
     tags.forEach((tag) => {
-      const found = existing.find((m) => m.key.toLowerCase() === tag.toLowerCase());
+      const found = existing.find(
+        (m) => m.key.toLowerCase().trim() === tag.toLowerCase().trim()
+      );
       if (found) {
-        newMappings.push(found);
+        newMappings.push({
+          ...found,
+          key: tag,
+        });
       } else {
         const matchedManifest = MANIFEST_FIELD_OPTIONS.find(
           (opt) =>
@@ -505,9 +558,9 @@ Demikian Surat Tugas ini dibuat dengan sebenarnya agar dapat dipergunakan sebaga
 
     setEditingTemplate({
       ...editingTemplate,
-      placeholders: newMappings.length > 0 ? newMappings : existing,
+      placeholders: newMappings,
     });
-    showToast(`Berhasil menyinkronkan ${tags.length} variabel placeholder dari template surat!`);
+    showToast(`Berhasil menyinkronkan ${newMappings.length} variabel placeholder dari template surat!`);
   };
 
   // Handle formatNamaFile change per document index
@@ -637,42 +690,113 @@ Demikian Surat Tugas ini dibuat dengan sebenarnya agar dapat dipergunakan sebaga
   // Real-time Placeholder Syncer for Editor & Attached Template Files
   const detectedTagsInEditing = useMemo(() => {
     if (!editingTemplate) return [];
-    const attachedTexts = (editingTemplate.attachedFiles || []).map((f) => f.content || "").join(" ");
-    const raw = `${editingTemplate.templateContent} ${editingTemplate.perihalDefault} ${editingTemplate.tujuanDefault || ""} ${editingTemplate.kotaTujuanDefault || ""} ${attachedTexts}`;
-    return extractPlaceholdersFromText(raw);
+    const hasAttachedDocs = (editingTemplate.attachedFiles || []).some(
+      (f) => (f.content && f.content.trim().length > 0) || (f.fileName && f.fileName.trim().length > 0)
+    );
+
+    const textPieces: string[] = [];
+    if (hasAttachedDocs) {
+      textPieces.push(
+        ...(editingTemplate.attachedFiles?.map((f) => f.content || "") || [])
+      );
+    } else {
+      textPieces.push(editingTemplate.templateContent);
+    }
+
+    textPieces.push(
+      editingTemplate.formatNamaFile || "",
+      ...(editingTemplate.attachedFiles?.map((f) => f.formatNamaFile || "") || []),
+      editingTemplate.perihalDefault || "",
+      editingTemplate.tujuanDefault || "",
+      editingTemplate.kotaTujuanDefault || ""
+    );
+
+    return extractPlaceholdersFromText(textPieces.join("\n"));
   }, [editingTemplate]);
 
-  // Synchronize placeholder mappings when tags change in template
+  // Synchronize placeholder mappings when tags change in template & prune stale placeholders
   useEffect(() => {
     if (!editingTemplate) return;
-    const currentMappings = [...editingTemplate.placeholders];
-    let hasChanges = false;
+    if (detectedTagsInEditing.length === 0) return;
+
+    const hasAttachedDocs = (editingTemplate.attachedFiles || []).some(
+      (f) => (f.content && f.content.trim().length > 0) || (f.fileName && f.fileName.trim().length > 0)
+    );
+
+    const currentKeys = new Set(editingTemplate.placeholders.map((m) => m.key.toLowerCase().trim()));
+    const detectedLower = detectedTagsInEditing.map((t) => t.toLowerCase().trim());
+
+    const hasMissingTags = detectedLower.some((t) => !currentKeys.has(t));
+    const hasStaleTags =
+      hasAttachedDocs &&
+      editingTemplate.placeholders.some((m) => !detectedLower.includes(m.key.toLowerCase().trim()));
+
+    if (!hasMissingTags && !hasStaleTags) return;
+
+    const newMappings: SuratPlaceholderMapping[] = [];
 
     detectedTagsInEditing.forEach((tag) => {
-      const exists = currentMappings.some((m) => m.key.toLowerCase() === tag.toLowerCase());
-      if (!exists) {
-        hasChanges = true;
-        // Check if there is a matching manifest option
-        const matchedManifest = MANIFEST_FIELD_OPTIONS.find((opt) =>
-          opt.key.toLowerCase().includes(tag) || tag.includes(opt.key.split(".")[1] || "")
+      const found = editingTemplate.placeholders.find(
+        (m) => m.key.toLowerCase().trim() === tag.toLowerCase().trim()
+      );
+      if (found) {
+        newMappings.push({ ...found, key: tag });
+      } else {
+        const matchedManifest = MANIFEST_FIELD_OPTIONS.find(
+          (opt) =>
+            opt.key.toLowerCase().includes(tag.toLowerCase()) ||
+            tag.toLowerCase().includes(opt.key.split(".")[1]?.toLowerCase() || "")
         );
 
-        const newMapping: SuratPlaceholderMapping = {
+        let detectedType: SuratInputType = "text";
+        const tagLower = tag.toLowerCase();
+        if (
+          tagLower.includes("tanggal") ||
+          tagLower.includes("tgl") ||
+          tagLower.includes("date") ||
+          tagLower.includes("lahir") ||
+          tagLower.includes("berangkat") ||
+          tagLower.includes("pulang")
+        ) {
+          detectedType = "date";
+        } else if (
+          tagLower.includes("kota") ||
+          tagLower.includes("tempat") ||
+          tagLower.includes("cabang") ||
+          tagLower.includes("city") ||
+          tagLower.includes("wilayah")
+        ) {
+          detectedType = "city";
+        } else if (
+          tagLower.includes("jumlah") ||
+          tagLower.includes("hari") ||
+          tagLower.includes("nominal") ||
+          tagLower.includes("biaya") ||
+          tagLower.includes("umur")
+        ) {
+          detectedType = "number";
+        } else if (
+          tagLower.includes("deskripsi") ||
+          tagLower.includes("keterangan") ||
+          tagLower.includes("alamat") ||
+          tagLower.includes("kronologi")
+        ) {
+          detectedType = "textarea";
+        }
+
+        newMappings.push({
           key: tag,
           label: tag.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
           sourceType: matchedManifest ? "manifest" : "manual",
           manifestField: matchedManifest ? matchedManifest.key : undefined,
-          inputType: "text",
+          inputType: detectedType,
           defaultValue: "",
           required: true,
-        };
-        currentMappings.push(newMapping);
+        });
       }
     });
 
-    if (hasChanges) {
-      setEditingTemplate((prev) => (prev ? { ...prev, placeholders: currentMappings } : null));
-    }
+    setEditingTemplate((prev) => (prev ? { ...prev, placeholders: newMappings } : null));
   }, [detectedTagsInEditing, editingTemplate]);
 
   // Save edited template
