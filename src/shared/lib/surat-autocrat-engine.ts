@@ -4,8 +4,10 @@ import type {
   GeneratedSuratLog,
   ManifestFieldOption,
 } from "@/shared/types/surat";
-import { formatDate } from "@/shared/lib/utils";
+import { formatDate, toTitleCase } from "@/shared/lib/utils";
 import { DAFTAR_KANTOR_IMIGRASI, getKotaFromKanimName } from "@/shared/lib/kantor-imigrasi";
+
+export { toTitleCase };
 
 // ────────────────────────────────────────────────────────────
 // ROMAN MONTHS & DATE UTILITIES
@@ -81,13 +83,13 @@ export function formatMonthYear(dateVal?: string | Date | null): string {
 
 export const MANIFEST_FIELD_OPTIONS: ManifestFieldOption[] = [
   // Jamaah personal
-  { key: "jamaah.namaLengkap", label: "Nama Lengkap Jamaah", group: "Jamaah", sampleValue: "MUCHAMAD ZAMRONI" },
+  { key: "jamaah.namaLengkap", label: "Nama Lengkap Jamaah", group: "Jamaah", sampleValue: "Muchamad Zamroni" },
   { key: "jamaah.nik", label: "Nomor Induk Kependudukan (NIK)", group: "Jamaah", sampleValue: "3515082103850001" },
   { key: "jamaah.nomorPaspor", label: "Nomor Paspor", group: "Jamaah", sampleValue: "X1234567" },
-  { key: "jamaah.tempatLahir", label: "Tempat Lahir", group: "Jamaah", sampleValue: "SIDOARJO" },
+  { key: "jamaah.tempatLahir", label: "Tempat Lahir", group: "Jamaah", sampleValue: "Sidoarjo" },
   { key: "jamaah.tanggalLahir", label: "Tanggal Lahir (DD MMMM YYYY)", group: "Jamaah", sampleValue: "21 Maret 1985" },
   { key: "jamaah.jenisKelamin", label: "Jenis Kelamin (Laki-laki / Perempuan)", group: "Jamaah", sampleValue: "LAKI-LAKI" },
-  { key: "jamaah.namaAyah", label: "Nama Ayah Kandung", group: "Jamaah", sampleValue: "H. AHMAD SOFWAN" },
+  { key: "jamaah.namaAyah", label: "Nama Ayah Kandung", group: "Jamaah", sampleValue: "H. Ahmad Sofwan" },
   { key: "jamaah.alamat", label: "Alamat Domisili Lengkap", group: "Jamaah", sampleValue: "Jl. Raya Taman No. 45, Sidoarjo, Jawa Timur" },
   { key: "jamaah.nomorTelepon", label: "Nomor Telepon / WhatsApp", group: "Jamaah", sampleValue: "081234567890" },
   { key: "jamaah.registrationId", label: "Nomor Registrasi / Pendaftaran", group: "Jamaah", sampleValue: "REG-2026-0814" },
@@ -822,7 +824,7 @@ export function resolveAutocratFieldValues(
           }
           const rawCity = manualFormData[key];
           const resolvedKota = (rawCity ? (getKotaFromKanimName(rawCity) || rawCity) : "") || (parentKanim ? getKotaFromKanimName(parentKanim) : "") || "Surabaya";
-          values[key] = resolvedKota;
+          values[key] = toTitleCase(resolvedKota);
         } else if (mapping.manifestField === "imigrasi.kanim") {
           values[key] = manualFormData[key] || DAFTAR_KANTOR_IMIGRASI[0]?.nama || "Kantor Imigrasi Kelas I Khusus TPI Surabaya";
         } else {
@@ -854,7 +856,7 @@ export function resolveAutocratFieldValues(
             }
           }
           if (parentKanim) {
-            val = getKotaFromKanimName(parentKanim);
+            val = toTitleCase(getKotaFromKanimName(parentKanim));
           }
         }
 
@@ -887,7 +889,7 @@ export function resolveManifestFieldValue(
     const subKey = fieldKey.replace("jamaah.", "");
     switch (subKey) {
       case "namaLengkap":
-        return (jamaah.namaLengkap || jamaah.name || "").toUpperCase();
+        return toTitleCase(jamaah.namaLengkap || jamaah.name || "");
       case "nik":
         return jamaah.nik || "-";
       case "nomorPaspor":
@@ -899,7 +901,7 @@ export function resolveManifestFieldValue(
           "-"
         );
       case "tempatLahir":
-        return jamaah.tempatLahir || jamaah.pob || "-";
+        return toTitleCase(jamaah.tempatLahir || jamaah.pob || "-");
       case "tanggalLahir":
         return jamaah.tanggalLahir ? formatDate(jamaah.tanggalLahir) : (jamaah.dob ? formatDate(jamaah.dob) : "-");
       case "jenisKelamin":
@@ -909,9 +911,9 @@ export function resolveManifestFieldValue(
           ? "PEREMPUAN"
           : "-";
       case "namaAyah":
-        return (jamaah.namaAyah || jamaah.ayahKandung || jamaah.fatherName || "-").toUpperCase();
+        return toTitleCase(jamaah.namaAyah || jamaah.ayahKandung || jamaah.fatherName || "-");
       case "alamat":
-        return jamaah.alamat || jamaah.address || "-";
+        return toTitleCase(jamaah.alamat || jamaah.address || "-");
       case "nomorTelepon":
         return jamaah.nomorTelepon || jamaah.noHp || jamaah.phone || "-";
       case "registrationId":
@@ -1087,7 +1089,7 @@ function autoDetectManifestValue(
       }
       const rawVal = manualFormData[key];
       const resolvedKota = (rawVal ? (getKotaFromKanimName(rawVal) || rawVal) : "") || (parentKanim ? getKotaFromKanimName(parentKanim) : "") || "Surabaya";
-      return resolvedKota;
+      return toTitleCase(resolvedKota);
     }
     return manualFormData[key] || DAFTAR_KANTOR_IMIGRASI[0]?.nama || "Kantor Imigrasi Kelas I Khusus TPI Surabaya";
   }

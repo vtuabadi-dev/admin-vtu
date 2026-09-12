@@ -33,7 +33,7 @@ import { Input } from "@/shared/components/ui/Input";
 import { Select } from "@/shared/components/ui/Select";
 import { Badge } from "@/shared/components/ui/Badge";
 import { Modal } from "@/shared/components/ui/Modal";
-import { formatDate, formatDateShort, cn, getWhatsAppUrl } from "@/shared/lib/utils";
+import { formatDate, formatDateShort, cn, getWhatsAppUrl, toTitleCase } from "@/shared/lib/utils";
 import { useOperationalStore } from "@/stores/operational-store";
 import { KOP_SURAT_BASE64 } from "@/server/assets/kop-surat";
 import {
@@ -430,7 +430,7 @@ function GenerateSuratPageContent() {
       templateName: activeTemplate.nama,
       kategori: activeTemplate.kategori,
       jamaahId: activeJamaah?.id,
-      jamaahNama: (activeJamaah?.namaLengkap || "Jamaah").toUpperCase(),
+      jamaahNama: toTitleCase(activeJamaah?.namaLengkap || "Jamaah"),
       jamaahPaspor: activeJamaah?.nomorPaspor || "-",
       jamaahNik: activeJamaah?.nik || "-",
       packageId: activeKeberangkatan?.id,
@@ -512,7 +512,7 @@ ${activeTemplate.penandatangan.jabatan}
     const msg = `*PT. VAUZA TRIKARSA UTAMA (VTU ABADI)*
 _Penyelenggara Ibadah Umroh Kemenag RI No. U.400/2021_
 
-Yth. Bapak/Ibu *${activeJamaah?.namaLengkap || "Jamaah"}*,
+Yth. Bapak/Ibu *${toTitleCase(activeJamaah?.namaLengkap || "Jamaah")}*,
 
 Berikut adalah informasi penerbitan *${activeTemplate.nama}*:
 📄 *Nomor Surat*: ${computedNomorSurat}
@@ -873,14 +873,14 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
                       <div className="flex items-center justify-between font-bold text-emerald-900 dark:text-emerald-300">
                         <span className="flex items-center gap-1.5">
                           <User className="h-3.5 w-3.5" />
-                          {activeJamaah.namaLengkap}
+                          {toTitleCase(activeJamaah.namaLengkap)}
                         </span>
                         <span className="font-mono text-[10px]">{activeJamaah.registrationId || "Terdaftar"}</span>
                       </div>
                       <div className="grid grid-cols-2 gap-2 text-[11px] text-emerald-800 dark:text-emerald-400">
                         <div>NIK: <strong>{activeJamaah.nik || "-"}</strong></div>
                         <div>Paspor: <strong>{activeJamaah.nomorPaspor || "-"}</strong></div>
-                        <div>Lahir: <strong>{activeJamaah.tempatLahir || "-"}, {activeJamaah.tanggalLahir ? formatDateShort(activeJamaah.tanggalLahir) : "-"}</strong></div>
+                        <div>Lahir: <strong>{toTitleCase(activeJamaah.tempatLahir || "-")}, {activeJamaah.tanggalLahir ? formatDateShort(activeJamaah.tanggalLahir) : "-"}</strong></div>
                         <div>Paket: <strong>{activeKeberangkatan?.namaPaket || "-"}</strong></div>
                       </div>
                     </div>
@@ -1001,10 +1001,11 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
                     const isSearchableSelect = p.inputType === "select" && validOptions.length > 4;
 
                     // Cleanse city display if office name was accidentally passed
-                    const displayValue =
+                    const rawDisplay =
                       isKotaKanimField && (resolvedVal.includes("Kantor Imigrasi") || resolvedVal.includes("TPI"))
                         ? getKotaFromKanimName(resolvedVal) || resolvedVal
                         : resolvedVal;
+                    const displayValue = (isKotaKanimField || isTempatField) ? toTitleCase(rawDisplay) : rawDisplay;
 
                     return (
                       <div
@@ -1051,7 +1052,7 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
                             value={resolvedVal}
                             onChange={(kanimNama, kanimKota) => {
                               const nextData = { ...manualFormData, [p.key]: kanimNama };
-                              const effectiveKota = kanimKota || getKotaFromKanimName(kanimNama);
+                              const effectiveKota = toTitleCase(kanimKota || getKotaFromKanimName(kanimNama));
 
                               if (effectiveKota) {
                                 // VLOOKUP: Automatically fill all matching kota kanim/imigrasi placeholders in template

@@ -7,6 +7,7 @@ import {
   DEFAULT_SURAT_TEMPLATES,
   isSystemAutoPlaceholder,
   formatMonthYear,
+  toTitleCase,
 } from "@/shared/lib/surat-autocrat-engine";
 import { searchKantorImigrasi, getKotaFromKanimName } from "@/shared/lib/kantor-imigrasi";
 
@@ -44,9 +45,10 @@ describe("Surat Autocrat Merge Engine", () => {
 
     const resolved = resolveAutocratFieldValues(template, mockJamaah, mockKeberangkatan, {});
 
-    expect(resolved.nama_lengkap).toBe("MUCHAMAD ZAMRONI");
+    expect(resolved.nama_lengkap).toBe("Muchamad Zamroni");
     expect(resolved.nik).toBe("3515082103850001");
     expect(resolved.tempat_lahir).toBe("Sidoarjo");
+    expect(resolved.alamat).toBe("Jl. Raya Taman No. 45, Sidoarjo");
     expect(resolved.jenis_kelamin).toBe("LAKI-LAKI");
     expect(resolved.nama_paket).toBe("Paket Umroh Reguler Awal Musim 1448 H");
   });
@@ -207,9 +209,9 @@ describe("Surat Autocrat Merge Engine", () => {
     const template = DEFAULT_SURAT_TEMPLATES[0]!; // has nama_lengkap as manifest field
     const mockJamaah = { namaLengkap: "Muchamad Zamroni" };
 
-    // Case 1: No manual edit -> auto-fills from manifest
+    // Case 1: No manual edit -> auto-fills from manifest in Title Case
     const defaultResolved = resolveAutocratFieldValues(template, mockJamaah, null, {});
-    expect(defaultResolved.nama_lengkap).toBe("MUCHAMAD ZAMRONI");
+    expect(defaultResolved.nama_lengkap).toBe("Muchamad Zamroni");
 
     // Case 2: Admin edits the field in form -> manual edit overrides manifest!
     const customResolved = resolveAutocratFieldValues(template, mockJamaah, null, {
@@ -263,12 +265,12 @@ describe("Surat Autocrat Merge Engine", () => {
     };
 
     const resolved = resolveAutocratFieldValues(template, mockJamaah, null, {});
-    expect(resolved["Nama Jama’ah"]).toBe("H. FAISAL WAHYUDI");
+    expect(resolved["Nama Jama’ah"]).toBe("H. Faisal Wahyudi");
 
     // Also test rendering template containing curly apostrophe
     const text = "Nama Calon Jamaah: {{Nama Jama’ah}}";
     const rendered = renderAutocratMergedText(text, resolved);
-    expect(rendered).toBe("Nama Calon Jamaah: H. FAISAL WAHYUDI");
+    expect(rendered).toBe("Nama Calon Jamaah: H. Faisal Wahyudi");
   });
 
   it("should resolve Nomor Surat 1 and Nomor Surat 2 separately in multi-document templates", () => {
@@ -288,6 +290,30 @@ describe("Surat Autocrat Merge Engine", () => {
     const rendered = renderAutocratMergedText(template.templateContent, resolved);
     expect(rendered).toContain("SURAT 1 No: 001/VTU/EXT/IX/2026");
     expect(rendered).toContain("SURAT 2 No: 002/VTU/EXT/IX/2026");
+  });
+
+  it("should convert all manifest names, addresses, cities, and places into Title Case mode", () => {
+    expect(toTitleCase("MUCHAMAD ZAMRONI")).toBe("Muchamad Zamroni");
+    expect(toTitleCase("H. AHMAD SOFWAN, S.E.")).toBe("H. Ahmad Sofwan, S.E.");
+    expect(toTitleCase("SIDOARJO")).toBe("Sidoarjo");
+    expect(toTitleCase("KOTA SURABAYA")).toBe("Kota Surabaya");
+    expect(toTitleCase("JL. RAYA TAMAN NO. 45, SIDOARJO, JAWA TIMUR")).toBe("Jl. Raya Taman No. 45, Sidoarjo, Jawa Timur");
+    expect(toTitleCase("RT 005 / RW 002")).toBe("RT 005 / RW 002");
+    expect(toTitleCase("DKI JAKARTA")).toBe("DKI Jakarta");
+    expect(toTitleCase("KANTOR IMIGRASI KELAS I KHUSUS TPI SURABAYA")).toBe("Kantor Imigrasi Kelas I Khusus TPI Surabaya");
+
+    const template = DEFAULT_SURAT_TEMPLATES[0]!;
+    const mockJamaahUpper = {
+      namaLengkap: "MUHAMMAD AL-FATIH",
+      tempatLahir: "JAKARTA SELATAN",
+      namaAyah: "H. AHMAD SOFWAN",
+      alamat: "DSN KAUMAN, 010/006, KALIPARE, KEC. KALIPARE, KAB. MALANG",
+    };
+
+    const resolved = resolveAutocratFieldValues(template, mockJamaahUpper, null, {});
+    expect(resolved.nama_lengkap).toBe("Muhammad Al-Fatih");
+    expect(resolved.tempat_lahir).toBe("Jakarta Selatan");
+    expect(resolved.alamat).toBe("Dsn Kauman, 010/006, Kalipare, Kec. Kalipare, Kab. Malang");
   });
 });
 

@@ -205,3 +205,43 @@ export function getWhatsAppUrl(phone?: string | null, text?: string): string {
   return params.length > 0 ? `${baseUrl}?${params.join("&")}` : baseUrl;
 }
 
+/**
+ * Converts a string into Indonesian Title Case mode.
+ * Formats names, addresses, cities, and places properly while preserving
+ * uppercase acronyms (RT, RW, DKI, TPI, RI, etc.) and Roman numerals (I, II, III).
+ */
+export function toTitleCase(str?: string | null): string {
+  if (!str) return "";
+  const trimmed = str.trim();
+  if (!trimmed || trimmed === "-") return trimmed;
+
+  const uppercaseAcronyms = new Set([
+    "rt", "rw", "dki", "di", "tpi", "ri", "nik", "kua", "polres", "polda", "pt", "cv", "sub", "cgk", "bpjs",
+    "i", "ii", "iii", "iv", "v", "vi", "vii", "viii", "ix", "x"
+  ]);
+
+  return trimmed
+    .toLowerCase()
+    .split(/\s+/)
+    .map((word) => {
+      // Handle slashes such as RT/RW or 005/002
+      if (word.includes("/")) {
+        return word
+          .split("/")
+          .map((sub) => {
+            const cleanSub = sub.replace(/[^a-zA-Z0-9]/g, "");
+            if (uppercaseAcronyms.has(cleanSub)) return sub.toUpperCase();
+            return sub.replace(/(?:^|[\-\(\).])([a-z])/g, (m) => m.toUpperCase());
+          })
+          .join("/");
+      }
+
+      const cleanWord = word.replace(/[^a-zA-Z0-9]/g, "");
+      if (uppercaseAcronyms.has(cleanWord)) {
+        return word.toUpperCase();
+      }
+
+      return word.replace(/(?:^|[\-\/\(\).])([a-z])/g, (m) => m.toUpperCase());
+    })
+    .join(" ");
+}

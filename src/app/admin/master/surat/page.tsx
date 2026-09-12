@@ -1940,13 +1940,13 @@ Demikian Surat Tugas ini dibuat dengan sebenarnya agar dapat dipergunakan sebaga
                 const resolved = resolveAutocratFieldValues(
                   editingTemplate,
                   {
-                    namaLengkap: "MUCHAMAD ZAMRONI",
+                    namaLengkap: "Muchamad Zamroni",
                     nik: "3515082103850001",
                     nomorPaspor: "X1234567",
                     tempatLahir: "Sidoarjo",
                     tanggalLahir: "1985-03-21",
                     jenisKelamin: "LAKI-LAKI",
-                    namaAyah: "H. AHMAD SOFWAN",
+                    namaAyah: "H. Ahmad Sofwan",
                     alamat: "Jl. Raya Taman No. 45, Sidoarjo, Jawa Timur",
                     nomorTelepon: "081234567890",
                     registrationId: "REG-2026-0814",
