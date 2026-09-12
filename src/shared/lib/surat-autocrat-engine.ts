@@ -723,7 +723,10 @@ export function resolveAutocratFieldValues(
   const detectedKeys = extractPlaceholdersFromText(textSources);
 
   detectedKeys.forEach((key) => {
-    const cleanK = key.toLowerCase().trim().replace(/[\s_\-\.]/g, "");
+    const normalizeKey = (s: string) =>
+      s.toLowerCase().trim().replace(/[\u2018\u2019\u201A\u201B']/g, "'").replace(/[\s_\-\.]/g, "");
+
+    const cleanK = normalizeKey(key);
 
     // 1. System auto-resolved variables
     if (cleanK === "nomorsurat2" || cleanK === "nosurat2") {
@@ -771,9 +774,31 @@ export function resolveAutocratFieldValues(
       return;
     }
 
+    // Departure Month Special Match
+    if (cleanK.includes("bulankeberangkatan") || cleanK.includes("bulanberangkat")) {
+      const depDate =
+        keberangkatan?.tanggalBerangkat ||
+        keberangkatan?.departureDate ||
+        keberangkatan?.bulan ||
+        keberangkatan?.bulanKeberangkatan;
+      values[key] = depDate ? formatMonthYear(depDate) : "Juni 2026";
+      return;
+    }
+
+    // Hal / Perihal Special Match
+    if (cleanK === "hal" || cleanK === "perihal") {
+      values[key] =
+        manualFormData[key] ||
+        manualFormData["Hal"] ||
+        manualFormData["hal"] ||
+        manualFormData["perihal"] ||
+        "Permohonan Baru";
+      return;
+    }
+
     // 2. Check if mapping exists in template.placeholders
     const mapping = template.placeholders.find(
-      (p) => p.key.toLowerCase().trim() === key.toLowerCase().trim()
+      (p) => normalizeKey(p.key) === cleanK
     );
 
     if (mapping) {
@@ -1084,7 +1109,7 @@ export function renderAutocratMergedText(templateText: string, resolvedValues: R
   let result = templateText;
   Object.keys(resolvedValues).forEach((key) => {
     const val = resolvedValues[key] !== undefined ? String(resolvedValues[key]) : "";
-    const escapedKey = escapeRegExp(key);
+    const escapedKey = escapeRegExp(key).replace(/['\u2019\u2018]/g, "['\\u2019\\u2018]");
     // Replace {key}, {{key}}, <<key>>, «key», [[key]] (case-insensitive with optional surrounding spaces)
     const pattern = new RegExp(`(?:\\{+|<<|«|\\[\\[)\\s*${escapedKey}\\s*(?:\\}+|>>|»|\\]\\])`, "gi");
     result = result.replace(pattern, val);

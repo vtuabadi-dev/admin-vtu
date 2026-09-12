@@ -25,6 +25,7 @@ import {
   Plane,
   Layers,
   ArrowRight,
+  FileText,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/components/ui/Card";
 import { Button } from "@/shared/components/ui/Button";
@@ -78,6 +79,12 @@ function GenerateSuratPageContent() {
   const [selectedTemplateSlug, setSelectedTemplateSlug] = useState<string>("rekom-paspor");
   const [selectedPackageId, setSelectedPackageId] = useState<string>("");
   const [selectedJamaahId, setSelectedJamaahId] = useState<string>("");
+  const [selectedDocIndex, setSelectedDocIndex] = useState<number>(0);
+
+  // Reset selected document index when template changes
+  useEffect(() => {
+    setSelectedDocIndex(0);
+  }, [selectedTemplateSlug]);
 
   // Dynamic Form Data (for placeholders)
   const [manualFormData, setManualFormData] = useState<Record<string, string>>({});
@@ -283,11 +290,61 @@ function GenerateSuratPageContent() {
     return `${prefix}/${nomorUrutSurat}/VTU/${todayInfo.romanMonth}/${todayInfo.year}`;
   }, [activeTemplate, nomorUrutSurat, todayInfo]);
 
+  const computedNomorSurat2 = useMemo(() => {
+    const nextNum = String(parseInt(nomorUrutSurat || "1", 10) + 1).padStart(3, "0");
+    if (!activeTemplate) return `SR-PASPOR/${nextNum}/VTU/${todayInfo.romanMonth}/${todayInfo.year}`;
+    if (activeTemplate.formatNomor && activeTemplate.formatNomor.trim()) {
+      return activeTemplate.formatNomor
+        .replace(/\[NOMOR\]/gi, nextNum)
+        .replace(/\[BULAN\]/gi, todayInfo.romanMonth)
+        .replace(/\[TAHUN\]/gi, String(todayInfo.year))
+        .replace(/\[HARI\]/gi, String(new Date().getDate()).padStart(2, "0"));
+    }
+    const prefix = activeTemplate?.kodeNomorDefault || "SR-PASPOR";
+    return `${prefix}/${nextNum}/VTU/${todayInfo.romanMonth}/${todayInfo.year}`;
+  }, [activeTemplate, nomorUrutSurat, todayInfo]);
+
   // Effective QR Code visibility
   const effectiveShowBarcode =
     customShowBarcode !== null
       ? customShowBarcode
       : (activeTemplate?.penandatangan?.showBarcode ?? true);
+
+  // Active attached document file (if uploaded template exists)
+  const activeAttachedFile = useMemo(() => {
+    const files = activeTemplate?.attachedFiles || [];
+    return files[selectedDocIndex] || files[0] || null;
+  }, [activeTemplate, selectedDocIndex]);
+
+  // Prioritize uploaded document text (attachedFiles) over hardcoded templateContent
+  const rawTemplateText = useMemo(() => {
+    if (!activeTemplate) return "";
+    if (activeAttachedFile?.content && activeAttachedFile.content.trim().length > 0) {
+      return activeAttachedFile.content;
+    }
+    const firstWithContent = activeTemplate.attachedFiles?.find(
+      (f) => f.content && f.content.trim().length > 0
+    );
+    if (firstWithContent?.content && firstWithContent.content.trim().length > 0) {
+      return firstWithContent.content;
+    }
+    return activeTemplate.templateContent || "";
+  }, [activeTemplate, activeAttachedFile]);
+
+  // Detect if the template contains its own document headers (Nomor, Kepada/Yth, etc.)
+  const isFullDocumentTemplate = useMemo(() => {
+    const lower = rawTemplateText.toLowerCase();
+    const hasNomor =
+      lower.includes("no:") ||
+      lower.includes("no :") ||
+      lower.includes("nomor:") ||
+      lower.includes("nomor :");
+    const hasTujuan =
+      lower.includes("kepada") ||
+      lower.includes("yth.") ||
+      lower.includes("yth ");
+    return hasNomor && hasTujuan;
+  }, [rawTemplateText]);
 
   // Autocrat Merged Field Values
   const resolvedFieldValues = useMemo(() => {
@@ -299,17 +356,22 @@ function GenerateSuratPageContent() {
       manualFormData,
       {
         nomorSurat: computedNomorSurat,
+        nomorSurat2: computedNomorSurat2,
         tanggalSurat: todayInfo.masehi,
         tanggalHijriyah: todayInfo.hijriyah,
       }
     );
-  }, [activeTemplate, activeJamaah, activeKeberangkatan, manualFormData, computedNomorSurat, todayInfo]);
+  }, [activeTemplate, activeJamaah, activeKeberangkatan, manualFormData, computedNomorSurat, computedNomorSurat2, todayInfo]);
 
-  // Rendered Body Text
+  // Rendered Body Text with clean formatting and Word artifact removal
   const renderedLetterBody = useMemo(() => {
-    if (!activeTemplate) return "";
-    return renderAutocratMergedText(activeTemplate.templateContent, resolvedFieldValues);
-  }, [activeTemplate, resolvedFieldValues]);
+    if (!rawTemplateText) return "";
+    let cleanText = rawTemplateText;
+    // Strip Word drawing coordinates artifacts (e.g. "1461770 -267335 0 0")
+    cleanText = cleanText.replace(/^[ \t]*-?\d{3,}[ \t]+-?\d{3,}[ \t]+-?\d+[ \t]+-?\d+[ \t]*$/gm, "");
+    cleanText = cleanText.replace(/\n{3,}/g, "\n\n");
+    return renderAutocratMergedText(cleanText, resolvedFieldValues);
+  }, [rawTemplateText, resolvedFieldValues]);
 
   // Rendered Tujuan & Perihal
   const renderedPerihal = useMemo(() => {
@@ -317,11 +379,31 @@ function GenerateSuratPageContent() {
   }, [customPerihal, activeTemplate, resolvedFieldValues]);
 
   const renderedTujuan = useMemo(() => {
-    return renderAutocratMergedText(customTujuan || activeTemplate?.tujuanDefault || "", resolvedFieldValues);
+    if (customTujuan && customTujuan.trim()) {
+      return renderAutocratMergedText(customTujuan, resolvedFieldValues);
+    }
+    const kanim =
+      resolvedFieldValues["Kanim"] ||
+      resolvedFieldValues["kanim"] ||
+      resolvedFieldValues["kantor_imigrasi"];
+    if (kanim && kanim.trim() && (!activeTemplate?.tujuanDefault || activeTemplate.tujuanDefault.toLowerCase().includes("imigrasi"))) {
+      return `Yth. Kepala ${kanim}`;
+    }
+    return renderAutocratMergedText(activeTemplate?.tujuanDefault || "", resolvedFieldValues);
   }, [customTujuan, activeTemplate, resolvedFieldValues]);
 
   const renderedKotaTujuan = useMemo(() => {
-    return renderAutocratMergedText(customKotaTujuan || activeTemplate?.kotaTujuanDefault || "", resolvedFieldValues);
+    if (customKotaTujuan && customKotaTujuan.trim()) {
+      return renderAutocratMergedText(customKotaTujuan, resolvedFieldValues);
+    }
+    const kota =
+      resolvedFieldValues["Kota Kanim"] ||
+      resolvedFieldValues["kota_kanim"] ||
+      resolvedFieldValues["kota"];
+    if (kota && kota.trim() && (!activeTemplate?.kotaTujuanDefault || activeTemplate.kotaTujuanDefault.toLowerCase().includes("tempat"))) {
+      return kota;
+    }
+    return renderAutocratMergedText(activeTemplate?.kotaTujuanDefault || "", resolvedFieldValues);
   }, [customKotaTujuan, activeTemplate, resolvedFieldValues]);
 
   // Verification URL for QR Code
@@ -396,7 +478,9 @@ function GenerateSuratPageContent() {
   // Action: Copy Text
   const handleCopy = () => {
     if (!activeTemplate) return;
-    const fullText = `
+    const fullText = isFullDocumentTemplate
+      ? renderedLetterBody
+      : `
 NOMOR   : ${computedNomorSurat}
 LAMP    : ${customLampiran || "-"}
 PERIHAL : ${renderedPerihal}
@@ -448,9 +532,31 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
   const handleDownloadDoc = () => {
     if (!activeTemplate) return;
     handleSaveToHistory();
-    const blob = new Blob(
-      [
-        `<!DOCTYPE html>
+
+    const docHtml = isFullDocumentTemplate
+      ? `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>${computedNomorSurat} - ${activeTemplate.nama}</title>
+  <style>
+    body { font-family: 'Times New Roman', serif; margin: 40px auto; max-width: 800px; line-height: 1.6; color: #111; padding: 20px; }
+    .content { white-space: pre-line; text-align: justify; font-size: 14px; }
+    .footer { margin-top: 40px; border-top: 1px solid #ccc; padding-top: 12px; font-family: sans-serif; font-size: 11px; color: #555; }
+  </style>
+</head>
+<body>
+  <div class="content">${renderedLetterBody}</div>
+  ${
+    effectiveShowBarcode
+      ? `<div class="footer">
+    <strong>VERIFIKASI KEABSAHAN SISTEM:</strong><br>${verificationUrl}
+  </div>`
+      : ""
+  }
+</body>
+</html>`
+      : `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8">
@@ -495,10 +601,9 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
     </div>
   </div>
 </body>
-</html>`,
-      ],
-      { type: "text/html" }
-    );
+</html>`;
+
+    const blob = new Blob([docHtml], { type: "text/html" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
@@ -1083,92 +1188,162 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
                 </CardContent>
               </Card>
 
-              {/* ── REALISTIC A4 LETTER SHEET PREVIEW ── */}
-              <div className="bg-white text-stone-950 p-8 sm:p-12 rounded-2xl shadow-xl border border-stone-300 font-serif text-[13px] leading-relaxed max-w-2xl mx-auto space-y-6 print:m-0 print:p-0 print:border-none print:shadow-none">
-                {/* Official Letterhead */}
-                {activeTemplate.kopSuratType === "ppiu_vtu" && (
-                  <div className="border-b-[3px] border-double border-stone-900 pb-3 flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                      <img
-                        src={KOP_SURAT_BASE64}
-                        alt="Logo Resmi PT Vauza Trikarsa Utama"
-                        className="h-20 w-auto object-contain"
-                      />
-                      <div>
-                        <h2 className="text-lg font-black tracking-tight text-stone-950 font-sans">
-                          PT. VAUZA TRIKARSA UTAMA
-                        </h2>
-                        <p className="text-[11px] font-bold text-stone-700 font-sans">
-                          Penyelenggara Perjalanan Ibadah Umroh (PPIU) Kemenag RI No. U.400 Tahun 2021
-                        </p>
-                        <p className="text-[10px] text-stone-600 font-sans mt-0.5">
-                          Kantor Pusat: Ruko Gateway Blok C-12, Waru, Sidoarjo &bull; Telp: (031) 854-4455 &bull; Email: operasional@vtuabadi.com
-                        </p>
-                      </div>
-                    </div>
+              {/* Document Switcher & Active Template Source Indicator */}
+              <div className="flex flex-wrap items-center justify-between gap-2 px-1">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5">
+                    <FileText className="h-3.5 w-3.5 text-primary" />
+                    Template Terpasang:
+                  </span>
+                  <Badge variant="outline" className="text-xs bg-muted/50 border-primary/20 text-foreground font-mono">
+                    {activeAttachedFile?.fileName || activeTemplate.fileNameUploaded || activeTemplate.nama}
+                  </Badge>
+                  {isFullDocumentTemplate && (
+                    <Badge variant="success" size="sm" className="text-[10px]">
+                      Full Document DOCX
+                    </Badge>
+                  )}
+                </div>
+
+                {/* If multiple documents attached, allow switching preview */}
+                {activeTemplate.attachedFiles && activeTemplate.attachedFiles.length > 1 && (
+                  <div className="inline-flex rounded-lg border border-stone-200 dark:border-stone-800 bg-muted/40 p-0.5">
+                    {activeTemplate.attachedFiles.map((doc, idx) => (
+                      <button
+                        key={doc.index || idx}
+                        type="button"
+                        onClick={() => setSelectedDocIndex(idx)}
+                        className={cn(
+                          "px-2.5 py-1 text-xs font-medium rounded-md transition-all cursor-pointer",
+                          selectedDocIndex === idx
+                            ? "bg-primary text-primary-foreground shadow-xs font-semibold"
+                            : "text-muted-foreground hover:text-foreground"
+                        )}
+                      >
+                        Dokumen {idx + 1}
+                        {doc.fileName ? `: ${doc.fileName.replace(/\.docx$/i, "")}` : ""}
+                      </button>
+                    ))}
                   </div>
                 )}
+              </div>
 
-                {/* Surat Meta (Nomor, Lamp, Hal, Tanggal) */}
-                <div className="flex items-start justify-between text-xs font-sans">
-                  <div className="space-y-0.5">
-                    <p>
-                      <strong>Nomor</strong>&nbsp;&nbsp;&nbsp;: {computedNomorSurat}
-                    </p>
-                    <p>
-                      <strong>Lamp</strong>&nbsp;&nbsp;&nbsp;&nbsp;: {customLampiran || "-"}
-                    </p>
-                    <p>
-                      <strong>Perihal</strong>&nbsp;: <strong>{renderedPerihal}</strong>
-                    </p>
+              {/* ── REALISTIC A4 LETTER SHEET PREVIEW ── */}
+              <div className="bg-white text-stone-950 p-8 sm:p-12 rounded-2xl shadow-xl border border-stone-300 font-serif text-[13px] leading-relaxed max-w-2xl mx-auto space-y-6 print:m-0 print:p-0 print:border-none print:shadow-none min-h-[842px]">
+                {isFullDocumentTemplate ? (
+                  /* Full Uploaded Document Template (Render merged document directly without duplicate headers/signatures) */
+                  <div className="space-y-6">
+                    <div className="whitespace-pre-line text-xs font-sans leading-relaxed text-justify">
+                      {renderedLetterBody}
+                    </div>
+
+                    {/* QR Code Barcode Verification */}
+                    {effectiveShowBarcode && (
+                      <div className="pt-6 flex items-center justify-between border-t border-stone-200 font-sans text-xs">
+                        <div className="p-2.5 border border-stone-300 rounded-xl flex items-center gap-2.5 bg-stone-50 max-w-[280px]">
+                          <QrCode className="h-10 w-10 text-stone-900 shrink-0" />
+                          <div className="text-[9px] text-stone-700 leading-tight">
+                            <p className="font-bold text-stone-950">VERIFIKASI KEABSAHAN SURAT</p>
+                            <p className="mt-0.5 text-stone-500 font-mono text-[8px] break-all">{computedNomorSurat}</p>
+                            <p className="text-[8px] text-stone-400">Scan QR Code untuk verifikasi resmi portal VTU</p>
+                          </div>
+                        </div>
+                        <div className="text-right text-[10px] text-stone-500">
+                          <p className="font-medium text-stone-700">Dokumen Resmi Sistem VTU</p>
+                          <p>Dicetak secara digital melalui VTU Sistem</p>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                  <div className="text-right">
-                    <p>Sidoarjo, {todayInfo.masehi}</p>
-                    <p className="text-[10px] text-stone-500">{todayInfo.hijriyah}</p>
-                  </div>
-                </div>
+                ) : (
+                  /* Standard Letter Template (Kop PPIU VTU + Meta + Destination + Body + Signature) */
+                  <>
+                    {/* Official Letterhead */}
+                    {activeTemplate.kopSuratType === "ppiu_vtu" && (
+                      <div className="border-b-[3px] border-double border-stone-900 pb-3 flex items-center justify-between">
+                        <div className="flex items-center gap-4">
+                          <img
+                            src={KOP_SURAT_BASE64}
+                            alt="Logo Resmi PT Vauza Trikarsa Utama"
+                            className="h-20 w-auto object-contain"
+                          />
+                          <div>
+                            <h2 className="text-lg font-black tracking-tight text-stone-950 font-sans">
+                              PT. VAUZA TRIKARSA UTAMA
+                            </h2>
+                            <p className="text-[11px] font-bold text-stone-700 font-sans">
+                              Penyelenggara Perjalanan Ibadah Umroh (PPIU) Kemenag RI No. U.400 Tahun 2021
+                            </p>
+                            <p className="text-[10px] text-stone-600 font-sans mt-0.5">
+                              Kantor Pusat: Ruko Gateway Blok C-12, Waru, Sidoarjo &bull; Telp: (031) 854-4455 &bull; Email: operasional@vtuabadi.com
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
 
-                {/* Destination */}
-                <div className="text-xs font-sans space-y-0.5 pt-1">
-                  <p className="font-semibold">{renderedTujuan}</p>
-                  <p>{renderedKotaTujuan}</p>
-                </div>
-
-                {/* Body Content */}
-                <div className="whitespace-pre-line text-xs font-sans pt-2 leading-relaxed text-justify">
-                  {renderedLetterBody}
-                </div>
-
-                {/* Signature & QR Code Verification */}
-                <div className="pt-8 flex items-end justify-between font-sans text-xs">
-                  {/* QR Code Barcode Verification */}
-                  {effectiveShowBarcode && (
-                    <div className="p-2.5 border border-stone-300 rounded-xl flex items-center gap-2.5 bg-stone-50 max-w-[240px]">
-                      <QrCode className="h-12 w-12 text-stone-900 shrink-0" />
-                      <div className="text-[9px] text-stone-700 leading-tight">
-                        <p className="font-bold text-stone-950">VERIFIKASI KEABSAHAN</p>
-                        <p className="mt-0.5 text-stone-500">Scan QR Code untuk verifikasi resmi di portal sistem VTU</p>
+                    {/* Surat Meta (Nomor, Lamp, Hal, Tanggal) */}
+                    <div className="flex items-start justify-between text-xs font-sans">
+                      <div className="space-y-0.5">
+                        <p>
+                          <strong>Nomor</strong>&nbsp;&nbsp;&nbsp;: {computedNomorSurat}
+                        </p>
+                        <p>
+                          <strong>Lamp</strong>&nbsp;&nbsp;&nbsp;&nbsp;: {customLampiran || "-"}
+                        </p>
+                        <p>
+                          <strong>Perihal</strong>&nbsp;: <strong>{renderedPerihal}</strong>
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p>Sidoarjo, {todayInfo.masehi}</p>
+                        <p className="text-[10px] text-stone-500">{todayInfo.hijriyah}</p>
                       </div>
                     </div>
-                  )}
 
-                  {/* Signature Block */}
-                  <div className="text-center min-w-[220px] ml-auto space-y-1">
-                    <p className="font-bold">PT. VAUZA TRIKARSA UTAMA</p>
-                    <div className="h-20 flex items-center justify-center relative">
-                      {activeTemplate.penandatangan.showStempel && (
-                        <div className="absolute inset-0 flex items-center justify-center opacity-70 pointer-events-none">
-                          <div className="w-20 h-20 rounded-full border-2 border-dashed border-red-600 flex items-center justify-center text-[10px] font-black text-red-600 rotate-[-12deg]">
-                            STEMPEL RESMI
+                    {/* Destination */}
+                    <div className="text-xs font-sans space-y-0.5 pt-1">
+                      <p className="font-semibold">{renderedTujuan}</p>
+                      <p>{renderedKotaTujuan}</p>
+                    </div>
+
+                    {/* Body Content */}
+                    <div className="whitespace-pre-line text-xs font-sans pt-2 leading-relaxed text-justify">
+                      {renderedLetterBody}
+                    </div>
+
+                    {/* Signature & QR Code Verification */}
+                    <div className="pt-8 flex items-end justify-between font-sans text-xs">
+                      {/* QR Code Barcode Verification */}
+                      {effectiveShowBarcode && (
+                        <div className="p-2.5 border border-stone-300 rounded-xl flex items-center gap-2.5 bg-stone-50 max-w-[240px]">
+                          <QrCode className="h-12 w-12 text-stone-900 shrink-0" />
+                          <div className="text-[9px] text-stone-700 leading-tight">
+                            <p className="font-bold text-stone-950">VERIFIKASI KEABSAHAN</p>
+                            <p className="mt-0.5 text-stone-500">Scan QR Code untuk verifikasi resmi di portal sistem VTU</p>
                           </div>
                         </div>
                       )}
-                      <span className="italic text-stone-400 text-[10px]">(Tanda Tangan Digital & Stempel)</span>
+
+                      {/* Signature Block */}
+                      <div className="text-center min-w-[220px] ml-auto space-y-1">
+                        <p className="font-bold">PT. VAUZA TRIKARSA UTAMA</p>
+                        <div className="h-20 flex items-center justify-center relative">
+                          {activeTemplate.penandatangan.showStempel && (
+                            <div className="absolute inset-0 flex items-center justify-center opacity-70 pointer-events-none">
+                              <div className="w-20 h-20 rounded-full border-2 border-dashed border-red-600 flex items-center justify-center text-[10px] font-black text-red-600 rotate-[-12deg]">
+                                STEMPEL RESMI
+                              </div>
+                            </div>
+                          )}
+                          <span className="italic text-stone-400 text-[10px]">(Tanda Tangan Digital & Stempel)</span>
+                        </div>
+                        <p className="font-bold underline uppercase">{activeTemplate.penandatangan.nama}</p>
+                        <p className="text-[11px] text-stone-600 font-medium">{activeTemplate.penandatangan.jabatan}</p>
+                      </div>
                     </div>
-                    <p className="font-bold underline uppercase">{activeTemplate.penandatangan.nama}</p>
-                    <p className="text-[11px] text-stone-600 font-medium">{activeTemplate.penandatangan.jabatan}</p>
-                  </div>
-                </div>
+                  </>
+                )}
               </div>
             </div>
           </div>

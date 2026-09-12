@@ -71,6 +71,7 @@ export default function MasterSuratPage() {
   const [editorActiveTab, setEditorActiveTab] = useState<"konfigurasi" | "editor" | "preview">("konfigurasi");
   const [savingTemplate, setSavingTemplate] = useState(false);
   const [showFormatHelper, setShowFormatHelper] = useState(false);
+  const [previewDocIndex, setPreviewDocIndex] = useState(0);
 
   // Upload Wizard Modal State
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
@@ -198,6 +199,7 @@ Demikian Surat Tugas ini dibuat dengan sebenarnya agar dapat dipergunakan sebaga
     setEditingTemplate(newTpl);
     setEditorActiveTab("konfigurasi");
     setShowFormatHelper(false);
+    setPreviewDocIndex(0);
   };
 
   // Handle edit existing template
@@ -237,6 +239,7 @@ Demikian Surat Tugas ini dibuat dengan sebenarnya agar dapat dipergunakan sebaga
     setEditingTemplate(cloned);
     setEditorActiveTab("konfigurasi");
     setShowFormatHelper(false);
+    setPreviewDocIndex(0);
   };
 
   // Handle Remove Column in Konfigurasi Isian Data
@@ -432,7 +435,7 @@ Demikian Surat Tugas ini dibuat dengan sebenarnya agar dapat dipergunakan sebaga
         fileNameUploaded: docIdx === 0 ? fileName : prev.fileNameUploaded,
         attachedFiles: currentAttached,
         templateContent:
-          docIdx === 0 && (!isDocx || !prev.templateContent)
+          docIdx === 0
             ? (content || prev.templateContent)
             : prev.templateContent,
         placeholders: newMappings.length > 0 ? newMappings : prev.placeholders,
@@ -917,18 +920,26 @@ Demikian Surat Tugas ini dibuat dengan sebenarnya agar dapat dipergunakan sebaga
   };
 
   // Upload Wizard File Parser
-  const handleProcessUploadedFile = (file: File) => {
+  const handleProcessUploadedFile = async (file: File) => {
     setUploadedFileName(file.name);
     const cleanName = file.name.replace(/\.[^/.]+$/, "").replace(/[-_]/g, " ");
     setUploadTemplateName(cleanName.charAt(0).toUpperCase() + cleanName.slice(1));
     setUploadPerihal(`Surat ${cleanName}`);
 
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const content = (e.target?.result as string) || "";
+    const isDocx = file.name.endsWith(".docx") || file.name.endsWith(".doc");
+    try {
+      if (isDocx) {
+        const res = await extractPlaceholdersFromDocxFile(file);
+        setUploadedFileContent(res.extractedText);
+      } else {
+        const content = await file.text();
+        setUploadedFileContent(content);
+      }
+    } catch (err) {
+      console.error("Error reading uploaded file:", err);
+      const content = await file.text();
       setUploadedFileContent(content);
-    };
-    reader.readAsText(file);
+    }
   };
 
   const handleSaveUploadedTemplate = () => {
@@ -1859,129 +1870,199 @@ Demikian Surat Tugas ini dibuat dengan sebenarnya agar dapat dipergunakan sebaga
           {/* ── TAB 3: PRATINJAU LEMBAR A4 ── */}
           {editorActiveTab === "preview" && (
             <div className="space-y-4">
-              <div className="p-3 rounded-xl bg-muted/40 border text-xs flex items-center justify-between">
-                <span className="font-semibold text-muted-foreground">
-                  Pratinjau Lembar Surat A4 (Menggunakan Dummy Data Resolusi Autocrat)
-                </span>
-                <Badge variant="success" size="sm">
-                  Autocrat Live Renderer
-                </Badge>
-              </div>
+              <div className="p-3 rounded-xl bg-muted/40 border text-xs flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold text-muted-foreground">
+                    Pratinjau Lembar Surat A4 (Menggunakan Dummy Data Resolusi Autocrat)
+                  </span>
+                  <Badge variant="success" size="sm">
+                    Autocrat Live Renderer
+                  </Badge>
+                </div>
 
-              {/* Simulated A4 Letter Sheet */}
-              <div className="bg-white text-stone-900 p-8 rounded-xl shadow-md border font-serif text-[13px] leading-relaxed max-w-2xl mx-auto space-y-5">
-                {/* Kop Surat */}
-                {editingTemplate.kopSuratType === "ppiu_vtu" && (
-                  <div className="border-b-2 border-stone-900 pb-3 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <img
-                        src={KOP_SURAT_BASE64}
-                        alt="Kop Surat PT VTU Abadi"
-                        className="h-16 w-auto object-contain"
-                      />
-                      <div>
-                        <h2 className="text-base font-bold tracking-tight text-stone-950 font-sans">
-                          PT. VAUZA TRIKARSA UTAMA
-                        </h2>
-                        <p className="text-[10px] text-stone-600 font-sans font-medium">
-                          Penyelenggara Perjalanan Ibadah Umroh (PPIU) Kemenag RI No. U.400 Tahun 2021
-                        </p>
-                        <p className="text-[9px] text-stone-500 font-sans">
-                          Ruko Gateway Blok C-12, Waru, Sidoarjo &bull; Telp: (031) 854-4455 &bull; info@vtuabadi.com
-                        </p>
-                      </div>
-                    </div>
+                {/* Multi-document switcher if multiple attached documents exist */}
+                {editingTemplate.attachedFiles && editingTemplate.attachedFiles.length > 1 && (
+                  <div className="inline-flex rounded-lg border border-stone-200 dark:border-stone-800 bg-muted/40 p-0.5">
+                    {editingTemplate.attachedFiles.map((doc, idx) => (
+                      <button
+                        key={doc.index || idx}
+                        type="button"
+                        onClick={() => setPreviewDocIndex(idx)}
+                        className={cn(
+                          "px-2.5 py-1 text-xs font-medium rounded-md transition-all cursor-pointer",
+                          previewDocIndex === idx
+                            ? "bg-primary text-primary-foreground shadow-xs font-semibold"
+                            : "text-muted-foreground hover:text-foreground"
+                        )}
+                      >
+                        Dokumen {idx + 1}
+                        {doc.fileName ? `: ${doc.fileName.replace(/\.docx$/i, "")}` : ""}
+                      </button>
+                    ))}
                   </div>
                 )}
+              </div>
 
-                {/* Header Meta */}
-                <div className="flex items-start justify-between text-xs font-sans">
-                  <div className="space-y-0.5">
-                    <p>
-                      <strong>Nomor</strong> :{" "}
-                      {editingTemplate.formatNomor
-                        ? editingTemplate.formatNomor
-                            .replace(/\[NOMOR\]/gi, "001")
-                            .replace(/\[BULAN\]/gi, getTodayDateInfo().romanMonth)
-                            .replace(/\[TAHUN\]/gi, String(getTodayDateInfo().year))
-                            .replace(/\[HARI\]/gi, "31")
-                        : `${editingTemplate.kodeNomorDefault}/001/VTU/${getTodayDateInfo().romanMonth}/${getTodayDateInfo().year}`}
-                    </p>
-                    <p><strong>Lamp</strong>  : {editingTemplate.lampiranDefault || "-"}</p>
-                    <p><strong>Perihal</strong>: <strong>{editingTemplate.perihalDefault}</strong></p>
-                  </div>
-                  <div className="text-right">
-                    <p>Sidoarjo, {getTodayDateInfo().masehi}</p>
-                  </div>
-                </div>
+              {/* Dynamic A4 Sheet Preview */}
+              {(() => {
+                const currentDoc =
+                  editingTemplate.attachedFiles?.[previewDocIndex] ||
+                  editingTemplate.attachedFiles?.[0];
+                const rawText =
+                  currentDoc?.content?.trim() || editingTemplate.templateContent || "";
+                let cleanText = rawText.replace(
+                  /^[ \t]*-?\d{3,}[ \t]+-?\d{3,}[ \t]+-?\d+[ \t]+-?\d+[ \t]*$/gm,
+                  ""
+                );
+                cleanText = cleanText.replace(/\n{3,}/g, "\n\n");
 
-                {/* Destination */}
-                <div className="text-xs font-sans space-y-0.5 pt-1">
-                  <p>{editingTemplate.tujuanDefault || "Kepada Pihak yang Berkepentingan"}</p>
-                  <p>{editingTemplate.kotaTujuanDefault || "Di Tempat"}</p>
-                </div>
+                const lower = cleanText.toLowerCase();
+                const isFullDoc =
+                  (lower.includes("no:") || lower.includes("nomor:")) &&
+                  (lower.includes("kepada") || lower.includes("yth"));
 
-                {/* Body Content with Merged Data */}
-                <div className="whitespace-pre-line text-xs font-sans pt-2 leading-relaxed text-justify">
-                  {renderAutocratMergedText(
-                    editingTemplate.templateContent,
-                    resolveAutocratFieldValues(
-                      editingTemplate,
-                      {
-                        namaLengkap: "MUCHAMAD ZAMRONI",
-                        nik: "3515082103850001",
-                        nomorPaspor: "X1234567",
-                        tempatLahir: "Sidoarjo",
-                        tanggalLahir: "1985-03-21",
-                        jenisKelamin: "LAKI-LAKI",
-                        namaAyah: "H. AHMAD SOFWAN",
-                        alamat: "Jl. Raya Taman No. 45, Sidoarjo, Jawa Timur",
-                        nomorTelepon: "081234567890",
-                        registrationId: "REG-2026-0814",
-                      },
-                      {
-                        namaPaket: "Paket Umroh Reguler Awal Musim 1448 H",
-                        kode: "KBR-2026-08-A",
-                        tanggalBerangkat: "2026-09-15",
-                        tanggalPulang: "2026-09-24",
-                        programHari: 9,
-                        maskapai: "Saudia Airlines (SV)",
-                        hotelMekkah: "Pullman Zamzam Makkah",
-                        hotelMadinah: "Rove Al Madinah",
-                      }
-                    )
-                  )}
-                </div>
+                const resolved = resolveAutocratFieldValues(
+                  editingTemplate,
+                  {
+                    namaLengkap: "MUCHAMAD ZAMRONI",
+                    nik: "3515082103850001",
+                    nomorPaspor: "X1234567",
+                    tempatLahir: "Sidoarjo",
+                    tanggalLahir: "1985-03-21",
+                    jenisKelamin: "LAKI-LAKI",
+                    namaAyah: "H. AHMAD SOFWAN",
+                    alamat: "Jl. Raya Taman No. 45, Sidoarjo, Jawa Timur",
+                    nomorTelepon: "081234567890",
+                    registrationId: "REG-2026-0814",
+                  },
+                  {
+                    namaPaket: "Paket Umroh Reguler Awal Musim 1448 H",
+                    kode: "KBR-2026-08-A",
+                    tanggalBerangkat: "2026-09-15",
+                    tanggalPulang: "2026-09-24",
+                    programHari: 9,
+                    maskapai: "Saudia Airlines (SV)",
+                    hotelMekkah: "Pullman Zamzam Makkah",
+                    hotelMadinah: "Rove Al Madinah",
+                  }
+                );
 
-                {/* Signature Section */}
-                <div className="pt-6 flex items-end justify-between font-sans text-xs">
-                  {editingTemplate.penandatangan.showBarcode && (
-                    <div className="p-2 border rounded-lg flex items-center gap-2 bg-stone-50">
-                      <QrCode className="h-10 w-10 text-stone-800" />
-                      <div className="text-[9px] text-stone-600">
-                        <p className="font-bold">VERIFIKASI RESMI</p>
-                        <p>Scan untuk cek keabsahan surat di portal VTU Abadi</p>
+                const renderedBody = renderAutocratMergedText(cleanText, resolved);
+
+                if (isFullDoc) {
+                  return (
+                    <div className="bg-white text-stone-900 p-8 sm:p-12 rounded-xl shadow-md border font-serif text-[13px] leading-relaxed max-w-2xl mx-auto space-y-6">
+                      <div className="whitespace-pre-line text-xs font-sans leading-relaxed text-justify">
+                        {renderedBody}
                       </div>
-                    </div>
-                  )}
-
-                  <div className="text-center min-w-[200px] ml-auto space-y-1">
-                    <p className="font-semibold">PT. VAUZA TRIKARSA UTAMA</p>
-                    <div className="h-16 flex items-center justify-center relative">
-                      {editingTemplate.penandatangan.showStempel && (
-                        <div className="absolute inset-0 flex items-center justify-center opacity-60 pointer-events-none">
-                          <div className="w-16 h-16 rounded-full border-2 border-dashed border-red-600 flex items-center justify-center text-[9px] font-black text-red-600 rotate-[-15deg]">
-                            STEMPEL VTU
+                      {editingTemplate.penandatangan.showBarcode && (
+                        <div className="pt-6 flex items-center justify-between border-t border-stone-200 font-sans text-xs">
+                          <div className="p-2 border rounded-lg flex items-center gap-2 bg-stone-50">
+                            <QrCode className="h-10 w-10 text-stone-800" />
+                            <div className="text-[9px] text-stone-600">
+                              <p className="font-bold">VERIFIKASI RESMI</p>
+                              <p>Scan untuk cek keabsahan surat di portal VTU Abadi</p>
+                            </div>
+                          </div>
+                          <div className="text-right text-[10px] text-stone-500">
+                            <p className="font-medium text-stone-700">Dokumen Resmi Sistem VTU</p>
+                            <p>Simulasi Preview Template Master</p>
                           </div>
                         </div>
                       )}
-                      <span className="italic text-stone-400 text-[10px]">(Tanda Tangan Digital)</span>
                     </div>
-                    <p className="font-bold underline uppercase">{editingTemplate.penandatangan.nama}</p>
-                    <p className="text-[11px] text-stone-600">{editingTemplate.penandatangan.jabatan}</p>
+                  );
+                }
+
+                return (
+                  <div className="bg-white text-stone-900 p-8 rounded-xl shadow-md border font-serif text-[13px] leading-relaxed max-w-2xl mx-auto space-y-5">
+                    {/* Kop Surat */}
+                    {editingTemplate.kopSuratType === "ppiu_vtu" && (
+                      <div className="border-b-2 border-stone-900 pb-3 flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <img
+                            src={KOP_SURAT_BASE64}
+                            alt="Kop Surat PT VTU Abadi"
+                            className="h-16 w-auto object-contain"
+                          />
+                          <div>
+                            <h2 className="text-base font-bold tracking-tight text-stone-950 font-sans">
+                              PT. VAUZA TRIKARSA UTAMA
+                            </h2>
+                            <p className="text-[10px] text-stone-600 font-sans font-medium">
+                              Penyelenggara Perjalanan Ibadah Umroh (PPIU) Kemenag RI No. U.400 Tahun 2021
+                            </p>
+                            <p className="text-[9px] text-stone-500 font-sans">
+                              Ruko Gateway Blok C-12, Waru, Sidoarjo &bull; Telp: (031) 854-4455 &bull; info@vtuabadi.com
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Header Meta */}
+                    <div className="flex items-start justify-between text-xs font-sans">
+                      <div className="space-y-0.5">
+                        <p>
+                          <strong>Nomor</strong> :{" "}
+                          {editingTemplate.formatNomor
+                            ? editingTemplate.formatNomor
+                                .replace(/\[NOMOR\]/gi, "001")
+                                .replace(/\[BULAN\]/gi, getTodayDateInfo().romanMonth)
+                                .replace(/\[TAHUN\]/gi, String(getTodayDateInfo().year))
+                                .replace(/\[HARI\]/gi, "31")
+                            : `${editingTemplate.kodeNomorDefault}/001/VTU/${getTodayDateInfo().romanMonth}/${getTodayDateInfo().year}`}
+                        </p>
+                        <p><strong>Lamp</strong>  : {editingTemplate.lampiranDefault || "-"}</p>
+                        <p><strong>Perihal</strong>: <strong>{editingTemplate.perihalDefault}</strong></p>
+                      </div>
+                      <div className="text-right">
+                        <p>Sidoarjo, {getTodayDateInfo().masehi}</p>
+                      </div>
+                    </div>
+
+                    {/* Destination */}
+                    <div className="text-xs font-sans space-y-0.5 pt-1">
+                      <p>{editingTemplate.tujuanDefault || "Kepada Pihak yang Berkepentingan"}</p>
+                      <p>{editingTemplate.kotaTujuanDefault || "Di Tempat"}</p>
+                    </div>
+
+                    {/* Body Content with Merged Data */}
+                    <div className="whitespace-pre-line text-xs font-sans pt-2 leading-relaxed text-justify">
+                      {renderedBody}
+                    </div>
+
+                    {/* Signature Section */}
+                    <div className="pt-6 flex items-end justify-between font-sans text-xs">
+                      {editingTemplate.penandatangan.showBarcode && (
+                        <div className="p-2 border rounded-lg flex items-center gap-2 bg-stone-50">
+                          <QrCode className="h-10 w-10 text-stone-800" />
+                          <div className="text-[9px] text-stone-600">
+                            <p className="font-bold">VERIFIKASI RESMI</p>
+                            <p>Scan untuk cek keabsahan surat di portal VTU Abadi</p>
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="text-center min-w-[200px] ml-auto space-y-1">
+                        <p className="font-semibold">PT. VAUZA TRIKARSA UTAMA</p>
+                        <div className="h-16 flex items-center justify-center relative">
+                          {editingTemplate.penandatangan.showStempel && (
+                            <div className="absolute inset-0 flex items-center justify-center opacity-60 pointer-events-none">
+                              <div className="w-16 h-16 rounded-full border-2 border-dashed border-red-600 flex items-center justify-center text-[9px] font-black text-red-600 rotate-[-15deg]">
+                                STEMPEL VTU
+                              </div>
+                            </div>
+                          )}
+                          <span className="italic text-stone-400 text-[10px]">(Tanda Tangan Digital)</span>
+                        </div>
+                        <p className="font-bold underline uppercase">{editingTemplate.penandatangan.nama}</p>
+                        <p className="text-[11px] text-stone-600">{editingTemplate.penandatangan.jabatan}</p>
+                      </div>
+                    </div>
                   </div>
-                </div>
-              </div>
+                );
+              })()}
 
             </div>
           )}

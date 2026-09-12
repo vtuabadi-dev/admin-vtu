@@ -245,5 +245,49 @@ describe("Surat Autocrat Merge Engine", () => {
     const resolved = resolveAutocratFieldValues(template, null, mockKeberangkatan, {});
     expect(resolved.bulan_berangkat).toBe("September 2026");
   });
+
+  it("should match placeholders with curly apostrophe like {{Nama Jama’ah}} to manifest field", () => {
+    const template: any = {
+      ...DEFAULT_SURAT_TEMPLATES[0]!,
+      placeholders: [
+        {
+          key: "Nama Jama’ah",
+          label: "Nama Jama'ah",
+          sourceType: "manifest",
+          manifestField: "jamaah.namaLengkap",
+        },
+      ],
+    };
+    const mockJamaah = {
+      namaLengkap: "H. Faisal Wahyudi",
+    };
+
+    const resolved = resolveAutocratFieldValues(template, mockJamaah, null, {});
+    expect(resolved["Nama Jama’ah"]).toBe("H. FAISAL WAHYUDI");
+
+    // Also test rendering template containing curly apostrophe
+    const text = "Nama Calon Jamaah: {{Nama Jama’ah}}";
+    const rendered = renderAutocratMergedText(text, resolved);
+    expect(rendered).toBe("Nama Calon Jamaah: H. FAISAL WAHYUDI");
+  });
+
+  it("should resolve Nomor Surat 1 and Nomor Surat 2 separately in multi-document templates", () => {
+    const template: any = {
+      ...DEFAULT_SURAT_TEMPLATES[0]!,
+      templateContent: "SURAT 1 No: {{Nomor Surat 1}}\nSURAT 2 No: {{Nomor Surat 2}}",
+    };
+
+    const resolved = resolveAutocratFieldValues(template, null, null, {}, {
+      nomorSurat: "001/VTU/EXT/IX/2026",
+      nomorSurat2: "002/VTU/EXT/IX/2026",
+    });
+
+    expect(resolved["Nomor Surat 1"]).toBe("001/VTU/EXT/IX/2026");
+    expect(resolved["Nomor Surat 2"]).toBe("002/VTU/EXT/IX/2026");
+
+    const rendered = renderAutocratMergedText(template.templateContent, resolved);
+    expect(rendered).toContain("SURAT 1 No: 001/VTU/EXT/IX/2026");
+    expect(rendered).toContain("SURAT 2 No: 002/VTU/EXT/IX/2026");
+  });
 });
 
