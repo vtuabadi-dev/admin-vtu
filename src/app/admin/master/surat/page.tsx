@@ -384,7 +384,7 @@ Demikian Surat Tugas ini dibuat dengan sebenarnya agar dapat dipergunakan sebaga
             (tagLower.includes("tanggal") ||
               tagLower.includes("tgl") ||
               tagLower.includes("date") ||
-              tagLower.includes("lahir") ||
+              (tagLower.includes("lahir") && !tagLower.includes("tempat") && !tagLower.includes("pob")) ||
               tagLower.includes("berangkat") ||
               tagLower.includes("pulang")) &&
             !tagLower.includes("bulan")
@@ -559,7 +559,7 @@ Demikian Surat Tugas ini dibuat dengan sebenarnya agar dapat dipergunakan sebaga
           (tagLower.includes("tanggal") ||
             tagLower.includes("tgl") ||
             tagLower.includes("date") ||
-            tagLower.includes("lahir") ||
+            (tagLower.includes("lahir") && !tagLower.includes("tempat") && !tagLower.includes("pob")) ||
             tagLower.includes("berangkat") ||
             tagLower.includes("pulang")) &&
           !tagLower.includes("bulan")
@@ -823,7 +823,7 @@ Demikian Surat Tugas ini dibuat dengan sebenarnya agar dapat dipergunakan sebaga
           (tagLower.includes("tanggal") ||
             tagLower.includes("tgl") ||
             tagLower.includes("date") ||
-            tagLower.includes("lahir") ||
+            (tagLower.includes("lahir") && !tagLower.includes("tempat") && !tagLower.includes("pob")) ||
             tagLower.includes("berangkat") ||
             tagLower.includes("pulang")) &&
           !tagLower.includes("bulan")

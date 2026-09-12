@@ -794,7 +794,7 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
                   </CardTitle>
                 </CardHeader>
 
-                <CardContent className="pt-4 space-y-3 max-h-[45vh] overflow-y-auto pr-1">
+                <CardContent className="p-3.5 space-y-2.5 max-h-[58vh] overflow-y-auto pr-2">
                   {activeTemplate.placeholders
                     .filter((p) => !isSystemAutoPlaceholder(p.key))
                     .map((p) => {
@@ -811,35 +811,50 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
                       cleanLabel.includes("kotaimigrasi") ||
                       (cleanKey.includes("kota") && !cleanKey.includes("lahir") && !cleanKey.includes("paket"));
 
+                    const isTempatField =
+                      cleanKey.includes("tempat") ||
+                      cleanLabel.includes("tempat") ||
+                      cleanKey.includes("pob") ||
+                      (cleanKey.includes("kota") && cleanKey.includes("lahir"));
+
+                    // Cleanse city display if office name was accidentally passed
+                    const displayValue =
+                      isKotaKanimField && (resolvedVal.includes("Kantor Imigrasi") || resolvedVal.includes("TPI"))
+                        ? getKotaFromKanimName(resolvedVal) || resolvedVal
+                        : resolvedVal;
+
                     return (
-                      <div key={p.key} className="space-y-1">
+                      <div
+                        key={p.key}
+                        className="p-2.5 rounded-xl border border-stone-200/80 dark:border-stone-800/80 bg-card/60 shadow-2xs space-y-1.5 transition-all hover:border-primary/40"
+                      >
                         <div className="flex items-center justify-between">
-                          <label className="text-xs font-medium text-foreground flex items-center gap-1.5">
+                          <label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
                             <span className="font-mono text-[10px] text-muted-foreground">&#123;{p.key}&#125;</span>
                             <span>{p.label}</span>
                           </label>
 
                           {isManifest ? (
-                            <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded flex items-center gap-1">
+                            <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded flex items-center gap-1">
                               <CheckCircle2 className="h-3 w-3" />
                               Otomatis Manifest
                             </span>
                           ) : isKotaKanimField ? (
                             <span
-                              className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded flex items-center gap-1"
+                              className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded flex items-center gap-1"
                               title="Kota ini otomatis terisi saat memilih Kantor Imigrasi"
                             >
                               <Sparkles className="h-3 w-3" />
                               Auto VLOOKUP Kanim
                             </span>
                           ) : (
-                            <span className="text-[10px] font-semibold text-blue-600 dark:text-blue-400 bg-blue-500/10 px-1.5 py-0.5 rounded">
+                            <span className="text-[10px] font-semibold text-blue-600 dark:text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded">
                               Input Form
                             </span>
                           )}
                         </div>
 
-                        {p.inputType === "kantor_imigrasi" ? (
+                        {p.inputType === "kantor_imigrasi" && !isKotaKanimField ? (
                           <KantorImigrasiCombobox
                             value={resolvedVal}
                             onChange={(kanimNama, kanimKota) => {
@@ -880,7 +895,7 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
                             onChange={(e) =>
                               setManualFormData({ ...manualFormData, [p.key]: e.target.value })
                             }
-                            className="w-full p-2 text-xs rounded-lg border bg-background focus:ring-1 focus:ring-primary focus:outline-none"
+                            className="w-full p-2.5 text-xs rounded-lg border bg-background focus:ring-2 focus:ring-primary/20 focus:border-primary focus:outline-none"
                             placeholder={p.placeholderHint || `Masukkan ${p.label}...`}
                           />
                         ) : p.inputType === "select" && p.options ? (
@@ -890,12 +905,18 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
                               setManualFormData({ ...manualFormData, [p.key]: e.target.value })
                             }
                             options={p.options.map((opt) => ({ value: opt, label: opt }))}
-                            className="text-xs"
+                            className="text-xs h-9 bg-background"
                           />
                         ) : (
                           <Input
-                            type={p.inputType === "date" ? "date" : p.inputType === "number" ? "number" : "text"}
-                            value={resolvedVal}
+                            type={
+                              p.inputType === "date" && !isTempatField && !isKotaKanimField
+                                ? "date"
+                                : p.inputType === "number"
+                                ? "number"
+                                : "text"
+                            }
+                            value={displayValue}
                             onChange={(e) =>
                               setManualFormData({ ...manualFormData, [p.key]: e.target.value })
                             }
@@ -906,7 +927,7 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
                                 : `Masukkan ${p.label}...`)
                             }
                             className={cn(
-                              "text-xs h-8",
+                              "text-xs h-9 bg-background",
                               (isManifest || isKotaKanimField) && "bg-muted/40 font-medium text-foreground"
                             )}
                           />

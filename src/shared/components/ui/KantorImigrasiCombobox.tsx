@@ -172,7 +172,7 @@ export function KantorImigrasiCombobox({
             }
           }}
           placeholder={placeholder}
-          className="w-full pl-8.5 pr-8 py-2 text-xs rounded-lg border border-stone-300 dark:border-stone-700 bg-background focus:ring-2 focus:ring-primary/20 focus:border-primary focus:outline-none transition-all placeholder:text-muted-foreground"
+          className="w-full pl-9 pr-9 py-2 text-xs rounded-lg border border-stone-300 dark:border-stone-700 bg-background focus:ring-2 focus:ring-primary/20 focus:border-primary focus:outline-none transition-all placeholder:text-muted-foreground"
         />
         {searchQuery ? (
           <button
