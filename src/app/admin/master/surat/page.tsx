@@ -1634,7 +1634,7 @@ Demikian Surat Tugas ini dibuat dengan sebenarnya agar dapat dipergunakan sebaga
                                   { value: "city", label: "Kota / Tempat" },
                                   { value: "number", label: "Angka / Nomor" },
                                   { value: "textarea", label: "Teks Panjang / Paragraf" },
-                                  { value: "select", label: "Pilihan (Dropdown)" },
+                                  { value: "select", label: "Pilihan (Dropdown / Searchable jika > 4 opsi)" },
                                   { value: "kantor_imigrasi", label: "Kantor Imigrasi / Layanan Paspor (Searchable)" },
                                   { value: "manifest", label: "Ambil dari Manifest (Otomatis)" },
                                 ]}
@@ -1686,31 +1686,47 @@ Demikian Surat Tugas ini dibuat dengan sebenarnya agar dapat dipergunakan sebaga
                           )}
 
                           {mapping.inputType === "select" && mapping.sourceType !== "manifest" && (
-                            <div className="w-full flex flex-col sm:flex-row sm:items-center gap-2.5 p-2.5 rounded-lg bg-blue-500/5 border border-blue-500/20 text-xs">
-                              <span className="text-[11px] font-bold text-blue-700 dark:text-blue-300 shrink-0 flex items-center gap-1.5">
-                                <ListFilter className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
-                                Opsi Pilihan (Koma):
-                              </span>
-                              <input
-                                type="text"
-                                value={(mapping.options || []).join(", ")}
-                                onChange={(e) => {
-                                  const val = e.target.value;
-                                  const opts = val
-                                    .split(",")
-                                    .map((s) => s.trim())
-                                    .filter(Boolean);
-                                  setEditingTemplate((prev) => {
-                                    if (!prev) return null;
-                                    const updated = [...prev.placeholders];
-                                    const cur = updated[idx];
-                                    if (cur) updated[idx] = { ...cur, options: opts };
-                                    return { ...prev, placeholders: updated };
-                                  });
-                                }}
-                                placeholder="Cth: Permohonan Baru, Endorsement, Paspor Rusak, Paspor Hilang (pisahkan tiap pilihan dengan koma)"
-                                className="w-full flex-1 h-9 px-3 text-xs rounded-md border border-blue-300 dark:border-blue-700 bg-background text-foreground font-semibold focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 focus:outline-none transition-all shadow-sm placeholder:text-muted-foreground placeholder:font-normal"
-                              />
+                            <div className="w-full flex flex-col gap-1.5 p-2.5 rounded-lg bg-blue-500/5 border border-blue-500/20 text-xs">
+                              <div className="w-full flex flex-col sm:flex-row sm:items-center gap-2.5">
+                                <span className="text-[11px] font-bold text-blue-700 dark:text-blue-300 shrink-0 flex items-center gap-1.5">
+                                  <ListFilter className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
+                                  Opsi Pilihan (Koma):
+                                </span>
+                                <input
+                                  type="text"
+                                  value={(mapping.options || []).join(", ")}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    const opts = val
+                                      .split(",")
+                                      .map((s) => s.trim())
+                                      .filter(Boolean);
+                                    setEditingTemplate((prev) => {
+                                      if (!prev) return null;
+                                      const updated = [...prev.placeholders];
+                                      const cur = updated[idx];
+                                      if (cur) updated[idx] = { ...cur, options: opts };
+                                      return { ...prev, placeholders: updated };
+                                    });
+                                  }}
+                                  placeholder="Cth: Opsi 1, Opsi 2, Opsi 3, Opsi 4, Opsi 5 (pisahkan tiap pilihan dengan koma)"
+                                  className="w-full flex-1 h-9 px-3 text-xs rounded-md border border-blue-300 dark:border-blue-700 bg-background text-foreground font-semibold focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 focus:outline-none transition-all shadow-sm placeholder:text-muted-foreground placeholder:font-normal"
+                                />
+                              </div>
+                              <div className="flex flex-wrap items-center justify-between gap-1 text-[10px] text-muted-foreground pl-1">
+                                <span>
+                                  💡 <strong>Sistem Cerdas:</strong> Jika opsi <strong>lebih dari 4</strong> (saat ini: {(mapping.options || []).length} opsi), form otomatis menjadi <strong>Searchable Select</strong>.
+                                </span>
+                                {(mapping.options || []).length > 4 ? (
+                                  <span className="font-semibold text-indigo-600 dark:text-indigo-400 bg-indigo-500/10 px-1.5 py-0.5 rounded">
+                                    Mode Searchable Aktif ({ (mapping.options || []).length } Opsi)
+                                  </span>
+                                ) : (
+                                  <span className="text-muted-foreground bg-stone-500/10 px-1.5 py-0.5 rounded">
+                                    Mode Dropdown Biasa ({ (mapping.options || []).length }/4 Opsi)
+                                  </span>
+                                )}
+                              </div>
                             </div>
                           )}
                         </div>

@@ -967,7 +967,7 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
                 <CardContent className="p-3.5 space-y-2.5 max-h-[58vh] overflow-y-auto pr-2">
                   {activeTemplate.placeholders
                     .filter((p) => !isSystemAutoPlaceholder(p.key))
-                    .map((p) => {
+                    .map((p, pIdx) => {
                     const isManifest = p.sourceType === "manifest";
                     const resolvedVal = resolvedFieldValues[p.key] || "";
 
@@ -994,6 +994,12 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
                         (cleanKey.includes("imigrasi") && !cleanKey.includes("kota"))) &&
                       !isKotaKanimField;
 
+                    // Clean and validate options if select
+                    const validOptions = (p.options || [])
+                      .map((opt) => opt.trim())
+                      .filter(Boolean);
+                    const isSearchableSelect = p.inputType === "select" && validOptions.length > 4;
+
                     // Cleanse city display if office name was accidentally passed
                     const displayValue =
                       isKotaKanimField && (resolvedVal.includes("Kantor Imigrasi") || resolvedVal.includes("TPI"))
@@ -1003,9 +1009,10 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
                     return (
                       <div
                         key={p.key}
+                        style={{ zIndex: 40 - pIdx }}
                         className={cn(
-                          "p-2.5 rounded-xl border border-stone-200/80 dark:border-stone-800/80 bg-card/60 shadow-2xs space-y-1.5 transition-all hover:border-primary/40",
-                          isKanimSelector && "relative z-30"
+                          "p-2.5 rounded-xl border border-stone-200/80 dark:border-stone-800/80 bg-card/60 shadow-2xs space-y-1.5 transition-all hover:border-primary/40 relative",
+                          (isKanimSelector || isSearchableSelect) && "z-30"
                         )}
                       >
                         <div className="flex items-center justify-between">
@@ -1026,6 +1033,11 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
                             >
                               <Sparkles className="h-3 w-3" />
                               Auto VLOOKUP Kanim
+                            </span>
+                          ) : isSearchableSelect ? (
+                            <span className="text-[10px] font-semibold text-indigo-600 dark:text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded flex items-center gap-1">
+                              <Search className="h-2.5 w-2.5" />
+                              Searchable ({validOptions.length} Opsi)
                             </span>
                           ) : (
                             <span className="text-[10px] font-semibold text-blue-600 dark:text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded">
@@ -1078,15 +1090,30 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
                             className="w-full p-2.5 text-xs rounded-lg border bg-background focus:ring-2 focus:ring-primary/20 focus:border-primary focus:outline-none"
                             placeholder={p.placeholderHint || `Masukkan ${p.label}...`}
                           />
-                        ) : p.inputType === "select" && p.options ? (
-                          <Select
-                            value={resolvedVal}
-                            onChange={(e) =>
-                              setManualFormData({ ...manualFormData, [p.key]: e.target.value })
-                            }
-                            options={p.options.map((opt) => ({ value: opt, label: opt }))}
-                            className="text-xs h-9 bg-background"
-                          />
+                        ) : p.inputType === "select" && validOptions.length > 0 ? (
+                          isSearchableSelect ? (
+                            <SearchableSelect
+                              value={resolvedVal}
+                              onChange={(val) =>
+                                setManualFormData({ ...manualFormData, [p.key]: val })
+                              }
+                              options={validOptions.map((opt) => ({ value: opt, label: opt }))}
+                              placeholder={p.placeholderHint || `Pilih atau cari ${p.label}...`}
+                              searchPlaceholder={`Cari opsi ${p.label}...`}
+                              size="sm"
+                              allowCustomText={true}
+                              className="text-xs w-full"
+                            />
+                          ) : (
+                            <Select
+                              value={resolvedVal}
+                              onChange={(e) =>
+                                setManualFormData({ ...manualFormData, [p.key]: e.target.value })
+                              }
+                              options={validOptions.map((opt) => ({ value: opt, label: opt }))}
+                              className="text-xs h-9 bg-background"
+                            />
+                          )
                         ) : (
                           <Input
                             type={
