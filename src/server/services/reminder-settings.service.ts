@@ -92,21 +92,26 @@ export async function getGlobalReminderSettings(): Promise<GlobalReminderSetting
 
   // 1. Try reading from PostgreSQL Database via AuditEntry (Persistent across cold-starts)
   try {
-    const latestDbRecord = await prisma.auditEntry.findFirst({
+    const records = await prisma.auditEntry.findMany({
       where: { action: "UPDATE_REMINDER_SETTINGS" },
       orderBy: { timestamp: "desc" },
+      take: 10,
     });
 
-    if (latestDbRecord?.after) {
-      const parsed = JSON.parse(latestDbRecord.after);
-      if (parsed && Array.isArray(parsed.stages) && parsed.stages.length > 0) {
-        cachedSettings = {
-          globalDeadlineDays: Number(parsed.globalDeadlineDays) || 40,
-          stages: parsed.stages,
-          updatedAt: latestDbRecord.timestamp.toISOString(),
-          updatedBy: latestDbRecord.userName || "admin",
-        };
-        return cachedSettings;
+    for (const rec of records) {
+      if (rec.after) {
+        try {
+          const parsed = JSON.parse(rec.after);
+          if (parsed && Array.isArray(parsed.stages) && parsed.stages.length > 0) {
+            cachedSettings = {
+              globalDeadlineDays: Number(parsed.globalDeadlineDays) || 40,
+              stages: parsed.stages,
+              updatedAt: rec.timestamp.toISOString(),
+              updatedBy: rec.userName || "admin",
+            };
+            return cachedSettings;
+          }
+        } catch {}
       }
     }
   } catch (dbErr) {
@@ -139,7 +144,8 @@ export async function getGlobalReminderSettings(): Promise<GlobalReminderSetting
 
 export async function updateGlobalReminderSettings(
   newSettings: Partial<GlobalReminderSettings>,
-  updatedBy: string = "admin"
+  updatedBy: string = "admin",
+  userInfo?: { userId?: string; role?: any }
 ): Promise<GlobalReminderSettings> {
   const current = await getGlobalReminderSettings();
 
@@ -163,11 +169,13 @@ export async function updateGlobalReminderSettings(
   try {
     await prisma.auditEntry.create({
       data: {
-        userId: "admin-settings",
+        userId: userInfo?.userId || "admin-settings",
         userName: updatedBy,
-        role: "super_admin",
+        role: userInfo?.role || "super_admin",
         module: "pembayaran",
         action: "UPDATE_REMINDER_SETTINGS",
+        entityType: "GLOBAL_REMINDER_SETTINGS",
+        entityId: "global",
         detail: `Konfigurasi deadline resmi H-${updated.globalDeadlineDays} & ${updated.stages.length} tahapan reminder disimpan di database`,
         after: JSON.stringify(updated),
       },

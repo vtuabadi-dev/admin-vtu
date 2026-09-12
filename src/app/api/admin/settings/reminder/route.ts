@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { auth } from "@/server/auth";
-import { prisma } from "@/server/db/client";
 import { checkServerPermission } from "@/shared/lib/rbac-utils";
 import {
   getGlobalReminderSettings,
@@ -13,10 +12,17 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   try {
     const settings = await getGlobalReminderSettings();
-    return NextResponse.json({
-      success: true,
-      data: settings,
-    });
+    return NextResponse.json(
+      {
+        success: true,
+        data: settings,
+      },
+      {
+        headers: {
+          "Cache-Control": "no-store, no-cache, must-revalidate",
+        },
+      }
+    );
   } catch (error) {
     return NextResponse.json(
       { success: false, message: (error as Error).message },
@@ -44,29 +50,12 @@ export async function POST(request: NextRequest) {
         globalDeadlineDays: body.globalDeadlineDays,
         stages: body.stages,
       },
-      session.user.name || session.user.email || "admin"
+      session.user.name || session.user.email || "Admin Pembayaran",
+      {
+        userId: session.user.id || "admin",
+        role: (session.user.role as any) || "super_admin",
+      }
     );
-
-    // Save Notification Log Entry to Database (Audit Trail)
-    try {
-      await prisma.auditEntry.create({
-        data: {
-          userId: session.user.id || "admin",
-          userName: session.user.name || session.user.email || "Admin Pembayaran",
-          role: (session.user.role as any) || "super_admin",
-          module: "pembayaran",
-          action: "UPDATE_REMINDER_SETTINGS",
-          detail: `Konfigurasi deadline resmi H-${body.globalDeadlineDays || 40} & ${body.stages?.length || 0} tahapan reminder berhasil disimpan ke Database`,
-          after: JSON.stringify({
-            globalDeadlineDays: body.globalDeadlineDays,
-            stagesCount: body.stages?.length,
-            updatedAt: updated.updatedAt,
-          }),
-        },
-      });
-    } catch (dbErr) {
-      console.warn("[AuditTrail DB Notice]:", dbErr);
-    }
 
     return NextResponse.json({
       success: true,
