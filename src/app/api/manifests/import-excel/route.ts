@@ -29,6 +29,8 @@ export interface ExcelImportRowInput {
   noInvoice?: string;
   biayaPaket?: number | string;
   upgradeKamar?: number | string;
+  upgradeHotel?: number | string;
+  ongkosJahit?: number | string;
   addOns?: number | string;
   diskon?: number | string;
   totalTagihan?: number | string;

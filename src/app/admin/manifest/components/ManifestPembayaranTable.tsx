@@ -58,6 +58,7 @@ export interface JamaahFinancialRow {
   paspor: number;
   kursiRoda: number;
   ongkir: number;
+  ongkosJahit: number;
   tambahanPerlengkapan: number;
   tambahanLain: number;
 
@@ -168,6 +169,7 @@ export function ManifestPembayaranTable({
         let paspor = 0;
         let kursiRoda = 0;
         let ongkir = 0;
+        let ongkosJahit = 0;
         let upgradeHotel = 0;
         let upgradeHotelLabel = "";
         let tambahanPerlengkapan = 0;
@@ -200,6 +202,8 @@ export function ManifestPembayaranTable({
             } else if (text.includes("upgrade kamar") || text.includes("double") || text.includes("triple") || text.includes("single")) {
               if (upgradeKamar === 0) upgradeKamar = itemVal;
               if (!upgradeKamarLabel) upgradeKamarLabel = item.deskripsi || "Upgrade Kamar";
+            } else if (text.includes("jahit") || text.includes("tailor") || text.includes("jahitan")) {
+              ongkosJahit += itemVal;
             } else if (
               text.includes("perlengkapan") ||
               text.includes("equipment") ||
@@ -237,6 +241,7 @@ export function ManifestPembayaranTable({
           paspor +
           kursiRoda +
           ongkir +
+          ongkosJahit +
           tambahanPerlengkapan -
           totalPotongan;
 
@@ -285,6 +290,7 @@ export function ManifestPembayaranTable({
           paspor,
           kursiRoda,
           ongkir,
+          ongkosJahit,
           tambahanPerlengkapan,
           tambahanLain,
           diskonPromo,
@@ -371,6 +377,7 @@ export function ManifestPembayaranTable({
           paspor: draft.paspor,
           kursiRoda: draft.kursiRoda,
           ongkir: draft.ongkir,
+          ongkosJahit: draft.ongkosJahit,
           tambahanPerlengkapan: draft.tambahanPerlengkapan,
           tambahanLain: draft.tambahanLain,
           diskonPromo: draft.diskonPromo,
@@ -448,6 +455,7 @@ export function ManifestPembayaranTable({
       const paspor = members.reduce((sum, m) => sum + m.paspor, 0);
       const kursiRoda = members.reduce((sum, m) => sum + m.kursiRoda, 0);
       const ongkir = members.reduce((sum, m) => sum + m.ongkir, 0);
+      const ongkosJahit = members.reduce((sum, m) => sum + (m.ongkosJahit || 0), 0);
       const tambahanPerlengkapan = members.reduce((sum, m) => sum + (m.tambahanPerlengkapan || 0), 0);
       const tambahanLain = members.reduce((sum, m) => sum + m.tambahanLain, 0);
       const diskonPromo = members.reduce((sum, m) => sum + m.diskonPromo, 0);
@@ -488,6 +496,7 @@ export function ManifestPembayaranTable({
         paspor,
         kursiRoda,
         ongkir,
+        ongkosJahit,
         tambahanPerlengkapan,
         tambahanLain,
         diskonPromo,
@@ -547,6 +556,7 @@ export function ManifestPembayaranTable({
     let sumPaspor = 0;
     let sumKursiRoda = 0;
     let sumOngkir = 0;
+    let sumOngkosJahit = 0;
     let sumTambahanPerlengkapan = 0;
     let sumTambahan = 0;
     let sumDiskonPromo = 0;
@@ -571,6 +581,7 @@ export function ManifestPembayaranTable({
       sumPaspor += r.paspor;
       sumKursiRoda += r.kursiRoda;
       sumOngkir += r.ongkir;
+      sumOngkosJahit += (r.ongkosJahit || 0);
       sumTambahanPerlengkapan += (r.tambahanPerlengkapan || r.tambahanLain || 0);
       sumTambahan += r.tambahanLain;
       sumDiskonPromo += r.diskonPromo;
@@ -594,6 +605,7 @@ export function ManifestPembayaranTable({
       sumPaspor,
       sumKursiRoda,
       sumOngkir,
+      sumOngkosJahit,
       sumTambahanPerlengkapan,
       sumTambahan,
       sumDiskonPromo,
@@ -670,6 +682,7 @@ PT VAUZA TAMMA ABADI`;
         "",
         "",
         "",
+        // Group 2: Detail Rincian Item Tagihan (10 columns: H..Q)
         "DETAIL RINCIAN ITEM TAGIHAN",
         "",
         "",
@@ -678,10 +691,14 @@ PT VAUZA TAMMA ABADI`;
         "",
         "",
         "",
+        "",
+        "",
+        // Group 3: Detail Diskon (4 columns: R..U)
         "DETAIL POTONGAN & DISKON",
         "",
         "",
         "",
+        // Group 4: Keterangan (1 column: V)
         "KETERANGAN & REKAP",
       ]);
 
@@ -695,12 +712,14 @@ PT VAUZA TAMMA ABADI`;
         "KURANG BAYAR",
         "STATUS PEMBAYARAN",
         "BIAYA PAKET",
-        "UPGRADE HOTEL / KAMAR",
+        "UPGRADE KAMAR",
+        "UPGRADE HOTEL",
         "KERETA CEPAT",
         "CITY TOUR THOIF",
         "PASPOR",
         "KURSI RODA",
         "ONGKIR",
+        "ONGKOS JAHIT SERAGAM",
         "TAMBAHAN PERLENGKAPAN",
         "DISKON PROMO",
         "POTONGAN ONGKIR",
@@ -710,11 +729,11 @@ PT VAUZA TAMMA ABADI`;
       ]);
 
       // Merge Cells for Grouped Header (Row 5)
-      sheet.mergeCells("A5:B5"); // Identitas
-      sheet.mergeCells("C5:G5"); // Status & Kas
-      sheet.mergeCells("H5:O5"); // Detail Item
-      sheet.mergeCells("P5:S5"); // Detail Diskon
-      sheet.mergeCells("T5:T5"); // Keterangan
+      sheet.mergeCells("A5:B5"); // Identitas (Cols 1..2)
+      sheet.mergeCells("C5:G5"); // Status & Kas (Cols 3..7)
+      sheet.mergeCells("H5:Q5"); // Detail Item (Cols 8..17 = 10 cols)
+      sheet.mergeCells("R5:U5"); // Detail Diskon (Cols 18..21 = 4 cols)
+      sheet.mergeCells("V5:V5"); // Keterangan (Col 22)
 
       // Style Group Header (Row 5)
       groupHeaderRow.font = { bold: true, color: { argb: "FFFFFFFF" }, size: 10 };
@@ -724,13 +743,13 @@ PT VAUZA TAMMA ABADI`;
       sheet.getCell("A5").fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF334155" } }; // Slate
       sheet.getCell("C5").fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF0F766E" } }; // Teal
       sheet.getCell("H5").fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFD97706" } }; // Orange/Peach
-      sheet.getCell("P5").fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE11D48" } }; // Rose/Pink
-      sheet.getCell("T5").fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF475569" } }; // Slate dark
+      sheet.getCell("R5").fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE11D48" } }; // Rose/Pink
+      sheet.getCell("V5").fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF475569" } }; // Slate dark
 
       // Style Sub Header (Row 6)
       subHeaderRow.font = { bold: true, size: 9, color: { argb: "FF1E293B" } };
       subHeaderRow.alignment = { vertical: "middle", horizontal: "center", wrapText: true };
-      for (let c = 1; c <= 20; c++) {
+      for (let c = 1; c <= 22; c++) {
         const cell = subHeaderRow.getCell(c);
         cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF1F5F9" } };
         cell.border = {
@@ -752,12 +771,14 @@ PT VAUZA TAMMA ABADI`;
           r.kurangBayar,
           r.statusPembayaran,
           r.biayaPaket,
-          (r.totalUpgrade || r.upgradeKamar || 0),
+          r.upgradeKamar || 0,
+          r.upgradeHotel || 0,
           r.keretaCepat || 0,
           r.cityTourThoif || 0,
           r.paspor || 0,
           r.kursiRoda || 0,
           r.ongkir || 0,
+          r.ongkosJahit || 0,
           (r.tambahanPerlengkapan || r.tambahanLain || 0),
           r.diskonPromo ? -r.diskonPromo : 0,
           r.potonganOngkir ? -r.potonganOngkir : 0,
@@ -767,7 +788,7 @@ PT VAUZA TAMMA ABADI`;
         ]);
 
         // Currency formatting on numeric columns
-        [4, 5, 6, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19].forEach((colIdx) => {
+        [4, 5, 6, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21].forEach((colIdx) => {
           const cell = row.getCell(colIdx);
           cell.numFmt = '"Rp "#,##0;[Red]-"Rp "#,##0;"Rp "0';
           cell.alignment = { horizontal: "right" };
@@ -787,12 +808,14 @@ PT VAUZA TAMMA ABADI`;
         summaryKPI.totalKurangBayar,
         `${summaryKPI.countLunas} LUNAS`,
         summaryKPI.sumBiayaPaket,
-        summaryKPI.sumTotalUpgrade,
+        summaryKPI.sumUpgradeKamar,
+        summaryKPI.sumUpgradeHotel,
         summaryKPI.sumKeretaCepat,
         summaryKPI.sumThoif,
         summaryKPI.sumPaspor,
         summaryKPI.sumKursiRoda,
         summaryKPI.sumOngkir,
+        summaryKPI.sumOngkosJahit,
         summaryKPI.sumTambahanPerlengkapan,
         summaryKPI.sumDiskonPromo ? -summaryKPI.sumDiskonPromo : 0,
         summaryKPI.sumPotonganOngkir ? -summaryKPI.sumPotonganOngkir : 0,
@@ -802,7 +825,7 @@ PT VAUZA TAMMA ABADI`;
       ]);
 
       totalRow.font = { bold: true, size: 10, color: { argb: "FF0F172A" } };
-      for (let c = 1; c <= 20; c++) {
+      for (let c = 1; c <= 22; c++) {
         const cell = totalRow.getCell(c);
         cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE2E8F0" } };
         cell.border = {
@@ -811,7 +834,7 @@ PT VAUZA TAMMA ABADI`;
         };
       }
 
-      [4, 5, 6, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19].forEach((colIdx) => {
+      [4, 5, 6, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21].forEach((colIdx) => {
         const cell = totalRow.getCell(colIdx);
         cell.numFmt = '"Rp "#,##0;[Red]-"Rp "#,##0;"Rp "0';
       });
@@ -1010,7 +1033,7 @@ PT VAUZA TAMMA ABADI`;
 
                 {/* Detail Rincian Item Tagihan Header (Peach / Orange) */}
                 <th
-                  colSpan={8}
+                  colSpan={10}
                   className="bg-gradient-to-r from-amber-600 to-amber-700 border-r-2 border-r-amber-500 dark:border-r-amber-400 px-3 py-2 text-center"
                 >
                   DETAIL RINCIAN ITEM TAGIHAN
@@ -1062,12 +1085,14 @@ PT VAUZA TAMMA ABADI`;
 
                 {/* Group 2: Detail Item Tagihan Sub-columns */}
                 <th className="px-3 py-2.5 min-w-[120px] text-right border-l-2 border-l-teal-600 dark:border-l-teal-500 border-r border-r-stone-200 dark:border-r-stone-800 bg-amber-50/50 dark:bg-amber-950/20">BIAYA PAKET</th>
-                <th className="px-3 py-2.5 min-w-[135px] text-right border-r border-r-stone-200 dark:border-r-stone-800 bg-amber-50/50 dark:bg-amber-950/20">UPGRADE HOTEL / KAMAR</th>
+                <th className="px-3 py-2.5 min-w-[125px] text-right border-r border-r-stone-200 dark:border-r-stone-800 bg-amber-50/50 dark:bg-amber-950/20">UPGRADE KAMAR</th>
+                <th className="px-3 py-2.5 min-w-[125px] text-right border-r border-r-stone-200 dark:border-r-stone-800 bg-amber-50/50 dark:bg-amber-950/20">UPGRADE HOTEL</th>
                 <th className="px-3 py-2.5 min-w-[105px] text-right border-r border-r-stone-200 dark:border-r-stone-800 bg-amber-50/50 dark:bg-amber-950/20">KERETA CEPAT</th>
                 <th className="px-3 py-2.5 min-w-[105px] text-right border-r border-r-stone-200 dark:border-r-stone-800 bg-amber-50/50 dark:bg-amber-950/20">THOIF</th>
                 <th className="px-3 py-2.5 min-w-[95px] text-right border-r border-r-stone-200 dark:border-r-stone-800 bg-amber-50/50 dark:bg-amber-950/20">PASPOR</th>
                 <th className="px-3 py-2.5 min-w-[95px] text-right border-r border-r-stone-200 dark:border-r-stone-800 bg-amber-50/50 dark:bg-amber-950/20">KURSI RODA</th>
                 <th className="px-3 py-2.5 min-w-[90px] text-right border-r border-r-stone-200 dark:border-r-stone-800 bg-amber-50/50 dark:bg-amber-950/20">ONGKIR</th>
+                <th className="px-3 py-2.5 min-w-[130px] text-right border-r border-r-stone-200 dark:border-r-stone-800 bg-amber-50/50 dark:bg-amber-950/20">ONGKOS JAHIT SERAGAM</th>
                 <th className="px-3 py-2.5 min-w-[140px] text-right border-r-2 border-r-amber-600 dark:border-r-amber-500 bg-amber-50/50 dark:bg-amber-950/20">TAMBAHAN PERLENGKAPAN</th>
 
                 {/* Group 3: Detail Diskon Sub-columns */}
@@ -1092,7 +1117,7 @@ PT VAUZA TAMMA ABADI`;
             <tbody className="font-mono text-xs">
               {filteredRows.length === 0 ? (
                 <tr>
-                  <td colSpan={21} className="py-12 text-center text-muted-foreground font-sans text-xs">
+                  <td colSpan={23} className="py-12 text-center text-muted-foreground font-sans text-xs">
                     Tidak ditemukan data pembayaran yang sesuai dengan pencarian.
                   </td>
                 </tr>
@@ -1208,24 +1233,34 @@ PT VAUZA TAMMA ABADI`;
                         Rp {r.biayaPaket.toLocaleString("id-ID")}
                       </td>
 
-                      {/* Detail: Upgrade Hotel / Kamar */}
+                      {/* Detail: Upgrade Kamar */}
                       <td className={cn("px-3 py-2.5 text-right border-r border-r-stone-200 dark:border-r-stone-800 bg-amber-50/20 dark:bg-amber-950/10", rowBorderClass)}>
-                        {(r.totalUpgrade || r.upgradeKamar || 0) > 0 ? (
+                        {r.upgradeKamar > 0 ? (
                           <div>
                             <span className="text-amber-700 dark:text-amber-300 font-semibold">
-                              Rp {(r.totalUpgrade || r.upgradeKamar || 0).toLocaleString("id-ID")}
+                              Rp {r.upgradeKamar.toLocaleString("id-ID")}
                             </span>
-                            {r.upgradeHotel && r.upgradeHotel > 0 && r.upgradeKamar > 0 ? (
-                              <div className="text-[9px] font-medium text-amber-600 dark:text-amber-400">
-                                Kamar + Hotel
-                              </div>
-                            ) : r.upgradeHotel && r.upgradeHotel > 0 ? (
-                              <div className="text-[9px] font-medium text-amber-600 dark:text-amber-400" title={r.upgradeHotelLabel}>
-                                Hotel
-                              </div>
-                            ) : r.upgradeKamarLabel ? (
+                            {r.upgradeKamarLabel ? (
                               <div className="text-[9px] font-medium text-amber-600 dark:text-amber-400" title={r.upgradeKamarLabel}>
                                 {r.upgradeKamarLabel.replace(/^Upgrade\s+/i, "")}
+                              </div>
+                            ) : null}
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
+                      </td>
+
+                      {/* Detail: Upgrade Hotel */}
+                      <td className={cn("px-3 py-2.5 text-right border-r border-r-stone-200 dark:border-r-stone-800 bg-amber-50/20 dark:bg-amber-950/10", rowBorderClass)}>
+                        {(r.upgradeHotel || 0) > 0 ? (
+                          <div>
+                            <span className="text-amber-700 dark:text-amber-300 font-semibold">
+                              Rp {r.upgradeHotel.toLocaleString("id-ID")}
+                            </span>
+                            {r.upgradeHotelLabel ? (
+                              <div className="text-[9px] font-medium text-amber-600 dark:text-amber-400" title={r.upgradeHotelLabel}>
+                                {r.upgradeHotelLabel.replace(/^Upgrade\s+/i, "")}
                               </div>
                             ) : null}
                           </div>
@@ -1274,6 +1309,17 @@ PT VAUZA TAMMA ABADI`;
                       <td className={cn("px-3 py-2.5 text-right border-r border-r-stone-200 dark:border-r-stone-800 bg-amber-50/20 dark:bg-amber-950/10", rowBorderClass)}>
                         {r.ongkir > 0 ? (
                           <span>Rp {r.ongkir.toLocaleString("id-ID")}</span>
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
+                      </td>
+
+                      {/* Detail: Ongkos Jahit Seragam */}
+                      <td className={cn("px-3 py-2.5 text-right border-r border-r-stone-200 dark:border-r-stone-800 bg-amber-50/20 dark:bg-amber-950/10", rowBorderClass)}>
+                        {(r.ongkosJahit || 0) > 0 ? (
+                          <span className="font-semibold text-stone-800 dark:text-stone-200">
+                            Rp {r.ongkosJahit.toLocaleString("id-ID")}
+                          </span>
                         ) : (
                           <span className="text-muted-foreground">-</span>
                         )}
@@ -1387,7 +1433,10 @@ PT VAUZA TAMMA ABADI`;
                     Rp {summaryKPI.sumBiayaPaket.toLocaleString("id-ID")}
                   </td>
                   <td className="px-3 py-3 text-right border-r border-r-stone-200 dark:border-r-stone-800 bg-amber-50/50 dark:bg-amber-950/20 font-bold text-amber-700 dark:text-amber-400">
-                    Rp {summaryKPI.sumTotalUpgrade.toLocaleString("id-ID")}
+                    Rp {summaryKPI.sumUpgradeKamar.toLocaleString("id-ID")}
+                  </td>
+                  <td className="px-3 py-3 text-right border-r border-r-stone-200 dark:border-r-stone-800 bg-amber-50/50 dark:bg-amber-950/20 font-bold text-amber-700 dark:text-amber-400">
+                    Rp {summaryKPI.sumUpgradeHotel.toLocaleString("id-ID")}
                   </td>
                   <td className="px-3 py-3 text-right border-r border-r-stone-200 dark:border-r-stone-800 bg-amber-50/50 dark:bg-amber-950/20">
                     Rp {summaryKPI.sumKeretaCepat.toLocaleString("id-ID")}
@@ -1403,6 +1452,9 @@ PT VAUZA TAMMA ABADI`;
                   </td>
                   <td className="px-3 py-3 text-right border-r border-r-stone-200 dark:border-r-stone-800 bg-amber-50/50 dark:bg-amber-950/20">
                     Rp {summaryKPI.sumOngkir.toLocaleString("id-ID")}
+                  </td>
+                  <td className="px-3 py-3 text-right border-r border-r-stone-200 dark:border-r-stone-800 bg-amber-50/50 dark:bg-amber-950/20 font-bold">
+                    Rp {summaryKPI.sumOngkosJahit.toLocaleString("id-ID")}
                   </td>
                   {/* Detail Tambahan Perlengkapan Footer (Solid Amber Right Border) */}
                   <td className="px-3 py-3 text-right border-r-2 border-r-amber-600 dark:border-r-amber-500 bg-amber-50/50 dark:bg-amber-950/20 font-bold">
@@ -1538,16 +1590,28 @@ PT VAUZA TAMMA ABADI`;
                     </span>
                   </div>
                   <div className="p-2 bg-stone-900/70 rounded border border-stone-800">
-                    <span className="text-stone-400 text-[10px] block">Upgrade Hotel / Kamar</span>
+                    <span className="text-stone-400 text-[10px] block">Upgrade Kamar</span>
                     <span className="font-mono font-semibold text-amber-300">
-                      Rp {(selectedDetailRow.totalUpgrade || selectedDetailRow.upgradeKamar || 0).toLocaleString("id-ID")}
+                      Rp {(selectedDetailRow.upgradeKamar || 0).toLocaleString("id-ID")}
+                    </span>
+                    {selectedDetailRow.upgradeKamarLabel ? (
+                      <span className="text-[9px] text-amber-400/80 block">{selectedDetailRow.upgradeKamarLabel}</span>
+                    ) : null}
+                  </div>
+                  <div className="p-2 bg-stone-900/70 rounded border border-stone-800">
+                    <span className="text-stone-400 text-[10px] block">Upgrade Hotel</span>
+                    <span className="font-mono font-semibold text-amber-300">
+                      Rp {(selectedDetailRow.upgradeHotel || 0).toLocaleString("id-ID")}
                     </span>
                     {selectedDetailRow.upgradeHotel && selectedDetailRow.upgradeHotel > 0 ? (
                       <span className="text-[9px] text-amber-400/80 block">{selectedDetailRow.upgradeHotelLabel || "Upgrade Hotel"}</span>
                     ) : null}
-                    {selectedDetailRow.upgradeKamarLabel ? (
-                      <span className="text-[9px] text-amber-400/80 block">{selectedDetailRow.upgradeKamarLabel}</span>
-                    ) : null}
+                  </div>
+                  <div className="p-2 bg-stone-900/70 rounded border border-stone-800">
+                    <span className="text-stone-400 text-[10px] block">Ongkos Jahit Seragam</span>
+                    <span className="font-mono font-semibold text-stone-200">
+                      Rp {(selectedDetailRow.ongkosJahit || 0).toLocaleString("id-ID")}
+                    </span>
                   </div>
                   <div className="p-2 bg-stone-900/70 rounded border border-stone-800">
                     <span className="text-stone-400 text-[10px] block">Tambahan Perlengkapan</span>

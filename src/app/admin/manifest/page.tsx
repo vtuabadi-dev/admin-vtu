@@ -1108,7 +1108,9 @@ function ManifestPageContent() {
           // Manifest Pembayaran Headers
           else if (/noinvoice|invoice/i.test(str) && !colMap.noInvoice) colMap.noInvoice = colIdx;
           else if (/biayapaket|tarifpaket|hargapaket/i.test(str) && !colMap.biayaPaket) colMap.biayaPaket = colIdx;
-          else if (/upgradekamar|upgradehotel|hotelkamar|kamarupg|upgrade/i.test(str) && !colMap.upgradeKamar) colMap.upgradeKamar = colIdx;
+          else if (/upgradekamar|kamarupg/i.test(str) && !colMap.upgradeKamar) colMap.upgradeKamar = colIdx;
+          else if (/upgradehotel|hotelupg/i.test(str) && !colMap.upgradeHotel) colMap.upgradeHotel = colIdx;
+          else if (/ongkosjahit|jahitseragam|jahit/i.test(str) && !colMap.ongkosJahit) colMap.ongkosJahit = colIdx;
           else if (/tambahanperlengkapan|tambahan|perlengkapan|addons|biayalain/i.test(str) && !colMap.addOns) colMap.addOns = colIdx;
           else if (/diskon|potongan/i.test(str) && !colMap.diskon) colMap.diskon = colIdx;
           else if (/totaltagihan|tagihan/i.test(str) && !colMap.totalTagihan) colMap.totalTagihan = colIdx;
@@ -1175,26 +1177,28 @@ function ManifestPageContent() {
         const provinsi = provinsiInput || deriveProvinsi(provinsiInput, kota);
         const alamat = getValByKey("alamat", 22);
 
-        // Payment fields (Columns 23..33)
+        // Payment fields (Columns 23..35)
         const noInvoice = getValByKey("noInvoice", 23);
         const biayaPaket = getValByKey("biayaPaket", 24);
         const upgradeKamar = getValByKey("upgradeKamar", 25);
-        const addOns = getValByKey("addOns", 26);
-        const diskon = getValByKey("diskon", 27);
-        const totalTagihan = getValByKey("totalTagihan", 28);
-        const totalPembayaran = getValByKey("totalPembayaran", 29);
-        const kurangBayar = getValByKey("kurangBayar", 30);
-        const statusPembayaran = getValByKey("statusPembayaran", 31);
-        const metodePembayaran = getValByKey("metodePembayaran", 32);
-        const keteranganPembayaran = getValByKey("keteranganPembayaran", 33);
+        const upgradeHotel = getValByKey("upgradeHotel", 26);
+        const ongkosJahit = getValByKey("ongkosJahit", 27);
+        const addOns = getValByKey("addOns", 28);
+        const diskon = getValByKey("diskon", 29);
+        const totalTagihan = getValByKey("totalTagihan", 30);
+        const totalPembayaran = getValByKey("totalPembayaran", 31);
+        const kurangBayar = getValByKey("kurangBayar", 32);
+        const statusPembayaran = getValByKey("statusPembayaran", 33);
+        const metodePembayaran = getValByKey("metodePembayaran", 34);
+        const keteranganPembayaran = getValByKey("keteranganPembayaran", 35);
 
-        // Riwayat Pembayaran Cicilan 1 s/d 20 (Columns 34..73)
+        // Riwayat Pembayaran Cicilan 1 s/d 20 (Columns 36..75)
         const pembayaranList: { ke: number; tanggal?: string; nominal: number }[] = [];
         const installmentsObj: Record<string, any> = {};
 
         for (let i = 1; i <= 20; i++) {
-          const tgl = getValByKey(`tglBayar${i}`, 33 + 2 * i - 1);
-          const nomStr = getValByKey(`nominal${i}`, 33 + 2 * i);
+          const tgl = getValByKey(`tglBayar${i}`, 35 + 2 * i - 1);
+          const nomStr = getValByKey(`nominal${i}`, 35 + 2 * i);
           const nom = parseInt(String(nomStr).replace(/[^0-9]/g, "") || "0", 10);
           installmentsObj[`tglBayar${i}`] = tgl;
           installmentsObj[`nominal${i}`] = nom;
@@ -1230,6 +1234,8 @@ function ManifestPageContent() {
           noInvoice,
           biayaPaket,
           upgradeKamar,
+          upgradeHotel,
+          ongkosJahit,
           addOns,
           diskon,
           totalTagihan,

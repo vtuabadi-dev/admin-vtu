@@ -242,20 +242,22 @@ export async function GET(request: Request) {
       { header: "PROVINSI (*)", key: "provinsi", width: 22 }, // Col 21 (U)
       { header: "ALAMAT", key: "alamat", width: 35 }, // Col 22 (V)
 
-      // ── SEKSI 2: MANIFEST PEMBAYARAN & FINANSIAL (W s/d AG, Col 23..33) ──
+      // ── SEKSI 2: MANIFEST PEMBAYARAN & FINANSIAL (W s/d AI, Col 23..35) ──
       { header: "NO INVOICE", key: "noInvoice", width: 20 }, // Col 23 (W)
       { header: "BIAYA PAKET (RP)", key: "biayaPaket", width: 20 }, // Col 24 (X)
-      { header: "UPGRADE HOTEL / KAMAR (RP)", key: "upgradeKamar", width: 26 }, // Col 25 (Y)
-      { header: "TAMBAHAN PERLENGKAPAN (RP)", key: "addOns", width: 26 }, // Col 26 (Z)
-      { header: "DISKON / POTONGAN (RP)", key: "diskon", width: 22 }, // Col 27 (AA)
-      { header: "TOTAL TAGIHAN (RP)", key: "totalTagihan", width: 22 }, // Col 28 (AB)
-      { header: "SUDAH BAYAR / DANA MASUK (RP)", key: "totalPembayaran", width: 28 }, // Col 29 (AC)
-      { header: "SISA TAGIHAN / KURANG BAYAR (RP)", key: "kurangBayar", width: 28 }, // Col 30 (AD)
-      { header: "STATUS PEMBAYARAN", key: "statusPembayaran", width: 22 }, // Col 31 (AE) [Dropdown]
-      { header: "METODE PEMBAYARAN", key: "metodePembayaran", width: 22 }, // Col 32 (AF) [Dropdown]
-      { header: "KETERANGAN PEMBAYARAN", key: "keteranganPembayaran", width: 35 }, // Col 33 (AG)
+      { header: "UPGRADE KAMAR (RP)", key: "upgradeKamar", width: 22 }, // Col 25 (Y)
+      { header: "UPGRADE HOTEL (RP)", key: "upgradeHotel", width: 22 }, // Col 26 (Z)
+      { header: "ONGKOS JAHIT SERAGAM (RP)", key: "ongkosJahit", width: 26 }, // Col 27 (AA)
+      { header: "TAMBAHAN PERLENGKAPAN (RP)", key: "addOns", width: 26 }, // Col 28 (AB)
+      { header: "DISKON / POTONGAN (RP)", key: "diskon", width: 22 }, // Col 29 (AC)
+      { header: "TOTAL TAGIHAN (RP)", key: "totalTagihan", width: 22 }, // Col 30 (AD)
+      { header: "SUDAH BAYAR / DANA MASUK (RP)", key: "totalPembayaran", width: 28 }, // Col 31 (AE)
+      { header: "SISA TAGIHAN / KURANG BAYAR (RP)", key: "kurangBayar", width: 28 }, // Col 32 (AF)
+      { header: "STATUS PEMBAYARAN", key: "statusPembayaran", width: 22 }, // Col 33 (AG) [Dropdown]
+      { header: "METODE PEMBAYARAN", key: "metodePembayaran", width: 22 }, // Col 34 (AH) [Dropdown]
+      { header: "KETERANGAN PEMBAYARAN", key: "keteranganPembayaran", width: 35 }, // Col 35 (AI)
 
-      // ── SEKSI 3: RIWAYAT PEMBAYARAN CICILAN 1 S/D 20 (AH s/d BU, Col 34..73) ──
+      // ── SEKSI 3: RIWAYAT PEMBAYARAN CICILAN 1 S/D 20 (AJ s/d BW, Col 36..75) ──
       ...cicilanColumns,
     ];
 
@@ -431,8 +433,10 @@ export async function GET(request: Request) {
             }
           }
 
-          // Hitung rincian item tagihan invoice (Upgrade Hotel/Kamar, Tambahan Perlengkapan, Diskon)
-          let invoiceUpgrade = 0;
+          // Hitung rincian item tagihan invoice (Upgrade Kamar, Upgrade Hotel, Ongkos Jahit, Tambahan Perlengkapan, Diskon)
+          let invoiceUpgradeHotel = 0;
+          let invoiceUpgradeKamar = 0;
+          let invoiceOngkosJahit = 0;
           let invoiceTambahanPerlengkapan = 0;
           let invoiceDiskon = 0;
 
@@ -442,15 +446,12 @@ export async function GET(request: Request) {
               const text = `${item.kategori || ""} ${item.deskripsi || ""}`.toLowerCase();
               const itemVal = Number(item.jumlah || 0);
 
-              if (
-                text.includes("upgrade hotel") ||
-                text.includes("upgrade kamar") ||
-                text.includes("double") ||
-                text.includes("triple") ||
-                text.includes("single") ||
-                (text.includes("hotel") && (text.includes("bintang") || text.includes("upgrade")))
-              ) {
-                invoiceUpgrade += itemVal;
+              if (text.includes("upgrade hotel") || (text.includes("hotel") && (text.includes("bintang") || text.includes("upgrade")))) {
+                invoiceUpgradeHotel += itemVal;
+              } else if (text.includes("upgrade kamar") || text.includes("double") || text.includes("triple") || text.includes("single")) {
+                invoiceUpgradeKamar += itemVal;
+              } else if (text.includes("jahit") || text.includes("tailor") || text.includes("jahitan")) {
+                invoiceOngkosJahit += itemVal;
               } else if (
                 text.includes("perlengkapan") ||
                 text.includes("equipment") ||
@@ -538,8 +539,10 @@ export async function GET(request: Request) {
               // Finansial: Hanya terisi penuh di baris PIC grup (memberIdx === 0).
               // Anggota grup lainnya dikosongkan karena tagihan terpusat oleh PIC.
               noInvoice: isPic ? (activeInvoice?.nomorInvoice || (group.kodeRegistrasi ? `INV/${group.kodeRegistrasi}` : "")) : "",
-              biayaPaket: isPic ? Math.max(0, groupTagihan - invoiceUpgrade - invoiceTambahanPerlengkapan + invoiceDiskon) : "",
-              upgradeKamar: isPic ? invoiceUpgrade : "",
+              biayaPaket: isPic ? Math.max(0, groupTagihan - invoiceUpgradeKamar - invoiceUpgradeHotel - invoiceOngkosJahit - invoiceTambahanPerlengkapan + invoiceDiskon) : "",
+              upgradeKamar: isPic ? invoiceUpgradeKamar : "",
+              upgradeHotel: isPic ? invoiceUpgradeHotel : "",
+              ongkosJahit: isPic ? invoiceOngkosJahit : "",
               addOns: isPic ? invoiceTambahanPerlengkapan : "",
               diskon: isPic ? invoiceDiskon : "",
               totalTagihan: isPic ? groupTagihan : "",
@@ -602,6 +605,8 @@ export async function GET(request: Request) {
           noInvoice: "INV/2026/03/2980",
           biayaPaket: 34900000,
           upgradeKamar: 4000000,
+          upgradeHotel: 0,
+          ongkosJahit: 0,
           addOns: 0,
           diskon: 0,
           totalTagihan: 38900000,
@@ -643,6 +648,8 @@ export async function GET(request: Request) {
           noInvoice: "",
           biayaPaket: "",
           upgradeKamar: "",
+          upgradeHotel: "",
+          ongkosJahit: "",
           addOns: "",
           diskon: "",
           totalTagihan: "",
@@ -684,6 +691,8 @@ export async function GET(request: Request) {
           noInvoice: "INV/2026/03/2981",
           biayaPaket: 34900000,
           upgradeKamar: 0,
+          upgradeHotel: 0,
+          ongkosJahit: 0,
           addOns: 0,
           diskon: 1000000,
           totalTagihan: 33900000,
@@ -756,38 +765,34 @@ export async function GET(request: Request) {
         formulae: [`'Data Referensi'!$H$2:$H$${statusMenikahOptions.length + 1}`],
       };
 
-      // AE: Status Pembayaran
-      sheet.getCell(`AE${r}`).dataValidation = {
+      // AG: Status Pembayaran
+      sheet.getCell(`AG${r}`).dataValidation = {
         type: "list",
         allowBlank: true,
         formulae: [`'Data Referensi'!$D$2:$D$${statusPembayaranOptions.length + 1}`],
       };
 
-      // AF: Metode Pembayaran
-      sheet.getCell(`AF${r}`).dataValidation = {
+      // AH: Metode Pembayaran
+      sheet.getCell(`AH${r}`).dataValidation = {
         type: "list",
         allowBlank: true,
         formulae: [`'Data Referensi'!$E$2:$E$${metodePembayaranOptions.length + 1}`],
       };
 
-      // Number Formatting for Currency columns (X, Y, Z, AA, AB, AC, AD)
-      sheet.getCell(`X${r}`).numFmt = "#,##0";
-      sheet.getCell(`Y${r}`).numFmt = "#,##0";
-      sheet.getCell(`Z${r}`).numFmt = "#,##0";
-      sheet.getCell(`AA${r}`).numFmt = "#,##0";
-      sheet.getCell(`AB${r}`).numFmt = "#,##0";
-      sheet.getCell(`AC${r}`).numFmt = "#,##0";
-      sheet.getCell(`AD${r}`).numFmt = "#,##0";
+      // Number Formatting for Currency columns (X s/d AF: 9 columns)
+      ["X", "Y", "Z", "AA", "AB", "AC", "AD", "AE", "AF"].forEach((col) => {
+        sheet.getCell(`${col}${r}`).numFmt = "#,##0";
+      });
 
       // Date center alignment (H, I, P)
       sheet.getCell(`H${r}`).alignment = { horizontal: "center" };
       sheet.getCell(`I${r}`).alignment = { horizontal: "center" };
       sheet.getCell(`P${r}`).alignment = { horizontal: "center" };
 
-      // Riwayat Pembayaran Cicilan 1 s/d 20 (Col 34..73)
+      // Riwayat Pembayaran Cicilan 1 s/d 20 (Col 36..75)
       for (let i = 1; i <= 20; i++) {
-        const tglCol = 33 + 2 * i - 1;
-        const nomCol = 33 + 2 * i;
+        const tglCol = 35 + 2 * i - 1;
+        const nomCol = 35 + 2 * i;
         sheet.getCell(r, tglCol).alignment = { horizontal: "center" };
         sheet.getCell(r, nomCol).numFmt = "#,##0";
         sheet.getCell(r, nomCol).alignment = { horizontal: "right" };
@@ -818,8 +823,8 @@ export async function GET(request: Request) {
       };
     }
 
-    // Columns 23..33: Manifest Pembayaran Ringkasan (Dark Navy Blue 900)
-    for (let c = 23; c <= 33; c++) {
+    // Columns 23..35: Manifest Pembayaran Ringkasan (Dark Navy Blue 900)
+    for (let c = 23; c <= 35; c++) {
       const cell = headerRow.getCell(c);
       cell.fill = {
         type: "pattern",
@@ -834,8 +839,8 @@ export async function GET(request: Request) {
       };
     }
 
-    // Columns 34..73: Riwayat Pembayaran Cicilan 1 s/d 20 (Dark Emerald 800)
-    for (let c = 34; c <= 73; c++) {
+    // Columns 36..75: Riwayat Pembayaran Cicilan 1 s/d 20 (Dark Emerald 800)
+    for (let c = 36; c <= 75; c++) {
       const cell = headerRow.getCell(c);
       cell.fill = {
         type: "pattern",
