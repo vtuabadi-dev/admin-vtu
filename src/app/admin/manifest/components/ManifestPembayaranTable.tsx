@@ -50,11 +50,15 @@ export interface JamaahFinancialRow {
   biayaPaket: number;
   upgradeKamar: number;
   upgradeKamarLabel?: string;
+  upgradeHotel: number;
+  upgradeHotelLabel?: string;
+  totalUpgrade: number;
   keretaCepat: number;
   cityTourThoif: number;
   paspor: number;
   kursiRoda: number;
   ongkir: number;
+  tambahanPerlengkapan: number;
   tambahanLain: number;
 
   // Blok 3: Detail Potongan & Diskon
@@ -164,6 +168,9 @@ export function ManifestPembayaranTable({
         let paspor = 0;
         let kursiRoda = 0;
         let ongkir = 0;
+        let upgradeHotel = 0;
+        let upgradeHotelLabel = "";
+        let tambahanPerlengkapan = 0;
         let tambahanLain = 0;
         let diskonPromo = 0;
         let potonganOngkir = 0;
@@ -187,12 +194,28 @@ export function ManifestPembayaranTable({
               else ongkir += itemVal;
             } else if (text.includes("diskon") || text.includes("promo") || text.includes("voucher") || itemVal < 0) {
               diskonPromo += Math.abs(itemVal);
-            } else if (text.includes("upgrade kamar") || text.includes("double") || text.includes("triple")) {
+            } else if (text.includes("upgrade hotel") || (text.includes("hotel") && (text.includes("bintang") || text.includes("upgrade")))) {
+              upgradeHotel += itemVal;
+              upgradeHotelLabel = item.deskripsi || "Upgrade Hotel";
+            } else if (text.includes("upgrade kamar") || text.includes("double") || text.includes("triple") || text.includes("single")) {
               if (upgradeKamar === 0) upgradeKamar = itemVal;
+              if (!upgradeKamarLabel) upgradeKamarLabel = item.deskripsi || "Upgrade Kamar";
+            } else if (
+              text.includes("perlengkapan") ||
+              text.includes("equipment") ||
+              text.includes("koper") ||
+              text.includes("seragam") ||
+              text.includes("ihram") ||
+              (item.kategori || "").toLowerCase().includes("perlengkapan")
+            ) {
+              tambahanPerlengkapan += itemVal;
             } else if (text.includes("paket umroh") || text.includes("biaya paket")) {
               biayaPaket = itemVal;
             } else {
-              if (itemVal > 0) tambahanLain += itemVal;
+              if (itemVal > 0) {
+                tambahanPerlengkapan += itemVal;
+                tambahanLain += itemVal;
+              }
             }
           });
         });
@@ -204,16 +227,17 @@ export function ManifestPembayaranTable({
           cityTourThoif = 750000;
         }
 
+        const totalUpgrade = upgradeKamar + upgradeHotel;
         const totalPotongan = diskonPromo + potonganOngkir;
         let netTagihan =
           biayaPaket +
-          upgradeKamar +
+          totalUpgrade +
           keretaCepat +
           cityTourThoif +
           paspor +
           kursiRoda +
           ongkir +
-          tambahanLain -
+          tambahanPerlengkapan -
           totalPotongan;
 
         if (g?.totalTagihan && g.totalTagihan > 0) {
@@ -240,8 +264,9 @@ export function ManifestPembayaranTable({
           (j as any).noTelepon ||
           "";
 
+        const combinedUpgradeLabel = [upgradeKamarLabel, upgradeHotelLabel].filter(Boolean).join(" + ");
         const keterangan =
-          upgradeKamarLabel ||
+          combinedUpgradeLabel ||
           (totalPotongan > 0 ? `Diskon Rp ${totalPotongan.toLocaleString("id-ID")}` : "") ||
           "-";
 
@@ -252,11 +277,15 @@ export function ManifestPembayaranTable({
           biayaPaket,
           upgradeKamar,
           upgradeKamarLabel,
+          upgradeHotel,
+          upgradeHotelLabel,
+          totalUpgrade,
           keretaCepat,
           cityTourThoif,
           paspor,
           kursiRoda,
           ongkir,
+          tambahanPerlengkapan,
           tambahanLain,
           diskonPromo,
           potonganOngkir,
@@ -334,11 +363,15 @@ export function ManifestPembayaranTable({
           biayaPaket: draft.biayaPaket,
           upgradeKamar: draft.upgradeKamar,
           upgradeKamarLabel: draft.upgradeKamarLabel,
+          upgradeHotel: draft.upgradeHotel,
+          upgradeHotelLabel: draft.upgradeHotelLabel,
+          totalUpgrade: draft.totalUpgrade,
           keretaCepat: draft.keretaCepat,
           cityTourThoif: draft.cityTourThoif,
           paspor: draft.paspor,
           kursiRoda: draft.kursiRoda,
           ongkir: draft.ongkir,
+          tambahanPerlengkapan: draft.tambahanPerlengkapan,
           tambahanLain: draft.tambahanLain,
           diskonPromo: draft.diskonPromo,
           potonganOngkir: draft.potonganOngkir,
@@ -408,11 +441,14 @@ export function ManifestPembayaranTable({
 
       const biayaPaket = members.reduce((sum, m) => sum + m.biayaPaket, 0);
       const upgradeKamar = members.reduce((sum, m) => sum + m.upgradeKamar, 0);
+      const upgradeHotel = members.reduce((sum, m) => sum + (m.upgradeHotel || 0), 0);
+      const totalUpgrade = upgradeKamar + upgradeHotel;
       const keretaCepat = members.reduce((sum, m) => sum + m.keretaCepat, 0);
       const cityTourThoif = members.reduce((sum, m) => sum + m.cityTourThoif, 0);
       const paspor = members.reduce((sum, m) => sum + m.paspor, 0);
       const kursiRoda = members.reduce((sum, m) => sum + m.kursiRoda, 0);
       const ongkir = members.reduce((sum, m) => sum + m.ongkir, 0);
+      const tambahanPerlengkapan = members.reduce((sum, m) => sum + (m.tambahanPerlengkapan || 0), 0);
       const tambahanLain = members.reduce((sum, m) => sum + m.tambahanLain, 0);
       const diskonPromo = members.reduce((sum, m) => sum + m.diskonPromo, 0);
       const potonganOngkir = members.reduce((sum, m) => sum + m.potonganOngkir, 0);
@@ -444,11 +480,15 @@ export function ManifestPembayaranTable({
         biayaPaket,
         upgradeKamar,
         upgradeKamarLabel: picMember.upgradeKamarLabel,
+        upgradeHotel,
+        upgradeHotelLabel: picMember.upgradeHotelLabel,
+        totalUpgrade,
         keretaCepat,
         cityTourThoif,
         paspor,
         kursiRoda,
         ongkir,
+        tambahanPerlengkapan,
         tambahanLain,
         diskonPromo,
         potonganOngkir,
@@ -500,11 +540,14 @@ export function ManifestPembayaranTable({
 
     let sumBiayaPaket = 0;
     let sumUpgradeKamar = 0;
+    let sumUpgradeHotel = 0;
+    let sumTotalUpgrade = 0;
     let sumKeretaCepat = 0;
     let sumThoif = 0;
     let sumPaspor = 0;
     let sumKursiRoda = 0;
     let sumOngkir = 0;
+    let sumTambahanPerlengkapan = 0;
     let sumTambahan = 0;
     let sumDiskonPromo = 0;
     let sumPotonganOngkir = 0;
@@ -521,11 +564,14 @@ export function ManifestPembayaranTable({
 
       sumBiayaPaket += r.biayaPaket;
       sumUpgradeKamar += r.upgradeKamar;
+      sumUpgradeHotel += (r.upgradeHotel || 0);
+      sumTotalUpgrade += (r.totalUpgrade || r.upgradeKamar || 0);
       sumKeretaCepat += r.keretaCepat;
       sumThoif += r.cityTourThoif;
       sumPaspor += r.paspor;
       sumKursiRoda += r.kursiRoda;
       sumOngkir += r.ongkir;
+      sumTambahanPerlengkapan += (r.tambahanPerlengkapan || r.tambahanLain || 0);
       sumTambahan += r.tambahanLain;
       sumDiskonPromo += r.diskonPromo;
       sumPotonganOngkir += r.potonganOngkir;
@@ -541,11 +587,14 @@ export function ManifestPembayaranTable({
       countBelum,
       sumBiayaPaket,
       sumUpgradeKamar,
+      sumUpgradeHotel,
+      sumTotalUpgrade,
       sumKeretaCepat,
       sumThoif,
       sumPaspor,
       sumKursiRoda,
       sumOngkir,
+      sumTambahanPerlengkapan,
       sumTambahan,
       sumDiskonPromo,
       sumPotonganOngkir,
@@ -646,13 +695,13 @@ PT VAUZA TAMMA ABADI`;
         "KURANG BAYAR",
         "STATUS PEMBAYARAN",
         "BIAYA PAKET",
-        "UPGRADE KAMAR",
+        "UPGRADE HOTEL / KAMAR",
         "KERETA CEPAT",
         "CITY TOUR THOIF",
         "PASPOR",
         "KURSI RODA",
         "ONGKIR",
-        "TAMBAHAN",
+        "TAMBAHAN PERLENGKAPAN",
         "DISKON PROMO",
         "POTONGAN ONGKIR",
         "TOTAL POTONGAN",
@@ -703,13 +752,13 @@ PT VAUZA TAMMA ABADI`;
           r.kurangBayar,
           r.statusPembayaran,
           r.biayaPaket,
-          r.upgradeKamar || 0,
+          (r.totalUpgrade || r.upgradeKamar || 0),
           r.keretaCepat || 0,
           r.cityTourThoif || 0,
           r.paspor || 0,
           r.kursiRoda || 0,
           r.ongkir || 0,
-          r.tambahanLain || 0,
+          (r.tambahanPerlengkapan || r.tambahanLain || 0),
           r.diskonPromo ? -r.diskonPromo : 0,
           r.potonganOngkir ? -r.potonganOngkir : 0,
           r.totalPotongan ? -r.totalPotongan : 0,
@@ -738,13 +787,13 @@ PT VAUZA TAMMA ABADI`;
         summaryKPI.totalKurangBayar,
         `${summaryKPI.countLunas} LUNAS`,
         summaryKPI.sumBiayaPaket,
-        summaryKPI.sumUpgradeKamar,
+        summaryKPI.sumTotalUpgrade,
         summaryKPI.sumKeretaCepat,
         summaryKPI.sumThoif,
         summaryKPI.sumPaspor,
         summaryKPI.sumKursiRoda,
         summaryKPI.sumOngkir,
-        summaryKPI.sumTambahan,
+        summaryKPI.sumTambahanPerlengkapan,
         summaryKPI.sumDiskonPromo ? -summaryKPI.sumDiskonPromo : 0,
         summaryKPI.sumPotonganOngkir ? -summaryKPI.sumPotonganOngkir : 0,
         summaryKPI.sumTotalPotongan ? -summaryKPI.sumTotalPotongan : 0,
@@ -1013,13 +1062,13 @@ PT VAUZA TAMMA ABADI`;
 
                 {/* Group 2: Detail Item Tagihan Sub-columns */}
                 <th className="px-3 py-2.5 min-w-[120px] text-right border-l-2 border-l-teal-600 dark:border-l-teal-500 border-r border-r-stone-200 dark:border-r-stone-800 bg-amber-50/50 dark:bg-amber-950/20">BIAYA PAKET</th>
-                <th className="px-3 py-2.5 min-w-[110px] text-right border-r border-r-stone-200 dark:border-r-stone-800 bg-amber-50/50 dark:bg-amber-950/20">UPGRADE</th>
+                <th className="px-3 py-2.5 min-w-[135px] text-right border-r border-r-stone-200 dark:border-r-stone-800 bg-amber-50/50 dark:bg-amber-950/20">UPGRADE HOTEL / KAMAR</th>
                 <th className="px-3 py-2.5 min-w-[105px] text-right border-r border-r-stone-200 dark:border-r-stone-800 bg-amber-50/50 dark:bg-amber-950/20">KERETA CEPAT</th>
                 <th className="px-3 py-2.5 min-w-[105px] text-right border-r border-r-stone-200 dark:border-r-stone-800 bg-amber-50/50 dark:bg-amber-950/20">THOIF</th>
                 <th className="px-3 py-2.5 min-w-[95px] text-right border-r border-r-stone-200 dark:border-r-stone-800 bg-amber-50/50 dark:bg-amber-950/20">PASPOR</th>
                 <th className="px-3 py-2.5 min-w-[95px] text-right border-r border-r-stone-200 dark:border-r-stone-800 bg-amber-50/50 dark:bg-amber-950/20">KURSI RODA</th>
                 <th className="px-3 py-2.5 min-w-[90px] text-right border-r border-r-stone-200 dark:border-r-stone-800 bg-amber-50/50 dark:bg-amber-950/20">ONGKIR</th>
-                <th className="px-3 py-2.5 min-w-[95px] text-right border-r-2 border-r-amber-600 dark:border-r-amber-500 bg-amber-50/50 dark:bg-amber-950/20">TAMBAHAN</th>
+                <th className="px-3 py-2.5 min-w-[140px] text-right border-r-2 border-r-amber-600 dark:border-r-amber-500 bg-amber-50/50 dark:bg-amber-950/20">TAMBAHAN PERLENGKAPAN</th>
 
                 {/* Group 3: Detail Diskon Sub-columns */}
                 <th className="px-3 py-2.5 min-w-[105px] text-right border-l-2 border-l-amber-600 dark:border-l-amber-500 border-r border-r-stone-200 dark:border-r-stone-800 bg-rose-50/50 dark:bg-rose-950/20">DISKON PROMO</th>
@@ -1159,12 +1208,27 @@ PT VAUZA TAMMA ABADI`;
                         Rp {r.biayaPaket.toLocaleString("id-ID")}
                       </td>
 
-                      {/* Detail: Upgrade Kamar */}
+                      {/* Detail: Upgrade Hotel / Kamar */}
                       <td className={cn("px-3 py-2.5 text-right border-r border-r-stone-200 dark:border-r-stone-800 bg-amber-50/20 dark:bg-amber-950/10", rowBorderClass)}>
-                        {r.upgradeKamar > 0 ? (
-                          <span className="text-amber-700 dark:text-amber-300 font-medium">
-                            Rp {r.upgradeKamar.toLocaleString("id-ID")}
-                          </span>
+                        {(r.totalUpgrade || r.upgradeKamar || 0) > 0 ? (
+                          <div>
+                            <span className="text-amber-700 dark:text-amber-300 font-semibold">
+                              Rp {(r.totalUpgrade || r.upgradeKamar || 0).toLocaleString("id-ID")}
+                            </span>
+                            {r.upgradeHotel && r.upgradeHotel > 0 && r.upgradeKamar > 0 ? (
+                              <div className="text-[9px] font-medium text-amber-600 dark:text-amber-400">
+                                Kamar + Hotel
+                              </div>
+                            ) : r.upgradeHotel && r.upgradeHotel > 0 ? (
+                              <div className="text-[9px] font-medium text-amber-600 dark:text-amber-400" title={r.upgradeHotelLabel}>
+                                Hotel
+                              </div>
+                            ) : r.upgradeKamarLabel ? (
+                              <div className="text-[9px] font-medium text-amber-600 dark:text-amber-400" title={r.upgradeKamarLabel}>
+                                {r.upgradeKamarLabel.replace(/^Upgrade\s+/i, "")}
+                              </div>
+                            ) : null}
+                          </div>
                         ) : (
                           <span className="text-muted-foreground">-</span>
                         )}
@@ -1215,10 +1279,12 @@ PT VAUZA TAMMA ABADI`;
                         )}
                       </td>
 
-                      {/* Detail: Tambahan (Solid Amber Right Border) */}
+                      {/* Detail: Tambahan Perlengkapan (Solid Amber Right Border) */}
                       <td className={cn("px-3 py-2.5 text-right border-r-2 border-r-amber-600 dark:border-r-amber-500 bg-amber-50/20 dark:bg-amber-950/10", rowBorderClass)}>
-                        {r.tambahanLain > 0 ? (
-                          <span>Rp {r.tambahanLain.toLocaleString("id-ID")}</span>
+                        {(r.tambahanPerlengkapan || r.tambahanLain || 0) > 0 ? (
+                          <span className="font-semibold text-stone-800 dark:text-stone-200">
+                            Rp {(r.tambahanPerlengkapan || r.tambahanLain || 0).toLocaleString("id-ID")}
+                          </span>
                         ) : (
                           <span className="text-muted-foreground">-</span>
                         )}
@@ -1320,8 +1386,8 @@ PT VAUZA TAMMA ABADI`;
                   <td className="px-3 py-3 text-right border-l-2 border-l-teal-600 dark:border-l-teal-500 border-r border-r-stone-200 dark:border-r-stone-800 bg-amber-50/50 dark:bg-amber-950/20">
                     Rp {summaryKPI.sumBiayaPaket.toLocaleString("id-ID")}
                   </td>
-                  <td className="px-3 py-3 text-right border-r border-r-stone-200 dark:border-r-stone-800 bg-amber-50/50 dark:bg-amber-950/20">
-                    Rp {summaryKPI.sumUpgradeKamar.toLocaleString("id-ID")}
+                  <td className="px-3 py-3 text-right border-r border-r-stone-200 dark:border-r-stone-800 bg-amber-50/50 dark:bg-amber-950/20 font-bold text-amber-700 dark:text-amber-400">
+                    Rp {summaryKPI.sumTotalUpgrade.toLocaleString("id-ID")}
                   </td>
                   <td className="px-3 py-3 text-right border-r border-r-stone-200 dark:border-r-stone-800 bg-amber-50/50 dark:bg-amber-950/20">
                     Rp {summaryKPI.sumKeretaCepat.toLocaleString("id-ID")}
@@ -1338,9 +1404,9 @@ PT VAUZA TAMMA ABADI`;
                   <td className="px-3 py-3 text-right border-r border-r-stone-200 dark:border-r-stone-800 bg-amber-50/50 dark:bg-amber-950/20">
                     Rp {summaryKPI.sumOngkir.toLocaleString("id-ID")}
                   </td>
-                  {/* Detail Tambahan Footer (Solid Amber Right Border) */}
-                  <td className="px-3 py-3 text-right border-r-2 border-r-amber-600 dark:border-r-amber-500 bg-amber-50/50 dark:bg-amber-950/20">
-                    Rp {summaryKPI.sumTambahan.toLocaleString("id-ID")}
+                  {/* Detail Tambahan Perlengkapan Footer (Solid Amber Right Border) */}
+                  <td className="px-3 py-3 text-right border-r-2 border-r-amber-600 dark:border-r-amber-500 bg-amber-50/50 dark:bg-amber-950/20 font-bold">
+                    Rp {summaryKPI.sumTambahanPerlengkapan.toLocaleString("id-ID")}
                   </td>
 
                   {/* Diskon Totals (Solid Amber Left Border) */}
@@ -1456,6 +1522,69 @@ PT VAUZA TAMMA ABADI`;
                   <p className="text-sm font-bold text-rose-400 font-mono mt-0.5">
                     Rp {selectedDetailRow.kurangBayar.toLocaleString("id-ID")}
                   </p>
+                </div>
+              </div>
+
+              {/* Rincian Komponen Item Tagihan */}
+              <div className="p-3 bg-stone-950/60 rounded-lg border border-stone-800 space-y-2">
+                <span className="text-[10px] font-bold text-amber-400 uppercase tracking-wider block">
+                  Detail Rincian Item Tagihan {selectedDetailRow.paxCount && selectedDetailRow.paxCount > 1 ? `(${selectedDetailRow.paxCount} Pax)` : ""}
+                </span>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                  <div className="p-2 bg-stone-900/70 rounded border border-stone-800">
+                    <span className="text-stone-400 text-[10px] block">Biaya Paket</span>
+                    <span className="font-mono font-semibold text-stone-200">
+                      Rp {selectedDetailRow.biayaPaket.toLocaleString("id-ID")}
+                    </span>
+                  </div>
+                  <div className="p-2 bg-stone-900/70 rounded border border-stone-800">
+                    <span className="text-stone-400 text-[10px] block">Upgrade Hotel / Kamar</span>
+                    <span className="font-mono font-semibold text-amber-300">
+                      Rp {(selectedDetailRow.totalUpgrade || selectedDetailRow.upgradeKamar || 0).toLocaleString("id-ID")}
+                    </span>
+                    {selectedDetailRow.upgradeHotel && selectedDetailRow.upgradeHotel > 0 ? (
+                      <span className="text-[9px] text-amber-400/80 block">{selectedDetailRow.upgradeHotelLabel || "Upgrade Hotel"}</span>
+                    ) : null}
+                    {selectedDetailRow.upgradeKamarLabel ? (
+                      <span className="text-[9px] text-amber-400/80 block">{selectedDetailRow.upgradeKamarLabel}</span>
+                    ) : null}
+                  </div>
+                  <div className="p-2 bg-stone-900/70 rounded border border-stone-800">
+                    <span className="text-stone-400 text-[10px] block">Tambahan Perlengkapan</span>
+                    <span className="font-mono font-semibold text-stone-200">
+                      Rp {(selectedDetailRow.tambahanPerlengkapan || selectedDetailRow.tambahanLain || 0).toLocaleString("id-ID")}
+                    </span>
+                  </div>
+                  <div className="p-2 bg-stone-900/70 rounded border border-stone-800">
+                    <span className="text-stone-400 text-[10px] block">Kereta Cepat</span>
+                    <span className="font-mono font-semibold text-stone-200">
+                      Rp {(selectedDetailRow.keretaCepat || 0).toLocaleString("id-ID")}
+                    </span>
+                  </div>
+                  <div className="p-2 bg-stone-900/70 rounded border border-stone-800">
+                    <span className="text-stone-400 text-[10px] block">City Tour Thoif</span>
+                    <span className="font-mono font-semibold text-stone-200">
+                      Rp {(selectedDetailRow.cityTourThoif || 0).toLocaleString("id-ID")}
+                    </span>
+                  </div>
+                  <div className="p-2 bg-stone-900/70 rounded border border-stone-800">
+                    <span className="text-stone-400 text-[10px] block">Paspor & Kursi Roda</span>
+                    <span className="font-mono font-semibold text-stone-200">
+                      Rp {((selectedDetailRow.paspor || 0) + (selectedDetailRow.kursiRoda || 0)).toLocaleString("id-ID")}
+                    </span>
+                  </div>
+                  <div className="p-2 bg-stone-900/70 rounded border border-stone-800">
+                    <span className="text-stone-400 text-[10px] block">Ongkir Pengiriman</span>
+                    <span className="font-mono font-semibold text-stone-200">
+                      Rp {(selectedDetailRow.ongkir || 0).toLocaleString("id-ID")}
+                    </span>
+                  </div>
+                  <div className="p-2 bg-stone-900/70 rounded border border-stone-800">
+                    <span className="text-stone-400 text-[10px] block">Total Potongan Diskon</span>
+                    <span className="font-mono font-semibold text-rose-400">
+                      -Rp {(selectedDetailRow.totalPotongan || 0).toLocaleString("id-ID")}
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>

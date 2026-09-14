@@ -348,18 +348,24 @@ function formatGroupMergeLabel(groupObj: any, groupMembers: any[], groupPkg?: an
 
 function hasEquipmentAddonInInvoice(groupObj: any, j: any): boolean {
   if (!groupObj) return false;
-  if (j?.hasPerlengkapanAddon || j?.addonPerlengkapan) return true;
+  if (j?.hasPerlengkapanAddon || j?.addonPerlengkapan || j?.isBeliPerlengkapan) return true;
+  if (groupObj?.hasPerlengkapanAddon || groupObj?.isBeliPerlengkapan || groupObj?.beliPerlengkapan) return true;
 
   const invoices = groupObj.invoices || [];
   for (const inv of invoices) {
     if (inv.status === "cancelled") continue;
-    if (inv.jamaahId && inv.jamaahId !== j.id) continue;
 
     const items = inv.items || [];
     for (const item of items) {
       if (item.status === "cancelled") continue;
       const text = `${item.kategori || ""} ${item.deskripsi || ""}`.toLowerCase();
-      if (text.includes("perlengkapan")) {
+      if (
+        text.includes("perlengkapan") ||
+        text.includes("equipment") ||
+        text.includes("koper") ||
+        text.includes("seragam") ||
+        text.includes("ihram")
+      ) {
         return true;
       }
     }
@@ -369,7 +375,8 @@ function hasEquipmentAddonInInvoice(groupObj: any, j: any): boolean {
 }
 
 function resolveSystemStatusPerlengkapan(activePackage: any, groupObj: any, j: any): {
-  status: "TANPA" | "BELUM_AMBIL" | "SEBAGIAN" | "SUDAH_AMBIL";
+  status: "INCLUDE" | "EXCLUDE" | "PAID";
+  physicalStatus?: "SUDAH_AMBIL" | "SEBAGIAN" | "BELUM_AMBIL";
   isAddon: boolean;
   keterangan: string;
 } {
@@ -396,35 +403,51 @@ function resolveSystemStatusPerlengkapan(activePackage: any, groupObj: any, j: a
   const isBaseWithoutEquipment = isGroupTanpa || isPackageExclude;
   const hasAddon = hasEquipmentAddonInInvoice(groupObj, j);
 
-  // If base package / cluster is without equipment:
+  // Jika paket / klaster dasar adalah tanpa perlengkapan:
   if (isBaseWithoutEquipment) {
     if (hasAddon) {
-      // Customer ordered equipment add-on in invoice:
-      if (physicalStatus === "SUDAH_AMBIL") {
-        return { status: "SUDAH_AMBIL", isAddon: true, keterangan: "Add-on Tagihan • Sudah Diambil" };
-      }
-      if (physicalStatus === "SEBAGIAN") {
-        return { status: "SEBAGIAN", isAddon: true, keterangan: "Add-on Tagihan • Ambil Sebagian" };
-      }
-      return { status: "BELUM_AMBIL", isAddon: true, keterangan: "Add-on Tagihan • Belum Diambil" };
+      // Awalnya exclude tetapi membayar tambahan perlengkapan => statusnya PAID
+      return {
+        status: "PAID",
+        physicalStatus:
+          physicalStatus === "SUDAH_AMBIL"
+            ? "SUDAH_AMBIL"
+            : physicalStatus === "SEBAGIAN"
+            ? "SEBAGIAN"
+            : "BELUM_AMBIL",
+        isAddon: true,
+        keterangan: "Status: PAID (Awalnya exclude, namun membayar tambahan perlengkapan)",
+      };
     }
 
-    // No add-on purchased: Strictly TANPA
-    return { status: "TANPA", isAddon: false, keterangan: "Paket Tanpa Perlengkapan" };
+    // Tanpa perlengkapan dan tidak membayar add-on: EXCLUDE
+    return {
+      status: "EXCLUDE",
+      isAddon: false,
+      keterangan: "Status: EXCLUDE (Paket tanpa perlengkapan)",
+    };
   }
 
-  // If base package includes equipment:
-  if (physicalStatus === "SUDAH_AMBIL") {
-    return { status: "SUDAH_AMBIL", isAddon: false, keterangan: "Termasuk Paket • Sudah Diambil" };
-  }
-  if (physicalStatus === "SEBAGIAN") {
-    return { status: "SEBAGIAN", isAddon: false, keterangan: "Termasuk Paket • Ambil Sebagian" };
-  }
-  if (physicalStatus === "TANPA") {
-    return { status: "TANPA", isAddon: false, keterangan: "Tanpa Perlengkapan (Opt-out)" };
+  // Jika paket reguler/induk sudah termasuk perlengkapan:
+  if (physicalStatus === "TANPA" || j?.tanpaPerlengkapan === true) {
+    return {
+      status: "EXCLUDE",
+      isAddon: false,
+      keterangan: "Status: EXCLUDE (Opt-out tanpa perlengkapan)",
+    };
   }
 
-  return { status: "BELUM_AMBIL", isAddon: false, keterangan: "Termasuk Paket • Belum Diambil" };
+  return {
+    status: "INCLUDE",
+    physicalStatus:
+      physicalStatus === "SUDAH_AMBIL"
+        ? "SUDAH_AMBIL"
+        : physicalStatus === "SEBAGIAN"
+        ? "SEBAGIAN"
+        : "BELUM_AMBIL",
+    isAddon: false,
+    keterangan: "Status: INCLUDE (Termasuk fasilitas paket)",
+  };
 }
 
 function resolveJamaahKeretaCepat(activePackage: any, groupObj: any, j: any): boolean {
@@ -1085,8 +1108,8 @@ function ManifestPageContent() {
           // Manifest Pembayaran Headers
           else if (/noinvoice|invoice/i.test(str) && !colMap.noInvoice) colMap.noInvoice = colIdx;
           else if (/biayapaket|tarifpaket|hargapaket/i.test(str) && !colMap.biayaPaket) colMap.biayaPaket = colIdx;
-          else if (/upgradekamar|kamarupg/i.test(str) && !colMap.upgradeKamar) colMap.upgradeKamar = colIdx;
-          else if (/addons|biayalain|tambahan/i.test(str) && !colMap.addOns) colMap.addOns = colIdx;
+          else if (/upgradekamar|upgradehotel|hotelkamar|kamarupg|upgrade/i.test(str) && !colMap.upgradeKamar) colMap.upgradeKamar = colIdx;
+          else if (/tambahanperlengkapan|tambahan|perlengkapan|addons|biayalain/i.test(str) && !colMap.addOns) colMap.addOns = colIdx;
           else if (/diskon|potongan/i.test(str) && !colMap.diskon) colMap.diskon = colIdx;
           else if (/totaltagihan|tagihan/i.test(str) && !colMap.totalTagihan) colMap.totalTagihan = colIdx;
           else if (/sudahbayar|totalpembayaran|bayar|danamasuk/i.test(str) && !colMap.totalPembayaran) colMap.totalPembayaran = colIdx;
@@ -1927,40 +1950,65 @@ function ManifestPageContent() {
                                           )}
                                         </div>
                                         <div>
-                                          {resolved.status === "TANPA" ? (
-                                            <span
-                                              className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-black bg-black text-white shadow-sm border border-stone-800 tracking-wider select-none"
-                                              title={resolved.keterangan}
-                                            >
-                                              TANPA
-                                            </span>
-                                          ) : resolved.status === "SUDAH_AMBIL" ? (
-                                            <span
-                                              className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-600 text-white shadow-sm select-none"
-                                              title={resolved.keterangan}
-                                            >
-                                              SUDAH AMBIL
-                                            </span>
-                                          ) : resolved.status === "SEBAGIAN" ? (
-                                            <span
-                                              className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-yellow-400 text-stone-950 shadow-sm select-none"
-                                              title={resolved.keterangan}
-                                            >
-                                              AMBIL SEBAGIAN
-                                            </span>
+                                          {resolved.status === "INCLUDE" ? (
+                                            <div>
+                                              <span
+                                                className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-black bg-emerald-600 text-white shadow-sm tracking-wider select-none"
+                                                title={resolved.keterangan}
+                                              >
+                                                INCLUDE
+                                              </span>
+                                              {resolved.physicalStatus === "SUDAH_AMBIL" ? (
+                                                <span className="text-[9px] font-semibold text-emerald-600 dark:text-emerald-400 block mt-0.5">
+                                                  ✓ Sudah Diambil
+                                                </span>
+                                              ) : resolved.physicalStatus === "SEBAGIAN" ? (
+                                                <span className="text-[9px] font-semibold text-amber-600 dark:text-amber-400 block mt-0.5">
+                                                  ⚡ Ambil Sebagian
+                                                </span>
+                                              ) : (
+                                                <span className="text-[9px] font-medium text-stone-500 dark:text-stone-400 block mt-0.5">
+                                                  Belum Diambil
+                                                </span>
+                                              )}
+                                            </div>
+                                          ) : resolved.status === "PAID" ? (
+                                            <div>
+                                              <span
+                                                className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-black bg-blue-600 text-white shadow-sm tracking-wider select-none"
+                                                title={resolved.keterangan}
+                                              >
+                                                PAID
+                                              </span>
+                                              <span className="text-[9px] font-bold text-blue-600 dark:text-blue-400 block mt-0.5">
+                                                + Tambahan
+                                              </span>
+                                              {resolved.physicalStatus === "SUDAH_AMBIL" ? (
+                                                <span className="text-[9px] font-semibold text-emerald-600 dark:text-emerald-400 block">
+                                                  ✓ Sudah Diambil
+                                                </span>
+                                              ) : resolved.physicalStatus === "SEBAGIAN" ? (
+                                                <span className="text-[9px] font-semibold text-amber-600 dark:text-amber-400 block">
+                                                  ⚡ Ambil Sebagian
+                                                </span>
+                                              ) : (
+                                                <span className="text-[9px] font-medium text-stone-500 dark:text-stone-400 block">
+                                                  Belum Diambil
+                                                </span>
+                                              )}
+                                            </div>
                                           ) : (
-                                            <span
-                                              className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500 text-white shadow-sm select-none"
-                                              title={resolved.keterangan}
-                                            >
-                                              BELUM AMBIL
-                                            </span>
-                                          )}
-
-                                          {resolved.isAddon && (
-                                            <span className="text-[9px] font-bold text-amber-600 dark:text-amber-400 block mt-0.5">
-                                              + Add-on Biaya
-                                            </span>
+                                            <div>
+                                              <span
+                                                className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-black bg-stone-800 text-stone-200 dark:bg-stone-900 dark:text-stone-300 border border-stone-700 shadow-sm tracking-wider select-none"
+                                                title={resolved.keterangan}
+                                              >
+                                                EXCLUDE
+                                              </span>
+                                              <span className="text-[9px] text-stone-400 block mt-0.5 italic">
+                                                Tanpa perlengkapan
+                                              </span>
+                                            </div>
                                           )}
                                         </div>
                                       </div>

@@ -245,8 +245,8 @@ export async function GET(request: Request) {
       // ── SEKSI 2: MANIFEST PEMBAYARAN & FINANSIAL (W s/d AG, Col 23..33) ──
       { header: "NO INVOICE", key: "noInvoice", width: 20 }, // Col 23 (W)
       { header: "BIAYA PAKET (RP)", key: "biayaPaket", width: 20 }, // Col 24 (X)
-      { header: "UPGRADE KAMAR (RP)", key: "upgradeKamar", width: 22 }, // Col 25 (Y)
-      { header: "ADD-ONS / BIAYA LAIN (RP)", key: "addOns", width: 24 }, // Col 26 (Z)
+      { header: "UPGRADE HOTEL / KAMAR (RP)", key: "upgradeKamar", width: 26 }, // Col 25 (Y)
+      { header: "TAMBAHAN PERLENGKAPAN (RP)", key: "addOns", width: 26 }, // Col 26 (Z)
       { header: "DISKON / POTONGAN (RP)", key: "diskon", width: 22 }, // Col 27 (AA)
       { header: "TOTAL TAGIHAN (RP)", key: "totalTagihan", width: 22 }, // Col 28 (AB)
       { header: "SUDAH BAYAR / DANA MASUK (RP)", key: "totalPembayaran", width: 28 }, // Col 29 (AC)
@@ -342,6 +342,7 @@ export async function GET(request: Request) {
             },
             invoices: {
               where: { status: { not: "cancelled" } },
+              include: { items: true },
               orderBy: { createdAt: "desc" },
             },
             pembayaran: {
@@ -430,6 +431,43 @@ export async function GET(request: Request) {
             }
           }
 
+          // Hitung rincian item tagihan invoice (Upgrade Hotel/Kamar, Tambahan Perlengkapan, Diskon)
+          let invoiceUpgrade = 0;
+          let invoiceTambahanPerlengkapan = 0;
+          let invoiceDiskon = 0;
+
+          (group.invoices || []).forEach((inv: any) => {
+            (inv.items || []).forEach((item: any) => {
+              if (item.status === "cancelled") return;
+              const text = `${item.kategori || ""} ${item.deskripsi || ""}`.toLowerCase();
+              const itemVal = Number(item.jumlah || 0);
+
+              if (
+                text.includes("upgrade hotel") ||
+                text.includes("upgrade kamar") ||
+                text.includes("double") ||
+                text.includes("triple") ||
+                text.includes("single") ||
+                (text.includes("hotel") && (text.includes("bintang") || text.includes("upgrade")))
+              ) {
+                invoiceUpgrade += itemVal;
+              } else if (
+                text.includes("perlengkapan") ||
+                text.includes("equipment") ||
+                text.includes("koper") ||
+                text.includes("seragam") ||
+                text.includes("ihram") ||
+                (item.kategori || "").toLowerCase().includes("perlengkapan")
+              ) {
+                invoiceTambahanPerlengkapan += itemVal;
+              } else if (text.includes("diskon") || text.includes("promo") || text.includes("voucher") || itemVal < 0) {
+                invoiceDiskon += Math.abs(itemVal);
+              } else if (!text.includes("paket umroh") && !text.includes("biaya paket")) {
+                if (itemVal > 0) invoiceTambahanPerlengkapan += itemVal;
+              }
+            });
+          });
+
           sortedMembers.forEach((j, memberIdx) => {
             const isPic = memberIdx === 0;
 
@@ -500,10 +538,10 @@ export async function GET(request: Request) {
               // Finansial: Hanya terisi penuh di baris PIC grup (memberIdx === 0).
               // Anggota grup lainnya dikosongkan karena tagihan terpusat oleh PIC.
               noInvoice: isPic ? (activeInvoice?.nomorInvoice || (group.kodeRegistrasi ? `INV/${group.kodeRegistrasi}` : "")) : "",
-              biayaPaket: isPic ? groupTagihan : "",
-              upgradeKamar: isPic ? 0 : "",
-              addOns: isPic ? 0 : "",
-              diskon: isPic ? 0 : "",
+              biayaPaket: isPic ? Math.max(0, groupTagihan - invoiceUpgrade - invoiceTambahanPerlengkapan + invoiceDiskon) : "",
+              upgradeKamar: isPic ? invoiceUpgrade : "",
+              addOns: isPic ? invoiceTambahanPerlengkapan : "",
+              diskon: isPic ? invoiceDiskon : "",
               totalTagihan: isPic ? groupTagihan : "",
               totalPembayaran: isPic ? groupPembayaran : "",
               kurangBayar: isPic ? groupKurang : "",
