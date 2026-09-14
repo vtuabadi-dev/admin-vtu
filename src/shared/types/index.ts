@@ -393,6 +393,26 @@ export interface Keberangkatan {
   childKeberangkatanList?: Keberangkatan[];
   driveFolderIds?: any;
   hotelOptions?: any;
+  flightDetails?: FlightDetails;
+}
+
+export interface FlightSegment {
+  tanggal: string;
+  kodeFlight: string;
+  pnr: string;
+  asal: string;
+  tujuan: string;
+  jamBerangkat: string;
+  jamTiba: string;
+  terminal?: string;
+  isFeeder?: boolean;
+}
+
+export interface FlightDetails {
+  pnr?: string;
+  nomorPenerbangan?: string;
+  rutePenerbangan?: string;
+  segments?: FlightSegment[];
 }
 
 /** TODO: Multi-tenant — add tenantId: string */

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
   ArrowLeft,
@@ -16,6 +16,9 @@ import {
   CheckCircle2,
   Clipboard,
   ExternalLink,
+  UploadCloud,
+  Sparkles,
+  Loader2,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/components/ui/Card";
 import { Button } from "@/shared/components/ui/Button";
@@ -23,17 +26,7 @@ import { Input } from "@/shared/components/ui/Input";
 import { ErrorState } from "@/shared/components/ui/ErrorState";
 import { SearchableSelect } from "@/shared/components/ui/SearchableSelect";
 import { getKeberangkatanById } from "@/server/actions/api";
-import type { Keberangkatan } from "@/shared/types";
-
-interface FlightSegment {
-  tanggal: string;
-  kodeFlight: string;
-  pnr: string;
-  asal: string;
-  tujuan: string;
-  jamBerangkat: string;
-  jamTiba: string;
-}
+import type { Keberangkatan, FlightSegment } from "@/shared/types";
 
 export default function EditKeberangkatanPage() {
   const params = useParams();
@@ -109,6 +102,16 @@ export default function EditKeberangkatanPage() {
   // Flight Segments State
   const [flightSegments, setFlightSegments] = useState<FlightSegment[]>([]);
 
+  // Flight OCR & Split Starting States
+  const [ocrLoading, setOcrLoading] = useState(false);
+  const [ocrError, setOcrError] = useState<string | null>(null);
+  const [ocrSuccess, setOcrSuccess] = useState<string | null>(null);
+  const [ocrMode, setOcrMode] = useState<"replace" | "append">("replace");
+  const [isDragging, setIsDragging] = useState(false);
+  const [isSplitStarting, setIsSplitStarting] = useState(false);
+  const [parentPackage, setParentPackage] = useState<{ id: string; kode: string; namaPaket?: string } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   useEffect(() => {
     async function loadData() {
       try {
@@ -144,47 +147,60 @@ export default function EditKeberangkatanPage() {
         setMuthowifNama(muth.nama || "");
         setMuthowifKontak(muth.kontak || "");
 
-        // Multi-segment flight
+        // Periksa apakah ini merupakan paket pecahan Split Starting Point
+        const isSplit =
+          (data as any).splitReason === "starting_point" ||
+          (data as any).splitReason === "starting" ||
+          !!data.parentKeberangkatanId;
+        setIsSplitStarting(isSplit);
+
+        let parentFlight: any = null;
+        if (data.parentKeberangkatanId) {
+          try {
+            const parentData = await getKeberangkatanById(data.parentKeberangkatanId);
+            if (parentData) {
+              setParentPackage({
+                id: parentData.id,
+                kode: parentData.kode,
+                namaPaket: parentData.namaPaket || parentData.kode,
+              });
+              const parentMeta = (parentData as any).driveFolderIds || {};
+              parentFlight = parentMeta.flightDetails || null;
+            }
+          } catch (pe) {
+            console.warn("Gagal memuat paket induk split starting:", pe);
+          }
+        }
+
+        // Multi-segment flight resolution
         if (Array.isArray(flight.segments) && flight.segments.length > 0) {
           setFlightSegments(flight.segments);
+        } else if (parentFlight && Array.isArray(parentFlight.segments) && parentFlight.segments.length > 0) {
+          // Otomatis mewarisi detail flight dari paket induk
+          setFlightSegments(parentFlight.segments);
+          if (!flight.pnr && parentFlight.pnr) {
+            setPnrMain(parentFlight.pnr);
+          }
         } else {
-          // Default segments matching flight details sheet
+          // Default awal bersih sesuai tanggal paket
           setFlightSegments([
             {
               tanggal: depStr,
-              kodeFlight: data.nomorPenerbangan || "1796",
-              pnr: flight.pnr || "17J4HP / ROYAL BRUNEI",
-              asal: "SUB",
-              tujuan: "BWN",
-              jamBerangkat: "05:00",
-              jamTiba: "09:15",
-            },
-            {
-              tanggal: depStr,
-              kodeFlight: "1001",
-              pnr: flight.pnr || "17J4HP / ROYAL BRUNEI",
-              asal: "BWN",
+              kodeFlight: data.nomorPenerbangan || "SV-816",
+              pnr: flight.pnr || data.nomorPenerbangan || "SV-816",
+              asal: "CGK",
               tujuan: "JED",
-              jamBerangkat: "11:15",
-              jamTiba: "16:15",
+              jamBerangkat: "11:00",
+              jamTiba: "17:00",
             },
             {
               tanggal: retStr,
-              kodeFlight: "1002",
-              pnr: flight.pnr || "17J4HP / ROYAL BRUNEI",
+              kodeFlight: data.nomorPenerbangan || "SV-817",
+              pnr: flight.pnr || data.nomorPenerbangan || "SV-817",
               asal: "JED",
-              tujuan: "BWN",
-              jamBerangkat: "18:15",
-              jamTiba: "09:35+1",
-            },
-            {
-              tanggal: retStr,
-              kodeFlight: "1795",
-              pnr: flight.pnr || "17J4HP / ROYAL BRUNEI",
-              asal: "BWN",
-              tujuan: "SUB",
-              jamBerangkat: "19:45",
-              jamTiba: "21:00",
+              tujuan: "CGK",
+              jamBerangkat: "19:00",
+              jamTiba: "09:00+1",
             },
           ]);
         }
@@ -196,6 +212,118 @@ export default function EditKeberangkatanPage() {
     }
     loadData();
   }, [id]);
+
+  const handleProcessFlightOcr = async (file: File) => {
+    if (!file) return;
+
+    const validTypes = [
+      "application/pdf",
+      "image/jpeg",
+      "image/png",
+      "image/webp",
+      "image/jpg",
+    ];
+    if (!validTypes.includes(file.type) && !file.name.toLowerCase().endsWith(".pdf")) {
+      setOcrError("Format file tidak didukung. Harap unggah file Gambar (PNG, JPG, WEBP) atau Dokumen PDF.");
+      return;
+    }
+
+    setOcrLoading(true);
+    setOcrError(null);
+    setOcrSuccess(null);
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      if (tanggalBerangkat) {
+        formData.append("departureDate", tanggalBerangkat);
+      }
+
+      const res = await fetch("/api/keberangkatan/flight-ocr", {
+        method: "POST",
+        body: formData,
+      });
+
+      const resJson = await res.json();
+      if (!resJson.success) {
+        throw new Error(resJson.message || "Gagal memproses dokumen tiket penerbangan.");
+      }
+
+      const { pnrMain: extractedPnr, segments: extractedSegments } = resJson.data;
+
+      if (extractedPnr && (!pnrMain || ocrMode === "replace")) {
+        setPnrMain(extractedPnr);
+      }
+
+      if (Array.isArray(extractedSegments) && extractedSegments.length > 0) {
+        if (ocrMode === "append") {
+          setFlightSegments((prev) => [...prev, ...extractedSegments]);
+          setOcrSuccess(
+            `Berhasil menambahkan ${extractedSegments.length} segmen penerbangan baru dari dokumen "${file.name}"!`
+          );
+        } else {
+          setFlightSegments(extractedSegments);
+          setOcrSuccess(
+            `Berhasil memuat ${extractedSegments.length} segmen penerbangan dari dokumen "${file.name}" ke dalam tabel!`
+          );
+        }
+      } else {
+        setOcrError("AI tidak mendeteksi rincian segmen penerbangan pada dokumen tersebut.");
+      }
+    } catch (err: any) {
+      setOcrError(err instanceof Error ? err.message : "Terjadi kesalahan saat memproses OCR tiket.");
+    } finally {
+      setOcrLoading(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      handleProcessFlightOcr(file);
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) {
+      handleProcessFlightOcr(file);
+    }
+  };
+
+  const handlePasteDocument = (e: React.ClipboardEvent) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      if (item && (item.type.startsWith("image/") || item.type === "application/pdf")) {
+        const file = item.getAsFile();
+        if (file) {
+          e.preventDefault();
+          handleProcessFlightOcr(file);
+          return;
+        }
+      }
+    }
+  };
 
   const handleAddSegment = () => {
     setFlightSegments((prev) => [
@@ -595,6 +723,151 @@ export default function EditKeberangkatanPage() {
               onChange={(e) => setPnrMain(e.target.value)}
               className="font-mono text-sm font-semibold uppercase"
             />
+          </div>
+
+          {/* Banner Informasi Paket Split Starting Point */}
+          {isSplitStarting && parentPackage && (
+            <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-xs text-emerald-900 dark:text-emerald-100 flex items-start gap-3 shadow-2xs">
+              <div className="h-8 w-8 rounded-lg bg-emerald-500/20 flex items-center justify-center shrink-0 text-emerald-700 dark:text-emerald-300">
+                <Plane className="h-4 w-4" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-emerald-800 dark:text-emerald-200">Paket Pecahan Split Starting Point</span>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-emerald-600 text-white">
+                    Pewarisan Otomatis Aktif
+                  </span>
+                </div>
+                <p className="text-[11px] text-emerald-700/90 dark:text-emerald-300/90 mt-1">
+                  Paket ini terhubung dengan Paket Induk <strong>{parentPackage.kode}</strong> ({parentPackage.namaPaket}). Segmen penerbangan internasional utama diwarisi dari paket induk. Anda dapat menambahkan tiket penerbangan feeder/domestik tambahan di bawah.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* AI OCR Scanner Box for Image & PDF */}
+          <div
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+            onPaste={handlePasteDocument}
+            tabIndex={0}
+            className={`relative rounded-xl border-2 border-dashed p-4.5 transition-all outline-none focus:ring-2 focus:ring-primary/40 ${
+              isDragging
+                ? "border-primary bg-primary/15 scale-[1.005]"
+                : "border-primary/30 hover:border-primary/60 bg-primary/5 hover:bg-primary/10"
+            }`}
+          >
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="application/pdf,image/jpeg,image/png,image/webp,image/jpg"
+              onChange={handleFileChange}
+              className="hidden"
+            />
+
+            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+              <div className="flex items-start gap-3">
+                <div className="h-10 w-10 rounded-xl bg-primary/15 border border-primary/25 flex items-center justify-center shrink-0 mt-0.5 text-primary shadow-2xs">
+                  {ocrLoading ? (
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                  ) : (
+                    <Sparkles className="h-5 w-5" />
+                  )}
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h4 className="text-sm font-bold text-foreground">
+                      Scan AI OCR Dokumen Tiket / E-Ticket (Gambar & PDF)
+                    </h4>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-primary text-primary-foreground shadow-2xs">
+                      Otomatis Masuk Tabel
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground mt-1 max-w-xl leading-relaxed">
+                    Unggah dokumen resmi <strong>E-Ticket (PDF)</strong> atau foto/screenshot jadwal tiket (<strong>PNG, JPG, WEBP</strong>). AI akan membaca jadwal dan otomatis memposisikan penempatan data ke dalam tabel 7 kolom di bawah.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto justify-start md:justify-end">
+                {flightSegments.length > 0 && (
+                  <div className="flex items-center gap-1 bg-background/90 border border-border/80 rounded-lg p-0.5 text-[11px] font-medium shadow-2xs">
+                    <button
+                      type="button"
+                      onClick={() => setOcrMode("replace")}
+                      className={`px-2.5 py-1.5 rounded-md transition-colors ${
+                        ocrMode === "replace"
+                          ? "bg-primary text-primary-foreground font-semibold shadow-xs"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      Ganti Tabel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setOcrMode("append")}
+                      className={`px-2.5 py-1.5 rounded-md transition-colors ${
+                        ocrMode === "append"
+                          ? "bg-primary text-primary-foreground font-semibold shadow-xs"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      Tambah Feeder (+Baris)
+                    </button>
+                  </div>
+                )}
+
+                <Button
+                  type="button"
+                  size="sm"
+                  disabled={ocrLoading}
+                  onClick={() => fileInputRef.current?.click()}
+                  className="gap-2 text-xs font-bold h-9 shadow-xs px-3.5"
+                >
+                  {ocrLoading ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Menganalisis Berkas...
+                    </>
+                  ) : (
+                    <>
+                      <UploadCloud className="h-4 w-4" />
+                      Pilih E-Ticket (PDF / Gambar)
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+
+            {ocrSuccess && (
+              <div className="mt-3 p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-xs text-emerald-800 dark:text-emerald-200 flex items-center justify-between gap-2 animate-in fade-in">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
+                  <span className="font-medium">{ocrSuccess}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setOcrSuccess(null)}
+                  className="text-xs hover:underline text-emerald-700 font-semibold px-2 py-0.5"
+                >
+                  Tutup
+                </button>
+              </div>
+            )}
+
+            {ocrError && (
+              <div className="mt-3 p-3 rounded-lg bg-red-500/10 border border-red-500/30 text-xs text-red-800 dark:text-red-200 flex items-center justify-between gap-2 animate-in fade-in">
+                <span className="font-medium">⚠️ {ocrError}</span>
+                <button
+                  type="button"
+                  onClick={() => setOcrError(null)}
+                  className="text-xs hover:underline text-red-700 font-semibold px-2 py-0.5"
+                >
+                  Tutup
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Banner Tip Paste Excel */}
