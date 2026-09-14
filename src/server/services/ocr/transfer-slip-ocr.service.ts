@@ -123,7 +123,6 @@ export async function extractTransferSlip(
   if (apiKey && imgData?.buffer) {
     try {
       const genAI = new GoogleGenerativeAI(apiKey);
-      const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
       const prompt = `Anda adalah asisten AI OCR spesialis verifikasi slip pembayaran bank Indonesia (Livin' by Mandiri, BCA Mobile, myBCA, BRImo, BSI Mobile, BNI Mobile, Permata, dll).
 Analisis gambar struk/slip bukti transfer ini dengan sangat teliti dan ekstrak informasinya ke dalam JSON valid:
@@ -143,15 +142,41 @@ Analisis gambar struk/slip bukti transfer ini dengan sangat teliti dan ekstrak i
 }
 HANYA kembalikan JSON valid tanpa tag markdown backtick.`;
 
-      const result = await model.generateContent([
-        prompt,
-        {
-          inlineData: {
-            data: imgData.buffer.toString("base64"),
-            mimeType: imgData.mimeType,
-          },
-        },
-      ]);
+      const candidateModels = [
+        "gemini-2.5-flash",
+        "gemini-flash-lite-latest",
+        "gemini-3.5-flash-lite",
+        "gemini-3.5-flash",
+        "gemini-flash-latest",
+        "gemini-pro-latest",
+        "gemini-1.5-flash",
+      ];
+
+      let result: any = null;
+      let lastErr: any = null;
+
+      for (const modelName of candidateModels) {
+        try {
+          const model = genAI.getGenerativeModel({ model: modelName });
+          result = await model.generateContent([
+            prompt,
+            {
+              inlineData: {
+                data: imgData.buffer.toString("base64"),
+                mimeType: imgData.mimeType,
+              },
+            },
+          ]);
+          if (result) break;
+        } catch (mErr) {
+          lastErr = mErr;
+          console.warn(`[slip-ocr] Model ${modelName} failed, trying next candidate:`, mErr);
+        }
+      }
+
+      if (!result) {
+        throw lastErr || new Error("Semua model AI candidate gagal memproses slip transfer.");
+      }
 
       const text = result.response.text();
       const jsonMatch = text.match(/\{[\s\S]*\}/);

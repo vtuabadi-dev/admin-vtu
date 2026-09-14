@@ -159,8 +159,6 @@ export async function extractFlightTicketOcr(
 
   try {
     const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
-
     const refYear = referenceDepartureDate ? referenceDepartureDate.slice(0, 4) : undefined;
 
     const prompt = `Anda adalah asisten AI OCR spesialis dokumen penerbangan umrah, E-Ticket maskapai (Saudia Airlines, Garuda Indonesia, Lion Air, Royal Brunei, Qatar Airways, Emirates, Scoot, Flynas, Batik Air), dan GDS PNR Booking Sheets (Sabre, Amadeus, Galileo, Altea).
@@ -194,15 +192,41 @@ ATURAN PENTING:
 3. Format bandara gunakan KODE IATA 3 HURUF BESAR (SUB = Surabaya, CGK = Jakarta, BWN = Brunei, JED = Jeddah, MED = Madinah, KUL = Kuala Lumpur, SIN = Singapore, DOH = Doha, DXB = Dubai).
 4. HANYA kembalikan teks JSON valid tanpa format markdown backtick atau teks pembuka lainnya.`;
 
-    const result = await model.generateContent([
-      prompt,
-      {
-        inlineData: {
-          data: fileBuffer.toString("base64"),
-          mimeType: effectiveMime,
-        },
-      },
-    ]);
+    const candidateModels = [
+      "gemini-2.5-flash",
+      "gemini-flash-lite-latest",
+      "gemini-3.5-flash-lite",
+      "gemini-3.5-flash",
+      "gemini-flash-latest",
+      "gemini-pro-latest",
+      "gemini-1.5-flash",
+    ];
+
+    let result: any = null;
+    let lastError: any = null;
+
+    for (const modelName of candidateModels) {
+      try {
+        const model = genAI.getGenerativeModel({ model: modelName });
+        result = await model.generateContent([
+          prompt,
+          {
+            inlineData: {
+              data: fileBuffer.toString("base64"),
+              mimeType: effectiveMime,
+            },
+          },
+        ]);
+        if (result) break;
+      } catch (mErr: any) {
+        lastError = mErr;
+        console.warn(`[flight-ocr] Model ${modelName} failed (${mErr?.message}), trying next candidate...`);
+      }
+    }
+
+    if (!result) {
+      throw lastError || new Error("Semua model AI candidate gagal memproses berkas tiket.");
+    }
 
     const text = result.response.text();
     const jsonMatch = text.match(/\{[\s\S]*\}/);
