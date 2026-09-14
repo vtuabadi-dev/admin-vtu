@@ -248,6 +248,8 @@ export interface PackageExtractionResultV2 {
   upgradeTriple: ExtractionField<number>;
   /** Equipment inclusion flag — Optional */
   isAdaPerlengkapan: ExtractionField<'ya' | 'tidak'>;
+  /** Board Type / Konsumsi: Full Board (FB) vs Breakfast Only (BF) — Optional */
+  boardType?: ExtractionField<'FB' | 'BF'>;
 }
 
 // ── Draft Lifecycle (Business States L122-L148) ──────────────

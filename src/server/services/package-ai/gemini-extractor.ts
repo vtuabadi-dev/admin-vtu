@@ -45,7 +45,7 @@ export async function extractWithGemini(
   rawOcrText: string,
   caption: string,
   apiKeyOverride?: string
-): Promise<Partial<PackageExtractionResult> & { landingRoute?: string; rawText?: string }> {
+): Promise<Partial<PackageExtractionResult> & { landingRoute?: string; rawText?: string; tipeMakan?: "FB" | "BF" }> {
   const startMs = Date.now();
   const keySequence = await getGeminiApiKeysSequence(apiKeyOverride);
 
@@ -133,6 +133,10 @@ export async function extractWithGemini(
     `  - Jika flyer/caption menyebutkan "Kereta Cepat", "Fast Train", "Haramain", isi 'isAdaKeretaCepat' = "ya", selain itu "tidak".\n` +
     `• Termasuk City Tour Thoif ('isAdaThoif'):\n` +
     `  - Jika flyer/caption menyebutkan "Thoif", "Taif", "City Tour Taif", isi 'isAdaThoif' = "ya", selain itu "tidak".\n` +
+    `• Tipe Makan / Konsumsi ('tipeMakan'):\n` +
+    `  - Jika caption atau flyer menyebutkan "makan 3x1 hari", "makan 3x sehari", "3x sehari", "full board", "fullboard", atau "FB", isi 'tipeMakan' = "FB".\n` +
+    `  - Jika TIDAK tercantum "makan 3x1 hari" dan tercantum "breakfast only", "bf", "sarapan saja", atau "hanya sarapan", isi 'tipeMakan' = "BF".\n` +
+    `  - Jika tidak ada keterangan spesifik tentang makan/konsumsi, default adalah "FB".\n` +
     `• Harga Upgrade Kamar Double & Triple:\n` +
     `  - 'upgradeDouble': Nominal upgrade kamar berdua (cth: 7500000 dari "Sekamar Berdua + Rp 7.500.000").\n` +
     `  - 'upgradeTriple': Nominal upgrade kamar bertiga (cth: 5000000 dari "Sekamar Bertiga + Rp 5.000.000").\n\n` +
@@ -201,6 +205,7 @@ export async function extractWithGemini(
                 isAdaPerlengkapan: { type: SchemaType.STRING, description: "Dari Caption: 'ya' jika termasuk perlengkapan, 'tidak' jika belum/tidak" },
                 isAdaKeretaCepat: { type: SchemaType.STRING, description: "'ya' jika termasuk kereta cepat Haramain / fast train, 'tidak' jika tidak" },
                 isAdaThoif: { type: SchemaType.STRING, description: "'ya' jika termasuk city tour Thoif / Ta'if, 'tidak' jika tidak" },
+                tipeMakan: { type: SchemaType.STRING, description: "'FB' jika full board / makan 3x1 hari, 'BF' jika breakfast only / sarapan saja" },
                 hargaBase: { type: SchemaType.STRING, description: "Harga base paket (hanya angka nominal)" },
                 upgradeDouble: { type: SchemaType.STRING, description: "Harga upgrade kamar double umum dari Caption (hanya angka nominal)" },
                 upgradeTriple: { type: SchemaType.STRING, description: "Harga upgrade kamar triple umum dari Caption (hanya angka nominal)" },

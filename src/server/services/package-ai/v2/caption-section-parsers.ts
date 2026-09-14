@@ -567,3 +567,49 @@ export function parsePromoText(text: string): ExtractionField {
 
   return createMissingField('OPTIONAL');
 }
+
+// ── Board Type Parser (FB vs BF) ─────────────────────────────
+
+/**
+ * Detect Board Type (Full Board / Breakfast Only) from text.
+ * Rule:
+ * - "makan 3x1 hari", "makan 3x sehari", "3x sehari", "full board", "fullboard", "fb" -> FB
+ * - If not makan 3x and has "breakfast only", "bf", "sarapan saja", "hanya sarapan" -> BF
+ * - Default -> FB
+ */
+export function parseBoardType(text: string): ExtractionField<'FB' | 'BF'> {
+  const upper = text.toUpperCase();
+
+  const isFB =
+    upper.includes('MAKAN 3X1 HARI') ||
+    upper.includes('MAKAN 3X SEHARI') ||
+    upper.includes('MAKAN 3 X SEHARI') ||
+    upper.includes('MAKAN 3 KALI SEHARI') ||
+    upper.includes('FULL BOARD') ||
+    upper.includes('FULLBOARD') ||
+    /\bFB\b/.test(upper);
+
+  const isBF =
+    upper.includes('BREAKFAST ONLY') ||
+    upper.includes('SARAPAN SAJA') ||
+    upper.includes('HANYA SARAPAN') ||
+    /\bBF\b/.test(upper);
+
+  if (isFB) {
+    return createExtractedField<'FB' | 'BF'>('FB', 'caption', 0.95, 'OPTIONAL', {
+      patternMatch: 0.95,
+    });
+  }
+
+  if (isBF) {
+    return createExtractedField<'FB' | 'BF'>('BF', 'caption', 0.95, 'OPTIONAL', {
+      patternMatch: 0.95,
+    });
+  }
+
+  // Default is FB for Umrah packages
+  return createExtractedField<'FB' | 'BF'>('FB', 'caption', 0.80, 'OPTIONAL', {
+    patternMatch: 0.80,
+  });
+}
+

@@ -274,6 +274,15 @@ export const packageService = {
       if (data.isAdaThoif === "ya" && !includeList.includes("City Tour Thoif")) {
         includeList.push("City Tour Thoif");
       }
+      if (data.tipeMakan === "BF") {
+        if (!includeList.some((item: string) => item.toLowerCase().includes("breakfast only"))) {
+          includeList.push("Breakfast Only (BF)");
+        }
+      } else {
+        if (!includeList.some((item: string) => item.toLowerCase().includes("full board") || item.toLowerCase().includes("makan 3x"))) {
+          includeList.push("Makan 3x Sehari (Full Board / FB)");
+        }
+      }
 
       const created = await keberangkatanRepo.create({
         kode: kodeIndividu,

@@ -538,6 +538,33 @@ function resolveJamaahCityTourThoif(activePackage: any, groupObj: any, j: any): 
   return true;
 }
 
+/**
+ * Resolves whether a package is Full Board (FB) or Breakfast Only (BF).
+ * Checks explicit boardType / tipeMakan, include array, and fallbacks safely to "FB".
+ */
+function resolvePackageBoardType(groupPkg: any, activePackage: any): "FB" | "BF" {
+  const pkgToCheck = groupPkg || activePackage;
+  if (!pkgToCheck) return "FB";
+
+  if (pkgToCheck.tipeMakan === "BF" || pkgToCheck.boardType === "BF") return "BF";
+  if (pkgToCheck.tipeMakan === "FB" || pkgToCheck.boardType === "FB") return "FB";
+
+  const includes = Array.isArray(pkgToCheck.include) ? pkgToCheck.include : [];
+  const hasBF = includes.some((inc: string) => /breakfast only|\bbf\b|sarapan saja/i.test(inc));
+  if (hasBF) return "BF";
+
+  const hasFB = includes.some((inc: string) => /makan 3x|full board|\bfb\b/i.test(inc));
+  if (hasFB) return "FB";
+
+  if (activePackage && activePackage !== pkgToCheck) {
+    if (activePackage.tipeMakan === "BF" || activePackage.boardType === "BF") return "BF";
+    const actIncludes = Array.isArray(activePackage.include) ? activePackage.include : [];
+    if (actIncludes.some((inc: string) => /breakfast only|\bbf\b|sarapan saja/i.test(inc))) return "BF";
+  }
+
+  return "FB";
+}
+
 // ── Main Page Component Content ──────────────────────────────
 
 function ManifestPageContent() {
@@ -1751,6 +1778,9 @@ function ManifestPageContent() {
                         <th className="px-3 py-3 font-extrabold uppercase tracking-wider text-[10px] text-stone-800 dark:text-stone-100 border-r border-stone-300/80 dark:border-stone-700/80 w-32 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
                           CITY TOUR THOIF
                         </th>
+                        <th className="px-3 py-3 font-extrabold uppercase tracking-wider text-[10px] text-stone-800 dark:text-stone-100 border-r border-stone-300/80 dark:border-stone-700/80 w-28 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
+                          TIPE MAKAN
+                        </th>
                         <th className="px-3 py-3 font-extrabold uppercase tracking-wider text-[10px] text-stone-800 dark:text-stone-100 border-r border-stone-300/80 dark:border-stone-700/80 min-w-[130px] shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
                           HOTEL MAKKAH
                         </th>
@@ -1795,7 +1825,7 @@ function ManifestPageContent() {
                     <tbody className="bg-white dark:bg-stone-900">
                       {filteredActiveJamaah.length === 0 ? (
                         <tr>
-                          <td colSpan={isSelectMode ? 23 : 22} className="px-4 py-12 text-center text-stone-500">
+                          <td colSpan={isSelectMode ? 24 : 23} className="px-4 py-12 text-center text-stone-500">
                             <div className="space-y-3">
                               <p>Belum ada data jamaah terdaftar pada paket ini.</p>
                               <Button
@@ -2047,6 +2077,25 @@ function ManifestPageContent() {
                                     </span>
                                   ) : (
                                     <span className="text-stone-300 dark:text-stone-700 font-mono select-none">—</span>
+                                  )}
+                                </td>
+
+                                {/* TIPE MAKAN (FB / BF) */}
+                                <td className={`px-3 py-2.5 text-center ${cellBorder}`}>
+                                  {resolvePackageBoardType(groupPkg, activePackage) === "FB" ? (
+                                    <span
+                                      className="inline-flex items-center justify-center px-2 py-0.5 rounded text-[11px] font-extrabold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700 shadow-2xs select-none"
+                                      title="Paket Full Board (Makan 3x Sehari)"
+                                    >
+                                      FB
+                                    </span>
+                                  ) : (
+                                    <span
+                                      className="inline-flex items-center justify-center px-2 py-0.5 rounded text-[11px] font-extrabold bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 border border-amber-300 dark:border-amber-700 shadow-2xs select-none"
+                                      title="Paket Breakfast Only (Sarapan Saja)"
+                                    >
+                                      BF
+                                    </span>
                                   )}
                                 </td>
 

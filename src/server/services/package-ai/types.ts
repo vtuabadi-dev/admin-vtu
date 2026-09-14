@@ -38,6 +38,7 @@ export interface PackageExtractionResult {
   upgradeDouble?: string;
   upgradeTriple?: string;
   isAdaPerlengkapan?: "ya" | "tidak";
+  tipeMakan?: "FB" | "BF";
   hargaBase?: string;
   clusters?: ClusterExtractionItem[];
   durationDays: number;

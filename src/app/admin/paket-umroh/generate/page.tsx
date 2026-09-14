@@ -141,6 +141,7 @@ export default function GeneratePaketPage() {
     isAdaPerlengkapan: "",
     isAdaKeretaCepat: "tidak",
     isAdaThoif: "tidak",
+    tipeMakan: "FB",
     hargaBase: "",
     durasiHari: "9",
     upgradeDouble: "",
@@ -436,6 +437,8 @@ export default function GeneratePaketPage() {
         const hasKC = incArray.some((inc: string) => /kereta|fast train|haramain/i.test(inc)) ? "ya" : "tidak";
         const hasThoif = incArray.some((inc: string) => /thoif|taif|ta'if/i.test(inc)) ? "ya" : "tidak";
         const hasPerlengkapan = incArray.some((inc: string) => /perlengkapan/i.test(inc)) ? "ya" : "tidak";
+        const hasBF = incArray.some((inc: string) => /breakfast only|\bbf\b|sarapan saja/i.test(inc)) || pkg.tipeMakan === "BF";
+        const boardType = hasBF ? "BF" : "FB";
 
         setFormData(prev => ({
           ...prev,
@@ -454,6 +457,7 @@ export default function GeneratePaketPage() {
           isAdaKeretaCepat: hasKC,
           isAdaThoif: hasThoif,
           isAdaPerlengkapan: hasPerlengkapan,
+          tipeMakan: boardType,
         }));
 
         if (pkg.tanggalBerangkat) {
@@ -492,6 +496,11 @@ export default function GeneratePaketPage() {
     if (formData.isAdaPerlengkapan === "ya") includeList.push("Perlengkapan Umroh");
     if (formData.isAdaKeretaCepat === "ya") includeList.push("Kereta Cepat Haramain");
     if (formData.isAdaThoif === "ya") includeList.push("City Tour Thoif");
+    if (formData.tipeMakan === "BF") {
+      includeList.push("Breakfast Only (BF)");
+    } else {
+      includeList.push("Makan 3x Sehari (Full Board / FB)");
+    }
 
     const firstDepDate = departureDates[0] ? new Date(departureDates[0]) : undefined;
     let firstArrDate: Date | undefined = undefined;
@@ -512,6 +521,7 @@ export default function GeneratePaketPage() {
       maskapaiId: formData.maskapaiId || undefined,
       hotelMekkahId: formData.hotelMekkahId || undefined,
       hotelMadinahId: formData.hotelMadinahId || undefined,
+      tipeMakan: formData.tipeMakan || "FB",
       include: includeList,
     };
 
@@ -848,6 +858,30 @@ export default function GeneratePaketPage() {
             finalFormData.isAdaThoif = "ya";
           }
         }
+        if (result.tipeMakan) {
+          finalFormData.tipeMakan = result.tipeMakan;
+        } else {
+          const fullText = `${caption || ""} ${result.rawOcrText || ""}`.toLowerCase();
+          if (
+            fullText.includes("makan 3x1 hari") ||
+            fullText.includes("makan 3x sehari") ||
+            fullText.includes("3 kali sehari") ||
+            fullText.includes("full board") ||
+            fullText.includes("fullboard") ||
+            /\bfb\b/.test(fullText)
+          ) {
+            finalFormData.tipeMakan = "FB";
+          } else if (
+            fullText.includes("breakfast only") ||
+            fullText.includes("sarapan saja") ||
+            fullText.includes("hanya sarapan") ||
+            /\bbf\b/.test(fullText)
+          ) {
+            finalFormData.tipeMakan = "BF";
+          } else {
+            finalFormData.tipeMakan = "FB";
+          }
+        }
         if (result.upgradeDouble) finalFormData.upgradeDouble = String(result.upgradeDouble).replace(/\D/g, "");
         if (result.upgradeTriple) finalFormData.upgradeTriple = String(result.upgradeTriple).replace(/\D/g, "");
 
@@ -1043,6 +1077,7 @@ export default function GeneratePaketPage() {
       isAdaPerlengkapan: formData.isAdaPerlengkapan,
       isAdaKeretaCepat: formData.isAdaKeretaCepat,
       isAdaThoif: formData.isAdaThoif,
+      tipeMakan: formData.tipeMakan || "FB",
       clusterConfigs: formData.isAdaKlaster === "ya" ? activeClusterConfigs : null,
       caption: caption || undefined,
       flyerBase64List,
@@ -1085,6 +1120,7 @@ export default function GeneratePaketPage() {
           isAdaPerlengkapan: "",
           isAdaKeretaCepat: "tidak",
           isAdaThoif: "tidak",
+          tipeMakan: "FB",
           hargaBase: "",
           durasiHari: "9",
           upgradeDouble: "",
@@ -1724,6 +1760,39 @@ export default function GeneratePaketPage() {
                   </span>
                 </div>
               </div>
+
+              {/* Saklar Tipe Konsumsi / Makan (FB vs BF) */}
+              <div className="flex flex-col justify-end h-full">
+                <label className="block text-xs font-bold text-slate-800 mb-1 min-h-[2.5rem] flex items-end">Tipe Konsumsi / Makan</label>
+                <div className="flex items-center gap-2 h-10">
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={formData.tipeMakan === "FB"}
+                    onClick={() => setFormData(prev => ({ ...prev, tipeMakan: prev.tipeMakan === "FB" ? "BF" : "FB" }))}
+                    className={cn(
+                      "relative inline-flex h-7 w-14 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-2",
+                      formData.tipeMakan === "FB" ? "bg-emerald-600" : "bg-amber-500"
+                    )}
+                    title={formData.tipeMakan === "FB" ? "Full Board (Makan 3x Sehari)" : "Breakfast Only (Sarapan Saja)"}
+                  >
+                    <span
+                      className={cn(
+                        "pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out",
+                        formData.tipeMakan === "FB" ? "translate-x-7" : "translate-x-0"
+                      )}
+                    />
+                  </button>
+                  <span className={cn(
+                    "text-xs font-bold px-2.5 py-1 rounded-md border min-w-[70px] text-center transition-colors select-none",
+                    formData.tipeMakan === "FB" 
+                      ? "bg-emerald-50 text-emerald-950 border-emerald-300" 
+                      : "bg-amber-50 text-amber-950 border-amber-300"
+                  )}>
+                    {formData.tipeMakan === "FB" ? "Full Board (FB)" : "Breakfast Only (BF)"}
+                  </span>
+                </div>
+              </div>
               <div>
                 {formData.isAdaKlaster === "tidak" ? (
                   <>
@@ -2257,6 +2326,39 @@ export default function GeneratePaketPage() {
                     : "bg-white text-stone-700 border-stone-300"
                 )}>
                   {formData.isAdaThoif === "ya" ? "Ya" : "Tidak"}
+                </span>
+              </div>
+            </div>
+
+            {/* Saklar Tipe Konsumsi / Makan (FB vs BF) */}
+            <div className="flex flex-col justify-end h-full">
+              <label className="block text-xs font-semibold mb-1 min-h-[2.25rem] flex items-end">Tipe Konsumsi / Makan</label>
+              <div className="flex items-center gap-2 h-10">
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={formData.tipeMakan === "FB"}
+                  onClick={() => setFormData(prev => ({ ...prev, tipeMakan: prev.tipeMakan === "FB" ? "BF" : "FB" }))}
+                  className={cn(
+                    "relative inline-flex h-7 w-14 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-2",
+                    formData.tipeMakan === "FB" ? "bg-emerald-600" : "bg-amber-500"
+                  )}
+                  title={formData.tipeMakan === "FB" ? "Full Board (Makan 3x Sehari)" : "Breakfast Only (Sarapan Saja)"}
+                >
+                  <span
+                    className={cn(
+                      "pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out",
+                      formData.tipeMakan === "FB" ? "translate-x-7" : "translate-x-0"
+                    )}
+                  />
+                </button>
+                <span className={cn(
+                  "text-xs font-semibold px-2.5 py-1 rounded-md border min-w-[70px] text-center transition-colors select-none",
+                  formData.tipeMakan === "FB" 
+                    ? "bg-emerald-50 text-emerald-950 border-emerald-300" 
+                    : "bg-amber-50 text-amber-950 border-amber-300"
+                )}>
+                  {formData.tipeMakan === "FB" ? "Full Board (FB)" : "Breakfast Only (BF)"}
                 </span>
               </div>
             </div>

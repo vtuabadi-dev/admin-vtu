@@ -427,13 +427,20 @@ export async function GET(request: Request) {
           const defaultCatatan = statusBayar === "LUNAS" ? "Lunas Paket" : `Cicilan ${groupPembayaran > 0 ? "Berjalan" : "Belum Masuk"}`;
           const primaryCatatan = payments[0]?.catatan || (isGroupPromo && groupPkg.id !== parentPkgId ? `[Varian Promo: ${groupPkg.promoLabel || groupPkg.splitLabel || groupPkg.kode}] ${defaultCatatan}` : defaultCatatan);
 
-          // Rombongan label: if registered in a promo package variant, clearly tag it
+          // Rombongan label: if registered in a promo package variant or specific board type, tag it
           let groupTitle = group.namaGroup || group.kodeRegistrasi;
+          const isBF = (groupPkg.include || []).some((inc: string) => /breakfast only|\bbf\b|sarapan saja/i.test(inc)) || (groupPkg as any).tipeMakan === "BF";
+          const boardTag = isBF ? "[BF]" : "[FB]";
+
           if (isGroupPromo && groupPkg.id !== parentPkgId) {
             const promoTag = groupPkg.promoLabel || groupPkg.splitLabel || groupPkg.kode;
             if (!groupTitle.toUpperCase().includes("PROMO")) {
-              groupTitle = `[PROMO ${promoTag}] ${groupTitle}`;
+              groupTitle = `[PROMO ${promoTag}] ${boardTag} ${groupTitle}`;
+            } else if (!groupTitle.includes("[FB]") && !groupTitle.includes("[BF]")) {
+              groupTitle = `${boardTag} ${groupTitle}`;
             }
+          } else if (!groupTitle.includes("[FB]") && !groupTitle.includes("[BF]")) {
+            groupTitle = `${boardTag} ${groupTitle}`;
           }
 
           // Hitung rincian item tagihan invoice (Upgrade Kamar, Upgrade Hotel, Ongkos Jahit, Tambahan Perlengkapan, Diskon)
