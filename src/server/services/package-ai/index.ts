@@ -130,6 +130,18 @@ export async function processPackageFlyer(
   // Combine local parsed data with Gemini AI completion
   const mergedDates = Array.from(new Set([...(localParsed.departureDates || []), ...(geminiData.departureDates || [])])).sort();
 
+  const isAdaKeretaCepat =
+    localParsed.isAdaKeretaCepat === "ya" || geminiData.isAdaKeretaCepat === "ya"
+      ? "ya"
+      : (geminiData.isAdaKeretaCepat || localParsed.isAdaKeretaCepat || "tidak");
+
+  const isAdaThoif =
+    localParsed.isAdaThoif === "ya" || geminiData.isAdaThoif === "ya"
+      ? "ya"
+      : (geminiData.isAdaThoif || localParsed.isAdaThoif || "tidak");
+
+  const tipeMakan = (localParsed.tipeMakan === "BF" || geminiData.tipeMakan === "BF") ? "BF" : (geminiData.tipeMakan || localParsed.tipeMakan || "FB");
+
   return {
     title: geminiData.title || localParsed.title || "Untitled Package",
     packageType: (geminiData.packageType as any) || localParsed.packageType || "umroh_reguler",
@@ -143,6 +155,9 @@ export async function processPackageFlyer(
     upgradeDouble: geminiData.upgradeDouble || localParsed.upgradeDouble,
     upgradeTriple: geminiData.upgradeTriple || localParsed.upgradeTriple,
     isAdaPerlengkapan: (geminiData.isAdaPerlengkapan as any) || localParsed.isAdaPerlengkapan,
+    isAdaKeretaCepat,
+    isAdaThoif,
+    tipeMakan,
     hargaBase: geminiData.hargaBase || localParsed.hargaBase,
     clusters: geminiData.clusters || localParsed.clusters,
     durationDays: geminiData.durationDays || localParsed.durationDays || 0,

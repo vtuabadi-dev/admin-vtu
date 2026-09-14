@@ -613,3 +613,81 @@ export function parseBoardType(text: string): ExtractionField<'FB' | 'BF'> {
   });
 }
 
+// ── City Tour Thoif / Thaif Parser ────────────────────────────
+
+/**
+ * Detect City Tour Thoif / Thaif inclusion from text.
+ * Covers variations: Thaif, Thoif, Taif, Ta'if, Tha'if, Tho'if, Toif.
+ */
+export function parseThoifStatus(text: string): ExtractionField<'ya' | 'tidak'> {
+  const upper = text.toUpperCase();
+
+  if (
+    upper.includes('TIDAK TERMASUK THAIF') ||
+    upper.includes('TIDAK TERMASUK THOIF') ||
+    upper.includes('TANPA THAIF') ||
+    upper.includes('TANPA THOIF') ||
+    upper.includes('EXCLUDE THAIF') ||
+    upper.includes('EXCLUDE THOIF')
+  ) {
+    return createExtractedField<'ya' | 'tidak'>('tidak', 'caption', 0.90, 'OPTIONAL', {
+      patternMatch: 0.90,
+    });
+  }
+
+  if (
+    upper.includes('FREE CITY TOUR THAIF') ||
+    upper.includes('FREE CITY TOUR THOIF') ||
+    upper.includes('CITY TOUR THAIF') ||
+    upper.includes('CITY TOUR THOIF') ||
+    upper.includes('FREE THAIF') ||
+    upper.includes('FREE THOIF') ||
+    upper.includes('ZIARAH THAIF') ||
+    upper.includes('ZIARAH THOIF') ||
+    /\bTHAIF\b/.test(upper) ||
+    /\bTHOIF\b/.test(upper) ||
+    /\bTAIF\b/.test(upper) ||
+    /\bTA'IF\b/.test(upper) ||
+    /\bTOIF\b/.test(upper)
+  ) {
+    return createExtractedField<'ya' | 'tidak'>('ya', 'caption', 0.95, 'OPTIONAL', {
+      patternMatch: 0.95,
+    });
+  }
+
+  return createMissingField<'ya' | 'tidak'>('OPTIONAL');
+}
+
+// ── Kereta Cepat Haramain Parser ─────────────────────────────
+
+/**
+ * Detect Kereta Cepat Haramain inclusion from text.
+ */
+export function parseKeretaCepatStatus(text: string): ExtractionField<'ya' | 'tidak'> {
+  const upper = text.toUpperCase();
+
+  if (
+    upper.includes('TIDAK TERMASUK KERETA CEPAT') ||
+    upper.includes('TANPA KERETA CEPAT') ||
+    upper.includes('EXCLUDE KERETA CEPAT')
+  ) {
+    return createExtractedField<'ya' | 'tidak'>('tidak', 'caption', 0.90, 'OPTIONAL', {
+      patternMatch: 0.90,
+    });
+  }
+
+  if (
+    upper.includes('KERETA CEPAT') ||
+    upper.includes('FAST TRAIN') ||
+    upper.includes('HARAMAIN') ||
+    upper.includes('BULLET TRAIN')
+  ) {
+    return createExtractedField<'ya' | 'tidak'>('ya', 'caption', 0.95, 'OPTIONAL', {
+      patternMatch: 0.95,
+    });
+  }
+
+  return createMissingField<'ya' | 'tidak'>('OPTIONAL');
+}
+
+

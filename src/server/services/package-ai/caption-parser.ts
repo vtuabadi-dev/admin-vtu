@@ -526,6 +526,113 @@ export function extractClustersFromCaption(caption: string): import("./types").C
   return Object.values(clusterMap);
 }
 
+/**
+ * Detect City Tour Thoif / Thaif inclusion from caption text.
+ * Covers variations: Thaif, Thoif, Taif, Ta'if, Tha'if, Tho'if, Toif.
+ */
+export function extractThoifStatus(caption: string): "ya" | "tidak" {
+  const text = caption.toLowerCase();
+
+  // If text contains sections, inspect line by line:
+  const lines = text.split("\n");
+  let inExcludeSection = false;
+
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
+    if (/^(?:tidak\s+termasuk|belum\s+termasuk|harga\s+tidak\s+termasuk|exclude)\s*[:=-]?/i.test(line)) {
+      inExcludeSection = true;
+    } else if (/^(?:termasuk|harga\s+termasuk|fasilitas\s+termasuk|include|bonus|keunggulan|free)\s*[:=-]?/i.test(line)) {
+      inExcludeSection = false;
+    }
+
+    if (inExcludeSection && /(?:th[ao]'?if|ta'?if|toif)/i.test(line)) {
+      if (!line.includes("free") && !line.includes("gratis") && !line.includes("bonus")) {
+        return "tidak";
+      }
+    }
+  }
+
+  // Check inline explicit exclusion: "tidak termasuk: city tour thaif", "tanpa thaif"
+  if (
+    /(?:tidak|belum|tanpa|exclude)\s*(?:termasuk)?\s*[:=-]?\s*(?:[^\n,;.]*?)(?:city\s+tour\s+)?(?:th[ao]'?if|ta'?if|toif)/i.test(text)
+  ) {
+    const match = text.match(/(?:tidak|belum|tanpa|exclude)\s*(?:termasuk)?\s*[:=-]?\s*([^\n,;.]*?(?:th[ao]'?if|ta'?if|toif))/i);
+    if (match && !match[0].includes("free") && !match[0].includes("gratis") && !match[0].includes("bonus")) {
+      return "tidak";
+    }
+  }
+
+  // Positive mention: "free city tour thaif", "free city tour thoif", "city tour thaif", "free thaif", "thaif", "thoif", etc.
+  if (
+    /free\s+city\s+tour\s+th[ao]'?if/i.test(text) ||
+    /city\s+tour\s+th[ao]'?if/i.test(text) ||
+    /free\s+th[ao]'?if/i.test(text) ||
+    /tour\s+th[ao]'?if/i.test(text) ||
+    /ziarah\s+th[ao]'?if/i.test(text) ||
+    /\bth[ao]'?if\b/i.test(text) ||
+    /\bta'?if\b/i.test(text) ||
+    /\btoif\b/i.test(text)
+  ) {
+    return "ya";
+  }
+
+  return "tidak";
+}
+
+/**
+ * Detect Kereta Cepat Haramain inclusion from caption text.
+ */
+export function extractKeretaCepatStatus(caption: string): "ya" | "tidak" {
+  const text = caption.toLowerCase();
+
+  if (
+    /(?:tidak|belum|tanpa|exclude)\s+(?:termasuk\s+)?(?:kereta\s+cepat|fast\s+train|haramain)/i.test(text)
+  ) {
+    return "tidak";
+  }
+
+  if (
+    text.includes("kereta cepat") ||
+    text.includes("fast train") ||
+    text.includes("haramain") ||
+    text.includes("bullet train")
+  ) {
+    return "ya";
+  }
+
+  return "tidak";
+}
+
+/**
+ * Detect Board Type (FB vs BF) from caption text.
+ */
+export function extractBoardType(caption: string): "FB" | "BF" {
+  const text = caption.toLowerCase();
+
+  if (
+    text.includes("makan 3x1 hari") ||
+    text.includes("makan 3x sehari") ||
+    text.includes("makan 3 x sehari") ||
+    text.includes("3 kali sehari") ||
+    text.includes("full board") ||
+    text.includes("fullboard") ||
+    /\bfb\b/.test(text)
+  ) {
+    return "FB";
+  }
+
+  if (
+    text.includes("breakfast only") ||
+    text.includes("sarapan saja") ||
+    text.includes("hanya sarapan") ||
+    /\bbf\b/.test(text)
+  ) {
+    return "BF";
+  }
+
+  return "FB";
+}
+
 // ── Main Parser ──────────────────────────────────────────────
 
 /**
@@ -545,6 +652,9 @@ export function parseCaption(caption: string): Partial<PackageExtractionResult> 
   const upgradePrices = extractRoomUpgradePrices(trimmed);
   const description = extractDescription(trimmed);
   const equipmentStatus = extractEquipmentStatus(trimmed);
+  const thoifStatus = extractThoifStatus(trimmed);
+  const keretaCepatStatus = extractKeretaCepatStatus(trimmed);
+  const boardType = extractBoardType(trimmed);
   const captionClusters = extractClustersFromCaption(trimmed);
 
   // Title: first meaningful line or package type + duration
@@ -607,6 +717,9 @@ export function parseCaption(caption: string): Partial<PackageExtractionResult> 
     upgradeDouble: upgradePrices.upgradeDouble,
     upgradeTriple: upgradePrices.upgradeTriple,
     isAdaPerlengkapan: equipmentStatus,
+    isAdaKeretaCepat: keretaCepatStatus,
+    isAdaThoif: thoifStatus,
+    tipeMakan: boardType,
     clusters: captionClusters.length > 0 ? captionClusters : undefined,
     durationDays: duration,
     departureDates: dates,

@@ -435,7 +435,7 @@ export default function GeneratePaketPage() {
         const pkg = json.data;
         const incArray = Array.isArray(pkg.include) ? pkg.include : [];
         const hasKC = incArray.some((inc: string) => /kereta|fast train|haramain/i.test(inc)) ? "ya" : "tidak";
-        const hasThoif = incArray.some((inc: string) => /thoif|taif|ta'if/i.test(inc)) ? "ya" : "tidak";
+        const hasThoif = incArray.some((inc: string) => /th[ao]'?if|ta'?if|toif/i.test(inc)) ? "ya" : "tidak";
         const hasPerlengkapan = incArray.some((inc: string) => /perlengkapan/i.test(inc)) ? "ya" : "tidak";
         const hasBF = incArray.some((inc: string) => /breakfast only|\bbf\b|sarapan saja/i.test(inc)) || pkg.tipeMakan === "BF";
         const boardType = hasBF ? "BF" : "FB";
@@ -841,46 +841,85 @@ export default function GeneratePaketPage() {
         if (mappedHotelMadinah) finalFormData.hotelMadinahId = mappedHotelMadinah;
         if (result.durationDays) finalFormData.durasiHari = String(result.durationDays);
         if (result.hargaBase) finalFormData.hargaBase = String(result.hargaBase).replace(/\D/g, "");
-        if (result.isAdaPerlengkapan) finalFormData.isAdaPerlengkapan = result.isAdaPerlengkapan;
-        if (result.isAdaKeretaCepat) {
-          finalFormData.isAdaKeretaCepat = result.isAdaKeretaCepat;
-        } else {
-          const fullText = `${caption || ""} ${result.rawOcrText || ""}`.toLowerCase();
-          if (fullText.includes("kereta cepat") || fullText.includes("fast train") || fullText.includes("haramain")) {
-            finalFormData.isAdaKeretaCepat = "ya";
-          }
+        // ── 6a. Termasuk Perlengkapan ──
+        const fullCaptionLower = `${caption || ""} ${result.rawCaption || ""} ${result.rawOcrText || ""}`.toLowerCase();
+
+        if (
+          result.isAdaPerlengkapan === "ya" ||
+          fullCaptionLower.includes("termasuk perlengkapan") ||
+          fullCaptionLower.includes("free perlengkapan") ||
+          fullCaptionLower.includes("all in perlengkapan")
+        ) {
+          finalFormData.isAdaPerlengkapan = "ya";
+        } else if (
+          result.isAdaPerlengkapan === "tidak" ||
+          fullCaptionLower.includes("tanpa perlengkapan") ||
+          fullCaptionLower.includes("belum termasuk perlengkapan")
+        ) {
+          finalFormData.isAdaPerlengkapan = "tidak";
+        } else if (result.isAdaPerlengkapan) {
+          finalFormData.isAdaPerlengkapan = result.isAdaPerlengkapan;
         }
-        if (result.isAdaThoif) {
-          finalFormData.isAdaThoif = result.isAdaThoif;
+
+        // ── 6b. Termasuk Kereta Cepat ──
+        const hasNegationKC = /(?:tidak|belum|tanpa|exclude)\s+(?:termasuk\s+)?(?:kereta\s+cepat|fast\s+train|haramain)/i.test(fullCaptionLower);
+        const hasKCMention =
+          result.isAdaKeretaCepat === "ya" ||
+          fullCaptionLower.includes("kereta cepat") ||
+          fullCaptionLower.includes("fast train") ||
+          fullCaptionLower.includes("bullet train") ||
+          fullCaptionLower.includes("haramain");
+
+        if (hasKCMention && !hasNegationKC) {
+          finalFormData.isAdaKeretaCepat = "ya";
+        } else if (hasNegationKC) {
+          finalFormData.isAdaKeretaCepat = "tidak";
         } else {
-          const fullText = `${caption || ""} ${result.rawOcrText || ""}`.toLowerCase();
-          if (fullText.includes("thoif") || fullText.includes("taif") || fullText.includes("ta'if") || fullText.includes("thowif")) {
-            finalFormData.isAdaThoif = "ya";
-          }
+          finalFormData.isAdaKeretaCepat = result.isAdaKeretaCepat === "ya" ? "ya" : "tidak";
         }
-        if (result.tipeMakan) {
-          finalFormData.tipeMakan = result.tipeMakan;
+
+        // ── 6c. Termasuk City Tour Thoif / Thaif ──
+        // Mendukung variasi penulisan: Thaif, Thoif, Taif, Ta'if, Tha'if, Tho'if, Toif, "Free city tour Thaif", dsb.
+        const hasNegationThoif = /(?:tidak|belum|tanpa|exclude)\s+(?:termasuk\s+)?(?:city\s+tour\s+)?(?:th[ao]'?if|ta'?if|toif)/i.test(fullCaptionLower);
+        const hasThoifMention =
+          result.isAdaThoif === "ya" ||
+          fullCaptionLower.includes("free city tour thaif") ||
+          fullCaptionLower.includes("free city tour thoif") ||
+          fullCaptionLower.includes("city tour thaif") ||
+          fullCaptionLower.includes("city tour thoif") ||
+          fullCaptionLower.includes("free thaif") ||
+          fullCaptionLower.includes("free thoif") ||
+          fullCaptionLower.includes("ziarah thaif") ||
+          fullCaptionLower.includes("ziarah thoif") ||
+          fullCaptionLower.includes("thaif") ||
+          fullCaptionLower.includes("thoif") ||
+          fullCaptionLower.includes("taif") ||
+          fullCaptionLower.includes("toif") ||
+          fullCaptionLower.includes("ta'if") ||
+          fullCaptionLower.includes("tha'if") ||
+          fullCaptionLower.includes("tho'if") ||
+          fullCaptionLower.includes("thowif") ||
+          fullCaptionLower.includes("thayif");
+
+        if (hasThoifMention && !hasNegationThoif) {
+          finalFormData.isAdaThoif = "ya";
+        } else if (hasNegationThoif) {
+          finalFormData.isAdaThoif = "tidak";
         } else {
-          const fullText = `${caption || ""} ${result.rawOcrText || ""}`.toLowerCase();
-          if (
-            fullText.includes("makan 3x1 hari") ||
-            fullText.includes("makan 3x sehari") ||
-            fullText.includes("3 kali sehari") ||
-            fullText.includes("full board") ||
-            fullText.includes("fullboard") ||
-            /\bfb\b/.test(fullText)
-          ) {
-            finalFormData.tipeMakan = "FB";
-          } else if (
-            fullText.includes("breakfast only") ||
-            fullText.includes("sarapan saja") ||
-            fullText.includes("hanya sarapan") ||
-            /\bbf\b/.test(fullText)
-          ) {
-            finalFormData.tipeMakan = "BF";
-          } else {
-            finalFormData.tipeMakan = "FB";
-          }
+          finalFormData.isAdaThoif = result.isAdaThoif === "ya" ? "ya" : "tidak";
+        }
+
+        // ── 6d. Tipe Konsumsi / Makan (FB vs BF) ──
+        if (
+          result.tipeMakan === "BF" ||
+          fullCaptionLower.includes("breakfast only") ||
+          fullCaptionLower.includes("sarapan saja") ||
+          fullCaptionLower.includes("hanya sarapan") ||
+          /\bbf\b/.test(fullCaptionLower)
+        ) {
+          finalFormData.tipeMakan = "BF";
+        } else {
+          finalFormData.tipeMakan = "FB";
         }
         if (result.upgradeDouble) finalFormData.upgradeDouble = String(result.upgradeDouble).replace(/\D/g, "");
         if (result.upgradeTriple) finalFormData.upgradeTriple = String(result.upgradeTriple).replace(/\D/g, "");

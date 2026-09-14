@@ -506,7 +506,7 @@ function resolveJamaahCityTourThoif(activePackage: any, groupObj: any, j: any): 
     return Boolean(groupObj.isThoif);
   }
   if (groupObj?.snapshotInclude && Array.isArray(groupObj.snapshotInclude)) {
-    return groupObj.snapshotInclude.some((inc: string) => /thoif|taif|ta'if/i.test(inc));
+    return groupObj.snapshotInclude.some((inc: string) => /th[ao]'?if|ta'?if|toif/i.test(inc));
   }
 
   // 3. Invoice items / Addons
@@ -514,7 +514,7 @@ function resolveJamaahCityTourThoif(activePackage: any, groupObj: any, j: any): 
     for (const inv of groupObj.invoices) {
       if (inv.items && Array.isArray(inv.items)) {
         const hasItem = inv.items.some((item: any) =>
-          /thoif|taif|ta'if/i.test(`${item.deskripsi || ""} ${item.kategori || ""}`)
+          /th[ao]'?if|ta'?if|toif/i.test(`${item.deskripsi || ""} ${item.kategori || ""}`)
         );
         if (hasItem) return true;
       }
@@ -523,7 +523,7 @@ function resolveJamaahCityTourThoif(activePackage: any, groupObj: any, j: any): 
 
   // 4. Package Inclusions Snapshot Comparison
   const packageHasThoif = (activePackage?.include && Array.isArray(activePackage.include) &&
-    activePackage.include.some((inc: string) => /thoif|taif|ta'if/i.test(inc))) ||
+    activePackage.include.some((inc: string) => /th[ao]'?if|ta'?if|toif/i.test(inc))) ||
     activePackage?.isAdaThoif === "ya";
 
   if (!packageHasThoif) return false;

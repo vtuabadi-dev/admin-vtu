@@ -131,8 +131,11 @@ export async function extractWithGemini(
     `  - Jika caption menyebutkan "Belum Termasuk Perlengkapan", "Tanpa Perlengkapan", isi 'isAdaPerlengkapan' = "tidak".\n` +
     `• Termasuk Kereta Cepat ('isAdaKeretaCepat'):\n` +
     `  - Jika flyer/caption menyebutkan "Kereta Cepat", "Fast Train", "Haramain", isi 'isAdaKeretaCepat' = "ya", selain itu "tidak".\n` +
-    `• Termasuk City Tour Thoif ('isAdaThoif'):\n` +
-    `  - Jika flyer/caption menyebutkan "Thoif", "Taif", "City Tour Taif", isi 'isAdaThoif' = "ya", selain itu "tidak".\n` +
+    `• Termasuk City Tour Thoif / Thaif ('isAdaThoif'):\n` +
+    `  - PERIKSA CAPTION DAN FLYER DENGAN SANGAT TELITI untuk kota Thaif / Thoif / Taif!\n` +
+    `  - Variasi penulisan sering berupa: "Thaif", "Thoif", "Taif", "Ta'if", "Tha'if", "Tho'if", "Toif".\n` +
+    `  - Jika caption atau flyer menyebutkan kata "Free city tour Thaif", "Free city tour Thoif", "City Tour Thaif", "City Tour Thoif", "Free Thaif", "Free Thoif", "Ziarah Thaif", "Ziarah Thoif", "Thaif", atau "Thoif", maka WAJIB ISI 'isAdaThoif' = "ya"!\n` +
+    `  - Hanya isi 'isAdaThoif' = "tidak" jika benar-benar tidak ada penyebutan Thaif/Thoif sama sekali atau tertulis belum/tidak termasuk.\n` +
     `• Tipe Makan / Konsumsi ('tipeMakan'):\n` +
     `  - Jika caption atau flyer menyebutkan "makan 3x1 hari", "makan 3x sehari", "3x sehari", "full board", "fullboard", atau "FB", isi 'tipeMakan' = "FB".\n` +
     `  - Jika TIDAK tercantum "makan 3x1 hari" dan tercantum "breakfast only", "bf", "sarapan saja", atau "hanya sarapan", isi 'tipeMakan' = "BF".\n` +
@@ -204,7 +207,7 @@ export async function extractWithGemini(
                 landingRoute: { type: SchemaType.STRING, description: "Rute In-Out pesawat dari analisis alur itinerary" },
                 isAdaPerlengkapan: { type: SchemaType.STRING, description: "Dari Caption: 'ya' jika termasuk perlengkapan, 'tidak' jika belum/tidak" },
                 isAdaKeretaCepat: { type: SchemaType.STRING, description: "'ya' jika termasuk kereta cepat Haramain / fast train, 'tidak' jika tidak" },
-                isAdaThoif: { type: SchemaType.STRING, description: "'ya' jika termasuk city tour Thoif / Ta'if, 'tidak' jika tidak" },
+                isAdaThoif: { type: SchemaType.STRING, description: "'ya' jika terdapat city tour Thaif / Thoif / Ta'if / 'Free city tour Thaif', 'tidak' jika tidak" },
                 tipeMakan: { type: SchemaType.STRING, description: "'FB' jika full board / makan 3x1 hari, 'BF' jika breakfast only / sarapan saja" },
                 hargaBase: { type: SchemaType.STRING, description: "Harga base paket (hanya angka nominal)" },
                 upgradeDouble: { type: SchemaType.STRING, description: "Harga upgrade kamar double umum dari Caption (hanya angka nominal)" },
