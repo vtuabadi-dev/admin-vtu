@@ -412,6 +412,7 @@ export interface FlightDetails {
   pnr?: string;
   nomorPenerbangan?: string;
   rutePenerbangan?: string;
+  tipePenerbangan?: "Direct" | "Transit";
   segments?: FlightSegment[];
 }
 

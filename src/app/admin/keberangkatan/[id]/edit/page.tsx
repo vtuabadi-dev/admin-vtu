@@ -27,6 +27,7 @@ import { ErrorState } from "@/shared/components/ui/ErrorState";
 import { SearchableSelect } from "@/shared/components/ui/SearchableSelect";
 import { getKeberangkatanById } from "@/server/actions/api";
 import type { Keberangkatan, FlightSegment } from "@/shared/types";
+import { detectFlightType } from "@/shared/lib/flight-utils";
 
 export default function EditKeberangkatanPage() {
   const params = useParams();
@@ -101,6 +102,7 @@ export default function EditKeberangkatanPage() {
 
   // Flight Segments State
   const [flightSegments, setFlightSegments] = useState<FlightSegment[]>([]);
+  const flightType = useMemo(() => detectFlightType(flightSegments), [flightSegments]);
 
   // Flight OCR & Split Starting States
   const [ocrLoading, setOcrLoading] = useState(false);
@@ -467,6 +469,7 @@ export default function EditKeberangkatanPage() {
             pnr: pnrMain,
             nomorPenerbangan: mainFlightNo,
             rutePenerbangan: mainRouteStr,
+            tipePenerbangan: flightType || undefined,
             segments: flightSegments,
           },
           tourLeader: {
@@ -712,17 +715,39 @@ export default function EditKeberangkatanPage() {
           </Button>
         </CardHeader>
         <CardContent className="p-5 space-y-4">
-          <div className="max-w-md">
-            <label className="block text-xs font-medium text-muted-foreground mb-1">
-              Kode PNR / Nama Maskapai Lengkap
-            </label>
-            <Input
-              type="text"
-              placeholder="Misal: 17J4HP / 17J4Y8 ROYAL BRUNEI"
-              value={pnrMain}
-              onChange={(e) => setPnrMain(e.target.value)}
-              className="font-mono text-sm font-semibold uppercase"
-            />
+          <div className="flex flex-col sm:flex-row items-start sm:items-end gap-3">
+            <div className="flex-1 max-w-md w-full">
+              <label className="block text-xs font-medium text-muted-foreground mb-1">
+                Kode PNR / Nama Maskapai Lengkap
+              </label>
+              <Input
+                type="text"
+                placeholder="Misal: 17J4HP / 17J4Y8 ROYAL BRUNEI"
+                value={pnrMain}
+                onChange={(e) => setPnrMain(e.target.value)}
+                className="font-mono text-sm font-semibold uppercase"
+              />
+            </div>
+
+            {flightType && (
+              <div className="flex items-center gap-2 pb-1">
+                <span className="text-xs text-muted-foreground font-medium">Tipe:</span>
+                <span
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border shadow-2xs ${
+                    flightType === "Direct"
+                      ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/30"
+                      : "bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/30"
+                  }`}
+                >
+                  <span
+                    className={`h-2 w-2 rounded-full ${
+                      flightType === "Direct" ? "bg-emerald-500" : "bg-amber-500"
+                    }`}
+                  />
+                  {flightType}
+                </span>
+              </div>
+            )}
           </div>
 
           {/* Banner Informasi Paket Split Starting Point */}

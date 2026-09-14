@@ -6,11 +6,13 @@
 
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import type { FlightSegment } from "@/shared/types";
+import { detectFlightType, type FlightType } from "@/shared/lib/flight-utils";
 
 export interface FlightOcrResult {
   success: boolean;
   pnrMain: string;
   maskapai?: string;
+  tipePenerbangan?: FlightType;
   segments: FlightSegment[];
   rawText?: string;
   confidence: number;
@@ -298,6 +300,7 @@ ATURAN PENTING:
       success: true,
       pnrMain: String(parsed.pnrMain || "").trim().toUpperCase(),
       maskapai: parsed.maskapai || undefined,
+      tipePenerbangan: detectFlightType(segments) || undefined,
       segments,
       confidence: typeof parsed.confidence === "number" ? parsed.confidence : 0.95,
       rawText: parsed.rawText || text.slice(0, 200),
