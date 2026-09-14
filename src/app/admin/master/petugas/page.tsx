@@ -7,6 +7,7 @@ import { Input } from "@/shared/components/ui/Input";
 import { Modal } from "@/shared/components/ui/Modal";
 import { Table } from "@/shared/components/ui/Table";
 import { ErrorState } from "@/shared/components/ui/ErrorState";
+import { downloadFileFromUrl } from "@/shared/lib/utils";
 import {
   Users,
   Phone,
@@ -330,8 +331,12 @@ export default function MasterPetugasPage() {
     }
   }
 
-  function handleDownloadTemplate() {
-    window.open("/api/master/petugas/template", "_blank");
+  async function handleDownloadTemplate() {
+    try {
+      await downloadFileFromUrl("/api/master/petugas/template", "Template_Import_Master_Petugas.xlsx");
+    } catch (err: any) {
+      alert("Gagal mengunduh template: " + (err?.message || "Kesalahan jaringan"));
+    }
   }
 
   async function handleImportSubmit(e: React.FormEvent) {

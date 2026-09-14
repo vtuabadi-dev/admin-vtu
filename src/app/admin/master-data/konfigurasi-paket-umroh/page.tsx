@@ -10,6 +10,7 @@ import { Modal } from "@/shared/components/ui/Modal";
 import { Button } from "@/shared/components/ui/Button";
 import { Input } from "@/shared/components/ui/Input";
 import { Trash2, Upload, ExternalLink, Play, FileSpreadsheet, Download, CheckCircle2 } from "lucide-react";
+import { downloadFileFromUrl } from "@/shared/lib/utils";
 
 const TABS = [
   { value: "jenis-paket", label: "Jenis Paket" },
@@ -474,13 +475,19 @@ export default function MasterKonfigurasiPaketUmrohPage() {
               <FileSpreadsheet className="h-4 w-4 text-sky-600" />
               <span>Gunakan format kolom Excel standar</span>
             </div>
-            <a
-              href="/api/master/hotels/template"
-              download
-              className="inline-flex items-center gap-1 font-semibold text-sky-700 dark:text-sky-300 hover:underline"
+            <button
+              type="button"
+              onClick={async () => {
+                try {
+                  await downloadFileFromUrl("/api/master/hotels/template", "template_import_hotel.xlsx");
+                } catch (err: any) {
+                  alert("Gagal mengunduh template: " + (err?.message || "Kesalahan jaringan"));
+                }
+              }}
+              className="inline-flex items-center gap-1 font-semibold text-sky-700 dark:text-sky-300 hover:underline bg-transparent border-none p-0 cursor-pointer"
             >
               <Download className="h-3.5 w-3.5" /> Download Template (.xlsx)
-            </a>
+            </button>
           </div>
 
           <form

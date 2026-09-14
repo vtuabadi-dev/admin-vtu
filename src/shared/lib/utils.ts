@@ -252,3 +252,32 @@ export function toTitleCase(str?: string | null): string {
     })
     .join(" ");
 }
+
+/**
+ * Downloads a file from a URL using fetch and Blob without navigating the active page
+ * or leaving blank white tabs open.
+ */
+export async function downloadFileFromUrl(url: string, defaultFilename: string): Promise<void> {
+  const res = await fetch(url);
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => null);
+    throw new Error(errorData?.message || `Gagal mengunduh file (HTTP ${res.status})`);
+  }
+
+  const disposition = res.headers.get("Content-Disposition");
+  let filename = defaultFilename;
+  if (disposition && disposition.includes("filename=")) {
+    const match = disposition.match(/filename="?([^";]+)"?/);
+    if (match?.[1]) filename = match[1];
+  }
+
+  const blob = await res.blob();
+  const blobUrl = window.URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = blobUrl;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  window.URL.revokeObjectURL(blobUrl);
+  document.body.removeChild(link);
+}

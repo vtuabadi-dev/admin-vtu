@@ -5,6 +5,7 @@ import { useEffect, useState, useCallback, useMemo, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   Download,
+  Loader2,
   X,
   CalendarDays,
   Plane,
@@ -30,7 +31,7 @@ import { SearchableSelect } from "@/shared/components/ui/SearchableSelect";
 import { StatusBadge } from "@/shared/components/ui/Badge";
 import { Modal } from "@/shared/components/ui/Modal";
 import { ErrorState } from "@/shared/components/ui/ErrorState";
-import { formatDateShort, formatDate, cn } from "@/shared/lib/utils";
+import { formatDateShort, formatDate, cn, downloadFileFromUrl } from "@/shared/lib/utils";
 import type { Manifest, Keberangkatan, Jamaah, RegistrationGroup } from "@/shared/types";
 import { useOperationalStore } from "@/stores/operational-store";
 import { extractFilesFromEvent } from "@/shared/lib/file-drop-utils";
@@ -39,6 +40,21 @@ import { hasPackageTourLeader } from "@/shared/lib/file-standardization";
 import { ManifestPembayaranTable } from "./components/ManifestPembayaranTable";
 
 // ── Helper Utilities ─────────────────────────────────────────
+
+function isPromoVariant(k: any): boolean {
+  if (!k) return false;
+  if (k.splitReason === "promo") return true;
+  if (k.splitReason === "starting_point" || k.splitReason === "starting") return false;
+  if (k.promoLabel && String(k.promoLabel).trim() !== "") return true;
+  if (k.kode && /_V\d+$/i.test(k.kode)) return true;
+  return false;
+}
+
+function isStartingPointSplit(k: any): boolean {
+  if (!k) return false;
+  if (k.splitReason === "starting_point" || k.splitReason === "starting") return true;
+  return false;
+}
 
 function getSingleSourceOfTruthName(j: any): string {
   if (j.dokumen && Array.isArray(j.dokumen)) {
@@ -306,7 +322,7 @@ function getJamaahCluster(groupObj: any, j: any): string {
   return c;
 }
 
-function formatGroupMergeLabel(groupObj: any, groupMembers: any[]): string {
+function formatGroupMergeLabel(groupObj: any, groupMembers: any[], groupPkg?: any): string {
   const paxCount = groupMembers.length;
   const firstMember = groupMembers[0] || {};
   const defaultRoom =
@@ -325,8 +341,9 @@ function formatGroupMergeLabel(groupObj: any, groupMembers: any[]): string {
   
   const roomStr = String(rawRoom).toUpperCase().replace(/^UPGRADE\s+/i, "UPGRADE ");
   const clusterStr = clusterName ? ` + ${clusterName.toUpperCase()}` : "";
+  const promoStr = groupPkg && isPromoVariant(groupPkg) ? ` [PROMO: ${groupPkg.promoLabel || groupPkg.splitLabel || groupPkg.kode}]` : "";
 
-  return `${paxCount} PAX ${roomStr}${clusterStr} ${dateStr}`;
+  return `${paxCount} PAX ${roomStr}${clusterStr}${promoStr} ${dateStr}`;
 }
 
 function hasEquipmentAddonInInvoice(groupObj: any, j: any): boolean {
@@ -525,6 +542,8 @@ function ManifestPageContent() {
 
   // Excel Import Modal state
   const [importModalOpen, setImportModalOpen] = useState(false);
+  const [downloadingTemplate, setDownloadingTemplate] = useState(false);
+  const [exportingManifest, setExportingManifest] = useState(false);
   const [excelFile, setExcelFile] = useState<File | null>(null);
   const [excelPreviewRows, setExcelPreviewRows] = useState<any[]>([]);
   const [parsingExcel, setParsingExcel] = useState(false);
@@ -669,11 +688,14 @@ function ManifestPageContent() {
 
     const getBaseCode = (code: string) => (code || "").replace(/_V\d+$/i, "").trim().toLowerCase();
 
-    // 1. Identify true child split packages (promo variants, starting point splits)
-    const isChildPackage = (k: Keberangkatan) => {
-      if (k.parentKeberangkatanId) return true;
+    // 1. Identify true child split packages:
+    // PROMO variants (sama itinerary) -> child of parent
+    // STARTING POINT splits (beda itinerary) -> NOT a child of parent, but their OWN root manifest!
+    const isChildPromo = (k: Keberangkatan) => {
+      if (isStartingPointSplit(k)) return false; // Starting point is always a separate manifest
+      if (k.parentKeberangkatanId && isPromoVariant(k)) return true;
       if (k.kode && /_V\d+$/i.test(k.kode)) return true;
-      if ((k as any).splitReason && (k as any).splitReason !== "none" && (k as any).splitReason !== "") return true;
+      if ((k as any).splitReason === "promo" || (k as any).promoLabel) return true;
       return false;
     };
 
@@ -681,7 +703,7 @@ function ManifestPageContent() {
     const children: Keberangkatan[] = [];
 
     keberangkatanList.forEach((k) => {
-      if (isChildPackage(k)) {
+      if (isChildPromo(k)) {
         children.push(k);
       } else {
         roots.push(k);
@@ -689,7 +711,7 @@ function ManifestPageContent() {
       }
     });
 
-    // 2. Associate each child with its correct parent on the same departure date
+    // 2. Associate each promo child with its parent
     children.forEach((child) => {
       let matchedParent: Keberangkatan | undefined;
 
@@ -818,16 +840,46 @@ function ManifestPageContent() {
   // Jamaah belonging to the active package
   const activePackageJamaah = useMemo(() => {
     if (!activePackage) return [];
-    const jamaahIds = new Set(activePackage.jamaahIds || []);
 
-    const relatedPkgIds = new Set([
-      activePackage.id,
-      ...keberangkatanList.filter((k) => k.parentKeberangkatanId === activePackage.id || (activePackage.parentKeberangkatanId && k.id === activePackage.parentKeberangkatanId)).map((k) => k.id)
-    ]);
+    const isCurrentStartingPoint = isStartingPointSplit(activePackage);
+    const isCurrentPromo = isPromoVariant(activePackage);
+
+    const relatedPkgIds = new Set<string>();
+    relatedPkgIds.add(activePackage.id);
+
+    if (isCurrentStartingPoint) {
+      // BEDA ITINERARY: Manifest Starting Point terpisah secara mandiri.
+      // Hanya menyertakan promo children di bawah starting point ini (jika ada).
+      keberangkatanList.forEach((k) => {
+        if (k.parentKeberangkatanId === activePackage.id && isPromoVariant(k)) {
+          relatedPkgIds.add(k.id);
+        }
+      });
+    } else {
+      // SATU ITINERARY: Manifest Induk menyatukan seluruh varian Promo Split.
+      // Eksklusikan paket pecahan split starting point (karena beda itinerary).
+      let parentId = activePackage.id;
+      if (isCurrentPromo && activePackage.parentKeberangkatanId) {
+        parentId = activePackage.parentKeberangkatanId;
+        relatedPkgIds.add(parentId);
+      }
+
+      keberangkatanList.forEach((k) => {
+        if (isStartingPointSplit(k)) return; // EXCLUDE starting point splits
+        if (k.parentKeberangkatanId === parentId && isPromoVariant(k)) {
+          relatedPkgIds.add(k.id);
+        }
+        if (k.id === parentId) {
+          relatedPkgIds.add(k.id);
+        }
+      });
+    }
 
     const packageGroupIds = new Set(
       groups.filter((g) => relatedPkgIds.has(g.paketKeberangkatanId)).map((g) => g.id)
     );
+
+    const jamaahIds = new Set(activePackage.jamaahIds || []);
 
     return allJamaah
       .filter((j) => (jamaahIds.has(j.id) || packageGroupIds.has(j.groupId)) && j.status !== "batal")
@@ -966,6 +1018,20 @@ function ManifestPageContent() {
 
   // ── Excel Import Parsing & Execution ────────────────────────
 
+  const handleExportManifestExcel = async () => {
+    if (!activePackage) return;
+    setExportingManifest(true);
+    try {
+      const cleanKode = (activePackage.kode || "PAKET").replace(/[^a-zA-Z0-9_-]/g, "_");
+      const filename = `Manifest_${cleanKode}.xlsx`;
+      await downloadFileFromUrl(`/api/manifests/template-excel?paketId=${activePackage.id}`, filename);
+    } catch (err: any) {
+      alert("Gagal mengekspor data manifest: " + (err?.message || "Kesalahan jaringan"));
+    } finally {
+      setExportingManifest(false);
+    }
+  };
+
   async function handleExcelFileChange(file: File) {
     setExcelFile(file);
     setParsingExcel(true);
@@ -1028,6 +1094,15 @@ function ManifestPageContent() {
           else if (/statuspembayaran|statusbayar/i.test(str) && !colMap.statusPembayaran) colMap.statusPembayaran = colIdx;
           else if (/metodepembayaran|metodebayar/i.test(str) && !colMap.metodePembayaran) colMap.metodePembayaran = colIdx;
           else if (/keteranganpembayaran|ketbayar/i.test(str) && !colMap.keteranganPembayaran) colMap.keteranganPembayaran = colIdx;
+
+          // Riwayat Pembayaran Cicilan 1 s/d 20
+          for (let i = 1; i <= 20; i++) {
+            if (new RegExp(`tglbayar${i}|tgl${i}|tanggalbayar${i}`, "i").test(str) && !colMap[`tglBayar${i}`]) {
+              colMap[`tglBayar${i}`] = colIdx;
+            } else if (new RegExp(`nominal${i}|nominalbayar${i}|bayar${i}`, "i").test(str) && !colMap[`nominal${i}`]) {
+              colMap[`nominal${i}`] = colIdx;
+            }
+          }
         });
       }
 
@@ -1090,6 +1165,21 @@ function ManifestPageContent() {
         const metodePembayaran = getValByKey("metodePembayaran", 32);
         const keteranganPembayaran = getValByKey("keteranganPembayaran", 33);
 
+        // Riwayat Pembayaran Cicilan 1 s/d 20 (Columns 34..73)
+        const pembayaranList: { ke: number; tanggal?: string; nominal: number }[] = [];
+        const installmentsObj: Record<string, any> = {};
+
+        for (let i = 1; i <= 20; i++) {
+          const tgl = getValByKey(`tglBayar${i}`, 33 + 2 * i - 1);
+          const nomStr = getValByKey(`nominal${i}`, 33 + 2 * i);
+          const nom = parseInt(String(nomStr).replace(/[^0-9]/g, "") || "0", 10);
+          installmentsObj[`tglBayar${i}`] = tgl;
+          installmentsObj[`nominal${i}`] = nom;
+          if (nom > 0 || (tgl && tgl !== "-")) {
+            pembayaranList.push({ ke: i, tanggal: tgl, nominal: nom });
+          }
+        }
+
         parsedRows.push({
           rombongan,
           noJamaah: getValByKey("noJamaah", 2),
@@ -1125,6 +1215,9 @@ function ManifestPageContent() {
           statusPembayaran,
           metodePembayaran,
           keteranganPembayaran,
+          // Riwayat Cicilan
+          pembayaranList,
+          ...installmentsObj,
         });
       });
 
@@ -1273,11 +1366,28 @@ function ManifestPageContent() {
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div className="flex items-center gap-3 w-full sm:w-auto flex-1 max-w-2xl">
               <SearchableSelect
-                options={keberangkatanList.map((k) => ({
-                  value: k.id,
-                  label: `${k.kode} — ${formatPackageTitleShort(k.namaPaket || k.paketUmroh?.namaPaket || "-")}`,
-                  sublabel: `📅 Berangkat: ${formatDateShort(k.tanggalBerangkat)} • ✈️ Maskapai: ${getAirlineCode(k.maskapai)} • 👥 ${k.jamaahIds?.length || 0} Pax`,
-                }))}
+                options={keberangkatanList.map((k) => {
+                  const isStarting = isStartingPointSplit(k);
+                  const isPromo = isPromoVariant(k);
+                  let labelPrefix = "";
+                  let sublabelSuffix = "";
+
+                  if (isStarting) {
+                    labelPrefix = `📍 [STARTING: ${(k as any).splitLabel || k.namaPaket}] `;
+                    sublabelSuffix = " • ✈️ Manifest Terpisah";
+                  } else if (isPromo && k.parentKeberangkatanId) {
+                    labelPrefix = `🏷️ [PROMO: ${(k as any).promoLabel || (k as any).splitLabel || "PROMO"}] `;
+                    sublabelSuffix = " • 👥 Bersatu dg Manifest Induk";
+                  } else {
+                    sublabelSuffix = " • 👥 Termasuk Varian Promo";
+                  }
+
+                  return {
+                    value: k.id,
+                    label: `${labelPrefix}${k.kode} — ${formatPackageTitleShort(k.namaPaket || k.paketUmroh?.namaPaket || "-")}`,
+                    sublabel: `📅 Berangkat: ${formatDateShort(k.tanggalBerangkat)} • ✈️ Maskapai: ${getAirlineCode(k.maskapai)}${sublabelSuffix}`,
+                  };
+                })}
                 placeholder="🔍 Ketik atau cari paket keberangkatan aktif..."
                 value={selectedKeberangkatan}
                 onChange={(newId) => {
@@ -1321,6 +1431,26 @@ function ManifestPageContent() {
                     className="pl-8 h-11 text-xs"
                   />
                 </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleExportManifestExcel}
+                  disabled={exportingManifest}
+                  className="h-11 text-xs border-emerald-600/40 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 font-bold cursor-pointer shrink-0"
+                  title="Ekspor Data Manifest Paket Ini ke Excel (.xlsx)"
+                >
+                  {exportingManifest ? (
+                    <>
+                      <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin text-emerald-600" />
+                      Mengekspor...
+                    </>
+                  ) : (
+                    <>
+                      <FileSpreadsheet className="h-3.5 w-3.5 mr-1.5 text-emerald-600" />
+                      Ekspor Excel
+                    </>
+                  )}
+                </Button>
                 <Button
                   variant="outline"
                   size="sm"
@@ -1656,7 +1786,8 @@ function ManifestPageContent() {
                         </tr>
                       ) : (
                         groupedJamaahList.map((group) => {
-                          const groupMergeText = formatGroupMergeLabel(group.groupObj, group.members);
+                          const groupPkg = keberangkatanList.find((k) => k.id === group.groupObj?.paketKeberangkatanId) || activePackage;
+                          const groupMergeText = formatGroupMergeLabel(group.groupObj, group.members, groupPkg);
                           const totalInGroup = group.members.length;
 
                           return group.members.map((j: any, memberIdx) => {
@@ -1779,15 +1910,15 @@ function ManifestPageContent() {
                                   {(() => {
                                     const rawKlaster = getJamaahCluster(group.groupObj, j);
                                     const klasterName = rawKlaster || "SILVER";
-                                    const isPromoKlaster = klasterName.toUpperCase().includes("PROMO");
-                                    const resolved = resolveSystemStatusPerlengkapan(activePackage, group.groupObj, j);
+                                    const isPromoKlaster = klasterName.toUpperCase().includes("PROMO") || isPromoVariant(groupPkg);
+                                    const resolved = resolveSystemStatusPerlengkapan(groupPkg, group.groupObj, j);
 
                                     return (
                                       <div className="space-y-1">
                                         <div>
                                           {isPromoKlaster ? (
                                             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-extrabold bg-purple-500/20 text-purple-800 dark:text-purple-300 border border-purple-500/40">
-                                              🏷️ {klasterName}
+                                              🏷️ {groupPkg?.promoLabel || groupPkg?.splitLabel || klasterName}
                                             </span>
                                           ) : (
                                             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/15 text-amber-900 dark:text-amber-300 border border-amber-500/30">
@@ -1839,7 +1970,7 @@ function ManifestPageContent() {
 
                                 {/* KERETA CEPAT */}
                                 <td className={`px-3 py-2.5 text-center ${cellBorder}`}>
-                                  {resolveJamaahKeretaCepat(activePackage, group.groupObj, j) ? (
+                                  {resolveJamaahKeretaCepat(groupPkg, group.groupObj, j) ? (
                                     <span
                                       className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 font-extrabold text-xs shadow-2xs mx-auto border border-emerald-300 dark:border-emerald-700 select-none"
                                       title="Terdaftar dengan layanan Kereta Cepat Haramain"
@@ -1853,7 +1984,7 @@ function ManifestPageContent() {
 
                                 {/* CITY TOUR THOIF */}
                                 <td className={`px-3 py-2.5 text-center ${cellBorder}`}>
-                                  {resolveJamaahCityTourThoif(activePackage, group.groupObj, j) ? (
+                                  {resolveJamaahCityTourThoif(groupPkg, group.groupObj, j) ? (
                                     <span
                                       className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 font-extrabold text-xs shadow-2xs mx-auto border border-emerald-300 dark:border-emerald-700 select-none"
                                       title="Terdaftar dengan layanan City Tour Thoif"
@@ -1868,7 +1999,7 @@ function ManifestPageContent() {
                                 {/* HOTEL MAKKAH */}
                                 <td className={`px-3 py-2.5 ${cellBorder}`}>
                                   {resolveHotelForKlaster(
-                                    j.hotelMekkah || activePackage.hotelMekkah,
+                                    j.hotelMekkah || groupPkg.hotelMekkah || activePackage.hotelMekkah,
                                     getJamaahCluster(group.groupObj, j) || "SILVER"
                                   )}
                                 </td>
@@ -1876,7 +2007,7 @@ function ManifestPageContent() {
                                 {/* HOTEL MADINAH */}
                                 <td className={`px-3 py-2.5 ${cellBorder}`}>
                                   {resolveHotelForKlaster(
-                                    j.hotelMadinah || activePackage.hotelMadinah,
+                                    j.hotelMadinah || groupPkg.hotelMadinah || activePackage.hotelMadinah,
                                     getJamaahCluster(group.groupObj, j) || "SILVER"
                                   )}
                                 </td>
@@ -2144,12 +2275,15 @@ function ManifestPageContent() {
                   {/* Month's Package Cards */}
                   <div className="space-y-4">
                     {items.map(({ parent, children }) => {
+                      const isStarting = isStartingPointSplit(parent);
+                      const relatedChildIds = children.map((c) => c.id);
+                      const allCardPkgIds = new Set([parent.id, ...relatedChildIds]);
                       const parentGroupIds = new Set(
-                        groups.filter((g) => g.paketKeberangkatanId === parent.id).map((g) => g.id)
+                        groups.filter((g) => allCardPkgIds.has(g.paketKeberangkatanId)).map((g) => g.id)
                       );
                       const parentJamaah = allJamaah.filter(
                         (j) =>
-                          (parent.jamaahIds?.includes(j.id) || parentGroupIds.has(j.groupId)) &&
+                          (allCardPkgIds.has(j.id) || parentGroupIds.has(j.groupId)) &&
                           j.status !== "batal"
                       );
                       const parentQuota = parent.maxSeat || parent.kuota || 45;
@@ -2162,7 +2296,7 @@ function ManifestPageContent() {
                           key={parent.id}
                           className="p-4 bg-gradient-to-br from-teal-950/70 via-slate-950/80 to-emerald-950/70 border border-teal-500/30 hover:border-teal-400/50 rounded-2xl shadow-[0_4px_20px_rgba(13,148,136,0.15)] backdrop-blur-md space-y-3 transition-all"
                         >
-                          {/* PAKET UTAMA (Parent Card Header) */}
+                          {/* PAKET UTAMA / INDUK (Card Header) */}
                           <div
                             onClick={() => {
                               setSelectedKeberangkatan(parent.id);
@@ -2177,11 +2311,15 @@ function ManifestPageContent() {
                                   <span className="bg-teal-500/20 text-teal-300 border border-teal-400/40 text-[10px] font-bold px-2 py-0.5 rounded uppercase font-mono shadow-xs">
                                     {parent.kode}
                                   </span>
-                                  {children.length > 0 && (
-                                    <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-400/40 text-[10px] font-bold px-2 py-0.5 rounded uppercase flex items-center gap-1">
-                                      <Split className="h-3 w-3" /> Paket Utama ({children.length} Pecahan)
+                                  {isStarting ? (
+                                    <span className="bg-sky-500/20 text-sky-300 border border-sky-400/40 text-[10px] font-bold px-2 py-0.5 rounded uppercase flex items-center gap-1">
+                                      📍 Starting Point: {(parent as any).splitLabel || parent.namaPaket}
                                     </span>
-                                  )}
+                                  ) : children.length > 0 ? (
+                                    <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-400/40 text-[10px] font-bold px-2 py-0.5 rounded uppercase flex items-center gap-1">
+                                      <Split className="h-3 w-3" /> Paket Induk ({children.length} Varian Promo)
+                                    </span>
+                                  ) : null}
                                   <StatusBadge status={parent.status} />
                                 </div>
                                 <h3 className="text-lg font-bold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-teal-200 via-teal-100 to-emerald-300 group-hover:from-white group-hover:to-teal-100 transition-colors">
@@ -2233,12 +2371,12 @@ function ManifestPageContent() {
                             </div>
                           </div>
 
-                          {/* PECAHAN PAKET (Children Split Packages) */}
+                          {/* PECAHAN PAKET PROMO */}
                           {children.length > 0 && (
                             <div className="pl-4 space-y-2.5 pt-1 border-l-2 border-dashed border-teal-500/40 ml-4">
                               <p className="text-[11px] font-extrabold uppercase tracking-wider text-teal-300 flex items-center gap-1.5 pl-1">
-                                <Split className="h-3.5 w-3.5" />
-                                Pecahan Paket ({children.length} Variant Split / Starting / Promo)
+                                <Tag className="h-3.5 w-3.5 text-purple-400" />
+                                Varian Promo Terintegrasi ({children.length} Varian • Manifest Bersatu)
                               </p>
                               {children.map((child) => {
                                 const childGroupIds = new Set(
@@ -2253,29 +2391,22 @@ function ManifestPageContent() {
                                 const childFilled = childJamaah.length;
                                 const childTargetMat = child.targetMaterialisasi || parent.targetMaterialisasi || 30;
                                 const childDeficit = childTargetMat - childFilled;
-                                const isPromo = child.splitReason === "promo" || !!child.promoLabel;
 
                                 return (
                                   <div
                                     key={child.id}
                                     onClick={() => {
-                                      setSelectedKeberangkatan(child.id);
+                                      setSelectedKeberangkatan(parent.id);
                                       const typeQuery = activeManifestView === "pembayaran" ? "&type=pembayaran" : "";
-                                      router.push(`/admin/manifest?paketId=${child.id}${typeQuery}`);
+                                      router.push(`/admin/manifest?paketId=${parent.id}${typeQuery}`);
                                     }}
                                     className="p-4 bg-gradient-to-r from-teal-950/90 via-slate-900/90 to-teal-950/90 border border-teal-500/30 hover:border-teal-400/60 text-white rounded-xl shadow-xs transition-all cursor-pointer flex flex-col md:flex-row md:items-center justify-between gap-4 group hover:shadow-[0_0_15px_rgba(20,184,166,0.15)]"
                                   >
                                     <div className="space-y-1">
                                       <div className="flex items-center flex-wrap gap-2">
-                                        {isPromo ? (
-                                          <span className="bg-purple-500/20 text-purple-300 border border-purple-500/30 text-[10px] font-bold px-2 py-0.5 rounded uppercase flex items-center gap-1">
-                                            <Tag className="h-3 w-3" /> Promo: {child.promoLabel || child.splitLabel || "PROMO SPECIAL"}
-                                          </span>
-                                        ) : (
-                                          <span className="bg-sky-500/20 text-sky-300 border border-sky-500/30 text-[10px] font-bold px-2 py-0.5 rounded uppercase flex items-center gap-1">
-                                            📍 Starting Point: {child.splitLabel || child.namaPaket}
-                                          </span>
-                                        )}
+                                        <span className="bg-purple-500/20 text-purple-300 border border-purple-500/30 text-[10px] font-bold px-2 py-0.5 rounded uppercase flex items-center gap-1">
+                                          <Tag className="h-3 w-3" /> Promo: {child.promoLabel || child.splitLabel || "PROMO SPECIAL"}
+                                        </span>
                                         <span className="bg-teal-500/20 text-teal-300 border border-teal-500/30 text-[10px] font-bold px-2 py-0.5 rounded uppercase font-mono">
                                           {child.kode}
                                         </span>
@@ -2288,6 +2419,8 @@ function ManifestPageContent() {
                                         <span>Berangkat: <strong className="text-white">{formatDate(child.tanggalBerangkat)}</strong></span>
                                         <span>•</span>
                                         <span>Maskapai: <strong className="text-white">{getAirlineCode(child.maskapai)}</strong></span>
+                                        <span>•</span>
+                                        <span className="text-purple-300 font-semibold italic">Termasuk ke dalam Manifest Utama</span>
                                       </div>
                                     </div>
 
@@ -2343,26 +2476,66 @@ function ManifestPageContent() {
         size="xl"
       >
         <div className="space-y-5">
-          {/* Download Template Bar */}
-          <div className="flex items-center justify-between p-3.5 rounded-lg border border-amber-200 dark:border-amber-900 bg-amber-50/50 dark:bg-amber-950/20">
+          {/* Download & Export Bar */}
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-3.5 rounded-lg border border-amber-200 dark:border-amber-900 bg-amber-50/50 dark:bg-amber-950/20 gap-3">
             <div className="space-y-0.5">
               <p className="text-xs font-bold text-amber-900 dark:text-amber-200 flex items-center gap-1.5">
                 <FileSpreadsheet className="h-4 w-4 text-amber-600" />
-                Template Excel Manifest Standard (Termasuk KOTA/KAB & PULAU)
+                Download Data Manifest Paket / Format Excel
               </p>
               <p className="text-[11px] text-amber-700 dark:text-amber-400">
-                Gunakan template standar agar format kolom (Rombongan, Nama, Paspor/NIK, Kota, Pulau) sesuai.
+                Format lengkap 73 kolom: Identitas &amp; Dokumen Jamaah, Tagihan &amp; Finansial, serta Riwayat Pembayaran Cicilan 1 s/d 20.
               </p>
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              className="bg-white dark:bg-stone-900 border-amber-300 dark:border-amber-800 text-amber-900 dark:text-amber-200 shrink-0"
-              onClick={() => window.open("/api/manifests/template-excel", "_blank")}
-            >
-              <Download className="mr-1.5 h-3.5 w-3.5 text-amber-600" />
-              Download Template
-            </Button>
+            <div className="flex items-center gap-2 shrink-0">
+              <Button
+                variant="outline"
+                size="sm"
+                className="bg-emerald-600 hover:bg-emerald-700 text-white border-none shrink-0 cursor-pointer shadow-xs font-semibold text-xs"
+                disabled={exportingManifest}
+                onClick={handleExportManifestExcel}
+              >
+                {exportingManifest ? (
+                  <>
+                    <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                    Mengekspor...
+                  </>
+                ) : (
+                  <>
+                    <FileSpreadsheet className="mr-1.5 h-3.5 w-3.5" />
+                    Download Data Manifest Paket Ini ({activePackageJamaah.length} Pax)
+                  </>
+                )}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="bg-white dark:bg-stone-900 border-amber-300 dark:border-amber-800 text-amber-900 dark:text-amber-200 shrink-0 cursor-pointer text-xs"
+                disabled={downloadingTemplate}
+                onClick={async () => {
+                  setDownloadingTemplate(true);
+                  try {
+                    await downloadFileFromUrl("/api/manifests/template-excel", "Template_Manifest_Jamaah_VTU.xlsx");
+                  } catch (err: any) {
+                    alert("Gagal mengunduh template: " + (err?.message || "Kesalahan jaringan"));
+                  } finally {
+                    setDownloadingTemplate(false);
+                  }
+                }}
+              >
+                {downloadingTemplate ? (
+                  <>
+                    <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin text-amber-600" />
+                    Mengunduh...
+                  </>
+                ) : (
+                  <>
+                    <Download className="mr-1.5 h-3.5 w-3.5 text-amber-600" />
+                    Unduh Template Polos (Kosong)
+                  </>
+                )}
+              </Button>
+            </div>
           </div>
 
           {/* Upload Area */}

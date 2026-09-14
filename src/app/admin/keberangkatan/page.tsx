@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
-import { Calendar, CalendarDays, Hotel, Search, Trash2, Info, Copy, Check, Pencil, FileText, UserCheck, UserPlus, FileSpreadsheet, Upload } from "lucide-react";
+import { Calendar, CalendarDays, Hotel, Search, Trash2, Info, Copy, Check, Pencil, FileText, UserCheck, UserPlus, FileSpreadsheet, Upload, Download, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Modal } from "@/shared/components/ui/Modal";
 import {
@@ -16,7 +16,7 @@ import { Input } from "@/shared/components/ui/Input";
 import { ErrorState } from "@/shared/components/ui/ErrorState";
 import { getKeberangkatanList, deleteKeberangkatan } from "@/server/actions/api";
 import type { Keberangkatan } from "@/shared/types";
-import { formatDate, cn } from "@/shared/lib/utils";
+import { formatDate, cn, downloadFileFromUrl } from "@/shared/lib/utils";
 import { useOperationalStore } from "@/stores/operational-store";
 
 const BULAN_LABEL: Record<number, string> = {
@@ -47,6 +47,18 @@ export default function KeberangkatanListPage() {
     successCount: number;
     errors: string[];
   } | null>(null);
+  const [downloadingTemplate, setDownloadingTemplate] = useState(false);
+
+  const handleDownloadTemplate = async () => {
+    setDownloadingTemplate(true);
+    try {
+      await downloadFileFromUrl("/api/admin/keberangkatan/template", "template_import_keberangkatan.xlsx");
+    } catch (err: any) {
+      alert("Gagal mengunduh template: " + (err?.message || "Kesalahan jaringan"));
+    } finally {
+      setDownloadingTemplate(false);
+    }
+  };
 
 
 
@@ -826,12 +838,22 @@ export default function KeberangkatanListPage() {
 
           <div className="bg-muted/40 border rounded-lg p-3.5 flex items-center justify-between text-xs">
             <span className="font-semibold text-foreground">Template Format Excel</span>
-            <a
-              href="/api/admin/keberangkatan/template"
-              className="inline-flex items-center justify-center font-bold text-emerald-600 dark:text-emerald-400 hover:underline gap-1"
+            <button
+              type="button"
+              onClick={handleDownloadTemplate}
+              disabled={downloadingTemplate}
+              className="inline-flex items-center justify-center font-bold text-emerald-600 dark:text-emerald-400 hover:underline gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed bg-transparent border-none p-0"
             >
-              Download Template (.xlsx)
-            </a>
+              {downloadingTemplate ? (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" /> Mengunduh...
+                </>
+              ) : (
+                <>
+                  <Download className="h-3.5 w-3.5" /> Download Template (.xlsx)
+                </>
+              )}
+            </button>
           </div>
 
           <div className="space-y-2">

@@ -37,6 +37,12 @@ export interface ExcelImportRowInput {
   statusPembayaran?: string;
   metodePembayaran?: string;
   keteranganPembayaran?: string;
+  pembayaranList?: {
+    ke: number;
+    tanggal?: string;
+    nominal: number;
+  }[];
+  [key: string]: any;
 }
 
 function parseDateInput(input?: string): Date {
@@ -176,6 +182,39 @@ export async function POST(req: Request) {
           groupSisa = groupTagihan - groupPembayaran;
         }
 
+        // Extract any installment payments (ke 1 s/d 20)
+        const installmentPayments: { ke: number; tanggal: string; nominal: number }[] = [];
+        const seenKe = new Set<number>();
+
+        members.forEach((m) => {
+          if (Array.isArray(m.pembayaranList)) {
+            m.pembayaranList.forEach((p) => {
+              if (p.nominal > 0 && !seenKe.has(p.ke)) {
+                seenKe.add(p.ke);
+                installmentPayments.push({ ke: p.ke, tanggal: p.tanggal || "", nominal: p.nominal });
+              }
+            });
+          }
+
+          for (let i = 1; i <= 20; i++) {
+            const nom = toNum((m as any)[`nominal${i}`] || (m as any)[`nominal_${i}`]);
+            const tgl = (m as any)[`tglBayar${i}`] || (m as any)[`tgl_bayar_${i}`];
+            if (nom > 0 && !seenKe.has(i)) {
+              seenKe.add(i);
+              installmentPayments.push({ ke: i, tanggal: String(tgl || ""), nominal: nom });
+            }
+          }
+        });
+
+        installmentPayments.sort((a, b) => a.ke - b.ke);
+
+        // If installment payments exist, use their sum if groupPembayaran wasn't explicitly given
+        const totalFromInstallments = installmentPayments.reduce((acc, curr) => acc + curr.nominal, 0);
+        if (totalFromInstallments > 0 && groupPembayaran === 0) {
+          groupPembayaran = totalFromInstallments;
+          groupSisa = Math.max(0, groupTagihan - groupPembayaran);
+        }
+
         // 1. Create RegistrationGroup with temporary ketuaGroupId
         const group = await tx.registrationGroup.create({
           data: {
@@ -205,13 +244,27 @@ export async function POST(req: Request) {
           },
         });
 
-        if (groupPembayaran > 0) {
-          let metodeEnum: "transfer" | "cash" | "virtual_account" | "qris" = "transfer";
-          const cleanMet = (customMetode || "").toLowerCase();
-          if (cleanMet.includes("cash") || cleanMet.includes("tunai")) metodeEnum = "cash";
-          else if (cleanMet.includes("qris")) metodeEnum = "qris";
-          else if (cleanMet.includes("va") || cleanMet.includes("virtual")) metodeEnum = "virtual_account";
+        let metodeEnum: "transfer" | "cash" | "virtual_account" | "qris" = "transfer";
+        const cleanMet = (customMetode || "").toLowerCase();
+        if (cleanMet.includes("cash") || cleanMet.includes("tunai")) metodeEnum = "cash";
+        else if (cleanMet.includes("qris")) metodeEnum = "qris";
+        else if (cleanMet.includes("va") || cleanMet.includes("virtual")) metodeEnum = "virtual_account";
 
+        if (installmentPayments.length > 0) {
+          for (const item of installmentPayments) {
+            await tx.pembayaran.create({
+              data: {
+                groupId: group.id,
+                invoiceId: invoice.id,
+                jumlah: item.nominal,
+                metode: metodeEnum,
+                tanggal: item.tanggal ? parseDateInput(item.tanggal) : new Date(),
+                status: "verified",
+                catatan: `Pembayaran ke-${item.ke} via Impor Excel (${item.ke === installmentPayments.length && groupSisa === 0 ? "Pelunasan" : "Cicilan"})`,
+              },
+            });
+          }
+        } else if (groupPembayaran > 0) {
           await tx.pembayaran.create({
             data: {
               groupId: group.id,
