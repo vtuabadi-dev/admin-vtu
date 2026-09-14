@@ -231,6 +231,26 @@ export function ManifestPembayaranTable({
           cityTourThoif = 750000;
         }
 
+        // Otomatis 100.000 / pax jika seragam yang diambil adalah seragam jadi (bukan kain)
+        if (ongkosJahit === 0) {
+          const detailList = (j as any).detailPengambilan || [];
+          const tookSeragamJadi = detailList.some((dp: any) => {
+            const code = (dp.code || dp.barang?.code || "").toUpperCase();
+            const name = (dp.name || dp.namaBarang || dp.barang?.name || "").toLowerCase();
+            const isSeragam = code.startsWith("SRG") || name.includes("seragam") || name.includes("batik");
+            const isSudah = dp.status === "SUDAH";
+            const uk = (dp.kodeUkuran || dp.petugas?.match(/#UK:([A-Za-z0-9_-]+)/)?.[1] || "").toUpperCase();
+            return isSeragam && isSudah && uk && uk !== "KAIN";
+          });
+
+          const cat = (j.catatanPerlengkapan || "").toLowerCase();
+          const hasJahitNote = cat.includes("seragam jadi") || cat.includes("ongkos jahit") || cat.includes("jahit");
+
+          if (tookSeragamJadi || hasJahitNote) {
+            ongkosJahit = 100000;
+          }
+        }
+
         const totalUpgrade = upgradeKamar + upgradeHotel;
         const totalPotongan = diskonPromo + potonganOngkir;
         let netTagihan =
@@ -246,7 +266,13 @@ export function ManifestPembayaranTable({
           totalPotongan;
 
         if (g?.totalTagihan && g.totalTagihan > 0) {
-          netTagihan = Math.round(g.totalTagihan / groupMembersCount);
+          const basePerMember = Math.round(g.totalTagihan / groupMembersCount);
+          const hasExplicitJahitInvoice = activeInvoices.some((inv) =>
+            (inv.items || []).some(
+              (it) => it.status !== "cancelled" && /jahit|tailor/i.test(`${it.kategori || ""} ${it.deskripsi || ""}`)
+            )
+          );
+          netTagihan = hasExplicitJahitInvoice ? basePerMember : Math.max(netTagihan, basePerMember + ongkosJahit);
         }
 
         const totalTagihan = netTagihan + totalPotongan;

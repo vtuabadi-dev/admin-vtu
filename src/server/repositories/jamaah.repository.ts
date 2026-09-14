@@ -40,6 +40,15 @@ function mapJamaah(row: any): Jamaah {
     hotelMekkah: row.hotelMekkah,
     hotelMadinah: row.hotelMadinah,
     dokumen: (row.dokumen ?? []).map(dokumenRepo.mapDokumen),
+    detailPengambilan: (row.detailPengambilan ?? []).map((dp: any) => ({
+      barangId: dp.barangId,
+      code: dp.barang?.code,
+      name: dp.barang?.name,
+      status: dp.status,
+      tanggalAmbil: dp.tanggalAmbil ? dp.tanggalAmbil.toISOString() : null,
+      petugas: dp.petugas?.includes("#UK:") ? dp.petugas.split("#UK:")[0] : dp.petugas,
+      kodeUkuran: dp.petugas?.includes("#UK:") ? dp.petugas.split("#UK:")[1] : undefined,
+    })),
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
@@ -68,29 +77,48 @@ export const jamaahRepo = {
       ];
     }
     const [rows, total] = await Promise.all([
-      prisma.jamaah.findMany({ where, include: { dokumen: true }, take: params?.limit, skip: params?.offset, orderBy: [{ registrationId: "asc" }, { createdAt: "asc" }] }),
+      prisma.jamaah.findMany({
+        where,
+        include: { dokumen: true, detailPengambilan: { include: { barang: true } } },
+        take: params?.limit,
+        skip: params?.offset,
+        orderBy: [{ registrationId: "asc" }, { createdAt: "asc" }],
+      }),
       prisma.jamaah.count({ where }),
     ]);
     return { data: rows.map(mapJamaah), total };
   },
 
   async findById(id: string) {
-    const row = await prisma.jamaah.findUnique({ where: { id }, include: { dokumen: true } });
+    const row = await prisma.jamaah.findUnique({
+      where: { id },
+      include: { dokumen: true, detailPengambilan: { include: { barang: true } } },
+    });
     return row ? mapJamaah(row) : null;
   },
 
   async findByRegistrationId(registrationId: string) {
-    const row = await prisma.jamaah.findUnique({ where: { registrationId }, include: { dokumen: true } });
+    const row = await prisma.jamaah.findUnique({
+      where: { registrationId },
+      include: { dokumen: true, detailPengambilan: { include: { barang: true } } },
+    });
     return row ? mapJamaah(row) : null;
   },
 
   async findByUserId(userId: string) {
-    const row = await prisma.jamaah.findFirst({ where: { userId }, include: { dokumen: true } });
+    const row = await prisma.jamaah.findFirst({
+      where: { userId },
+      include: { dokumen: true, detailPengambilan: { include: { barang: true } } },
+    });
     return row ? mapJamaah(row) : null;
   },
 
   async findByGroup(groupId: string) {
-    const rows = await prisma.jamaah.findMany({ where: { groupId }, include: { dokumen: true }, orderBy: { nomorPeserta: "asc" } });
+    const rows = await prisma.jamaah.findMany({
+      where: { groupId },
+      include: { dokumen: true, detailPengambilan: { include: { barang: true } } },
+      orderBy: { nomorPeserta: "asc" },
+    });
     return rows.map(mapJamaah);
   },
 

@@ -129,6 +129,7 @@ export interface Jamaah {
   hotelMekkah: string;
   hotelMadinah: string;
   dokumen: DokumenItem[];
+  detailPengambilan?: any[];
   createdAt: string;
   updatedAt: string;
 }

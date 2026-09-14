@@ -49,6 +49,7 @@ interface JamaahPerlengkapan {
     status: string;
     tanggalAmbil?: string;
     petugas?: string;
+    kodeUkuran?: string;
   }[];
 }
 
@@ -156,14 +157,19 @@ export default function PengambilanPerlengkapanPage() {
     setEditTanggal(existingDate);
     setEditCatatan(j.catatanPerlengkapan || "");
 
-    // Populate checklist map
+    // Populate checklist map & size map
     const checks: Record<string, boolean> = {};
-    const checklist = j.checklist || [];
+    const sizes: Record<string, string> = {};
+    const checklist = (j as any).checklist || [];
     for (const item of (masterItems || [])) {
-      const match = checklist.find((c) => c?.barangId === item.id);
+      const match = checklist.find((c: any) => c?.barangId === item.id);
       checks[item.id] = match ? match.status === "SUDAH" : j.statusPerlengkapan === "SUDAH_AMBIL";
+      if (match?.kodeUkuran) {
+        sizes[item.id] = match.kodeUkuran;
+      }
     }
     setItemCheckState(checks);
+    setItemSizeState(sizes);
     setEditModalOpen(true);
   };
 
@@ -476,8 +482,29 @@ export default function PengambilanPerlengkapanPage() {
                           </span>
                         )}
                       </td>
-                      <td className="px-4 py-3 text-stone-500 text-[11px] truncate max-w-xs">
-                        {j.catatanPerlengkapan || "-"}
+                      <td className="px-4 py-3 text-stone-500 text-[11px] max-w-xs">
+                        {(() => {
+                          const seragamItem = checklist.find((c: any) => (c?.code?.startsWith("SRG") || /seragam|batik/i.test(c?.namaBarang || "")) && c?.status === "SUDAH");
+                          const isJadi = seragamItem && seragamItem.kodeUkuran && seragamItem.kodeUkuran !== "KAIN";
+                          const isKain = seragamItem && seragamItem.kodeUkuran === "KAIN";
+                          return (
+                            <div className="space-y-1">
+                              {isJadi ? (
+                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-100 text-amber-900 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
+                                  Seragam Jadi ({seragamItem.kodeUkuran}) • +100rb
+                                </span>
+                              ) : isKain ? (
+                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-medium bg-stone-100 text-stone-600 dark:bg-stone-800 dark:text-stone-300">
+                                  Bahan Kain • Rp 0
+                                </span>
+                              ) : null}
+                              {j.catatanPerlengkapan && (
+                                <div className="truncate text-stone-600 dark:text-stone-400">{j.catatanPerlengkapan}</div>
+                              )}
+                              {!isJadi && !isKain && !j.catatanPerlengkapan && <span>-</span>}
+                            </div>
+                          );
+                        })()}
                       </td>
                       <td className="px-4 py-3 text-center">
                         <Button
@@ -706,25 +733,49 @@ export default function PengambilanPerlengkapanPage() {
 
                         {/* Size Selection Dropdown for Seragam / Items with Variants */}
                         {(item.ukuran || []).filter((u) => u.kodeUkuran !== "STD").length > 0 ? (
-                          <select
-                            value={itemSizeState[item.id] || ""}
-                            onChange={(e) => {
-                              e.stopPropagation();
-                              const val = e.target.value;
-                              setItemSizeState((prev) => ({ ...prev, [item.id]: val }));
-                            }}
-                            onClick={(e) => e.stopPropagation()}
-                            className="text-[11px] font-bold p-1 rounded border border-stone-300 dark:border-stone-700 bg-white dark:bg-stone-800 text-stone-800 dark:text-stone-100"
-                          >
-                            <option value="">Pilih Ukuran / Opsi...</option>
-                            {item.ukuran
-                              ?.filter((u) => u.kodeUkuran !== "STD")
-                              .map((u) => (
-                                <option key={u.id} value={u.kodeUkuran}>
-                                  {u.namaUkuran}
-                                </option>
-                              ))}
-                          </select>
+                          <div className="flex flex-col items-end gap-1">
+                            <select
+                              value={itemSizeState[item.id] || ""}
+                              onChange={(e) => {
+                                e.stopPropagation();
+                                const val = e.target.value;
+                                setItemSizeState((prev) => ({ ...prev, [item.id]: val }));
+                              }}
+                              onClick={(e) => e.stopPropagation()}
+                              className="text-[11px] font-bold p-1 rounded border border-stone-300 dark:border-stone-700 bg-white dark:bg-stone-800 text-stone-800 dark:text-stone-100"
+                            >
+                              <option value="">Pilih Ukuran / Opsi...</option>
+                              {item.ukuran
+                                ?.filter((u) => u.kodeUkuran !== "STD")
+                                .map((u) => {
+                                  const isSeragam = item.code.startsWith("SRG") || /seragam|batik/i.test(item.name);
+                                  const feeLabel = isSeragam
+                                    ? u.kodeUkuran === "KAIN"
+                                      ? " (Bahan Kain - Rp 0)"
+                                      : " (+ Rp 100.000 Ongkos Jahit)"
+                                    : "";
+                                  return (
+                                    <option key={u.id} value={u.kodeUkuran}>
+                                      {u.namaUkuran}{feeLabel}
+                                    </option>
+                                  );
+                                })}
+                            </select>
+                            {itemSizeState[item.id] && (item.code.startsWith("SRG") || /seragam|batik/i.test(item.name)) && (
+                              <span
+                                className={cn(
+                                  "text-[9px] font-bold px-1.5 py-0.5 rounded",
+                                  itemSizeState[item.id] === "KAIN"
+                                    ? "bg-stone-100 text-stone-600 dark:bg-stone-800 dark:text-stone-300"
+                                    : "bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-300 dark:border-amber-700"
+                                )}
+                              >
+                                {itemSizeState[item.id] === "KAIN"
+                                  ? "Bahan Kain (Standar - Rp 0)"
+                                  : "+ Rp 100.000 Ongkos Jahit Seragam Jadi"}
+                              </span>
+                            )}
+                          </div>
                         ) : (
                           <span className="text-[10px] font-bold text-stone-400">
                             Stok: {item.stokTersedia} {item.satuan}

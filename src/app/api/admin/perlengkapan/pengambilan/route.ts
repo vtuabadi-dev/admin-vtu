@@ -152,14 +152,24 @@ export async function GET(request: NextRequest) {
         paketId: j.group?.paketKeberangkatanId,
         namaPaket: j.group?.keberangkatan?.namaPaket || "-",
         tanggalKeberangkatan: j.group?.keberangkatan?.tanggalBerangkat,
-        checklist: (j.detailPengambilan || []).map((dp: any) => ({
-          barangId: dp.barangId,
-          namaBarang: dp.barang?.name,
-          code: dp.barang?.code,
-          status: dp.status,
-          tanggalAmbil: dp.tanggalAmbil,
-          petugas: dp.petugas,
-        })),
+        checklist: (j.detailPengambilan || []).map((dp: any) => {
+          let kodeUkuran = "";
+          let petugasClean = dp.petugas || "";
+          if (dp.petugas && dp.petugas.includes("#UK:")) {
+            const parts = dp.petugas.split("#UK:");
+            petugasClean = parts[0];
+            kodeUkuran = parts[1];
+          }
+          return {
+            barangId: dp.barangId,
+            namaBarang: dp.barang?.name,
+            code: dp.barang?.code,
+            status: dp.status,
+            tanggalAmbil: dp.tanggalAmbil,
+            petugas: petugasClean,
+            kodeUkuran: kodeUkuran || undefined,
+          };
+        }),
       };
     });
 
@@ -221,6 +231,8 @@ export async function PUT(request: NextRequest) {
 
         const isNewlyTaken = it.status === "SUDAH" && (!existing || existing.status !== "SUDAH");
 
+        const petugasWithUkuran = it.kodeUkuran ? `${petugasName}#UK:${it.kodeUkuran}` : petugasName;
+
         await prisma.pengambilanPerlengkapanItem.upsert({
           where: {
             jamaahId_barangId: {
@@ -231,14 +243,14 @@ export async function PUT(request: NextRequest) {
           update: {
             status: it.status,
             tanggalAmbil: it.status === "SUDAH" ? (tanggalAmbilPerlengkapan ? new Date(tanggalAmbilPerlengkapan) : now) : null,
-            petugas: petugasName,
+            petugas: petugasWithUkuran,
           },
           create: {
             jamaahId,
             barangId: it.barangId,
             status: it.status,
             tanggalAmbil: it.status === "SUDAH" ? (tanggalAmbilPerlengkapan ? new Date(tanggalAmbilPerlengkapan) : now) : null,
-            petugas: petugasName,
+            petugas: petugasWithUkuran,
           },
         });
 
@@ -314,6 +326,161 @@ export async function PUT(request: NextRequest) {
         catatanPerlengkapan: catatanPerlengkapan !== undefined ? catatanPerlengkapan : undefined,
       },
     });
+
+    // Otomatisasi Tagihan Ongkos Jahit Seragam Jadi (Rp 100.000 / pax):
+    // Jika pengambilan seragam memakai seragam jadi (bukan KAIN), otomatis tambahkan tagihan 100.000.
+    // Jika diubah ke KAIN / belum diambil, batalkan/revert tagihan 100.000.
+    try {
+      const fullJamaah = await prisma.jamaah.findUnique({
+        where: { id: jamaahId },
+        include: {
+          group: {
+            include: {
+              invoices: {
+                where: { status: { not: "cancelled" } },
+                include: { items: true },
+                orderBy: { createdAt: "asc" },
+              },
+            },
+          },
+        },
+      });
+
+      if (fullJamaah?.group && Array.isArray(items)) {
+        const seragamMasters = await prisma.masterPerlengkapan.findMany({
+          where: {
+            OR: [
+              { code: { startsWith: "SRG" } },
+              { name: { contains: "seragam", mode: "insensitive" } },
+              { name: { contains: "batik", mode: "insensitive" } },
+            ],
+          },
+          select: { id: true, code: true, name: true },
+        });
+        const seragamIdSet = new Set(seragamMasters.map((s) => s.id));
+
+        let tookSeragamJadi = false;
+        for (const it of items) {
+          if (seragamIdSet.has(it.barangId)) {
+            // Jika status SUDAH dan kodeUkuran terisi serta BUKAN KAIN
+            if (it.status === "SUDAH" && it.kodeUkuran && it.kodeUkuran !== "KAIN") {
+              tookSeragamJadi = true;
+              break;
+            }
+          }
+        }
+
+        let targetInvoice = fullJamaah.group.invoices?.[0];
+        // Jika belum ada invoice aktif sama sekali, buat invoice baru untuk rombongan
+        if (!targetInvoice && fullJamaah.group.id) {
+          const invNo = `INV/${fullJamaah.group.kodeRegistrasi || fullJamaah.group.id}`;
+          targetInvoice = await prisma.invoice.create({
+            data: {
+              nomorInvoice: invNo,
+              groupId: fullJamaah.group.id,
+              tipe: "tambahan",
+              jumlah: 0,
+              sisaTagihan: 0,
+              status: "unpaid",
+              jatuhTempo: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+            },
+            include: { items: true },
+          });
+        }
+
+        if (targetInvoice) {
+          const isTargetJahitItem = (desc: string) => {
+            const d = desc.toLowerCase();
+            return (
+              (d.includes("ongkos jahit") || d.includes("jahit seragam")) &&
+              (desc.includes(fullJamaah.namaLengkap) ||
+                desc.includes(fullJamaah.nomorPeserta) ||
+                desc.includes(fullJamaah.registrationId))
+            );
+          };
+
+          const existingJahit = (targetInvoice.items || []).find(
+            (item) => item.status === "active" && isTargetJahitItem(item.deskripsi || "")
+          );
+
+          if (tookSeragamJadi && !existingJahit) {
+            // Tambahkan item invoice ongkos jahit Rp 100.000
+            await prisma.invoiceItem.create({
+              data: {
+                invoiceId: targetInvoice.id,
+                kategori: "tambahan",
+                deskripsi: `Ongkos Jahit Seragam Batik (${fullJamaah.namaLengkap})`,
+                qty: 1,
+                hargaSatuan: 100000,
+                jumlah: 100000,
+                status: "active",
+              },
+            });
+
+            const activeItems = await prisma.invoiceItem.findMany({
+              where: { invoiceId: targetInvoice.id, status: "active" },
+            });
+            const newTotal = activeItems.reduce((sum, it) => sum + it.jumlah, 0);
+            const payments = await prisma.pembayaran.aggregate({
+              where: { invoiceId: targetInvoice.id, status: "verified" },
+              _sum: { jumlah: true },
+            });
+            const totalBayar = payments._sum.jumlah || 0;
+            const newSisa = Math.max(0, newTotal - totalBayar);
+
+            await prisma.invoice.update({
+              where: { id: targetInvoice.id },
+              data: { jumlah: newTotal, sisaTagihan: newSisa },
+            });
+
+            await prisma.registrationGroup.update({
+              where: { id: fullJamaah.group.id },
+              data: {
+                totalTagihan: { increment: 100000 },
+                sisaPembayaran: { increment: 100000 },
+              },
+            });
+          } else if (!tookSeragamJadi && existingJahit) {
+            // Batalkan item invoice ongkos jahit karena beralih ke KAIN atau dibatalkan
+            await prisma.invoiceItem.update({
+              where: { id: existingJahit.id },
+              data: {
+                status: "cancelled",
+                cancelledAt: new Date(),
+                cancelledBy: petugasName,
+                cancellationReason: "Ganti ke Bahan Kain / Batal Seragam Jadi",
+              },
+            });
+
+            const activeItems = await prisma.invoiceItem.findMany({
+              where: { invoiceId: targetInvoice.id, status: "active" },
+            });
+            const newTotal = activeItems.reduce((sum, it) => sum + it.jumlah, 0);
+            const payments = await prisma.pembayaran.aggregate({
+              where: { invoiceId: targetInvoice.id, status: "verified" },
+              _sum: { jumlah: true },
+            });
+            const totalBayar = payments._sum.jumlah || 0;
+            const newSisa = Math.max(0, newTotal - totalBayar);
+
+            await prisma.invoice.update({
+              where: { id: targetInvoice.id },
+              data: { jumlah: newTotal, sisaTagihan: newSisa },
+            });
+
+            await prisma.registrationGroup.update({
+              where: { id: fullJamaah.group.id },
+              data: {
+                totalTagihan: { decrement: 100000 },
+                sisaPembayaran: { decrement: 100000 },
+              },
+            });
+          }
+        }
+      }
+    } catch (invoiceErr) {
+      console.error("[AUTO ONGKOS JAHIT ERROR]", invoiceErr);
+    }
 
     return NextResponse.json({ success: true, data: updatedJamaah });
   } catch (error) {

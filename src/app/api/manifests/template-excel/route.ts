@@ -339,7 +339,10 @@ export async function GET(request: Request) {
           include: {
             anggota: {
               where: { status: { not: "batal" } },
-              include: { dokumen: true },
+              include: {
+                dokumen: true,
+                detailPengambilan: { include: { barang: true } },
+              },
               orderBy: { createdAt: "asc" },
             },
             invoices: {
@@ -394,7 +397,7 @@ export async function GET(request: Request) {
           const payments = group.pembayaran || [];
 
           // Total tagihan & pembayaran terpusat pada tingkat grup/PIC
-          const groupTagihan = group.totalTagihan
+          let groupTagihan = group.totalTagihan
             ? Number(group.totalTagihan)
             : activeInvoice?.jumlah
             ? Number(activeInvoice.jumlah)
@@ -468,6 +471,32 @@ export async function GET(request: Request) {
               }
             });
           });
+
+          // Otomatisasi 100.000 / pax jika jamaah mengambil seragam jadi (bukan kain)
+          if (invoiceOngkosJahit === 0) {
+            const seragamJadiCount = sortedMembers.filter((m: any) => {
+              const cat = (m.catatanPerlengkapan || "").toLowerCase();
+              const hasNote = cat.includes("seragam jadi") || cat.includes("ongkos jahit") || cat.includes("jahit");
+              const details = m.detailPengambilan || [];
+              const tookJadi = details.some((dp: any) => {
+                const code = (dp.code || dp.barang?.code || "").toUpperCase();
+                const name = (dp.name || dp.namaBarang || dp.barang?.name || "").toLowerCase();
+                const isSeragam = code.startsWith("SRG") || name.includes("seragam") || name.includes("batik");
+                const isSudah = dp.status === "SUDAH";
+                const uk = (dp.kodeUkuran || dp.petugas?.match(/#UK:([A-Za-z0-9_-]+)/)?.[1] || "").toUpperCase();
+                return isSeragam && isSudah && uk && uk !== "KAIN";
+              });
+              return hasNote || tookJadi;
+            }).length;
+
+            if (seragamJadiCount > 0) {
+              invoiceOngkosJahit = seragamJadiCount * 100000;
+              if (!group.totalTagihan || Number(group.totalTagihan) <= groupPkg.hargaPaket * memberCount) {
+                groupTagihan += invoiceOngkosJahit;
+                groupKurang += invoiceOngkosJahit;
+              }
+            }
+          }
 
           sortedMembers.forEach((j, memberIdx) => {
             const isPic = memberIdx === 0;
