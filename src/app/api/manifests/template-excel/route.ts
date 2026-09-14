@@ -370,8 +370,13 @@ export async function GET(request: Request) {
           const groupPkg = packageMap.get(group.paketKeberangkatanId) || currentPkg;
           const isGroupPromo = isPromoPackage(groupPkg);
 
-          // Sort members within this rombongan group: nomorPeserta ASC, registrationId ASC, createdAt ASC
+          // Sort members within this rombongan group:
+          // Ensure ketuaGroupId (PIC) is placed first at index 0, followed by nomorPeserta ASC, registrationId ASC, createdAt ASC
           const sortedMembers = [...members].sort((a, b) => {
+            if (group.ketuaGroupId) {
+              if (a.id === group.ketuaGroupId) return -1;
+              if (b.id === group.ketuaGroupId) return 1;
+            }
             const numA = parseInt((a.nomorPeserta || "0").replace(/\D/g, ""), 10) || 0;
             const numB = parseInt((b.nomorPeserta || "0").replace(/\D/g, ""), 10) || 0;
             if (numA !== numB) return numA - numB;
@@ -385,17 +390,35 @@ export async function GET(request: Request) {
           const activeInvoice = group.invoices?.[0];
           const payments = group.pembayaran || [];
 
-          // Per-member financial allocation based on group's registered package
-          const memberTagihan = group.totalTagihan ? Math.round(group.totalTagihan / memberCount) : groupPkg.hargaPaket;
-          const memberPembayaran = group.totalPembayaran ? Math.round(group.totalPembayaran / memberCount) : 0;
-          const memberKurang = Math.max(0, memberTagihan - memberPembayaran);
+          // Total tagihan & pembayaran terpusat pada tingkat grup/PIC
+          const groupTagihan = group.totalTagihan
+            ? Number(group.totalTagihan)
+            : activeInvoice?.jumlah
+            ? Number(activeInvoice.jumlah)
+            : groupPkg.hargaPaket * memberCount;
+
+          const groupPembayaran =
+            group.totalPembayaran !== null && group.totalPembayaran !== undefined
+              ? Number(group.totalPembayaran)
+              : payments.reduce((sum, p) => sum + Number(p.jumlah || 0), 0);
+
+          let groupKurang =
+            group.sisaPembayaran !== null && group.sisaPembayaran !== undefined
+              ? Number(group.sisaPembayaran)
+              : activeInvoice?.sisaTagihan !== null && activeInvoice?.sisaTagihan !== undefined
+              ? Number(activeInvoice.sisaTagihan)
+              : Math.max(0, groupTagihan - groupPembayaran);
+
+          if (groupPembayaran >= groupTagihan && groupTagihan > 0) {
+            groupKurang = 0;
+          }
 
           let statusBayar: "LUNAS" | "CICILAN" | "BELUM BAYAR" = "BELUM BAYAR";
-          if (memberKurang === 0 && memberPembayaran > 0) statusBayar = "LUNAS";
-          else if (memberPembayaran > 0) statusBayar = "CICILAN";
+          if (groupKurang === 0 && groupPembayaran > 0) statusBayar = "LUNAS";
+          else if (groupPembayaran > 0) statusBayar = "CICILAN";
 
           const primaryMetode = payments[0]?.metode ? payments[0].metode.toUpperCase().replace("_", " ") : "TRANSFER BSI";
-          const defaultCatatan = statusBayar === "LUNAS" ? "Lunas Paket" : `Cicilan ${memberPembayaran > 0 ? "Berjalan" : "Belum Masuk"}`;
+          const defaultCatatan = statusBayar === "LUNAS" ? "Lunas Paket" : `Cicilan ${groupPembayaran > 0 ? "Berjalan" : "Belum Masuk"}`;
           const primaryCatatan = payments[0]?.catatan || (isGroupPromo && groupPkg.id !== parentPkgId ? `[Varian Promo: ${groupPkg.promoLabel || groupPkg.splitLabel || groupPkg.kode}] ${defaultCatatan}` : defaultCatatan);
 
           // Rombongan label: if registered in a promo package variant, clearly tag it
@@ -407,7 +430,9 @@ export async function GET(request: Request) {
             }
           }
 
-          sortedMembers.forEach((j) => {
+          sortedMembers.forEach((j, memberIdx) => {
+            const isPic = memberIdx === 0;
+
             // SOT Name: Paspor > KTP > namaLengkap
             const pasporDoc = j.dokumen?.find((d) => d.jenis === "paspor");
             const ktpDoc = j.dokumen?.find((d) => d.jenis === "ktp");
@@ -471,26 +496,29 @@ export async function GET(request: Request) {
               kota: j.kota || "JAKARTA SELATAN",
               provinsi: j.provinsi || "DKI JAKARTA",
               alamat: j.alamat || "-",
-              // Finansial
-              noInvoice: activeInvoice?.nomorInvoice || `INV/${group.kodeRegistrasi}`,
-              biayaPaket: memberTagihan,
-              upgradeKamar: 0,
-              addOns: 0,
-              diskon: 0,
-              totalTagihan: memberTagihan,
-              totalPembayaran: memberPembayaran,
-              kurangBayar: memberKurang,
-              statusPembayaran: statusBayar,
-              metodePembayaran: primaryMetode.includes("TRANSFER") ? primaryMetode : `TRANSFER ${primaryMetode}`,
-              keteranganPembayaran: primaryCatatan,
+
+              // Finansial: Hanya terisi penuh di baris PIC grup (memberIdx === 0).
+              // Anggota grup lainnya dikosongkan karena tagihan terpusat oleh PIC.
+              noInvoice: isPic ? (activeInvoice?.nomorInvoice || (group.kodeRegistrasi ? `INV/${group.kodeRegistrasi}` : "")) : "",
+              biayaPaket: isPic ? groupTagihan : "",
+              upgradeKamar: isPic ? 0 : "",
+              addOns: isPic ? 0 : "",
+              diskon: isPic ? 0 : "",
+              totalTagihan: isPic ? groupTagihan : "",
+              totalPembayaran: isPic ? groupPembayaran : "",
+              kurangBayar: isPic ? groupKurang : "",
+              statusPembayaran: isPic ? statusBayar : "",
+              metodePembayaran: isPic ? (primaryMetode.includes("TRANSFER") ? primaryMetode : `TRANSFER ${primaryMetode}`) : "",
+              keteranganPembayaran: isPic ? primaryCatatan : "",
             };
 
-            // Riwayat Pembayaran Cicilan 1 s/d 20
+            // Riwayat Pembayaran Cicilan 1 s/d 20:
+            // Nominal penuh dialokasikan ke baris PIC, anggota grup dikosongkan
             for (let i = 1; i <= 20; i++) {
               const pay = payments[i - 1];
-              if (pay) {
+              if (isPic && pay) {
                 rowData[`tglBayar${i}`] = formatDdMmYyyy(pay.tanggal);
-                rowData[`nominal${i}`] = Math.round(Number(pay.jumlah || 0) / memberCount);
+                rowData[`nominal${i}`] = Number(pay.jumlah || 0);
               } else {
                 rowData[`tglBayar${i}`] = "";
                 rowData[`nominal${i}`] = "";
@@ -574,23 +602,23 @@ export async function GET(request: Request) {
           kota: "JAKARTA SELATAN",
           provinsi: "DKI JAKARTA",
           alamat: "Jl. Tebet Raya No. 45, Jakarta Selatan",
-          noInvoice: "INV/2026/03/2980",
-          biayaPaket: 34900000,
-          upgradeKamar: 4000000,
-          addOns: 0,
-          diskon: 0,
-          totalTagihan: 38900000,
-          totalPembayaran: 38900000,
-          kurangBayar: 0,
-          statusPembayaran: "LUNAS",
-          metodePembayaran: "TRANSFER BSI",
-          keteranganPembayaran: "Lunas Paket Rombongan",
-          tglBayar1: "15/01/2026",
-          nominal1: 10000000,
-          tglBayar2: "10/02/2026",
-          nominal2: 15000000,
-          tglBayar3: "01/03/2026",
-          nominal3: 13900000,
+          noInvoice: "",
+          biayaPaket: "",
+          upgradeKamar: "",
+          addOns: "",
+          diskon: "",
+          totalTagihan: "",
+          totalPembayaran: "",
+          kurangBayar: "",
+          statusPembayaran: "",
+          metodePembayaran: "",
+          keteranganPembayaran: "",
+          tglBayar1: "",
+          nominal1: "",
+          tglBayar2: "",
+          nominal2: "",
+          tglBayar3: "",
+          nominal3: "",
         },
         {
           rombongan: "1 PAX QUAD FAMILY + PLATINUM (34.900) 12/03/2026",

@@ -163,20 +163,58 @@ export async function POST(req: Request) {
         let customMetode = "";
         let customKeterangan = "";
 
-        members.forEach((m) => {
-          const t = toNum(m.totalTagihan);
-          const p = toNum(m.totalPembayaran);
-          const s = toNum(m.kurangBayar);
-          const itemTagihan = t > 0 ? t : defaultPrice;
-          groupTagihan += itemTagihan;
-          groupPembayaran += p;
-          groupSisa += s > 0 ? s : Math.max(0, itemTagihan - p);
-          if (m.noInvoice && !customInvoiceNo) customInvoiceNo = m.noInvoice;
-          if (m.metodePembayaran && !customMetode) customMetode = m.metodePembayaran;
-          if (m.keteranganPembayaran && !customKeterangan) customKeterangan = m.keteranganPembayaran;
-        });
+        // Deteksi apakah tagihan terpusat di PIC (firstMember) atau terbagi per-baris jamaah (format legacy)
+        const picTagihan = toNum(firstMember.totalTagihan) || toNum(firstMember.biayaPaket);
+        const picPembayaran = toNum(firstMember.totalPembayaran);
+        const picSisa = toNum(firstMember.kurangBayar);
 
-        if (groupSisa === 0 && groupPembayaran >= groupTagihan) {
+        // Periksa apakah baris anggota selain PIC memiliki tagihan eksplisit
+        const hasOtherMemberTagihan = members.slice(1).some((m) => toNum(m.totalTagihan) > 0 || toNum(m.biayaPaket) > 0);
+
+        if (picTagihan > 0 && !hasOtherMemberTagihan) {
+          // FORMAT TERPUSAT: Tagihan dan pembayaran terpusat pada PIC grup saja
+          groupTagihan = picTagihan;
+          groupPembayaran = picPembayaran;
+          groupSisa = picSisa > 0 ? picSisa : Math.max(0, groupTagihan - groupPembayaran);
+          customInvoiceNo = firstMember.noInvoice || "";
+          customMetode = firstMember.metodePembayaran || "";
+          customKeterangan = firstMember.keteranganPembayaran || "";
+        } else if (hasOtherMemberTagihan) {
+          // FORMAT LEGACY: Setiap anggota memiliki nominal baris masing-masing
+          members.forEach((m) => {
+            const t = toNum(m.totalTagihan) || toNum(m.biayaPaket);
+            const p = toNum(m.totalPembayaran);
+            const s = toNum(m.kurangBayar);
+            const itemTagihan = t > 0 ? t : defaultPrice;
+            groupTagihan += itemTagihan;
+            groupPembayaran += p;
+            groupSisa += s > 0 ? s : Math.max(0, itemTagihan - p);
+            if (m.noInvoice && !customInvoiceNo) customInvoiceNo = m.noInvoice;
+            if (m.metodePembayaran && !customMetode) customMetode = m.metodePembayaran;
+            if (m.keteranganPembayaran && !customKeterangan) customKeterangan = m.keteranganPembayaran;
+          });
+        } else {
+          // Default: tidak ada data tagihan sama sekali di semua anggota rombongan
+          groupTagihan = defaultPrice * members.length;
+          groupPembayaran = 0;
+          groupSisa = groupTagihan;
+        }
+
+        // Fallback pencarian nomor invoice / metode / keterangan jika belum terisi
+        if (!customInvoiceNo) {
+          const found = members.find((m) => m.noInvoice);
+          if (found && found.noInvoice) customInvoiceNo = found.noInvoice;
+        }
+        if (!customMetode) {
+          const found = members.find((m) => m.metodePembayaran);
+          if (found && found.metodePembayaran) customMetode = found.metodePembayaran;
+        }
+        if (!customKeterangan) {
+          const found = members.find((m) => m.keteranganPembayaran);
+          if (found && found.keteranganPembayaran) customKeterangan = found.keteranganPembayaran;
+        }
+
+        if (groupPembayaran >= groupTagihan && groupTagihan > 0) {
           groupSisa = 0;
         } else if (groupSisa === 0 && groupTagihan > groupPembayaran) {
           groupSisa = groupTagihan - groupPembayaran;
