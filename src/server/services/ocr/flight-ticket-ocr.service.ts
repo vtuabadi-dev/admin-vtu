@@ -5,7 +5,6 @@
 // ============================================================
 
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import { prisma } from "@/server/db/client";
 import type { FlightSegment } from "@/shared/types";
 
 export interface FlightOcrResult {
@@ -18,29 +17,54 @@ export interface FlightOcrResult {
   error?: string;
 }
 
-async function getGeminiApiKey(): Promise<string> {
+async function getGeminiApiKeysSequence(): Promise<{ key: string; providerId?: string }[]> {
   try {
-    const dbProviders = await prisma.ocrProvider.findMany({
-      where: { isActive: true },
-      orderBy: { rotationOrder: "asc" },
+    const { loadProviders } = await import("@/server/services/ocr/registry");
+    const { reactivateExpiredCooldowns, isInCooldown } = await import("@/server/services/ocr/cooldown-manager");
+
+    let providers = await loadProviders();
+    await reactivateExpiredCooldowns(providers);
+
+    // Filter active google/gemini providers with valid API key
+    const active = providers.filter((p) => {
+      const pType = String(p.providerType || "").toLowerCase();
+      const pLabel = String(p.label || "").toLowerCase();
+      return (
+        p.isActive &&
+        p.apiKey?.trim() &&
+        (pType.includes("google") || pType.includes("gemini") || pLabel.includes("gemini"))
+      );
     });
-    for (const p of dbProviders) {
-      const typeStr = String(p.providerType || "").toLowerCase();
-      const labelStr = String(p.label || "").toLowerCase();
-      if (typeStr.includes("gemini") || typeStr.includes("google") || labelStr.includes("gemini")) {
-        if (p.apiKey && p.apiKey.trim()) return p.apiKey.trim();
-      }
+
+    if (active.length > 0) {
+      active.sort((a, b) => {
+        const inCoolA = isInCooldown(a) ? 1 : 0;
+        const inCoolB = isInCooldown(b) ? 1 : 0;
+        if (inCoolA !== inCoolB) return inCoolA - inCoolB;
+        const tA = a.cooldownUntil ? new Date(a.cooldownUntil).getTime() : 0;
+        const tB = b.cooldownUntil ? new Date(b.cooldownUntil).getTime() : 0;
+        return tA - tB;
+      });
+
+      return active.map((p) => ({ key: p.apiKey!, providerId: p.id }));
     }
   } catch (e) {
-    console.warn("[flight-ocr] Error loading DB OCR providers:", e);
+    console.warn("[flight-ocr] Failed to fetch API key sequence from DB registry:", e);
   }
 
-  const envKey =
-    process.env.GEMINI_API_KEY ||
-    process.env.GOOGLE_VISION_API_KEY ||
-    process.env.GEMINI_API_KEY_2 ||
-    "";
-  return envKey.trim();
+  // Fallback to environment variables
+  const envKeys = [
+    process.env.GEMINI_API_KEY,
+    process.env.GOOGLE_VISION_API_KEY,
+    process.env.GEMINI_API_KEY_2,
+    process.env.GOOGLE_VISION_API_KEY_2,
+  ].filter((k): k is string => Boolean(k && k.trim()));
+
+  if (envKeys.length > 0) {
+    return envKeys.map((k) => ({ key: k.trim() }));
+  }
+
+  return [];
 }
 
 /**
@@ -137,14 +161,14 @@ export async function extractFlightTicketOcr(
   mimeType: string,
   referenceDepartureDate?: string
 ): Promise<FlightOcrResult> {
-  const apiKey = await getGeminiApiKey();
-  if (!apiKey) {
+  const keySequence = await getGeminiApiKeysSequence();
+  if (keySequence.length === 0) {
     return {
       success: false,
       pnrMain: "",
       segments: [],
       confidence: 0,
-      error: "Kunci API Gemini tidak ditemukan pada konfigurasi sistem maupun database.",
+      error: "Kunci API untuk OCR belum tersedia. Harap aktifkan provider di menu Pengaturan -> Integrasi OCR.",
     };
   }
 
@@ -156,11 +180,9 @@ export async function extractFlightTicketOcr(
     "image/jpg",
   ];
   const effectiveMime = validMimes.includes(mimeType) ? mimeType : "image/jpeg";
+  const refYear = referenceDepartureDate ? referenceDepartureDate.slice(0, 4) : undefined;
 
   try {
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const refYear = referenceDepartureDate ? referenceDepartureDate.slice(0, 4) : undefined;
-
     const prompt = `Anda adalah asisten AI OCR spesialis dokumen penerbangan umrah, E-Ticket maskapai (Saudia Airlines, Garuda Indonesia, Lion Air, Royal Brunei, Qatar Airways, Emirates, Scoot, Flynas, Batik Air), dan GDS PNR Booking Sheets (Sabre, Amadeus, Galileo, Altea).
 
 TUGAS UTAMA:
@@ -192,23 +214,25 @@ ATURAN PENTING:
 3. Format bandara gunakan KODE IATA 3 HURUF BESAR (SUB = Surabaya, CGK = Jakarta, BWN = Brunei, JED = Jeddah, MED = Madinah, KUL = Kuala Lumpur, SIN = Singapore, DOH = Doha, DXB = Dubai).
 4. HANYA kembalikan teks JSON valid tanpa format markdown backtick atau teks pembuka lainnya.`;
 
-    const candidateModels = [
-      "gemini-2.5-flash",
-      "gemini-flash-lite-latest",
-      "gemini-3.5-flash-lite",
-      "gemini-3.5-flash",
-      "gemini-flash-latest",
-      "gemini-pro-latest",
-      "gemini-1.5-flash",
-    ];
+  const candidateModels = [
+    "gemini-flash-lite-latest",
+    "gemini-3.5-flash-lite",
+    "gemini-3.5-flash",
+    "gemini-flash-latest",
+    "gemini-pro-latest",
+    "gemini-2.5-flash",
+  ];
 
-    let result: any = null;
-    let lastError: any = null;
+  let rawJsonText = "";
+  let lastError: any = null;
+
+  for (const { key: apiKey } of keySequence) {
+    const genAI = new GoogleGenerativeAI(apiKey);
 
     for (const modelName of candidateModels) {
       try {
         const model = genAI.getGenerativeModel({ model: modelName });
-        result = await model.generateContent([
+        const result = await model.generateContent([
           prompt,
           {
             inlineData: {
@@ -217,18 +241,32 @@ ATURAN PENTING:
             },
           },
         ]);
-        if (result) break;
+        rawJsonText = result.response.text() || "";
+        if (rawJsonText) break;
       } catch (mErr: any) {
         lastError = mErr;
-        console.warn(`[flight-ocr] Model ${modelName} failed (${mErr?.message}), trying next candidate...`);
+        const msg = mErr?.message || String(mErr);
+        console.warn(`[flight-ocr] Model ${modelName} with key ***${apiKey.slice(-6)} failed:`, msg);
+        if (msg.includes("429") || msg.includes("quota") || msg.includes("exhausted")) {
+          break; // Try next key
+        }
       }
     }
 
-    if (!result) {
-      throw lastError || new Error("Semua model AI candidate gagal memproses berkas tiket.");
-    }
+    if (rawJsonText) break;
+  }
 
-    const text = result.response.text();
+  if (!rawJsonText) {
+    return {
+      success: false,
+      pnrMain: "",
+      segments: [],
+      confidence: 0,
+      error: lastError instanceof Error ? lastError.message : "Semua provider OCR dan model AI gagal memproses berkas tiket.",
+    };
+  }
+
+  const text = rawJsonText;
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
       return {
