@@ -741,7 +741,7 @@ PT VAUZA TAMMA ABADI`;
         "UPGRADE KAMAR",
         "UPGRADE HOTEL",
         "KERETA CEPAT",
-        "CITY TOUR THOIF",
+        "CITY TOUR THOIF / THAIF",
         "PASPOR",
         "KURSI RODA",
         "ONGKIR",
@@ -1652,7 +1652,7 @@ PT VAUZA TAMMA ABADI`;
                     </span>
                   </div>
                   <div className="p-2 bg-stone-900/70 rounded border border-stone-800">
-                    <span className="text-stone-400 text-[10px] block">City Tour Thoif</span>
+                    <span className="text-stone-400 text-[10px] block">City Tour Thoif / Thaif</span>
                     <span className="font-mono font-semibold text-stone-200">
                       Rp {(selectedDetailRow.cityTourThoif || 0).toLocaleString("id-ID")}
                     </span>

@@ -219,3 +219,30 @@ export function resolveHotel(text: string): string {
 
   return normalized.trim();
 }
+
+// ── Thoif / Thaif Canonical Resolution ───────────────────────
+// ATURAN KESETARAAN MUTLAK (EQUIVALENCE MANDATE):
+// "Thoif" dan "Thaif" adalah 100% KATA YANG SAMA (SINONIM IDENTIK).
+// Sistem dilarang membedakan hanya karena perbedaan vokal 'o' vs 'a'.
+export const THOIF_THAIF_SYNONYMS = [
+  "thoif",
+  "thaif",
+  "taif",
+  "toif",
+  "ta'if",
+  "tha'if",
+  "tho'if",
+  "thowif",
+  "thayif",
+] as const;
+
+export function isThoifSynonym(word: string): boolean {
+  if (!word) return false;
+  const cleaned = word.trim().toLowerCase();
+  return /^(?:th[ao]'?if|ta'?if|toif|thowif|thayif)$/i.test(cleaned);
+}
+
+export function containsThoifOrThaif(text: string): boolean {
+  if (!text) return false;
+  return /\b(?:th[ao]'?if|ta'?if|toif|thowif|thayif)\b/i.test(text);
+}

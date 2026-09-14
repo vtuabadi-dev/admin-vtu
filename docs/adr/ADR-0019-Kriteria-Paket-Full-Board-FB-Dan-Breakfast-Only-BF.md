@@ -61,3 +61,25 @@ Sebelumnya:
 - AI OCR mengekstrak tipe makan secara otomatis dari caption tanpa memerlukan input manual berulang.
 - Skema data sepenuhnya kompatibel ke belakang (*backward compatible*). Paket lama yang tidak memiliki penanda otomatis teridentifikasi sebagai Full Board.
 - Memenuhi kepatuhan **EEOS Governance Baseline v1.2** (Tier 1 Evidence).
+
+---
+
+## 4. Addendum: Aturan Kesetaraan Mutlak (Equivalence Mandate) Thoif == Thaif
+
+### Latar Belakang & Mandat Pengguna
+Ditemukan inkonsistensi fonetik di mana penulisan nama kota tujuan ziarah/wisata di Arab Saudi dalam flyer dan caption sering bergantian antara **"Thaif"** (transliterasi fonetis standar bahasa Arab طائف) dan **"Thoif"** (vokalisasi populer di Indonesia). Mandat eksplisit menyatakan:
+> *"Dengan kata ini: 'Free city tour Thoif' jangan menganggap dengan kata ini 'Free city tour Thaif' suatu kata yang berbeda hanya karena yang awal pakai o, dan yang kedua pakai a. Maka anggap keduanya yaitu Thoif/Thaif adalah suatu kata yang sama."*
+
+### Keputusan Implementasi
+1. **Gemini AI Prompt & Schema Mandate**:
+   - Menambahkan klausul `ATURAN KESETARAAN MUTLAK (EQUIVALENCE MANDATE)`: AI dilarang membedakan kata "Thoif" dan "Thaif".
+   - Frasa `"Free city tour Thaif"`, `"Free city tour Thoif"`, `"City Tour Thaif"`, `"City Tour Thoif"`, `"Free Thaif"`, `"Free Thoif"`, `"Ziarah Thaif"`, `"Ziarah Thoif"` **SUDAH DIPASTIKAN** menghasilkan `isAdaThoif = "ya"`.
+2. **Deterministic Section & Regex Parser Engine**:
+   - `extractThoifStatus()` pada `caption-parser.ts` dan `caption-section-parsers.ts` menggunakan pola regex komprehensif `/th[ao]'?if|ta'?if|toif|thowif|thayif/i`.
+   - Modul `alias-resolver.ts` menyediakan konstanta `THOIF_THAIF_SYNONYMS` dan fungsi pendeteksi `isThoifSynonym()` / `containsThoifOrThaif()`.
+   - Menggunakan prinsip *union-fallback* di `generate/page.tsx`: deteksi positif pada caption atau OCR flyer langsung mengaktifkan saklar `isAdaThoif = "ya"` tanpa dapat dibatalkan oleh AI extraction yang gagal/null.
+3. **Penyelarasan UI & Manifest**:
+   - Saklar pada Form Pembuatan Paket (mode manual & OCR) dinamai eksplisit: `Termasuk City Tour Thoif / Thaif?`.
+   - Kolom tabel Manifest Jamaah dan Manifest Pembayaran dinamai: `CITY TOUR THOIF / THAIF`.
+4. **EEOS Compliance**:
+   - Status: CONFIRMED (Tier 1 Evidence).

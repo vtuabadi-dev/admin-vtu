@@ -271,7 +271,7 @@ export const packageService = {
       if (data.isAdaKeretaCepat === "ya" && !includeList.includes("Kereta Cepat Haramain")) {
         includeList.push("Kereta Cepat Haramain");
       }
-      if (data.isAdaThoif === "ya" && !includeList.includes("City Tour Thoif")) {
+      if (data.isAdaThoif === "ya" && !includeList.some((item: string) => /th[ao]'?if|ta'?if/i.test(item))) {
         includeList.push("City Tour Thoif");
       }
       if (data.tipeMakan === "BF") {

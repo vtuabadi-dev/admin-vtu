@@ -495,7 +495,7 @@ export default function GeneratePaketPage() {
     const includeList = ["Tiket Pesawat PP", "Visa Umroh", "Hotel Mekkah & Madinah", "Handling & Bus AC"];
     if (formData.isAdaPerlengkapan === "ya") includeList.push("Perlengkapan Umroh");
     if (formData.isAdaKeretaCepat === "ya") includeList.push("Kereta Cepat Haramain");
-    if (formData.isAdaThoif === "ya") includeList.push("City Tour Thoif");
+    if (formData.isAdaThoif === "ya" && !includeList.some(i => /th[ao]'?if|ta'?if/i.test(i))) includeList.push("City Tour Thoif");
     if (formData.tipeMakan === "BF") {
       includeList.push("Breakfast Only (BF)");
     } else {
@@ -1768,9 +1768,9 @@ export default function GeneratePaketPage() {
                 </div>
               </div>
 
-              {/* Saklar Termasuk City Tour Thoif */}
+              {/* Saklar Termasuk City Tour Thoif / Thaif */}
               <div className="flex flex-col justify-end h-full">
-                <label className="block text-xs font-bold text-slate-800 mb-1 min-h-[2.5rem] flex items-end">Termasuk City Tour Thoif?</label>
+                <label className="block text-xs font-bold text-slate-800 mb-1 min-h-[2.5rem] flex items-end">Termasuk City Tour Thoif / Thaif?</label>
                 <div className="flex items-center gap-2 h-10">
                   <button
                     type="button"
@@ -2337,9 +2337,9 @@ export default function GeneratePaketPage() {
               </div>
             </div>
 
-            {/* Saklar Termasuk City Tour Thoif (OCR Mode) */}
+            {/* Saklar Termasuk City Tour Thoif / Thaif (Manual Mode) */}
             <div className="flex flex-col justify-end h-full">
-              <label className="block text-xs font-semibold mb-1 min-h-[2.25rem] flex items-end">Termasuk City Tour Thoif?</label>
+              <label className="block text-xs font-semibold mb-1 min-h-[2.25rem] flex items-end">Termasuk City Tour Thoif / Thaif?</label>
               <div className="flex items-center gap-2 h-10">
                 <button
                   type="button"

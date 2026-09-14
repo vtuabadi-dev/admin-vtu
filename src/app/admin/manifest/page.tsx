@@ -1775,8 +1775,8 @@ function ManifestPageContent() {
                         <th className="px-3 py-3 font-extrabold uppercase tracking-wider text-[10px] text-stone-800 dark:text-stone-100 border-r border-stone-300/80 dark:border-stone-700/80 w-28 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
                           KERETA CEPAT
                         </th>
-                        <th className="px-3 py-3 font-extrabold uppercase tracking-wider text-[10px] text-stone-800 dark:text-stone-100 border-r border-stone-300/80 dark:border-stone-700/80 w-32 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
-                          CITY TOUR THOIF
+                        <th className="px-3 py-3 font-extrabold uppercase tracking-wider text-[10px] text-stone-800 dark:text-stone-100 border-r border-stone-300/80 dark:border-stone-700/80 w-36 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
+                          CITY TOUR THOIF / THAIF
                         </th>
                         <th className="px-3 py-3 font-extrabold uppercase tracking-wider text-[10px] text-stone-800 dark:text-stone-100 border-r border-stone-300/80 dark:border-stone-700/80 w-28 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
                           TIPE MAKAN
@@ -2071,7 +2071,7 @@ function ManifestPageContent() {
                                   {resolveJamaahCityTourThoif(groupPkg, group.groupObj, j) ? (
                                     <span
                                       className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 font-extrabold text-xs shadow-2xs mx-auto border border-emerald-300 dark:border-emerald-700 select-none"
-                                      title="Terdaftar dengan layanan City Tour Thoif"
+                                      title="Terdaftar dengan layanan City Tour Thoif / Thaif"
                                     >
                                       ✓
                                     </span>
