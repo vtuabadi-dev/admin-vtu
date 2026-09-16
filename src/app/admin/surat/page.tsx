@@ -452,6 +452,14 @@ function GenerateSuratPageContent() {
   const handleSaveToHistory = useCallback(() => {
     if (!activeTemplate) return;
 
+    const effectiveNama =
+      resolvedFieldValues["Nama Jama'ah"] ||
+      resolvedFieldValues["nama_lengkap"] ||
+      resolvedFieldValues["nama_jamaah"] ||
+      resolvedFieldValues["Nama"] ||
+      activeJamaah?.namaLengkap ||
+      "Jamaah";
+
     const logItem: GeneratedSuratLog = {
       id: `srt-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       nomorSurat: computedNomorSurat,
@@ -460,7 +468,7 @@ function GenerateSuratPageContent() {
       templateName: activeTemplate.nama,
       kategori: activeTemplate.kategori,
       jamaahId: activeJamaah?.id,
-      jamaahNama: toTitleCase(activeJamaah?.namaLengkap || "Jamaah"),
+      jamaahNama: toTitleCase(effectiveNama),
       jamaahPaspor: activeJamaah?.nomorPaspor || "-",
       jamaahNik: activeJamaah?.nik || "-",
       packageId: activeKeberangkatan?.id,
@@ -511,10 +519,18 @@ function GenerateSuratPageContent() {
     handleSaveToHistory();
     const phone = activeJamaah?.nomorTelepon || "";
     const cleanPhone = phone.replace(/[^0-9]/g, "").replace(/^0/, "62");
+    const effectiveNama =
+      resolvedFieldValues["Nama Jama'ah"] ||
+      resolvedFieldValues["nama_lengkap"] ||
+      resolvedFieldValues["nama_jamaah"] ||
+      resolvedFieldValues["Nama"] ||
+      activeJamaah?.namaLengkap ||
+      "Jamaah";
+
     const msg = `*PT. VAUZA TAMMA ABADI (VTU ABADI)*
 _Penyelenggara Ibadah Umroh Kemenag RI No. U.400/2021 / No. 805/2019_
 
-Yth. Bapak/Ibu *${toTitleCase(activeJamaah?.namaLengkap || "Jamaah")}*,
+Yth. Bapak/Ibu *${toTitleCase(effectiveNama)}*,
 
 Berikut adalah informasi penerbitan *${activeTemplate.nama}*:
 📄 *Nomor Surat*: ${computedNomorSurat}
@@ -916,6 +932,27 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
                           (cleanKey.includes("imigrasi") && !cleanKey.includes("kota"))) &&
                         !isKotaKanimField;
 
+                      const isEndorsementActive = (
+                        manualFormData["Hal"] ||
+                        manualFormData["hal"] ||
+                        manualFormData["perihal"] ||
+                        manualFormData["Perihal"] ||
+                        (resolvedFieldValues as Record<string, string>)["Hal"] ||
+                        (resolvedFieldValues as Record<string, string>)["hal"] ||
+                        customPerihal ||
+                        activeTemplate?.perihalDefault ||
+                        ""
+                      )
+                        .toLowerCase()
+                        .includes("endorse");
+
+                      const isNamaJamaahField =
+                        cleanKey.includes("namajamaah") ||
+                        cleanKey.includes("namalengkap") ||
+                        cleanKey === "nama" ||
+                        cleanLabel.includes("nama jama") ||
+                        cleanLabel.includes("nama lengkap");
+
                       // Clean and validate options if select
                       const validOptions = (Array.isArray(p.options) ? p.options : [])
                         .map((opt: string) => String(opt).trim())
@@ -934,7 +971,8 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
                           style={{ zIndex: 40 - pIdx }}
                           className={cn(
                             "p-2.5 rounded-xl border border-stone-200/80 dark:border-stone-800/80 bg-card/60 shadow-2xs space-y-1.5 transition-all hover:border-primary/40 relative",
-                            (isKanimSelector || isSearchableSelect) && "z-30"
+                            (isKanimSelector || isSearchableSelect) && "z-30",
+                            isEndorsementActive && isNamaJamaahField && "border-amber-400/60 dark:border-amber-500/40 bg-amber-50/30 dark:bg-amber-950/10"
                           )}
                         >
                           <div className="flex items-center justify-between">
@@ -943,7 +981,12 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
                               <span>{p.label || p.key}</span>
                             </label>
 
-                            {manualVal !== undefined && manualVal !== resolvedVal ? (
+                            {isEndorsementActive && isNamaJamaahField ? (
+                              <span className="text-[10px] font-semibold text-amber-700 dark:text-amber-300 bg-amber-500/15 border border-amber-500/30 px-2 py-0.5 rounded flex items-center gap-1 shadow-2xs">
+                                <Sparkles className="h-3 w-3 text-amber-500" />
+                                + Nama Ayah (Endorsement)
+                              </span>
+                            ) : manualVal !== undefined && manualVal !== resolvedVal ? (
                               <span className="text-[10px] font-semibold text-amber-600 dark:text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded flex items-center gap-1">
                                 Diedit Manual
                               </span>
@@ -1052,6 +1095,25 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
                               }
                               className="text-xs h-9 bg-background text-foreground"
                             />
+                          )}
+
+                          {isEndorsementActive && isNamaJamaahField && (
+                            <p className="text-[10px] text-amber-700 dark:text-amber-400 flex items-center gap-1 pt-0.5 font-medium">
+                              <Sparkles className="h-3 w-3 shrink-0 text-amber-500" />
+                              <span>
+                                Mode Endorsement: Nama otomatis ditambahkan nama ayah (
+                                <strong>
+                                  {toTitleCase(
+                                    manualFormData["namaAyah"] ||
+                                    manualFormData["nama_ayah"] ||
+                                    activeJamaah?.namaAyah ||
+                                    (activeJamaah as any)?.ayahKandung ||
+                                    "Ayah Kandung"
+                                  )}
+                                </strong>
+                                )
+                              </span>
+                            </p>
                           )}
                         </div>
                       );

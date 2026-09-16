@@ -736,6 +736,31 @@ export function resolveAutocratFieldValues(
     return undefined;
   };
 
+  // Detect whether the current letter is for Endorsement
+  const currentHal =
+    getManualOverride("Hal") ||
+    getManualOverride("hal") ||
+    getManualOverride("perihal") ||
+    getManualOverride("Perihal") ||
+    manualFormData["Hal"] ||
+    manualFormData["hal"] ||
+    manualFormData["Perihal"] ||
+    manualFormData["perihal"] ||
+    template.perihalDefault ||
+    "";
+  const isEndorsement = currentHal.toLowerCase().includes("endorse");
+  const namaAyahCandidate =
+    getManualOverride("namaAyah") ||
+    getManualOverride("nama_ayah") ||
+    getManualOverride("Nama Ayah") ||
+    getManualOverride("nama_ayah_kandung") ||
+    jamaah?.namaAyah ||
+    jamaah?.ayahKandung ||
+    jamaah?.fatherName ||
+    jamaah?.dokumen?.find?.((d: any) => d.jenis === "kk" || d.jenis === "buku_nikah")?.manualData?.namaAyah ||
+    jamaah?.dokumen?.find?.((d: any) => d.jenis === "kk" || d.jenis === "buku_nikah")?.ocrData?.namaAyah ||
+    "";
+
   detectedKeys.forEach((key) => {
     const cleanK = normalizeKey(key);
 
@@ -854,7 +879,10 @@ export function resolveAutocratFieldValues(
             effectiveField = "jamaah.alamat";
           }
 
-          values[key] = resolveManifestFieldValue(effectiveField, jamaah, keberangkatan, today);
+          values[key] = resolveManifestFieldValue(effectiveField, jamaah, keberangkatan, today, {
+            isEndorsement,
+            namaAyah: namaAyahCandidate,
+          });
         }
       } else {
         // Manual form data priority -> auto-lookup kota if empty -> defaultValue -> empty string
@@ -886,7 +914,10 @@ export function resolveAutocratFieldValues(
       }
     } else {
       // Smart Auto-detection based on key name if not explicitly configured in mapping
-      values[key] = autoDetectManifestValue(key, jamaah, keberangkatan, today, manualFormData);
+      values[key] = autoDetectManifestValue(key, jamaah, keberangkatan, today, manualFormData, {
+        isEndorsement,
+        namaAyah: namaAyahCandidate,
+      });
     }
   });
 
@@ -897,11 +928,61 @@ export function resolveAutocratFieldValues(
 // RESOLVE SPECIFIC MANIFEST FIELD
 // ────────────────────────────────────────────────────────────
 
+export interface ManifestResolveOptions {
+  isEndorsement?: boolean;
+  namaAyah?: string | null;
+}
+
+export function formatJamaahNameWithEndorsement(
+  baseName: string,
+  rawAyah?: string | null,
+  isEndorsement = true
+): string {
+  if (!baseName) return "";
+  const trimmedBase = baseName.trim();
+  if (!isEndorsement) return toTitleCase(trimmedBase);
+
+  if (!rawAyah || rawAyah.trim() === "-" || rawAyah.trim() === "") {
+    return toTitleCase(trimmedBase);
+  }
+
+  // Saring gelar ayah seperti H., Hj., Drs., Dr., K.H., KH., Prof., Ustadz, Ust., Ir., Ir, Kyai, Hajjah, Haji
+  const cleanAyah = rawAyah
+    .trim()
+    .replace(/^(?:(?:H\.|Hj\.|Drs\.|Dr\.|K\.H\.|KH\.|Prof\.|Ustadz|Ust\.|Ir\.|Ir|Haji|Hajjah|Kyai)\s*)+/i, "")
+    .trim();
+
+  if (!cleanAyah || cleanAyah === "-") return toTitleCase(trimmedBase);
+
+  // Periksa apakah nama jamaah sudah berakhiran nama ayah tersebut
+  const lowerBase = trimmedBase.toLowerCase();
+  const lowerAyah = cleanAyah.toLowerCase();
+
+  if (lowerBase.endsWith(lowerAyah)) {
+    return toTitleCase(trimmedBase);
+  }
+
+  // Jika kata pertama ayah sudah sama dengan kata terakhir nama jamaah, cegah duplikasi
+  const baseWords = trimmedBase.split(/\s+/);
+  const ayahWords = cleanAyah.split(/\s+/);
+  const lastBaseWord = baseWords[baseWords.length - 1]?.toLowerCase();
+  const firstAyahWord = ayahWords[0]?.toLowerCase();
+
+  if (lastBaseWord && firstAyahWord && lastBaseWord === firstAyahWord) {
+    const remainingAyah = ayahWords.slice(1).join(" ");
+    if (!remainingAyah) return toTitleCase(trimmedBase);
+    return toTitleCase(`${trimmedBase} ${remainingAyah}`);
+  }
+
+  return toTitleCase(`${trimmedBase} ${cleanAyah}`);
+}
+
 export function resolveManifestFieldValue(
   fieldKey: string,
   jamaah: any | null,
   keberangkatan: any | null,
-  today = getTodayDateInfo()
+  today = getTodayDateInfo(),
+  options?: ManifestResolveOptions
 ): string {
   if (!fieldKey) return "";
 
@@ -910,8 +991,14 @@ export function resolveManifestFieldValue(
     if (!jamaah) return "";
     const subKey = fieldKey.replace("jamaah.", "");
     switch (subKey) {
-      case "namaLengkap":
-        return toTitleCase(jamaah.namaLengkap || jamaah.name || "");
+      case "namaLengkap": {
+        const baseName = jamaah.namaLengkap || jamaah.name || "";
+        if (options?.isEndorsement) {
+          const ayah = options.namaAyah || jamaah.namaAyah || jamaah.ayahKandung || jamaah.fatherName || "";
+          return formatJamaahNameWithEndorsement(baseName, ayah, true);
+        }
+        return toTitleCase(baseName);
+      }
       case "nik":
         return (
           jamaah.nik ||
@@ -1087,82 +1174,91 @@ function autoDetectManifestValue(
   jamaah: any | null,
   keberangkatan: any | null,
   today = getTodayDateInfo(),
-  manualFormData: Record<string, any> = {}
+  manualFormData: Record<string, any> = {},
+  options?: ManifestResolveOptions
 ): string {
   const k = key.toLowerCase();
+  const cleanK = k.replace(/[\u2018\u2019\u201A\u201B']/g, "'").replace(/[\s_\-\.]/g, "");
 
   // If user provided manual value
   if (manualFormData[key] !== undefined) {
     return String(manualFormData[key]);
   }
 
-  // Common keywords
-  if (k.includes("nama_lengkap") || k === "nama" || k === "nama_jamaah") {
-    return resolveManifestFieldValue("jamaah.namaLengkap", jamaah, keberangkatan, today);
+  // Common keywords matching
+  if (
+    cleanK.includes("namajamaah") ||
+    cleanK.includes("namalengkap") ||
+    cleanK.includes("namapeserta") ||
+    cleanK === "nama" ||
+    cleanK === "namakaryawan" ||
+    cleanK === "namatertanggung" ||
+    cleanK === "namapetugas"
+  ) {
+    return resolveManifestFieldValue("jamaah.namaLengkap", jamaah, keberangkatan, today, options);
   }
-  if (k === "nik" || k.includes("ktp")) {
-    return resolveManifestFieldValue("jamaah.nik", jamaah, keberangkatan, today);
+  if (cleanK.includes("ayah") || cleanK.includes("orangtua")) {
+    return resolveManifestFieldValue("jamaah.namaAyah", jamaah, keberangkatan, today, options);
   }
-  if (k.includes("paspor")) {
-    return resolveManifestFieldValue("jamaah.nomorPaspor", jamaah, keberangkatan, today);
+  if (cleanK === "nik" || cleanK.includes("ktp") || cleanK.includes("nikkaryawan")) {
+    return resolveManifestFieldValue("jamaah.nik", jamaah, keberangkatan, today, options);
   }
-  if (k.includes("tempat_lahir")) {
-    return resolveManifestFieldValue("jamaah.tempatLahir", jamaah, keberangkatan, today);
+  if (cleanK.includes("paspor")) {
+    return resolveManifestFieldValue("jamaah.nomorPaspor", jamaah, keberangkatan, today, options);
   }
-  if (k.includes("tanggal_lahir") || k === "tgl_lahir") {
-    return resolveManifestFieldValue("jamaah.tanggalLahir", jamaah, keberangkatan, today);
+  if (cleanK.includes("tempatlahir") || (cleanK.includes("tempat") && cleanK.includes("lahir"))) {
+    return resolveManifestFieldValue("jamaah.tempatLahir", jamaah, keberangkatan, today, options);
   }
-  if (k.includes("jenis_kelamin") || k === "gender") {
-    return resolveManifestFieldValue("jamaah.jenisKelamin", jamaah, keberangkatan, today);
+  if (cleanK.includes("tanggallahir") || cleanK.includes("tgllahir") || (cleanK.includes("tgl") && cleanK.includes("lahir"))) {
+    return resolveManifestFieldValue("jamaah.tanggalLahir", jamaah, keberangkatan, today, options);
   }
-  if (k.includes("ayah") || k.includes("orang_tua")) {
-    return resolveManifestFieldValue("jamaah.namaAyah", jamaah, keberangkatan, today);
+  if (cleanK.includes("jeniskelamin") || cleanK.includes("gender")) {
+    return resolveManifestFieldValue("jamaah.jenisKelamin", jamaah, keberangkatan, today, options);
   }
-  if (k.includes("alamat")) {
-    return resolveManifestFieldValue("jamaah.alamat", jamaah, keberangkatan, today);
+  if (cleanK.includes("alamat")) {
+    return resolveManifestFieldValue("jamaah.alamat", jamaah, keberangkatan, today, options);
   }
-  if (k.includes("telepon") || k.includes("hp") || k.includes("wa")) {
-    return resolveManifestFieldValue("jamaah.nomorTelepon", jamaah, keberangkatan, today);
+  if (cleanK.includes("telepon") || cleanK.includes("nohp") || cleanK.includes("hp") || cleanK.includes("wa") || cleanK.includes("kontak")) {
+    return resolveManifestFieldValue("jamaah.nomorTelepon", jamaah, keberangkatan, today, options);
   }
-  if (k.includes("nama_paket") || k === "paket") {
-    return resolveManifestFieldValue("keberangkatan.namaPaket", jamaah, keberangkatan, today);
+  if (cleanK.includes("namapaket") || cleanK === "paket") {
+    return resolveManifestFieldValue("keberangkatan.namaPaket", jamaah, keberangkatan, today, options);
   }
-  if (k.includes("kode_paket") || k === "kode_keberangkatan" || k === "kode_manifest") {
-    return resolveManifestFieldValue("keberangkatan.kode", jamaah, keberangkatan, today);
+  if (cleanK.includes("kodepaket") || cleanK.includes("kodekeberangkatan") || cleanK.includes("kodemanifest") || cleanK.includes("koderombongan")) {
+    return resolveManifestFieldValue("keberangkatan.kode", jamaah, keberangkatan, today, options);
   }
-  if (k.includes("tanggal_berangkat") || k === "tgl_berangkat") {
-    return resolveManifestFieldValue("keberangkatan.tanggalBerangkat", jamaah, keberangkatan, today);
+  if (cleanK.includes("tanggalberangkat") || cleanK.includes("tglberangkat")) {
+    return resolveManifestFieldValue("keberangkatan.tanggalBerangkat", jamaah, keberangkatan, today, options);
   }
   if (
-    k.includes("bulan_keberangkatan") ||
-    k.includes("bulankeberangkatan") ||
-    k.includes("bulan_berangkat") ||
-    k === "bulan_paket" ||
-    k === "bulan" ||
-    (k.includes("bulan") && (k.includes("berangkat") || k.includes("paket")))
+    cleanK.includes("bulankeberangkatan") ||
+    cleanK.includes("bulanberangkat") ||
+    cleanK === "bulanpaket" ||
+    cleanK === "bulan" ||
+    (cleanK.includes("bulan") && (cleanK.includes("berangkat") || cleanK.includes("paket")))
   ) {
-    return resolveManifestFieldValue("keberangkatan.bulanKeberangkatan", jamaah, keberangkatan, today);
+    return resolveManifestFieldValue("keberangkatan.bulanKeberangkatan", jamaah, keberangkatan, today, options);
   }
-  if (k.includes("tanggal_pulang") || k === "tgl_pulang" || k.includes("tanggal_kembali")) {
-    return resolveManifestFieldValue("keberangkatan.tanggalPulang", jamaah, keberangkatan, today);
+  if (cleanK.includes("tanggalpulang") || cleanK.includes("tglpulang") || cleanK.includes("tanggalkembali")) {
+    return resolveManifestFieldValue("keberangkatan.tanggalPulang", jamaah, keberangkatan, today, options);
   }
-  if (k.includes("maskapai")) {
-    return resolveManifestFieldValue("keberangkatan.maskapai", jamaah, keberangkatan, today);
+  if (cleanK.includes("maskapai")) {
+    return resolveManifestFieldValue("keberangkatan.maskapai", jamaah, keberangkatan, today, options);
   }
-  if (k.includes("hotel_mekkah") || k.includes("hotel_makkah")) {
-    return resolveManifestFieldValue("keberangkatan.hotelMekkah", jamaah, keberangkatan, today);
+  if (cleanK.includes("hotelmekkah") || cleanK.includes("hotelmakkah")) {
+    return resolveManifestFieldValue("keberangkatan.hotelMekkah", jamaah, keberangkatan, today, options);
   }
-  if (k.includes("hotel_madinah")) {
-    return resolveManifestFieldValue("keberangkatan.hotelMadinah", jamaah, keberangkatan, today);
+  if (cleanK.includes("hotelmadinah")) {
+    return resolveManifestFieldValue("keberangkatan.hotelMadinah", jamaah, keberangkatan, today, options);
   }
-  if (k.includes("program_hari") || k === "durasi") {
-    return resolveManifestFieldValue("keberangkatan.programHari", jamaah, keberangkatan, today);
+  if (cleanK.includes("programhari") || cleanK === "durasi" || cleanK.includes("lamacuti")) {
+    return resolveManifestFieldValue("keberangkatan.programHari", jamaah, keberangkatan, today, options);
   }
-  if (k.includes("tanggal_hari_ini") || k === "today") {
+  if (cleanK.includes("tanggalhariini") || cleanK.includes("today")) {
     return today.masehi;
   }
-  if (k.includes("kanim") || k.includes("imigrasi")) {
-    if (k.includes("kota")) {
+  if (cleanK.includes("kanim") || cleanK.includes("imigrasi")) {
+    if (cleanK.includes("kota")) {
       let parentKanim = "";
       for (const [mk, mv] of Object.entries(manualFormData)) {
         const cleanMk = mk.toLowerCase().replace(/[\s_\-\.]/g, "");
