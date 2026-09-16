@@ -4,7 +4,6 @@ import React, { useState, useEffect, useMemo, useCallback, Suspense } from "reac
 import { useSearchParams, useRouter } from "next/navigation";
 import {
   Printer,
-  Copy,
   Check,
   Building2,
   ScrollText,
@@ -46,6 +45,7 @@ import {
   getTodayDateInfo,
   isSystemAutoPlaceholder,
 } from "@/shared/lib/surat-autocrat-engine";
+import { downloadOfficialLetterPdf } from "@/shared/lib/surat-pdf";
 import { KantorImigrasiCombobox } from "@/shared/components/ui/KantorImigrasiCombobox";
 import { SearchableSelect } from "@/shared/components/ui/SearchableSelect";
 import { getKotaFromKanimName } from "@/shared/lib/kantor-imigrasi";
@@ -101,7 +101,6 @@ function GenerateSuratPageContent() {
   const [historyFilterTemplate, setHistoryFilterTemplate] = useState<string>("all");
 
   // UI helpers
-  const [copiedText, setCopiedText] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [previewModalLog, setPreviewModalLog] = useState<GeneratedSuratLog | null>(null);
 
@@ -475,34 +474,6 @@ function GenerateSuratPageContent() {
     window.print();
   };
 
-  // Action: Copy Text
-  const handleCopy = () => {
-    if (!activeTemplate) return;
-    const fullText = isFullDocumentTemplate
-      ? renderedLetterBody
-      : `
-NOMOR   : ${computedNomorSurat}
-LAMP    : ${customLampiran || "-"}
-PERIHAL : ${renderedPerihal}
-
-${renderedTujuan}
-${renderedKotaTujuan}
-
-${renderedLetterBody}
-
-Sidoarjo, ${todayInfo.masehi}
-PT. VAUZA TRIKARSA UTAMA
-
-${activeTemplate.penandatangan.nama}
-${activeTemplate.penandatangan.jabatan}
-    `.trim();
-
-    navigator.clipboard.writeText(fullText);
-    setCopiedText(true);
-    showToast("Teks surat berhasil disalin ke clipboard!");
-    setTimeout(() => setCopiedText(false), 2000);
-  };
-
   // Action: Share WhatsApp
   const handleShareWhatsApp = () => {
     if (!activeTemplate) return;
@@ -528,96 +499,40 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
     window.open(waUrl, "_blank");
   };
 
-  // Action: Download HTML / Text File
+  // Action: Download PDF File
   const handleDownloadDoc = () => {
     if (!activeTemplate) return;
     handleSaveToHistory();
 
-    const docHtml = isFullDocumentTemplate
-      ? `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <title>${computedNomorSurat} - ${activeTemplate.nama}</title>
-  <style>
-    body { font-family: 'Times New Roman', serif; margin: 40px auto; max-width: 800px; line-height: 1.6; color: #111; padding: 20px; }
-    .content { white-space: pre-line; text-align: justify; font-size: 14px; }
-    .footer { margin-top: 40px; border-top: 1px solid #ccc; padding-top: 12px; font-family: sans-serif; font-size: 11px; color: #555; }
-  </style>
-</head>
-<body>
-  <div class="content">${renderedLetterBody}</div>
-  ${
-    effectiveShowBarcode
-      ? `<div class="footer">
-    <strong>VERIFIKASI KEABSAHAN SISTEM:</strong><br>${verificationUrl}
-  </div>`
-      : ""
-  }
-</body>
-</html>`
-      : `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <title>${computedNomorSurat} - ${activeTemplate.nama}</title>
-  <style>
-    body { font-family: 'Times New Roman', serif; margin: 40px; line-height: 1.6; color: #111; }
-    .header { border-bottom: 2px solid #000; padding-bottom: 12px; margin-bottom: 20px; display: flex; align-items: center; }
-    .meta { display: flex; justify-content: space-between; margin-bottom: 20px; font-family: sans-serif; font-size: 13px; }
-    .content { white-space: pre-line; text-align: justify; font-size: 14px; }
-    .footer { margin-top: 40px; display: flex; justify-content: space-between; align-items: flex-end; font-family: sans-serif; }
-  </style>
-</head>
-<body>
-  <div class="header">
-    <div style="font-family: sans-serif;">
-      <h2 style="margin: 0; font-size: 18px;">PT. VAUZA TRIKARSA UTAMA</h2>
-      <p style="margin: 2px 0; font-size: 11px; color: #555;">Penyelenggara Perjalanan Ibadah Umroh (PPIU) Kemenag RI No. U.400 Tahun 2021</p>
-      <p style="margin: 0; font-size: 10px; color: #777;">Ruko Gateway Blok C-12, Waru, Sidoarjo &bull; Telp: (031) 854-4455</p>
-    </div>
-  </div>
-  <div class="meta">
-    <div>
-      <p><strong>Nomor</strong> : ${computedNomorSurat}</p>
-      <p><strong>Lamp</strong>  : ${customLampiran || "-"}</p>
-      <p><strong>Perihal</strong>: <strong>${renderedPerihal}</strong></p>
-    </div>
-    <div style="text-align: right;">
-      <p>Sidoarjo, ${todayInfo.masehi}</p>
-    </div>
-  </div>
-  <p style="font-family: sans-serif; font-size: 13px;">${renderedTujuan}<br>${renderedKotaTujuan}</p>
-  <div class="content">${renderedLetterBody}</div>
-  <div class="footer">
-    <div style="font-size: 10px; border: 1px solid #ccc; padding: 6px 10px; border-radius: 6px;">
-      <strong>VERIFIKASI KEABSAHAN SISTEM:</strong><br>${verificationUrl}
-    </div>
-    <div style="text-align: center; min-width: 200px;">
-      <p style="margin: 0; font-weight: bold;">PT. VAUZA TRIKARSA UTAMA</p>
-      <div style="height: 60px;"></div>
-      <p style="margin: 0; font-weight: bold; text-decoration: underline;">${activeTemplate.penandatangan.nama}</p>
-      <p style="margin: 0; font-size: 12px; color: #555;">${activeTemplate.penandatangan.jabatan}</p>
-    </div>
-  </div>
-</body>
-</html>`;
-
-    const blob = new Blob([docHtml], { type: "text/html" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    let fileName = `${computedNomorSurat.replace(/[/\\?%*:|"<>]/g, "-")}_${activeTemplate.nama}.html`;
+    let customFileName: string | undefined = undefined;
     if (activeTemplate.formatNamaFile && activeTemplate.formatNamaFile.trim()) {
       const mergedName = renderAutocratMergedText(activeTemplate.formatNamaFile, resolvedFieldValues)
         .replace(/[/\\?%*:|"<>]/g, "_")
         .trim();
-      if (mergedName) fileName = `${mergedName}.html`;
+      if (mergedName) customFileName = `${mergedName}.pdf`;
     }
-    a.download = fileName;
-    a.click();
-    URL.revokeObjectURL(url);
-    showToast("File dokumen surat berhasil diunduh!");
+
+    downloadOfficialLetterPdf(
+      {
+        template: activeTemplate,
+        rawText: renderedLetterBody,
+        computedNomorSurat,
+        computedNomorSurat2: (activeTemplate?.kebutuhanNomorPerSurat ?? 1) > 1 ? computedNomorSurat2 : undefined,
+        renderedPerihal,
+        renderedTujuan,
+        renderedKotaTujuan,
+        customLampiran,
+        todayInfo,
+        effectiveShowBarcode,
+        verificationUrl,
+        selectedDocIndex: selectedDocIndex,
+        activeJamaah,
+        activeKeberangkatan,
+      },
+      customFileName
+    );
+
+    showToast("Dokumen PDF surat resmi berhasil diunduh!");
   };
 
   // Delete History Item
@@ -1144,11 +1059,11 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
                     <Button
                       variant="outline"
                       size="sm"
-                      className="text-xs"
+                      className="text-xs text-blue-600 dark:text-blue-400 border-blue-500/30 hover:bg-blue-500/10"
                       onClick={handleDownloadDoc}
                     >
-                      <Download className="mr-1.5 h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
-                      Download Dokumen
+                      <Download className="mr-1.5 h-3.5 w-3.5" />
+                      Download PDF
                     </Button>
                   </div>
 
@@ -1181,25 +1096,6 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
                     >
                       <Share2 className="mr-1.5 h-3.5 w-3.5" />
                       Kirim WhatsApp
-                    </Button>
-
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="text-xs"
-                      onClick={handleCopy}
-                    >
-                      {copiedText ? (
-                        <>
-                          <Check className="mr-1.5 h-3.5 w-3.5 text-emerald-500" />
-                          Tersalin
-                        </>
-                      ) : (
-                        <>
-                          <Copy className="mr-1.5 h-3.5 w-3.5" />
-                          Salin Teks
-                        </>
-                      )}
                     </Button>
                   </div>
                 </CardContent>
