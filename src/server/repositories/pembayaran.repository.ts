@@ -139,143 +139,144 @@ export const pembayaranRepo = {
     return mapPembayaran(row);
   },
 
-  async getReviewQueue(statusFilter?: string) {
-    // 1. Lightweight sync only for unlinked RegistrationRequests (where groupId is null)
-    try {
-      const unsyncedRegs = await prisma.registrationRequest.findMany({
-        where: {
-          groupId: null,
-          OR: [
-            { status: "PENDING_REVIEW" },
-            { catatanAdmin: { contains: "[Bukti DP Uploaded" } },
-          ],
-        },
-        take: 10,
-        include: {
-          keberangkatan: true,
-          members: true,
-        },
-      });
+  /**
+   * Fire-and-forget sync for unlinked RegistrationRequests.
+   * Extracted from getReviewQueue so the read path is never blocked by writes.
+   */
+  async syncPendingRegistrations() {
+    const unsyncedRegs = await prisma.registrationRequest.findMany({
+      where: {
+        groupId: null,
+        OR: [
+          { status: "PENDING_REVIEW" },
+          { catatanAdmin: { contains: "[Bukti DP Uploaded" } },
+        ],
+      },
+      take: 10,
+      include: {
+        keberangkatan: true,
+        members: true,
+      },
+    });
 
-      if (unsyncedRegs.length > 0) {
-        for (const reg of unsyncedRegs) {
-          // Extract buktiUrl from catatanAdmin if available
-          let extractedBuktiUrl: string | undefined = undefined;
-          if (reg.catatanAdmin) {
-            const match = reg.catatanAdmin.match(/\[Bukti DP Uploaded[^\]]*\]:\s*([^\s\n]+)/);
-            if (match?.[1] && match[1] !== "File" && match[1] !== "received") {
-              extractedBuktiUrl = match[1];
-            }
-          }
+    if (unsyncedRegs.length === 0) return;
 
-          let group = await prisma.registrationGroup.findFirst({
-            where: { kodeRegistrasi: reg.kodeRegistrasi },
-          });
-
-          const memberList = (reg.members && reg.members.length > 0)
-            ? (reg.members as any[]).sort((a, b) => (a.urutan || 0) - (b.urutan || 0))
-            : [{ namaLengkap: reg.namaPerwakilan, jenisKelamin: "L", tempatLahir: "-", tanggalLahir: "2000-01-01", urutan: 1 }];
-
-          // Ensure RegistrationGroup exists FIRST so Jamaah has a valid groupId foreign key
-          if (!group) {
-            const totalTagihan = (reg.keberangkatan?.hargaPaket || 0) * (reg.paxCount || memberList.length || 1);
-            group = await prisma.registrationGroup.create({
-              data: {
-                kodeRegistrasi: reg.kodeRegistrasi,
-                namaGroup: `GRUP ${reg.namaPerwakilan}`,
-                ketuaGroupId: "",
-                paketKeberangkatanId: reg.paketId,
-                jumlahAnggota: reg.paxCount || memberList.length,
-                totalTagihan,
-                totalPembayaran: 0,
-                sisaPembayaran: totalTagihan,
-                status: "active",
-              },
-            });
-          }
-
-          // Create Jamaah records linked to valid group.id
-          const createdJamaah: any[] = [];
-          for (let i = 0; i < memberList.length; i++) {
-            const m = memberList[i];
-            const regId = `${reg.kodeRegistrasi}-${i + 1}`;
-            let j = await prisma.jamaah.findUnique({ where: { registrationId: regId } });
-            if (!j) {
-              j = await prisma.jamaah.create({
-                data: {
-                  registrationId: regId,
-                  groupId: group.id,
-                  nomorPeserta: regId,
-                  namaLengkap: m.namaLengkap || (i === 0 ? reg.namaPerwakilan : `Anggota ${i + 1}`),
-                  namaAyah: "",
-                  jenisKelamin: ((m.jenisKelamin) as any) || "L",
-                  tempatLahir: m.tempatLahir || "-",
-                  tanggalLahir: m.tanggalLahir ? new Date(m.tanggalLahir) : new Date("2000-01-01"),
-                  nik: "",
-                  nomorPaspor: "",
-                  masaBerlakuPaspor: new Date("2030-01-01"),
-                  nomorTelepon: reg.nomorTelepon,
-                  email: reg.emailPerwakilan,
-                  alamat: "-",
-                  provinsi: "-",
-                  kota: "-",
-                  kecamatan: "-",
-                  kelurahan: "-",
-                  status: "registered",
-                  hotelMekkah: "",
-                  hotelMadinah: "",
-                  syaratDisetujui: reg.termsAccepted ?? true,
-                },
-              });
-            }
-            createdJamaah.push(j);
-          }
-
-          if (createdJamaah.length > 0 && !group.ketuaGroupId) {
-            await prisma.registrationGroup.update({
-              where: { id: group.id },
-              data: { ketuaGroupId: createdJamaah[0].id },
-            });
-          }
-
-          // Ensure all jamaah in this registration are linked to the group
-          await prisma.jamaah.updateMany({
-            where: { id: { in: createdJamaah.map((j) => j.id) } },
-            data: { groupId: group.id },
-          });
-
-          await prisma.registrationRequest.update({
-            where: { id: reg.id },
-            data: { groupId: group.id },
-          });
-
-          // Ensure payment row exists for this group
-          const existingPayment = await prisma.pembayaran.findFirst({
-            where: { groupId: group.id },
-          });
-
-          if (!existingPayment) {
-            const nominalDp = 5000000 * (reg.paxCount || 1);
-            await prisma.pembayaran.create({
-              data: {
-                groupId: group.id,
-                jumlah: nominalDp,
-                metode: "transfer",
-                tanggal: reg.updatedAt || reg.createdAt,
-                buktiUrl: extractedBuktiUrl,
-                status: "pending",
-                sumber: "jamaah",
-                catatan: `DP Pendaftaran ${reg.paxCount} Pax - ${reg.namaPerwakilan} (${reg.kodeRegistrasi})`,
-              },
-            });
-          }
+    for (const reg of unsyncedRegs) {
+      // Extract buktiUrl from catatanAdmin if available
+      let extractedBuktiUrl: string | undefined = undefined;
+      if (reg.catatanAdmin) {
+        const match = reg.catatanAdmin.match(/\[Bukti DP Uploaded[^\]]*\]:\s*([^\s\n]+)/);
+        if (match?.[1] && match[1] !== "File" && match[1] !== "received") {
+          extractedBuktiUrl = match[1];
         }
       }
-    } catch (syncErr) {
-      console.warn("[pembayaran-repo] Failed auto-syncing pending registrations to review queue:", syncErr);
-    }
 
-    // 2. Query all Pembayaran rows with full relations
+      let group = await prisma.registrationGroup.findFirst({
+        where: { kodeRegistrasi: reg.kodeRegistrasi },
+      });
+
+      const memberList = (reg.members && reg.members.length > 0)
+        ? (reg.members as any[]).sort((a, b) => (a.urutan || 0) - (b.urutan || 0))
+        : [{ namaLengkap: reg.namaPerwakilan, jenisKelamin: "L", tempatLahir: "-", tanggalLahir: "2000-01-01", urutan: 1 }];
+
+      // Ensure RegistrationGroup exists FIRST so Jamaah has a valid groupId foreign key
+      if (!group) {
+        const totalTagihan = (reg.keberangkatan?.hargaPaket || 0) * (reg.paxCount || memberList.length || 1);
+        group = await prisma.registrationGroup.create({
+          data: {
+            kodeRegistrasi: reg.kodeRegistrasi,
+            namaGroup: `GRUP ${reg.namaPerwakilan}`,
+            ketuaGroupId: "",
+            paketKeberangkatanId: reg.paketId,
+            jumlahAnggota: reg.paxCount || memberList.length,
+            totalTagihan,
+            totalPembayaran: 0,
+            sisaPembayaran: totalTagihan,
+            status: "active",
+          },
+        });
+      }
+
+      // Create Jamaah records linked to valid group.id
+      const createdJamaah: any[] = [];
+      for (let i = 0; i < memberList.length; i++) {
+        const m = memberList[i];
+        const regId = `${reg.kodeRegistrasi}-${i + 1}`;
+        let j = await prisma.jamaah.findUnique({ where: { registrationId: regId } });
+        if (!j) {
+          j = await prisma.jamaah.create({
+            data: {
+              registrationId: regId,
+              groupId: group.id,
+              nomorPeserta: regId,
+              namaLengkap: m.namaLengkap || (i === 0 ? reg.namaPerwakilan : `Anggota ${i + 1}`),
+              namaAyah: "",
+              jenisKelamin: ((m.jenisKelamin) as any) || "L",
+              tempatLahir: m.tempatLahir || "-",
+              tanggalLahir: m.tanggalLahir ? new Date(m.tanggalLahir) : new Date("2000-01-01"),
+              nik: "",
+              nomorPaspor: "",
+              masaBerlakuPaspor: new Date("2030-01-01"),
+              nomorTelepon: reg.nomorTelepon,
+              email: reg.emailPerwakilan,
+              alamat: "-",
+              provinsi: "-",
+              kota: "-",
+              kecamatan: "-",
+              kelurahan: "-",
+              status: "registered",
+              hotelMekkah: "",
+              hotelMadinah: "",
+              syaratDisetujui: reg.termsAccepted ?? true,
+            },
+          });
+        }
+        createdJamaah.push(j);
+      }
+
+      if (createdJamaah.length > 0 && !group.ketuaGroupId) {
+        await prisma.registrationGroup.update({
+          where: { id: group.id },
+          data: { ketuaGroupId: createdJamaah[0].id },
+        });
+      }
+
+      // Ensure all jamaah in this registration are linked to the group
+      await prisma.jamaah.updateMany({
+        where: { id: { in: createdJamaah.map((j) => j.id) } },
+        data: { groupId: group.id },
+      });
+
+      await prisma.registrationRequest.update({
+        where: { id: reg.id },
+        data: { groupId: group.id },
+      });
+
+      // Ensure payment row exists for this group
+      const existingPayment = await prisma.pembayaran.findFirst({
+        where: { groupId: group.id },
+      });
+
+      if (!existingPayment) {
+        const nominalDp = 5000000 * (reg.paxCount || 1);
+        await prisma.pembayaran.create({
+          data: {
+            groupId: group.id,
+            jumlah: nominalDp,
+            metode: "transfer",
+            tanggal: reg.updatedAt || reg.createdAt,
+            buktiUrl: extractedBuktiUrl,
+            status: "pending",
+            sumber: "jamaah",
+            catatan: `DP Pendaftaran ${reg.paxCount} Pax - ${reg.namaPerwakilan} (${reg.kodeRegistrasi})`,
+          },
+        });
+      }
+    }
+  },
+
+  async getReviewQueue(statusFilter?: string) {
+    // Pure read query — sync logic moved to syncPendingRegistrations()
     const whereClause: any = {};
     if (statusFilter && statusFilter !== "all") {
       whereClause.status = statusFilter;

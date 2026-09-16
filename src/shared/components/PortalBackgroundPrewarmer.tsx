@@ -23,7 +23,6 @@ const CRITICAL_IMAGES = [
 
 const CRITICAL_APIS = [
   "/api/master/harga-layanan",
-  "/api/pembayaran/review?status=all",
 ];
 
 export default function PortalBackgroundPrewarmer() {

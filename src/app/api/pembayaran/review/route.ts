@@ -12,6 +12,12 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const status = searchParams.get("status") || undefined;
+
+    // Fire-and-forget sync — don't block the read response
+    pembayaranRepo.syncPendingRegistrations().catch((err) => {
+      console.warn("[review-api] Background sync error:", err);
+    });
+
     const data = await pembayaranRepo.getReviewQueue(status);
     return NextResponse.json({ success: true, data });
   } catch (error) {

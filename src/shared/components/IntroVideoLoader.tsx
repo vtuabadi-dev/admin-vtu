@@ -29,13 +29,12 @@ export default function IntroVideoLoader({
   const headerRef = useRef<HTMLDivElement | null>(null);
   const ambientGlowRef = useRef<HTMLDivElement | null>(null);
 
-  // Pre-warm client side routes and critical APIs while intro video plays
+  // Pre-warm client side routes while intro video plays
   useEffect(() => {
     if (typeof window !== "undefined") {
       try {
         router.prefetch("/admin/dashboard");
         router.prefetch("/admin/pembayaran/laporan");
-        fetch("/api/pembayaran/review?status=all", { method: "GET" }).catch(() => {});
       } catch {}
     }
   }, [router]);
