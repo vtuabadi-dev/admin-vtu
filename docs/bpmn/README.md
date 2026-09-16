@@ -186,22 +186,83 @@ graph TD
 
 ---
 
-## 5. Susunan 8 Swimlanes (Urutan Baris / Row)
+---
+
+## 5. Sub-Proses: Alur Automator Manifest (SISKOPATUH Kemenag, Block Seat Airlines, dan Visa Umroh KSA)
+
+Setelah seluruh dokumen referensi dan dokumen paspor jamaah terverifikasi **Lengkap & Valid 100%**, sistem mengaktifkan **Automator Manifest Tri-Engine** untuk memproduksi 3 jenis manifest operasional secara otomatis, presisi, dan terintegrasi:
+
+```mermaid
+graph TD
+    StartManifest(["● Mulai: Seluruh Dokumen Terverifikasi Lengkap 100%"]):::event --> GateCheckDoc{"Verifikasi Kelayakan Status Dokumen:<br/>Paspor (Aktif >6 bln), KTP, KK, Buku Nikah, Pas Foto Putih"}:::gateway
+
+    %% DOKUMEN BELUM LENGKAP
+    GateCheckDoc -- "BELUM LENGKAP / INVALID" --> BlockManifest["Status: PENDING DOKUMEN (Kunci Ekspor Manifest)"]:::taskOps
+    BlockManifest --> LoopBack["Kembali ke Sub-Proses Verifikasi Dokumen & Surat Rekomendasi"]:::taskOps
+
+    %% DOKUMEN LENGKAP 100%
+    GateCheckDoc -- "100% LENGKAP & VALID" --> TrigAutomator["Eksekusi: Multi-Format Manifest Automator Engine"]:::taskSistem
+
+    %% PARALLEL AUTOMATOR ENGINES (FORK)
+    TrigAutomator --> ForkManifest{"Fork Parallel"}:::gateway
+
+    %% ENGINE 1: MANIFEST SISKOPATUH KEMENAG
+    ForkManifest --> Auto_Sisko["1. SISKOPATUH Automator (Kemenag RI)<br/>• Ingest NIK & No Paspor Asli<br/>• Ingest Nama Ayah Kandung (dari KK / Buku Nikah)<br/>• Ingest Tanggal Terbit & Expired Paspor<br/>• Binding Kombinasi Hotel Mekkah & Madinah<br/>• Inject Kode PPIU VTU Abadi & No SK Kemenag"]:::taskSisko
+
+    %% ENGINE 2: MANIFEST BLOCK SEAT AIRLINES
+    ForkManifest --> Auto_Seat["2. Block Seat Automator (Airlines / GDS)<br/>• Parsing Nama Depan, Tengah & Belakang<br/>• Format Title Internasional (MR / MRS / MS / MSTR)<br/>• Mapping PNR Booking Code & Jadwal Flight<br/>• Validasi Masa Berlaku Paspor > 6 Bulan<br/>• Export Format Standard Maskapai (Saudia / SV)"]:::taskSeat
+
+    %% ENGINE 3: MANIFEST VISA UMROH KSA
+    ForkManifest --> Auto_Visa["3. Visa Umroh Automator (Muassasah / KSA MoFA)<br/>• Format Nama 3-4 Suku Kata (Sesuai Endorsement)<br/>• Ingest Mahram ID & Hubungan Mahram Keluarga<br/>• Auto-Link Pas Foto Studio Background Putih<br/>• Mapping Port of Entry (Jeddah / Madinah)<br/>• Generate Batch File Pengajuan Provider Visa"]:::taskVisa
+
+    %% JOIN PARALLEL
+    Auto_Sisko --> JoinManifest{"Join Parallel"}:::gateway
+    Auto_Seat --> JoinManifest
+    Auto_Visa --> JoinManifest
+
+    JoinManifest --> Manifest_Validate["Admin Manifest & Operasional: Cross-Check & Final Approval Manifest"]:::taskOps
+    Manifest_Validate --> Distribute_Outputs["Distribusi Otomatis: API Siskopatuh Kemenag, Airlines GDS PNR, & Provider Visa"]:::taskSistem
+    Distribute_Outputs --> Ready_Departure(["■ Selesai: Manifest Terbit & Rombongan Siap Diberangkatkan"]):::endEvent
+
+    classDef event fill:#a5d6a7,stroke:#2e7d32,stroke-width:2px,color:#000;
+    classDef endEvent fill:#a5d6a7,stroke:#2e7d32,stroke-width:3px,color:#000;
+    classDef gateway fill:#ffe0b2,stroke:#e65100,stroke-width:2px,color:#000;
+    classDef taskSistem fill:#eceff1,stroke:#455a64,stroke-width:1.5px,color:#000;
+    classDef taskOps fill:#e8f5e9,stroke:#2e7d32,stroke-width:1.5px,color:#000;
+    classDef taskSisko fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px,color:#000;
+    classDef taskSeat fill:#e1f5fe,stroke:#0288d1,stroke-width:2px,color:#000;
+    classDef taskVisa fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px,color:#000;
+```
+
+### Rincian 3 Output Manifest Automator:
+1. **Manifest SISKOPATUH (Kemenag RI)**:
+   - Mengintegrasikan data identitas sipil (NIK, Tempat Lahir, Tanggal Lahir), data keimigrasian (Nomor Paspor, Tanggal Terbit, Tanggal Expired), serta **Nama Ayah Kandung** yang telah diverifikasi dari KK / Buku Nikah.
+   - Mengelompokkan jamaah berdasarkan kombinasi hotel Mekkah dan Madinah sesuai paket yang dipilih.
+2. **Manifest Block Seat (Airlines / PNR Flight)**:
+   - Memecah nama jamaah menjadi format standar IATA penerbangan (*First Name, Middle Name, Last Name*), menentukan *Gender Title* (`MR`, `MRS`, `MS`, `MSTR`), serta memvalidasi tanggal *expiry* paspor tidak kurang dari 6 bulan sebelum tanggal kepulangan.
+   - Menghubungkan nomor tiket / kode booking PNR maskapai penerbangan (Saudia Airlines / Garuda Indonesia / Qatar Airways).
+3. **Manifest Visa Umroh (Muassasah / KSA MoFA)**:
+   - Menyusun nama paspor 3–4 suku kata (memanfaatkan nama endorsement ber-nasab ayah), relasi mahram / ID mahram pendamping, serta mengaitkan tautan berkas **Pas Foto Studio Background Putih** beresolusi standar kedutaan.
+   - Menghasilkan berkas batch export untuk injeksi ke sistem Provider Visa / platform KSA MoFA.
+
+---
+
+## 6. Susunan 8 Swimlanes (Urutan Baris / Row)
 
 | No (Row) | Lane / Role | Kode Role Sistem | Posisi & Tanggung Jawab Utama |
 |:---|:---|:---|:---|
 | **Row 1** | **JAMAAH / KETUA GROUP** | `jamaah` | Mengisi data group, memilih paket, tentukan kamar, upload bukti bayar DP, terima perlengkapan, upload berkas referensi (KTP, KK, Buku Nikah), upload paspor, pelunasan, hingga keberangkatan dan kepulangan. |
-| **Row 2** | **SISTEM VTU & AI ENGINE** | *Automated Service* | Auto-broadcast jadwal ke Telegram, kalkulasi nominal total & DP, generate PDF formulir bertanda tangan, ingest data ke manifest, Gemini OCR, Autocrat Engine surat rekomendasi & endorsement, sinkronisasi Google Drive, dan immutable `AuditEntry`. |
+| **Row 2** | **SISTEM VTU & AI ENGINE** | *Automated Service* | Auto-broadcast jadwal ke Telegram, kalkulasi nominal total & DP, generate PDF formulir bertanda tangan, ingest data ke manifest, Gemini OCR, Autocrat Engine surat rekomendasi, Tri-Engine Automator Manifest (SISKOPATUH, Block Seat, Visa), dan immutable `AuditEntry`. |
 | **Row 3** | **ADMIN OPERASIONAL** | `admin_operasional` | **Sub-Proses Manajemen Paket:** Paket baru, update, split starting, split promo; peninjauan pendaftaran baru & bukti transfer DP; penerbitan surat rekomendasi paspor di `/admin/surat`; serta closing paket keberangkatan. |
 | **Row 4** | **ADMIN DOKUMEN** | `admin_dokumen` | Manual review berkas buram/OCR error, verifikasi kelengkapan dokumen referensi (KTP, KK, Buku Nikah), penolakan/permintaan ulang dokumen belum lengkap, approval kelayakan dokumen visa. |
 | **Row 5** | **ADMIN PEMBAYARAN** | `admin_pembayaran` | Penerbitan invoice resmi (DP & Pelunasan), invoice split group (A/B/C), rekonsiliasi mutasi bank, alokasi pembayaran per jamaah. |
-| **Row 6** | **ADMIN MANIFEST & ROOMING** | `admin_manifest` | Finalisasi manifest jamaah, grouping kombinasi hotel Mekkah/Madinah, dan eksekusi algoritma *Rooming Engine* (Quad/Triple/Double, Mahram & Gender). |
+| **Row 6** | **ADMIN MANIFEST & ROOMING** | `admin_manifest` | Finalisasi manifest jamaah, eksekusi Tri-Engine Automator Manifest (SISKOPATUH, Block Seat, Visa), grouping kombinasi hotel, dan eksekusi algoritma *Rooming Engine*. |
 | **Row 7** | **TOUR LEADER** | `tour_leader` | Serah terima (*handover*) final manifest & rooming list, manasik jamaah, pendampingan spiritual & logistik di Makkah/Madinah, laporan TL. |
 | **Row 8** | **ADMIN BADAL & WAKAF** | `admin_badal` | Layanan khusus: pemrosesan order badal umroh & wakaf mushaf Quran, penugasan muthawif di Makkah, serta upload video dokumentasi & sertifikat badal. |
 
 ---
 
-## 6. Kepatuhan Validasi Standard OMG BPMN 2.0
+## 7. Kepatuhan Validasi Standard OMG BPMN 2.0
 
 Verifikasi integritas model XML diuji secara otomatis dengan hasil:
 - **Total IDs Terdaftar**: 405 Node & Element
