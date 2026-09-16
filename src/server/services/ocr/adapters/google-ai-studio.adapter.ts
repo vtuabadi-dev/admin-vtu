@@ -165,11 +165,14 @@ Ekstrak seluruh data di atas dalam format JSON valid (tanpa markdown wrapper):
   "rawText": "Teks mentah lengkap KTP"
 }`;
     case "kk":
-      return `Analisis gambar Kartu Keluarga ini dan ekstrak data terstruktur berikut dalam format JSON:
+      return `Analisis gambar Kartu Keluarga (KK) atau Buku Nikah Indonesia ini.
+Tugas utama adalah mengidentifikasi dan mengekstrak NAMA AYAH KANDUNG / KEPALA KELUARGA dari jamaah/anggota keluarga terkait dalam format JSON valid (tanpa markdown wrapper):
 {
-  "namaLengkap": "Nama kepala keluarga / anggota",
-  "nik": "NIK 16 digit",
-  "rawText": "Teks mentah KK"
+  "namaAyah": "Nama Ayah Kandung dari jamaah atau nama Kepala Keluarga yang tertera pada kolom NAMA AYAH / KEPALA KELUARGA (contoh: H. AHMAD SOFWAN / SOLEH ISMAIL)",
+  "namaLengkap": "Nama lengkap jamaah / anggota keluarga",
+  "nik": "16 digit NIK",
+  "nomorKk": "16 digit Nomor Kartu Keluarga jika tertera",
+  "rawText": "Teks mentah KK / Buku Nikah"
 }`;
     case "akta":
       return `Analisis gambar Akta Lahir ini dan ekstrak data terstruktur berikut dalam format JSON:

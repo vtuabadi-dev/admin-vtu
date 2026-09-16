@@ -74,7 +74,7 @@ export const DOCUMENT_FIELD_MAPS: Record<string, string[]> = {
     "rt",
     "rw",
   ],
-  kk: ["namaLengkap", "nik"],
+  kk: ["namaAyah", "namaLengkap", "nik", "nomorKk"],
   akta: ["namaLengkap", "nik", "tanggalLahir", "tempatLahir"],
 };
 

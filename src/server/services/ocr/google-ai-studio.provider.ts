@@ -183,6 +183,15 @@ export class GoogleAiStudioOcrProvider implements OcrProvider {
   "alamatLengkap": "Gabungan lengkap: {Alamat}, RT.{RT}/RW.{RW}, Kel. {Kelurahan}, Kec. {Kecamatan}, {Kota}",
   "rawText": "Teks mentah lengkap KTP"
 }`
+          : jenis === "kk"
+          ? `Analisis gambar Kartu Keluarga (KK) atau Buku Nikah Indonesia ini dan ekstrak data terstruktur berikut dalam format JSON valid:
+{
+  "namaAyah": "Nama Ayah Kandung dari anggota keluarga / nama Kepala Keluarga pada kolom Nama Ayah / Kepala Keluarga (contoh: H. AHMAD SOFWAN / SOLEH ISMAIL)",
+  "namaLengkap": "Nama lengkap jamaah / anggota keluarga",
+  "nik": "16 digit NIK",
+  "nomorKk": "16 digit Nomor Kartu Keluarga jika ada",
+  "rawText": "Teks mentah lengkap KK / Buku Nikah"
+}`
           : `Analisis gambar dokumen ${jenis} ini dan ekstrak data terstruktur berikut dalam format JSON:
 {
   "namaLengkap": "Nama lengkap pemegang paspor / dokumen",

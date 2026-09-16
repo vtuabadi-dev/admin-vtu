@@ -89,6 +89,10 @@ async function syncJamaahAndManifestFromDocData(jamaahId: string, data: Record<s
     jamaahUpdates.nik = data.nik.trim();
   }
 
+  if (typeof data.namaAyah === "string" && data.namaAyah.trim() && data.namaAyah.trim() !== "-") {
+    jamaahUpdates.namaAyah = data.namaAyah.trim().toUpperCase();
+  }
+
   if (typeof data.statusPerkawinan === "string" && data.statusPerkawinan.trim()) {
     const s = data.statusPerkawinan.trim().toUpperCase();
     jamaahUpdates.statusMenikah = s.includes("BELUM") ? "Belum Menikah" : s.includes("KAWIN") || s.includes("MENIKAH") ? "Menikah" : s;

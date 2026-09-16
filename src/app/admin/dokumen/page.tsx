@@ -756,6 +756,7 @@ export default function DokumenPage() {
         if (!initialOcr["kk"]) {
           initialOcr["kk"] = {
             namaLengkap: member.namaLengkap || "",
+            namaAyah: member.namaAyah && member.namaAyah !== "-" ? member.namaAyah : "",
             nik: member.nik && member.nik !== "-" ? member.nik : "",
           };
         }
@@ -913,6 +914,7 @@ export default function DokumenPage() {
               ...j,
               dokumen: updatedDocs,
               ...(ocrData.namaLengkap && (jenis === "paspor" || !hasPassport) ? { namaLengkap: ocrData.namaLengkap } : {}),
+              ...(ocrData.namaAyah ? { namaAyah: ocrData.namaAyah } : {}),
               ...(ocrData.nik ? { nik: ocrData.nik } : {}),
               ...(ocrData.nomorPaspor ? { nomorPaspor: ocrData.nomorPaspor } : {}),
               ...(ocrData.tanggalLahir ? { tanggalLahir: ocrData.tanggalLahir } : {}),
@@ -2713,8 +2715,61 @@ export default function DokumenPage() {
                                       </>
                                     )}
 
-                                    {/* KK / Akta Fields */}
-                                    {(activeDocType === "kk" || activeDocType === "akta") && (
+                                    {/* KK Specific Fields (Nama Ayah Kandung - Utama) */}
+                                    {activeDocType === "kk" && (
+                                      <>
+                                        <div className="space-y-1.5 p-3 rounded-lg bg-emerald-500/5 dark:bg-emerald-500/10 border border-emerald-500/30">
+                                          <div className="flex items-center justify-between">
+                                            <label className="text-[11px] font-bold text-emerald-900 dark:text-emerald-300 flex items-center gap-1.5">
+                                              <span>Nama Ayah Kandung:</span>
+                                              <span className="text-[9px] bg-emerald-600 text-white font-semibold px-1.5 py-0.2 rounded">
+                                                Wajib Siskopatuh & Visa
+                                              </span>
+                                            </label>
+                                          </div>
+                                          <Input
+                                            value={ocrResults[activeDocType]?.namaAyah || ""}
+                                            onChange={(e) => handleOcrFieldChange(activeDocType, "namaAyah", e.target.value.toUpperCase())}
+                                            disabled={savedOcrDocs[activeDocType] && !editingOcrDocs[activeDocType]}
+                                            placeholder="NAMA AYAH KANDUNG (CONTOH: H. AHMAD SOFWAN)"
+                                            className="h-9 text-xs font-bold text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700 bg-white dark:bg-stone-900 focus-visible:ring-emerald-500"
+                                          />
+                                          <p className="text-[10px] text-stone-500 dark:text-stone-400">
+                                            * Diekstrak dari kolom Nama Ayah / Kepala Keluarga pada KK / Buku Nikah dan otomatis tersinkron ke profil Jamaah & Manifest.
+                                          </p>
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-2">
+                                          <div className="space-y-1">
+                                            <label className="text-[11px] font-semibold text-stone-600 dark:text-stone-400">
+                                              NIK (Nomor Induk Kependudukan):
+                                            </label>
+                                            <Input
+                                              value={ocrResults[activeDocType]?.nik || ""}
+                                              onChange={(e) => handleOcrFieldChange(activeDocType, "nik", e.target.value)}
+                                              disabled={savedOcrDocs[activeDocType] && !editingOcrDocs[activeDocType]}
+                                              placeholder="16 digit NIK"
+                                              className="h-8 text-xs font-mono font-medium"
+                                            />
+                                          </div>
+                                          <div className="space-y-1">
+                                            <label className="text-[11px] font-semibold text-stone-600 dark:text-stone-400">
+                                              Nomor KK (Opsional):
+                                            </label>
+                                            <Input
+                                              value={ocrResults[activeDocType]?.nomorKk || ""}
+                                              onChange={(e) => handleOcrFieldChange(activeDocType, "nomorKk", e.target.value)}
+                                              disabled={savedOcrDocs[activeDocType] && !editingOcrDocs[activeDocType]}
+                                              placeholder="16 digit No. KK"
+                                              className="h-8 text-xs font-mono"
+                                            />
+                                          </div>
+                                        </div>
+                                      </>
+                                    )}
+
+                                    {/* Akta Fields */}
+                                    {activeDocType === "akta" && (
                                       <>
                                         <div className="space-y-1">
                                           <label className="text-[11px] font-semibold text-stone-600 dark:text-stone-400">
