@@ -217,8 +217,53 @@ export function formatBlockSeatPassengerName(
 }
 
 // ────────────────────────────────────────────────────────────
-// GENDER & NOMENCLATURE LOGIC FOR MANIFEST SISKOPATUH (KEMENAG)
+// GENDER & TITLE NOMENCLATURE FOR MANIFEST SISKOPATUH (KEMENAG)
 // ────────────────────────────────────────────────────────────
+
+export type SiskopatuhTitle = "TUAN" | "NONA" | "NYONYA";
+
+/**
+ * Resolves standard SISKOPATUH Title (strictly 3 dropdown values):
+ * - TUAN   : Semua jamaah laki-laki (dewasa, anak, bayi)
+ * - NYONYA : Jamaah perempuan yang sudah menikah / bersuami / janda / ibu
+ * - NONA   : Jamaah perempuan yang belum menikah / anak-anak / gadis
+ */
+export function getSiskopatuhTitle(jamaah: {
+  jenisKelamin?: string;
+  gender?: string;
+  statusPernikahan?: string;
+  maritalStatus?: string;
+  isMarried?: boolean;
+  hubMahram?: string;
+  hubKeluarga?: string;
+  dokumen?: Array<{ jenis: string }>;
+}): SiskopatuhTitle {
+  const rawJk = (jamaah.jenisKelamin || jamaah.gender || "").toUpperCase().trim();
+  const isMale = rawJk === "L" || rawJk === "LAKI-LAKI" || rawJk === "MALE" || rawJk === "PRIA";
+
+  // 1. Seluruh jamaah laki-laki ber-title TUAN
+  if (isMale) {
+    return "TUAN";
+  }
+
+  // 2. Untuk jamaah perempuan:
+  const statusNikah = (jamaah.statusPernikahan || jamaah.maritalStatus || "").toLowerCase();
+  const hub = (jamaah.hubMahram || jamaah.hubKeluarga || "").toLowerCase();
+  const hasBukuNikah = jamaah.dokumen?.some((d) => d.jenis === "buku_nikah");
+
+  const isMarried =
+    jamaah.isMarried === true ||
+    hasBukuNikah ||
+    statusNikah.includes("menikah") ||
+    statusNikah.includes("kawin") ||
+    statusNikah.includes("married") ||
+    statusNikah.includes("cerai") ||
+    statusNikah.includes("janda") ||
+    hub.includes("istri") ||
+    hub.includes("ibu");
+
+  return isMarried ? "NYONYA" : "NONA";
+}
 
 /**
  * Resolves standard SISKOPATUH Kemenag Gender String:

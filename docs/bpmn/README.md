@@ -237,6 +237,10 @@ graph TD
 ### Rincian 3 Output Manifest Automator:
 1. **Manifest SISKOPATUH (Kemenag RI)**:
    - Mengintegrasikan data identitas sipil (NIK, Tempat Lahir, Tanggal Lahir), data keimigrasian (Nomor Paspor, Tanggal Terbit, Tanggal Expired), serta **Nama Ayah Kandung** yang telah diverifikasi dari KK / Buku Nikah.
+   - Menentukan kolom **Title SISKOPATUH** secara otomatis dengan 3 opsi standar:
+     - **`TUAN`**: Seluruh jamaah laki-laki (dewasa, anak, bayi).
+     - **`NYONYA`**: Jamaah perempuan yang sudah menikah / bersuami / janda / ibu.
+     - **`NONA`**: Jamaah perempuan yang belum menikah / anak-anak / gadis.
    - Mengelompokkan jamaah berdasarkan kombinasi hotel Mekkah dan Madinah sesuai paket yang dipilih.
 2. **Manifest Block Seat (Airlines / PNR Flight)**:
    - Memecah nama jamaah menjadi format standar IATA penerbangan (*First Name, Middle Name, Last Name*), menentukan *Gender Title* sesuai aturan operasional:
