@@ -2735,7 +2735,7 @@ export default function DokumenPage() {
                                             className="h-9 text-xs font-bold text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700 bg-white dark:bg-stone-900 focus-visible:ring-emerald-500"
                                           />
                                           <p className="text-[10px] text-stone-500 dark:text-stone-400">
-                                            * Diekstrak dari kolom Nama Ayah / Kepala Keluarga pada KK / Buku Nikah dan otomatis tersinkron ke profil Jamaah & Manifest.
+                                            * Diekstrak dari kolom Nama Ayah pada baris data jamaah di KK / Buku Nikah dan otomatis tersinkron ke profil Jamaah & Manifest.
                                           </p>
                                         </div>
 
