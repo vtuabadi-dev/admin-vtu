@@ -100,7 +100,7 @@ function parseLetter(
   let salamPenutup = "Wassalamu'alaikum Warahmatullahi Wabarakatuh.";
   let signatureKotaTanggal = `Sidoarjo, ${todayInfo.masehi}`;
   let signatureJabatan = template.penandatangan?.jabatan || "Direktur Utama";
-  let signatureInstansi = "PT. VAUZA TRIKARSA UTAMA";
+  let signatureInstansi = "PT. VAUZA TAMMA ABADI";
   let signatureNama = template.penandatangan?.nama || "H. FAISAL WAHYUDI";
 
   let currentSection = "meta";
@@ -276,12 +276,12 @@ function parseLetter(
   }
 
   // Detect company entity
-  let entityCompany: "tamma" | "trikarsa" | "custom" = "trikarsa";
+  let entityCompany: "tamma" | "trikarsa" | "custom" = "tamma";
   const allText = text.toLowerCase();
-  if (allText.includes("tamma") || allText.includes("vauza tamma")) {
-    entityCompany = "tamma";
-  } else if (allText.includes("trikarsa") || allText.includes("vauza trikarsa")) {
+  if (allText.includes("trikarsa") || allText.includes("vauza trikarsa")) {
     entityCompany = "trikarsa";
+  } else {
+    entityCompany = "tamma";
   }
 
   return {
@@ -337,18 +337,18 @@ function renderLetterPage(
   doc.setFontSize(13);
   doc.setTextColor(6, 78, 59); // Emerald #064E3B
   const companyTitle =
-    parsed.entityCompany === "tamma"
-      ? "PT. VAUZA TAMMA ABADI"
-      : "PT. VAUZA TRIKARSA UTAMA";
+    parsed.entityCompany === "trikarsa"
+      ? "PT. VAUZA TRIKARSA UTAMA"
+      : "PT. VAUZA TAMMA ABADI";
   doc.text(companyTitle, 46, y + 6);
 
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8.5);
   doc.setTextColor(30, 41, 59); // Slate #1E293B
   const kemenagText =
-    parsed.entityCompany === "tamma"
-      ? "Izin Operasional Umroh Kemenag RI No. 805 Tahun 2019"
-      : "Penyelenggara Perjalanan Ibadah Umroh (PPIU) Kemenag RI No. U.400 Tahun 2021";
+    parsed.entityCompany === "trikarsa"
+      ? "Penyelenggara Perjalanan Ibadah Umroh (PPIU) Kemenag RI No. U.400 Tahun 2021"
+      : "Penyelenggara Perjalanan Ibadah Umroh (PPIU) Kemenag RI No. U.400 Tahun 2021 / No. 805 Tahun 2019";
   doc.text(kemenagText, 46, y + 11);
 
   doc.setFontSize(7.5);
@@ -523,7 +523,7 @@ function renderLetterPage(
     align: "center",
   });
   doc.setFont("helvetica", "bold");
-  doc.text(parsed.signature.instansi || "PT. VAUZA TRIKARSA UTAMA", sigX + 32.5, sigY + 4.8, {
+  doc.text(parsed.signature.instansi || "PT. VAUZA TAMMA ABADI", sigX + 32.5, sigY + 4.8, {
     align: "center",
   });
 

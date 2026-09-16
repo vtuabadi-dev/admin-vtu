@@ -366,17 +366,13 @@ export default function OfficialLetterPreview({
           />
           <div>
             <h2 className="text-base sm:text-lg font-black tracking-tight text-stone-950 font-sans uppercase">
-              {isTamma ? "PT. VAUZA TAMMA ABADI" : "PT. VAUZA TRIKARSA UTAMA"}
+              PT. VAUZA TAMMA ABADI
             </h2>
             <p className="text-[11px] sm:text-[11.5px] font-bold text-stone-800 font-sans tracking-wide">
-              {isTamma
-                ? "Penyelenggara Perjalanan Ibadah Umroh (PPIU) Kemenag RI No. U.493 Tahun 2021"
-                : "Penyelenggara Perjalanan Ibadah Umroh (PPIU) Kemenag RI No. U.400 Tahun 2021"}
+              Penyelenggara Perjalanan Ibadah Umroh (PPIU) Kemenag RI No. U.400 Tahun 2021 / No. 805 Tahun 2019
             </p>
             <p className="text-[9.5px] sm:text-[10px] text-stone-600 font-sans mt-0.5 leading-tight">
-              {isTamma
-                ? "Kantor Pusat: Jl. Kauman No. 21, Klojen, Kota Malang, Jawa Timur • Telp: (0341) 368-888 • Email: info@vauzatamma.com"
-                : "Kantor Pusat: Ruko Gateway Blok C-12, Waru, Sidoarjo • Telp: (031) 854-4455 • Email: operasional@vtuabadi.com"}
+              Kantor Pusat: Ruko Gateway Blok C-12, Waru, Sidoarjo • Telp: (031) 854-4455 • Email: info@vauzatamma.co.id
             </p>
           </div>
         </div>

@@ -147,7 +147,7 @@ export default function MasterSuratPage() {
       slug: `custom-surat-${Date.now().toString(36)}`,
       nama: "Surat Tugas",
       kategori: "internal",
-      deskripsi: "Template surat operasional kustom PT. Vauza Trikarsa Utama",
+      deskripsi: "Template surat operasional kustom PT. Vauza Tamma Abadi",
       kodeNomorDefault: "ST",
       formatNomor: "[NOMOR]/ST/[BULAN]/[TAHUN]",
       jumlahTemplateTerlampir: 1,
@@ -167,8 +167,8 @@ export default function MasterSuratPage() {
       tujuanDefault: "Kepada Pihak yang Berkepentingan",
       kotaTujuanDefault: "Di Tempat",
       penandatangan: {
-        nama: "H. Fauzan Adzim, S.E.",
-        jabatan: "Direktur Utama PT. Vauza Trikarsa Utama",
+        nama: "H. Faisal Wahyudi",
+        jabatan: "Direktur Utama PT. Vauza Tamma Abadi",
         showStempel: true,
         showBarcode: true,
       },
@@ -181,7 +181,7 @@ Instansi / Cabang   : {Kantor Cabang}
 Kota Penugasan      : {Kota Tujuan}
 Tanggal Tugas       : {Tanggal Penugasan}
 
-Untuk melaksanakan tugas operasional pendampingan dan pelayanan jamaah PT. Vauza Trikarsa Utama.
+Untuk melaksanakan tugas operasional pendampingan dan pelayanan jamaah PT. Vauza Tamma Abadi.
 
 Demikian Surat Tugas ini dibuat dengan sebenarnya agar dapat dipergunakan sebagaimana mestinya.`,
       placeholders: [
@@ -977,8 +977,8 @@ Demikian Surat Tugas ini dibuat dengan sebenarnya agar dapat dipergunakan sebaga
       tujuanDefault: "Yth. Pihak yang Berkepentingan",
       kotaTujuanDefault: "Di Tempat",
       penandatangan: {
-        nama: "H. Fauzan Adzim, S.E.",
-        jabatan: "Direktur Utama PT. Vauza Trikarsa Utama",
+        nama: "H. Faisal Wahyudi",
+        jabatan: "Direktur Utama PT. Vauza Tamma Abadi",
         showStempel: true,
         showBarcode: true,
       },
@@ -2003,13 +2003,13 @@ Demikian Surat Tugas ini dibuat dengan sebenarnya agar dapat dipergunakan sebaga
                           />
                           <div>
                             <h2 className="text-base font-bold tracking-tight text-stone-950 font-sans">
-                              PT. VAUZA TRIKARSA UTAMA
+                              PT. VAUZA TAMMA ABADI
                             </h2>
                             <p className="text-[10px] text-stone-600 font-sans font-medium">
-                              Penyelenggara Perjalanan Ibadah Umroh (PPIU) Kemenag RI No. U.400 Tahun 2021
+                              Penyelenggara Perjalanan Ibadah Umroh (PPIU) Kemenag RI No. U.400 Tahun 2021 / No. 805 Tahun 2019
                             </p>
                             <p className="text-[9px] text-stone-500 font-sans">
-                              Ruko Gateway Blok C-12, Waru, Sidoarjo &bull; Telp: (031) 854-4455 &bull; info@vtuabadi.com
+                              Ruko Gateway Blok C-12, Waru, Sidoarjo &bull; Telp: (031) 854-4455 &bull; info@vauzatamma.co.id
                             </p>
                           </div>
                         </div>
@@ -2061,7 +2061,7 @@ Demikian Surat Tugas ini dibuat dengan sebenarnya agar dapat dipergunakan sebaga
                       )}
 
                       <div className="text-center min-w-[200px] ml-auto space-y-1">
-                        <p className="font-semibold">PT. VAUZA TRIKARSA UTAMA</p>
+                        <p className="font-semibold">PT. VAUZA TAMMA ABADI</p>
                         <div className="h-16 flex items-center justify-center relative">
                           {editingTemplate.penandatangan.showStempel && (
                             <div className="absolute inset-0 flex items-center justify-center opacity-60 pointer-events-none">

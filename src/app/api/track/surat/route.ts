@@ -40,8 +40,8 @@ export async function GET(request: NextRequest) {
       data: {
         id: id || "VERIF-DOC-VTU",
         nomorSurat: no || "SR-PASPOR/001/VTU/VIII/2026",
-        publisher: "PT. Vauza Trikarsa Utama (VTU Abadi)",
-        license: "PPIU Kemenag RI No. U.400 Tahun 2021",
+        publisher: "PT. Vauza Tamma Abadi (VTU Abadi)",
+        license: "PPIU Kemenag RI No. U.400 Tahun 2021 / No. 805 Tahun 2019",
         verifiedAt: new Date().toISOString(),
         jamaah: jamaahData
           ? {

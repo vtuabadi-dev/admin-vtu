@@ -1,14 +1,21 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Save, Sparkles } from "lucide-react";
+import { Save, Sparkles, Building2, CheckCircle2 } from "lucide-react";
 import { PermissionGuard } from "@/shared/components/PermissionGuard";
 import { Tabs } from "@/shared/components/ui/Tabs";
 import { Select } from "@/shared/components/ui/Select";
 import { BankSelect } from "@/shared/components/ui/BankSelect";
 import { Button } from "@/shared/components/ui/Button";
+import { Badge } from "@/shared/components/ui/Badge";
 import { OcrSettingsTab } from "./components/OcrSettingsTab";
 import { TelegramBroadcastTab } from "./components/TelegramBroadcastTab";
+import {
+  getCompanyProfile,
+  saveCompanyProfile,
+  DEFAULT_COMPANY_PROFILE,
+  type CompanyProfile,
+} from "@/shared/lib/company-config";
 
 const DEFAULT_WA_INVOICE_TPL = `*INVOICE PEMBAYARAN RESMI — VTU ABADI TRAVEL*
 --------------------------------------------------
@@ -39,10 +46,10 @@ Wassalamu'alaikum Warahmatullahi Wabarakatuh.
 // ── Settings section wrapper ──
 function SettingSection({ title, desc, children }: { title: string; desc?: string; children: React.ReactNode }) {
   return (
-    <div className="space-y-3 pb-6 border-b border-slate-200 last:border-b-0 last:pb-0">
+    <div className="space-y-3 pb-6 border-b border-slate-200 dark:border-stone-800 last:border-b-0 last:pb-0">
       <div>
-        <h3 className="text-sm font-bold text-slate-900">{title}</h3>
-        {desc && <p className="text-xs text-slate-500 mt-0.5">{desc}</p>}
+        <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">{title}</h3>
+        {desc && <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{desc}</p>}
       </div>
       <div className="space-y-3">{children}</div>
     </div>
@@ -53,10 +60,187 @@ function SettingRow({ label, desc, children }: { label: string; desc?: string; c
   return (
     <div className="flex items-start justify-between gap-4">
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-semibold text-slate-800">{label}</p>
-        {desc && <p className="text-xs text-slate-500 mt-0.5">{desc}</p>}
+        <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">{label}</p>
+        {desc && <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{desc}</p>}
       </div>
       <div className="shrink-0">{children}</div>
+    </div>
+  );
+}
+
+// ── Profil & Legalitas Perusahaan (PT) ──
+function ProfilPerusahaan() {
+  const [saved, setSaved] = useState(false);
+  const [profile, setProfile] = useState<CompanyProfile>(DEFAULT_COMPANY_PROFILE);
+
+  useEffect(() => {
+    async function load() {
+      try {
+        const res = await fetch("/api/admin/settings/general");
+        const json = await res.json();
+        if (json.success && json.data) {
+          setProfile((prev) => ({
+            ...prev,
+            companyName: json.data.companyName || prev.companyName,
+            companyBrand: json.data.companyBrand || prev.companyBrand,
+            companyLicense: json.data.companyLicense || prev.companyLicense,
+            companyAddress: json.data.companyAddress || prev.companyAddress,
+            companyPhone: json.data.companyPhone || prev.companyPhone,
+            companyEmail: json.data.companyEmail || prev.companyEmail,
+            companyWebsite: json.data.companyWebsite || prev.companyWebsite,
+            companyDirector: json.data.companyDirector || prev.companyDirector,
+            companyDirectorTitle: json.data.companyDirectorTitle || prev.companyDirectorTitle,
+          }));
+          return;
+        }
+      } catch {}
+      setProfile(getCompanyProfile());
+    }
+    load();
+  }, []);
+
+  const handleSave = async () => {
+    saveCompanyProfile(profile);
+    try {
+      await fetch("/api/admin/settings/general", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(profile),
+      });
+    } catch (e) {
+      console.warn("Failed to persist to server API, saved to localStorage", e);
+    }
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2500);
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="p-4 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/40 flex items-start gap-3">
+        <Building2 className="h-5 w-5 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
+        <div className="text-xs text-emerald-800 dark:text-emerald-200 leading-relaxed">
+          <strong>Master Referensi Perusahaan:</strong> Data identitas legal di bawah ini menjadi <em>Single Source of Truth</em> resmi untuk seluruh Kop Surat, Generator PDF Surat, Kuitansi/Invoice, Verifikasi QR Code, dan Pesan WhatsApp.
+        </div>
+      </div>
+
+      <SettingSection
+        title="Badan Hukum & Identitas Resmi"
+        desc="Nama PT dan Izin Kemenag yang dicantumkan pada seluruh dokumen operasional"
+      >
+        <SettingRow
+          label="Nama Legal PT / Perusahaan"
+          desc="Nama resmi badan hukum (Contoh: PT. VAUZA TAMMA ABADI)"
+        >
+          <input
+            className="h-9 w-80 rounded-md border border-input bg-background px-3 py-1 text-sm font-bold text-primary"
+            value={profile.companyName}
+            onChange={(e) => setProfile({ ...profile, companyName: e.target.value })}
+            placeholder="PT. VAUZA TAMMA ABADI"
+          />
+        </SettingRow>
+
+        <SettingRow
+          label="Nama Brand / Merk Dagang"
+          desc="Nama komersial travel (Contoh: VTU ABADI Travel)"
+        >
+          <input
+            className="h-9 w-80 rounded-md border border-input bg-background px-3 py-1 text-sm font-semibold"
+            value={profile.companyBrand}
+            onChange={(e) => setProfile({ ...profile, companyBrand: e.target.value })}
+            placeholder="VTU ABADI Travel"
+          />
+        </SettingRow>
+
+        <SettingRow
+          label="Izin PPIU / SK Kemenag RI"
+          desc="Legalitas izin penyelenggara ibadah umroh resmi Kemenag RI"
+        >
+          <input
+            className="h-9 w-80 rounded-md border border-input bg-background px-3 py-1 text-sm"
+            value={profile.companyLicense}
+            onChange={(e) => setProfile({ ...profile, companyLicense: e.target.value })}
+            placeholder="Penyelenggara Perjalanan Ibadah Umroh (PPIU) Kemenag RI No. U.400 Tahun 2021"
+          />
+        </SettingRow>
+      </SettingSection>
+
+      <SettingSection
+        title="Alamat & Kontak Kantor Pusat"
+        desc="Lokasi kantor dan saluran komunikasi resmi travel"
+      >
+        <SettingRow label="Alamat Kantor Pusat" desc="Alamat lengkap yang tercantum pada footer & kop surat">
+          <textarea
+            className="w-80 rounded-md border border-input bg-background px-3 py-1.5 text-sm resize-none"
+            rows={2}
+            value={profile.companyAddress}
+            onChange={(e) => setProfile({ ...profile, companyAddress: e.target.value })}
+            placeholder="Ruko Gateway Blok C-12, Waru, Sidoarjo - Jawa Timur"
+          />
+        </SettingRow>
+
+        <SettingRow label="Telepon Kantor / Hotline" desc="Nomor telepon kantor operasional">
+          <input
+            className="h-9 w-80 rounded-md border border-input bg-background px-3 py-1 text-sm"
+            value={profile.companyPhone}
+            onChange={(e) => setProfile({ ...profile, companyPhone: e.target.value })}
+            placeholder="(031) 854-4455"
+          />
+        </SettingRow>
+
+        <SettingRow label="Email Resmi" desc="Email resmi pelayanan jamaah">
+          <input
+            className="h-9 w-80 rounded-md border border-input bg-background px-3 py-1 text-sm"
+            value={profile.companyEmail}
+            onChange={(e) => setProfile({ ...profile, companyEmail: e.target.value })}
+            placeholder="info@vauzatamma.co.id"
+          />
+        </SettingRow>
+
+        <SettingRow label="Website Resmi" desc="URL portal web resmi">
+          <input
+            className="h-9 w-80 rounded-md border border-input bg-background px-3 py-1 text-sm"
+            value={profile.companyWebsite}
+            onChange={(e) => setProfile({ ...profile, companyWebsite: e.target.value })}
+            placeholder="https://vtuabadi.com"
+          />
+        </SettingRow>
+      </SettingSection>
+
+      <SettingSection
+        title="Penandatangan Dokumen Resmi"
+        desc="Pejabat direksi yang menandatangani surat rekomendasi & dokumen operasional"
+      >
+        <SettingRow label="Nama Pimpinan / Direktur" desc="Nama lengkap penandatangan surat resmi">
+          <input
+            className="h-9 w-80 rounded-md border border-input bg-background px-3 py-1 text-sm font-bold"
+            value={profile.companyDirector}
+            onChange={(e) => setProfile({ ...profile, companyDirector: e.target.value })}
+            placeholder="H. FAISAL WAHYUDI"
+          />
+        </SettingRow>
+
+        <SettingRow label="Jabatan Penandatangan" desc="Jabatan resmi struktural di perusahaan">
+          <input
+            className="h-9 w-80 rounded-md border border-input bg-background px-3 py-1 text-sm"
+            value={profile.companyDirectorTitle}
+            onChange={(e) => setProfile({ ...profile, companyDirectorTitle: e.target.value })}
+            placeholder="Direktur Utama"
+          />
+        </SettingRow>
+      </SettingSection>
+
+      <div className="flex items-center gap-2 pt-2">
+        <Button onClick={handleSave} className="gap-1.5 bg-primary text-primary-foreground font-bold shadow-sm">
+          <Save className="h-3.5 w-3.5" />
+          Simpan Profil Perusahaan
+        </Button>
+        {saved && (
+          <Badge variant="success" className="text-xs">
+            <CheckCircle2 className="h-3 w-3 mr-1" />
+            Profil Perusahaan Berhasil Disimpan & Sinkron!
+          </Badge>
+        )}
+      </div>
     </div>
   );
 }
@@ -70,53 +254,58 @@ function ProfilAkun() {
   };
 
   return (
-    <div className="space-y-4">
-      <SettingSection title="Informasi Akun" desc="Data akun administrator yang sedang login">
-        <SettingRow label="Nama Lengkap" desc="Nama yang ditampilkan di sistem">
-          <input
-            className="h-9 w-64 rounded-md border border-input bg-transparent px-3 py-1 text-sm"
-            defaultValue="Admin VTU"
-          />
-        </SettingRow>
-        <SettingRow label="Email" desc="Email untuk login dan notifikasi sistem">
-          <input
-            className="h-9 w-64 rounded-md border border-input bg-transparent px-3 py-1 text-sm"
-            defaultValue="admin@vtu.id"
-          />
-        </SettingRow>
-        <SettingRow label="Role" desc="Role menentukan hak akses di sistem">
-          <Select
-            options={[
-              { value: "super_admin", label: "Super Admin" },
-              { value: "admin_operasional", label: "Admin Operasional" },
-              { value: "admin_pembayaran", label: "Admin Pembayaran" },
-              { value: "admin_manifest", label: "Admin Manifest" },
-              { value: "admin_dokumen", label: "Admin Dokumen" },
-              { value: "admin_badal", label: "Admin Badal Umroh & Wakaf" },
-            ]}
-            defaultValue="super_admin"
-          />
-        </SettingRow>
-      </SettingSection>
+    <div className="space-y-6">
+      {/* Company Profile Embedded */}
+      <ProfilPerusahaan />
 
-      <SettingSection title="Keamanan" desc="Ubah password akun">
-        <SettingRow label="Password Saat Ini">
-          <input type="password" className="h-9 w-64 rounded-md border border-input bg-transparent px-3 py-1 text-sm" defaultValue="••••••••" />
-        </SettingRow>
-        <SettingRow label="Password Baru">
-          <input type="password" className="h-9 w-64 rounded-md border border-input bg-transparent px-3 py-1 text-sm" placeholder="Min. 8 karakter" />
-        </SettingRow>
-        <SettingRow label="Konfirmasi Password">
-          <input type="password" className="h-9 w-64 rounded-md border border-input bg-transparent px-3 py-1 text-sm" placeholder="Ketik ulang password" />
-        </SettingRow>
-      </SettingSection>
+      <div className="pt-4 border-t border-slate-200 dark:border-stone-800">
+        <SettingSection title="Informasi Akun Admin" desc="Data akun administrator yang sedang login">
+          <SettingRow label="Nama Lengkap" desc="Nama yang ditampilkan di sistem">
+            <input
+              className="h-9 w-64 rounded-md border border-input bg-transparent px-3 py-1 text-sm"
+              defaultValue="Admin VTU"
+            />
+          </SettingRow>
+          <SettingRow label="Email" desc="Email untuk login dan notifikasi sistem">
+            <input
+              className="h-9 w-64 rounded-md border border-input bg-transparent px-3 py-1 text-sm"
+              defaultValue="admin@vtu.id"
+            />
+          </SettingRow>
+          <SettingRow label="Role" desc="Role menentukan hak akses di sistem">
+            <Select
+              options={[
+                { value: "super_admin", label: "Super Admin" },
+                { value: "admin_operasional", label: "Admin Operasional" },
+                { value: "admin_pembayaran", label: "Admin Pembayaran" },
+                { value: "admin_manifest", label: "Admin Manifest" },
+                { value: "admin_dokumen", label: "Admin Dokumen" },
+                { value: "admin_badal", label: "Admin Badal Umroh & Wakaf" },
+              ]}
+              defaultValue="super_admin"
+            />
+          </SettingRow>
+        </SettingSection>
 
-      <div className="flex items-center gap-2 pt-2">
-        <Button onClick={handleSave} className="gap-1.5">
-          <Save className="h-3.5 w-3.5" />
-          Simpan Perubahan
-        </Button>
-        {saved && <span className="text-xs text-success">Tersimpan!</span>}
+        <SettingSection title="Keamanan Akun" desc="Ubah password akun">
+          <SettingRow label="Password Saat Ini">
+            <input type="password" className="h-9 w-64 rounded-md border border-input bg-transparent px-3 py-1 text-sm" defaultValue="••••••••" />
+          </SettingRow>
+          <SettingRow label="Password Baru">
+            <input type="password" className="h-9 w-64 rounded-md border border-input bg-transparent px-3 py-1 text-sm" placeholder="Min. 8 karakter" />
+          </SettingRow>
+          <SettingRow label="Konfirmasi Password">
+            <input type="password" className="h-9 w-64 rounded-md border border-input bg-transparent px-3 py-1 text-sm" placeholder="Ketik ulang password" />
+          </SettingRow>
+        </SettingSection>
+
+        <div className="flex items-center gap-2 pt-2">
+          <Button onClick={handleSave} className="gap-1.5">
+            <Save className="h-3.5 w-3.5" />
+            Simpan Password & Akun
+          </Button>
+          {saved && <span className="text-xs text-success">Tersimpan!</span>}
+        </div>
       </div>
     </div>
   );
@@ -483,7 +672,8 @@ export default function PengaturanPage() {
 
         <Tabs
           tabs={[
-            { value: "akun", label: "Profil & Akun" },
+            { value: "perusahaan", label: "Profil Perusahaan (PT)" },
+            { value: "akun", label: "Akun Admin" },
             { value: "sistem", label: "Preferensi Sistem" },
             { value: "notifikasi", label: "Notifikasi" },
             { value: "broadcast", label: "Broadcast Telegram" },
@@ -494,6 +684,8 @@ export default function PengaturanPage() {
         >
           {(activeTab) => {
             switch (activeTab) {
+              case "perusahaan":
+                return <ProfilPerusahaan />;
               case "akun":
                 return <ProfilAkun />;
               case "sistem":

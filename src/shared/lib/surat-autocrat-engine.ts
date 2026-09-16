@@ -111,9 +111,9 @@ export const MANIFEST_FIELD_OPTIONS: ManifestFieldOption[] = [
   { key: "today.hijriyah", label: "Tanggal Hari Ini (Hijriyah)", group: "Tanggal & Sistem", sampleValue: "29 Safar 1448 H" },
   { key: "today.bulanRomawi", label: "Bulan Romawi Saat Ini", group: "Tanggal & Sistem", sampleValue: "IX" },
   { key: "today.tahun", label: "Tahun Saat Ini", group: "Tanggal & Sistem", sampleValue: "2026" },
-  { key: "vtu.pimpinan", label: "Nama Direktur / Pimpinan PPIU", group: "Tanggal & Sistem", sampleValue: "H. Fauzan Adzim, S.E." },
+  { key: "vtu.pimpinan", label: "Nama Direktur / Pimpinan PPIU", group: "Tanggal & Sistem", sampleValue: "H. Faisal Wahyudi" },
   { key: "vtu.jabatan", label: "Jabatan Penandatangan", group: "Tanggal & Sistem", sampleValue: "Direktur Utama" },
-  { key: "vtu.noIzin", label: "Nomor Izin PPIU Resmi", group: "Tanggal & Sistem", sampleValue: "Izin Kemenag RI No. U.400 Tahun 2021" },
+  { key: "vtu.noIzin", label: "Nomor Izin PPIU Resmi", group: "Tanggal & Sistem", sampleValue: "Izin Kemenag RI No. U.400 Tahun 2021 / No. 805 Tahun 2019" },
 
   // Dokumen Keimigrasian & Layanan Paspor
   { key: "imigrasi.kanim", label: "Kantor Imigrasi / Layanan Paspor", group: "Dokumen & Paspor", sampleValue: "Kantor Imigrasi Kelas I Khusus TPI Surabaya" },
@@ -296,14 +296,14 @@ export const DEFAULT_SURAT_TEMPLATES: SuratTemplate[] = [
     tujuanDefault: "Yth. Kepala Kantor Imigrasi",
     kotaTujuanDefault: "Di Tempat",
     penandatangan: {
-      nama: "H. Fauzan Adzim, S.E.",
-      jabatan: "Direktur Utama PT. Vauza Trikarsa Utama",
+      nama: "H. Faisal Wahyudi",
+      jabatan: "Direktur Utama PT. Vauza Tamma Abadi",
       showStempel: true,
       showBarcode: true,
     },
     templateContent: `Assalamu'alaikum Warahmatullahi Wabarakatuh,
 
-Yang bertanda tangan di bawah ini, Pimpinan Penyelenggara Perjalanan Ibadah Umroh (PPIU) PT. Vauza Trikarsa Utama (Izin Kemenag No. U.400 Tahun 2021), menerangkan dengan sebenarnya bahwa:
+Yang bertanda tangan di bawah ini, Pimpinan Penyelenggara Perjalanan Ibadah Umroh (PPIU) PT. Vauza Tamma Abadi (Izin Kemenag No. U.400 Tahun 2021 / No. 805 Tahun 2019), menerangkan dengan sebenarnya bahwa:
 
 Nama Lengkap      : {nama_lengkap}
 Nomor NIK / KTP   : {nik}
@@ -312,7 +312,7 @@ Jenis Kelamin     : {jenis_kelamin}
 Alamat Lengkap    : {alamat}
 Nomor Telepon/HP  : {nomor_telepon}
 
-Adalah benar-benar calon jamaah Umroh PT. Vauza Trikarsa Utama yang telah terdaftar resmi dan dijadwalkan berangkat ibadah Umroh dengan rincian jadwal sebagai berikut:
+Adalah benar-benar calon jamaah Umroh PT. Vauza Tamma Abadi yang telah terdaftar resmi dan dijadwalkan berangkat ibadah Umroh dengan rincian jadwal sebagai berikut:
 
 Paket Umroh       : {nama_paket} ({program_hari})
 Tanggal Berangkat : {tanggal_berangkat}
@@ -364,14 +364,14 @@ Wassalamu'alaikum Warahmatullahi Wabarakatuh.`,
     tujuanDefault: "Yth. Pimpinan / HRD {nama_perusahaan}",
     kotaTujuanDefault: "{kota_kantor}",
     penandatangan: {
-      nama: "H. Fauzan Adzim, S.E.",
-      jabatan: "Direktur Utama PT. Vauza Trikarsa Utama",
+      nama: "H. Faisal Wahyudi",
+      jabatan: "Direktur Utama PT. Vauza Tamma Abadi",
       showStempel: true,
       showBarcode: true,
     },
     templateContent: `Dengan hormat,
 
-Sehubungan dengan rencana keberangkatan Ibadah Umroh jamaah PT. Vauza Trikarsa Utama, dengan ini kami sampaikan bahwa karyawan/karyawati Bapak/Ibu di bawah ini:
+Sehubungan dengan rencana keberangkatan Ibadah Umroh jamaah PT. Vauza Tamma Abadi, dengan ini kami sampaikan bahwa karyawan/karyawati Bapak/Ibu di bawah ini:
 
 Nama Karyawan     : {nama_lengkap}
 Nomor NIK / KTP   : {nik}
@@ -380,7 +380,7 @@ Jabatan / Posisi  : {jabatan_karyawan}
 Departemen / Div  : {departemen}
 Nama Perusahaan   : {nama_perusahaan}
 
-Telah terdaftar resmi sebagai jamaah umroh PT. Vauza Trikarsa Utama dan dijadwalkan menunaikan ibadah Umroh ke Tanah Suci pada:
+Telah terdaftar resmi sebagai jamaah umroh PT. Vauza Tamma Abadi dan dijadwalkan menunaikan ibadah Umroh ke Tanah Suci pada:
 
 Paket Umroh       : {nama_paket}
 Tanggal Berangkat : {tanggal_berangkat}
@@ -425,14 +425,14 @@ Demikian surat permohonan ini kami sampaikan. Atas perhatian, kebijaksanaan, dan
     tujuanDefault: "Yth. Kepala Sekolah / Dekan {nama_sekolah}",
     kotaTujuanDefault: "{kota_sekolah}",
     penandatangan: {
-      nama: "H. Fauzan Adzim, S.E.",
-      jabatan: "Direktur Utama PT. Vauza Trikarsa Utama",
+      nama: "H. Faisal Wahyudi",
+      jabatan: "Direktur Utama PT. Vauza Tamma Abadi",
       showStempel: true,
       showBarcode: true,
     },
     templateContent: `Dengan hormat,
 
-Bersama surat ini kami dari Penyelenggara Ibadah Umroh PT. Vauza Trikarsa Utama memberitahukan bahwa siswa / siswi / mahasiswa di bawah ini:
+Bersama surat ini kami dari Penyelenggara Ibadah Umroh PT. Vauza Tamma Abadi memberitahukan bahwa siswa / siswi / mahasiswa di bawah ini:
 
 Nama Siswa/i      : {nama_lengkap}
 NISN / NIM        : {nisn_nim}
@@ -484,8 +484,8 @@ Demikian permohonan ini kami ajukan. Atas perhatian, dukungan, dan izin yang dib
     tujuanDefault: "Kepada Pihak yang Berkepentingan",
     kotaTujuanDefault: "Di Tempat",
     penandatangan: {
-      nama: "H. Fauzan Adzim, S.E.",
-      jabatan: "Direktur Utama PT. Vauza Trikarsa Utama",
+      nama: "H. Faisal Wahyudi",
+      jabatan: "Direktur Utama PT. Vauza Tamma Abadi",
       showStempel: true,
       showBarcode: true,
     },
@@ -498,7 +498,7 @@ Tempat/Tgl Lahir  : {tempat_lahir}, {tanggal_lahir}
 Alamat Lengkap    : {alamat}
 Nomor Registrasi  : {nomor_registrasi}
 
-Adalah benar calon jamaah Umroh PT. Vauza Trikarsa Utama (Izin PPIU Kemenag RI No. U.400/2021) yang telah menyelesaikan proses administrasi pendaftaran untuk program keberangkatan:
+Adalah benar calon jamaah Umroh PT. Vauza Tamma Abadi (Izin PPIU Kemenag RI No. U.400/2021) yang telah menyelesaikan proses administrasi pendaftaran untuk program keberangkatan:
 
 Paket Umroh       : {nama_paket}
 Kode Manifest     : {kode_paket}
@@ -544,14 +544,14 @@ Demikian surat keterangan ini kami berikan untuk dapat dipergunakan sebagaimana 
     tujuanDefault: "Kepada Petugas yang Ditugaskan",
     kotaTujuanDefault: "Di Tempat",
     penandatangan: {
-      nama: "H. Fauzan Adzim, S.E.",
-      jabatan: "Direktur Utama PT. Vauza Trikarsa Utama",
+      nama: "H. Faisal Wahyudi",
+      jabatan: "Direktur Utama PT. Vauza Tamma Abadi",
       showStempel: true,
       showBarcode: true,
     },
     templateContent: `SURAT PERINTAH TUGAS OPERASIONAL
 
-Pimpinan PT. Vauza Trikarsa Utama dengan ini memberikan tugas dan tanggung jawab kepada:
+Pimpinan PT. Vauza Tamma Abadi dengan ini memberikan tugas dan tanggung jawab kepada:
 
 Nama Petugas      : {Nama Pegawai}
 ID / NIP Petugas  : {NIP}
@@ -605,14 +605,14 @@ Demikian surat tugas ini diterbitkan untuk dilaksanakan dengan penuh amanah dan 
     tujuanDefault: "Yth. Bagian Klaim {nama_perusahaan_asuransi}",
     kotaTujuanDefault: "Di Tempat",
     penandatangan: {
-      nama: "H. Fauzan Adzim, S.E.",
-      jabatan: "Direktur Utama PT. Vauza Trikarsa Utama",
+      nama: "H. Faisal Wahyudi",
+      jabatan: "Direktur Utama PT. Vauza Tamma Abadi",
       showStempel: true,
       showBarcode: true,
     },
     templateContent: `Dengan hormat,
 
-Sehubungan dengan kepesertaan asuransi perjalanan ibadah umroh jamaah PT. Vauza Trikarsa Utama, bersama ini kami mengajukan permohonan klaim asuransi atas nama tertanggung:
+Sehubungan dengan kepesertaan asuransi perjalanan ibadah umroh jamaah PT. Vauza Tamma Abadi, bersama ini kami mengajukan permohonan klaim asuransi atas nama tertanggung:
 
 Nama Jamaah / Tertanggung : {nama_lengkap}
 Nomor Paspor              : {nomor_paspor}
@@ -1055,9 +1055,9 @@ export function resolveManifestFieldValue(
   if (fieldKey === "today.hijriyah") return today.hijriyah;
   if (fieldKey === "today.bulanRomawi") return today.bulanRomawi;
   if (fieldKey === "today.tahun") return String(today.year);
-  if (fieldKey === "vtu.pimpinan") return "H. Fauzan Adzim, S.E.";
+  if (fieldKey === "vtu.pimpinan") return "H. Faisal Wahyudi";
   if (fieldKey === "vtu.jabatan") return "Direktur Utama";
-  if (fieldKey === "vtu.noIzin") return "Izin Kemenag RI No. U.400 Tahun 2021";
+  if (fieldKey === "vtu.noIzin") return "Izin Kemenag RI No. U.400 Tahun 2021 / No. 805 Tahun 2019";
 
   // Imigrasi fields
   if (fieldKey === "imigrasi.kanim") {

@@ -81,10 +81,10 @@ function TrackSuratContent() {
             DOKUMEN RESMI TERVERIFIKASI SISTEM
           </div>
           <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white">
-            PT. VAUZA TRIKARSA UTAMA
+            PT. VAUZA TAMMA ABADI
           </h1>
           <p className="text-xs sm:text-sm text-slate-400 font-medium max-w-md mx-auto">
-            Penyelenggara Perjalanan Ibadah Umroh (PPIU) Resmi Kemenag RI No. U.400 Tahun 2021
+            Penyelenggara Perjalanan Ibadah Umroh (PPIU) Resmi Kemenag RI No. U.400 Tahun 2021 / No. 805 Tahun 2019
           </p>
         </div>
 
@@ -111,7 +111,7 @@ function TrackSuratContent() {
           <CardContent className="pt-5 space-y-5">
             {/* Statement Box */}
             <div className="p-3.5 rounded-xl bg-emerald-950/40 border border-emerald-800/50 text-xs text-emerald-200/90 leading-relaxed">
-              <strong>Pernyataan Keabsahan:</strong> Surat ini adalah dokumen resmi yang sah diterbitkan oleh sistem operasional PT. Vauza Trikarsa Utama (VTU Abadi) untuk kepentingan administrasi resmi jamaah yang bersangkutan.
+              <strong>Pernyataan Keabsahan:</strong> Surat ini adalah dokumen resmi yang sah diterbitkan oleh sistem operasional PT. Vauza Tamma Abadi (VTU Abadi) untuk kepentingan administrasi resmi jamaah yang bersangkutan.
             </div>
 
             {/* Details Table */}
@@ -146,7 +146,7 @@ function TrackSuratContent() {
                   Lembaga Penerbit
                 </span>
                 <span className="font-medium text-slate-300 text-right">
-                  PT. Vauza Trikarsa Utama (Surabaya)
+                  PT. Vauza Tamma Abadi (Sidoarjo / Surabaya)
                 </span>
               </div>
 
@@ -156,7 +156,7 @@ function TrackSuratContent() {
                   Penandatangan
                 </span>
                 <span className="font-semibold text-slate-200 text-right">
-                  H. Fauzan Adzim, S.E. (Direktur Utama)
+                  H. Faisal Wahyudi (Direktur Utama)
                 </span>
               </div>
             </div>
@@ -175,7 +175,7 @@ function TrackSuratContent() {
         {/* Footer info */}
         <div className="text-center space-y-3">
           <p className="text-[11px] text-slate-500">
-            &copy; 2026 PT. Vauza Trikarsa Utama. All rights reserved. <br />
+            &copy; 2026 PT. Vauza Tamma Abadi. All rights reserved. <br />
             Kantor Pusat: Ruko Gateway Blok C-12, Waru, Sidoarjo &bull; Telp: (031) 854-4455
           </p>
           <div>

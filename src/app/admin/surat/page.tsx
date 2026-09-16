@@ -480,8 +480,8 @@ function GenerateSuratPageContent() {
     handleSaveToHistory();
     const phone = activeJamaah?.nomorTelepon || "";
     const cleanPhone = phone.replace(/[^0-9]/g, "").replace(/^0/, "62");
-    const msg = `*PT. VAUZA TRIKARSA UTAMA (VTU ABADI)*
-_Penyelenggara Ibadah Umroh Kemenag RI No. U.400/2021_
+    const msg = `*PT. VAUZA TAMMA ABADI (VTU ABADI)*
+_Penyelenggara Ibadah Umroh Kemenag RI No. U.400/2021 / No. 805/2019_
 
 Yth. Bapak/Ibu *${toTitleCase(activeJamaah?.namaLengkap || "Jamaah")}*,
 

@@ -94,8 +94,8 @@ export async function POST(request: NextRequest) {
       tujuanDefault: body.tujuanDefault || "Kepada Pihak yang Berkepentingan",
       kotaTujuanDefault: body.kotaTujuanDefault || "Di Tempat",
       penandatangan: body.penandatangan || {
-        nama: "H. Fauzan Adzim, S.E.",
-        jabatan: "Direktur Utama PT. Vauza Trikarsa Utama",
+        nama: "H. Faisal Wahyudi",
+        jabatan: "Direktur Utama PT. Vauza Tamma Abadi",
         showStempel: true,
         showBarcode: true,
       },

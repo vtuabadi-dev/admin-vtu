@@ -29,6 +29,15 @@ Wassalamu'alaikum Warahmatullahi Wabarakatuh.
 🌐 https://vtuabadi.com`;
 
 export interface GeneralSystemSettings {
+  companyName?: string;
+  companyBrand?: string;
+  companyLicense?: string;
+  companyAddress?: string;
+  companyPhone?: string;
+  companyEmail?: string;
+  companyWebsite?: string;
+  companyDirector?: string;
+  companyDirectorTitle?: string;
   bankName: string;
   bankAccount: string;
   bankHolder: string;
@@ -43,6 +52,15 @@ export interface GeneralSystemSettings {
 }
 
 const DEFAULT_SETTINGS: GeneralSystemSettings = {
+  companyName: "PT. VAUZA TAMMA ABADI",
+  companyBrand: "VTU ABADI Travel",
+  companyLicense: "Penyelenggara Perjalanan Ibadah Umroh (PPIU) Kemenag RI No. U.400 Tahun 2021",
+  companyAddress: "Ruko Gateway Blok C-12, Waru, Sidoarjo - Jawa Timur",
+  companyPhone: "(031) 854-4455",
+  companyEmail: "info@vauzatamma.co.id",
+  companyWebsite: "https://vtuabadi.com",
+  companyDirector: "H. FAISAL WAHYUDI",
+  companyDirectorTitle: "Direktur Utama",
   bankName: "Bank Syariah Indonesia (BSI)",
   bankAccount: "7123 4567 89",
   bankHolder: "PT VTU ABADI TRAVEL",
