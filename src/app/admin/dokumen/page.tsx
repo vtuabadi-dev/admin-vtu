@@ -54,12 +54,13 @@ const LABEL_DOKUMEN: Record<string, string> = {
   pas_foto: "Pas Foto",
   vaksin: "Sertifikat Vaksin",
   ktp: "KTP",
-  kk: "KK / Buku Nikah",
+  kk: "Kartu Keluarga (KK)",
+  buku_nikah: "Buku Nikah",
   akta: "Akta Lahir",
   surat_lansia: "Surat Lansia",
 };
 
-const ALL_DOC_JENIS: DokumenJenis[] = ["paspor", "pas_foto", "vaksin", "ktp", "kk", "akta", "surat_lansia"];
+const ALL_DOC_JENIS: DokumenJenis[] = ["paspor", "pas_foto", "vaksin", "ktp", "kk", "buku_nikah", "akta", "surat_lansia"];
 
 // ============================================================
 // HELPERS
@@ -758,6 +759,13 @@ export default function DokumenPage() {
             namaLengkap: member.namaLengkap || "",
             namaAyah: member.namaAyah && member.namaAyah !== "-" ? member.namaAyah : "",
             nik: member.nik && member.nik !== "-" ? member.nik : "",
+          };
+        }
+        if (!initialOcr["buku_nikah"]) {
+          initialOcr["buku_nikah"] = {
+            namaAyah: member.namaAyah && member.namaAyah !== "-" ? member.namaAyah : "",
+            namaSuami: member.jenisKelamin === "L" ? member.namaLengkap : "",
+            namaIstri: member.jenisKelamin === "P" ? member.namaLengkap : "",
           };
         }
         if (!initialOcr["akta"]) {
@@ -2735,7 +2743,7 @@ export default function DokumenPage() {
                                             className="h-9 text-xs font-bold text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700 bg-white dark:bg-stone-900 focus-visible:ring-emerald-500"
                                           />
                                           <p className="text-[10px] text-stone-500 dark:text-stone-400">
-                                            * Diekstrak dari kolom Nama Ayah pada baris data jamaah di KK / Buku Nikah dan otomatis tersinkron ke profil Jamaah & Manifest.
+                                            * Diekstrak dari kolom Nama Ayah pada baris data jamaah di Kartu Keluarga (KK) dan otomatis tersinkron ke profil Jamaah & Manifest.
                                           </p>
                                         </div>
 
@@ -2762,6 +2770,116 @@ export default function DokumenPage() {
                                               disabled={savedOcrDocs[activeDocType] && !editingOcrDocs[activeDocType]}
                                               placeholder="16 digit No. KK"
                                               className="h-8 text-xs font-mono"
+                                            />
+                                          </div>
+                                        </div>
+                                      </>
+                                    )}
+
+                                    {/* Buku Nikah Specific Fields */}
+                                    {activeDocType === "buku_nikah" && (
+                                      <>
+                                        <div className="space-y-1.5 p-3 rounded-lg bg-emerald-500/5 dark:bg-emerald-500/10 border border-emerald-500/30">
+                                          <div className="flex items-center justify-between">
+                                            <label className="text-[11px] font-bold text-emerald-900 dark:text-emerald-300 flex items-center gap-1.5">
+                                              <span>Nama Ayah Kandung:</span>
+                                              <span className="text-[9px] bg-emerald-600 text-white font-semibold px-1.5 py-0.2 rounded">
+                                                Wajib Siskopatuh & Visa
+                                              </span>
+                                            </label>
+                                          </div>
+                                          <Input
+                                            value={ocrResults[activeDocType]?.namaAyah || ""}
+                                            onChange={(e) => handleOcrFieldChange(activeDocType, "namaAyah", e.target.value.toUpperCase())}
+                                            disabled={savedOcrDocs[activeDocType] && !editingOcrDocs[activeDocType]}
+                                            placeholder="NAMA AYAH KANDUNG (HASIL EKSTRAKSI BUKU NIKAH)"
+                                            className="h-9 text-xs font-bold text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700 bg-white dark:bg-stone-900 focus-visible:ring-emerald-500"
+                                          />
+                                          <p className="text-[10px] text-stone-500 dark:text-stone-400">
+                                            * Diekstrak dari data orang tua / nasab (bin/binti) mempelai pada Buku Nikah dan otomatis tersinkron ke profil Jamaah & Manifest.
+                                          </p>
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-2">
+                                          <div className="space-y-1">
+                                            <label className="text-[11px] font-semibold text-stone-600 dark:text-stone-400">
+                                              Nama Suami:
+                                            </label>
+                                            <Input
+                                              value={ocrResults[activeDocType]?.namaSuami || ""}
+                                              onChange={(e) => handleOcrFieldChange(activeDocType, "namaSuami", e.target.value.toUpperCase())}
+                                              disabled={savedOcrDocs[activeDocType] && !editingOcrDocs[activeDocType]}
+                                              placeholder="NAMA SUAMI"
+                                              className="h-8 text-xs font-semibold"
+                                            />
+                                          </div>
+                                          <div className="space-y-1">
+                                            <label className="text-[11px] font-semibold text-stone-600 dark:text-stone-400">
+                                              Nama Istri:
+                                            </label>
+                                            <Input
+                                              value={ocrResults[activeDocType]?.namaIstri || ""}
+                                              onChange={(e) => handleOcrFieldChange(activeDocType, "namaIstri", e.target.value.toUpperCase())}
+                                              disabled={savedOcrDocs[activeDocType] && !editingOcrDocs[activeDocType]}
+                                              placeholder="NAMA ISTRI"
+                                              className="h-8 text-xs font-semibold"
+                                            />
+                                          </div>
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-2">
+                                          <div className="space-y-1">
+                                            <label className="text-[11px] font-semibold text-stone-600 dark:text-stone-400">
+                                              Nomor Akta Nikah:
+                                            </label>
+                                            <Input
+                                              value={ocrResults[activeDocType]?.nomorAktaNikah || ""}
+                                              onChange={(e) => handleOcrFieldChange(activeDocType, "nomorAktaNikah", e.target.value)}
+                                              disabled={savedOcrDocs[activeDocType] && !editingOcrDocs[activeDocType]}
+                                              placeholder="Contoh: 0123/045/VI/2020"
+                                              className="h-8 text-xs font-mono font-medium"
+                                            />
+                                          </div>
+                                          <div className="space-y-1">
+                                            <label className="text-[11px] font-semibold text-stone-600 dark:text-stone-400">
+                                              Nomor Seri / Porporasi:
+                                            </label>
+                                            <Input
+                                              value={ocrResults[activeDocType]?.nomorSeriBukuNikah || ""}
+                                              onChange={(e) => handleOcrFieldChange(activeDocType, "nomorSeriBukuNikah", e.target.value)}
+                                              disabled={savedOcrDocs[activeDocType] && !editingOcrDocs[activeDocType]}
+                                              placeholder="No. Seri Buku Nikah"
+                                              className="h-8 text-xs font-mono"
+                                            />
+                                          </div>
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-2">
+                                          <div className="space-y-1">
+                                            <label className="text-[11px] font-semibold text-stone-600 dark:text-stone-400">
+                                              Tanggal Akad Nikah:
+                                            </label>
+                                            <Input
+                                              value={ocrResults[activeDocType]?.tanggalNikah || ""}
+                                              onChange={(e) => handleOcrFieldChange(activeDocType, "tanggalNikah", e.target.value)}
+                                              disabled={savedOcrDocs[activeDocType] && !editingOcrDocs[activeDocType]}
+                                              placeholder="YYYY-MM-DD"
+                                              className="h-8 text-xs font-mono"
+                                            />
+                                          </div>
+                                          <div className="space-y-1">
+                                            <label className="text-[11px] font-semibold text-stone-600 dark:text-stone-400">
+                                              KUA / Lokasi Pernikahan:
+                                            </label>
+                                            <Input
+                                              value={ocrResults[activeDocType]?.kuaKecamatan || ocrResults[activeDocType]?.kotaKabupaten || ""}
+                                              onChange={(e) => {
+                                                handleOcrFieldChange(activeDocType, "kuaKecamatan", e.target.value);
+                                                handleOcrFieldChange(activeDocType, "kotaKabupaten", e.target.value);
+                                              }}
+                                              disabled={savedOcrDocs[activeDocType] && !editingOcrDocs[activeDocType]}
+                                              placeholder="KUA Kec. ..."
+                                              className="h-8 text-xs"
                                             />
                                           </div>
                                         </div>

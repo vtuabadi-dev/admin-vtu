@@ -75,7 +75,20 @@ export const DOCUMENT_FIELD_MAPS: Record<string, string[]> = {
     "rw",
   ],
   kk: ["namaAyah", "namaLengkap", "nik", "nomorKk"],
+  buku_nikah: [
+    "namaSuami",
+    "namaIstri",
+    "namaAyah",
+    "namaAyahSuami",
+    "namaAyahIstri",
+    "nomorAktaNikah",
+    "nomorSeriBukuNikah",
+    "tanggalNikah",
+    "kuaKecamatan",
+    "kotaKabupaten",
+  ],
   akta: ["namaLengkap", "nik", "tanggalLahir", "tempatLahir"],
+  surat_lansia: ["namaLengkap"],
 };
 
 export function getExpectedFields(jenis: DokumenJenis): string[] {

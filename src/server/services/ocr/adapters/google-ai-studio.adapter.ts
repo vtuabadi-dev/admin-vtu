@@ -165,7 +165,7 @@ Ekstrak seluruh data di atas dalam format JSON valid (tanpa markdown wrapper):
   "rawText": "Teks mentah lengkap KTP"
 }`;
     case "kk":
-      return `Analisis gambar Kartu Keluarga (KK) atau Buku Nikah Indonesia ini.
+      return `Analisis gambar Kartu Keluarga (KK) Indonesia ini.
 PENTING: Di Kartu Keluarga terdapat tabel anggota keluarga yang memiliki kolom khusus 'NAMA AYAH' (atau 'Nama Orang Tua: Ayah') untuk masing-masing anggota.
 Tugas utama adalah mengekstrak NAMA AYAH KANDUNG dari jamaah/anggota keluarga terkait (BUKAN nama kepala keluarga, karena jamaah bisa jadi adalah kepala keluarga itu sendiri).
 Ekstrak dalam format JSON valid (tanpa markdown wrapper):
@@ -174,7 +174,22 @@ Ekstrak dalam format JSON valid (tanpa markdown wrapper):
   "namaLengkap": "Nama lengkap jamaah / anggota keluarga terkait",
   "nik": "16 digit NIK",
   "nomorKk": "16 digit Nomor Kartu Keluarga jika tertera",
-  "rawText": "Teks mentah KK / Buku Nikah"
+  "rawText": "Teks mentah KK"
+}`;
+    case "buku_nikah":
+      return `Analisis gambar Buku Nikah (Kementerian Agama RI) ini dan ekstrak data pernikahan serta nasab dalam format JSON valid (tanpa markdown wrapper):
+{
+  "namaSuami": "Nama lengkap suami",
+  "namaIstri": "Nama lengkap istri",
+  "namaAyahSuami": "Nama ayah kandung suami / bin",
+  "namaAyahIstri": "Nama ayah kandung istri / binti",
+  "namaAyah": "Nama ayah kandung dari mempelai terkait (suami atau istri)",
+  "nomorAktaNikah": "Nomor Akta Nikah (contoh: 0123/045/VI/2020)",
+  "nomorSeriBukuNikah": "Nomor seri / porporasi buku nikah jika tertera",
+  "tanggalNikah": "Tanggal akad nikah format YYYY-MM-DD",
+  "kuaKecamatan": "Nama KUA Kecamatan tempat menikah",
+  "kotaKabupaten": "Kota atau Kabupaten KUA",
+  "rawText": "Teks mentah Buku Nikah"
 }`;
     case "akta":
       return `Analisis gambar Akta Lahir ini dan ekstrak data terstruktur berikut dalam format JSON:

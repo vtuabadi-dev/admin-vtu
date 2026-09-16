@@ -184,7 +184,7 @@ export class GoogleAiStudioOcrProvider implements OcrProvider {
   "rawText": "Teks mentah lengkap KTP"
 }`
           : jenis === "kk"
-          ? `Analisis gambar Kartu Keluarga (KK) atau Buku Nikah Indonesia ini. Di tabel Kartu Keluarga, setiap anggota memiliki kolom 'NAMA AYAH' (atau 'Nama Orang Tua: Ayah').
+          ? `Analisis gambar Kartu Keluarga (KK) Indonesia ini. Di tabel Kartu Keluarga, setiap anggota memiliki kolom 'NAMA AYAH' (atau 'Nama Orang Tua: Ayah').
 Tugas utama adalah mengekstrak NAMA AYAH KANDUNG dari jamaah terkait (BUKAN nama kepala keluarga, karena jamaah bisa berstatus kepala keluarga).
 Ekstrak dalam format JSON valid:
 {
@@ -192,7 +192,22 @@ Ekstrak dalam format JSON valid:
   "namaLengkap": "Nama lengkap jamaah / anggota keluarga terkait",
   "nik": "16 digit NIK",
   "nomorKk": "16 digit Nomor Kartu Keluarga jika ada",
-  "rawText": "Teks mentah lengkap KK / Buku Nikah"
+  "rawText": "Teks mentah lengkap KK"
+}`
+          : jenis === "buku_nikah"
+          ? `Analisis gambar Buku Nikah (Kementerian Agama RI) ini dan ekstrak data pernikahan serta nasab dalam format JSON valid:
+{
+  "namaSuami": "Nama lengkap suami",
+  "namaIstri": "Nama lengkap istri",
+  "namaAyahSuami": "Nama ayah kandung suami",
+  "namaAyahIstri": "Nama ayah kandung istri",
+  "namaAyah": "Nama ayah kandung dari mempelai terkait",
+  "nomorAktaNikah": "Nomor Akta Nikah",
+  "nomorSeriBukuNikah": "Nomor seri buku nikah jika ada",
+  "tanggalNikah": "YYYY-MM-DD",
+  "kuaKecamatan": "Nama KUA Kecamatan",
+  "kotaKabupaten": "Kota atau Kabupaten KUA",
+  "rawText": "Teks mentah lengkap Buku Nikah"
 }`
           : `Analisis gambar dokumen ${jenis} ini dan ekstrak data terstruktur berikut dalam format JSON:
 {

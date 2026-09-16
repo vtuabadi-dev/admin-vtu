@@ -91,6 +91,10 @@ async function syncJamaahAndManifestFromDocData(jamaahId: string, data: Record<s
 
   if (typeof data.namaAyah === "string" && data.namaAyah.trim() && data.namaAyah.trim() !== "-") {
     jamaahUpdates.namaAyah = data.namaAyah.trim().toUpperCase();
+  } else if (typeof data.namaAyahSuami === "string" && data.namaAyahSuami.trim() && currentJamaah?.jenisKelamin === "L") {
+    jamaahUpdates.namaAyah = data.namaAyahSuami.trim().toUpperCase();
+  } else if (typeof data.namaAyahIstri === "string" && data.namaAyahIstri.trim() && currentJamaah?.jenisKelamin === "P") {
+    jamaahUpdates.namaAyah = data.namaAyahIstri.trim().toUpperCase();
   }
 
   if (typeof data.statusPerkawinan === "string" && data.statusPerkawinan.trim()) {
