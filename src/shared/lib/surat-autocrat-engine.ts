@@ -921,6 +921,21 @@ export function resolveAutocratFieldValues(
     }
   });
 
+  // Cross-populate all aliases for template placeholders so keys like 'alamat', 'Alamat', 'Alamat Lengkap' match seamlessly
+  template.placeholders.forEach((p) => {
+    if (values[p.key] === undefined) {
+      const normPKey = normalizeKey(p.key);
+      const normLabel = normalizeKey(p.label || "");
+      for (const [vk, vv] of Object.entries(values)) {
+        const normVk = normalizeKey(vk);
+        if (normVk === normPKey || normVk === normLabel) {
+          values[p.key] = vv;
+          break;
+        }
+      }
+    }
+  });
+
   return values;
 }
 

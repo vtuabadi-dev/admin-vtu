@@ -959,9 +959,45 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
                         .filter(Boolean);
                       const isSearchableSelect = p.inputType === "select" && validOptions.length > 4;
 
-                      // Live value resolution: user edits take absolute precedence
-                      const manualVal = manualFormData[p.key];
-                      const resolvedVal = (resolvedFieldValues as Record<string, string>)[p.key] ?? "";
+                      // Live value resolution: user edits take absolute precedence with case/whitespace-insensitive fallback
+                      const normKey = (p.key || "").toLowerCase().replace(/[\u2018\u2019\u201A\u201B']/g, "'").replace(/[\s_\-\.]/g, "");
+                      const normLabel = (p.label || "").toLowerCase().replace(/[\u2018\u2019\u201A\u201B']/g, "'").replace(/[\s_\-\.]/g, "");
+
+                      let manualVal = manualFormData[p.key];
+                      if (manualVal === undefined) {
+                        for (const [mk, mv] of Object.entries(manualFormData)) {
+                          const cleanMk = mk.toLowerCase().replace(/[\u2018\u2019\u201A\u201B']/g, "'").replace(/[\s_\-\.]/g, "");
+                          if ((cleanMk === normKey || cleanMk === normLabel) && mv !== undefined) {
+                            manualVal = mv;
+                            break;
+                          }
+                        }
+                      }
+
+                      let resolvedVal = (resolvedFieldValues as Record<string, string>)[p.key];
+                      if (resolvedVal === undefined) {
+                        for (const [rk, rv] of Object.entries(resolvedFieldValues as Record<string, string>)) {
+                          const cleanRk = rk.toLowerCase().replace(/[\u2018\u2019\u201A\u201B']/g, "'").replace(/[\s_\-\.]/g, "");
+                          if (cleanRk === normKey || cleanRk === normLabel) {
+                            resolvedVal = rv;
+                            break;
+                          }
+                        }
+                      }
+
+                      // Additional fallback for Alamat / Alamat Lengkap
+                      if ((resolvedVal === undefined || resolvedVal === "") && (normKey.includes("alamat") || normLabel.includes("alamat"))) {
+                        resolvedVal =
+                          (resolvedFieldValues as Record<string, string>)["Alamat"] ||
+                          (resolvedFieldValues as Record<string, string>)["alamat"] ||
+                          (resolvedFieldValues as Record<string, string>)["Alamat Lengkap"] ||
+                          (resolvedFieldValues as Record<string, string>)["alamat_lengkap"] ||
+                          activeJamaah?.alamatLengkap ||
+                          activeJamaah?.alamat ||
+                          "";
+                      }
+
+                      resolvedVal = resolvedVal ?? "";
                       const rawDisplay = manualVal !== undefined ? manualVal : resolvedVal;
                       const displayValue = rawDisplay === "-" ? "" : rawDisplay;
 
