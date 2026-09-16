@@ -302,7 +302,7 @@ export default function PasFotoStudio({
           </div>
           <div>
             <h4 className="text-xs font-bold text-stone-900 dark:text-stone-100 flex items-center gap-1.5">
-              AI Pas Foto Studio
+              Engine Pass Foto
               <Badge variant="success" size="sm" className="font-mono text-[9px] px-1.5 py-0">
                 100% GRATIS
               </Badge>
