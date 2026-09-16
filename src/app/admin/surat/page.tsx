@@ -893,60 +893,41 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
                 <CardHeader className="pb-3 border-b border-stone-200 dark:border-stone-800">
                   <CardTitle className="text-xs font-bold flex items-center gap-1.5">
                     <FileSignature className="h-4 w-4 text-primary" />
-                    2. Nomor Surat & Tujuan
+                    2. Nomor Surat
                   </CardTitle>
                 </CardHeader>
 
                 <CardContent className="pt-4 space-y-3">
                   <div className="grid grid-cols-3 gap-2">
                     <div className="col-span-1">
-                      <label className="text-xs font-semibold">No. Urut</label>
+                      <label className="text-xs font-semibold text-stone-700 dark:text-stone-300">No. Urut</label>
                       <Input
                         value={nomorUrutSurat}
                         onChange={(e) => setNomorUrutSurat(e.target.value)}
                         placeholder="001"
-                        className="text-xs mt-1 font-mono text-center"
+                        className="text-xs mt-1 font-mono text-center font-bold"
                       />
                     </div>
                     <div className="col-span-2">
-                      <label className="text-xs font-semibold">Nomor Surat Final</label>
+                      <label className="text-xs font-semibold text-stone-700 dark:text-stone-300">Nomor Surat Final</label>
                       <Input
                         value={computedNomorSurat}
                         readOnly
-                        className="text-xs mt-1 font-mono bg-muted font-bold text-primary"
+                        className="text-xs mt-1 font-mono bg-muted/60 font-bold text-primary"
                       />
                     </div>
                   </div>
 
-                  <div>
-                    <label className="text-xs font-semibold">Perihal Surat</label>
-                    <Input
-                      value={customPerihal}
-                      onChange={(e) => setCustomPerihal(e.target.value)}
-                      className="text-xs mt-1"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2">
+                  {(activeTemplate?.kebutuhanNomorPerSurat ?? 1) > 1 && (
                     <div>
-                      <label className="text-xs font-semibold">Tujuan (Kepada)</label>
+                      <label className="text-xs font-semibold text-stone-700 dark:text-stone-300">Nomor Surat Dokumen 2</label>
                       <Input
-                        value={customTujuan}
-                        onChange={(e) => setCustomTujuan(e.target.value)}
-                        className="text-xs mt-1"
-                        placeholder="Yth. Kepala Kantor..."
+                        value={computedNomorSurat2}
+                        readOnly
+                        className="text-xs mt-1 font-mono bg-muted/60 font-bold text-primary"
                       />
                     </div>
-                    <div>
-                      <label className="text-xs font-semibold">Kota Tujuan</label>
-                      <Input
-                        value={customKotaTujuan}
-                        onChange={(e) => setCustomKotaTujuan(e.target.value)}
-                        className="text-xs mt-1"
-                        placeholder="Di Tempat"
-                      />
-                    </div>
-                  </div>
+                  )}
                 </CardContent>
               </Card>
 
