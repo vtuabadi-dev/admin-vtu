@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useMemo } from "react";
+import React, { useMemo, useState, useEffect } from "react";
+import QRCode from "qrcode";
 import { QrCode, CheckCircle2, ExternalLink } from "lucide-react";
 import { KOP_SURAT_BASE64 } from "@/server/assets/kop-surat";
 import type { SuratTemplate } from "@/shared/types/surat";
@@ -351,6 +352,29 @@ export default function OfficialLetterPreview({
 
   const isTamma = parsed.entityCompany === "tamma";
 
+  const [qrSrc, setQrSrc] = useState<string>("");
+
+  useEffect(() => {
+    let isMounted = true;
+    if (effectiveShowBarcode && verificationUrl) {
+      QRCode.toDataURL(verificationUrl, {
+        errorCorrectionLevel: "M",
+        margin: 0,
+        width: 300,
+        color: { dark: "#0f172a", light: "#ffffff" },
+      })
+        .then((url) => {
+          if (isMounted) setQrSrc(url);
+        })
+        .catch(() => {});
+    } else {
+      setQrSrc("");
+    }
+    return () => {
+      isMounted = false;
+    };
+  }, [effectiveShowBarcode, verificationUrl]);
+
   return (
     <div className="bg-white text-stone-950 p-8 sm:p-12 rounded-2xl shadow-xl border border-stone-300 font-serif text-[13px] leading-relaxed max-w-2xl mx-auto space-y-6 print:m-0 print:p-0 print:border-none print:shadow-none min-h-[842px]">
       {/* ── 1. OFFICIAL LETTERHEAD (KOP SURAT PPIU) ── */}
@@ -509,7 +533,15 @@ export default function OfficialLetterPreview({
             className="p-2.5 border border-stone-300 rounded-xl flex items-center gap-2.5 bg-stone-50/90 max-w-[260px] shadow-2xs hover:bg-stone-100 transition-colors group cursor-pointer"
             title="Klik untuk membuka verifikasi keabsahan surat"
           >
-            <QrCode className="h-11 w-11 text-stone-900 shrink-0 group-hover:scale-105 transition-transform" />
+            {qrSrc ? (
+              <img
+                src={qrSrc}
+                alt="QR Code Verifikasi"
+                className="h-11 w-11 shrink-0 rounded bg-white p-0.5 border border-stone-200 group-hover:scale-105 transition-transform"
+              />
+            ) : (
+              <QrCode className="h-11 w-11 text-stone-900 shrink-0 group-hover:scale-105 transition-transform" />
+            )}
             <div className="text-[9px] text-stone-700 leading-tight">
               <p className="font-bold text-stone-950 flex items-center gap-1">
                 <CheckCircle2 className="h-2.5 w-2.5 text-emerald-600 inline" />

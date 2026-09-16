@@ -1,4 +1,5 @@
 import jsPDF from "jspdf";
+import QRCode from "qrcode";
 import { VAUZA_TAMMA_LOGO_BASE64, VAUZA_TAMMA_SIGNATURE_BASE64, VAUZA_TAMMA_QR_BASE64 } from "./invoice-logo";
 import { toTitleCase } from "./utils";
 import type { SuratTemplate } from "../types/surat";
@@ -317,7 +318,8 @@ function renderLetterPage(
   doc: jsPDF,
   parsed: ParsedLetterDoc,
   effectiveShowBarcode: boolean,
-  verificationUrl: string
+  verificationUrl: string,
+  qrDataUrl?: string
 ) {
   const marginX = 20;
   const contentWidth = 210 - marginX * 2; // 170mm
@@ -494,12 +496,21 @@ function renderLetterPage(
 
   // QR Code on bottom-left
   if (effectiveShowBarcode) {
-    try {
-      if (VAUZA_TAMMA_QR_BASE64) {
-        doc.addImage(VAUZA_TAMMA_QR_BASE64, "PNG", marginX, sigY + 2, 20, 20);
+    let qrRendered = false;
+    if (qrDataUrl) {
+      try {
+        doc.addImage(qrDataUrl, "PNG", marginX, sigY + 2, 20, 20);
+        qrRendered = true;
+      } catch (err) {
+        console.error("Failed to add high-res dynamic QR code:", err);
       }
-    } catch {
-      // Fallback if image fails
+    }
+    if (!qrRendered && VAUZA_TAMMA_QR_BASE64) {
+      try {
+        doc.addImage(VAUZA_TAMMA_QR_BASE64, "PNG", marginX, sigY + 2, 20, 20);
+      } catch {
+        // Fallback if image fails
+      }
     }
 
     doc.setFont("helvetica", "bold");
@@ -511,7 +522,7 @@ function renderLetterPage(
     doc.setFontSize(6.5);
     doc.setTextColor(100, 116, 139);
     doc.text("Pindai QR code untuk memeriksa keabsahan surat ini.", marginX + 23, sigY + 11);
-    doc.text(verificationUrl.substring(0, 48) + "...", marginX + 23, sigY + 15);
+    doc.text(verificationUrl.substring(0, 48) + (verificationUrl.length > 48 ? "..." : ""), marginX + 23, sigY + 15);
   }
 
   // Official Signature Block on right
@@ -558,12 +569,29 @@ function renderLetterPage(
 /**
  * Generates an official letter PDF instance.
  */
-export function generateOfficialLetterPdf(props: OfficialLetterPdfProps): jsPDF {
+export async function generateOfficialLetterPdf(props: OfficialLetterPdfProps): Promise<jsPDF> {
   const doc = new jsPDF({
     orientation: "portrait",
     unit: "mm",
     format: "a4",
   });
+
+  let qrDataUrl = "";
+  if (props.effectiveShowBarcode && props.verificationUrl) {
+    try {
+      qrDataUrl = await QRCode.toDataURL(props.verificationUrl, {
+        errorCorrectionLevel: "M",
+        margin: 0,
+        width: 600,
+        color: {
+          dark: "#000000",
+          light: "#ffffff",
+        },
+      });
+    } catch (e) {
+      console.error("Failed to generate QR Code data URL:", e);
+    }
+  }
 
   const rawDocs = splitMultipleDocuments(props.rawText);
 
@@ -585,7 +613,7 @@ export function generateOfficialLetterPdf(props: OfficialLetterPdfProps): jsPDF 
       props.template
     );
 
-    renderLetterPage(doc, parsed, props.effectiveShowBarcode, props.verificationUrl);
+    renderLetterPage(doc, parsed, props.effectiveShowBarcode, props.verificationUrl, qrDataUrl);
   });
 
   return doc;
@@ -594,11 +622,11 @@ export function generateOfficialLetterPdf(props: OfficialLetterPdfProps): jsPDF 
 /**
  * Generates and downloads the official letter as a PDF file.
  */
-export function downloadOfficialLetterPdf(
+export async function downloadOfficialLetterPdf(
   props: OfficialLetterPdfProps,
   fileName?: string
-): void {
-  const doc = generateOfficialLetterPdf(props);
+): Promise<void> {
+  const doc = await generateOfficialLetterPdf(props);
   const cleanNomor = props.computedNomorSurat.replace(/[/\\?%*:|"<>]/g, "-");
   const fallbackName = `${cleanNomor}_${props.template.nama || "Surat_Resmi"}.pdf`;
   const finalFileName = fileName ? (fileName.endsWith(".pdf") ? fileName : `${fileName}.pdf`) : fallbackName;

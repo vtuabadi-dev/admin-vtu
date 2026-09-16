@@ -531,7 +531,7 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
   };
 
   // Action: Download PDF File
-  const handleDownloadDoc = () => {
+  const handleDownloadDoc = async () => {
     if (!activeTemplate) return;
     handleSaveToHistory();
 
@@ -543,7 +543,7 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
       if (mergedName) customFileName = `${mergedName}.pdf`;
     }
 
-    downloadOfficialLetterPdf(
+    await downloadOfficialLetterPdf(
       {
         template: activeTemplate,
         rawText: renderedLetterBody,
