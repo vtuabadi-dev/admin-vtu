@@ -992,7 +992,7 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
                           (resolvedFieldValues as Record<string, string>)["alamat"] ||
                           (resolvedFieldValues as Record<string, string>)["Alamat Lengkap"] ||
                           (resolvedFieldValues as Record<string, string>)["alamat_lengkap"] ||
-                          activeJamaah?.alamatLengkap ||
+                          (activeJamaah as any)?.alamatLengkap ||
                           activeJamaah?.alamat ||
                           "";
                       }
