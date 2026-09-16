@@ -173,17 +173,44 @@ export const DAFTAR_KANTOR_IMIGRASI: KantorImigrasiItem[] = [
 /**
  * Helper untuk mencari item kantor imigrasi berdasarkan nama / kota / keyword
  */
-export function searchKantorImigrasi(query: string): KantorImigrasiItem[] {
-  if (!query || query.trim().length === 0) return DAFTAR_KANTOR_IMIGRASI;
+export function searchKantorImigrasi(query: string, customList?: KantorImigrasiItem[]): KantorImigrasiItem[] {
+  const baseList = customList && customList.length > 0 ? customList : DAFTAR_KANTOR_IMIGRASI;
+  if (!query || query.trim().length === 0) return baseList;
   const q = query.toLowerCase().trim().replace(/[-_]/g, " ");
   const qTerms = q.split(/\s+/).filter(Boolean);
 
-  return DAFTAR_KANTOR_IMIGRASI.filter((item) => {
+  const matched = baseList.filter((item) => {
     const target = `${item.nama} ${item.shortLabel} ${item.kota} ${item.provinsi}`
       .toLowerCase()
       .replace(/[-_]/g, " ");
     return qTerms.every((term) => target.includes(term));
   });
+
+  return matched
+    .map((item) => {
+      let score = 0;
+      const kotaLower = item.kota.toLowerCase().trim();
+      const namaLower = item.nama.toLowerCase().trim();
+      const labelLower = item.shortLabel.toLowerCase().trim();
+
+      if (kotaLower === q) score += 1000;
+      else if (kotaLower.startsWith(q)) score += 600;
+      else if (new RegExp(`\\b${q}\\b`, "i").test(kotaLower)) score += 500;
+
+      if (namaLower === q || labelLower === q) score += 900;
+      else if (namaLower.startsWith(q) || labelLower.startsWith(q)) score += 400;
+      else if (new RegExp(`\\b${q}\\b`, "i").test(namaLower) || new RegExp(`\\b${q}\\b`, "i").test(labelLower)) {
+        score += 350;
+      } else if (namaLower.includes(q)) {
+        score += 100;
+      }
+
+      if (item.provinsi.toLowerCase().trim() === q) score += 50;
+
+      return { item, score };
+    })
+    .sort((a, b) => b.score - a.score)
+    .map((s) => s.item);
 }
 
 const KANIM_STORAGE_KEY = "vtu_kantor_imigrasi_cache_v1";

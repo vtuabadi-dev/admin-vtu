@@ -58,19 +58,49 @@ export function KantorImigrasiCombobox({
       .catch(() => {});
   }, []);
 
-  // Filtered items based on currently typed value
+  // Filtered and similarity-scored items based on currently typed value
   const filteredList = useMemo(() => {
     if (!value || !value.trim()) return list.slice(0, 35);
     const q = value.toLowerCase().trim();
-    return list
-      .filter(
-        (item) =>
-          item.nama.toLowerCase().includes(q) ||
-          item.shortLabel.toLowerCase().includes(q) ||
-          item.kota.toLowerCase().includes(q) ||
-          item.provinsi.toLowerCase().includes(q)
-      )
-      .slice(0, 35);
+    const qWords = q.split(/\s+/).filter(Boolean);
+
+    // Filter candidate items first
+    const matched = list.filter((item) => {
+      const fullText = `${item.nama} ${item.shortLabel} ${item.kota} ${item.provinsi}`.toLowerCase();
+      return qWords.every((word) => fullText.includes(word));
+    });
+
+    // Score and rank each candidate for best similarity
+    const scored = matched.map((item) => {
+      let score = 0;
+      const kotaLower = item.kota.toLowerCase().trim();
+      const namaLower = item.nama.toLowerCase().trim();
+      const labelLower = item.shortLabel.toLowerCase().trim();
+
+      // 1. Exact match on Kota (e.g. "Malang" === "Malang") -> Highest priority
+      if (kotaLower === q) score += 1000;
+      else if (kotaLower.startsWith(q)) score += 600;
+      else if (new RegExp(`\\b${q}\\b`, "i").test(kotaLower)) score += 500;
+
+      // 2. Exact match on Nama or ShortLabel
+      if (namaLower === q || labelLower === q) score += 900;
+      else if (namaLower.startsWith(q) || labelLower.startsWith(q)) score += 400;
+      else if (new RegExp(`\\b${q}\\b`, "i").test(namaLower) || new RegExp(`\\b${q}\\b`, "i").test(labelLower)) {
+        score += 350; // Standalone whole word match (e.g. "TPI Malang")
+      } else if (namaLower.includes(q)) {
+        score += 100; // Substring match inside word (e.g. "Pemalang")
+      }
+
+      // 3. Province match
+      if (item.provinsi.toLowerCase().trim() === q) score += 50;
+
+      return { item, score };
+    });
+
+    // Sort descending by similarity score
+    scored.sort((a, b) => b.score - a.score);
+
+    return scored.map((s) => s.item).slice(0, 35);
   }, [list, value]);
 
   // Check if current value matches an existing office name exactly
@@ -111,7 +141,8 @@ export function KantorImigrasiCombobox({
     const detectedKota = getKotaFromKanimName(newVal);
     onChange(newVal, detectedKota);
     if (!isOpen) setIsOpen(true);
-    setHighlightedIndex(-1);
+    // Auto highlight first matching item if available
+    setHighlightedIndex(0);
   };
 
   // Handle clearing value
@@ -119,6 +150,7 @@ export function KantorImigrasiCombobox({
     e.stopPropagation();
     onChange("", "");
     inputRef.current?.focus();
+    setHighlightedIndex(-1);
   };
 
   // Handle deleting a custom office item
@@ -134,7 +166,7 @@ export function KantorImigrasiCombobox({
     }
   };
 
-  // Handle creating a new office name on-the-fly and saving to DB
+  // Handle creating a new office name on-the-fly and saving to DB (HANYA via klik tombol Simpan)
   const handleAddNewKanim = async () => {
     const trimmed = (value || "").trim();
     if (!trimmed) return;
@@ -154,7 +186,7 @@ export function KantorImigrasiCombobox({
     setHighlightedIndex(-1);
   };
 
-  // Keyboard navigation
+  // Keyboard navigation: Enter hanya untuk memilih item rekomendasi di list (default yang teratas)
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (disabled) return;
 
@@ -162,6 +194,7 @@ export function KantorImigrasiCombobox({
       e.preventDefault();
       if (!isOpen) {
         setIsOpen(true);
+        setHighlightedIndex(0);
       } else {
         setHighlightedIndex((prev) =>
           prev < filteredList.length - 1 ? prev + 1 : 0
@@ -178,12 +211,13 @@ export function KantorImigrasiCombobox({
       if (isOpen) {
         e.preventDefault();
         if (highlightedIndex >= 0 && filteredList[highlightedIndex]) {
+          // Pilih item yang disorot
           handleSelect(filteredList[highlightedIndex]!);
-        } else if (filteredList.length > 0 && exactMatchExists) {
+        } else if (filteredList.length > 0) {
+          // Jika tidak ada yang disorot, pilih rekomendasi teratas
           handleSelect(filteredList[0]!);
-        } else if ((value || "").trim().length > 2) {
-          handleAddNewKanim();
         } else {
+          // Jika list kosong, cukup tutup popover tanpa membuat kategori baru
           setIsOpen(false);
         }
       }
