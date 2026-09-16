@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState, useEffect, useRef, useMemo } from "react";
-import { Search, Building2, Plus, Check, MapPin, X, ChevronDown } from "lucide-react";
+import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
+import { Building2, Plus, Check, MapPin, X, ChevronDown, Search } from "lucide-react";
 import { cn } from "@/shared/lib/utils";
 import {
   getStoredKantorImigrasiList,
@@ -21,15 +21,16 @@ interface KantorImigrasiComboboxProps {
 export function KantorImigrasiCombobox({
   value,
   onChange,
-  placeholder = "Cari atau pilih Kantor Imigrasi / Layanan Paspor...",
+  placeholder = "Cari atau ketik Kantor Imigrasi / Layanan Paspor...",
   className,
   disabled = false,
 }: KantorImigrasiComboboxProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
   const [list, setList] = useState<KantorImigrasiItem[]>([]);
+  const [highlightedIndex, setHighlightedIndex] = useState<number>(-1);
+
   const containerRef = useRef<HTMLDivElement>(null);
-  const searchInputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   // Load initial list from local cache + backend
   useEffect(() => {
@@ -47,33 +48,10 @@ export function KantorImigrasiCombobox({
       .catch(() => {});
   }, []);
 
-  // When opening dropdown, autofocus search input
-  useEffect(() => {
-    if (isOpen) {
-      setSearchQuery("");
-      setTimeout(() => {
-        searchInputRef.current?.focus();
-      }, 50);
-    }
-  }, [isOpen]);
-
-  // Find currently selected item
-  const selectedItem = useMemo(() => {
-    if (!value || !value.trim()) return null;
-    const cleanVal = value.toLowerCase().trim();
-    return (
-      list.find(
-        (item) =>
-          item.nama.toLowerCase().trim() === cleanVal ||
-          item.shortLabel.toLowerCase().trim() === cleanVal
-      ) || null
-    );
-  }, [list, value]);
-
-  // Filtered items based on searchQuery
+  // Filtered items based on currently typed value
   const filteredList = useMemo(() => {
-    if (!searchQuery || !searchQuery.trim()) return list.slice(0, 35);
-    const q = searchQuery.toLowerCase().trim();
+    if (!value || !value.trim()) return list.slice(0, 35);
+    const q = value.toLowerCase().trim();
     return list
       .filter(
         (item) =>
@@ -83,18 +61,18 @@ export function KantorImigrasiCombobox({
           item.provinsi.toLowerCase().includes(q)
       )
       .slice(0, 35);
-  }, [list, searchQuery]);
+  }, [list, value]);
 
-  // Check if current search query matches an existing office name exactly
+  // Check if current value matches an existing office name exactly
   const exactMatchExists = useMemo(() => {
-    if (!searchQuery || !searchQuery.trim()) return true;
-    const q = searchQuery.toLowerCase().trim();
+    if (!value || !value.trim()) return true;
+    const q = value.toLowerCase().trim();
     return list.some(
       (item) =>
         item.nama.toLowerCase().trim() === q ||
         item.shortLabel.toLowerCase().trim() === q
     );
-  }, [list, searchQuery]);
+  }, [list, value]);
 
   // Handle outside click to close dropdown
   useEffect(() => {
@@ -108,20 +86,34 @@ export function KantorImigrasiCombobox({
   }, []);
 
   // Handle selecting an existing office
-  const handleSelect = (item: KantorImigrasiItem) => {
-    onChange(item.nama, item.kota);
-    setIsOpen(false);
+  const handleSelect = useCallback(
+    (item: KantorImigrasiItem) => {
+      onChange(item.nama, item.kota);
+      setIsOpen(false);
+      setHighlightedIndex(-1);
+    },
+    [onChange]
+  );
+
+  // Handle direct text input
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newVal = e.target.value;
+    const detectedKota = getKotaFromKanimName(newVal);
+    onChange(newVal, detectedKota);
+    if (!isOpen) setIsOpen(true);
+    setHighlightedIndex(-1);
   };
 
   // Handle clearing value
   const handleClear = (e: React.MouseEvent) => {
     e.stopPropagation();
     onChange("", "");
+    inputRef.current?.focus();
   };
 
   // Handle creating a new office name on-the-fly and saving to DB
   const handleAddNewKanim = async () => {
-    const trimmed = searchQuery.trim();
+    const trimmed = (value || "").trim();
     if (!trimmed) return;
 
     // Detect kota from name if possible
@@ -136,46 +128,77 @@ export function KantorImigrasiCombobox({
     setList((prev) => [newItem, ...prev.filter((k) => k.id !== newItem.id)]);
     onChange(newItem.nama, newItem.kota);
     setIsOpen(false);
+    setHighlightedIndex(-1);
+  };
+
+  // Keyboard navigation
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (disabled) return;
+
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      if (!isOpen) {
+        setIsOpen(true);
+      } else {
+        setHighlightedIndex((prev) =>
+          prev < filteredList.length - 1 ? prev + 1 : 0
+        );
+      }
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      if (isOpen) {
+        setHighlightedIndex((prev) =>
+          prev > 0 ? prev - 1 : filteredList.length - 1
+        );
+      }
+    } else if (e.key === "Enter") {
+      if (isOpen) {
+        e.preventDefault();
+        if (highlightedIndex >= 0 && filteredList[highlightedIndex]) {
+          handleSelect(filteredList[highlightedIndex]!);
+        } else if (filteredList.length > 0 && exactMatchExists) {
+          handleSelect(filteredList[0]!);
+        } else if ((value || "").trim().length > 2) {
+          handleAddNewKanim();
+        } else {
+          setIsOpen(false);
+        }
+      }
+    } else if (e.key === "Escape") {
+      setIsOpen(false);
+    }
   };
 
   return (
     <div ref={containerRef} className={cn("relative w-full", className)}>
-      {/* Searchable Trigger Button */}
+      {/* ── DIRECT NATIVE INPUT BOX ── */}
       <div
-        role="button"
-        tabIndex={disabled ? -1 : 0}
-        onClick={() => {
-          if (!disabled) setIsOpen((prev) => !prev);
-        }}
-        onKeyDown={(e) => {
-          if ((e.key === "Enter" || e.key === " ") && !disabled) {
-            e.preventDefault();
-            setIsOpen((prev) => !prev);
-          }
-        }}
         className={cn(
-          "w-full min-h-[38px] px-3 py-2 text-xs rounded-lg border bg-background text-foreground transition-all flex items-center justify-between gap-2 cursor-pointer select-none",
+          "w-full min-h-[38px] px-3 py-1.5 text-xs rounded-lg border bg-background text-foreground transition-all flex items-center gap-2",
           isOpen
             ? "border-primary ring-2 ring-primary/20"
-            : "border-stone-300 dark:border-stone-700 hover:border-primary/50",
+            : "border-stone-300 dark:border-stone-700 hover:border-primary/50 focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20",
           disabled && "opacity-50 cursor-not-allowed pointer-events-none"
         )}
       >
-        <div className="flex items-center gap-2 min-w-0 flex-1">
-          <Building2 className="h-4 w-4 text-primary shrink-0" />
-          {value ? (
-            <div className="flex items-center gap-1.5 truncate">
-              <span className="font-semibold text-foreground truncate">{value}</span>
-              {selectedItem?.kota && (
-                <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded shrink-0">
-                  {selectedItem.kota}
-                </span>
-              )}
-            </div>
-          ) : (
-            <span className="text-muted-foreground truncate">{placeholder}</span>
-          )}
-        </div>
+        <Building2 className="h-4 w-4 text-primary shrink-0" />
+
+        <input
+          ref={inputRef}
+          type="text"
+          value={value || ""}
+          onChange={handleInputChange}
+          onFocus={() => {
+            if (!disabled) setIsOpen(true);
+          }}
+          onClick={() => {
+            if (!disabled && !isOpen) setIsOpen(true);
+          }}
+          onKeyDown={handleKeyDown}
+          disabled={disabled}
+          placeholder={placeholder}
+          className="w-full bg-transparent text-xs text-foreground placeholder:text-muted-foreground focus:outline-none font-medium"
+        />
 
         <div className="flex items-center gap-1 shrink-0">
           {value && !disabled && (
@@ -183,81 +206,66 @@ export function KantorImigrasiCombobox({
               type="button"
               onClick={handleClear}
               className="p-1 rounded-md text-stone-400 hover:text-stone-700 dark:hover:text-stone-200 hover:bg-stone-100 dark:hover:bg-stone-800 transition-colors"
-              title="Hapus pilihan"
+              title="Hapus / Kosongkan"
             >
               <X className="h-3.5 w-3.5" />
             </button>
           )}
-          <ChevronDown
-            className={cn(
-              "h-3.5 w-3.5 text-muted-foreground transition-transform duration-200",
-              isOpen && "rotate-180 text-primary"
-            )}
-          />
+          <button
+            type="button"
+            onClick={() => {
+              if (!disabled) {
+                setIsOpen((prev) => !prev);
+                inputRef.current?.focus();
+              }
+            }}
+            tabIndex={-1}
+            className="p-1 rounded-md text-muted-foreground hover:text-foreground transition-colors"
+            title="Buka / Tutup Rekomendasi"
+          >
+            <ChevronDown
+              className={cn(
+                "h-3.5 w-3.5 text-muted-foreground transition-transform duration-200",
+                isOpen && "rotate-180 text-primary"
+              )}
+            />
+          </button>
         </div>
       </div>
 
-      {/* Floating Popover (100% Solid Opaque Background & High Stacking Context) */}
+      {/* ── FLOATING POPOVER RECOMMENDATIONS ── */}
       {isOpen && !disabled && (
         <div className="absolute left-0 right-0 top-full mt-1.5 z-50 rounded-xl border-2 border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 text-stone-950 dark:text-stone-50 shadow-2xl overflow-hidden animate-in fade-in-0 zoom-in-95">
-          {/* Search Bar Input */}
-          <div className="p-2.5 border-b border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-950/60 space-y-1.5">
-            <div className="relative flex items-center">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
-              <input
-                ref={searchInputRef}
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    if (filteredList.length > 0 && exactMatchExists) {
-                      handleSelect(filteredList[0]!);
-                    } else if (searchQuery.trim().length > 2) {
-                      handleAddNewKanim();
-                    }
-                  } else if (e.key === "Escape") {
-                    setIsOpen(false);
-                  }
-                }}
-                placeholder="Ketik kantor, kota (Surabaya, Malang, Sidoarjo)..."
-                className="w-full pl-8 pr-7 py-1.5 text-xs rounded-lg border border-stone-300 dark:border-stone-700 bg-white dark:bg-stone-900 text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary placeholder:text-muted-foreground"
-              />
-              {searchQuery && (
-                <button
-                  type="button"
-                  onClick={() => setSearchQuery("")}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 text-stone-400 hover:text-stone-600 rounded-full"
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              )}
-            </div>
-
-            <div className="flex items-center justify-between px-1 text-[10px] text-muted-foreground">
-              <span>Daftar Kantor Imigrasi / Kanim</span>
-              <span>{filteredList.length} kantor tersedia</span>
-            </div>
+          {/* Subheader info */}
+          <div className="px-3 py-1.5 border-b border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-950/60 flex items-center justify-between text-[10px] text-muted-foreground">
+            <span className="flex items-center gap-1">
+              <Search className="h-3 w-3" />
+              Pilih dari daftar atau lanjut ketik manual
+            </span>
+            <span>{filteredList.length} kantor ditemukan</span>
           </div>
 
           {/* List of Matched Offices */}
           <div className="max-h-56 overflow-y-auto p-1.5 space-y-1">
-            {filteredList.map((item) => {
+            {filteredList.map((item, idx) => {
               const isSelected =
                 value &&
                 (value.toLowerCase().trim() === item.nama.toLowerCase().trim() ||
                   value.toLowerCase().trim() === item.shortLabel.toLowerCase().trim());
+              const isHighlighted = idx === highlightedIndex;
 
               return (
                 <button
                   key={item.id}
                   type="button"
                   onClick={() => handleSelect(item)}
+                  onMouseEnter={() => setHighlightedIndex(idx)}
                   className={cn(
                     "w-full text-left px-3 py-2 rounded-lg text-xs transition-all flex items-start justify-between gap-2 group cursor-pointer",
                     isSelected
                       ? "bg-primary/10 text-primary font-bold border border-primary/20"
+                      : isHighlighted
+                      ? "bg-stone-100 dark:bg-stone-800 text-foreground"
                       : "hover:bg-stone-100 dark:hover:bg-stone-800 text-foreground"
                   )}
                 >
@@ -281,12 +289,12 @@ export function KantorImigrasiCombobox({
 
             {filteredList.length === 0 && (
               <div className="p-3 text-center text-xs text-muted-foreground">
-                Tidak ada kantor imigrasi yang cocok dengan &quot;{searchQuery}&quot;.
+                Tidak ada kantor di daftar dengan nama &quot;{value}&quot;. Ketikan Anda tetap akan tersimpan sebagai teks surat.
               </div>
             )}
 
             {/* If user typed a new office name not in the list, offer to save it */}
-            {!exactMatchExists && searchQuery.trim().length > 2 && (
+            {!exactMatchExists && (value || "").trim().length > 2 && (
               <button
                 type="button"
                 onClick={handleAddNewKanim}
@@ -294,12 +302,12 @@ export function KantorImigrasiCombobox({
               >
                 <Plus className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
                 <div className="min-w-0">
-                  <span>Tambahkan sebagai Kantor Baru:</span>
+                  <span>Simpan ke Database Master:</span>
                   <p className="font-bold text-emerald-950 dark:text-emerald-100 truncate">
-                    &quot;{searchQuery.trim()}&quot;
+                    &quot;{(value || "").trim()}&quot;
                   </p>
                   <p className="text-[10px] font-normal text-emerald-700 dark:text-emerald-400">
-                    Otomatis tersimpan ke database & terhubung dengan Kota Kanim.
+                    Otomatis terhubung dengan Kota Kanim di surat.
                   </p>
                 </div>
               </button>
