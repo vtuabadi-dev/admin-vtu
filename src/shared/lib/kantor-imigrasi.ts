@@ -201,14 +201,35 @@ export function getStoredKantorImigrasiList(): KantorImigrasiItem[] {
       const map = new Map<string, KantorImigrasiItem>();
       DAFTAR_KANTOR_IMIGRASI.forEach((k) => map.set(k.nama.toLowerCase().trim(), k));
       parsed.forEach((k: KantorImigrasiItem) => {
-        if (k?.nama) map.set(k.nama.toLowerCase().trim(), k);
+        // Abaikan entri malang yang bukan resmi
+        if (k?.nama && !(k.id !== "kanim-mlg" && k.nama.toLowerCase().trim() === "malang")) {
+          map.set(k.nama.toLowerCase().trim(), k);
+        }
       });
-      return Array.from(map.values());
+      const result = Array.from(map.values());
+      // Perbarui localStorage jika ada entri malang yang dibersihkan
+      if (parsed.some((k: KantorImigrasiItem) => k?.id !== "kanim-mlg" && k?.nama?.toLowerCase().trim() === "malang")) {
+        localStorage.setItem(KANIM_STORAGE_KEY, JSON.stringify(result));
+      }
+      return result;
     }
   } catch (err) {
     console.warn("Failed to load stored kanim list:", err);
   }
   return DAFTAR_KANTOR_IMIGRASI;
+}
+
+/**
+ * Memeriksa apakah suatu item Kantor Imigrasi merupakan item kustom (bukan bawaan resmi sistem)
+ */
+export function isCustomKantorImigrasi(itemOrId: KantorImigrasiItem | string): boolean {
+  const id = typeof itemOrId === "string" ? itemOrId : itemOrId.id;
+  const nama = typeof itemOrId === "string" ? "" : itemOrId.nama;
+
+  if (id.startsWith("kanim-custom-")) return true;
+  return !DAFTAR_KANTOR_IMIGRASI.some(
+    (k) => k.id === id || (nama && k.nama.toLowerCase().trim() === nama.toLowerCase().trim())
+  );
 }
 
 /**
@@ -299,4 +320,49 @@ export async function saveNewKantorImigrasi(newKanim: {
   } catch {}
 
   return item;
+}
+
+/**
+ * Menghapus item Kantor Imigrasi kustom dari localStorage dan database backend.
+ */
+export async function deleteCustomKantorImigrasi(idOrNama: string): Promise<boolean> {
+  if (!idOrNama) return false;
+  const cleanTarget = idOrNama.trim().toLowerCase();
+
+  // Pastikan bukan bawaan resmi sistem
+  const isBuiltIn = DAFTAR_KANTOR_IMIGRASI.some(
+    (k) => k.id === idOrNama || k.nama.toLowerCase().trim() === cleanTarget
+  );
+  if (isBuiltIn && idOrNama !== "kanim-custom-malang" && cleanTarget !== "malang") {
+    console.warn("Tidak dapat menghapus kantor imigrasi bawaan resmi sistem.");
+    return false;
+  }
+
+  if (typeof window !== "undefined") {
+    try {
+      const raw = localStorage.getItem(KANIM_STORAGE_KEY);
+      if (raw) {
+        const parsed: KantorImigrasiItem[] = JSON.parse(raw);
+        const filtered = parsed.filter(
+          (k) => k.id !== idOrNama && k.nama.toLowerCase().trim() !== cleanTarget
+        );
+        localStorage.setItem(KANIM_STORAGE_KEY, JSON.stringify(filtered));
+      }
+    } catch (err) {
+      console.warn("Failed to delete from localStorage:", err);
+    }
+  }
+
+  // Request DELETE to API backend
+  try {
+    await fetch("/api/master/kantor-imigrasi", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: idOrNama, nama: idOrNama }),
+    });
+    return true;
+  } catch (err) {
+    console.warn("Failed to delete from API backend:", err);
+    return true;
+  }
 }

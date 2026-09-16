@@ -61,10 +61,18 @@ async function saveKanimListToDb(list: KantorImigrasiItem[], userName: string): 
 export async function GET() {
   try {
     const list = await getKanimListFromDb();
+    // Filter out accidental "malang" custom entry if present
+    const cleaned = list.filter(
+      (k) => !(k.id !== "kanim-mlg" && k.nama.toLowerCase().trim() === "malang")
+    );
+    if (cleaned.length !== list.length) {
+      cachedKanimList = cleaned;
+      await saveKanimListToDb(cleaned, "System Cleanup");
+    }
     return NextResponse.json({
       success: true,
-      data: list,
-      total: list.length,
+      data: cleaned,
+      total: cleaned.length,
     });
   } catch (error) {
     return NextResponse.json({ success: false, message: (error as Error).message }, { status: 500 });
@@ -111,6 +119,56 @@ export async function POST(request: NextRequest) {
       success: true,
       data: newItem,
       message: `Kantor imigrasi "${cleanNama}" berhasil disimpan ke database`,
+    });
+  } catch (error) {
+    return NextResponse.json({ success: false, message: (error as Error).message }, { status: 500 });
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  const session = await auth();
+  const userName = session?.user?.name || "Admin Operasional";
+
+  try {
+    const body = (await request.json()) as { id?: string; nama?: string };
+    const idToDelete = body.id?.trim();
+    const namaToDelete = body.nama?.trim().toLowerCase();
+
+    if (!idToDelete && !namaToDelete) {
+      return NextResponse.json(
+        { success: false, message: "ID atau Nama kantor imigrasi wajib disertakan" },
+        { status: 400 }
+      );
+    }
+
+    const currentList = await getKanimListFromDb();
+
+    // Pastikan tidak menghapus entri bawaan resmi
+    const isBuiltIn = DAFTAR_KANTOR_IMIGRASI.some(
+      (k) =>
+        (idToDelete && k.id === idToDelete) ||
+        (namaToDelete && k.nama.toLowerCase().trim() === namaToDelete)
+    );
+
+    if (isBuiltIn && idToDelete !== "kanim-custom-malang" && namaToDelete !== "malang") {
+      return NextResponse.json(
+        { success: false, message: "Kantor imigrasi resmi bawaan sistem tidak dapat dihapus." },
+        { status: 403 }
+      );
+    }
+
+    const updatedList = currentList.filter((k) => {
+      if (idToDelete && k.id === idToDelete && k.id !== "kanim-mlg") return false;
+      if (namaToDelete && k.nama.toLowerCase().trim() === namaToDelete && k.id !== "kanim-mlg") return false;
+      return true;
+    });
+
+    await saveKanimListToDb(updatedList, userName);
+
+    return NextResponse.json({
+      success: true,
+      data: updatedList,
+      message: "Kantor imigrasi kustom berhasil dihapus dari database",
     });
   } catch (error) {
     return NextResponse.json({ success: false, message: (error as Error).message }, { status: 500 });

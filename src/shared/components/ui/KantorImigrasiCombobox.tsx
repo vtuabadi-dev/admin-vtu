@@ -1,12 +1,14 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
-import { Building2, Plus, Check, MapPin, X, ChevronDown, Search } from "lucide-react";
+import { Building2, Plus, Check, MapPin, X, ChevronDown, Search, Trash2 } from "lucide-react";
 import { cn } from "@/shared/lib/utils";
 import {
   getStoredKantorImigrasiList,
   saveNewKantorImigrasi,
   getKotaFromKanimName,
+  deleteCustomKantorImigrasi,
+  isCustomKantorImigrasi,
 } from "@/shared/lib/kantor-imigrasi";
 import type { KantorImigrasiItem } from "@/shared/lib/kantor-imigrasi";
 
@@ -35,14 +37,22 @@ export function KantorImigrasiCombobox({
   // Load initial list from local cache + backend
   useEffect(() => {
     const stored = getStoredKantorImigrasiList();
-    setList(stored);
+    // Filter out accidental "malang" custom entry if any
+    const cleaned = stored.filter(
+      (k) => !(k.id !== "kanim-mlg" && k.nama.toLowerCase().trim() === "malang")
+    );
+    setList(cleaned);
 
     // Fetch freshest list from API in background
     fetch("/api/master/kantor-imigrasi")
       .then((res) => res.json())
       .then((data) => {
         if (data.success && Array.isArray(data.data) && data.data.length > 0) {
-          setList(data.data);
+          const apiCleaned = data.data.filter(
+            (k: KantorImigrasiItem) =>
+              !(k.id !== "kanim-mlg" && k.nama.toLowerCase().trim() === "malang")
+          );
+          setList(apiCleaned);
         }
       })
       .catch(() => {});
@@ -109,6 +119,19 @@ export function KantorImigrasiCombobox({
     e.stopPropagation();
     onChange("", "");
     inputRef.current?.focus();
+  };
+
+  // Handle deleting a custom office item
+  const handleDeleteCustomItem = async (
+    item: KantorImigrasiItem,
+    e: React.MouseEvent
+  ) => {
+    e.stopPropagation();
+    await deleteCustomKantorImigrasi(item.id);
+    setList((prev) => prev.filter((k) => k.id !== item.id && k.nama !== item.nama));
+    if (value && value.toLowerCase().trim() === item.nama.toLowerCase().trim()) {
+      onChange("", "");
+    }
   };
 
   // Handle creating a new office name on-the-fly and saving to DB
@@ -253,15 +276,15 @@ export function KantorImigrasiCombobox({
                 (value.toLowerCase().trim() === item.nama.toLowerCase().trim() ||
                   value.toLowerCase().trim() === item.shortLabel.toLowerCase().trim());
               const isHighlighted = idx === highlightedIndex;
+              const isCustom = isCustomKantorImigrasi(item);
 
               return (
-                <button
+                <div
                   key={item.id}
-                  type="button"
                   onClick={() => handleSelect(item)}
                   onMouseEnter={() => setHighlightedIndex(idx)}
                   className={cn(
-                    "w-full text-left px-3 py-2 rounded-lg text-xs transition-all flex items-start justify-between gap-2 group cursor-pointer",
+                    "w-full text-left px-3 py-2 rounded-lg text-xs transition-all flex items-center justify-between gap-2 group cursor-pointer",
                     isSelected
                       ? "bg-primary/10 text-primary font-bold border border-primary/20"
                       : isHighlighted
@@ -269,10 +292,17 @@ export function KantorImigrasiCombobox({
                       : "hover:bg-stone-100 dark:hover:bg-stone-800 text-foreground"
                   )}
                 >
-                  <div className="space-y-0.5 min-w-0">
-                    <p className="font-semibold leading-tight group-hover:text-primary transition-colors truncate">
-                      {item.nama}
-                    </p>
+                  <div className="space-y-0.5 min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5">
+                      <p className="font-semibold leading-tight group-hover:text-primary transition-colors truncate">
+                        {item.nama}
+                      </p>
+                      {isCustom && (
+                        <span className="text-[9px] px-1.5 py-0.2 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 font-normal shrink-0 border border-amber-500/20">
+                          Kustom
+                        </span>
+                      )}
+                    </div>
                     <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
                       <span className="flex items-center gap-0.5 font-medium">
                         <MapPin className="h-2.5 w-2.5 text-primary shrink-0" />
@@ -282,8 +312,21 @@ export function KantorImigrasiCombobox({
                       <span>{item.provinsi}</span>
                     </div>
                   </div>
-                  {isSelected && <Check className="h-4 w-4 text-primary shrink-0 mt-0.5" />}
-                </button>
+
+                  <div className="flex items-center gap-1 shrink-0">
+                    {isCustom && (
+                      <button
+                        type="button"
+                        onClick={(e) => handleDeleteCustomItem(item, e)}
+                        className="p-1 rounded text-stone-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/50 transition-colors"
+                        title={`Hapus "${item.nama}" dari daftar`}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                    {isSelected && <Check className="h-4 w-4 text-primary shrink-0" />}
+                  </div>
+                </div>
               );
             })}
 
