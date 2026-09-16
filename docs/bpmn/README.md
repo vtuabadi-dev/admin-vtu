@@ -114,14 +114,86 @@ graph TD
 
 ---
 
-## 4. Susunan 8 Swimlanes (Urutan Baris / Row)
+## 4. Sub-Proses: Alur Pembuatan Surat Rekomendasi Paspor & Verifikasi Dokumen Referensi
+
+Sub-proses ini mengatur alur verifikasi berkas identitas bagi jamaah yang **belum memiliki paspor**, siklus permintaan ulang dokumen jika belum lengkap (*loopback review*), serta otomatisasi pembuatan **Surat Rekomendasi Paspor** (termasuk penambahan 1 suku kata nama ayah saat perihal **Endorsement Nama**):
+
+```mermaid
+graph TD
+    StartRekom(["● Mulai: Jamaah Belum Punya Paspor"]):::event --> J1["1. Jamaah: Upload Dokumen Referensi (KTP, KK, Dokumen Pendukung/Buku Nikah)"]:::taskJamaah
+
+    %% TAHAP 2: AI OCR & INGESTION
+    J1 --> OCR_Scan["2. Sistem: AI OCR Scan Dokumen Referensi & Ekstrak Nama Ayah"]:::taskSistem
+    OCR_Scan --> Ops_Review["3. Admin Dokumen: Verifikasi Kelengkapan & Keabsahan Dokumen"]:::taskOps
+
+    %% GATEWAY 1: CEK KELENGKAPAN DOKUMEN REFERENSI
+    Ops_Review --> GateDoc{"Dokumen Referensi Lengkap?<br/>(KTP, KK, Buku Nikah/Akta)"}:::gateway
+
+    %% CABANG DOKUMEN BELUM LENGKAP (LOOPBACK)
+    GateDoc -- "TIDAK LENGKAP / BURAM" --> Notif_Kurang["4a. Admin Dokumen: Kirim Notifikasi Kekurangan Berkas via WhatsApp & Portal"]:::taskOps
+    Notif_Kurang --> J_Reupload["4b. Jamaah: Melengkapi / Upload Ulang Berkas yang Diminta"]:::taskJamaah
+    J_Reupload --> OCR_Scan
+
+    %% CABANG DOKUMEN LENGKAP
+    GateDoc -- "LENGKAP & VALID" --> Ingest_Valid["5. Sistem: Update Status Dokumen Valid & Ingest Nama Ayah ke Database"]:::taskSistem
+    Ingest_Valid --> Admin_Surat["6. Admin Operasional: Buka Halaman Generate Surat (/admin/surat) & Pilih Jamaah"]:::taskOps
+
+    %% GATEWAY 2: PERIHAL SURAT (HAL)
+    Admin_Surat --> GateHal{"Pilihan Perihal Surat {Hal}?"}:::gateway
+
+    %% PERIHAL A: PERMOHONAN BARU / PERPANJANGAN
+    GateHal -- "Permohonan Baru / Perpanjangan" --> Auto_New["7a. Autocrat Engine: Format Nama Sesuai Nama Asli di Manifest"]:::taskSistem
+
+    %% PERIHAL B: ENDORSEMENT NAMA
+    GateHal -- "Endorsements Nama" --> Auto_Endorse["7b. Autocrat Engine: Filter Gelar Ayah & Auto-Append Nama Ayah ke Nama Jamaah"]:::taskSistem
+
+    %% MERGE PROSES AUTOCRAT
+    Auto_New --> Merge_Surat{"Merge"}:::gateway
+    Auto_Endorse --> Merge_Surat
+
+    Merge_Surat --> Auto_Kanim["8. Autocrat Engine: Auto VLOOKUP Kantor Imigrasi & Kota Kanim Tujuan"]:::taskSistem
+    Auto_Kanim --> Auto_Nomor["9. Sistem: Generate Nomor Surat Resmi PPIU ([NOMOR]/SR-PASPOR/VTU/[BULAN]/[TAHUN])"]:::taskSistem
+    Auto_Nomor --> Gen_PDF["10. Sistem: Generate PDF Surat Rekom A4 Resmi (Kop PPIU, QR Verification & TTD Direktur)"]:::taskSistem
+
+    Gen_PDF --> Log_Audit["11. Sistem: Catat Audit Log Penerbitan Surat & Siapkan URL Verifikasi"]:::taskSistem
+    Log_Audit --> Share_WA["12. Admin / Sistem: Kirim File PDF & Notifikasi Pengurusan Paspor ke Jamaah"]:::taskOps
+    Share_WA --> J_Imigrasi["13. Jamaah: Menyerahkan Surat Rekomendasi & Dokumen Asli ke Kantor Imigrasi"]:::taskJamaah
+    J_Imigrasi --> EndRekom(["■ Selesai: Paspor Diterbitkan & Diunggah ke Sistem"]):::endEvent
+
+    classDef event fill:#a5d6a7,stroke:#2e7d32,stroke-width:2px,color:#000;
+    classDef endEvent fill:#a5d6a7,stroke:#2e7d32,stroke-width:3px,color:#000;
+    classDef gateway fill:#ffe0b2,stroke:#e65100,stroke-width:2px,color:#000;
+    classDef taskJamaah fill:#e1f5fe,stroke:#0288d1,stroke-width:1.5px,color:#000;
+    classDef taskSistem fill:#eceff1,stroke:#455a64,stroke-width:1.5px,color:#000;
+    classDef taskOps fill:#e8f5e9,stroke:#2e7d32,stroke-width:1.5px,color:#000;
+```
+
+### Rincian Siklus & Aturan Bisnis Pembuatan Surat Rekomendasi:
+1. **Identifikasi Status Paspor**:
+   - Jika jamaah terdaftar di manifest namun belum mengunggah nomor paspor aktif, sistem menandai perlunya **Surat Rekomendasi Paspor PPIU**.
+2. **Pengumpulan Dokumen Referensi**:
+   - **KTP**: Ekstraksi NIK, Tempat/Tgl Lahir, Jenis Kelamin, dan Alamat Domisili.
+   - **Kartu Keluarga (KK)**: Ekstraksi Nomor KK dan **Nama Ayah Kandung** dari tabel silsilah keluarga.
+   - **Dokumen Pendukung (Buku Nikah / Akta Lahir / Ijazah)**: Slot khusus untuk pembuktian nasab ayah kandung serta status pernikahan jamaah.
+3. **Decision Gate & Loopback Berkas Belum Lengkap**:
+   - Apabila salah satu dokumen referensi belum diunggah atau hasil pemindaian buram/tidak terbaca, Admin Dokumen menolak verifikasi dengan catatan kekurangan.
+   - Sistem secara otomatis mengirimkan notifikasi interaktif via WhatsApp & Portal Jamaah agar jamaah mengunggah ulang dokumen yang kurang.
+4. **Logika Autocrat Engine & Mode Endorsement**:
+   - **Mode Permohonan Baru / Perpanjangan**: `{Nama Jama'ah}` menggunakan nama lengkap resmi jamaah.
+   - **Mode Endorsements Nama**: Sistem secara otomatis mengekstrak nama ayah kandung (dari data KK / Buku Nikah), membuang gelar kehormatan (`H.`, `Hj.`, `Drs.`, `Dr.`, `K.H.`, `Prof.`, dll.), dan menyambungkan 1 suku kata nama ayah di belakang nama jamaah jika belum ada akhiran nama ayah.
+5. **Penerbitan Dokumen Resmi**:
+   - Surat dicetak dengan kop resmi PPIU VTU Abadi, penomoran urut otomatis, tanda tangan Direktur Utama, stempel resmi, dan **Barcode QR Verifikasi Digital** yang dapat divalidasi keabsahannya oleh petugas Imigrasi.
+
+---
+
+## 5. Susunan 8 Swimlanes (Urutan Baris / Row)
 
 | No (Row) | Lane / Role | Kode Role Sistem | Posisi & Tanggung Jawab Utama |
 |:---|:---|:---|:---|
-| **Row 1** | **JAMAAH / KETUA GROUP** | `jamaah` | Mengisi data group, memilih paket, tentukan kamar, upload bukti bayar DP, terima perlengkapan, upload berkas paspor, pelunasan, hingga keberangkatan dan kepulangan. |
-| **Row 2** | **SISTEM VTU & AI ENGINE** | *Automated Service* | Auto-broadcast jadwal ke Telegram, kalkulasi nominal total & DP, generate PDF formulir bertanda tangan, ingest data ke manifest, Gemini OCR, auto-deadlines, sinkronisasi Google Drive, dan immutable `AuditEntry`. |
-| **Row 3** | **ADMIN OPERASIONAL** | `admin_operasional` | **Sub-Proses Manajemen Paket:** Paket baru, update, split starting, split promo; peninjauan pendaftaran baru & bukti transfer DP; serta closing paket keberangkatan. |
-| **Row 4** | **ADMIN DOKUMEN** | `admin_dokumen` | Manual review berkas buram/OCR error, verifikasi paspor (>6 bulan), approval kelayakan dokumen visa. |
+| **Row 1** | **JAMAAH / KETUA GROUP** | `jamaah` | Mengisi data group, memilih paket, tentukan kamar, upload bukti bayar DP, terima perlengkapan, upload berkas referensi (KTP, KK, Buku Nikah), upload paspor, pelunasan, hingga keberangkatan dan kepulangan. |
+| **Row 2** | **SISTEM VTU & AI ENGINE** | *Automated Service* | Auto-broadcast jadwal ke Telegram, kalkulasi nominal total & DP, generate PDF formulir bertanda tangan, ingest data ke manifest, Gemini OCR, Autocrat Engine surat rekomendasi & endorsement, sinkronisasi Google Drive, dan immutable `AuditEntry`. |
+| **Row 3** | **ADMIN OPERASIONAL** | `admin_operasional` | **Sub-Proses Manajemen Paket:** Paket baru, update, split starting, split promo; peninjauan pendaftaran baru & bukti transfer DP; penerbitan surat rekomendasi paspor di `/admin/surat`; serta closing paket keberangkatan. |
+| **Row 4** | **ADMIN DOKUMEN** | `admin_dokumen` | Manual review berkas buram/OCR error, verifikasi kelengkapan dokumen referensi (KTP, KK, Buku Nikah), penolakan/permintaan ulang dokumen belum lengkap, approval kelayakan dokumen visa. |
 | **Row 5** | **ADMIN PEMBAYARAN** | `admin_pembayaran` | Penerbitan invoice resmi (DP & Pelunasan), invoice split group (A/B/C), rekonsiliasi mutasi bank, alokasi pembayaran per jamaah. |
 | **Row 6** | **ADMIN MANIFEST & ROOMING** | `admin_manifest` | Finalisasi manifest jamaah, grouping kombinasi hotel Mekkah/Madinah, dan eksekusi algoritma *Rooming Engine* (Quad/Triple/Double, Mahram & Gender). |
 | **Row 7** | **TOUR LEADER** | `tour_leader` | Serah terima (*handover*) final manifest & rooming list, manasik jamaah, pendampingan spiritual & logistik di Makkah/Madinah, laporan TL. |
@@ -129,7 +201,7 @@ graph TD
 
 ---
 
-## 5. Kepatuhan Validasi Standard OMG BPMN 2.0
+## 6. Kepatuhan Validasi Standard OMG BPMN 2.0
 
 Verifikasi integritas model XML diuji secara otomatis dengan hasil:
 - **Total IDs Terdaftar**: 405 Node & Element
