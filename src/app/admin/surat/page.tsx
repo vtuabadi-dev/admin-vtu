@@ -44,6 +44,7 @@ import {
   renderAutocratMergedText,
   getTodayDateInfo,
   isSystemAutoPlaceholder,
+  extractPlaceholdersFromText,
 } from "@/shared/lib/surat-autocrat-engine";
 import { downloadOfficialLetterPdf } from "@/shared/lib/surat-pdf";
 import { KantorImigrasiCombobox } from "@/shared/components/ui/KantorImigrasiCombobox";
@@ -344,6 +345,36 @@ function GenerateSuratPageContent() {
       lower.includes("yth ");
     return hasNomor && hasTujuan;
   }, [rawTemplateText]);
+
+  // Effective Placeholders list combining template.placeholders with placeholders extracted from template text
+  const effectivePlaceholders = useMemo(() => {
+    const map = new Map<string, any>();
+    const normalize = (s: string) =>
+      s.toLowerCase().trim().replace(/[\u2018\u2019\u201A\u201B']/g, "'").replace(/[\s_\-\.]/g, "");
+
+    (activeTemplate?.placeholders || []).forEach((p) => {
+      if (!isSystemAutoPlaceholder(p.key)) {
+        map.set(normalize(p.key), p);
+      }
+    });
+
+    if (rawTemplateText) {
+      const extracted = extractPlaceholdersFromText(rawTemplateText);
+      extracted.forEach((k) => {
+        const clean = normalize(k);
+        if (!map.has(clean) && !isSystemAutoPlaceholder(k)) {
+          map.set(clean, {
+            key: k,
+            label: k,
+            sourceType: "manifest",
+            inputType: "text",
+          });
+        }
+      });
+    }
+
+    return Array.from(map.values());
+  }, [activeTemplate, rawTemplateText]);
 
   // Autocrat Merged Field Values
   const resolvedFieldValues = useMemo(() => {
@@ -855,188 +886,177 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
                       3. Kolom Isian Data Surat (Autocrat Tags)
                     </span>
                     <span className="text-[10px] text-muted-foreground">
-                      {activeTemplate.placeholders.filter((p) => !isSystemAutoPlaceholder(p.key)).length} Tag Terkonfigurasi
+                      {effectivePlaceholders.length} Tag Terkonfigurasi
                     </span>
                   </CardTitle>
                 </CardHeader>
 
                 <CardContent className="p-3.5 space-y-2.5 max-h-[58vh] overflow-y-auto pr-2">
-                  {activeTemplate.placeholders
-                    .filter((p) => !isSystemAutoPlaceholder(p.key))
-                    .map((p, pIdx) => {
-                    const isManifest = p.sourceType === "manifest";
-                    const resolvedVal = resolvedFieldValues[p.key] || "";
+                  {effectivePlaceholders.length === 0 ? (
+                    <div className="text-center py-6 text-xs text-muted-foreground">
+                      Semua data surat telah otomatis terisi dari manifest.
+                    </div>
+                  ) : (
+                    effectivePlaceholders.map((p, pIdx) => {
+                      const isManifest = p.sourceType === "manifest";
+                      const cleanKey = (p.key || "").toLowerCase().replace(/[\s_\-\.]/g, "");
+                      const cleanLabel = (p.label || "").toLowerCase().replace(/[\s_\-\.]/g, "");
+                      const isKotaKanimField =
+                        cleanKey.includes("kotakanim") ||
+                        cleanKey.includes("kotaimigrasi") ||
+                        cleanKey.includes("kotakantor") ||
+                        cleanLabel.includes("kotakanim") ||
+                        cleanLabel.includes("kotaimigrasi") ||
+                        (cleanKey.includes("kota") && !cleanKey.includes("lahir") && !cleanKey.includes("paket"));
 
-                    const cleanKey = p.key.toLowerCase().replace(/[\s_\-\.]/g, "");
-                    const cleanLabel = (p.label || "").toLowerCase().replace(/[\s_\-\.]/g, "");
-                    const isKotaKanimField =
-                      cleanKey.includes("kotakanim") ||
-                      cleanKey.includes("kotaimigrasi") ||
-                      cleanKey.includes("kotakantor") ||
-                      cleanLabel.includes("kotakanim") ||
-                      cleanLabel.includes("kotaimigrasi") ||
-                      (cleanKey.includes("kota") && !cleanKey.includes("lahir") && !cleanKey.includes("paket"));
+                      const isKanimSelector =
+                        (p.inputType === "kantor_imigrasi" ||
+                          cleanKey === "kanim" ||
+                          cleanKey === "kantorimigrasi" ||
+                          (cleanKey.includes("imigrasi") && !cleanKey.includes("kota"))) &&
+                        !isKotaKanimField;
 
-                    const isTempatField =
-                      cleanKey.includes("tempat") ||
-                      cleanLabel.includes("tempat") ||
-                      cleanKey.includes("pob") ||
-                      (cleanKey.includes("kota") && cleanKey.includes("lahir"));
+                      // Clean and validate options if select
+                      const validOptions = (Array.isArray(p.options) ? p.options : [])
+                        .map((opt: string) => String(opt).trim())
+                        .filter(Boolean);
+                      const isSearchableSelect = p.inputType === "select" && validOptions.length > 4;
 
-                    const isKanimSelector =
-                      (p.inputType === "kantor_imigrasi" ||
-                        cleanKey === "kanim" ||
-                        cleanKey === "kantorimigrasi" ||
-                        (cleanKey.includes("imigrasi") && !cleanKey.includes("kota"))) &&
-                      !isKotaKanimField;
+                      // Live value resolution: user edits take absolute precedence
+                      const manualVal = manualFormData[p.key];
+                      const resolvedVal = (resolvedFieldValues as Record<string, string>)[p.key] ?? "";
+                      const rawDisplay = manualVal !== undefined ? manualVal : resolvedVal;
+                      const displayValue = rawDisplay === "-" ? "" : rawDisplay;
 
-                    // Clean and validate options if select
-                    const validOptions = (p.options || [])
-                      .map((opt) => opt.trim())
-                      .filter(Boolean);
-                    const isSearchableSelect = p.inputType === "select" && validOptions.length > 4;
+                      return (
+                        <div
+                          key={p.key}
+                          style={{ zIndex: 40 - pIdx }}
+                          className={cn(
+                            "p-2.5 rounded-xl border border-stone-200/80 dark:border-stone-800/80 bg-card/60 shadow-2xs space-y-1.5 transition-all hover:border-primary/40 relative",
+                            (isKanimSelector || isSearchableSelect) && "z-30"
+                          )}
+                        >
+                          <div className="flex items-center justify-between">
+                            <label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                              <span className="font-mono text-[10px] text-muted-foreground">&#123;{p.key}&#125;</span>
+                              <span>{p.label || p.key}</span>
+                            </label>
 
-                    // Cleanse city display if office name was accidentally passed
-                    const rawDisplay =
-                      isKotaKanimField && (resolvedVal.includes("Kantor Imigrasi") || resolvedVal.includes("TPI"))
-                        ? getKotaFromKanimName(resolvedVal) || resolvedVal
-                        : resolvedVal;
-                    const displayValue = (isKotaKanimField || isTempatField) ? toTitleCase(rawDisplay) : rawDisplay;
+                            {manualVal !== undefined && manualVal !== resolvedVal ? (
+                              <span className="text-[10px] font-semibold text-amber-600 dark:text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded flex items-center gap-1">
+                                Diedit Manual
+                              </span>
+                            ) : isManifest ? (
+                              <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded flex items-center gap-1">
+                                <CheckCircle2 className="h-3 w-3" />
+                                Otomatis Manifest
+                              </span>
+                            ) : isKotaKanimField ? (
+                              <span
+                                className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded flex items-center gap-1"
+                                title="Kota ini otomatis terisi saat memilih Kantor Imigrasi"
+                              >
+                                <Sparkles className="h-3 w-3" />
+                                Auto VLOOKUP Kanim
+                              </span>
+                            ) : isSearchableSelect ? (
+                              <span className="text-[10px] font-semibold text-indigo-600 dark:text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded flex items-center gap-1">
+                                <Search className="h-2.5 w-2.5" />
+                                Searchable ({validOptions.length} Opsi)
+                              </span>
+                            ) : (
+                              <span className="text-[10px] font-semibold text-blue-600 dark:text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded">
+                                Input Form
+                              </span>
+                            )}
+                          </div>
 
-                    return (
-                      <div
-                        key={p.key}
-                        style={{ zIndex: 40 - pIdx }}
-                        className={cn(
-                          "p-2.5 rounded-xl border border-stone-200/80 dark:border-stone-800/80 bg-card/60 shadow-2xs space-y-1.5 transition-all hover:border-primary/40 relative",
-                          (isKanimSelector || isSearchableSelect) && "z-30"
-                        )}
-                      >
-                        <div className="flex items-center justify-between">
-                          <label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-                            <span className="font-mono text-[10px] text-muted-foreground">&#123;{p.key}&#125;</span>
-                            <span>{p.label}</span>
-                          </label>
+                          {isKanimSelector ? (
+                            <KantorImigrasiCombobox
+                              value={displayValue}
+                              onChange={(kanimNama, kanimKota) => {
+                                const nextData: Record<string, string> = { ...manualFormData, [p.key]: kanimNama };
+                                const effectiveKota = toTitleCase(kanimKota || getKotaFromKanimName(kanimNama));
 
-                          {isManifest ? (
-                            <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded flex items-center gap-1">
-                              <CheckCircle2 className="h-3 w-3" />
-                              Otomatis Manifest
-                            </span>
-                          ) : isKotaKanimField ? (
-                            <span
-                              className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded flex items-center gap-1"
-                              title="Kota ini otomatis terisi saat memilih Kantor Imigrasi"
-                            >
-                              <Sparkles className="h-3 w-3" />
-                              Auto VLOOKUP Kanim
-                            </span>
-                          ) : isSearchableSelect ? (
-                            <span className="text-[10px] font-semibold text-indigo-600 dark:text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded flex items-center gap-1">
-                              <Search className="h-2.5 w-2.5" />
-                              Searchable ({validOptions.length} Opsi)
-                            </span>
+                                if (effectiveKota) {
+                                  effectivePlaceholders.forEach((pl) => {
+                                    if (pl.key === p.key) return;
+                                    const k = pl.key.toLowerCase().replace(/[\s_\-\.]/g, "");
+                                    const lbl = (pl.label || "").toLowerCase().replace(/[\s_\-\.]/g, "");
+                                    if (
+                                      k.includes("kotakanim") ||
+                                      k.includes("kotaimigrasi") ||
+                                      k.includes("kotakantor") ||
+                                      k.includes("kotatujuan") ||
+                                      lbl.includes("kotakanim") ||
+                                      lbl.includes("kotaimigrasi") ||
+                                      lbl.includes("kotakantor") ||
+                                      (k.includes("kota") && !k.includes("lahir") && !k.includes("paket"))
+                                    ) {
+                                      nextData[pl.key] = effectiveKota;
+                                    }
+                                  });
+                                  setCustomKotaTujuan(effectiveKota);
+                                }
+                                setManualFormData(nextData);
+                              }}
+                              placeholder={p.placeholderHint || "Cari atau ketik Kantor Imigrasi / Layanan Paspor..."}
+                            />
+                          ) : p.inputType === "textarea" ? (
+                            <textarea
+                              rows={3}
+                              value={displayValue}
+                              onChange={(e) =>
+                                setManualFormData((prev) => ({ ...prev, [p.key]: e.target.value }))
+                              }
+                              className="w-full p-2.5 text-xs rounded-lg border bg-background text-foreground focus:ring-2 focus:ring-primary/20 focus:border-primary focus:outline-none"
+                              placeholder={p.placeholderHint || `Masukkan ${p.label || p.key}...`}
+                            />
+                          ) : p.inputType === "select" && validOptions.length > 0 ? (
+                            isSearchableSelect ? (
+                              <SearchableSelect
+                                value={displayValue}
+                                onChange={(val) =>
+                                  setManualFormData((prev) => ({ ...prev, [p.key]: val }))
+                                }
+                                options={validOptions.map((opt: string) => ({ value: opt, label: opt }))}
+                                placeholder={p.placeholderHint || `Pilih atau cari ${p.label}...`}
+                                searchPlaceholder={`Cari opsi ${p.label}...`}
+                                size="sm"
+                                allowCustomText={true}
+                                className="text-xs w-full"
+                              />
+                            ) : (
+                              <Select
+                                value={displayValue}
+                                onChange={(e) =>
+                                  setManualFormData((prev) => ({ ...prev, [p.key]: e.target.value }))
+                                }
+                                options={validOptions.map((opt: string) => ({ value: opt, label: opt }))}
+                                className="text-xs h-9 bg-background text-foreground"
+                              />
+                            )
                           ) : (
-                            <span className="text-[10px] font-semibold text-blue-600 dark:text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded">
-                              Input Form
-                            </span>
+                            <Input
+                              type={p.inputType === "number" ? "number" : "text"}
+                              value={displayValue}
+                              onChange={(e) =>
+                                setManualFormData((prev) => ({ ...prev, [p.key]: e.target.value }))
+                              }
+                              placeholder={
+                                p.placeholderHint ||
+                                (isKotaKanimField
+                                  ? "Otomatis terisi saat memilih Kantor Imigrasi..."
+                                  : `Masukkan ${p.label || p.key}...`)
+                              }
+                              className="text-xs h-9 bg-background text-foreground"
+                            />
                           )}
                         </div>
-
-                        {isKanimSelector ? (
-                          <KantorImigrasiCombobox
-                            value={resolvedVal}
-                            onChange={(kanimNama, kanimKota) => {
-                              const nextData = { ...manualFormData, [p.key]: kanimNama };
-                              const effectiveKota = toTitleCase(kanimKota || getKotaFromKanimName(kanimNama));
-
-                              if (effectiveKota) {
-                                // VLOOKUP: Automatically fill all matching kota kanim/imigrasi placeholders in template
-                                activeTemplate.placeholders.forEach((pl) => {
-                                  if (pl.key === p.key) return;
-                                  const k = pl.key.toLowerCase().replace(/[\s_\-\.]/g, "");
-                                  const lbl = (pl.label || "").toLowerCase().replace(/[\s_\-\.]/g, "");
-                                  if (
-                                    k.includes("kotakanim") ||
-                                    k.includes("kotaimigrasi") ||
-                                    k.includes("kotakantor") ||
-                                    k.includes("kotatujuan") ||
-                                    lbl.includes("kotakanim") ||
-                                    lbl.includes("kotaimigrasi") ||
-                                    lbl.includes("kotakantor") ||
-                                    (k.includes("kota") && !k.includes("lahir") && !k.includes("paket"))
-                                  ) {
-                                    nextData[pl.key] = effectiveKota;
-                                  }
-                                });
-
-                                // Also update header kota tujuan
-                                setCustomKotaTujuan(effectiveKota);
-                              }
-                              setManualFormData(nextData);
-                            }}
-                            placeholder={p.placeholderHint || "Cari atau ketik Kantor Imigrasi / Layanan Paspor..."}
-                          />
-                        ) : p.inputType === "textarea" ? (
-                          <textarea
-                            rows={3}
-                            value={resolvedVal === "-" ? "" : resolvedVal}
-                            onChange={(e) =>
-                              setManualFormData({ ...manualFormData, [p.key]: e.target.value })
-                            }
-                            className="w-full p-2.5 text-xs rounded-lg border bg-background focus:ring-2 focus:ring-primary/20 focus:border-primary focus:outline-none"
-                            placeholder={p.placeholderHint || `Masukkan ${p.label}...`}
-                          />
-                        ) : p.inputType === "select" && validOptions.length > 0 ? (
-                          isSearchableSelect ? (
-                            <SearchableSelect
-                              value={resolvedVal === "-" ? "" : resolvedVal}
-                              onChange={(val) =>
-                                setManualFormData({ ...manualFormData, [p.key]: val })
-                              }
-                              options={validOptions.map((opt) => ({ value: opt, label: opt }))}
-                              placeholder={p.placeholderHint || `Pilih atau cari ${p.label}...`}
-                              searchPlaceholder={`Cari opsi ${p.label}...`}
-                              size="sm"
-                              allowCustomText={true}
-                              className="text-xs w-full"
-                            />
-                          ) : (
-                            <Select
-                              value={resolvedVal === "-" ? "" : resolvedVal}
-                              onChange={(e) =>
-                                setManualFormData({ ...manualFormData, [p.key]: e.target.value })
-                              }
-                              options={validOptions.map((opt) => ({ value: opt, label: opt }))}
-                              className="text-xs h-9 bg-background"
-                            />
-                          )
-                        ) : (
-                          <Input
-                            type={
-                              p.inputType === "number"
-                                ? "number"
-                                : "text"
-                            }
-                            value={displayValue === "-" ? "" : displayValue}
-                            onChange={(e) =>
-                              setManualFormData({ ...manualFormData, [p.key]: e.target.value })
-                            }
-                            placeholder={
-                              p.placeholderHint ||
-                              (isKotaKanimField
-                                ? "Otomatis terisi saat memilih Kantor Imigrasi..."
-                                : `Masukkan ${p.label}...`)
-                            }
-                            className={cn(
-                              "text-xs h-9 bg-background",
-                              (isManifest || isKotaKanimField) && "bg-muted/40 font-medium text-foreground"
-                            )}
-                          />
-                        )}
-                      </div>
-                    );
-                  })}
+                      );
+                    })
+                  )}
                 </CardContent>
               </Card>
             </div>

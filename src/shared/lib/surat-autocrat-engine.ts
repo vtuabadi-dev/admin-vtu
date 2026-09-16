@@ -724,10 +724,19 @@ export function resolveAutocratFieldValues(
 
   const detectedKeys = extractPlaceholdersFromText(textSources);
 
-  detectedKeys.forEach((key) => {
-    const normalizeKey = (s: string) =>
-      s.toLowerCase().trim().replace(/[\u2018\u2019\u201A\u201B']/g, "'").replace(/[\s_\-\.]/g, "");
+  const normalizeKey = (s: string) =>
+    s.toLowerCase().trim().replace(/[\u2018\u2019\u201A\u201B']/g, "'").replace(/[\s_\-\.]/g, "");
 
+  const getManualOverride = (k: string): string | undefined => {
+    if (manualFormData[k] !== undefined) return manualFormData[k];
+    const target = normalizeKey(k);
+    for (const [mk, mv] of Object.entries(manualFormData)) {
+      if (normalizeKey(mk) === target && mv !== undefined) return mv;
+    }
+    return undefined;
+  };
+
+  detectedKeys.forEach((key) => {
     const cleanK = normalizeKey(key);
 
     // 1. System auto-resolved variables
@@ -776,6 +785,13 @@ export function resolveAutocratFieldValues(
       return;
     }
 
+    // Check direct manual form override first
+    const directManualVal = getManualOverride(key);
+    if (directManualVal !== undefined) {
+      values[key] = directManualVal;
+      return;
+    }
+
     // Departure Month Special Match
     if (cleanK.includes("bulankeberangkatan") || cleanK.includes("bulanberangkat")) {
       const depDate =
@@ -789,12 +805,8 @@ export function resolveAutocratFieldValues(
 
     // Hal / Perihal Special Match
     if (cleanK === "hal" || cleanK === "perihal") {
-      values[key] =
-        manualFormData[key] ||
-        manualFormData["Hal"] ||
-        manualFormData["hal"] ||
-        manualFormData["perihal"] ||
-        "Permohonan Baru";
+      const manualHal = getManualOverride("Hal") || getManualOverride("hal") || getManualOverride("perihal") || getManualOverride(key);
+      values[key] = manualHal || "Permohonan Baru";
       return;
     }
 
@@ -822,11 +834,11 @@ export function resolveAutocratFieldValues(
               }
             }
           }
-          const rawCity = manualFormData[key];
+          const rawCity = getManualOverride(key);
           const resolvedKota = (rawCity ? (getKotaFromKanimName(rawCity) || rawCity) : "") || (parentKanim ? getKotaFromKanimName(parentKanim) : "") || "Surabaya";
           values[key] = toTitleCase(resolvedKota);
         } else if (mapping.manifestField === "imigrasi.kanim") {
-          values[key] = manualFormData[key] || DAFTAR_KANTOR_IMIGRASI[0]?.nama || "Kantor Imigrasi Kelas I Khusus TPI Surabaya";
+          values[key] = getManualOverride(key) || DAFTAR_KANTOR_IMIGRASI[0]?.nama || "Kantor Imigrasi Kelas I Khusus TPI Surabaya";
         } else {
           // Intelligent auto-correction for misconfigured manifestField
           let effectiveField = mapping.manifestField;
@@ -842,15 +854,11 @@ export function resolveAutocratFieldValues(
             effectiveField = "jamaah.alamat";
           }
 
-          // If the admin edited this field in the form, use their manual edit! Otherwise resolve from manifest.
-          values[key] =
-            manualFormData[key] !== undefined && String(manualFormData[key]).trim() !== ""
-              ? String(manualFormData[key])
-              : resolveManifestFieldValue(effectiveField, jamaah, keberangkatan, today);
+          values[key] = resolveManifestFieldValue(effectiveField, jamaah, keberangkatan, today);
         }
       } else {
         // Manual form data priority -> auto-lookup kota if empty -> defaultValue -> empty string
-        let val = manualFormData[key];
+        let val = getManualOverride(key);
         const cleanKey = key.toLowerCase().replace(/[\s_\-\.]/g, "");
         if (
           (!val || !String(val).trim()) &&
