@@ -106,7 +106,7 @@ export function generateManifestRows(
 // GENDER TITLE LOGIC FOR BLOCK SEAT (AIRLINES / GDS / IATA)
 // ────────────────────────────────────────────────────────────
 
-export type BlockSeatTitle = "MR" | "MRS" | "MS" | "MISS" | "MSTR" | "INF";
+export type BlockSeatTitle = "MR" | "MRS" | "MSTR" | "MISS";
 
 /**
  * Calculates passenger age accurately relative to flight departure date.
@@ -129,13 +129,11 @@ export function calculatePassengerAge(
 }
 
 /**
- * Resolves standard IATA / Airline Gender Title for Manifest Block Seat:
- * - Infant (< 2 years): INF
- * - Child Male (2 to < 12 years): MSTR (Master)
- * - Child Female (2 to < 12 years): MISS
- * - Adult Male (>= 12 years): MR
- * - Adult Married Female: MRS
- * - Adult Single / Default Female: MS (or MISS)
+ * Resolves standard Airline Gender Title for Manifest Block Seat:
+ * - Dewasa Laki-laki (>= 12 tahun): MR
+ * - Dewasa Perempuan (>= 12 tahun): MRS (seluruh dewasa wanita)
+ * - Anak & Bayi Laki-laki (< 12 tahun): MSTR
+ * - Anak & Bayi Perempuan (< 12 tahun): MISS
  */
 export function getBlockSeatGenderTitle(
   jamaah: {
@@ -143,10 +141,6 @@ export function getBlockSeatGenderTitle(
     gender?: string;
     tanggalLahir?: string | Date | null;
     dob?: string | Date | null;
-    statusPernikahan?: string;
-    maritalStatus?: string;
-    isMarried?: boolean;
-    hubMahram?: string;
   },
   departureDate?: string | Date
 ): BlockSeatTitle {
@@ -155,34 +149,13 @@ export function getBlockSeatGenderTitle(
   const birthDate = jamaah.tanggalLahir || jamaah.dob;
   const age = calculatePassengerAge(birthDate, departureDate);
 
-  // 1. Infant category (< 2 years old)
-  if (age < 2) {
-    return "INF";
-  }
-
-  // 2. Child category (2 to < 12 years old)
+  // 1. Anak-anak dan Bayi (< 12 tahun)
   if (age < 12) {
     return isMale ? "MSTR" : "MISS";
   }
 
-  // 3. Adult Male (>= 12 years old)
-  if (isMale) {
-    return "MR";
-  }
-
-  // 4. Adult Female (>= 12 years old)
-  // Check marital status indicators (Buku Nikah, status nikah, hubungan istri)
-  const statusNikah = (jamaah.statusPernikahan || jamaah.maritalStatus || "").toLowerCase();
-  const hub = (jamaah.hubMahram || "").toLowerCase();
-  const isMarried =
-    jamaah.isMarried === true ||
-    statusNikah.includes("menikah") ||
-    statusNikah.includes("kawin") ||
-    statusNikah.includes("married") ||
-    statusNikah.includes("cerai") ||
-    hub.includes("istri");
-
-  return isMarried ? "MRS" : "MS";
+  // 2. Dewasa (>= 12 tahun)
+  return isMale ? "MR" : "MRS";
 }
 
 /**

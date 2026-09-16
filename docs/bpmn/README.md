@@ -239,7 +239,12 @@ graph TD
    - Mengintegrasikan data identitas sipil (NIK, Tempat Lahir, Tanggal Lahir), data keimigrasian (Nomor Paspor, Tanggal Terbit, Tanggal Expired), serta **Nama Ayah Kandung** yang telah diverifikasi dari KK / Buku Nikah.
    - Mengelompokkan jamaah berdasarkan kombinasi hotel Mekkah dan Madinah sesuai paket yang dipilih.
 2. **Manifest Block Seat (Airlines / PNR Flight)**:
-   - Memecah nama jamaah menjadi format standar IATA penerbangan (*First Name, Middle Name, Last Name*), menentukan *Gender Title* (`MR`, `MRS`, `MS`, `MSTR`), serta memvalidasi tanggal *expiry* paspor tidak kurang dari 6 bulan sebelum tanggal kepulangan.
+   - Memecah nama jamaah menjadi format standar IATA penerbangan (*First Name, Middle Name, Last Name*), menentukan *Gender Title* sesuai aturan operasional:
+     - **Dewasa Laki-laki ($\ge$ 12 th)**: `MR`
+     - **Dewasa Perempuan ($\ge$ 12 th)**: `MRS` (seluruh wanita dewasa)
+     - **Anak & Bayi Laki-laki ($<$ 12 th)**: `MSTR` (termasuk bayi)
+     - **Anak & Bayi Perempuan ($<$ 12 th)**: `MISS` (termasuk bayi)
+   - Memvalidasi tanggal *expiry* paspor tidak kurang dari 6 bulan sebelum tanggal kepulangan.
    - Menghubungkan nomor tiket / kode booking PNR maskapai penerbangan (Saudia Airlines / Garuda Indonesia / Qatar Airways).
 3. **Manifest Visa Umroh (Muassasah / KSA MoFA)**:
    - Menyusun nama paspor 3–4 suku kata (memanfaatkan nama endorsement ber-nasab ayah), relasi mahram / ID mahram pendamping, serta mengaitkan tautan berkas **Pas Foto Studio Background Putih** beresolusi standar kedutaan.
