@@ -101,3 +101,220 @@ export function generateManifestRows(
 
   return rows;
 }
+
+// ────────────────────────────────────────────────────────────
+// GENDER TITLE LOGIC FOR BLOCK SEAT (AIRLINES / GDS / IATA)
+// ────────────────────────────────────────────────────────────
+
+export type BlockSeatTitle = "MR" | "MRS" | "MS" | "MISS" | "MSTR" | "INF";
+
+/**
+ * Calculates passenger age accurately relative to flight departure date.
+ */
+export function calculatePassengerAge(
+  birthDate?: string | Date | null,
+  referenceDate: string | Date = new Date()
+): number {
+  if (!birthDate) return 30; // Default adult if birth date is unknown
+  const dob = typeof birthDate === "string" ? new Date(birthDate) : birthDate;
+  if (isNaN(dob.getTime())) return 30;
+
+  const ref = typeof referenceDate === "string" ? new Date(referenceDate) : referenceDate;
+  let age = ref.getFullYear() - dob.getFullYear();
+  const m = ref.getMonth() - dob.getMonth();
+  if (m < 0 || (m === 0 && ref.getDate() < dob.getDate())) {
+    age--;
+  }
+  return Math.max(0, age);
+}
+
+/**
+ * Resolves standard IATA / Airline Gender Title for Manifest Block Seat:
+ * - Infant (< 2 years): INF
+ * - Child Male (2 to < 12 years): MSTR (Master)
+ * - Child Female (2 to < 12 years): MISS
+ * - Adult Male (>= 12 years): MR
+ * - Adult Married Female: MRS
+ * - Adult Single / Default Female: MS (or MISS)
+ */
+export function getBlockSeatGenderTitle(
+  jamaah: {
+    jenisKelamin?: string;
+    gender?: string;
+    tanggalLahir?: string | Date | null;
+    dob?: string | Date | null;
+    statusPernikahan?: string;
+    maritalStatus?: string;
+    isMarried?: boolean;
+    hubMahram?: string;
+  },
+  departureDate?: string | Date
+): BlockSeatTitle {
+  const rawJk = (jamaah.jenisKelamin || jamaah.gender || "").toUpperCase().trim();
+  const isMale = rawJk === "L" || rawJk === "LAKI-LAKI" || rawJk === "MALE" || rawJk === "PRIA";
+  const birthDate = jamaah.tanggalLahir || jamaah.dob;
+  const age = calculatePassengerAge(birthDate, departureDate);
+
+  // 1. Infant category (< 2 years old)
+  if (age < 2) {
+    return "INF";
+  }
+
+  // 2. Child category (2 to < 12 years old)
+  if (age < 12) {
+    return isMale ? "MSTR" : "MISS";
+  }
+
+  // 3. Adult Male (>= 12 years old)
+  if (isMale) {
+    return "MR";
+  }
+
+  // 4. Adult Female (>= 12 years old)
+  // Check marital status indicators (Buku Nikah, status nikah, hubungan istri)
+  const statusNikah = (jamaah.statusPernikahan || jamaah.maritalStatus || "").toLowerCase();
+  const hub = (jamaah.hubMahram || "").toLowerCase();
+  const isMarried =
+    jamaah.isMarried === true ||
+    statusNikah.includes("menikah") ||
+    statusNikah.includes("kawin") ||
+    statusNikah.includes("married") ||
+    statusNikah.includes("cerai") ||
+    hub.includes("istri");
+
+  return isMarried ? "MRS" : "MS";
+}
+
+/**
+ * Formats passenger name for GDS Airline systems:
+ * Standard IATA Format: LASTNAME/FIRSTNAME MIDDLENAME TITLE
+ * e.g. "Muchamad Zamroni" -> "ZAMRONI/MUCHAMAD MR"
+ * e.g. "Nur Laila Safitri" -> "SAFITRI/NUR LAILA MRS"
+ * e.g. "Supardi" (Single word name) -> "SUPARDI/SUPARDI MR"
+ */
+export function formatBlockSeatPassengerName(
+  namaLengkap: string,
+  genderTitle?: BlockSeatTitle
+): {
+  fullNameWithTitle: string;
+  lastName: string;
+  firstName: string;
+  middleName: string;
+  title: BlockSeatTitle;
+  gdsFormat: string;
+} {
+  const cleaned = (namaLengkap || "")
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z\s]/g, "")
+    .replace(/\s+/g, " ");
+
+  const words = cleaned ? cleaned.split(" ") : ["JAMAAH"];
+  const title = genderTitle || "MR";
+
+  let lastName = "";
+  let firstName = "";
+  let middleName = "";
+
+  if (words.length === 1) {
+    // Single name duplicate for airline GDS requirements
+    lastName = words[0] || "JAMAAH";
+    firstName = words[0] || "JAMAAH";
+  } else if (words.length === 2) {
+    firstName = words[0] || "";
+    lastName = words[1] || "";
+  } else {
+    lastName = words[words.length - 1] || "";
+    firstName = words[0] || "";
+    middleName = words.slice(1, words.length - 1).join(" ");
+  }
+
+  const gdsNamePart = middleName ? `${firstName} ${middleName}` : firstName;
+  const gdsFormat = `${lastName}/${gdsNamePart} ${title}`.trim();
+  const fullNameWithTitle = `${cleaned} ${title}`.trim();
+
+  return {
+    fullNameWithTitle,
+    lastName,
+    firstName,
+    middleName,
+    title,
+    gdsFormat,
+  };
+}
+
+// ────────────────────────────────────────────────────────────
+// GENDER & NOMENCLATURE LOGIC FOR MANIFEST SISKOPATUH (KEMENAG)
+// ────────────────────────────────────────────────────────────
+
+/**
+ * Resolves standard SISKOPATUH Kemenag Gender String:
+ * Returns strictly "LAKI-LAKI" or "PEREMPUAN"
+ */
+export function getSiskopatuhGender(jamaah: {
+  jenisKelamin?: string;
+  gender?: string;
+}): "LAKI-LAKI" | "PEREMPUAN" {
+  const raw = (jamaah.jenisKelamin || jamaah.gender || "").toUpperCase().trim();
+  if (raw === "P" || raw === "PEREMPUAN" || raw === "FEMALE" || raw === "WANITA") {
+    return "PEREMPUAN";
+  }
+  return "LAKI-LAKI";
+}
+
+/**
+ * Filters father's name for SISKOPATUH:
+ * Strips all religious and academic titles (H., Hj., Drs., Dr., K.H., KH., Prof., Ustadz, Ust., Ir.)
+ * as mandated by Kemenag Siskopatuh database rules.
+ */
+export function getSiskopatuhCleanFatherName(rawFatherName?: string | null): string {
+  if (!rawFatherName || rawFatherName.trim() === "-" || rawFatherName.trim() === "") {
+    return "-";
+  }
+
+  const cleaned = rawFatherName
+    .trim()
+    .replace(/^(?:(?:H\.|Hj\.|Drs\.|Dr\.|K\.H\.|KH\.|Prof\.|Ustadz|Ust\.|Ir\.|Ir|Haji|Hajjah|Kyai)\s*)+/i, "")
+    .trim();
+
+  return cleaned || "-";
+}
+
+/**
+ * Formats standard SISKOPATUH Mahram Relationship according to Kemenag guidelines:
+ * - SUAMI / ISTRI
+ * - ANAK LAKI-LAKI / ANAK PEREMPUAN
+ * - AYAH / IBU
+ * - SAUDARA KANDUNG
+ * - SENDIRIAN (>= 45 TAHUN)
+ * - NON-MAHRAM PEREMPUAN
+ */
+export function getSiskopatuhMahramRelation(
+  rawRelation?: string | null,
+  gender?: string,
+  age?: number
+): string {
+  const rel = (rawRelation || "").toLowerCase().trim();
+  const isFemale = (gender || "").toUpperCase().startsWith("P") || (gender || "").toUpperCase().startsWith("W");
+
+  if (rel.includes("suami")) return "SUAMI";
+  if (rel.includes("istri")) return "ISTRI";
+  if (rel.includes("ayah") || rel.includes("bapak")) return "AYAH";
+  if (rel.includes("ibu") || rel.includes("mama")) return "IBU";
+  if (rel.includes("anak")) {
+    return isFemale ? "ANAK PEREMPUAN" : "ANAK LAKI-LAKI";
+  }
+  if (rel.includes("saudara") || rel.includes("kakak") || rel.includes("adik")) {
+    return "SAUDARA KANDUNG";
+  }
+
+  // Standar Kemenag untuk wanita tanpa mahram
+  if (isFemale) {
+    if (age !== undefined && age >= 45) {
+      return "SENDIRIAN (>= 45 TAHUN)";
+    }
+    return "NON-MAHRAM PEREMPUAN";
+  }
+
+  return "SENDIRIAN (LAKI-LAKI DEWASA)";
+}
