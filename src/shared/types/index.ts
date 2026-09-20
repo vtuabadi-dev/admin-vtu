@@ -404,6 +404,7 @@ export interface FlightSegment {
   tujuan: string;
   jamBerangkat: string;
   jamTiba: string;
+  maskapai?: string;
   terminal?: string;
   isFeeder?: boolean;
 }

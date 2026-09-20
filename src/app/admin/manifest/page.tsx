@@ -19,7 +19,6 @@ import {
   Trash2,
   ArrowRightLeft,
   Split,
-  Tag,
   Layers,
   CreditCard,
 } from "lucide-react";
@@ -32,7 +31,7 @@ import { StatusBadge } from "@/shared/components/ui/Badge";
 import { Modal } from "@/shared/components/ui/Modal";
 import { ErrorState } from "@/shared/components/ui/ErrorState";
 import { formatDateShort, formatDate, cn, downloadFileFromUrl } from "@/shared/lib/utils";
-import type { Manifest, Keberangkatan, Jamaah, RegistrationGroup } from "@/shared/types";
+import type { Manifest, Keberangkatan, Jamaah, RegistrationGroup, FlightSegment } from "@/shared/types";
 import { useOperationalStore } from "@/stores/operational-store";
 import { extractFilesFromEvent } from "@/shared/lib/file-drop-utils";
 import { resolveHotelForKlaster } from "@/shared/lib/hotel-utils";
@@ -54,6 +53,74 @@ function isStartingPointSplit(k: any): boolean {
   if (!k) return false;
   if (k.splitReason === "starting_point" || k.splitReason === "starting") return true;
   return false;
+}
+
+function calculateDurationDays(startStr?: string, endStr?: string): number {
+  if (!startStr || !endStr) return 12;
+  try {
+    const start = new Date(startStr);
+    const end = new Date(endStr);
+    const diff = Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+    return isNaN(diff) || diff <= 0 ? 12 : diff;
+  } catch {
+    return 12;
+  }
+}
+
+function formatFlightDate(dateStr?: string): string {
+  if (!dateStr) return "-";
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
+    const day = d.getDate().toString().padStart(2, "0");
+    const months = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"];
+    return `${day} ${months[d.getMonth()]}`;
+  } catch {
+    return dateStr;
+  }
+}
+
+function getPackageFlightSegments(pkg: Keberangkatan): FlightSegment[] {
+  let segs: FlightSegment[] = [];
+  try {
+    const meta = typeof pkg.driveFolderIds === "string" ? JSON.parse(pkg.driveFolderIds) : pkg.driveFolderIds;
+    if (meta?.flightDetails?.segments && Array.isArray(meta.flightDetails.segments) && meta.flightDetails.segments.length > 0) {
+      segs = meta.flightDetails.segments;
+    }
+  } catch {}
+
+  if (segs.length > 0) {
+    return segs;
+  }
+
+  const meta = typeof pkg.driveFolderIds === "string" ? JSON.parse(pkg.driveFolderIds || "{}") : (pkg.driveFolderIds || {});
+  const pnr = String(meta?.flightDetails?.pnr || (pkg as any).pnr || "-");
+  const isSub = (pkg.namaPaket || "").toUpperCase().includes("SUB") || (pkg.kode || "").toUpperCase().includes("SUB");
+  const departDateStr = pkg.tanggalBerangkat ? new Date(pkg.tanggalBerangkat).toISOString().split("T")[0] : "";
+  const returnDateStr = pkg.tanggalPulang ? new Date(pkg.tanggalPulang).toISOString().split("T")[0] : "";
+  
+  return [
+    {
+      tanggal: departDateStr || "",
+      kodeFlight: (pkg.nomorPenerbangan && pkg.nomorPenerbangan !== "-") ? pkg.nomorPenerbangan : "SV-816",
+      pnr: pnr,
+      maskapai: pkg.maskapai || "Saudia",
+      asal: isSub ? "SUB" : "CGK",
+      tujuan: "JED",
+      jamBerangkat: "11:30",
+      jamTiba: "17:30"
+    },
+    {
+      tanggal: returnDateStr || "",
+      kodeFlight: (pkg.nomorPenerbangan && pkg.nomorPenerbangan !== "-") ? pkg.nomorPenerbangan : "SV-817",
+      pnr: pnr,
+      maskapai: pkg.maskapai || "Saudia",
+      asal: "JED",
+      tujuan: isSub ? "SUB" : "CGK",
+      jamBerangkat: "19:30",
+      jamTiba: "10:00"
+    }
+  ];
 }
 
 function getSingleSourceOfTruthName(j: any): string {
@@ -2375,10 +2442,9 @@ function ManifestPageContent() {
                     <div className="flex-grow border-t border-amber-500/30 dark:border-amber-500/20 bg-gradient-to-l from-transparent via-amber-500/40 to-amber-500/10 h-[1px]"></div>
                   </div>
 
-                  {/* Month's Package Cards */}
-                  <div className="space-y-4">
+                  {/* Month's Package Cards - UNIFIED MASTER CONTAINER (MENEMPEL SEPERTI TABEL) */}
+                  <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border border-teal-500/30 rounded-2xl shadow-[0_12px_36px_rgba(20,184,166,0.08)] overflow-hidden divide-y divide-teal-500/20">
                     {items.map(({ parent, children }) => {
-                      const isStarting = isStartingPointSplit(parent);
                       const relatedChildIds = children.map((c) => c.id);
                       const allCardPkgIds = new Set([parent.id, ...relatedChildIds]);
                       const parentGroupIds = new Set(
@@ -2392,171 +2458,234 @@ function ManifestPageContent() {
                       const parentQuota = parent.maxSeat || parent.kuota || 45;
                       const parentFilled = parentJamaah.length;
                       const parentTargetMat = parent.targetMaterialisasi || 30;
-                      const parentDeficit = parentTargetMat - parentFilled;
+                      const sisaSeat = Math.max(0, parentQuota - parentFilled);
+                      const fillPercentage = Math.min(100, Math.round((parentFilled / (parentQuota || 1)) * 100));
+
+                      // Determine Surabaya & Jakarta packages
+                      const allPkgs = [parent, ...children];
+                      const sbyPkg = allPkgs.find((p) => {
+                        const name = (p.namaPaket || "").toUpperCase();
+                        const code = (p.kode || "").toUpperCase();
+                        const split = (p as any).splitLabel ? String((p as any).splitLabel).toUpperCase() : "";
+                        return name.includes("SUB") || name.includes("SURABAYA") || code.includes("SUB") || split.includes("SUB");
+                      });
+
+                      const jktPkg = allPkgs.find((p) => {
+                        if (sbyPkg && p.id === sbyPkg.id) return false;
+                        const name = (p.namaPaket || "").toUpperCase();
+                        const code = (p.kode || "").toUpperCase();
+                        const split = (p as any).splitLabel ? String((p as any).splitLabel).toUpperCase() : "";
+                        return name.includes("CGK") || name.includes("JKT") || name.includes("JAKARTA") || code.includes("CGK") || code.includes("JKT") || split.includes("CGK") || p.id === parent.id;
+                      });
+
+                      // Seat per starting point
+                      const sbyGroupIds = sbyPkg ? new Set(groups.filter((g) => g.paketKeberangkatanId === sbyPkg.id).map((g) => g.id)) : new Set();
+                      const sbyJamaahCount = sbyPkg
+                        ? allJamaah.filter((j) => (sbyPkg.jamaahIds?.includes(j.id) || sbyGroupIds.has(j.groupId)) && j.status !== "batal").length
+                        : 0;
+                      const sbyQuota = sbyPkg ? (sbyPkg.maxSeat || sbyPkg.kuota || 10) : 10;
+
+                      const jktGroupIds = jktPkg ? new Set(groups.filter((g) => g.paketKeberangkatanId === jktPkg.id).map((g) => g.id)) : new Set();
+                      const jktJamaahCount = jktPkg
+                        ? allJamaah.filter((j) => (jktPkg.jamaahIds?.includes(j.id) || jktGroupIds.has(j.groupId)) && j.status !== "batal").length
+                        : parentFilled;
+                      const jktQuota = jktPkg ? (jktPkg.maxSeat || jktPkg.kuota || 35) : parentQuota;
+
+                      const flightSegments = getPackageFlightSegments(parent);
 
                       return (
                         <div
                           key={parent.id}
-                          className="p-4 bg-gradient-to-br from-teal-950/70 via-slate-950/80 to-emerald-950/70 border border-teal-500/30 hover:border-teal-400/50 rounded-2xl shadow-[0_4px_20px_rgba(13,148,136,0.15)] backdrop-blur-md space-y-3 transition-all"
+                          onClick={() => {
+                            setSelectedKeberangkatan(parent.id);
+                            const typeQuery = activeManifestView === "pembayaran" ? "&type=pembayaran" : "";
+                            router.push(`/admin/manifest?paketId=${parent.id}${typeQuery}`);
+                          }}
+                          className="p-4 md:p-5 hover:bg-teal-50/40 dark:hover:bg-teal-950/30 transition-colors cursor-pointer group"
                         >
-                          {/* PAKET UTAMA / INDUK (Card Header) */}
-                          <div
-                            onClick={() => {
-                              setSelectedKeberangkatan(parent.id);
-                              const typeQuery = activeManifestView === "pembayaran" ? "&type=pembayaran" : "";
-                              router.push(`/admin/manifest?paketId=${parent.id}${typeQuery}`);
-                            }}
-                            className="p-5 bg-gradient-to-r from-teal-950 via-teal-900/80 to-emerald-950 border border-teal-500/40 hover:border-teal-300/80 text-white rounded-xl shadow-[inset_0_1px_1px_rgba(94,234,212,0.3)] transition-all cursor-pointer group hover:shadow-[0_0_25px_rgba(20,184,166,0.25)]"
-                          >
-                            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                              <div className="space-y-1.5">
-                                <div className="flex items-center flex-wrap gap-2">
-                                  <span className="bg-teal-500/20 text-teal-300 border border-teal-400/40 text-[10px] font-bold px-2 py-0.5 rounded uppercase font-mono shadow-xs">
-                                    {parent.kode}
-                                  </span>
-                                  {isStarting ? (
-                                    <span className="bg-sky-500/20 text-sky-300 border border-sky-400/40 text-[10px] font-bold px-2 py-0.5 rounded uppercase flex items-center gap-1">
-                                      📍 Starting Point: {(parent as any).splitLabel || parent.namaPaket}
-                                    </span>
-                                  ) : children.length > 0 ? (
-                                    <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-400/40 text-[10px] font-bold px-2 py-0.5 rounded uppercase flex items-center gap-1">
-                                      <Split className="h-3 w-3" /> Paket Induk ({children.length} Varian Promo)
-                                    </span>
-                                  ) : null}
-                                  <StatusBadge status={parent.status} />
-                                </div>
-                                <h3 className="text-lg font-bold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-teal-200 via-teal-100 to-emerald-300 group-hover:from-white group-hover:to-teal-100 transition-colors">
-                                  {formatPackageTitleShort(parent.namaPaket || parent.paketUmroh?.namaPaket || "PAKET UMROH")}
+                          <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-center">
+                            
+                            {/* SISI KIRI: INFO PAKET & STARTING (SBY DI ATAS) */}
+                            <div className="lg:col-span-3 space-y-2.5 pr-2 border-b lg:border-b-0 lg:border-r border-slate-100 dark:border-slate-800/80 pb-4 lg:pb-0">
+                              <div className="flex items-center gap-2">
+                                <span className="w-2 h-2 rounded-full bg-teal-500 animate-pulse"></span>
+                                <h3 className="text-base font-extrabold text-slate-900 dark:text-white group-hover:text-teal-600 dark:group-hover:text-teal-300 transition-colors tracking-tight">
+                                  {formatPackageTitleShort(parent.namaPaket || parent.paketUmroh?.namaPaket || "PAKET UMROH").replace(/\s*\d+\s*[Dd]$/i, "").trim()}
                                 </h3>
-                                <div className="flex flex-wrap items-center gap-4 text-xs text-teal-100/80 pt-1">
-                                  <span className="flex items-center gap-1.5">
-                                    <CalendarDays className="h-3.5 w-3.5 text-teal-400" />
-                                    Berangkat: <strong className="text-white font-medium">{formatDate(parent.tanggalBerangkat)}</strong>
-                                  </span>
-                                  <span className="text-teal-700">•</span>
-                                  <span className="flex items-center gap-1.5">
-                                    <CalendarDays className="h-3.5 w-3.5 text-teal-400" />
-                                    Pulang: <strong className="text-white font-medium">{formatDate(parent.tanggalPulang)}</strong>
-                                  </span>
-                                  <span className="text-teal-700">•</span>
-                                  <span className="flex items-center gap-1.5">
-                                    <Plane className="h-3.5 w-3.5 text-teal-400" />
-                                    Maskapai: <strong className="text-white font-medium">{getAirlineCode(parent.maskapai)}</strong>
-                                  </span>
-                                </div>
                               </div>
-
-                              {/* Materialization Metrics Box (Metallic Glass Finish) */}
-                              <div className="flex items-center gap-3 bg-gradient-to-br from-teal-950/90 via-slate-900/90 to-emerald-950/90 border border-teal-500/40 rounded-xl p-3 shrink-0 self-start md:self-auto shadow-[inset_0_1px_0_rgba(45,212,191,0.25)]">
-                                <div className="text-center px-3 border-r border-teal-800/60">
-                                  <p className="text-[10px] text-teal-300/80 font-semibold uppercase">Total Pax</p>
-                                  <p className="text-xl font-bold text-white">{parentFilled}</p>
-                                </div>
-                                <div className="text-center px-3 border-r border-teal-800/60 min-w-[100px] flex flex-col items-center justify-center">
-                                  <p className="text-[10px] text-teal-300/80 font-semibold uppercase">
-                                    Materialisasi ({parentTargetMat})
-                                  </p>
-                                  {parentDeficit > 0 ? (
-                                    <p className="text-sm font-bold text-amber-400 mt-1">Kurang {parentDeficit} Pax</p>
-                                  ) : (
-                                    <div className="mt-1 flex items-center justify-center" title="Target Materialisasi Terpenuhi">
-                                      <CheckCircle2 className="h-6 w-6 text-emerald-400" />
+                              
+                              <div className="space-y-1.5 text-xs">
+                                {/* SBY (FIRST) */}
+                                {sbyPkg ? (
+                                  <div className="bg-teal-50/80 dark:bg-teal-950/40 border border-teal-500/25 rounded-md p-1.5 space-y-0.5">
+                                    <div className="flex items-center justify-between font-bold text-teal-950 dark:text-teal-200">
+                                      <span className="flex items-center gap-1">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-teal-500"></span>
+                                        Starting Surabaya (SUB)
+                                      </span>
+                                      <span className="text-[10px] text-teal-700 dark:text-teal-300 font-bold bg-teal-200/60 dark:bg-teal-800/60 px-1.5 rounded">
+                                        {calculateDurationDays(sbyPkg.tanggalBerangkat, sbyPkg.tanggalPulang)} H
+                                      </span>
                                     </div>
-                                  )}
-                                </div>
-                                <div className="text-center px-3">
-                                  <p className="text-[10px] text-teal-300/80 font-semibold uppercase">Kuota Seat</p>
-                                  <p className="text-xl font-bold text-emerald-400">
-                                    {parentFilled}/{parentQuota}
-                                  </p>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* PECAHAN PAKET PROMO */}
-                          {children.length > 0 && (
-                            <div className="pl-4 space-y-2.5 pt-1 border-l-2 border-dashed border-teal-500/40 ml-4">
-                              <p className="text-[11px] font-extrabold uppercase tracking-wider text-teal-300 flex items-center gap-1.5 pl-1">
-                                <Tag className="h-3.5 w-3.5 text-purple-400" />
-                                Varian Promo Terintegrasi ({children.length} Varian • Manifest Bersatu)
-                              </p>
-                              {children.map((child) => {
-                                const childGroupIds = new Set(
-                                  groups.filter((g) => g.paketKeberangkatanId === child.id).map((g) => g.id)
-                                );
-                                const childJamaah = allJamaah.filter(
-                                  (j) =>
-                                    (child.jamaahIds?.includes(j.id) || childGroupIds.has(j.groupId)) &&
-                                    j.status !== "batal"
-                                );
-                                const childQuota = child.maxSeat || child.kuota || 45;
-                                const childFilled = childJamaah.length;
-                                const childTargetMat = child.targetMaterialisasi || parent.targetMaterialisasi || 30;
-                                const childDeficit = childTargetMat - childFilled;
-
-                                return (
-                                  <div
-                                    key={child.id}
-                                    onClick={() => {
-                                      setSelectedKeberangkatan(parent.id);
-                                      const typeQuery = activeManifestView === "pembayaran" ? "&type=pembayaran" : "";
-                                      router.push(`/admin/manifest?paketId=${parent.id}${typeQuery}`);
-                                    }}
-                                    className="p-4 bg-gradient-to-r from-teal-950/90 via-slate-900/90 to-teal-950/90 border border-teal-500/30 hover:border-teal-400/60 text-white rounded-xl shadow-xs transition-all cursor-pointer flex flex-col md:flex-row md:items-center justify-between gap-4 group hover:shadow-[0_0_15px_rgba(20,184,166,0.15)]"
-                                  >
-                                    <div className="space-y-1">
-                                      <div className="flex items-center flex-wrap gap-2">
-                                        <span className="bg-purple-500/20 text-purple-300 border border-purple-500/30 text-[10px] font-bold px-2 py-0.5 rounded uppercase flex items-center gap-1">
-                                          <Tag className="h-3 w-3" /> Promo: {child.promoLabel || child.splitLabel || "PROMO SPECIAL"}
-                                        </span>
-                                        <span className="bg-teal-500/20 text-teal-300 border border-teal-500/30 text-[10px] font-bold px-2 py-0.5 rounded uppercase font-mono">
-                                          {child.kode}
-                                        </span>
-                                        <StatusBadge status={child.status} />
-                                      </div>
-                                      <h4 className="text-base font-bold text-teal-100 group-hover:text-teal-300 transition-colors">
-                                        {formatPackageTitleShort(child.namaPaket)}
-                                      </h4>
-                                      <div className="flex flex-wrap items-center gap-3 text-xs text-teal-200/70">
-                                        <span>Berangkat: <strong className="text-white">{formatDate(child.tanggalBerangkat)}</strong></span>
-                                        <span>•</span>
-                                        <span>Maskapai: <strong className="text-white">{getAirlineCode(child.maskapai)}</strong></span>
-                                        <span>•</span>
-                                        <span className="text-purple-300 font-semibold italic">Termasuk ke dalam Manifest Utama</span>
-                                      </div>
-                                    </div>
-
-                                    {/* Child Materialization Metrics Box */}
-                                    <div className="flex items-center gap-2.5 bg-gradient-to-br from-teal-950/90 to-slate-900/90 border border-teal-500/30 rounded-lg p-2.5 shrink-0 self-start md:self-auto shadow-[inset_0_1px_0_rgba(45,212,191,0.15)]">
-                                      <div className="text-center px-2.5 border-r border-teal-800/60">
-                                        <p className="text-[9px] text-teal-300/80 font-semibold uppercase">Total Pax</p>
-                                        <p className="text-base font-bold text-white">{childFilled}</p>
-                                      </div>
-                                      <div className="text-center px-2.5 border-r border-teal-800/60 min-w-[90px] flex flex-col items-center justify-center">
-                                        <p className="text-[9px] text-teal-300/80 font-semibold uppercase">
-                                          Materialisasi ({childTargetMat})
-                                        </p>
-                                        {childDeficit > 0 ? (
-                                          <p className="text-xs font-bold text-amber-400 mt-0.5">Kurang {childDeficit} Pax</p>
-                                        ) : (
-                                          <div className="mt-0.5 flex items-center justify-center" title="Target Materialisasi Terpenuhi">
-                                            <CheckCircle2 className="h-5 w-5 text-emerald-400" />
-                                          </div>
-                                        )}
-                                      </div>
-                                      <div className="text-center px-2.5">
-                                        <p className="text-[9px] text-teal-300/80 font-semibold uppercase">Kuota Seat</p>
-                                        <p className="text-base font-bold text-emerald-400">
-                                          {childFilled}/{childQuota}
-                                        </p>
-                                      </div>
+                                    <div className="flex items-center justify-between text-[11px] text-teal-800 dark:text-teal-300/90 pl-2.5">
+                                      <span className="font-mono font-semibold">{sbyPkg.kode}</span>
+                                      <span className="text-[10px] text-teal-600 dark:text-teal-400">
+                                        {formatFlightDate(sbyPkg.tanggalBerangkat)} - {formatFlightDate(sbyPkg.tanggalPulang)}
+                                      </span>
                                     </div>
                                   </div>
-                                );
-                              })}
+                                ) : null}
+
+                                {/* JKT (SECOND) */}
+                                {jktPkg ? (
+                                  <div className="bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/60 rounded-md p-1.5 space-y-0.5">
+                                    <div className="flex items-center justify-between font-bold text-slate-800 dark:text-slate-200">
+                                      <span className="flex items-center gap-1">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+                                        Starting Jakarta (CGK)
+                                      </span>
+                                      <span className="text-[10px] text-slate-600 dark:text-slate-300 font-bold bg-slate-200/80 dark:bg-slate-700/80 px-1.5 rounded">
+                                        {calculateDurationDays(jktPkg.tanggalBerangkat, jktPkg.tanggalPulang)} H
+                                      </span>
+                                    </div>
+                                    <div className="flex items-center justify-between text-[11px] text-slate-700 dark:text-slate-300/90 pl-2.5">
+                                      <span className="font-mono font-semibold">{jktPkg.kode}</span>
+                                      <span className="text-[10px] text-slate-500 dark:text-slate-400">
+                                        {formatFlightDate(jktPkg.tanggalBerangkat)} - {formatFlightDate(jktPkg.tanggalPulang)}
+                                      </span>
+                                    </div>
+                                  </div>
+                                ) : !sbyPkg ? (
+                                  <div className="bg-teal-50/80 dark:bg-teal-950/40 border border-teal-500/25 rounded-md p-1.5 space-y-0.5">
+                                    <div className="flex items-center justify-between font-bold text-teal-950 dark:text-teal-200">
+                                      <span className="flex items-center gap-1">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-teal-500"></span>
+                                        {parent.namaPaket}
+                                      </span>
+                                      <span className="text-[10px] text-teal-700 dark:text-teal-300 font-bold bg-teal-200/60 dark:bg-teal-800/60 px-1.5 rounded">
+                                        {calculateDurationDays(parent.tanggalBerangkat, parent.tanggalPulang)} H
+                                      </span>
+                                    </div>
+                                    <div className="flex items-center justify-between text-[11px] text-teal-800 dark:text-teal-300/90 pl-2.5">
+                                      <span className="font-mono font-semibold">{parent.kode}</span>
+                                      <span className="text-[10px] text-teal-600 dark:text-teal-400">
+                                        {formatFlightDate(parent.tanggalBerangkat)} - {formatFlightDate(parent.tanggalPulang)}
+                                      </span>
+                                    </div>
+                                  </div>
+                                ) : null}
+                              </div>
+
+                              <div className="flex items-center flex-wrap gap-2 pt-0.5">
+                                {sbyPkg && jktPkg ? (
+                                  <span className="inline-flex items-center gap-1 bg-teal-500/15 text-teal-700 dark:text-teal-300 border border-teal-400/40 text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider">
+                                    <Split className="w-2.5 h-2.5" />
+                                    Dual Starting
+                                  </span>
+                                ) : sbyPkg ? (
+                                  <span className="inline-flex items-center gap-1 bg-sky-500/15 text-sky-700 dark:text-sky-300 border border-sky-400/40 text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider">
+                                    Starting Surabaya
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 bg-teal-500/15 text-teal-700 dark:text-teal-300 border border-teal-400/40 text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider">
+                                    Starting Jakarta
+                                  </span>
+                                )}
+                                <StatusBadge status={parent.status} />
+                              </div>
                             </div>
-                          )}
+
+                            {/* BAGIAN TENGAH: TABEL PENERBANGAN LENGKAP PNR */}
+                            <div className="lg:col-span-6 overflow-x-auto">
+                              <div className="border border-teal-500/30 rounded-xl overflow-hidden shadow-2xs bg-white dark:bg-slate-950/60">
+                                <table className="w-full text-left text-xs border-collapse min-w-[480px]">
+                                  <thead>
+                                    <tr className="bg-gradient-to-r from-teal-500/15 via-teal-500/10 to-emerald-500/15 text-teal-950 dark:text-teal-200 font-bold uppercase text-[10px] tracking-wider border-b border-teal-500/30">
+                                      <th className="py-1.5 px-2 border-r border-teal-500/20 w-16">TGL</th>
+                                      <th className="py-1.5 px-2 border-r border-teal-500/20 w-16">FLIGHT</th>
+                                      <th className="py-1.5 px-2 border-r border-teal-500/20 w-18">PNR</th>
+                                      <th className="py-1.5 px-2 border-r border-teal-500/20">MASKAPAI</th>
+                                      <th className="py-1.5 px-2 border-r border-teal-500/20 text-center w-24">RUTE</th>
+                                      <th className="py-1.5 px-2 text-center w-26">JAM</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody className="divide-y divide-teal-500/15 text-[11px]">
+                                    {flightSegments.slice(0, 4).map((seg, sIdx) => (
+                                      <tr key={sIdx} className="hover:bg-teal-50/40 dark:hover:bg-teal-950/40 transition-colors">
+                                        <td className="py-1.5 px-2 border-r border-teal-500/15 font-semibold text-slate-700 dark:text-slate-300">
+                                          {formatFlightDate(seg.tanggal)}
+                                        </td>
+                                        <td className="py-1.5 px-2 border-r border-teal-500/15 font-mono font-bold text-teal-700 dark:text-teal-300">
+                                          {seg.kodeFlight || "-"}
+                                        </td>
+                                        <td className="py-1.5 px-2 border-r border-teal-500/15 font-mono font-bold text-amber-700 dark:text-amber-300 bg-amber-500/10 text-center rounded text-[10px]">
+                                          {seg.pnr || "-"}
+                                        </td>
+                                        <td className="py-1.5 px-2 border-r border-teal-500/15 font-medium text-slate-800 dark:text-slate-200 truncate max-w-[110px]" title={seg.maskapai}>
+                                          {seg.maskapai || parent.maskapai || "Saudia"}
+                                        </td>
+                                        <td className="py-1.5 px-2 border-r border-teal-500/15 text-center font-bold text-teal-800 dark:text-teal-300">
+                                          {seg.asal || "SUB"} ➔ {seg.tujuan || "JED"}
+                                        </td>
+                                        <td className="py-1.5 px-2 text-center font-mono text-slate-600 dark:text-slate-400">
+                                          {seg.jamBerangkat && seg.jamTiba ? `${seg.jamBerangkat} - ${seg.jamTiba}` : "-"}
+                                        </td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            </div>
+
+                            {/* SISI KANAN: STATISTIK SEAT (NEON GLOW) */}
+                            <div className="lg:col-span-3">
+                              <div className="bg-gradient-to-br from-teal-950 via-slate-900 to-emerald-950 text-white rounded-xl p-3 border-2 border-teal-400 shadow-[0_0_20px_rgba(6,182,212,0.35),inset_0_0_10px_rgba(6,182,212,0.15)] space-y-2">
+                                
+                                {sbyPkg && jktPkg ? (
+                                  <div className="grid grid-cols-2 gap-2 text-xs border-b border-teal-800/60 pb-1.5">
+                                    <div>
+                                      <span className="text-[9px] text-teal-300 font-semibold uppercase block">Seat SBY</span>
+                                      <span className="text-xs font-extrabold text-white font-mono">
+                                        {sbyJamaahCount}<span className="text-teal-400 font-normal"> / {sbyQuota}</span>
+                                      </span>
+                                    </div>
+                                    <div>
+                                      <span className="text-[9px] text-teal-300 font-semibold uppercase block">Seat JKT</span>
+                                      <span className="text-xs font-extrabold text-white font-mono">
+                                        {jktJamaahCount}<span className="text-teal-400 font-normal"> / {jktQuota}</span>
+                                      </span>
+                                    </div>
+                                  </div>
+                                ) : null}
+
+                                <div className="space-y-1">
+                                  <div className="flex items-center justify-between text-xs">
+                                    <span className="text-teal-200 font-semibold text-[11px]">Total Seat</span>
+                                    <span className="font-bold text-teal-300 font-mono text-xs">{parentFilled} / {parentQuota}</span>
+                                  </div>
+                                  <div className="w-full bg-slate-800 rounded-full h-1.5 overflow-hidden p-0.5 border border-teal-500/40">
+                                    <div
+                                      style={{ width: `${fillPercentage}%` }}
+                                      className="bg-gradient-to-r from-teal-400 to-emerald-400 h-full rounded-full shadow-[0_0_8px_rgba(45,212,191,0.8)] transition-all"
+                                    />
+                                  </div>
+                                </div>
+
+                                <div className="flex items-center justify-between text-xs pt-1 border-t border-teal-800/60">
+                                  <div>
+                                    <span className="text-[9px] text-teal-400 block font-semibold uppercase">Materialisasi</span>
+                                    <span className="font-bold text-white text-[11px]">({parentTargetMat}) Target</span>
+                                  </div>
+                                  <div className="text-right">
+                                    <span className="text-[9px] text-amber-400 block font-semibold uppercase">Sisa Seat</span>
+                                    <span className="font-extrabold text-amber-300 font-mono text-xs">{sisaSeat} Seat</span>
+                                  </div>
+                                </div>
+
+                              </div>
+                            </div>
+
+                          </div>
                         </div>
                       );
                     })}
