@@ -83,10 +83,19 @@ const SplitInvoiceModal = dynamic(
   const [activeTab, setActiveTab] = useState<"laporan" | "review">("review");
   const [showCreateInvoiceModal, setShowCreateInvoiceModal] = useState(false);
 
-  // Group lookup
-  const [kodeInput, setKodeInput] = useState("");
+  // Group lookup (Dikunci 4-5 digit seperti CreateInvoiceModal)
+  const [selectedYear, setSelectedYear] = useState<string>("2026");
+  const [seqInput, setSeqInput] = useState<string>("");
+  const [kodeInput, setKodeInput] = useState<string>("");
   const [searching, setSearching] = useState(false);
   const [error, setError] = useState("");
+
+  const currentFullCode = useMemo(() => {
+    if (!seqInput.trim()) return "";
+    const clean = seqInput.trim();
+    const padded = clean.length <= 4 ? clean.padStart(4, "0") : clean.padStart(5, "0");
+    return `GRP-${selectedYear}-${padded}`;
+  }, [selectedYear, seqInput]);
 
   // Group data
   const [groupData, setGroupData] = useState<GroupPaymentSummary | null>(null);
@@ -384,24 +393,48 @@ const SplitInvoiceModal = dynamic(
     reader.readAsDataURL(file);
   }
 
-  async function handleCari() {
+  async function handleCari(overrideCode?: string) {
     setError("");
     setGroupData(null);
     setSplitConfig(null);
     setActiveSplitId(null);
 
-    if (!kodeInput.trim()) {
-      setError("Masukkan kode registrasi group");
+    const targetCode = overrideCode || currentFullCode || kodeInput;
+    if (!targetCode.trim()) {
+      setError("Masukkan nomor sekuensial group (contoh: 0004 atau 00081)");
       return;
     }
 
     setSearching(true);
     try {
-      const group = await getGroupByKode(kodeInput.trim().toUpperCase());
+      // 1. Try exact targetCode
+      let group = await getGroupByKode(targetCode.trim().toUpperCase());
+
+      // 2. If not found and targetCode was derived from sequence, try alternate padding (4 digits vs 5 digits)
+      if (!group && seqInput.trim()) {
+        const cleanSeq = seqInput.trim();
+        const alt4 = `GRP-${selectedYear}-${cleanSeq.padStart(4, "0")}`;
+        const alt5 = `GRP-${selectedYear}-${cleanSeq.padStart(5, "0")}`;
+        if (targetCode.toUpperCase() !== alt4.toUpperCase()) {
+          group = await getGroupByKode(alt4);
+        }
+        if (!group && targetCode.toUpperCase() !== alt5.toUpperCase()) {
+          group = await getGroupByKode(alt5);
+        }
+      }
+
       if (!group) {
-        setError("Group tidak ditemukan");
+        setError(`Group dengan kode "${targetCode}" tidak ditemukan`);
         setSearching(false);
         return;
+      }
+
+      // Sync inputs with found group
+      if (group.kodeRegistrasi) {
+        setKodeInput(group.kodeRegistrasi);
+        const parts = group.kodeRegistrasi.split("-");
+        if (parts[1]) setSelectedYear(parts[1]);
+        if (parts[2]) setSeqInput(parts[2]);
       }
 
       const [summary, split] = await Promise.all([
@@ -561,27 +594,89 @@ const SplitInvoiceModal = dynamic(
       {/* TAB 1: DAFTAR & INPUT PEMBAYARAN */}
       {activeTab === "laporan" && (
         <div className="space-y-6">
-          {/* Group lookup */}
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-end gap-3">
-                <div className="flex-1 max-w-md">
-                  <Input
-                    label="Kode Registrasi Group"
-                    placeholder="Contoh: GRP-2026-00081"
-                    value={kodeInput}
-                    onChange={(e) => setKodeInput(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && handleCari()}
-                  />
-                </div>
-                <Button onClick={handleCari} disabled={searching} className="font-bold">
-                  <Search className="mr-1.5 h-4 w-4" />
-                  {searching ? "Mencari..." : "Cari Group"}
-                </Button>
+          {/* Group lookup: SMART 4/5-DIGIT LOOKUP CONTROL (Sesuai Gambar 1) */}
+          <div className="p-3.5 bg-amber-500/10 border border-amber-500/30 rounded-xl space-y-2 relative shadow-xs">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold uppercase tracking-wider text-amber-900 dark:text-amber-200 flex items-center gap-1.5">
+                <Search className="h-4 w-4 text-amber-600" />
+                1. Cari &amp; Pilih Group Registrasi Jamaah (Dikunci 4 Digit)
+              </label>
+              {currentFullCode && (
+                <span className="font-mono text-[11px] font-extrabold bg-amber-200 text-amber-900 px-2 py-0.5 rounded">
+                  Target: {currentFullCode}
+                </span>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2">
+              {/* Visual GRP Prefix */}
+              <span className="px-3 py-2 bg-[#cb6806] text-white font-mono font-bold rounded-lg shrink-0 text-sm">
+                GRP-
+              </span>
+
+              {/* Year Select Dropdown */}
+              <select
+                value={selectedYear}
+                onChange={(e) => setSelectedYear(e.target.value)}
+                className="px-2.5 py-2 bg-background border border-slate-300 dark:border-slate-700 font-mono font-bold rounded-lg text-sm shrink-0 cursor-pointer"
+              >
+                <option value="2026">2026</option>
+                <option value="2025">2025</option>
+                <option value="2027">2027</option>
+                <option value="2028">2028</option>
+              </select>
+
+              <span className="font-mono font-bold text-amber-800 dark:text-amber-200">-</span>
+
+              {/* 4-Digit Sequence Input */}
+              <div className="relative flex-1">
+                <input
+                  type="text"
+                  maxLength={5}
+                  placeholder="0004"
+                  value={seqInput}
+                  onChange={(e) => {
+                    const raw = e.target.value;
+                    if (raw.toUpperCase().includes("GRP-")) {
+                      const m = raw.toUpperCase().match(/GRP-(\d{4})-(\d+)/);
+                      if (m && m[1] && m[2]) {
+                        setSelectedYear(m[1]);
+                        setSeqInput(m[2]);
+                        return;
+                      }
+                    }
+                    const val = raw.replace(/\D/g, "").slice(0, 5);
+                    setSeqInput(val);
+                  }}
+                  onBlur={() => {
+                    if (seqInput.trim()) {
+                      const clean = seqInput.trim();
+                      const padded = clean.length <= 4 ? clean.padStart(4, "0") : clean.padStart(5, "0");
+                      setSeqInput(padded);
+                    }
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      handleCari();
+                    }
+                  }}
+                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 font-mono font-bold rounded-lg text-sm tracking-widest text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                />
               </div>
-              {error && <p className="mt-2 text-sm text-destructive">{error}</p>}
-            </CardContent>
-          </Card>
+
+              <Button
+                type="button"
+                onClick={() => handleCari()}
+                disabled={searching || !seqInput.trim()}
+                className="bg-[#e3a869] hover:bg-[#d69554] text-white font-bold px-5 py-2 rounded-lg shrink-0 shadow-xs cursor-pointer"
+              >
+                <Search className="mr-1.5 h-4 w-4" />
+                {searching ? "Mencari..." : "Cari Group"}
+              </Button>
+            </div>
+
+            {error && <p className="mt-1 text-xs text-destructive font-medium">{error}</p>}
+          </div>
 
           {groupData && (
             <>
