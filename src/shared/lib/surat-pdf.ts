@@ -330,17 +330,17 @@ function renderLetterPage(
   try {
     if (KOP_SURAT_BASE64) {
       const kopWidth = contentWidth; // 178 mm
-      const kopHeight = kopWidth / 3.6806; // ~48.36 mm
+      const kopHeight = 36; // compact proportional height ~36mm
       doc.addImage(KOP_SURAT_BASE64, "JPEG", marginX, y, kopWidth, kopHeight);
-      y += kopHeight + 6;
+      y += kopHeight + 4;
     }
   } catch (err) {
     console.error("Failed to draw Kop Surat image in PDF:", err);
-    y += 48;
+    y += 36;
   }
 
   // 2. Metadata Section (Nomor, Lampiran, Perihal on left; Tanggal on right)
-  doc.setFontSize(9.5);
+  doc.setFontSize(9);
   doc.setTextColor(15, 23, 42); // Black / dark slate
 
   const metaLeftY = y;
@@ -351,46 +351,46 @@ function renderLetterPage(
   doc.text(parsed.nomorSurat, marginX + 22, metaLeftY);
 
   doc.setFont("helvetica", "normal");
-  doc.text("Lampiran", marginX, metaLeftY + 4.8);
-  doc.text(":", marginX + 18, metaLeftY + 4.8);
-  doc.text(parsed.lampiran, marginX + 22, metaLeftY + 4.8);
+  doc.text("Lampiran", marginX, metaLeftY + 4.2);
+  doc.text(":", marginX + 18, metaLeftY + 4.2);
+  doc.text(parsed.lampiran, marginX + 22, metaLeftY + 4.2);
 
-  doc.text("Perihal", marginX, metaLeftY + 9.6);
-  doc.text(":", marginX + 18, metaLeftY + 9.6);
+  doc.text("Perihal", marginX, metaLeftY + 8.4);
+  doc.text(":", marginX + 18, metaLeftY + 8.4);
   doc.setFont("helvetica", "bold");
   const perihalLines = doc.splitTextToSize(parsed.perihal, 80);
-  doc.text(perihalLines, marginX + 22, metaLeftY + 9.6);
+  doc.text(perihalLines, marginX + 22, metaLeftY + 8.4);
 
   // Date on right
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(9.5);
+  doc.setFontSize(9);
   doc.text(`Sidoarjo, ${parsed.tanggalMasehi}`, 210 - marginX, metaLeftY, { align: "right" });
   if (parsed.tanggalHijriyah) {
     doc.setFontSize(8);
     doc.setTextColor(100, 116, 139);
-    doc.text(parsed.tanggalHijriyah, 210 - marginX, metaLeftY + 4.2, { align: "right" });
+    doc.text(parsed.tanggalHijriyah, 210 - marginX, metaLeftY + 3.8, { align: "right" });
     doc.setTextColor(15, 23, 42);
-    doc.setFontSize(9.5);
+    doc.setFontSize(9);
   }
 
-  y = Math.max(metaLeftY + 12 + perihalLines.length * 3, metaLeftY + 16);
+  y = Math.max(metaLeftY + 10 + perihalLines.length * 2.8, metaLeftY + 14);
 
   // 3. Recipient (Kepada Yth)
   doc.setFont("helvetica", "normal");
   doc.text("Kepada Yth.", marginX, y);
-  y += 4.5;
+  y += 4;
   doc.setFont("helvetica", "bold");
   doc.text(parsed.tujuanKepada || "Yth. Pimpinan Terkait", marginX, y);
-  y += 4.5;
+  y += 4;
   doc.setFont("helvetica", "normal");
   doc.text(parsed.kotaTujuan ? `di ${parsed.kotaTujuan}` : "Di Tempat", marginX, y);
-  y += 7.5;
+  y += 6;
 
   // 4. Salam Pembuka
   if (parsed.salamPembuka) {
     doc.setFont("helvetica", "italic");
     doc.text(parsed.salamPembuka, marginX, y);
-    y += 5.5;
+    y += 4.5;
   }
 
   // 5. Paragraf Pembuka
@@ -398,7 +398,7 @@ function renderLetterPage(
     doc.setFont("helvetica", "normal");
     const openLines = doc.splitTextToSize(parsed.paragrafPembuka, contentWidth);
     doc.text(openLines, marginX, y);
-    y += openLines.length * 4.5 + 2.5;
+    y += openLines.length * 4.0 + 2;
   }
 
   // 6. Table Pihak 1 (if any)
@@ -410,9 +410,9 @@ function renderLetterPage(
       doc.setFont("helvetica", "bold");
       const valLines = doc.splitTextToSize(item.value, contentWidth - 52);
       doc.text(valLines, marginX + 52, y);
-      y += Math.max(4.5, valLines.length * 4.2);
+      y += Math.max(4.0, valLines.length * 3.8);
     });
-    y += 2;
+    y += 1.5;
   }
 
   // 7. Keterangan Antara
@@ -420,7 +420,7 @@ function renderLetterPage(
     doc.setFont("helvetica", "normal");
     const ketLines = doc.splitTextToSize(parsed.keteranganAntara, contentWidth);
     doc.text(ketLines, marginX, y);
-    y += ketLines.length * 4.5 + 2.5;
+    y += ketLines.length * 4.0 + 2;
   }
 
   // 8. Table Data Jamaah
@@ -432,9 +432,9 @@ function renderLetterPage(
       doc.setFont("helvetica", "bold");
       const valLines = doc.splitTextToSize(item.value, contentWidth - 52);
       doc.text(valLines, marginX + 52, y);
-      y += Math.max(4.5, valLines.length * 4.2);
+      y += Math.max(4.0, valLines.length * 3.8);
     });
-    y += 2.5;
+    y += 2;
   }
 
   // 9. Body Paragraphs
@@ -443,7 +443,7 @@ function renderLetterPage(
     parsed.paragraphs.forEach((p) => {
       const pLines = doc.splitTextToSize(p, contentWidth);
       doc.text(pLines, marginX, y);
-      y += pLines.length * 4.5 + 2;
+      y += pLines.length * 4.0 + 1.8;
     });
   }
 
@@ -452,13 +452,13 @@ function renderLetterPage(
     doc.setFont("helvetica", "normal");
     const penutupLines = doc.splitTextToSize(parsed.penutup, contentWidth);
     doc.text(penutupLines, marginX, y);
-    y += penutupLines.length * 4.5 + 2.5;
+    y += penutupLines.length * 4.0 + 2;
   }
 
   if (parsed.salamPenutup) {
     doc.setFont("helvetica", "italic");
     doc.text(parsed.salamPenutup, marginX, y);
-    y += 7;
+    y += 5.5;
   }
 
   // 11. Signature and QR Verification Section (at bottom)

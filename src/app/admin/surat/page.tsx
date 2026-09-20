@@ -26,6 +26,7 @@ import {
   FileText,
   RefreshCw,
   FileDown,
+  Info,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/components/ui/Card";
 import { Button } from "@/shared/components/ui/Button";
@@ -580,7 +581,22 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
         console.warn("Gagal sinkronisasi surat ke database:", err);
       }
 
-      showToast(`Surat "${logItem.nomorSurat}" berhasil dibuat! Dialihkan ke Riwayat Surat...`);
+      // Auto-download Word (.docx) from uploaded template immediately
+      const binary = logItem.templateFileBase64 || activeTemplate.templateFileBase64;
+      if (binary && logItem.fieldsData) {
+        const cleanNomor = logItem.nomorSurat.replace(/[/\\?%*:|"<>]/g, "-");
+        const suffix = selectedDocIndex === 0 && (activeTemplate.attachedFiles?.length || 0) > 1 ? "TTD_" : "";
+        const fileName = `${cleanNomor}_${suffix}${logItem.jamaahNama.replace(/\s+/g, "_")}.docx`;
+        try {
+          await downloadMergedDocx(binary, logItem.fieldsData, fileName);
+          showToast(`Surat "${logItem.nomorSurat}" berhasil dibuat & file Word (.docx) diunduh sesuai template asli!`);
+        } catch (e) {
+          console.warn("Auto-download docx failed:", e);
+          showToast(`Surat "${logItem.nomorSurat}" berhasil dibuat! Dialihkan ke Riwayat Surat...`);
+        }
+      } else {
+        showToast(`Surat "${logItem.nomorSurat}" berhasil dibuat! Dialihkan ke Riwayat Surat...`);
+      }
 
       // Switch to history tab immediately
       setActiveMainTab("history");
@@ -657,17 +673,27 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
     showToast("PDF surat berhasil diunduh!");
   };
 
-  // Re-download Word from history log
-  const handleHistoryRedownloadWord = async (log: GeneratedSuratLog) => {
+  // Re-download Word from history log with file variant support (TTD vs non-TTD)
+  const handleHistoryRedownloadWord = async (log: GeneratedSuratLog, fileIndex: number = 0) => {
     const tpl = templates.find((t) => t.id === log.templateId || t.slug === log.templateSlug) || activeTemplate;
     const cleanNomor = log.nomorSurat.replace(/[/\\?%*:|"<>]/g, "-");
-    const fileName = `${cleanNomor}_${log.jamaahNama.replace(/\s+/g, "_")}.docx`;
+    const attached = tpl?.attachedFiles || [];
+    const hasMultiple = attached.length > 1;
+    const isTtd = fileIndex === 0 && hasMultiple;
+    const suffix = isTtd ? "TTD_" : "";
+    const fileName = `${cleanNomor}_${suffix}${log.jamaahNama.replace(/\s+/g, "_")}.docx`;
 
-    const binary = log.templateFileBase64 || tpl?.templateFileBase64;
+    const binary =
+      attached[fileIndex]?.templateFileBase64 ||
+      (fileIndex === 0
+        ? log.templateFileBase64 || tpl?.templateFileBase64
+        : attached[1]?.templateFileBase64 || log.templateFileBase64 || tpl?.templateFileBase64);
+
     if (binary && log.fieldsData) {
       try {
         await downloadMergedDocx(binary, log.fieldsData, fileName);
-        showToast("Dokumen Word (.docx) berhasil diunduh dari template asli!");
+        const label = isTtd ? "Dengan TTD & Stempel" : "Tanpa TTD (Cap Basah)";
+        showToast(`Dokumen Word (.docx - ${label}) berhasil diunduh dari template asli!`);
         return;
       } catch (err) {
         console.warn("Gagal download docx merge, fallback:", err);
@@ -706,8 +732,10 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
     }
   };
 
-  // Generate document file names from log
-  const getDocumentFileNames = (log: GeneratedSuratLog): string[] => {
+  // Generate document variant items for history table
+  const getDocumentVariants = (
+    log: GeneratedSuratLog
+  ): { name: string; label: string; fileIndex: number; isTtd: boolean }[] => {
     const namaClean = log.jamaahNama.replace(/\s+/g, "_");
     const tpl = templates.find((t) => t.id === log.templateId || t.slug === log.templateSlug);
     const basePrefix = tpl?.slug?.includes("rekom")
@@ -724,12 +752,32 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
       ? "Surat_Keterangan"
       : "Surat";
 
-    const docs: string[] = [];
-    // TTD version
-    docs.push(`${basePrefix}_TTD_${namaClean}`);
-    // Regular version
-    docs.push(`${basePrefix}_${namaClean}`);
-    return docs;
+    const attached = tpl?.attachedFiles || [];
+    if (attached.length > 1) {
+      return [
+        {
+          name: `${basePrefix}_TTD_${namaClean}`,
+          label: "Dengan TTD & Stempel",
+          fileIndex: 0,
+          isTtd: true,
+        },
+        {
+          name: `${basePrefix}_${namaClean}`,
+          label: "Tanpa TTD (Cap Basah)",
+          fileIndex: 1,
+          isTtd: false,
+        },
+      ];
+    }
+
+    return [
+      {
+        name: `${basePrefix}_${namaClean}`,
+        label: "Template Standar",
+        fileIndex: 0,
+        isTtd: false,
+      },
+    ];
   };
 
   // Short template name for display
@@ -938,6 +986,53 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
             {/* ── LEFT COLUMN (5 COLS): CONTROLS & DYNAMIC AUTOCRAT FORM ── */}
             <div className="lg:col-span-5 space-y-4">
+              {/* Template Variant Selector (e.g. Dengan TTD vs Tanpa TTD) */}
+              {activeTemplate.attachedFiles && activeTemplate.attachedFiles.length > 1 && (
+                <Card className="border-blue-200 dark:border-blue-900/40 bg-blue-50/50 dark:bg-blue-950/20">
+                  <CardContent className="p-3.5 space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-bold text-blue-950 dark:text-blue-200 flex items-center gap-1.5">
+                        <FileSignature className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
+                        Pilih Varian Template Surat:
+                      </label>
+                      <Badge variant="info" size="sm" className="text-[10px] bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-200 border-blue-200">
+                        {activeTemplate.attachedFiles.length} Varian Terupload
+                      </Badge>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      {activeTemplate.attachedFiles.map((doc, idx) => {
+                        const isTtd = idx === 0 || doc.fileName?.toLowerCase().includes("ttd");
+                        const isSelected = selectedDocIndex === idx;
+                        return (
+                          <button
+                            key={doc.index || idx}
+                            type="button"
+                            onClick={() => setSelectedDocIndex(idx)}
+                            className={cn(
+                              "p-2.5 rounded-lg border text-left transition-all cursor-pointer flex flex-col justify-between",
+                              isSelected
+                                ? "bg-white dark:bg-slate-800 border-blue-600 dark:border-blue-500 shadow-xs ring-1 ring-blue-600 text-foreground"
+                                : "bg-white/60 dark:bg-slate-800/40 border-stone-200 dark:border-stone-700 text-muted-foreground hover:bg-white"
+                            )}
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-bold text-foreground">
+                                {isTtd ? "✓ Dengan TTD & Stempel" : "✍️ Tanpa TTD (Cap Basah)"}
+                              </span>
+                              {isSelected && <Check className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />}
+                            </div>
+                            <span className="text-[10px] text-muted-foreground truncate mt-1">
+                              {doc.fileName || `Template Varian ${idx + 1}`}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
               {/* Card 1: Data Source Selector (Manifest & Jamaah) */}
               <Card className="border-stone-200 dark:border-stone-800">
                 <CardHeader className="pb-3 border-b border-stone-200 dark:border-stone-800">
@@ -1524,6 +1619,14 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
             </div>
           </div>
 
+          {/* ── INFO BANNER: Word Template Asli ── */}
+          <div className="flex items-start gap-3 p-3.5 rounded-xl border border-blue-200 dark:border-blue-900/50 bg-blue-50/80 dark:bg-blue-950/20 text-xs text-blue-900 dark:text-blue-200 shadow-2xs">
+            <Info className="h-4 w-4 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
+            <div className="leading-relaxed">
+              <strong>Format Asli Template Word (.docx):</strong> Gunakan tombol biru <strong>Word (.docx)</strong> untuk mengunduh surat dengan <strong>100% tata letak, margin, kop surat, tabel, dan jenis font asli</strong> sesuai file template yang Anda upload. Tombol PDF menghasilkan berkas PDF standar.
+            </div>
+          </div>
+
           {/* ── DATA TABLE: Riwayat Pembuatan Surat ── */}
           <Card className="border-stone-200 dark:border-stone-800 overflow-hidden shadow-sm">
             <div className="overflow-x-auto">
@@ -1586,49 +1689,62 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
                             {/* Document File Rows */}
                             <div className="flex flex-col gap-2">
                               {group.logs.map((log) => {
-                                const docNames = getDocumentFileNames(log);
-                                return docNames.map((docName, dIdx) => (
+                                const docVariants = getDocumentVariants(log);
+                                return docVariants.map((variant) => (
                                   <div
-                                    key={`${log.id}-${dIdx}`}
+                                    key={`${log.id}-${variant.fileIndex}`}
                                     className="flex items-center justify-between gap-3 bg-white dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/50 rounded-lg px-3.5 py-2.5 shadow-2xs hover:shadow-sm transition-shadow group"
                                   >
                                     <div className="flex items-center gap-2.5 min-w-0">
                                       <FileText className="h-4 w-4 text-slate-400 shrink-0" />
-                                      <span className="text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-200 truncate">
-                                        {docName}
-                                      </span>
+                                      <div className="flex flex-col min-w-0">
+                                        <span className="text-xs sm:text-sm font-semibold text-slate-800 dark:text-slate-100 truncate">
+                                          {variant.name}
+                                        </span>
+                                        <span className="text-[11px] text-muted-foreground flex items-center gap-1.5 mt-0.5">
+                                          {variant.isTtd ? (
+                                            <Badge variant="info" size="sm" className="text-[10px] py-0 px-1.5 bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 font-semibold">
+                                              ✓ Ada TTD & Stempel
+                                            </Badge>
+                                          ) : (
+                                            <Badge variant="outline" size="sm" className="text-[10px] py-0 px-1.5 bg-stone-50 text-stone-600 border-stone-300 dark:bg-stone-800 dark:text-stone-400 font-medium">
+                                              ✍️ Tanpa TTD (Cap Basah)
+                                            </Badge>
+                                          )}
+                                        </span>
+                                      </div>
                                     </div>
 
-                                    {/* Action Buttons: Cetak, Word, PDF */}
+                                    {/* Action Buttons: Word (Template Asli), PDF, Cetak */}
                                     <div className="flex items-center gap-1.5 shrink-0">
                                       <button
                                         type="button"
-                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors shadow-2xs cursor-pointer"
+                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer"
+                                        onClick={() => handleHistoryRedownloadWord(log, variant.fileIndex)}
+                                        title={`Download Word (.docx) - ${variant.label}`}
+                                      >
+                                        <FileDown className="h-3.5 w-3.5" />
+                                        <span>Word (.docx)</span>
+                                      </button>
+
+                                      <button
+                                        type="button"
+                                        className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors shadow-2xs cursor-pointer"
+                                        onClick={() => handleHistoryRedownloadPdf(log)}
+                                        title="Download PDF Standar"
+                                      >
+                                        <Download className="h-3.5 w-3.5 text-slate-500" />
+                                        <span>PDF</span>
+                                      </button>
+
+                                      <button
+                                        type="button"
+                                        className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors shadow-2xs cursor-pointer"
                                         onClick={() => handleHistoryPrint(log)}
                                         title="Cetak dokumen"
                                       >
                                         <Printer className="h-3.5 w-3.5 text-slate-500" />
                                         <span className="hidden sm:inline">Cetak</span>
-                                      </button>
-
-                                      <button
-                                        type="button"
-                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-blue-200 dark:border-blue-700/50 bg-white dark:bg-slate-800 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors shadow-2xs cursor-pointer"
-                                        onClick={() => handleHistoryRedownloadWord(log)}
-                                        title="Download Word"
-                                      >
-                                        <FileDown className="h-3.5 w-3.5" />
-                                        <span className="hidden sm:inline">Word</span>
-                                      </button>
-
-                                      <button
-                                        type="button"
-                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-red-200 dark:border-red-700/50 bg-red-50 dark:bg-red-900/20 text-xs font-semibold text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors shadow-2xs cursor-pointer"
-                                        onClick={() => handleHistoryRedownloadPdf(log)}
-                                        title="Download PDF"
-                                      >
-                                        <Download className="h-3.5 w-3.5" />
-                                        <span className="hidden sm:inline">PDF</span>
                                       </button>
                                     </div>
                                   </div>
@@ -1739,27 +1855,29 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
                 )}
 
                 <Button
-                  variant="outline"
+                  variant="default"
                   size="sm"
-                  className="text-xs text-blue-600 border-blue-200 hover:bg-blue-50"
+                  className="text-xs bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow-xs"
                   onClick={() => {
                     if (previewModalLog) handleHistoryRedownloadWord(previewModalLog);
                   }}
+                  title="Download Word (.docx) dengan 100% tata letak dan margin template asli"
                 >
                   <FileDown className="mr-1.5 h-3.5 w-3.5" />
-                  Word
+                  Word (.docx - Asli)
                 </Button>
 
                 <Button
                   variant="outline"
                   size="sm"
-                  className="text-xs text-red-600 border-red-200 hover:bg-red-50"
+                  className="text-xs text-slate-700 border-slate-200 hover:bg-slate-50"
                   onClick={() => {
                     if (previewModalLog) handleHistoryRedownloadPdf(previewModalLog);
                   }}
+                  title="Download PDF Standar"
                 >
                   <Download className="mr-1.5 h-3.5 w-3.5" />
-                  PDF
+                  PDF Standar
                 </Button>
 
                 <Button

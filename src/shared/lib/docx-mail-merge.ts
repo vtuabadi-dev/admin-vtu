@@ -15,32 +15,126 @@ function escapeXml(unsafe: string): string {
     .replace(/'/g, "&apos;");
 }
 
+function escapeRegex(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * Expands field values with fuzzy variations (quotes, spaces, casing, synonyms)
+ */
+export function buildExpandedFieldMap(fieldValues: Record<string, string>): Record<string, string> {
+  const result: Record<string, string> = { ...fieldValues };
+
+  for (const [key, val] of Object.entries(fieldValues)) {
+    if (val === undefined || val === null) continue;
+    const strVal = String(val);
+
+    // Quote variations
+    const curlyKey = key.replace(/'/g, "’");
+    const straightKey = key.replace(/[’‘]/g, "'");
+    result[curlyKey] = strVal;
+    result[straightKey] = strVal;
+
+    // Word-spaced variations (e.g., "Ta nggal Lahir" vs "Tanggal Lahir")
+    if (key.toLowerCase().includes("tanggal lahir") || key.toLowerCase().includes("ta nggal lahir")) {
+      result["Tanggal Lahir"] = strVal;
+      result["Ta nggal Lahir"] = strVal;
+      result["ta nggal lahir"] = strVal;
+      result["tanggal_lahir"] = strVal;
+    }
+
+    if (key.toLowerCase().includes("nama") && (key.toLowerCase().includes("jamaah") || key.toLowerCase().includes("jama'ah") || key.toLowerCase().includes("jama’ah") || key.toLowerCase().includes("lengkap"))) {
+      result["Nama Jama'ah"] = strVal;
+      result["Nama Jama’ah"] = strVal;
+      result["Nama Jamaah"] = strVal;
+      result["nama_lengkap"] = strVal;
+      result["nama_jamaah"] = strVal;
+    }
+
+    if (key.toLowerCase().includes("tempat lahir")) {
+      result["Tempat Lahir"] = strVal;
+      result["tempat_lahir"] = strVal;
+    }
+
+    if (key.toLowerCase().includes("bulan") && key.toLowerCase().includes("keberangkatan")) {
+      result["Bulan Keberangkatan"] = strVal;
+      result["bulan_keberangkatan"] = strVal;
+    }
+
+    if (key.toLowerCase().includes("tanggal") && (key.toLowerCase().includes("hari") || key.toLowerCase().includes("surat"))) {
+      result["Tanggal Hari Ini"] = strVal;
+      result["Tanggal Surat"] = strVal;
+      result["tanggal_surat"] = strVal;
+    }
+
+    if (key.toLowerCase().includes("nomor surat 1") || key.toLowerCase() === "nomorsurat" || key.toLowerCase() === "nomor_surat") {
+      result["Nomor Surat 1"] = strVal;
+      result["Nomor Surat"] = strVal;
+      result["No Surat 1"] = strVal;
+      result["No Surat"] = strVal;
+    }
+
+    if (key.toLowerCase().includes("nomor surat 2") || key.toLowerCase() === "nomorsurat2" || key.toLowerCase() === "nomor_surat_2") {
+      result["Nomor Surat 2"] = strVal;
+      result["No Surat 2"] = strVal;
+    }
+
+    if (key.toLowerCase() === "hal" || key.toLowerCase() === "perihal") {
+      result["Hal"] = strVal;
+      result["Perihal"] = strVal;
+    }
+
+    if (key.toLowerCase().includes("kanim") && !key.toLowerCase().includes("kota")) {
+      result["Kanim"] = strVal;
+      result["Kantor Imigrasi"] = strVal;
+    }
+
+    if (key.toLowerCase().includes("kota kanim") || key.toLowerCase().includes("kota_kanim")) {
+      result["Kota Kanim"] = strVal;
+      result["Kota Imigrasi"] = strVal;
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Builds regex patterns for a given placeholder key supporting various bracket styles and spacing.
+ */
+function buildRegexPatternsForKey(key: string): RegExp[] {
+  const trimmed = key.trim();
+  // Allow optional spaces inside word characters, and match either straight or curly apostrophe
+  const flexible = escapeRegex(trimmed)
+    .replace(/['\u2018\u2019]/g, "['\\u2018\\u2019]")
+    .replace(/\\\s\+/g, "\\s*")
+    .replace(/\s+/g, "\\s*");
+
+  return [
+    // Double curly: {{key}}
+    new RegExp(`\\{\\{\\s*${flexible}\\s*\\}\\}`, "gi"),
+    // Single curly: {key}
+    new RegExp(`\\{\\s*${flexible}\\s*\\}`, "gi"),
+    // Double angle: <<key>> or &lt;&lt;key&gt;&gt;
+    new RegExp(`&lt;&lt;\\s*${flexible}\\s*&gt;&gt;`, "gi"),
+    new RegExp(`<<\\s*${flexible}\\s*>>`, "gi"),
+    // Guilemets: «key»
+    new RegExp(`«\\s*${flexible}\\s*»`, "gi"),
+    // Square brackets: [key]
+    new RegExp(`\\[\\s*${flexible}\\s*\\]`, "gi"),
+  ];
+}
+
 /**
  * Replaces placeholders in raw XML strings from Word documents.
- * Handles variations: {tag}, {{tag}}, <<tag>>, «tag», [tag]
  */
 function replacePlaceholdersInXml(xmlContent: string, fieldValues: Record<string, string>): string {
+  const expandedFields = buildExpandedFieldMap(fieldValues);
   let result = xmlContent;
 
-  for (const [key, rawValue] of Object.entries(fieldValues)) {
+  for (const [key, rawValue] of Object.entries(expandedFields)) {
     if (rawValue === undefined || rawValue === null) continue;
     const escapedValue = escapeXml(String(rawValue));
-    const trimmedKey = key.trim();
-
-    // Standard patterns
-    const patterns = [
-      // Double curly: {{key}}
-      new RegExp(`\\{\\{\\s*${escapeRegex(trimmedKey)}\\s*\\}\\}`, "gi"),
-      // Single curly: {key}
-      new RegExp(`\\{\\s*${escapeRegex(trimmedKey)}\\s*\\}`, "gi"),
-      // Double angle: <<key>>
-      new RegExp(`&lt;&lt;\\s*${escapeRegex(trimmedKey)}\\s*&gt;&gt;`, "gi"),
-      new RegExp(`<<\\s*${escapeRegex(trimmedKey)}\\s*>>`, "gi"),
-      // Guilemets: «key»
-      new RegExp(`«\\s*${escapeRegex(trimmedKey)}\\s*»`, "gi"),
-      // Square brackets: [key]
-      new RegExp(`\\[\\s*${escapeRegex(trimmedKey)}\\s*\\]`, "gi"),
-    ];
+    const patterns = buildRegexPatternsForKey(key);
 
     for (const pattern of patterns) {
       result = result.replace(pattern, escapedValue);
@@ -48,13 +142,9 @@ function replacePlaceholdersInXml(xmlContent: string, fieldValues: Record<string
   }
 
   // Handle split-run placeholders within paragraphs (<w:p>...</w:p>)
-  result = resolveSplitRunsInParagraphs(result, fieldValues);
+  result = resolveSplitRunsInParagraphs(result, expandedFields);
 
   return result;
-}
-
-function escapeRegex(str: string): string {
-  return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 /**
@@ -66,7 +156,7 @@ function resolveSplitRunsInParagraphs(xmlContent: string, fieldValues: Record<st
   // Regex to match paragraph content: <w:p ...>...</w:p>
   return xmlContent.replace(/<w:p\b[^>]*>([\s\S]*?)<\/w:p>/g, (paragraphMatch) => {
     // Check if paragraph contains opening bracket or curly
-    if (!paragraphMatch.includes("{") && !paragraphMatch.includes("&lt;&lt;") && !paragraphMatch.includes("«")) {
+    if (!paragraphMatch.includes("{") && !paragraphMatch.includes("&lt;&lt;") && !paragraphMatch.includes("«") && !paragraphMatch.includes("[")) {
       return paragraphMatch;
     }
 
@@ -96,14 +186,8 @@ function resolveSplitRunsInParagraphs(xmlContent: string, fieldValues: Record<st
     // Check if any key exists in combined text
     let hasMatch = false;
     for (const key of Object.keys(fieldValues)) {
-      const trimmedKey = key.trim();
-      if (
-        combinedText.includes(`{${trimmedKey}}`) ||
-        combinedText.includes(`{{${trimmedKey}}}`) ||
-        combinedText.includes(`<<${trimmedKey}>>`) ||
-        combinedText.includes(`&lt;&lt;${trimmedKey}&gt;&gt;`) ||
-        combinedText.includes(`«${trimmedKey}»`)
-      ) {
+      const patterns = buildRegexPatternsForKey(key);
+      if (patterns.some((p) => p.test(combinedText))) {
         hasMatch = true;
         break;
       }
@@ -116,17 +200,9 @@ function resolveSplitRunsInParagraphs(xmlContent: string, fieldValues: Record<st
     for (const [key, rawValue] of Object.entries(fieldValues)) {
       if (rawValue === undefined || rawValue === null) continue;
       const escapedValue = escapeXml(String(rawValue));
-      const trimmedKey = key.trim();
+      const patterns = buildRegexPatternsForKey(key);
 
-      const regexPatterns = [
-        new RegExp(`\\{\\{\\s*${escapeRegex(trimmedKey)}\\s*\\}\\}`, "gi"),
-        new RegExp(`\\{\\s*${escapeRegex(trimmedKey)}\\s*\\}`, "gi"),
-        new RegExp(`&lt;&lt;\\s*${escapeRegex(trimmedKey)}\\s*&gt;&gt;`, "gi"),
-        new RegExp(`<<\\s*${escapeRegex(trimmedKey)}\\s*>>`, "gi"),
-        new RegExp(`«\\s*${escapeRegex(trimmedKey)}\\s*»`, "gi"),
-      ];
-
-      for (const pattern of regexPatterns) {
+      for (const pattern of patterns) {
         replacedCombined = replacedCombined.replace(pattern, escapedValue);
       }
     }
@@ -142,11 +218,11 @@ function resolveSplitRunsInParagraphs(xmlContent: string, fieldValues: Record<st
       const actualEnd = m.end + offset;
 
       if (i === 0) {
-        const replacement = `${m.prefix}xml:space="preserve">${replacedCombined}${m.suffix}`;
+        const replacement = `<w:t xml:space="preserve">${replacedCombined}</w:t>`;
         newParagraph = newParagraph.slice(0, actualStart) + replacement + newParagraph.slice(actualEnd);
         offset += replacement.length - m.fullMatch.length;
       } else {
-        const replacement = `${m.prefix}${m.suffix}`; // empty text tag
+        const replacement = `<w:t></w:t>`;
         newParagraph = newParagraph.slice(0, actualStart) + replacement + newParagraph.slice(actualEnd);
         offset += replacement.length - m.fullMatch.length;
       }
