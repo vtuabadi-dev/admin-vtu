@@ -2443,8 +2443,8 @@ function ManifestPageContent() {
                   </div>
 
                   {/* Month's Package Cards - UNIFIED MASTER CONTAINER (MENEMPEL SEPERTI TABEL) */}
-                  <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border border-teal-500/30 rounded-2xl shadow-[0_12px_36px_rgba(20,184,166,0.08)] overflow-hidden divide-y divide-teal-500/20">
-                    {items.map(({ parent, children }) => {
+                  <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border border-teal-500/30 rounded-2xl shadow-[0_12px_36px_rgba(20,184,166,0.08)] overflow-hidden">
+                    {items.map(({ parent, children }, idx) => {
                       const relatedChildIds = children.map((c) => c.id);
                       const allCardPkgIds = new Set([parent.id, ...relatedChildIds]);
                       const parentGroupIds = new Set(
@@ -2494,15 +2494,23 @@ function ManifestPageContent() {
                       const flightSegments = getPackageFlightSegments(parent);
 
                       return (
-                        <div
-                          key={parent.id}
-                          onClick={() => {
-                            setSelectedKeberangkatan(parent.id);
-                            const typeQuery = activeManifestView === "pembayaran" ? "&type=pembayaran" : "";
-                            router.push(`/admin/manifest?paketId=${parent.id}${typeQuery}`);
-                          }}
-                          className="p-4 md:p-5 hover:bg-teal-50/40 dark:hover:bg-teal-950/30 transition-colors cursor-pointer group"
-                        >
+                        <div key={parent.id}>
+                          {/* Garis Pembatas Gradasi Kontras (Tebal Tengah & Memudar ke Sisi) */}
+                          {idx > 0 && (
+                            <div className="relative flex items-center justify-center my-0 py-1.5">
+                              <div className="w-full h-[2px] bg-gradient-to-r from-transparent via-teal-500/80 via-emerald-400 to-transparent drop-shadow-[0_0_4px_rgba(20,184,166,0.6)]"></div>
+                              <div className="absolute w-6 h-1.5 bg-gradient-to-r from-teal-400 to-emerald-300 rounded-full shadow-[0_0_10px_rgba(20,184,166,0.9)]"></div>
+                            </div>
+                          )}
+
+                          <div
+                            onClick={() => {
+                              setSelectedKeberangkatan(parent.id);
+                              const typeQuery = activeManifestView === "pembayaran" ? "&type=pembayaran" : "";
+                              router.push(`/admin/manifest?paketId=${parent.id}${typeQuery}`);
+                            }}
+                            className="p-4 md:p-5 hover:bg-teal-50/40 dark:hover:bg-teal-950/30 transition-colors cursor-pointer group"
+                          >
                           <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-center">
                             
                             {/* SISI KIRI: INFO PAKET & STARTING (SBY DI ATAS) */}
@@ -2687,8 +2695,9 @@ function ManifestPageContent() {
 
                           </div>
                         </div>
-                      );
-                    })}
+                      </div>
+                    );
+                  })}
                   </div>
                 </div>
               ))}
