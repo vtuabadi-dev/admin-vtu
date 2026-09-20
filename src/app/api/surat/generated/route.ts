@@ -1,11 +1,62 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { auth } from "@/server/auth";
+import { prisma } from "@/server/db/client";
 import { checkServerPermission } from "@/shared/lib/rbac-utils";
 import type { GeneratedSuratLog } from "@/shared/types/surat";
 
-// In-memory runtime cache for server-side generated letters logs
-let serverGeneratedLogs: GeneratedSuratLog[] = [];
+export const dynamic = "force-dynamic";
+
+// In-memory cache fallback for high-performance reading
+let cachedGeneratedLogs: GeneratedSuratLog[] | null = null;
+
+async function getGeneratedLogsFromDb(): Promise<GeneratedSuratLog[]> {
+  if (cachedGeneratedLogs && cachedGeneratedLogs.length > 0) {
+    return cachedGeneratedLogs;
+  }
+
+  try {
+    const latestDbRecord = await prisma.auditEntry.findFirst({
+      where: { action: "SAVE_GENERATED_SURAT_LOGS" },
+      orderBy: { timestamp: "desc" },
+    });
+
+    if (latestDbRecord?.after) {
+      const parsed = JSON.parse(latestDbRecord.after);
+      if (Array.isArray(parsed)) {
+        cachedGeneratedLogs = parsed;
+        return cachedGeneratedLogs!;
+      }
+    }
+  } catch (err) {
+    console.warn("[SuratLogs] Error reading from Supabase DB:", err);
+  }
+
+  return cachedGeneratedLogs ?? [];
+}
+
+async function saveGeneratedLogsToDb(logs: GeneratedSuratLog[], userName: string): Promise<void> {
+  cachedGeneratedLogs = logs;
+
+  try {
+    // Strip heavy base64 strings from audit log storage to keep DB payload light and fast
+    const lightweightLogs = logs.map(({ templateFileBase64, ...rest }) => rest);
+
+    await prisma.auditEntry.create({
+      data: {
+        userId: "admin-surat",
+        userName,
+        role: "super_admin",
+        module: "dokumen",
+        action: "SAVE_GENERATED_SURAT_LOGS",
+        detail: `Riwayat surat (${logs.length} surat) berhasil disimpan di Supabase Database`,
+        after: JSON.stringify(lightweightLogs.slice(0, 500)),
+      },
+    });
+  } catch (err) {
+    console.error("[SuratLogs] Failed to save logs to Supabase DB:", err);
+  }
+}
 
 export async function GET(request: NextRequest) {
   const session = await auth();
@@ -19,7 +70,7 @@ export async function GET(request: NextRequest) {
     const template = searchParams.get("template");
     const packageId = searchParams.get("packageId");
 
-    let logs = [...serverGeneratedLogs];
+    let logs = await getGeneratedLogsFromDb();
 
     if (q) {
       logs = logs.filter(
@@ -62,6 +113,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, message: "Nomor surat dan template surat diperlukan" }, { status: 400 });
     }
 
+    const currentLogs = await getGeneratedLogsFromDb();
+
     const newLog: GeneratedSuratLog = {
       ...body,
       id: body.id || `srt-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
@@ -70,11 +123,12 @@ export async function POST(request: NextRequest) {
       status: "aktif",
     };
 
-    serverGeneratedLogs = [newLog, ...serverGeneratedLogs.filter((l) => l.id !== newLog.id)].slice(0, 1000);
+    const updatedLogs = [newLog, ...currentLogs.filter((l) => l.id !== newLog.id)];
+    await saveGeneratedLogsToDb(updatedLogs, session.user.name || session.user.email || "Admin Operasional");
 
     return NextResponse.json({
       success: true,
-      message: "Surat berhasil dicatat ke riwayat",
+      message: "Surat berhasil dicatat ke riwayat Supabase",
       data: newLog,
     });
   } catch (error) {
@@ -93,11 +147,13 @@ export async function DELETE(request: NextRequest) {
     const id = searchParams.get("id");
     if (!id) return NextResponse.json({ success: false, message: "Surat ID required" }, { status: 400 });
 
-    serverGeneratedLogs = serverGeneratedLogs.filter((l) => l.id !== id);
+    const currentLogs = await getGeneratedLogsFromDb();
+    const updatedLogs = currentLogs.filter((l) => l.id !== id);
+    await saveGeneratedLogsToDb(updatedLogs, session.user.name || session.user.email || "Admin Operasional");
 
     return NextResponse.json({
       success: true,
-      message: "Riwayat surat berhasil dihapus",
+      message: "Riwayat surat berhasil dihapus dari Supabase",
     });
   } catch (error) {
     return NextResponse.json({ success: false, message: (error as Error).message }, { status: 500 });
