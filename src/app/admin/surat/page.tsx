@@ -5,7 +5,6 @@ import { useSearchParams, useRouter } from "next/navigation";
 import {
   Printer,
   Check,
-  Building2,
   ScrollText,
   User,
   Sparkles,
@@ -25,6 +24,8 @@ import {
   Layers,
   ArrowRight,
   FileText,
+  RefreshCw,
+  FileDown,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/components/ui/Card";
 import { Button } from "@/shared/components/ui/Button";
@@ -47,6 +48,7 @@ import {
   extractPlaceholdersFromText,
 } from "@/shared/lib/surat-autocrat-engine";
 import { downloadOfficialLetterPdf } from "@/shared/lib/surat-pdf";
+import { downloadMergedDocx } from "@/shared/lib/docx-mail-merge";
 import { KantorImigrasiCombobox } from "@/shared/components/ui/KantorImigrasiCombobox";
 import { SearchableSelect } from "@/shared/components/ui/SearchableSelect";
 import { getKotaFromKanimName } from "@/shared/lib/kantor-imigrasi";
@@ -481,6 +483,10 @@ function GenerateSuratPageContent() {
       createdBy: "Admin Operasional",
       fieldsData: { ...resolvedFieldValues },
       renderedText: renderedLetterBody,
+      templateFileBase64:
+        activeAttachedFile?.templateFileBase64 ||
+        activeTemplate.templateFileBase64 ||
+        undefined,
       status: "aktif",
       verificationUrl,
     };
@@ -582,6 +588,54 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
     showToast("Dokumen PDF surat resmi berhasil diunduh!");
   };
 
+  // Action: Download Merged Word (.docx) File
+  const handleDownloadWord = async () => {
+    if (!activeTemplate) return;
+    handleSaveToHistory();
+
+    const cleanNomor = computedNomorSurat.replace(/[/\\?%*:|"<>]/g, "-");
+    const jamNama = (
+      resolvedFieldValues["Nama Jama'ah"] ||
+      resolvedFieldValues["nama_lengkap"] ||
+      activeJamaah?.namaLengkap ||
+      "Jamaah"
+    )
+      .replace(/[/\\?%*:|"<>]/g, "_")
+      .trim();
+
+    let customFileName = `${cleanNomor}_${jamNama}.docx`;
+    if (activeTemplate.formatNamaFile && activeTemplate.formatNamaFile.trim()) {
+      const mergedName = renderAutocratMergedText(activeTemplate.formatNamaFile, resolvedFieldValues)
+        .replace(/[/\\?%*:|"<>]/g, "_")
+        .trim();
+      if (mergedName) customFileName = `${mergedName}.docx`;
+    }
+
+    const templateBinary =
+      activeAttachedFile?.templateFileBase64 ||
+      activeTemplate.templateFileBase64;
+
+    if (templateBinary) {
+      try {
+        await downloadMergedDocx(templateBinary, resolvedFieldValues, customFileName);
+        showToast("Dokumen Word (.docx) berhasil diunduh dari template asli!");
+        return;
+      } catch (err) {
+        console.error("Gagal mail merge docx:", err);
+      }
+    }
+
+    // Fallback if no binary uploaded
+    const blob = new Blob([renderedLetterBody], { type: "application/msword" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = customFileName.replace(/\.docx$/i, ".doc");
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast("Dokumen Word berhasil diunduh!");
+  };
+
   // Delete History Item
   const handleDeleteHistory = (id: string) => {
     if (!window.confirm("Hapus riwayat surat ini?")) return;
@@ -589,6 +643,143 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
     setHistoryLogs(updated);
     fetch(`/api/surat/generated?id=${id}`, { method: "DELETE" }).catch(() => {});
     showToast("Riwayat surat berhasil dihapus");
+  };
+
+  // Refresh History from server
+  const [historyRefreshing, setHistoryRefreshing] = useState(false);
+  const handleRefreshHistory = async () => {
+    setHistoryRefreshing(true);
+    try {
+      const hRes = await fetch("/api/surat/generated");
+      if (hRes.ok) {
+        const hJson = await hRes.json();
+        if (hJson.data && Array.isArray(hJson.data)) {
+          setHistoryLogs(hJson.data);
+        } else {
+          setHistoryLogs(loadGeneratedSuratLogs());
+        }
+      } else {
+        setHistoryLogs(loadGeneratedSuratLogs());
+      }
+      showToast("Data riwayat berhasil diperbarui!");
+    } catch {
+      setHistoryLogs(loadGeneratedSuratLogs());
+    } finally {
+      setHistoryRefreshing(false);
+    }
+  };
+
+  // Re-download PDF from history log
+  const handleHistoryRedownloadPdf = async (log: GeneratedSuratLog) => {
+    const tpl = templates.find((t) => t.id === log.templateId || t.slug === log.templateSlug) || activeTemplate;
+    if (!tpl || !log.renderedText) {
+      showToast("Data surat tidak tersedia untuk re-download PDF.");
+      return;
+    }
+    const cleanNomor = log.nomorSurat.replace(/[/\\?%*:|"<>]/g, "-");
+    const fileName = `${cleanNomor}_${log.jamaahNama.replace(/\s+/g, "_")}.pdf`;
+    await downloadOfficialLetterPdf(
+      {
+        template: tpl,
+        rawText: log.renderedText,
+        computedNomorSurat: log.nomorSurat,
+        renderedPerihal: log.perihal,
+        renderedTujuan: tpl.tujuanDefault || "",
+        renderedKotaTujuan: tpl.kotaTujuanDefault || "",
+        todayInfo,
+        effectiveShowBarcode: tpl.penandatangan?.showBarcode ?? true,
+        verificationUrl: log.verificationUrl || "",
+      },
+      fileName
+    );
+    showToast("PDF surat berhasil diunduh!");
+  };
+
+  // Re-download Word from history log
+  const handleHistoryRedownloadWord = async (log: GeneratedSuratLog) => {
+    const tpl = templates.find((t) => t.id === log.templateId || t.slug === log.templateSlug) || activeTemplate;
+    const cleanNomor = log.nomorSurat.replace(/[/\\?%*:|"<>]/g, "-");
+    const fileName = `${cleanNomor}_${log.jamaahNama.replace(/\s+/g, "_")}.docx`;
+
+    const binary = log.templateFileBase64 || tpl?.templateFileBase64;
+    if (binary && log.fieldsData) {
+      try {
+        await downloadMergedDocx(binary, log.fieldsData, fileName);
+        showToast("Dokumen Word (.docx) berhasil diunduh dari template asli!");
+        return;
+      } catch (err) {
+        console.warn("Gagal download docx merge, fallback:", err);
+      }
+    }
+
+    if (!log.renderedText) {
+      showToast("Data surat tidak tersedia untuk download.");
+      return;
+    }
+
+    const blob = new Blob([log.renderedText], { type: "application/msword" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = fileName.replace(/\.docx$/i, ".doc");
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast("Dokumen Word berhasil diunduh!");
+  };
+
+  // Print from history log
+  const handleHistoryPrint = (log: GeneratedSuratLog) => {
+    const printWin = window.open("", "_blank");
+    if (printWin) {
+      printWin.document.write(`
+        <html>
+          <head><title>${log.nomorSurat}</title></head>
+          <body style="font-family: sans-serif; padding: 40px; white-space: pre-line; line-height: 1.6;">
+            ${log.renderedText || ""}
+          </body>
+        </html>
+      `);
+      printWin.document.close();
+      printWin.print();
+    }
+  };
+
+  // Generate document file names from log
+  const getDocumentFileNames = (log: GeneratedSuratLog): string[] => {
+    const namaClean = log.jamaahNama.replace(/\s+/g, "_");
+    const tpl = templates.find((t) => t.id === log.templateId || t.slug === log.templateSlug);
+    const basePrefix = tpl?.slug?.includes("rekom")
+      ? "Surat_Rekom"
+      : tpl?.slug?.includes("cuti-pekerja")
+      ? "Surat_Cuti"
+      : tpl?.slug?.includes("cuti-sekolah")
+      ? "Surat_Cuti"
+      : tpl?.slug?.includes("tugas")
+      ? "SK"
+      : tpl?.slug?.includes("klaim")
+      ? "Surat_Klaim"
+      : tpl?.slug?.includes("keterangan")
+      ? "Surat_Keterangan"
+      : "Surat";
+
+    const docs: string[] = [];
+    // TTD version
+    docs.push(`${basePrefix}_TTD_${namaClean}`);
+    // Regular version
+    docs.push(`${basePrefix}_${namaClean}`);
+    return docs;
+  };
+
+  // Short template name for display
+  const getShortTemplateName = (log: GeneratedSuratLog): string => {
+    const tpl = templates.find((t) => t.id === log.templateId || t.slug === log.templateSlug);
+    if (tpl?.slug?.includes("rekom")) return "Surat Rekom";
+    if (tpl?.slug?.includes("cuti-pekerja")) return "Surat Cuti Pekerja";
+    if (tpl?.slug?.includes("cuti-sekolah")) return "Surat Izin Sekolah";
+    if (tpl?.slug?.includes("tugas")) return "Surat Tugas";
+    if (tpl?.slug?.includes("klaim")) return "Surat Klaim Asuransi";
+    if (tpl?.slug?.includes("keterangan")) return "Surat Keterangan";
+    return tpl?.nama || log.templateName || "Surat";
   };
 
   // Filtered History
@@ -607,6 +798,42 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
       return matchSearch && matchTemplate;
     });
   }, [historyLogs, historySearch, historyFilterTemplate]);
+
+  // Grouped history: group by date + jenis surat (for screenshot-like layout)
+  const groupedHistory = useMemo(() => {
+    const groups: Array<{
+      date: string;
+      jenis: string;
+      nomorSurat: string;
+      logs: GeneratedSuratLog[];
+    }> = [];
+
+    // Sort by generatedDate descending
+    const sorted = [...filteredHistory].sort(
+      (a, b) => new Date(b.generatedDate).getTime() - new Date(a.generatedDate).getTime()
+    );
+
+    sorted.forEach((log) => {
+      const dateStr = formatDate(log.generatedDate);
+      const jenis = getShortTemplateName(log);
+      // Find existing group with same date + same nomor surat
+      const existing = groups.find(
+        (g) => g.date === dateStr && g.nomorSurat === log.nomorSurat
+      );
+      if (existing) {
+        existing.logs.push(log);
+      } else {
+        groups.push({
+          date: dateStr,
+          jenis,
+          nomorSurat: log.nomorSurat,
+          logs: [log],
+        });
+      }
+    });
+
+    return groups;
+  }, [filteredHistory, templates]);
 
   return (
     <div className="space-y-6 pb-24">
@@ -1181,7 +1408,17 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
                       onClick={handleDownloadDoc}
                     >
                       <Download className="mr-1.5 h-3.5 w-3.5" />
-                      Download PDF
+                      PDF
+                    </Button>
+
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-xs text-emerald-600 dark:text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/10"
+                      onClick={handleDownloadWord}
+                    >
+                      <FileDown className="mr-1.5 h-3.5 w-3.5" />
+                      Word (.docx)
                     </Button>
                   </div>
 
@@ -1282,189 +1519,201 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
       )}
 
       {/* ══════════════════════════════════════════════════════════ */}
-      {/* TAB 2: DASHBOARD & RIWAYAT SURAT TERGENERATE */}
+      {/* TAB 2: RIWAYAT PEMBUATAN SURAT */}
       {/* ══════════════════════════════════════════════════════════ */}
       {activeMainTab === "history" && (
-        <div className="space-y-6">
-          {/* Summary Metric Cards */}
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <Card className="p-4 border-stone-200 dark:border-stone-800">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs text-muted-foreground font-medium">Total Surat Diterbitkan</p>
-                  <p className="text-2xl font-extrabold mt-1 text-foreground">{historyLogs.length}</p>
-                </div>
-                <div className="p-2.5 rounded-xl bg-primary/10 text-primary">
-                  <ScrollText className="h-5 w-5" />
-                </div>
-              </div>
-            </Card>
+        <div className="space-y-5">
+          {/* ── HEADER: Title + Filter + Refresh ── */}
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <h2 className="text-xl sm:text-2xl font-extrabold tracking-tight text-foreground">
+              Riwayat Pembuatan Surat
+            </h2>
 
-            <Card className="p-4 border-stone-200 dark:border-stone-800">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs text-muted-foreground font-medium">Surat Rekom Paspor</p>
-                  <p className="text-2xl font-extrabold mt-1 text-blue-600 dark:text-blue-400">
-                    {historyLogs.filter((l) => l.templateSlug.includes("rekom")).length}
-                  </p>
-                </div>
-                <div className="p-2.5 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400">
-                  <FileSignature className="h-5 w-5" />
-                </div>
+            <div className="flex items-center gap-2.5">
+              {/* Search */}
+              <div className="relative hidden sm:block">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                <Input
+                  placeholder="Cari nama / nomor surat..."
+                  className="pl-8 text-xs h-9 w-52"
+                  value={historySearch}
+                  onChange={(e) => setHistorySearch(e.target.value)}
+                />
               </div>
-            </Card>
 
-            <Card className="p-4 border-stone-200 dark:border-stone-800">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs text-muted-foreground font-medium">Surat Cuti / Izin</p>
-                  <p className="text-2xl font-extrabold mt-1 text-emerald-600 dark:text-emerald-400">
-                    {historyLogs.filter((l) => l.templateSlug.includes("cuti")).length}
-                  </p>
-                </div>
-                <div className="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
-                  <Building2 className="h-5 w-5" />
-                </div>
-              </div>
-            </Card>
+              {/* Filter Template */}
+              <Select
+                value={historyFilterTemplate}
+                onChange={(e) => setHistoryFilterTemplate(e.target.value)}
+                options={[
+                  { value: "all", label: "Semua Jenis Surat" },
+                  ...templates.map((t) => ({ value: t.slug, label: t.nama })),
+                ]}
+                className="text-xs h-9 w-48"
+              />
 
-            <Card className="p-4 border-stone-200 dark:border-stone-800">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs text-muted-foreground font-medium">Template Aktif</p>
-                  <p className="text-2xl font-extrabold mt-1 text-purple-600 dark:text-purple-400">
-                    {templates.length} Template
-                  </p>
-                </div>
-                <div className="p-2.5 rounded-xl bg-purple-500/10 text-purple-600 dark:text-purple-400">
-                  <Layers className="h-5 w-5" />
-                </div>
-              </div>
-            </Card>
+              {/* Refresh Data */}
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-xs text-primary border-primary/30 hover:bg-primary/5 h-9"
+                onClick={handleRefreshHistory}
+                disabled={historyRefreshing}
+              >
+                <RefreshCw className={cn("mr-1.5 h-3.5 w-3.5", historyRefreshing && "animate-spin")} />
+                Refresh Data
+              </Button>
+            </div>
           </div>
 
-          {/* Search & Filter Bar */}
-          <Card className="border-stone-200 dark:border-stone-800">
-            <CardContent className="pt-4 pb-4">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div className="relative flex-1 max-w-md">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Cari nomor surat, nama jamaah, paspor, atau paket..."
-                    className="pl-9 text-xs"
-                    value={historySearch}
-                    onChange={(e) => setHistorySearch(e.target.value)}
-                  />
-                </div>
+          {/* Mobile Search (shown only on small screens) */}
+          <div className="sm:hidden">
+            <div className="relative">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+              <Input
+                placeholder="Cari nama / nomor surat..."
+                className="pl-8 text-xs h-9"
+                value={historySearch}
+                onChange={(e) => setHistorySearch(e.target.value)}
+              />
+            </div>
+          </div>
 
-                <div className="flex items-center gap-2">
-                  <Select
-                    value={historyFilterTemplate}
-                    onChange={(e) => setHistoryFilterTemplate(e.target.value)}
-                    options={[
-                      { value: "all", label: "Semua Template Surat" },
-                      ...templates.map((t) => ({ value: t.slug, label: t.nama })),
-                    ]}
-                    className="text-xs h-8 w-56"
-                  />
-                  <Button
-                    size="sm"
-                    className="text-xs bg-primary text-primary-foreground"
-                    onClick={() => setActiveMainTab("generator")}
-                  >
-                    <Plus className="mr-1.5 h-3.5 w-3.5" />
-                    Generate Surat Baru
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Data Table */}
-          <Card className="border-stone-200 dark:border-stone-800 overflow-hidden">
+          {/* ── DATA TABLE: Riwayat Pembuatan Surat ── */}
+          <Card className="border-stone-200 dark:border-stone-800 overflow-hidden shadow-sm">
             <div className="overflow-x-auto">
-              <table className="w-full text-xs text-left">
-                <thead className="bg-muted/50 text-muted-foreground uppercase font-bold text-[10px] border-b">
+              <table className="w-full text-sm text-left">
+                <thead className="bg-slate-50 dark:bg-slate-900/50 text-slate-500 dark:text-slate-400 uppercase font-bold text-[11px] tracking-wider border-b border-slate-200 dark:border-slate-800">
                   <tr>
-                    <th className="py-3 px-4">Nomor Surat</th>
-                    <th className="py-3 px-4">Template / Jenis</th>
-                    <th className="py-3 px-4">Nama Jamaah</th>
-                    <th className="py-3 px-4">Paket Umroh</th>
-                    <th className="py-3 px-4">Tanggal Terbit</th>
-                    <th className="py-3 px-4">Pembuat</th>
-                    <th className="py-3 px-4 text-right">Aksi Dokumen</th>
+                    <th className="py-3.5 px-5 w-40">Tanggal</th>
+                    <th className="py-3.5 px-5">Jenis &amp; Nomor Surat</th>
+                    <th className="py-3.5 px-5 text-right">Aksi &amp; Download Dokumen</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-stone-200 dark:divide-stone-800">
-                  {filteredHistory.length === 0 ? (
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50">
+                  {groupedHistory.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="py-8 text-center text-muted-foreground">
-                        Belum ada riwayat generate surat. Klik &ldquo;Generate Surat Baru&rdquo; untuk memulai.
+                      <td colSpan={3} className="py-16 text-center">
+                        <div className="flex flex-col items-center gap-3">
+                          <div className="p-4 rounded-2xl bg-slate-100 dark:bg-slate-800/50">
+                            <ScrollText className="h-8 w-8 text-slate-400" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-semibold text-slate-500">Belum ada riwayat pembuatan surat</p>
+                            <p className="text-xs text-slate-400 mt-1">Klik &ldquo;Generate Surat Baru&rdquo; untuk memulai membuat surat operasional.</p>
+                          </div>
+                          <Button
+                            size="sm"
+                            className="mt-2 text-xs bg-primary text-primary-foreground"
+                            onClick={() => setActiveMainTab("generator")}
+                          >
+                            <Plus className="mr-1.5 h-3.5 w-3.5" />
+                            Generate Surat Baru
+                          </Button>
+                        </div>
                       </td>
                     </tr>
                   ) : (
-                    filteredHistory.map((log) => (
-                      <tr key={log.id} className="hover:bg-muted/30 transition-colors">
-                        <td className="py-3 px-4 font-mono font-bold text-primary">
-                          {log.nomorSurat}
+                    groupedHistory.map((group, gIdx) => (
+                      <tr key={`${group.nomorSurat}-${gIdx}`} className="hover:bg-slate-50/50 dark:hover:bg-slate-900/30 transition-colors align-top">
+                        {/* ── TANGGAL ── */}
+                        <td className="py-4 px-5 align-top">
+                          <span className="text-sm text-slate-600 dark:text-slate-300 font-medium whitespace-nowrap">
+                            {group.date}
+                          </span>
                         </td>
-                        <td className="py-3 px-4">
-                          <span className="font-semibold text-foreground">{log.templateName}</span>
-                          <p className="text-[10px] text-muted-foreground line-clamp-1">{log.perihal}</p>
-                        </td>
-                        <td className="py-3 px-4">
-                          <div className="font-bold text-foreground">{log.jamaahNama}</div>
-                          <div className="text-[10px] text-muted-foreground">
-                            Paspor: {log.jamaahPaspor || "-"}
+
+                        {/* ── JENIS & NOMOR SURAT ── */}
+                        <td className="py-4 px-5 align-top">
+                          <div className="flex flex-col gap-3">
+                            {/* Template Name & Nomor */}
+                            <div className="flex items-start gap-3">
+                              <div>
+                                <p className="text-sm font-bold text-slate-900 dark:text-slate-100 leading-tight">
+                                  {group.jenis}
+                                </p>
+                                <p className="text-xs text-slate-500 dark:text-slate-400 font-mono mt-0.5">
+                                  {group.nomorSurat}
+                                </p>
+                              </div>
+                            </div>
+
+                            {/* Document File Rows */}
+                            <div className="flex flex-col gap-2">
+                              {group.logs.map((log) => {
+                                const docNames = getDocumentFileNames(log);
+                                return docNames.map((docName, dIdx) => (
+                                  <div
+                                    key={`${log.id}-${dIdx}`}
+                                    className="flex items-center justify-between gap-3 bg-white dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/50 rounded-lg px-3.5 py-2.5 shadow-2xs hover:shadow-sm transition-shadow group"
+                                  >
+                                    <div className="flex items-center gap-2.5 min-w-0">
+                                      <FileText className="h-4 w-4 text-slate-400 shrink-0" />
+                                      <span className="text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-200 truncate">
+                                        {docName}
+                                      </span>
+                                    </div>
+
+                                    {/* Action Buttons: Cetak, Word, PDF */}
+                                    <div className="flex items-center gap-1.5 shrink-0">
+                                      <button
+                                        type="button"
+                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors shadow-2xs cursor-pointer"
+                                        onClick={() => handleHistoryPrint(log)}
+                                        title="Cetak dokumen"
+                                      >
+                                        <Printer className="h-3.5 w-3.5 text-slate-500" />
+                                        <span className="hidden sm:inline">Cetak</span>
+                                      </button>
+
+                                      <button
+                                        type="button"
+                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-blue-200 dark:border-blue-700/50 bg-white dark:bg-slate-800 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors shadow-2xs cursor-pointer"
+                                        onClick={() => handleHistoryRedownloadWord(log)}
+                                        title="Download Word"
+                                      >
+                                        <FileDown className="h-3.5 w-3.5" />
+                                        <span className="hidden sm:inline">Word</span>
+                                      </button>
+
+                                      <button
+                                        type="button"
+                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-red-200 dark:border-red-700/50 bg-red-50 dark:bg-red-900/20 text-xs font-semibold text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors shadow-2xs cursor-pointer"
+                                        onClick={() => handleHistoryRedownloadPdf(log)}
+                                        title="Download PDF"
+                                      >
+                                        <Download className="h-3.5 w-3.5" />
+                                        <span className="hidden sm:inline">PDF</span>
+                                      </button>
+                                    </div>
+                                  </div>
+                                ));
+                              })}
+                            </div>
                           </div>
                         </td>
-                        <td className="py-3 px-4">
-                          <span className="font-medium text-foreground">{log.packageName}</span>
-                        </td>
-                        <td className="py-3 px-4 text-muted-foreground">
-                          {formatDate(log.generatedDate)}
-                        </td>
-                        <td className="py-3 px-4 text-muted-foreground">
-                          {log.createdBy}
-                        </td>
-                        <td className="py-3 px-4 text-right">
-                          <div className="flex items-center justify-end gap-1">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="h-7 px-2 text-xs"
-                              title="Lihat Detail Surat"
-                              onClick={() => setPreviewModalLog(log)}
-                            >
-                              <Eye className="h-3 w-3 mr-1" />
-                              Preview
-                            </Button>
 
-                            <Button
-                              variant="secondary"
-                              size="sm"
-                              className="h-7 px-2 text-xs"
-                              title="Download Ulang"
-                              onClick={() => {
-                                const blob = new Blob([log.renderedText || ""], { type: "text/plain" });
-                                const url = URL.createObjectURL(blob);
-                                const a = document.createElement("a");
-                                a.href = url;
-                                a.download = `${log.nomorSurat.replace(/[/\\?%*:|"<>]/g, "-")}.txt`;
-                                a.click();
-                                URL.revokeObjectURL(url);
-                                showToast("Dokumen berhasil diunduh ulang!");
-                              }}
-                            >
-                              <Download className="h-3 w-3" />
-                            </Button>
-
+                        {/* ── AKSI COLUMN (header-only for alignment, actions are inline above) ── */}
+                        <td className="py-4 px-5 align-top text-right">
+                          <div className="flex items-center justify-end gap-1.5 mt-1">
                             <Button
                               variant="ghost"
                               size="sm"
-                              className="h-7 w-7 p-0 text-destructive hover:bg-destructive/10"
-                              title="Hapus Riwayat"
-                              onClick={() => handleDeleteHistory(log.id)}
+                              className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
+                              onClick={() => setPreviewModalLog(group.logs[0]!)}
+                              title="Lihat detail surat"
+                            >
+                              <Eye className="h-3.5 w-3.5 mr-1" />
+                              Detail
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 w-7 p-0 text-destructive/60 hover:text-destructive hover:bg-destructive/10"
+                              title="Hapus riwayat surat ini"
+                              onClick={() => {
+                                group.logs.forEach((l) => handleDeleteHistory(l.id));
+                              }}
                             >
                               <Trash2 className="h-3.5 w-3.5" />
                             </Button>
@@ -1476,6 +1725,27 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
                 </tbody>
               </table>
             </div>
+
+            {/* Footer Stats */}
+            {groupedHistory.length > 0 && (
+              <div className="px-5 py-3 bg-slate-50/80 dark:bg-slate-900/30 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
+                <span>
+                  Menampilkan <strong className="text-foreground">{groupedHistory.length}</strong> surat
+                  {filteredHistory.length !== historyLogs.length && (
+                    <> dari <strong className="text-foreground">{historyLogs.length}</strong> total</>
+                  )}
+                </span>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="text-xs text-primary hover:text-primary"
+                  onClick={() => setActiveMainTab("generator")}
+                >
+                  <Plus className="mr-1 h-3 w-3" />
+                  Generate Surat Baru
+                </Button>
+              </div>
+            )}
           </Card>
         </div>
       )}
@@ -1519,31 +1789,43 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
                     onClick={() => window.open(previewModalLog.verificationUrl, "_blank")}
                   >
                     <ExternalLink className="mr-1.5 h-3.5 w-3.5" />
-                    Cek Halaman Verifikasi
+                    Verifikasi
                   </Button>
                 )}
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="text-xs text-blue-600 border-blue-200 hover:bg-blue-50"
+                  onClick={() => {
+                    if (previewModalLog) handleHistoryRedownloadWord(previewModalLog);
+                  }}
+                >
+                  <FileDown className="mr-1.5 h-3.5 w-3.5" />
+                  Word
+                </Button>
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="text-xs text-red-600 border-red-200 hover:bg-red-50"
+                  onClick={() => {
+                    if (previewModalLog) handleHistoryRedownloadPdf(previewModalLog);
+                  }}
+                >
+                  <Download className="mr-1.5 h-3.5 w-3.5" />
+                  PDF
+                </Button>
 
                 <Button
                   size="sm"
                   className="text-xs bg-primary text-primary-foreground"
                   onClick={() => {
-                    const printWin = window.open("", "_blank");
-                    if (printWin) {
-                      printWin.document.write(`
-                        <html>
-                          <head><title>${previewModalLog.nomorSurat}</title></head>
-                          <body style="font-family: sans-serif; padding: 40px; white-space: pre-line; line-height: 1.6;">
-                            ${previewModalLog.renderedText}
-                          </body>
-                        </html>
-                      `);
-                      printWin.document.close();
-                      printWin.print();
-                    }
+                    if (previewModalLog) handleHistoryPrint(previewModalLog);
                   }}
                 >
                   <Printer className="mr-1.5 h-3.5 w-3.5" />
-                  Cetak Dokumen
+                  Cetak
                 </Button>
               </div>
             </div>

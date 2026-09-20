@@ -82,6 +82,7 @@ export default function MasterSuratPage() {
   const [uploadCategory, setUploadCategory] = useState<SuratKategori>("custom");
   const [uploadKodeNomor, setUploadKodeNomor] = useState("SK-CUSTOM");
   const [uploadPerihal, setUploadPerihal] = useState("");
+  const [uploadedBase64, setUploadedBase64] = useState("");
 
   // Toast / Notification State
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -264,9 +265,16 @@ Demikian Surat Tugas ini dibuat dengan sebenarnya agar dapat dipergunakan sebaga
 
     let content = "";
     let detectedTags: string[] = [];
+    let fileBase64 = "";
 
     try {
       if (isDocx) {
+        const reader = new FileReader();
+        fileBase64 = await new Promise<string>((resolve, reject) => {
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
         const res = await extractPlaceholdersFromDocxFile(file);
         detectedTags = res.tags;
         content = res.extractedText;
@@ -311,6 +319,7 @@ Demikian Surat Tugas ini dibuat dengan sebenarnya agar dapat dipergunakan sebaga
         index: docIdx + 1,
         fileName: fileName,
         content: content,
+        templateFileBase64: fileBase64 || currentAttached[docIdx]?.templateFileBase64,
       };
 
       // Determine if template has attached files with content/filename
@@ -433,6 +442,7 @@ Demikian Surat Tugas ini dibuat dengan sebenarnya agar dapat dipergunakan sebaga
       return {
         ...prev,
         fileNameUploaded: docIdx === 0 ? fileName : prev.fileNameUploaded,
+        templateFileBase64: docIdx === 0 && fileBase64 ? fileBase64 : prev.templateFileBase64,
         attachedFiles: currentAttached,
         templateContent:
           docIdx === 0
@@ -929,16 +939,25 @@ Demikian Surat Tugas ini dibuat dengan sebenarnya agar dapat dipergunakan sebaga
     const isDocx = file.name.endsWith(".docx") || file.name.endsWith(".doc");
     try {
       if (isDocx) {
+        const reader = new FileReader();
+        const base64 = await new Promise<string>((resolve, reject) => {
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+        setUploadedBase64(base64);
         const res = await extractPlaceholdersFromDocxFile(file);
         setUploadedFileContent(res.extractedText);
       } else {
         const content = await file.text();
         setUploadedFileContent(content);
+        setUploadedBase64("");
       }
     } catch (err) {
       console.error("Error reading uploaded file:", err);
       const content = await file.text();
       setUploadedFileContent(content);
+      setUploadedBase64("");
     }
   };
 
@@ -983,6 +1002,8 @@ Demikian Surat Tugas ini dibuat dengan sebenarnya agar dapat dipergunakan sebaga
         showBarcode: true,
       },
       templateContent: uploadedFileContent,
+      fileNameUploaded: uploadedFileName,
+      templateFileBase64: uploadedBase64 || undefined,
       placeholders,
       isDefault: false,
       createdAt: new Date().toISOString(),

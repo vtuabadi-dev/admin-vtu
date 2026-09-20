@@ -9,7 +9,7 @@
 File standar BPMN 2.0 yang dimodelkan langsung dari arsitektur backend, Prisma schema, API routes, dan alur pendaftaran rombongan yang telah dikoreksi telah diperbarui di:
 - 👉 [**`docs/bpmn/vtu-operasional-system-bpmn.bpmn`**](file:///d:/Projects/app-admin-vtu/docs/bpmn/vtu-operasional-system-bpmn.bpmn) *(85.3 KB)*
 
-File ini mematuhi standar internasional **OMG BPMN 2.0**, lengkap dengan koordinat visual (BPMNDI), color codes per aktor, **Expanded Sub-Process Container**, gateways, data objects, data stores, serta konektor message flow ke sistem eksternal (Telegram Bot, Gemini AI Vision OCR, Google Drive).
+File ini mematuhi standar internasional **OMG BPMN 2.0**, lengkap dengan koordinat visual (BPMNDI), color codes per aktor, **Expanded Sub-Process Container**, gateways, data objects, data stores, serta konektor message flow ke sistem eksternal (WhatsApp Hyperlink, Gemini AI Vision OCR, Google Drive).
 
 Dapat langsung dibuka & diedit secara visual di:
 1. [**demo.bpmn.io**](https://demo.bpmn.io) (Tinggal drag & drop file `.bpmn`)
@@ -261,7 +261,7 @@ graph TD
 | No (Row) | Lane / Role | Kode Role Sistem | Posisi & Tanggung Jawab Utama |
 |:---|:---|:---|:---|
 | **Row 1** | **JAMAAH / KETUA GROUP** | `jamaah` | Mengisi data group, memilih paket, tentukan kamar, upload bukti bayar DP, terima perlengkapan, upload berkas referensi (KTP, KK, Buku Nikah), upload paspor, pelunasan, hingga keberangkatan dan kepulangan. |
-| **Row 2** | **SISTEM VTU & AI ENGINE** | *Automated Service* | Auto-broadcast jadwal ke Telegram, kalkulasi nominal total & DP, generate PDF formulir bertanda tangan, ingest data ke manifest, Gemini OCR, Autocrat Engine surat rekomendasi, Tri-Engine Automator Manifest (SISKOPATUH, Block Seat, Visa), dan immutable `AuditEntry`. |
+| **Row 2** | **SISTEM VTU & AI ENGINE** | *Automated Service* | Auto-broadcast jadwal ke WhatsApp Hyperlink, kalkulasi nominal total & DP, generate PDF formulir bertanda tangan, ingest data ke manifest, Gemini OCR, Autocrat Engine surat rekomendasi, Tri-Engine Automator Manifest (SISKOPATUH, Block Seat, Visa), dan immutable `AuditEntry`. |
 | **Row 3** | **ADMIN OPERASIONAL** | `admin_operasional` | **Sub-Proses Manajemen Paket:** Paket baru, update, split starting, split promo; peninjauan pendaftaran baru & bukti transfer DP; penerbitan surat rekomendasi paspor di `/admin/surat`; serta closing paket keberangkatan. |
 | **Row 4** | **ADMIN DOKUMEN** | `admin_dokumen` | Manual review berkas buram/OCR error, verifikasi kelengkapan dokumen referensi (KTP, KK, Buku Nikah), penolakan/permintaan ulang dokumen belum lengkap, approval kelayakan dokumen visa. |
 | **Row 5** | **ADMIN PEMBAYARAN** | `admin_pembayaran` | Penerbitan invoice resmi (DP & Pelunasan), invoice split group (A/B/C), rekonsiliasi mutasi bank, alokasi pembayaran per jamaah. |

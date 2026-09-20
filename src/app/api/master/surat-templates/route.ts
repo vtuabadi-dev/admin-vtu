@@ -82,6 +82,7 @@ export async function POST(request: NextRequest) {
     const currentTemplates = await getSuratTemplatesFromDb();
 
     const newTemplate: SuratTemplate = {
+      ...body,
       id: body.id || `tpl-custom-${Date.now()}`,
       slug: body.slug || body.nama.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
       nama: body.nama,
@@ -101,6 +102,12 @@ export async function POST(request: NextRequest) {
       },
       templateContent: body.templateContent,
       placeholders: body.placeholders || [],
+      fileNameUploaded: body.fileNameUploaded,
+      formatNamaFile: body.formatNamaFile,
+      templateFileBase64: body.templateFileBase64,
+      attachedFiles: body.attachedFiles,
+      jumlahTemplateTerlampir: body.jumlahTemplateTerlampir || 1,
+      kebutuhanNomorPerSurat: body.kebutuhanNomorPerSurat || 1,
       isDefault: false,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),

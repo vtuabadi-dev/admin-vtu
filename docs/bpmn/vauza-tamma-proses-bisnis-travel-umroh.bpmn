@@ -15,13 +15,13 @@
     <bpmn:participant id="Participant_VauzaTamma" 
                       name="VAUZA TAMMA — PROSES BISNIS TRAVEL UMROH (End-to-End)" 
                       processRef="Process_TravelUmroh" />
-    <bpmn:participant id="Participant_Telegram" name="Channel Telegram" />
+    <bpmn:participant id="Participant_WhatsApp" name="WhatsApp Hyperlink" />
     <bpmn:participant id="Participant_GDS" name="Sistem Tiketing (GDS / Consolidator)" />
     <bpmn:participant id="Participant_Nusuk" name="Nusuk / Muqeem" />
     <bpmn:participant id="Participant_Drive" name="Google Drive (Otomatis per Paket)" />
     
     <!-- MESSAGE FLOWS TO EXTERNAL SYSTEMS -->
-    <bpmn:messageFlow id="MsgFlow_Telegram" sourceRef="Task_BroadcastTelegram" targetRef="Participant_Telegram" />
+    <bpmn:messageFlow id="MsgFlow_WhatsApp" sourceRef="Task_BroadcastWA" targetRef="Participant_WhatsApp" />
     <bpmn:messageFlow id="MsgFlow_GDS" sourceRef="Task_PesanTiket" targetRef="Participant_GDS" />
     <bpmn:messageFlow id="MsgFlow_Nusuk" sourceRef="Task_PengurusanVisa" targetRef="Participant_Nusuk" />
     <bpmn:messageFlow id="MsgFlow_Drive_TL" sourceRef="Task_LaporanPerjalanan" targetRef="Participant_Drive" />
@@ -51,7 +51,7 @@
       <!-- 2. MARKETING / SALES -->
       <bpmn:lane id="Lane_Marketing" name="MARKETING / SALES">
         <bpmn:flowNodeRef>Task_ListPaket</bpmn:flowNodeRef>
-        <bpmn:flowNodeRef>Task_BroadcastTelegram</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_BroadcastWA</bpmn:flowNodeRef>
         <bpmn:flowNodeRef>Task_FollowUp</bpmn:flowNodeRef>
       </bpmn:lane>
 
@@ -115,7 +115,7 @@
       </bpmn:dataOutputAssociation>
     </bpmn:userTask>
 
-    <bpmn:serviceTask id="Task_BroadcastTelegram" name="Broadcast Paket ke Telegram">
+    <bpmn:serviceTask id="Task_BroadcastWA" name="Broadcast Paket ke WhatsApp Hyperlink">
       <bpmn:incoming>Flow_Mkt_1</bpmn:incoming>
       <bpmn:outgoing>Flow_BroadcastToJamaah</bpmn:outgoing>
     </bpmn:serviceTask>
@@ -398,8 +398,8 @@
 
     <!-- SEQUENCE FLOWS -->
     <bpmn:sequenceFlow id="Flow_1" sourceRef="StartEvent_Mulai" targetRef="Task_LihatPaket" />
-    <bpmn:sequenceFlow id="Flow_Mkt_1" sourceRef="Task_ListPaket" targetRef="Task_BroadcastTelegram" />
-    <bpmn:sequenceFlow id="Flow_BroadcastToJamaah" sourceRef="Task_BroadcastTelegram" targetRef="Task_LihatPaket" />
+    <bpmn:sequenceFlow id="Flow_Mkt_1" sourceRef="Task_ListPaket" targetRef="Task_BroadcastWA" />
+    <bpmn:sequenceFlow id="Flow_BroadcastToJamaah" sourceRef="Task_BroadcastWA" targetRef="Task_LihatPaket" />
     <bpmn:sequenceFlow id="Flow_2" sourceRef="Task_LihatPaket" targetRef="Task_DaftarOnline" />
     <bpmn:sequenceFlow id="Flow_3" sourceRef="Task_DaftarOnline" targetRef="Task_UploadDokumen" />
     <bpmn:sequenceFlow id="Flow_NotifDaftar" sourceRef="Task_DaftarOnline" targetRef="Task_TerimaNotifDaftar" />
@@ -486,7 +486,7 @@
       </bpmndi:BPMNShape>
 
       <!-- EXTERNAL PARTICIPANTS / SYSTEMS (BOTTOM) -->
-      <bpmndi:BPMNShape id="Participant_Telegram_di" bpmnElement="Participant_Telegram" isHorizontal="true" bioc:stroke="#0288d1" bioc:fill="#e1f5fe">
+      <bpmndi:BPMNShape id="Participant_WhatsApp_di" bpmnElement="Participant_WhatsApp" isHorizontal="true" bioc:stroke="#25d366" bioc:fill="#dcf8c6">
         <dc:Bounds x="460" y="1180" width="160" height="60" />
       </bpmndi:BPMNShape>
 
@@ -564,7 +564,7 @@
         <dc:Bounds x="260" y="265" width="130" height="70" />
       </bpmndi:BPMNShape>
 
-      <bpmndi:BPMNShape id="Task_BroadcastTelegram_di" bpmnElement="Task_BroadcastTelegram" bioc:stroke="#1565c0" bioc:fill="#e3f2fd">
+      <bpmndi:BPMNShape id="Task_BroadcastWA_di" bpmnElement="Task_BroadcastWA" bioc:stroke="#25d366" bioc:fill="#dcf8c6">
         <dc:Bounds x="430" y="265" width="130" height="70" />
       </bpmndi:BPMNShape>
 
@@ -1014,7 +1014,7 @@
       </bpmndi:BPMNEdge>
 
       <!-- MESSAGE FLOW EDGES -->
-      <bpmndi:BPMNEdge id="MsgFlow_Telegram_di" bpmnElement="MsgFlow_Telegram" stroke="#0288d1" stroke-dasharray="4 2">
+      <bpmndi:BPMNEdge id="MsgFlow_WhatsApp_di" bpmnElement="MsgFlow_WhatsApp" stroke="#25d366" stroke-dasharray="4 2">
         <di:waypoint x="495" y="335" />
         <di:waypoint x="495" y="1180" />
       </bpmndi:BPMNEdge>

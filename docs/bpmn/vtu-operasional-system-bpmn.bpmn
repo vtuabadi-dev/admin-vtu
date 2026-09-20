@@ -17,14 +17,14 @@
                       processRef="Process_VTU_Operasional" />
     
     <!-- EXTERNAL PARTICIPANTS -->
-    <bpmn:participant id="Participant_TelegramGateway" name="Telegram Broadcast &amp; Bot Gateway" />
+    <bpmn:participant id="Participant_WAHyperlinkGateway" name="WhatsApp Hyperlink Broadcast Gateway" />
     <bpmn:participant id="Participant_GeminiAI" name="Gemini AI Vision &amp; OCR Engine" />
     <bpmn:participant id="Participant_GoogleDrive" name="Google Drive Cloud Storage" />
 
     <!-- MESSAGE FLOWS -->
-    <bpmn:messageFlow id="MF_Telegram_1" sourceRef="Task_Sys_BroadcastJadwal" targetRef="Participant_TelegramGateway" />
-    <bpmn:messageFlow id="MF_Telegram_2" sourceRef="Task_Sys_SendReceipt" targetRef="Participant_TelegramGateway" />
-    <bpmn:messageFlow id="MF_Telegram_3" sourceRef="Task_Sys_AutoDeadlines" targetRef="Participant_TelegramGateway" />
+    <bpmn:messageFlow id="MF_WA_1" sourceRef="Task_Sys_BroadcastJadwal" targetRef="Participant_WAHyperlinkGateway" />
+    <bpmn:messageFlow id="MF_WA_2" sourceRef="Task_Sys_SendReceipt" targetRef="Participant_WAHyperlinkGateway" />
+    <bpmn:messageFlow id="MF_WA_3" sourceRef="Task_Sys_AutoDeadlines" targetRef="Participant_WAHyperlinkGateway" />
     <bpmn:messageFlow id="MF_Gemini_OCR" sourceRef="Task_Sys_OCRTrigger" targetRef="Participant_GeminiAI" />
     <bpmn:messageFlow id="MF_Gemini_PackageOCR" sourceRef="Task_Sub_GeminiVisionOCR" targetRef="Participant_GeminiAI" />
     <bpmn:messageFlow id="MF_Drive_Sync" sourceRef="Task_Sys_SyncDrive" targetRef="Participant_GoogleDrive" />
@@ -248,7 +248,7 @@
     </bpmn:subProcess>
 
     <!-- FASE 1: BROADCAST PAKET -->
-    <bpmn:serviceTask id="Task_Sys_BroadcastJadwal" name="Auto-Broadcast Jadwal Paket ke Telegram">
+    <bpmn:serviceTask id="Task_Sys_BroadcastJadwal" name="Auto-Broadcast Jadwal Paket ke WhatsApp Hyperlink">
       <bpmn:incoming>F_Sub_To_Broadcast</bpmn:incoming>
       <bpmn:outgoing>F_Sys_1</bpmn:outgoing>
     </bpmn:serviceTask>
@@ -399,7 +399,7 @@
       <bpmn:outgoing>F_Pay_3</bpmn:outgoing>
     </bpmn:userTask>
 
-    <bpmn:serviceTask id="Task_Sys_SendReceipt" name="Generate E-Kwitansi &amp; Broadcast Notif Lunas (Telegram)">
+    <bpmn:serviceTask id="Task_Sys_SendReceipt" name="Generate E-Kwitansi &amp; Broadcast Notif Lunas (WhatsApp Hyperlink)">
       <bpmn:incoming>F_Pay_3</bpmn:incoming>
       <bpmn:outgoing>F_Sys_7</bpmn:outgoing>
     </bpmn:serviceTask>
@@ -438,7 +438,7 @@
     </bpmn:exclusiveGateway>
 
     <!-- FASE 6: OPERASIONAL KEBERANGKATAN & TOUR LEADER -->
-    <bpmn:serviceTask id="Task_Sys_AutoDeadlines" name="Auto Deadlines Engine (H-30, H-7 Reminder via Telegram)">
+    <bpmn:serviceTask id="Task_Sys_AutoDeadlines" name="Auto Reminder Pelunasan Jamaah (Pengingat Awal H-45, Batas Akhir H-40) &amp; Deadline Operasional (Dokumen H-30, Manifest H-20, Rooming H-14) via WhatsApp Hyperlink">
       <bpmn:incoming>F_Man_Yes</bpmn:incoming>
       <bpmn:outgoing>F_Sys_9</bpmn:outgoing>
     </bpmn:serviceTask>
@@ -1166,7 +1166,7 @@
       </bpmndi:BPMNShape>
 
       <!-- EXTERNAL PARTICIPANTS (BOTTOM) -->
-      <bpmndi:BPMNShape id="Participant_TelegramGateway_di" bpmnElement="Participant_TelegramGateway" isHorizontal="true" bioc:stroke="#0288d1" bioc:fill="#b3e5fc">
+      <bpmndi:BPMNShape id="Participant_WAHyperlinkGateway_di" bpmnElement="Participant_WAHyperlinkGateway" isHorizontal="true" bioc:stroke="#25d366" bioc:fill="#dcf8c6">
         <dc:Bounds x="1800" y="1480" width="260" height="60" />
       </bpmndi:BPMNShape>
 
@@ -1613,19 +1613,19 @@
       </bpmndi:BPMNEdge>
 
       <!-- MESSAGE FLOWS -->
-      <bpmndi:BPMNEdge id="MF_Telegram_1_di" bpmnElement="MF_Telegram_1">
+      <bpmndi:BPMNEdge id="MF_WA_1_di" bpmnElement="MF_WA_1">
         <di:waypoint x="1740" y="340" />
         <di:waypoint x="1740" y="1460" />
         <di:waypoint x="1850" y="1460" />
         <di:waypoint x="1850" y="1480" />
       </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="MF_Telegram_2_di" bpmnElement="MF_Telegram_2">
+      <bpmndi:BPMNEdge id="MF_WA_2_di" bpmnElement="MF_WA_2">
         <di:waypoint x="4735" y="340" />
         <di:waypoint x="4735" y="1460" />
         <di:waypoint x="1990" y="1460" />
         <di:waypoint x="1990" y="1480" />
       </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="MF_Telegram_3_di" bpmnElement="MF_Telegram_3">
+      <bpmndi:BPMNEdge id="MF_WA_3_di" bpmnElement="MF_WA_3">
         <di:waypoint x="5375" y="340" />
         <di:waypoint x="5375" y="1450" />
         <di:waypoint x="2020" y="1450" />

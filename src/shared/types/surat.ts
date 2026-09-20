@@ -28,6 +28,7 @@ export interface SuratAttachedFile {
   formatNamaFile?: string;    // e.g. "Surat_Rekomendasi_{{nama_lengkap}}"
   opsiNomorSurat?: "same_as_template_1" | "new_number"; // Opsi Penomoran Surat
   content?: string;
+  templateFileBase64?: string; // Original binary DOCX file (base64)
 }
 
 export interface SuratTemplate {
@@ -42,6 +43,7 @@ export interface SuratTemplate {
   jumlahTemplateTerlampir?: number; // e.g. 1, 2
   formatNamaFile?: string;   // e.g. "SK_{{Nama Pegawai}}" or "Surat_{{nama_lengkap}}" (Document 1 format)
   fileNameUploaded?: string; // e.g. "Template_Surat_Tugas.docx" (Document 1 file)
+  templateFileBase64?: string; // Original binary DOCX file for Document 1 (base64)
   attachedFiles?: SuratAttachedFile[]; // List of attached template files (dynamic length)
   perihalDefault: string;    // e.g. "Surat Tugas Keberangkatan Umroh"
   kopSuratType: "ppiu_vtu" | "custom" | "none";
@@ -85,6 +87,7 @@ export interface GeneratedSuratLog {
   fieldsData: Record<string, any>;
   renderedHtml?: string;
   renderedText?: string;
+  templateFileBase64?: string;
   recipientContact?: string;
   status: "aktif" | "dibatalkan";
   verificationUrl?: string;
