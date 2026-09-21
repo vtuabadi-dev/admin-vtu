@@ -69,6 +69,16 @@ function mapKeberangkatan(row: any): Keberangkatan {
     promoLabel: row.promoLabel ?? undefined,
     driveFolderIds: row.driveFolderIds ?? undefined,
     hotelOptions: parsedHotelOptions,
+    packageType: row.packageType ? {
+      id: row.packageType.id,
+      name: row.packageType.name,
+      code: row.packageType.code,
+    } : undefined,
+    startingPoint: row.startingPoint ? {
+      id: row.startingPoint.id,
+      name: row.startingPoint.name,
+      code: row.startingPoint.code,
+    } : undefined,
   };
 }
 
@@ -76,6 +86,8 @@ const DEFAULT_INCLUDE = {
   maskapaiMaster: true,
   hotelMekkahMaster: true,
   hotelMadinahMaster: true,
+  startingPoint: true,
+  packageType: true,
   groups: {
     include: {
       anggota: {

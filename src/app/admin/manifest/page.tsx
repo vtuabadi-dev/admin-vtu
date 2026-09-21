@@ -80,6 +80,88 @@ function formatFlightDate(dateStr?: string): string {
   }
 }
 
+function getPackageStartingCity(pkg: Keberangkatan): { code: string; name: string; label: string } {
+  const text = `${pkg.namaPaket || ""} ${pkg.kode || ""} ${(pkg as any).splitLabel || ""} ${(pkg as any).startingPoint?.name || ""} ${(pkg as any).startingPoint?.code || ""}`.toUpperCase();
+  
+  if (text.includes("SUB") || text.includes("SBY") || text.includes("SURABAYA") || text.includes("JUANDA")) {
+    return { code: "SUB", name: "Surabaya", label: "Starting Surabaya (SUB)" };
+  }
+  if (text.includes("SOC") || text.includes("SOLO") || text.includes("SURAKARTA")) {
+    return { code: "SOC", name: "Solo", label: "Starting Solo (SOC)" };
+  }
+  if (text.includes("UPG") || text.includes("MAKASSAR") || text.includes("UJUNG PANDANG")) {
+    return { code: "UPG", name: "Makassar", label: "Starting Makassar (UPG)" };
+  }
+  if (text.includes("KNO") || text.includes("MEDAN") || text.includes("KUALANAMU")) {
+    return { code: "KNO", name: "Medan", label: "Starting Medan (KNO)" };
+  }
+  if (text.includes("KJT") || text.includes("KERTAJATI")) {
+    return { code: "KJT", name: "Kertajati", label: "Starting Kertajati (KJT)" };
+  }
+  if (text.includes("SRG") || text.includes("SEMARANG")) {
+    return { code: "SRG", name: "Semarang", label: "Starting Semarang (SRG)" };
+  }
+  if (text.includes("YIA") || text.includes("JOG") || text.includes("YOGYAKARTA") || text.includes("JOGJA")) {
+    return { code: "YIA", name: "Yogyakarta", label: "Starting Yogyakarta (YIA)" };
+  }
+  if (text.includes("BPN") || text.includes("BALIKPAPAN")) {
+    return { code: "BPN", name: "Balikpapan", label: "Starting Balikpapan (BPN)" };
+  }
+  if (text.includes("PLM") || text.includes("PALEMBANG")) {
+    return { code: "PLM", name: "Palembang", label: "Starting Palembang (PLM)" };
+  }
+  if (text.includes("PDG") || text.includes("PADANG")) {
+    return { code: "PDG", name: "Padang", label: "Starting Padang (PDG)" };
+  }
+  if (text.includes("BTJ") || text.includes("ACEH")) {
+    return { code: "BTJ", name: "Banda Aceh", label: "Starting Banda Aceh (BTJ)" };
+  }
+  if (text.includes("LOP") || text.includes("LOMBOK")) {
+    return { code: "LOP", name: "Lombok", label: "Starting Lombok (LOP)" };
+  }
+  return { code: "CGK", name: "Jakarta", label: "Starting Jakarta (CGK)" };
+}
+
+function getPackageProgramType(pkg: Keberangkatan): string {
+  // 1. Check relation packageType if available
+  const typeName = (pkg as any).packageType?.name;
+  if (typeName && typeof typeName === "string" && typeName.trim()) {
+    const upper = typeName.trim().toUpperCase();
+    if (upper.includes("PLUS")) return upper;
+    if (upper.includes("REGULER") || upper === "REG") return "UMROH REGULER";
+    if (upper.includes("RAMADHAN")) return "UMROH RAMADHAN";
+    if (upper.includes("SYAWAL")) return "UMROH SYAWAL";
+    if (upper.includes("HAJI")) return "HAJI PLUS / FURODA";
+    if (upper.startsWith("UMROH")) return upper;
+    return `UMROH ${upper}`;
+  }
+
+  // 2. Derive from namaPaket or kode
+  const text = `${pkg.namaPaket || ""} ${pkg.kode || ""}`.toUpperCase();
+
+  if (text.includes("TURKI") || text.includes("TURKEY") || text.includes("ISTANBUL")) return "UMROH PLUS TURKI";
+  if (text.includes("DUBAI")) return "UMROH PLUS DUBAI";
+  if (text.includes("MESIR") || text.includes("CAIRO") || text.includes("KAIRO")) return "UMROH PLUS MESIR";
+  if (text.includes("AQSHA") || text.includes("AQSO") || text.includes("PALESTINA")) return "UMROH PLUS AQSHA";
+  if (text.includes("QATAR") || text.includes("DOHA")) return "UMROH PLUS QATAR";
+  if (text.includes("THAIF") || text.includes("THOIF")) return "UMROH PLUS THAIF";
+  if (text.includes("JORDAN") || text.includes("YORDANIA") || text.includes("PETRA")) return "UMROH PLUS JORDAN";
+  if (text.includes("OMAN") || text.includes("MUSCAT")) return "UMROH PLUS OMAN";
+  if (text.includes("UZBEKISTAN") || text.includes("TASHKENT") || text.includes("SAMARKAND")) return "UMROH PLUS UZBEKISTAN";
+  if (text.includes("EROPA") || text.includes("SPAIN") || text.includes("SPANYOL")) return "UMROH PLUS EROPA";
+  if (text.includes("MALAYSIA") || text.includes("KUALA LUMPUR")) return "UMROH PLUS MALAYSIA";
+  if (text.includes("SINGAPUR")) return "UMROH PLUS SINGAPURA";
+  if (text.includes("RAMADHAN") || text.includes("RAMADAN") || text.includes("LAILATUL QADAR")) return "UMROH RAMADHAN";
+  if (text.includes("SYAWAL") || text.includes("IDUL FITRI")) return "UMROH SYAWAL";
+  if (text.includes("HAJI")) return "HAJI PLUS / FURODA";
+  if (text.includes("VIP") || text.includes("EXECUTIVE")) return "UMROH VIP";
+
+  const plusMatch = text.match(/PLUS\s+([A-Z]+)/);
+  if (plusMatch && plusMatch[1]) return `UMROH PLUS ${plusMatch[1]}`;
+
+  return "UMROH REGULER";
+}
+
 function getPackageFlightSegments(pkg: Keberangkatan): FlightSegment[] {
   let segs: FlightSegment[] = [];
   try {
@@ -95,7 +177,7 @@ function getPackageFlightSegments(pkg: Keberangkatan): FlightSegment[] {
 
   const meta = typeof pkg.driveFolderIds === "string" ? JSON.parse(pkg.driveFolderIds || "{}") : (pkg.driveFolderIds || {});
   const pnr = String(meta?.flightDetails?.pnr || (pkg as any).pnr || "-");
-  const isSub = (pkg.namaPaket || "").toUpperCase().includes("SUB") || (pkg.kode || "").toUpperCase().includes("SUB");
+  const originCode = getPackageStartingCity(pkg).code || "CGK";
   const departDateStr = pkg.tanggalBerangkat ? new Date(pkg.tanggalBerangkat).toISOString().split("T")[0] : "";
   const returnDateStr = pkg.tanggalPulang ? new Date(pkg.tanggalPulang).toISOString().split("T")[0] : "";
   
@@ -105,7 +187,7 @@ function getPackageFlightSegments(pkg: Keberangkatan): FlightSegment[] {
       kodeFlight: (pkg.nomorPenerbangan && pkg.nomorPenerbangan !== "-") ? pkg.nomorPenerbangan : "SV-816",
       pnr: pnr,
       maskapai: pkg.maskapai || "Saudia",
-      asal: isSub ? "SUB" : "CGK",
+      asal: originCode,
       tujuan: "JED",
       jamBerangkat: "11:30",
       jamTiba: "17:30"
@@ -116,7 +198,7 @@ function getPackageFlightSegments(pkg: Keberangkatan): FlightSegment[] {
       pnr: pnr,
       maskapai: pkg.maskapai || "Saudia",
       asal: "JED",
-      tujuan: isSub ? "SUB" : "CGK",
+      tujuan: originCode,
       jamBerangkat: "19:30",
       jamTiba: "10:00"
     }
@@ -2476,7 +2558,15 @@ function ManifestPageContent() {
                         const name = (p.namaPaket || "").toUpperCase();
                         const code = (p.kode || "").toUpperCase();
                         const split = (p as any).splitLabel ? String((p as any).splitLabel).toUpperCase() : "";
-                        return name.includes("SUB") || name.includes("SURABAYA") || code.includes("SUB") || split.includes("SUB");
+                        return (
+                          name.includes("SUB") ||
+                          name.includes("SBY") ||
+                          name.includes("SURABAYA") ||
+                          code.includes("SUB") ||
+                          code.includes("SBY") ||
+                          split.includes("SUB") ||
+                          split.includes("SBY")
+                        );
                       });
 
                       const jktPkg = allPkgs.find((p) => {
@@ -2484,7 +2574,16 @@ function ManifestPageContent() {
                         const name = (p.namaPaket || "").toUpperCase();
                         const code = (p.kode || "").toUpperCase();
                         const split = (p as any).splitLabel ? String((p as any).splitLabel).toUpperCase() : "";
-                        return name.includes("CGK") || name.includes("JKT") || name.includes("JAKARTA") || code.includes("CGK") || code.includes("JKT") || split.includes("CGK") || p.id === parent.id;
+                        return (
+                          name.includes("CGK") ||
+                          name.includes("JKT") ||
+                          name.includes("JAKARTA") ||
+                          code.includes("CGK") ||
+                          code.includes("JKT") ||
+                          split.includes("CGK") ||
+                          split.includes("JKT") ||
+                          (!sbyPkg && p.id === parent.id)
+                        );
                       });
 
                       // Seat per starting point
@@ -2527,7 +2626,7 @@ function ManifestPageContent() {
                               <div className="flex items-center gap-2">
                                 <span className="w-2 h-2 rounded-full bg-teal-500 animate-pulse"></span>
                                 <h3 className="text-base font-extrabold text-slate-900 dark:text-white group-hover:text-teal-600 dark:group-hover:text-teal-300 transition-colors tracking-tight">
-                                  {formatPackageTitleShort(parent.namaPaket || parent.paketUmroh?.namaPaket || "PAKET UMROH").replace(/\s*\d+\s*[Dd]$/i, "").trim()}
+                                  {getPackageProgramType(parent)}
                                 </h3>
                               </div>
                               
@@ -2577,7 +2676,7 @@ function ManifestPageContent() {
                                       <div className="flex items-center justify-between font-bold text-teal-950 dark:text-teal-200">
                                         <span className="flex items-center gap-1.5">
                                           <span className="w-2 h-2 rounded-full bg-teal-500 shadow-2xs"></span>
-                                          {parent.namaPaket}
+                                          {getPackageStartingCity(parent).label}
                                         </span>
                                         <span className="text-[10px] text-teal-800 dark:text-teal-200 font-bold bg-teal-200/80 dark:bg-teal-800/80 px-1.5 py-0.5 rounded shadow-2xs">
                                           {calculateDurationDays(parent.tanggalBerangkat, parent.tanggalPulang)} H
@@ -2603,9 +2702,13 @@ function ManifestPageContent() {
                                   <span className="inline-flex items-center gap-1 bg-sky-500/15 text-sky-700 dark:text-sky-300 border border-sky-400/40 text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider">
                                     Starting Surabaya
                                   </span>
-                                ) : (
+                                ) : jktPkg ? (
                                   <span className="inline-flex items-center gap-1 bg-teal-500/15 text-teal-700 dark:text-teal-300 border border-teal-400/40 text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider">
                                     Starting Jakarta
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 bg-teal-500/15 text-teal-700 dark:text-teal-300 border border-teal-400/40 text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider">
+                                    {`Starting ${getPackageStartingCity(parent).name}`}
                                   </span>
                                 )}
                                 <StatusBadge status={parent.status} />

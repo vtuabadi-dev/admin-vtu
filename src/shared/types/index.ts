@@ -377,6 +377,8 @@ export interface Keberangkatan {
   hotelMadinahId?: string;
   startingPointId?: string;
   packageTypeId?: string;
+  packageType?: { id: string; name: string; code: string };
+  startingPoint?: { id: string; name: string; code: string };
   // Legacy Prisma fields needed before DB Drop
   namaPaket?: string;
   hargaPaket?: number;
