@@ -50,6 +50,7 @@ import {
 } from "@/shared/lib/surat-autocrat-engine";
 import { downloadOfficialLetterPdf } from "@/shared/lib/surat-pdf";
 import { downloadMergedDocx } from "@/shared/lib/docx-mail-merge";
+import { downloadDocxAsPdf } from "@/shared/lib/docx-to-pdf";
 import { KantorImigrasiCombobox } from "@/shared/components/ui/KantorImigrasiCombobox";
 import { SearchableSelect } from "@/shared/components/ui/SearchableSelect";
 import { getKotaFromKanimName } from "@/shared/lib/kantor-imigrasi";
@@ -581,21 +582,12 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
         console.warn("Gagal sinkronisasi surat ke database:", err);
       }
 
-      // Auto-download Word (.docx) from uploaded template immediately
-      const binary = logItem.templateFileBase64 || activeTemplate.templateFileBase64;
-      if (binary && logItem.fieldsData) {
-        const cleanNomor = logItem.nomorSurat.replace(/[/\\?%*:|"<>]/g, "-");
-        const suffix = selectedDocIndex === 0 && (activeTemplate.attachedFiles?.length || 0) > 1 ? "TTD_" : "";
-        const fileName = `${cleanNomor}_${suffix}${logItem.jamaahNama.replace(/\s+/g, "_")}.docx`;
-        try {
-          await downloadMergedDocx(binary, logItem.fieldsData, fileName);
-          showToast(`Surat "${logItem.nomorSurat}" berhasil dibuat & file Word (.docx) diunduh sesuai template asli!`);
-        } catch (e) {
-          console.warn("Auto-download docx failed:", e);
-          showToast(`Surat "${logItem.nomorSurat}" berhasil dibuat! Dialihkan ke Riwayat Surat...`);
-        }
+      // Berkas tersimpan ke Riwayat tanpa auto-download popup, siap diunduh di tab Riwayat
+      const hasMultipleVariants = (activeTemplate.attachedFiles?.length || 0) > 1;
+      if (hasMultipleVariants) {
+        showToast(`Surat "${logItem.nomorSurat}" berhasil dibuat! Kedua model template (Dengan TTD & Tanpa TTD) siap diunduh di tab Riwayat.`);
       } else {
-        showToast(`Surat "${logItem.nomorSurat}" berhasil dibuat! Dialihkan ke Riwayat Surat...`);
+        showToast(`Surat "${logItem.nomorSurat}" berhasil dibuat! Siap diunduh di tab Riwayat.`);
       }
 
       // Switch to history tab immediately
@@ -647,15 +639,39 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
     }
   };
 
-  // Re-download PDF from history log
-  const handleHistoryRedownloadPdf = async (log: GeneratedSuratLog) => {
+  // Re-download PDF from history log with file variant support (TTD vs non-TTD) using the uploaded template file!
+  const handleHistoryRedownloadPdf = async (log: GeneratedSuratLog, fileIndex: number = 0) => {
     const tpl = templates.find((t) => t.id === log.templateId || t.slug === log.templateSlug) || activeTemplate;
+    const cleanNomor = log.nomorSurat.replace(/[/\\?%*:|"<>]/g, "-");
+    const attached = tpl?.attachedFiles || [];
+    const hasMultiple = attached.length > 1;
+    const isTtd = fileIndex === 0 && hasMultiple;
+    const suffix = isTtd ? "TTD_" : "";
+    const fileName = `${cleanNomor}_${suffix}${log.jamaahNama.replace(/\s+/g, "_")}.pdf`;
+
+    const binary =
+      attached[fileIndex]?.templateFileBase64 ||
+      (fileIndex === 0
+        ? log.templateFileBase64 || tpl?.templateFileBase64
+        : attached[1]?.templateFileBase64 || log.templateFileBase64 || tpl?.templateFileBase64);
+
+    if (binary && log.fieldsData) {
+      try {
+        const label = isTtd ? "Dengan TTD & Stempel" : "Tanpa TTD (Cap Basah)";
+        showToast(`Sedang membuat PDF (${label}) dari template asli...`);
+        await downloadDocxAsPdf(binary, log.fieldsData, fileName);
+        showToast(`PDF (${label}) berhasil diunduh sesuai template asli!`);
+        return;
+      } catch (err) {
+        console.warn("Gagal render PDF dari docx template, fallback ke PDF builder:", err);
+      }
+    }
+
     if (!tpl || !log.renderedText) {
       showToast("Data surat tidak tersedia untuk re-download PDF.");
       return;
     }
-    const cleanNomor = log.nomorSurat.replace(/[/\\?%*:|"<>]/g, "-");
-    const fileName = `${cleanNomor}_${log.jamaahNama.replace(/\s+/g, "_")}.pdf`;
+
     await downloadOfficialLetterPdf(
       {
         template: tpl,
@@ -1730,8 +1746,8 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
                                       <button
                                         type="button"
                                         className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors shadow-2xs cursor-pointer"
-                                        onClick={() => handleHistoryRedownloadPdf(log)}
-                                        title="Download PDF Standar"
+                                        onClick={() => handleHistoryRedownloadPdf(log, variant.fileIndex)}
+                                        title={`Download PDF - ${variant.label}`}
                                       >
                                         <Download className="h-3.5 w-3.5 text-slate-500" />
                                         <span>PDF</span>
@@ -1874,10 +1890,10 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
                   onClick={() => {
                     if (previewModalLog) handleHistoryRedownloadPdf(previewModalLog);
                   }}
-                  title="Download PDF Standar"
+                  title="Download PDF sesuai format template asli"
                 >
                   <Download className="mr-1.5 h-3.5 w-3.5" />
-                  PDF Standar
+                  PDF (.pdf - Asli)
                 </Button>
 
                 <Button

@@ -542,28 +542,36 @@ export default function OfficialLetterPreview({
           <p className="text-xs font-bold text-stone-950">{parsed.signature.jabatan}</p>
           <p className="text-xs font-black tracking-wide text-stone-950">{parsed.signature.instansi}</p>
 
-          <div className="h-20 flex items-center justify-center relative my-1">
-            {/* Real Signature Image */}
-            <img
-              src="/images/signature-faisal.png"
-              alt="Tanda Tangan Pimpinan"
-              className="h-16 w-auto object-contain z-10 opacity-90"
-              onError={(e) => {
-                (e.currentTarget as HTMLImageElement).style.display = "none";
-              }}
-            />
+          {selectedDocIndex === 1 && (template.attachedFiles?.length || 0) > 1 ? (
+            <div className="h-20 flex flex-col items-center justify-center relative my-1 border border-dashed border-stone-300 rounded-lg bg-stone-50/40 p-2 text-center">
+              <span className="text-[10px] text-stone-500 font-sans italic">
+                (Ruang Tanda Tangan Fisik &amp; Cap Basah)
+              </span>
+            </div>
+          ) : (
+            <div className="h-20 flex items-center justify-center relative my-1">
+              {/* Real Signature Image */}
+              <img
+                src="/images/signature-faisal.png"
+                alt="Tanda Tangan Pimpinan"
+                className="h-16 w-auto object-contain z-10 opacity-90"
+                onError={(e) => {
+                  (e.currentTarget as HTMLImageElement).style.display = "none";
+                }}
+              />
 
-            {/* Official Stempel */}
-            {template.penandatangan?.showStempel && (
-              <div className="absolute inset-0 flex items-center justify-center opacity-75 pointer-events-none z-20">
-                <div className="w-20 h-20 rounded-full border-2 border-dashed border-red-600 flex flex-col items-center justify-center text-[7.5px] font-black text-red-600 rotate-[-12deg] bg-red-500/5 shadow-2xs">
-                  <span>PT. VAUZA</span>
-                  <span>{isTamma ? "TAMMA ABADI" : "TRIKARSA UTAMA"}</span>
-                  <span className="text-[6px] tracking-widest mt-0.5">{isTamma ? "MALANG" : "SIDOARJO"}</span>
+              {/* Official Stempel */}
+              {template.penandatangan?.showStempel && (
+                <div className="absolute inset-0 flex items-center justify-center opacity-75 pointer-events-none z-20">
+                  <div className="w-20 h-20 rounded-full border-2 border-dashed border-red-600 flex flex-col items-center justify-center text-[7.5px] font-black text-red-600 rotate-[-12deg] bg-red-500/5 shadow-2xs">
+                    <span>PT. VAUZA</span>
+                    <span>{isTamma ? "TAMMA ABADI" : "TRIKARSA UTAMA"}</span>
+                    <span className="text-[6px] tracking-widest mt-0.5">{isTamma ? "MALANG" : "SIDOARJO"}</span>
+                  </div>
                 </div>
-              </div>
-            )}
-          </div>
+              )}
+            </div>
+          )}
 
           <p className="font-bold underline uppercase text-stone-950 tracking-wider text-xs">
             {parsed.signature.nama}
