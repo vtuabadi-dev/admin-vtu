@@ -128,7 +128,7 @@ function getPackageProgramType(pkg: Keberangkatan): string {
   if (typeName && typeof typeName === "string" && typeName.trim()) {
     const upper = typeName.trim().toUpperCase();
     if (upper.includes("PLUS")) return upper;
-    if (upper.includes("REGULER") || upper === "REG") return "UMROH REGULER";
+    if (upper.includes("REGULER") || upper === "REG" || upper.includes("PAKET UMROH") || upper === "PAKET") return "UMROH REGULER";
     if (upper.includes("RAMADHAN")) return "UMROH RAMADHAN";
     if (upper.includes("SYAWAL")) return "UMROH SYAWAL";
     if (upper.includes("HAJI")) return "HAJI PLUS / FURODA";
@@ -2390,39 +2390,40 @@ function ManifestPageContent() {
       ) : (
         /* MANIFEST CARDS VIEW (All Manifests Summary List) */
         <div className="space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-gradient-to-r from-teal-50 via-emerald-50/40 to-amber-50/60 dark:from-slate-900 dark:via-teal-950/30 dark:to-slate-900 p-4 rounded-xl border border-teal-500/35 dark:border-teal-600/30 shadow-sm">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-teal-500 to-emerald-600 text-white flex items-center justify-center font-bold text-lg shadow-md shadow-teal-500/25 shrink-0">
-                <Layers className="h-5 w-5 text-white" />
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 md:p-4.5 rounded-2xl border-2 border-emerald-600/70 dark:border-emerald-500/50 bg-gradient-to-r from-emerald-200/95 via-teal-100 to-amber-100/70 dark:from-slate-900 dark:via-emerald-950/40 dark:to-slate-900 shadow-[inset_0_2.5px_4px_rgba(255,255,255,0.95),inset_0_-2.5px_4px_rgba(4,120,87,0.3),0_8px_24px_-4px_rgba(4,120,87,0.3)]">
+            <div className="flex items-center gap-3.5">
+              <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-emerald-600 via-emerald-700 to-teal-900 text-white flex items-center justify-center font-bold text-lg shadow-[inset_0_2px_3px_rgba(255,255,255,0.5),0_4px_12px_rgba(4,120,87,0.45)] border border-amber-300 shrink-0">
+                <Layers className="w-6 h-6 text-amber-300 drop-shadow-[0_2px_3px_rgba(0,0,0,0.3)]" />
               </div>
               <div>
-                <h2 className="text-base font-black text-slate-900 dark:text-white flex items-center gap-2 tracking-tight">
+                <h2 className="text-base font-black text-emerald-950 dark:text-white flex items-center gap-2.5 tracking-tight drop-shadow-[0_1px_0_rgba(255,255,255,0.8)] dark:drop-shadow-none">
                   {activeManifestView === "pembayaran"
                     ? "Pilih Paket untuk Melihat Manifest Pembayaran & Rincian Tagihan"
                     : "Daftar Paket Keberangkatan & Manifest"}
-                  <span className="text-[10px] bg-teal-600 text-white font-extrabold px-2 py-0.5 rounded-full shadow-2xs">AKTIF</span>
+                  <span className="text-[10px] bg-gradient-to-b from-amber-400 to-amber-600 text-slate-950 font-black px-2.5 py-0.5 rounded-full shadow-[inset_0_1px_2px_rgba(255,255,255,0.6),0_2px_4px_rgba(180,83,9,0.35)] border border-amber-300">AKTIF</span>
                 </h2>
-                <p className="text-xs text-teal-900/80 dark:text-teal-300/80 font-semibold mt-0.5">
+                <p className="text-xs text-emerald-900 dark:text-emerald-300 font-extrabold mt-0.5 flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-700 animate-pulse"></span>
                   {activeManifestView === "pembayaran"
                     ? "Pilih salah satu paket di bawah ini untuk membuka detail rincian tagihan & rekapan kas jamaah"
                     : `Total ${keberangkatanList.length} Paket Keberangkatan Terdaftar • Musim 1447H / 2026M`}
                 </p>
               </div>
             </div>
-            <div className="flex items-center gap-1.5 p-1 bg-white/90 dark:bg-slate-950 backdrop-blur rounded-xl border border-teal-300 dark:border-teal-700/60 shadow-sm shrink-0">
+            <div className="flex items-center gap-1.5 p-1.5 bg-gradient-to-b from-white to-emerald-50 dark:bg-slate-950 rounded-xl border-2 border-emerald-500/40 dark:border-emerald-700/60 shadow-[inset_0_2px_4px_rgba(0,0,0,0.06),0_2px_6px_rgba(0,0,0,0.04)] shrink-0">
               <button
                 onClick={() => {
                   setActiveManifestView("operasional");
                   router.push("/admin/manifest");
                 }}
                 className={cn(
-                  "px-3.5 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer",
+                  "px-4 py-2 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer active:scale-95",
                   activeManifestView === "operasional"
-                    ? "bg-gradient-to-r from-teal-600 to-emerald-600 text-white shadow-md shadow-teal-600/30"
-                    : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+                    ? "bg-gradient-to-b from-emerald-600 via-emerald-700 to-teal-800 text-white shadow-[inset_0_1.5px_1px_rgba(255,255,255,0.6),0_3px_8px_rgba(4,120,87,0.45)] border border-emerald-400/50"
+                    : "text-emerald-950 dark:text-emerald-300 hover:bg-emerald-100/70 dark:hover:bg-emerald-950/40"
                 )}
               >
-                <Plane className={cn("w-3.5 h-3.5", activeManifestView === "operasional" ? "text-amber-300" : "text-slate-400")} />
+                <Plane className={cn("w-3.5 h-3.5", activeManifestView === "operasional" ? "text-amber-300 drop-shadow-[0_1px_2px_rgba(0,0,0,0.3)]" : "text-emerald-700 dark:text-emerald-400")} />
                 <span>Manifest Operasional</span>
               </button>
               <button
@@ -2431,13 +2432,13 @@ function ManifestPageContent() {
                   router.push("/admin/manifest?type=pembayaran");
                 }}
                 className={cn(
-                  "px-3.5 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer",
+                  "px-4 py-2 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer active:scale-95",
                   activeManifestView === "pembayaran"
-                    ? "bg-gradient-to-r from-amber-500 to-amber-600 text-white shadow-md shadow-amber-500/30"
-                    : "text-amber-900 dark:text-amber-300 hover:text-amber-950 dark:hover:text-white hover:bg-amber-50/60 dark:hover:bg-amber-950/40"
+                    ? "bg-gradient-to-b from-amber-500 via-amber-600 to-amber-700 text-slate-950 font-black shadow-[inset_0_1.5px_1px_rgba(255,255,255,0.6),0_3px_8px_rgba(180,83,9,0.45)] border border-amber-300"
+                    : "text-emerald-950 dark:text-emerald-300 hover:bg-emerald-100/70 dark:hover:bg-emerald-950/40"
                 )}
               >
-                <CreditCard className={cn("w-3.5 h-3.5", activeManifestView === "pembayaran" ? "text-white" : "text-amber-500")} />
+                <CreditCard className={cn("w-3.5 h-3.5", activeManifestView === "pembayaran" ? "text-slate-950" : "text-emerald-700 dark:text-emerald-400")} />
                 <span>Manifest Pembayaran</span>
               </button>
             </div>
