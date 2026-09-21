@@ -2308,34 +2308,39 @@ function ManifestPageContent() {
       ) : (
         /* MANIFEST CARDS VIEW (All Manifests Summary List) */
         <div className="space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-stone-900/60 p-4 rounded-xl border border-stone-800">
-            <div>
-              <h2 className="text-base font-bold text-foreground flex items-center gap-2">
-                <Layers className="h-4 w-4 text-amber-500" />
-                {activeManifestView === "pembayaran"
-                  ? "Pilih Paket untuk Melihat Manifest Pembayaran & Rincian Tagihan"
-                  : "Daftar Paket Keberangkatan & Manifest"}
-              </h2>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                {activeManifestView === "pembayaran"
-                  ? "Pilih salah satu paket di bawah ini untuk membuka detail rincian tagihan & rekapan kas jamaah"
-                  : `Total ${keberangkatanList.length} Paket Keberangkatan Terdaftar`}
-              </p>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-gradient-to-r from-teal-50 via-emerald-50/40 to-amber-50/60 dark:from-slate-900 dark:via-teal-950/30 dark:to-slate-900 p-4 rounded-xl border border-teal-500/35 dark:border-teal-600/30 shadow-sm">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-teal-500 to-emerald-600 text-white flex items-center justify-center font-bold text-lg shadow-md shadow-teal-500/25 shrink-0">
+                <Layers className="h-5 w-5 text-white" />
+              </div>
+              <div>
+                <h2 className="text-base font-black text-slate-900 dark:text-white flex items-center gap-2 tracking-tight">
+                  {activeManifestView === "pembayaran"
+                    ? "Pilih Paket untuk Melihat Manifest Pembayaran & Rincian Tagihan"
+                    : "Daftar Paket Keberangkatan & Manifest"}
+                  <span className="text-[10px] bg-teal-600 text-white font-extrabold px-2 py-0.5 rounded-full shadow-2xs">AKTIF</span>
+                </h2>
+                <p className="text-xs text-teal-900/80 dark:text-teal-300/80 font-semibold mt-0.5">
+                  {activeManifestView === "pembayaran"
+                    ? "Pilih salah satu paket di bawah ini untuk membuka detail rincian tagihan & rekapan kas jamaah"
+                    : `Total ${keberangkatanList.length} Paket Keberangkatan Terdaftar • Musim 1447H / 2026M`}
+                </p>
+              </div>
             </div>
-            <div className="flex items-center gap-1.5 p-1 bg-stone-950 rounded-lg border border-stone-800 shrink-0">
+            <div className="flex items-center gap-1.5 p-1 bg-white/90 dark:bg-slate-950 backdrop-blur rounded-xl border border-teal-300 dark:border-teal-700/60 shadow-sm shrink-0">
               <button
                 onClick={() => {
                   setActiveManifestView("operasional");
                   router.push("/admin/manifest");
                 }}
                 className={cn(
-                  "px-3 py-1.5 rounded-md text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer",
+                  "px-3.5 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer",
                   activeManifestView === "operasional"
-                    ? "bg-stone-800 text-white shadow-xs border border-stone-700"
-                    : "text-stone-400 hover:text-white"
+                    ? "bg-gradient-to-r from-teal-600 to-emerald-600 text-white shadow-md shadow-teal-600/30"
+                    : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
                 )}
               >
-                <Plane className="w-3.5 h-3.5 text-emerald-400" />
+                <Plane className={cn("w-3.5 h-3.5", activeManifestView === "operasional" ? "text-amber-300" : "text-slate-400")} />
                 <span>Manifest Operasional</span>
               </button>
               <button
@@ -2344,13 +2349,13 @@ function ManifestPageContent() {
                   router.push("/admin/manifest?type=pembayaran");
                 }}
                 className={cn(
-                  "px-3 py-1.5 rounded-md text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer",
+                  "px-3.5 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer",
                   activeManifestView === "pembayaran"
-                    ? "bg-emerald-950 text-emerald-300 shadow-xs border border-emerald-700/60"
-                    : "text-stone-400 hover:text-white"
+                    ? "bg-gradient-to-r from-amber-500 to-amber-600 text-white shadow-md shadow-amber-500/30"
+                    : "text-amber-900 dark:text-amber-300 hover:text-amber-950 dark:hover:text-white hover:bg-amber-50/60 dark:hover:bg-amber-950/40"
                 )}
               >
-                <CreditCard className="w-3.5 h-3.5 text-amber-400" />
+                <CreditCard className={cn("w-3.5 h-3.5", activeManifestView === "pembayaran" ? "text-white" : "text-amber-500")} />
                 <span>Manifest Pembayaran</span>
               </button>
             </div>
@@ -2359,23 +2364,25 @@ function ManifestPageContent() {
           {/* Month Filter Tabs (Only shown when no specific package is selected in the top filter) */}
           {groupedByMonth.length > 0 && (
             <div className="flex items-center gap-2 overflow-x-auto pb-1 pt-1 no-scrollbar scroll-smooth">
-              <div className="flex items-center gap-1.5 p-1 bg-stone-900/90 dark:bg-stone-900/90 backdrop-blur-md rounded-xl border border-stone-800 shadow-md">
+              <div className="flex items-center gap-2 p-1.5 bg-gradient-to-r from-teal-100/70 via-white to-emerald-100/60 dark:from-slate-900 dark:via-slate-850 dark:to-slate-900 rounded-xl border border-teal-400/40 dark:border-teal-700/50 shadow-sm">
                 <button
                   type="button"
                   onClick={() => setSelectedMonthTab("ALL")}
                   className={cn(
-                    "px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-2 cursor-pointer whitespace-nowrap",
+                    "px-4 py-2 rounded-lg text-xs font-black transition-all flex items-center gap-2 cursor-pointer whitespace-nowrap shrink-0",
                     selectedMonthTab === "ALL"
-                      ? "bg-gradient-to-r from-teal-600 to-emerald-600 text-white shadow-md shadow-teal-950/50 border border-teal-400/40"
-                      : "text-stone-400 hover:text-stone-200 hover:bg-stone-800/60"
+                      ? "bg-gradient-to-r from-teal-600 via-emerald-600 to-teal-700 text-white shadow-md shadow-teal-600/30 border border-teal-400/30"
+                      : "text-teal-950 dark:text-teal-200 hover:text-teal-900 bg-white/90 dark:bg-slate-800/80 hover:bg-white dark:hover:bg-slate-800 border border-teal-200/90 dark:border-teal-800/60 shadow-2xs"
                   )}
                 >
-                  <CalendarDays className={cn("w-3.5 h-3.5", selectedMonthTab === "ALL" ? "text-amber-300" : "text-stone-400")} />
+                  <CalendarDays className={cn("w-3.5 h-3.5", selectedMonthTab === "ALL" ? "text-amber-300" : "text-teal-600 dark:text-teal-400")} />
                   <span>Semua Bulan</span>
                   <span
                     className={cn(
-                      "text-[10px] px-1.5 py-0.5 rounded-full font-mono font-semibold",
-                      selectedMonthTab === "ALL" ? "bg-white/20 text-white" : "bg-stone-800 text-stone-400"
+                      "text-[10px] px-2 py-0.5 rounded-full font-mono font-black shadow-2xs",
+                      selectedMonthTab === "ALL"
+                        ? "bg-amber-400 text-teal-950"
+                        : "bg-teal-50 dark:bg-teal-900/60 text-teal-800 dark:text-teal-300 border border-teal-200 dark:border-teal-800/60"
                     )}
                   >
                     {totalAllPackagesCount} Paket
@@ -2390,18 +2397,20 @@ function ManifestPageContent() {
                       type="button"
                       onClick={() => setSelectedMonthTab(label)}
                       className={cn(
-                        "px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-2 cursor-pointer whitespace-nowrap",
+                        "px-3.5 py-2 rounded-lg text-xs font-extrabold transition-all flex items-center gap-2 cursor-pointer whitespace-nowrap shrink-0",
                         isActive
-                          ? "bg-gradient-to-r from-teal-600 to-emerald-600 text-white shadow-md shadow-teal-950/50 border border-teal-400/40"
-                          : "text-stone-400 hover:text-stone-200 hover:bg-stone-800/60"
+                          ? "bg-gradient-to-r from-teal-600 via-emerald-600 to-teal-700 text-white shadow-md shadow-teal-600/30 border border-teal-400/30"
+                          : "text-teal-950 dark:text-teal-200 hover:text-teal-900 bg-white/90 dark:bg-slate-800/80 hover:bg-white dark:hover:bg-slate-800 border border-teal-200/90 dark:border-teal-800/60 shadow-2xs"
                       )}
                     >
-                      <CalendarDays className={cn("w-3.5 h-3.5", isActive ? "text-amber-300" : "text-stone-400")} />
+                      <CalendarDays className={cn("w-3.5 h-3.5", isActive ? "text-amber-300" : "text-teal-600 dark:text-teal-400")} />
                       <span>{label}</span>
                       <span
                         className={cn(
-                          "text-[10px] px-1.5 py-0.5 rounded-full font-mono font-semibold",
-                          isActive ? "bg-white/20 text-white" : "bg-stone-800 text-stone-400"
+                          "text-[10px] px-2 py-0.5 rounded-full font-mono font-bold",
+                          isActive
+                            ? "bg-amber-400 text-teal-950 font-black shadow-2xs"
+                            : "bg-teal-50 dark:bg-teal-900/60 text-teal-800 dark:text-teal-300 border border-teal-200 dark:border-teal-800/60"
                         )}
                       >
                         {items.length} Paket
@@ -2431,15 +2440,15 @@ function ManifestPageContent() {
                 <div key={label} className="space-y-4">
                   {/* Aesthetic Month Divider Line with Center Badge */}
                   <div className="relative flex items-center justify-center my-6 py-2">
-                    <div className="flex-grow border-t border-amber-500/30 dark:border-amber-500/20 bg-gradient-to-r from-transparent via-amber-500/40 to-amber-500/10 h-[1px]"></div>
-                    <div className="flex items-center gap-2 px-4 py-1.5 rounded-full bg-stone-900 border border-amber-500/40 text-amber-300 font-extrabold text-xs tracking-wider uppercase shadow-md shrink-0">
-                      <CalendarDays className="h-3.5 w-3.5 text-amber-400" />
+                    <div className="flex-grow border-t border-teal-400 dark:border-teal-500/40 bg-gradient-to-r from-transparent via-teal-500 via-amber-400 to-transparent h-[2px] drop-shadow-[0_0_4px_rgba(20,184,166,0.6)]"></div>
+                    <div className="flex items-center gap-2 px-5 py-2 rounded-full bg-gradient-to-r from-teal-700 via-emerald-600 to-teal-800 dark:from-teal-800 dark:via-emerald-700 dark:to-teal-900 text-white font-black text-xs tracking-wider uppercase shadow-md shadow-teal-700/30 border-2 border-amber-400 shrink-0">
+                      <CalendarDays className="h-3.5 w-3.5 text-amber-300" />
                       <span>KEBERANGKATAN {label}</span>
-                      <span className="ml-1 bg-amber-500/20 text-amber-400 text-[10px] px-2 py-0.5 rounded-full font-mono">
+                      <span className="ml-1 bg-amber-400 text-teal-950 text-[10px] px-2.5 py-0.5 rounded-full font-mono font-black shadow-2xs">
                         {items.length} Paket
                       </span>
                     </div>
-                    <div className="flex-grow border-t border-amber-500/30 dark:border-amber-500/20 bg-gradient-to-l from-transparent via-amber-500/40 to-amber-500/10 h-[1px]"></div>
+                    <div className="flex-grow border-t border-teal-400 dark:border-teal-500/40 bg-gradient-to-l from-transparent via-teal-500 via-amber-400 to-transparent h-[2px] drop-shadow-[0_0_4px_rgba(20,184,166,0.6)]"></div>
                   </div>
 
                   {/* Month's Package Cards - UNIFIED MASTER CONTAINER (MENEMPEL SEPERTI TABEL) */}
