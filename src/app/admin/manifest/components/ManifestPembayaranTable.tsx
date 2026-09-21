@@ -1044,7 +1044,7 @@ PT VAUZA TAMMA ABADI`;
                 {/* Fixed Sticky Left Group Header (No + Nama) */}
                 <th
                   colSpan={2}
-                  className="bg-slate-900 border-r-2 border-r-stone-500 dark:border-r-stone-600 px-3 py-2 text-center sticky left-0 z-40 shadow-[4px_0_8px_-2px_rgba(0,0,0,0.3)]"
+                  className="bg-slate-900 px-3 py-2 text-center sticky left-0 z-40 shadow-[inset_-2.5px_0_0_0_#292524,4px_0_8px_-2px_rgba(0,0,0,0.3)] dark:shadow-[inset_-2.5px_0_0_0_#78716c,4px_0_8px_-2px_rgba(0,0,0,0.3)]"
                 >
                   {viewMode === "group" ? "IDENTITAS PIC & GRUP" : "IDENTITAS JAMAAH"}
                 </th>
@@ -1098,7 +1098,7 @@ PT VAUZA TAMMA ABADI`;
                 </th>
 
                 {/* Sticky Left: Nama Jamaah / PIC */}
-                <th className="px-3 py-2.5 min-w-[220px] max-w-[280px] border-r-2 border-r-stone-400 dark:border-r-stone-600 sticky left-[48px] z-40 bg-stone-100 dark:bg-stone-900 shadow-[4px_0_8px_-2px_rgba(0,0,0,0.12)]">
+                <th className="px-3 py-2.5 min-w-[220px] max-w-[280px] sticky left-[48px] z-40 bg-stone-100 dark:bg-stone-900 shadow-[inset_-2.5px_0_0_0_#292524,4px_0_8px_-2px_rgba(0,0,0,0.12)] dark:shadow-[inset_-2.5px_0_0_0_#78716c,4px_0_8px_-2px_rgba(0,0,0,0.25)]">
                   {viewMode === "group" ? "NAMA PIC & GRUP" : "NAMA JAMAAH"}
                 </th>
 
@@ -1173,7 +1173,7 @@ PT VAUZA TAMMA ABADI`;
                       </td>
 
                       {/* Sticky Left: Nama Jamaah / PIC (100% Solid Opaque, locked offset at left-[48px]) */}
-                      <td className={cn("px-3 py-2.5 border-r-2 border-r-stone-400 dark:border-r-stone-600 sticky left-[48px] z-20 shadow-[4px_0_8px_-2px_rgba(0,0,0,0.08)] min-w-[220px] max-w-[280px]", stickyCellBg, rowBorderClass)}>
+                      <td className={cn("px-3 py-2.5 sticky left-[48px] z-20 shadow-[inset_-2.5px_0_0_0_#292524,4px_0_8px_-2px_rgba(0,0,0,0.12)] dark:shadow-[inset_-2.5px_0_0_0_#78716c,4px_0_8px_-2px_rgba(0,0,0,0.25)] min-w-[220px] max-w-[280px]", stickyCellBg, rowBorderClass)}>
                         {viewMode === "group" ? (
                           <div>
                             <div className="flex items-center gap-1.5 flex-wrap">
@@ -1436,7 +1436,7 @@ PT VAUZA TAMMA ABADI`;
                     ∑
                   </td>
                   {/* Sticky Left: Total Pax / Grup */}
-                  <td className="px-3 py-3 border-r-2 border-r-stone-400 dark:border-r-stone-600 sticky left-[48px] z-40 bg-stone-100 dark:bg-stone-900 font-sans shadow-[4px_0_8px_-2px_rgba(0,0,0,0.12)] min-w-[220px] max-w-[280px]">
+                  <td className="px-3 py-3 sticky left-[48px] z-40 bg-stone-100 dark:bg-stone-900 font-sans shadow-[inset_-2.5px_0_0_0_#292524,4px_0_8px_-2px_rgba(0,0,0,0.12)] dark:shadow-[inset_-2.5px_0_0_0_#78716c,4px_0_8px_-2px_rgba(0,0,0,0.25)] min-w-[220px] max-w-[280px]">
                     TOTAL {filteredRows.length} {viewMode === "group" ? "GRUP" : "PAX"}
                   </td>
                   <td className="px-3 py-3 border-r border-r-stone-200 dark:border-r-stone-800 font-sans text-[11px] text-muted-foreground">-</td>
