@@ -2522,67 +2522,67 @@ function ManifestPageContent() {
                                 </h3>
                               </div>
                               
-                              <div className="space-y-1.5 text-xs">
-                                {/* SBY (FIRST) */}
-                                {sbyPkg ? (
-                                  <div className="bg-teal-50/80 dark:bg-teal-950/40 border border-teal-500/25 rounded-md p-1.5 space-y-0.5">
-                                    <div className="flex items-center justify-between font-bold text-teal-950 dark:text-teal-200">
-                                      <span className="flex items-center gap-1">
-                                        <span className="w-1.5 h-1.5 rounded-full bg-teal-500"></span>
-                                        Starting Surabaya (SUB)
-                                      </span>
-                                      <span className="text-[10px] text-teal-700 dark:text-teal-300 font-bold bg-teal-200/60 dark:bg-teal-800/60 px-1.5 rounded">
-                                        {calculateDurationDays(sbyPkg.tanggalBerangkat, sbyPkg.tanggalPulang)} H
-                                      </span>
+                                <div className="space-y-1.5 text-xs">
+                                  {/* SBY (FIRST) */}
+                                  {sbyPkg ? (
+                                    <div className="bg-gradient-to-b from-white via-teal-50/70 to-teal-100/50 dark:from-teal-950/60 dark:to-teal-900/40 border border-teal-500/35 dark:border-teal-600/40 rounded-lg p-2 space-y-1 shadow-[0_2px_4px_rgba(13,148,136,0.12),0_1px_2px_rgba(0,0,0,0.04),inset_0_1px_0_rgba(255,255,255,0.9)] dark:shadow-[0_2px_4px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.06)]">
+                                      <div className="flex items-center justify-between font-bold text-teal-950 dark:text-teal-200">
+                                        <span className="flex items-center gap-1.5">
+                                          <span className="w-2 h-2 rounded-full bg-teal-500 shadow-2xs"></span>
+                                          Starting Surabaya (SUB)
+                                        </span>
+                                        <span className="text-[10px] text-teal-800 dark:text-teal-200 font-bold bg-teal-200/80 dark:bg-teal-800/80 px-1.5 py-0.5 rounded shadow-2xs">
+                                          {calculateDurationDays(sbyPkg.tanggalBerangkat, sbyPkg.tanggalPulang)} H
+                                        </span>
+                                      </div>
+                                      <div className="flex items-center justify-between text-[11px] text-teal-800 dark:text-teal-300/90 pl-3.5">
+                                        <span className="font-mono font-semibold">{sbyPkg.kode}</span>
+                                        <span className="text-[10px] text-teal-600 dark:text-teal-400 font-medium">
+                                          {formatFlightDate(sbyPkg.tanggalBerangkat)} - {formatFlightDate(sbyPkg.tanggalPulang)}
+                                        </span>
+                                      </div>
                                     </div>
-                                    <div className="flex items-center justify-between text-[11px] text-teal-800 dark:text-teal-300/90 pl-2.5">
-                                      <span className="font-mono font-semibold">{sbyPkg.kode}</span>
-                                      <span className="text-[10px] text-teal-600 dark:text-teal-400">
-                                        {formatFlightDate(sbyPkg.tanggalBerangkat)} - {formatFlightDate(sbyPkg.tanggalPulang)}
-                                      </span>
-                                    </div>
-                                  </div>
-                                ) : null}
+                                  ) : null}
 
-                                {/* JKT (SECOND) */}
-                                {jktPkg ? (
-                                  <div className="bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/60 rounded-md p-1.5 space-y-0.5">
-                                    <div className="flex items-center justify-between font-bold text-slate-800 dark:text-slate-200">
-                                      <span className="flex items-center gap-1">
-                                        <span className="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
-                                        Starting Jakarta (CGK)
-                                      </span>
-                                      <span className="text-[10px] text-slate-600 dark:text-slate-300 font-bold bg-slate-200/80 dark:bg-slate-700/80 px-1.5 rounded">
-                                        {calculateDurationDays(jktPkg.tanggalBerangkat, jktPkg.tanggalPulang)} H
-                                      </span>
+                                  {/* JKT (SECOND) */}
+                                  {jktPkg ? (
+                                    <div className="bg-gradient-to-b from-white via-slate-50/90 to-slate-100/80 dark:from-slate-800/90 dark:to-slate-900/90 border border-slate-300/90 dark:border-slate-700 rounded-lg p-2 space-y-1 shadow-[0_2px_4px_rgba(0,0,0,0.08),0_1px_2px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,1)] dark:shadow-[0_2px_4px_rgba(0,0,0,0.35),inset_0_1px_0_rgba(255,255,255,0.07)]">
+                                      <div className="flex items-center justify-between font-bold text-slate-800 dark:text-slate-200">
+                                        <span className="flex items-center gap-1.5">
+                                          <span className="w-2 h-2 rounded-full bg-slate-400 shadow-2xs"></span>
+                                          Starting Jakarta (CGK)
+                                        </span>
+                                        <span className="text-[10px] text-slate-700 dark:text-slate-200 font-bold bg-slate-200/90 dark:bg-slate-700 px-1.5 py-0.5 rounded shadow-2xs">
+                                          {calculateDurationDays(jktPkg.tanggalBerangkat, jktPkg.tanggalPulang)} H
+                                        </span>
+                                      </div>
+                                      <div className="flex items-center justify-between text-[11px] text-slate-700 dark:text-slate-300/90 pl-3.5">
+                                        <span className="font-mono font-semibold">{jktPkg.kode}</span>
+                                        <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">
+                                          {formatFlightDate(jktPkg.tanggalBerangkat)} - {formatFlightDate(jktPkg.tanggalPulang)}
+                                        </span>
+                                      </div>
                                     </div>
-                                    <div className="flex items-center justify-between text-[11px] text-slate-700 dark:text-slate-300/90 pl-2.5">
-                                      <span className="font-mono font-semibold">{jktPkg.kode}</span>
-                                      <span className="text-[10px] text-slate-500 dark:text-slate-400">
-                                        {formatFlightDate(jktPkg.tanggalBerangkat)} - {formatFlightDate(jktPkg.tanggalPulang)}
-                                      </span>
+                                  ) : !sbyPkg ? (
+                                    <div className="bg-gradient-to-b from-white via-teal-50/70 to-teal-100/50 dark:from-teal-950/60 dark:to-teal-900/40 border border-teal-500/35 dark:border-teal-600/40 rounded-lg p-2 space-y-1 shadow-[0_2px_4px_rgba(13,148,136,0.12),0_1px_2px_rgba(0,0,0,0.04),inset_0_1px_0_rgba(255,255,255,0.9)] dark:shadow-[0_2px_4px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.06)]">
+                                      <div className="flex items-center justify-between font-bold text-teal-950 dark:text-teal-200">
+                                        <span className="flex items-center gap-1.5">
+                                          <span className="w-2 h-2 rounded-full bg-teal-500 shadow-2xs"></span>
+                                          {parent.namaPaket}
+                                        </span>
+                                        <span className="text-[10px] text-teal-800 dark:text-teal-200 font-bold bg-teal-200/80 dark:bg-teal-800/80 px-1.5 py-0.5 rounded shadow-2xs">
+                                          {calculateDurationDays(parent.tanggalBerangkat, parent.tanggalPulang)} H
+                                        </span>
+                                      </div>
+                                      <div className="flex items-center justify-between text-[11px] text-teal-800 dark:text-teal-300/90 pl-3.5">
+                                        <span className="font-mono font-semibold">{parent.kode}</span>
+                                        <span className="text-[10px] text-teal-600 dark:text-teal-400 font-medium">
+                                          {formatFlightDate(parent.tanggalBerangkat)} - {formatFlightDate(parent.tanggalPulang)}
+                                        </span>
+                                      </div>
                                     </div>
-                                  </div>
-                                ) : !sbyPkg ? (
-                                  <div className="bg-teal-50/80 dark:bg-teal-950/40 border border-teal-500/25 rounded-md p-1.5 space-y-0.5">
-                                    <div className="flex items-center justify-between font-bold text-teal-950 dark:text-teal-200">
-                                      <span className="flex items-center gap-1">
-                                        <span className="w-1.5 h-1.5 rounded-full bg-teal-500"></span>
-                                        {parent.namaPaket}
-                                      </span>
-                                      <span className="text-[10px] text-teal-700 dark:text-teal-300 font-bold bg-teal-200/60 dark:bg-teal-800/60 px-1.5 rounded">
-                                        {calculateDurationDays(parent.tanggalBerangkat, parent.tanggalPulang)} H
-                                      </span>
-                                    </div>
-                                    <div className="flex items-center justify-between text-[11px] text-teal-800 dark:text-teal-300/90 pl-2.5">
-                                      <span className="font-mono font-semibold">{parent.kode}</span>
-                                      <span className="text-[10px] text-teal-600 dark:text-teal-400">
-                                        {formatFlightDate(parent.tanggalBerangkat)} - {formatFlightDate(parent.tanggalPulang)}
-                                      </span>
-                                    </div>
-                                  </div>
-                                ) : null}
-                              </div>
+                                  ) : null}
+                                </div>
 
                               <div className="flex items-center flex-wrap gap-2 pt-0.5">
                                 {sbyPkg && jktPkg ? (
