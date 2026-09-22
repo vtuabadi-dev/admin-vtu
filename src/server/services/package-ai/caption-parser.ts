@@ -649,6 +649,7 @@ const KNOWN_ROUTE_CODES = [
 export function extractLandingRoute(caption: string): string | undefined {
   if (!caption) return undefined;
   const upper = caption.toUpperCase();
+  const hasThaif = /\bTH[AO]'?IF\b/i.test(upper) || /\bTA'?IF\b/i.test(upper);
 
   // 1. Direct match for known route codes
   for (const code of KNOWN_ROUTE_CODES) {
@@ -656,6 +657,33 @@ export function extractLandingRoute(caption: string): string | undefined {
     if (regex.test(upper)) {
       return code;
     }
+  }
+
+  // 1b. Match dash initials: J-M vs M-J (e.g. "RUTE J-M", "(M-J)", "RUTE M-J", "J - M")
+  // Rule: Initial after '-' is the Saudi take-off OUT route (J = Jeddah, M = Madinah)
+  if (/\bJ\s*-\s*M\b/i.test(upper) || /\(J\s*-\s*M\)/i.test(upper) || /\[J\s*-\s*M\]/i.test(upper)) {
+    return hasThaif ? "JED.TH-M" : "JED.C-M";
+  }
+  if (/\bM\s*-\s*J\b/i.test(upper) || /\(M\s*-\s*J\)/i.test(upper) || /\[M\s*-\s*J\]/i.test(upper)) {
+    return "MED-J";
+  }
+
+  // 1c. Match flight IATA pairs (e.g. "SUB-JED // MED-SUB" or "CGK-MED // JED-CGK")
+  const flightJedThenMed =
+    (/\bJED(?:DAH)?\b/i.test(upper) && /\bMED(?:INAH|INA)?\s*-(?:SUB|CGK|KNO|UPG|SOC|BPN|BDJ|KJT|AAP|DPS|LOP|PLM)\b/i.test(upper)) ||
+    (/\b(?:SUB|CGK|KNO|UPG|SOC|BPN|BDJ|KJT|AAP)-JED\b/i.test(upper) && /\bMED-/i.test(upper)) ||
+    /\bJED(?:DAH)?\b[\s\S]*?\b(?:OUT|PULANG|TAKE\s*OFF|KEPULANGAN)\s*(?:DARI\s*)?(?:VIA\s*)?(?:MADINAH|MEDINA|MED)\b/i.test(upper);
+
+  const flightMedThenJed =
+    (/\bMED(?:INAH|INA)?\b/i.test(upper) && /\bJED(?:DAH)?\s*-(?:SUB|CGK|KNO|UPG|SOC|BPN|BDJ|KJT|AAP|DPS|LOP|PLM)\b/i.test(upper)) ||
+    (/\b(?:SUB|CGK|KNO|UPG|SOC|BPN|BDJ|KJT|AAP)-MED\b/i.test(upper) && /\bJED-/i.test(upper)) ||
+    /\b(?:MADINAH|MEDINA|MED)\b[\s\S]*?\b(?:OUT|PULANG|TAKE\s*OFF|KEPULANGAN)\s*(?:DARI\s*)?(?:VIA\s*)?JED(?:DAH)?\b/i.test(upper);
+
+  if (flightMedThenJed) {
+    return "MED-J";
+  }
+  if (flightJedThenMed) {
+    return hasThaif ? "JED.TH-M" : "JED.C-M";
   }
 
   // 2. Explicit In - Out syntax (e.g. "Landing Jeddah Out Madinah", "Jeddah In - Madinah Out")
@@ -668,8 +696,6 @@ export function extractLandingRoute(caption: string): string | undefined {
                     /\bJED(?:DAH)?\s*(?:OUT|TAKE\s*OFF|PULANG)\b/i.test(upper);
   const outMadinah = /\b(?:OUT|PULANG|TAKE\s*OFF|KEPULANGAN)\s*(?:DARI\s*)?(?:VIA\s*)?(?:MADINAH|MEDINA|MEDINAH|MED)\b/i.test(upper) ||
                      /\b(?:MADINAH|MEDINA|MEDINAH|MED)\s*(?:OUT|TAKE\s*OFF|PULANG)\b/i.test(upper);
-
-  const hasThaif = /\bTH[AO]'?IF\b/i.test(upper) || /\bTA'?IF\b/i.test(upper);
 
   // Direct Madinah from Jeddah then Out Jeddah -> JED.D-J
   const directMadinah = /\bJED(?:DAH)?\s*(?:DIRECT\s*)?(?:LANGSUNG\s*)?(?:KE\s*)?(?:MADINAH|MEDINA|MEDINAH|MED)\b/i.test(upper);
