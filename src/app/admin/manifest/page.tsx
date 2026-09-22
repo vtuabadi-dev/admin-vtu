@@ -49,6 +49,20 @@ function isPromoVariant(k: any): boolean {
   return false;
 }
 
+function isSpekVariant(k: any): boolean {
+  if (!k) return false;
+  if (k.splitReason === "spek" || k.splitReason === "spesifikasi") return true;
+  if (k.splitReason === "starting_point" || k.splitReason === "starting") return false;
+  if (k.spekLabel && String(k.spekLabel).trim() !== "") return true;
+  return false;
+}
+
+function isSameFlightVariant(k: any): boolean {
+  if (!k) return false;
+  if (isStartingPointSplit(k)) return false;
+  return isPromoVariant(k) || isSpekVariant(k);
+}
+
 function isStartingPointSplit(k: any): boolean {
   if (!k) return false;
   if (k.splitReason === "starting_point" || k.splitReason === "starting") return true;
@@ -123,43 +137,28 @@ function getPackageStartingCity(pkg: Keberangkatan): { code: string; name: strin
 }
 
 function getPackageProgramType(pkg: Keberangkatan): string {
-  // 1. Check relation packageType if available
-  const typeName = (pkg as any).packageType?.name;
-  if (typeName && typeof typeName === "string" && typeName.trim()) {
-    const upper = typeName.trim().toUpperCase();
-    if (upper.includes("PLUS")) return upper;
-    if (upper.includes("REGULER") || upper === "REG" || upper.includes("PAKET UMROH") || upper === "PAKET") return "UMROH REGULER";
-    if (upper.includes("RAMADHAN")) return "UMROH RAMADHAN";
-    if (upper.includes("SYAWAL")) return "UMROH SYAWAL";
-    if (upper.includes("HAJI")) return "HAJI PLUS / FURODA";
-    if (upper.startsWith("UMROH")) return upper;
-    return `UMROH ${upper}`;
-  }
+  const typeName = (pkg as any).packageType?.name || "";
+  const text = `${typeName} ${pkg.namaPaket || ""} ${pkg.kode || ""}`.toUpperCase();
 
-  // 2. Derive from namaPaket or kode
-  const text = `${pkg.namaPaket || ""} ${pkg.kode || ""}`.toUpperCase();
-
-  if (text.includes("TURKI") || text.includes("TURKEY") || text.includes("ISTANBUL")) return "UMROH PLUS TURKI";
-  if (text.includes("DUBAI")) return "UMROH PLUS DUBAI";
-  if (text.includes("MESIR") || text.includes("CAIRO") || text.includes("KAIRO")) return "UMROH PLUS MESIR";
-  if (text.includes("AQSHA") || text.includes("AQSO") || text.includes("PALESTINA")) return "UMROH PLUS AQSHA";
-  if (text.includes("QATAR") || text.includes("DOHA")) return "UMROH PLUS QATAR";
-  if (text.includes("THAIF") || text.includes("THOIF")) return "UMROH PLUS THAIF";
-  if (text.includes("JORDAN") || text.includes("YORDANIA") || text.includes("PETRA")) return "UMROH PLUS JORDAN";
-  if (text.includes("OMAN") || text.includes("MUSCAT")) return "UMROH PLUS OMAN";
-  if (text.includes("UZBEKISTAN") || text.includes("TASHKENT") || text.includes("SAMARKAND")) return "UMROH PLUS UZBEKISTAN";
-  if (text.includes("EROPA") || text.includes("SPAIN") || text.includes("SPANYOL")) return "UMROH PLUS EROPA";
-  if (text.includes("MALAYSIA") || text.includes("KUALA LUMPUR")) return "UMROH PLUS MALAYSIA";
-  if (text.includes("SINGAPUR")) return "UMROH PLUS SINGAPURA";
-  if (text.includes("RAMADHAN") || text.includes("RAMADAN") || text.includes("LAILATUL QADAR")) return "UMROH RAMADHAN";
-  if (text.includes("SYAWAL") || text.includes("IDUL FITRI")) return "UMROH SYAWAL";
-  if (text.includes("HAJI")) return "HAJI PLUS / FURODA";
-  if (text.includes("VIP") || text.includes("EXECUTIVE")) return "UMROH VIP";
+  if (text.includes("TURKI") || text.includes("TURKEY") || text.includes("TURKIYE") || text.includes("ISTANBUL")) return "UMRAH PLUS TURKI";
+  if (text.includes("DUBAI")) return "UMRAH PLUS DUBAI";
+  if (text.includes("EROPA") || text.includes("EUROPE") || text.includes("EUROPA")) return "UMRAH PLUS EROPA";
+  if (text.includes("MESIR") || text.includes("CAIRO") || text.includes("KAIRO")) return "UMRAH PLUS MESIR";
+  if (text.includes("AQSHA") || text.includes("AQSO") || text.includes("PALESTINA")) return "UMRAH PLUS AQSHA";
+  if (text.includes("QATAR") || text.includes("DOHA")) return "UMRAH PLUS QATAR";
+  if (text.includes("THAIF") || text.includes("THOIF")) return "UMRAH PLUS THAIF";
+  if (text.includes("JORDAN") || text.includes("YORDANIA") || text.includes("PETRA")) return "UMRAH PLUS JORDAN";
+  if (text.includes("OMAN") || text.includes("MUSCAT")) return "UMRAH PLUS OMAN";
+  if (text.includes("UZBEKISTAN") || text.includes("TASHKENT") || text.includes("SAMARKAND")) return "UMRAH PLUS UZBEKISTAN";
+  if (text.includes("MALAYSIA") || text.includes("KUALA LUMPUR")) return "UMRAH PLUS MALAYSIA";
+  if (text.includes("SINGAPUR")) return "UMRAH PLUS SINGAPURA";
 
   const plusMatch = text.match(/PLUS\s+([A-Z]+)/);
-  if (plusMatch && plusMatch[1]) return `UMROH PLUS ${plusMatch[1]}`;
+  if (plusMatch && plusMatch[1]) {
+    return `UMRAH PLUS ${plusMatch[1]}`;
+  }
 
-  return "UMROH REGULER";
+  return "UMRAH REGULER";
 }
 
 function getPackageFlightSegments(pkg: Keberangkatan): FlightSegment[] {
@@ -885,16 +884,14 @@ function ManifestPageContent() {
       try { return new Date(d).toISOString().split("T")[0] || ""; } catch { return ""; }
     };
 
-    const getBaseCode = (code: string) => (code || "").replace(/_V\d+$/i, "").trim().toLowerCase();
+    const getBaseCode = (code: string) => (code || "").replace(/_V\d+$/i, "").replace(/[-_](SUB|CGK|SOC|KNO|UPG|KJT|SRG|YIA|BPN|PLM|PDG|BTJ|LOP)$/i, "").trim().toLowerCase();
 
     // 1. Identify true child split packages:
-    // PROMO variants (sama itinerary) -> child of parent
-    // STARTING POINT splits (beda itinerary) -> NOT a child of parent, but their OWN root manifest!
-    const isChildPromo = (k: Keberangkatan) => {
-      if (isStartingPointSplit(k)) return false; // Starting point is always a separate manifest
-      if (k.parentKeberangkatanId && isPromoVariant(k)) return true;
-      if (k.kode && /_V\d+$/i.test(k.kode)) return true;
-      if ((k as any).splitReason === "promo" || (k as any).promoLabel) return true;
+    // - PROMO / SPEK variants (sama itinerary) -> child of parent
+    // - STARTING POINT splits yang memiliki induk -> child of parent pada list kartu manifest
+    const isChildPackage = (k: Keberangkatan) => {
+      if (isSameFlightVariant(k)) return true;
+      if (k.parentKeberangkatanId) return true;
       return false;
     };
 
@@ -902,7 +899,7 @@ function ManifestPageContent() {
     const children: Keberangkatan[] = [];
 
     keberangkatanList.forEach((k) => {
-      if (isChildPromo(k)) {
+      if (isChildPackage(k)) {
         children.push(k);
       } else {
         roots.push(k);
@@ -910,7 +907,7 @@ function ManifestPageContent() {
       }
     });
 
-    // 2. Associate each promo child with its parent
+    // 2. Associate each child with its parent
     children.forEach((child) => {
       let matchedParent: Keberangkatan | undefined;
 
@@ -919,7 +916,12 @@ function ManifestPageContent() {
         matchedParent = parentMap.get(child.parentKeberangkatanId) || keberangkatanList.find((p) => p.id === child.parentKeberangkatanId);
       }
 
-      // Match by base code AND same departure date
+      // Match by paketGrupId if both belong to the same group
+      if (!matchedParent && (child as any).paketGrupId) {
+        matchedParent = roots.find((r) => (r as any).paketGrupId === (child as any).paketGrupId);
+      }
+
+      // Match by base code AND same departure date (or within 2 days for dual starting connecting flight)
       if (!matchedParent) {
         const childBaseCode = getBaseCode(child.kode);
         const childDate = getDateStr(child.tanggalBerangkat);
@@ -927,16 +929,18 @@ function ManifestPageContent() {
         matchedParent = roots.find((r) => {
           const rootBaseCode = getBaseCode(r.kode);
           const rootDate = getDateStr(r.tanggalBerangkat);
-          return rootBaseCode === childBaseCode && rootDate === childDate;
+          const dateClose = Math.abs(new Date(rootDate).getTime() - new Date(childDate).getTime()) <= 86400000 * 2;
+          return rootBaseCode === childBaseCode && dateClose;
         });
       }
 
-      // Match by same departure date and airline
+      // Match by same departure month and airline
       if (!matchedParent) {
         const childDate = getDateStr(child.tanggalBerangkat);
         matchedParent = roots.find((r) => {
           const rootDate = getDateStr(r.tanggalBerangkat);
-          return rootDate === childDate && r.maskapai === child.maskapai;
+          const dateClose = Math.abs(new Date(rootDate).getTime() - new Date(childDate).getTime()) <= 86400000 * 2;
+          return dateClose && r.maskapai === child.maskapai;
         });
       }
 
@@ -947,6 +951,7 @@ function ManifestPageContent() {
         childrenMap.get(matchedParent.id)!.push(child);
       } else {
         // Fallback: if no parent matched, treat as independent root
+        roots.push(child);
         parentMap.set(child.id, child);
       }
     });
@@ -1041,31 +1046,31 @@ function ManifestPageContent() {
     if (!activePackage) return [];
 
     const isCurrentStartingPoint = isStartingPointSplit(activePackage);
-    const isCurrentPromo = isPromoVariant(activePackage);
+    const isCurrentSameFlight = isSameFlightVariant(activePackage);
 
     const relatedPkgIds = new Set<string>();
     relatedPkgIds.add(activePackage.id);
 
     if (isCurrentStartingPoint) {
       // BEDA ITINERARY: Manifest Starting Point terpisah secara mandiri.
-      // Hanya menyertakan promo children di bawah starting point ini (jika ada).
+      // Hanya menyertakan same flight variants (promo / spek) di bawah starting point ini (jika ada).
       keberangkatanList.forEach((k) => {
-        if (k.parentKeberangkatanId === activePackage.id && isPromoVariant(k)) {
+        if (k.parentKeberangkatanId === activePackage.id && isSameFlightVariant(k)) {
           relatedPkgIds.add(k.id);
         }
       });
     } else {
-      // SATU ITINERARY: Manifest Induk menyatukan seluruh varian Promo Split.
+      // SATU ITINERARY: Manifest Induk menyatukan seluruh varian Promo & Spek Split.
       // Eksklusikan paket pecahan split starting point (karena beda itinerary).
       let parentId = activePackage.id;
-      if (isCurrentPromo && activePackage.parentKeberangkatanId) {
+      if (isCurrentSameFlight && activePackage.parentKeberangkatanId) {
         parentId = activePackage.parentKeberangkatanId;
         relatedPkgIds.add(parentId);
       }
 
       keberangkatanList.forEach((k) => {
         if (isStartingPointSplit(k)) return; // EXCLUDE starting point splits
-        if (k.parentKeberangkatanId === parentId && isPromoVariant(k)) {
+        if (k.parentKeberangkatanId === parentId && isSameFlightVariant(k)) {
           relatedPkgIds.add(k.id);
         }
         if (k.id === parentId) {
@@ -1084,6 +1089,28 @@ function ManifestPageContent() {
       .filter((j) => (jamaahIds.has(j.id) || packageGroupIds.has(j.groupId)) && j.status !== "batal")
       .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
   }, [activePackage, allJamaah, groups, keberangkatanList]);
+
+  // Sibling starting points (for quick toggle between dual/multi-starting manifests)
+  const siblingStartingPkgs = useMemo(() => {
+    if (!activePackage) return [];
+    const currentId = activePackage.id;
+    const parentId = activePackage.parentKeberangkatanId || currentId;
+    const list = keberangkatanList.filter(k => 
+      k.id === parentId || 
+      k.parentKeberangkatanId === parentId || 
+      (activePackage.parentKeberangkatanId && k.id === activePackage.parentKeberangkatanId) ||
+      ((k as any).paketGrupId && (k as any).paketGrupId === (activePackage as any).paketGrupId && isStartingPointSplit(k))
+    );
+    // De-duplicate by id
+    const unique = list.filter((k, idx, arr) => arr.findIndex(item => item.id === k.id) === idx);
+    return unique.sort((a, b) => {
+      const codeA = getPackageStartingCity(a).code;
+      const codeB = getPackageStartingCity(b).code;
+      if (codeA === "SUB") return -1;
+      if (codeB === "SUB") return 1;
+      return 0;
+    });
+  }, [activePackage, keberangkatanList]);
 
   // Filtered Jamaah by search query
   const filteredActiveJamaah = useMemo(() => {
@@ -1735,6 +1762,37 @@ function ManifestPageContent() {
                 </div>
               </CardContent>
             </Card>
+
+            {/* Starting Point Switcher for Dual / Multi-Starting Packages */}
+            {siblingStartingPkgs.length > 1 && (
+              <div className="flex items-center gap-2 p-2 bg-gradient-to-r from-teal-950 via-slate-900 to-teal-950 rounded-xl border border-teal-500/40 text-xs">
+                <span className="text-teal-300 font-extrabold flex items-center gap-1.5 px-2">
+                  <Split className="w-3.5 h-3.5 text-amber-400" /> Manifest Starting Point:
+                </span>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  {siblingStartingPkgs.map((sp) => (
+                    <button
+                      key={sp.id}
+                      type="button"
+                      onClick={() => {
+                        setSelectedKeberangkatan(sp.id);
+                        const typeQuery = activeManifestView === "pembayaran" ? "&type=pembayaran" : "";
+                        router.push(`/admin/manifest?paketId=${sp.id}${typeQuery}`);
+                      }}
+                      className={cn(
+                        "px-3 py-1.5 rounded-lg font-bold transition-all text-xs flex items-center gap-1.5 cursor-pointer",
+                        sp.id === activePackage.id
+                          ? "bg-teal-600 text-white shadow-xs border border-teal-400"
+                          : "bg-slate-800/80 text-slate-300 hover:bg-slate-700 hover:text-white border border-slate-700"
+                      )}
+                    >
+                      <span>{getPackageStartingCity(sp).label}</span>
+                      <span className="text-[10px] font-mono opacity-80">({sp.kode})</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* VIEW MODE TABS: OPERASIONAL VS PEMBAYARAN & RINCIAN TAGIHAN */}
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-stone-200 dark:border-stone-800 pb-2">
@@ -2549,7 +2607,6 @@ function ManifestPageContent() {
                       );
                       const parentQuota = parent.maxSeat || parent.kuota || 45;
                       const parentFilled = parentJamaah.length;
-                      const parentTargetMat = parent.targetMaterialisasi || 30;
                       const sisaSeat = Math.max(0, parentQuota - parentFilled);
                       const fillPercentage = Math.min(100, Math.round((parentFilled / (parentQuota || 1)) * 100));
 
@@ -2559,6 +2616,7 @@ function ManifestPageContent() {
                         const name = (p.namaPaket || "").toUpperCase();
                         const code = (p.kode || "").toUpperCase();
                         const split = (p as any).splitLabel ? String((p as any).splitLabel).toUpperCase() : "";
+                        const startCity = (p as any).startingPoint?.name ? String((p as any).startingPoint.name).toUpperCase() : "";
                         return (
                           name.includes("SUB") ||
                           name.includes("SBY") ||
@@ -2566,7 +2624,9 @@ function ManifestPageContent() {
                           code.includes("SUB") ||
                           code.includes("SBY") ||
                           split.includes("SUB") ||
-                          split.includes("SBY")
+                          split.includes("SBY") ||
+                          startCity.includes("SURABAYA") ||
+                          startCity.includes("SUB")
                         );
                       });
 
@@ -2575,6 +2635,7 @@ function ManifestPageContent() {
                         const name = (p.namaPaket || "").toUpperCase();
                         const code = (p.kode || "").toUpperCase();
                         const split = (p as any).splitLabel ? String((p as any).splitLabel).toUpperCase() : "";
+                        const startCity = (p as any).startingPoint?.name ? String((p as any).startingPoint.name).toUpperCase() : "";
                         return (
                           name.includes("CGK") ||
                           name.includes("JKT") ||
@@ -2583,9 +2644,13 @@ function ManifestPageContent() {
                           code.includes("JKT") ||
                           split.includes("CGK") ||
                           split.includes("JKT") ||
+                          startCity.includes("JAKARTA") ||
+                          startCity.includes("CGK") ||
                           (!sbyPkg && p.id === parent.id)
                         );
                       });
+
+                      const isDualStarting = !!(sbyPkg && jktPkg);
 
                       // Seat per starting point
                       const sbyGroupIds = sbyPkg ? new Set(groups.filter((g) => g.paketKeberangkatanId === sbyPkg.id).map((g) => g.id)) : new Set();
@@ -2600,7 +2665,25 @@ function ManifestPageContent() {
                         : parentFilled;
                       const jktQuota = jktPkg ? (jktPkg.maxSeat || jktPkg.kuota || 35) : parentQuota;
 
-                      const flightSegments = getPackageFlightSegments(parent);
+                      const totalDualQuota = isDualStarting ? (sbyQuota + jktQuota) : parentQuota;
+                      const totalDualFilled = isDualStarting ? (sbyJamaahCount + jktJamaahCount) : parentFilled;
+                      const totalDualSisa = Math.max(0, totalDualQuota - totalDualFilled);
+                      const totalDualPercentage = Math.min(100, Math.round((totalDualFilled / (totalDualQuota || 1)) * 100));
+                      const parentTargetMat = parent.targetMaterialisasi || (isDualStarting ? 40 : 35);
+
+                      const flightSegments = (() => {
+                        if (isDualStarting && sbyPkg && jktPkg && sbyPkg.id !== jktPkg.id) {
+                          const sbySegs = getPackageFlightSegments(sbyPkg);
+                          const jktSegs = getPackageFlightSegments(jktPkg);
+                          const combined = [...sbySegs, ...jktSegs];
+                          const unique = combined.filter((seg, i, arr) => 
+                            arr.findIndex(s => s.tanggal === seg.tanggal && s.kodeFlight === seg.kodeFlight && s.asal === seg.asal) === i
+                          );
+                          unique.sort((a, b) => new Date(a.tanggal).getTime() - new Date(b.tanggal).getTime());
+                          return unique.length > 0 ? unique : sbySegs;
+                        }
+                        return getPackageFlightSegments(parent);
+                      })();
 
                       return (
                         <div key={parent.id}>
@@ -2625,8 +2708,8 @@ function ManifestPageContent() {
                             {/* SISI KIRI: INFO PAKET & STARTING (SBY DI ATAS) */}
                             <div className="lg:col-span-3 space-y-2.5 pr-2 border-b lg:border-b-0 lg:border-r border-slate-100 dark:border-slate-800/80 pb-4 lg:pb-0">
                               <div className="flex items-center gap-2">
-                                <span className="w-2 h-2 rounded-full bg-teal-500 animate-pulse"></span>
-                                <h3 className="text-base font-extrabold text-slate-900 dark:text-white group-hover:text-teal-600 dark:group-hover:text-teal-300 transition-colors tracking-tight">
+                                <span className="w-2.5 h-2.5 rounded-full bg-teal-500 shadow-2xs"></span>
+                                <h3 className="text-base font-black text-slate-900 dark:text-white group-hover:text-teal-600 dark:group-hover:text-teal-300 transition-colors tracking-tight uppercase">
                                   {getPackageProgramType(parent)}
                                 </h3>
                               </div>
@@ -2634,7 +2717,15 @@ function ManifestPageContent() {
                                 <div className="space-y-1.5 text-xs">
                                   {/* SBY (FIRST) */}
                                   {sbyPkg ? (
-                                    <div className="bg-gradient-to-b from-white via-teal-50/70 to-teal-100/50 dark:from-teal-950/60 dark:to-teal-900/40 border border-teal-500/35 dark:border-teal-600/40 rounded-lg p-2 space-y-1 shadow-[0_2px_4px_rgba(13,148,136,0.12),0_1px_2px_rgba(0,0,0,0.04),inset_0_1px_0_rgba(255,255,255,0.9)] dark:shadow-[0_2px_4px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.06)]">
+                                    <div 
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setSelectedKeberangkatan(sbyPkg.id);
+                                        const typeQuery = activeManifestView === "pembayaran" ? "&type=pembayaran" : "";
+                                        router.push(`/admin/manifest?paketId=${sbyPkg.id}${typeQuery}`);
+                                      }}
+                                      className="bg-gradient-to-b from-white via-teal-50/70 to-teal-100/50 dark:from-teal-950/60 dark:to-teal-900/40 border border-teal-500/35 dark:border-teal-600/40 rounded-lg p-2.5 space-y-1.5 shadow-[0_2px_4px_rgba(13,148,136,0.12)] cursor-pointer hover:ring-2 hover:ring-teal-500/50 transition-all"
+                                    >
                                       <div className="flex items-center justify-between font-bold text-teal-950 dark:text-teal-200">
                                         <span className="flex items-center gap-1.5">
                                           <span className="w-2 h-2 rounded-full bg-teal-500 shadow-2xs"></span>
@@ -2655,7 +2746,15 @@ function ManifestPageContent() {
 
                                   {/* JKT (SECOND) */}
                                   {jktPkg ? (
-                                    <div className="bg-gradient-to-b from-white via-slate-50/90 to-slate-100/80 dark:from-slate-800/90 dark:to-slate-900/90 border border-slate-300/90 dark:border-slate-700 rounded-lg p-2 space-y-1 shadow-[0_2px_4px_rgba(0,0,0,0.08),0_1px_2px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,1)] dark:shadow-[0_2px_4px_rgba(0,0,0,0.35),inset_0_1px_0_rgba(255,255,255,0.07)]">
+                                    <div 
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setSelectedKeberangkatan(jktPkg.id);
+                                        const typeQuery = activeManifestView === "pembayaran" ? "&type=pembayaran" : "";
+                                        router.push(`/admin/manifest?paketId=${jktPkg.id}${typeQuery}`);
+                                      }}
+                                      className="bg-gradient-to-b from-white via-slate-50/90 to-slate-100/80 dark:from-slate-800/90 dark:to-slate-900/90 border border-slate-300/90 dark:border-slate-700 rounded-lg p-2.5 space-y-1.5 shadow-[0_2px_4px_rgba(0,0,0,0.08)] cursor-pointer hover:ring-2 hover:ring-slate-500/50 transition-all"
+                                    >
                                       <div className="flex items-center justify-between font-bold text-slate-800 dark:text-slate-200">
                                         <span className="flex items-center gap-1.5">
                                           <span className="w-2 h-2 rounded-full bg-slate-400 shadow-2xs"></span>
@@ -2673,7 +2772,7 @@ function ManifestPageContent() {
                                       </div>
                                     </div>
                                   ) : !sbyPkg ? (
-                                    <div className="bg-gradient-to-b from-white via-teal-50/70 to-teal-100/50 dark:from-teal-950/60 dark:to-teal-900/40 border border-teal-500/35 dark:border-teal-600/40 rounded-lg p-2 space-y-1 shadow-[0_2px_4px_rgba(13,148,136,0.12),0_1px_2px_rgba(0,0,0,0.04),inset_0_1px_0_rgba(255,255,255,0.9)] dark:shadow-[0_2px_4px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.06)]">
+                                    <div className="bg-gradient-to-b from-white via-teal-50/70 to-teal-100/50 dark:from-teal-950/60 dark:to-teal-900/40 border border-teal-500/35 dark:border-teal-600/40 rounded-lg p-2.5 space-y-1.5 shadow-[0_2px_4px_rgba(13,148,136,0.12)]">
                                       <div className="flex items-center justify-between font-bold text-teal-950 dark:text-teal-200">
                                         <span className="flex items-center gap-1.5">
                                           <span className="w-2 h-2 rounded-full bg-teal-500 shadow-2xs"></span>
@@ -2693,23 +2792,14 @@ function ManifestPageContent() {
                                   ) : null}
                                 </div>
 
-                              <div className="flex items-center flex-wrap gap-2 pt-0.5">
-                                {sbyPkg && jktPkg ? (
-                                  <span className="inline-flex items-center gap-1 bg-teal-500/15 text-teal-700 dark:text-teal-300 border border-teal-400/40 text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider">
-                                    <Split className="w-2.5 h-2.5" />
-                                    Dual Starting
-                                  </span>
-                                ) : sbyPkg ? (
-                                  <span className="inline-flex items-center gap-1 bg-sky-500/15 text-sky-700 dark:text-sky-300 border border-sky-400/40 text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider">
-                                    Starting Surabaya
-                                  </span>
-                                ) : jktPkg ? (
-                                  <span className="inline-flex items-center gap-1 bg-teal-500/15 text-teal-700 dark:text-teal-300 border border-teal-400/40 text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider">
-                                    Starting Jakarta
+                              <div className="flex items-center flex-wrap gap-2 pt-1">
+                                {isDualStarting ? (
+                                  <span className="inline-flex items-center gap-1.5 bg-teal-50 text-teal-800 dark:bg-teal-950/60 dark:text-teal-300 border border-teal-300/70 dark:border-teal-700 text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider shadow-2xs">
+                                    ⇄ DUAL STARTING
                                   </span>
                                 ) : (
-                                  <span className="inline-flex items-center gap-1 bg-teal-500/15 text-teal-700 dark:text-teal-300 border border-teal-400/40 text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider">
-                                    {`Starting ${getPackageStartingCity(parent).name}`}
+                                  <span className="inline-flex items-center gap-1.5 bg-sky-50 text-sky-800 dark:bg-sky-950/60 dark:text-sky-300 border border-sky-300/70 dark:border-sky-700 text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider shadow-2xs">
+                                    {`STARTING ${getPackageStartingCity(parent).name.toUpperCase()}`}
                                   </span>
                                 )}
                                 <StatusBadge status={parent.status} />
@@ -2762,44 +2852,61 @@ function ManifestPageContent() {
                             <div className="lg:col-span-3">
                               <div className="bg-gradient-to-br from-teal-950 via-slate-900 to-emerald-950 text-white rounded-xl p-3 border-2 border-teal-400 shadow-[0_0_20px_rgba(6,182,212,0.35),inset_0_0_10px_rgba(6,182,212,0.15)] space-y-2">
                                 
-                                {sbyPkg && jktPkg ? (
-                                  <div className="grid grid-cols-2 gap-2 text-xs border-b border-teal-800/60 pb-1.5">
-                                    <div>
-                                      <span className="text-[9px] text-teal-300 font-semibold uppercase block">Seat SBY</span>
-                                      <span className="text-xs font-extrabold text-white font-mono">
-                                        {sbyJamaahCount}<span className="text-teal-400 font-normal"> / {sbyQuota}</span>
-                                      </span>
+                                {isDualStarting ? (
+                                  <>
+                                    <div className="grid grid-cols-2 gap-2 text-xs border-b border-teal-800/60 pb-1.5">
+                                      <div>
+                                        <span className="text-[9px] text-teal-300 font-semibold uppercase block">SEAT SBY</span>
+                                        <span className="text-xs font-extrabold text-white font-mono">
+                                          {sbyJamaahCount}<span className="text-teal-400 font-normal"> / {sbyQuota}</span>
+                                        </span>
+                                      </div>
+                                      <div>
+                                        <span className="text-[9px] text-teal-300 font-semibold uppercase block">SEAT JKT</span>
+                                        <span className="text-xs font-extrabold text-white font-mono">
+                                          {jktJamaahCount}<span className="text-teal-400 font-normal"> / {jktQuota}</span>
+                                        </span>
+                                      </div>
                                     </div>
-                                    <div>
-                                      <span className="text-[9px] text-teal-300 font-semibold uppercase block">Seat JKT</span>
-                                      <span className="text-xs font-extrabold text-white font-mono">
-                                        {jktJamaahCount}<span className="text-teal-400 font-normal"> / {jktQuota}</span>
-                                      </span>
-                                    </div>
-                                  </div>
-                                ) : null}
 
-                                <div className="space-y-1">
-                                  <div className="flex items-center justify-between text-xs">
-                                    <span className="text-teal-200 font-semibold text-[11px]">Total Seat</span>
-                                    <span className="font-bold text-teal-300 font-mono text-xs">{parentFilled} / {parentQuota}</span>
+                                    <div className="space-y-1">
+                                      <div className="flex items-center justify-between text-xs">
+                                        <span className="text-teal-200 font-semibold text-[11px]">Total Seat</span>
+                                        <span className="font-bold text-teal-300 font-mono text-xs">{totalDualFilled} / {totalDualQuota}</span>
+                                      </div>
+                                      <div className="w-full bg-slate-800 rounded-full h-1.5 overflow-hidden p-0.5 border border-teal-500/40">
+                                        <div
+                                          style={{ width: `${totalDualPercentage}%` }}
+                                          className="bg-gradient-to-r from-teal-400 to-emerald-400 h-full rounded-full shadow-[0_0_8px_rgba(45,212,191,0.8)] transition-all"
+                                        />
+                                      </div>
+                                    </div>
+                                  </>
+                                ) : (
+                                  <div className="space-y-1">
+                                    <div className="flex items-center justify-between text-xs">
+                                      <span className="text-teal-200 font-semibold text-[11px]">
+                                        Seat {getPackageStartingCity(parent).code === "SUB" ? "SBY" : getPackageStartingCity(parent).code === "CGK" ? "JKT" : getPackageStartingCity(parent).name}
+                                      </span>
+                                      <span className="font-bold text-teal-300 font-mono text-xs">{parentFilled} / {parentQuota}</span>
+                                    </div>
+                                    <div className="w-full bg-slate-800 rounded-full h-1.5 overflow-hidden p-0.5 border border-teal-500/40">
+                                      <div
+                                        style={{ width: `${fillPercentage}%` }}
+                                        className="bg-gradient-to-r from-teal-400 to-emerald-400 h-full rounded-full shadow-[0_0_8px_rgba(45,212,191,0.8)] transition-all"
+                                      />
+                                    </div>
                                   </div>
-                                  <div className="w-full bg-slate-800 rounded-full h-1.5 overflow-hidden p-0.5 border border-teal-500/40">
-                                    <div
-                                      style={{ width: `${fillPercentage}%` }}
-                                      className="bg-gradient-to-r from-teal-400 to-emerald-400 h-full rounded-full shadow-[0_0_8px_rgba(45,212,191,0.8)] transition-all"
-                                    />
-                                  </div>
-                                </div>
+                                )}
 
                                 <div className="flex items-center justify-between text-xs pt-1 border-t border-teal-800/60">
                                   <div>
-                                    <span className="text-[9px] text-teal-400 block font-semibold uppercase">Materialisasi</span>
+                                    <span className="text-[9px] text-teal-400 block font-semibold uppercase">MATERIALISASI</span>
                                     <span className="font-bold text-white text-[11px]">({parentTargetMat}) Target</span>
                                   </div>
                                   <div className="text-right">
-                                    <span className="text-[9px] text-amber-400 block font-semibold uppercase">Sisa Seat</span>
-                                    <span className="font-extrabold text-amber-300 font-mono text-xs">{sisaSeat} Seat</span>
+                                    <span className="text-[9px] text-amber-400 block font-semibold uppercase">SISA SEAT</span>
+                                    <span className="font-extrabold text-amber-300 font-mono text-xs">{isDualStarting ? totalDualSisa : sisaSeat} Seat</span>
                                   </div>
                                 </div>
 

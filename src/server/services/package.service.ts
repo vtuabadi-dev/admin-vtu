@@ -51,41 +51,50 @@ export const packageService = {
     let paketGrupId: string | undefined = data.paketGrupId;
     let kodeGrup: string | undefined = data.kodeGrup;
 
-    if (data.parentKeberangkatanId && !paketGrupId) {
-      const parentKeb = await prisma.keberangkatan.findUnique({
-        where: { id: data.parentKeberangkatanId },
+    // Detect parent ID from root parentKeberangkatanId or pairedItems
+    const initialParentId = data.parentKeberangkatanId || (Array.isArray(data.pairedItems) && data.pairedItems[0]?.parentId ? data.pairedItems[0].parentId : undefined);
+
+    let initialParentKeb: any = null;
+    if (initialParentId) {
+      initialParentKeb = await prisma.keberangkatan.findUnique({
+        where: { id: initialParentId },
+        include: { startingPoint: true, paketGrup: true },
       });
 
-      if (parentKeb) {
-        const finalKodeGrup = data.kodeGrup || generateKodeGrup({
-          tahun: year,
-          durasiHari,
-          packageTypeCode: pCode,
-          startingPointCode: sCode,
-          maskapaiCode: mCode,
-          tanggalList: departureDates,
-        });
-        kodeGrup = finalKodeGrup;
+      if (initialParentKeb) {
+        if (initialParentKeb.paketGrupId) {
+          paketGrupId = initialParentKeb.paketGrupId;
+        } else if (!paketGrupId) {
+          const finalKodeGrup = data.kodeGrup || generateKodeGrup({
+            tahun: year,
+            durasiHari,
+            packageTypeCode: pCode,
+            startingPointCode: initialParentKeb.startingPoint?.code || sCode,
+            maskapaiCode: mCode,
+            tanggalList: departureDates,
+          });
+          kodeGrup = finalKodeGrup;
 
-        let groupRecord = await prisma.paketGrup.findUnique({
-          where: { kodeGrup: finalKodeGrup },
-        });
+          let groupRecord = await prisma.paketGrup.findUnique({
+            where: { kodeGrup: finalKodeGrup },
+          });
 
-        if (!groupRecord) {
-          groupRecord = await prisma.paketGrup.create({
-            data: {
-              kodeGrup: finalKodeGrup,
-              namaPaket: parentKeb.namaPaket || `${pCode} ${sCode} Group`,
-            },
+          if (!groupRecord) {
+            groupRecord = await prisma.paketGrup.create({
+              data: {
+                kodeGrup: finalKodeGrup,
+                namaPaket: initialParentKeb.namaPaket || `${pCode} Group`,
+              },
+            });
+          }
+          paketGrupId = groupRecord.id;
+
+          // Update parent to be part of this group
+          await prisma.keberangkatan.update({
+            where: { id: initialParentKeb.id },
+            data: { paketGrupId },
           });
         }
-        paketGrupId = groupRecord.id;
-
-        // Update parent to be part of this group
-        await prisma.keberangkatan.update({
-          where: { id: data.parentKeberangkatanId },
-          data: { paketGrupId },
-        });
       }
     } else if (!paketGrupId && departureDates.length > 1) {
       kodeGrup = generateKodeGrup({
@@ -187,6 +196,7 @@ export const packageService = {
 
     for (let i = 0; i < departureDates.length; i++) {
       const depDate = departureDates[i]!;
+      const depDateStr = depDate.toISOString().split("T")[0];
       const depYear = depDate.getFullYear();
       const retDate = new Date(depDate);
       retDate.setDate(retDate.getDate() + durasiHari - 1);
@@ -257,9 +267,65 @@ export const packageService = {
         if (!formattedPackageName.toLowerCase().includes(pLabel.toLowerCase())) {
           formattedPackageName = `${formattedPackageName} (${pLabel})`;
         }
+      } else if (data.splitReason === "spek" && (data.spekLabel || data.splitLabel)) {
+        const sLabel = data.spekLabel || data.splitLabel;
+        if (!formattedPackageName.toLowerCase().includes(sLabel.toLowerCase())) {
+          formattedPackageName = `${formattedPackageName} [${sLabel}]`;
+        }
       }
 
-      const pairedItemForThisDate = Array.isArray(data.pairedItems) ? data.pairedItems[i] : null;
+      const pairedItemForThisDate = Array.isArray(data.pairedItems)
+        ? data.pairedItems.find((p: any) => p.childDate === depDateStr || p.parentDate === depDateStr) || data.pairedItems[i]
+        : null;
+
+      const specificParentId = pairedItemForThisDate?.parentId || initialParentId || undefined;
+
+      let parentRecord: any = null;
+      if (specificParentId) {
+        if (initialParentKeb && initialParentKeb.id === specificParentId) {
+          parentRecord = initialParentKeb;
+        } else {
+          parentRecord = await prisma.keberangkatan.findUnique({
+            where: { id: specificParentId },
+            include: { startingPoint: true, paketGrup: true },
+          });
+        }
+      }
+
+      // Pastikan paket grup sinkron dengan paket induk
+      let childPaketGrupId = parentRecord?.paketGrupId || paketGrupId || undefined;
+      if (parentRecord && !childPaketGrupId) {
+        const fallbackGroupCode = data.kodeGrup || `GRP-${parentRecord.kode}`;
+        let grp = await prisma.paketGrup.findUnique({ where: { kodeGrup: fallbackGroupCode } });
+        if (!grp) {
+          grp = await prisma.paketGrup.create({
+            data: { kodeGrup: fallbackGroupCode, namaPaket: parentRecord.namaPaket },
+          });
+        }
+        childPaketGrupId = grp.id;
+        await prisma.keberangkatan.update({
+          where: { id: parentRecord.id },
+          data: { paketGrupId: childPaketGrupId },
+        });
+      }
+
+      // Silsilah: Simpan riwayat silsilah paket secara presisi di notes
+      let lineageNotes = data.notes || "";
+      if (parentRecord) {
+        const parentCity = parentRecord.startingPoint?.name || parentRecord.startingPoint?.code || "Induk";
+        const childCity = startingPoint?.name || startingPoint?.code || sCode;
+        if (data.splitReason === "starting_point") {
+          const splitInfo = `[Silsilah Split Starting] Lahir dari paket: "${parentRecord.namaPaket}" (Kode: ${parentRecord.kode}) | Starting ${parentCity} -> Cabang: Starting ${childCity}`;
+          lineageNotes = lineageNotes ? `${splitInfo} | ${lineageNotes}` : splitInfo;
+        } else if (data.splitReason === "promo") {
+          const splitInfo = `[Silsilah Varian Promo] Lahir dari paket induk: "${parentRecord.namaPaket}" (Kode: ${parentRecord.kode})`;
+          lineageNotes = lineageNotes ? `${splitInfo} | ${lineageNotes}` : splitInfo;
+        } else if (data.splitReason === "spek") {
+          const splitInfo = `[Silsilah Varian Spek] Lahir dari paket induk: "${parentRecord.namaPaket}" (Kode: ${parentRecord.kode})`;
+          lineageNotes = lineageNotes ? `${splitInfo} | ${lineageNotes}` : splitInfo;
+        }
+      }
+
       const assignedChildSeat = typeof pairedItemForThisDate?.childSeat === "number"
         ? pairedItemForThisDate.childSeat
         : parseInt(data.kapasitas || data.kuota || "45", 10);
@@ -287,11 +353,13 @@ export const packageService = {
       const created = await keberangkatanRepo.create({
         kode: kodeIndividu,
         kodeIndividu,
-        paketGrupId,
-        parentKeberangkatanId: data.parentKeberangkatanId || undefined,
+        paketGrupId: childPaketGrupId,
+        parentKeberangkatanId: specificParentId,
         splitReason: data.splitReason || (data.splitType || undefined),
-        splitLabel: data.splitLabel || data.promoLabel || undefined,
+        splitLabel: data.splitLabel || data.spekLabel || data.promoLabel || undefined,
         promoLabel: data.promoLabel || (data.splitReason === "promo" ? data.splitLabel : undefined),
+        spekLabel: data.spekLabel || (data.splitReason === "spek" ? data.splitLabel : undefined),
+        notes: lineageNotes || undefined,
         driveFolderIds,
         include: includeList,
         namaPaket: formattedPackageName,
@@ -331,6 +399,19 @@ export const packageService = {
             },
           });
         }
+      }
+    } else if (data.splitReason === "starting_point" && initialParentId) {
+      const parent = await prisma.keberangkatan.findUnique({ where: { id: initialParentId } });
+      if (parent) {
+        const childSeat = parseInt(data.kapasitas || data.kuota || "15", 10);
+        const newParentSeat = Math.max(0, (parent.kuota || 45) - childSeat);
+        await prisma.keberangkatan.update({
+          where: { id: parent.id },
+          data: {
+            kuota: newParentSeat,
+            maxSeat: newParentSeat,
+          },
+        });
       }
     }
 

@@ -392,6 +392,14 @@ export interface Keberangkatan {
   splitReason?: string;
   splitLabel?: string;
   promoLabel?: string;
+  spekLabel?: string;
+  notes?: string;
+  parentKeberangkatan?: {
+    id: string;
+    kode: string;
+    namaPaket?: string;
+    startingPoint?: { id: string; name: string; code: string };
+  };
   childKeberangkatanList?: Keberangkatan[];
   driveFolderIds?: any;
   hotelOptions?: any;

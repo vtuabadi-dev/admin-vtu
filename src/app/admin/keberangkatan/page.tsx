@@ -449,13 +449,36 @@ export default function KeberangkatanListPage() {
               <CardHeader className="pb-3 border-b bg-muted/10">
                 <div className="flex items-start justify-between gap-2">
                   <div className="space-y-1.5 flex-1 min-w-0">
-                    {/* Promo or Split Variant Badges */}
+                    {/* Promo, Spek, or Split Variant Badges */}
                     {(() => {
                       const isPromo = (k as any).splitReason === "promo" || !!(k as any).promoLabel || !!(k as any).promoText || k.kode.includes("_V");
                       const promoName = (k as any).promoLabel || (k as any).promoText || ((k as any).splitReason === "promo" ? (k as any).splitLabel : null) || (k.kode.includes("_V") ? "Promo Bintang 5" : null);
 
+                      const isSpek = (k as any).splitReason === "spek" || !!(k as any).spekLabel;
+                      const spekName = (k as any).spekLabel || ((k as any).splitReason === "spek" ? (k as any).splitLabel : "Spesifikasi Khusus");
+
                       const isBranchSplit = (k as any).splitReason === "starting_point" || !!(k as any).parentKeberangkatanId;
                       const branchName = (k as any).splitLabel || (k as any).startingPoint?.name || "Cabang";
+
+                      const parentInfo = (k as any).parentKeberangkatan?.namaPaket || (k as any).parentKeberangkatan?.kode;
+
+                      if (isSpek) {
+                        return (
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-extrabold bg-gradient-to-r from-purple-500/20 to-indigo-500/20 text-purple-900 dark:text-purple-200 border border-purple-500/40 shadow-xs">
+                              ⚙️ Spek: {spekName}
+                            </span>
+                            <span className="text-[10px] font-bold text-purple-700 dark:text-purple-400 bg-purple-100 dark:bg-purple-950/60 px-2 py-0.5 rounded border border-purple-300 dark:border-purple-800">
+                              🔀 Varian Spek
+                            </span>
+                            {parentInfo && (
+                              <span className="text-[10px] text-muted-foreground bg-secondary/60 px-2 py-0.5 rounded">
+                                Induk: {parentInfo}
+                              </span>
+                            )}
+                          </div>
+                        );
+                      }
 
                       if (isPromo && promoName) {
                         return (
@@ -466,6 +489,11 @@ export default function KeberangkatanListPage() {
                             <span className="text-[10px] font-bold text-amber-700 dark:text-amber-400 bg-amber-100 dark:bg-amber-950/60 px-2 py-0.5 rounded border border-amber-300 dark:border-amber-800">
                               🔀 Pecahan Paket (Variant)
                             </span>
+                            {parentInfo && (
+                              <span className="text-[10px] text-muted-foreground bg-secondary/60 px-2 py-0.5 rounded">
+                                Induk: {parentInfo}
+                              </span>
+                            )}
                           </div>
                         );
                       }
@@ -479,6 +507,11 @@ export default function KeberangkatanListPage() {
                             <span className="text-[10px] font-bold text-blue-700 dark:text-blue-400 bg-blue-100 dark:bg-blue-950/60 px-2 py-0.5 rounded border border-blue-300 dark:border-blue-800">
                               🔀 Pecahan Paket
                             </span>
+                            {parentInfo && (
+                              <span className="text-[10px] text-blue-600 dark:text-blue-400 bg-blue-50/80 dark:bg-blue-950/40 px-2 py-0.5 rounded border border-blue-200 dark:border-blue-800/50">
+                                Lahir dari: {parentInfo}
+                              </span>
+                            )}
                           </div>
                         );
                       }

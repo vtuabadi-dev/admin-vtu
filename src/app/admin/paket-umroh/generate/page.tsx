@@ -49,8 +49,9 @@ export default function GeneratePaketPage() {
   // Mode Generator (Buat Paket Baru vs Pecah Starting Point vs Edit Spesifikasi)
   const [generateMode, setGenerateMode] = useState<"new" | "split" | "edit">("new");
   const [selectedEditPackageId, setSelectedEditPackageId] = useState<string>("");
-  const [splitType, setSplitType] = useState<"starting_point" | "promo">("starting_point");
+  const [splitType, setSplitType] = useState<"starting_point" | "promo" | "spek">("starting_point");
   const [promoLabel, setPromoLabel] = useState<string>("");
+  const [spekLabel, setSpekLabel] = useState<string>("");
   const [existingGroupsData, setExistingGroupsData] = useState<{ groups: any[]; individuals: any[] }>({ groups: [], individuals: [] });
   const [parentTypeFilter, setParentTypeFilter] = useState<"group" | "individual">("group");
   const [loadingGroups, setLoadingGroups] = useState(false);
@@ -2463,7 +2464,7 @@ export default function GeneratePaketPage() {
             Generate Paket Umroh
             {generateMode === "split" && (
               <span className="text-xs font-bold px-3 py-1 bg-amber-100 text-amber-900 border border-amber-300 rounded-full">
-                ➕ Mode Tambah Starting Point
+                {splitType === "starting_point" ? "➕ Mode Tambah Starting Point" : splitType === "promo" ? "🏷️ Mode Split Paket Promo" : "⚙️ Mode Split Varian Spek"}
               </span>
             )}
           </h1>
@@ -2638,6 +2639,17 @@ export default function GeneratePaketPage() {
                   />
                   <span>🏷️ Paket Promo (Variant Promo / Diskon)</span>
                 </label>
+                <label className="flex items-center gap-1.5 text-xs font-bold text-stone-800 dark:text-stone-200 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="splitType"
+                    value="spek"
+                    checked={splitType === "spek"}
+                    onChange={() => setSplitType("spek")}
+                    className="text-amber-600 focus:ring-amber-500 h-4 w-4"
+                  />
+                  <span>⚙️ Split Varian Spek (Spesifikasi / Fasilitas)</span>
+                </label>
               </div>
 
               {splitType === "promo" && (
@@ -2649,6 +2661,20 @@ export default function GeneratePaketPage() {
                     placeholder="Masukkan nama promo..."
                     value={promoLabel}
                     onChange={(e) => setPromoLabel(e.target.value)}
+                    className="h-8 text-xs bg-white dark:bg-card border-amber-300 dark:border-amber-700"
+                  />
+                </div>
+              )}
+
+              {splitType === "spek" && (
+                <div className="pt-2 space-y-1">
+                  <label className="text-[11px] font-bold text-amber-900 dark:text-amber-200">
+                    Nama / Label Spesifikasi (Contoh: &quot;Bintang 5 / VIP&quot;, &quot;Hotel Depan Masjid&quot;, &quot;Include Kereta Cepat&quot;, &quot;Fasilitas Executive&quot;):
+                  </label>
+                  <Input
+                    placeholder="Masukkan label spesifikasi / fasilitas..."
+                    value={spekLabel}
+                    onChange={(e) => setSpekLabel(e.target.value)}
                     className="h-8 text-xs bg-white dark:bg-card border-amber-300 dark:border-amber-700"
                   />
                 </div>
@@ -2706,7 +2732,27 @@ export default function GeneratePaketPage() {
                 };
               })}
               value={selectedParentGroupId}
-              onChange={(val) => setSelectedParentGroupId(val)}
+              onChange={(val) => {
+                setSelectedParentGroupId(val);
+                const found = (parentTypeFilter === "group" ? existingGroupsData.groups : existingGroupsData.individuals).find(g => g.id === val);
+                if (found && Array.isArray(found.items) && found.items.length > 0) {
+                  const newRows = found.items.map((it: any) => ({
+                    departureDate: it.date,
+                    arrivalDate: calculateReturnDate(it.date, formData.durasiHari),
+                    source: "Manual" as const,
+                    status: "Generated" as const,
+                    isManualOverride: false,
+                  }));
+                  newRows.push({ departureDate: "", arrivalDate: "", source: "-", status: "-", isManualOverride: false });
+                  setDepartureDateRows(newRows);
+
+                  if (splitType === "promo" || splitType === "spek") {
+                    if (found.startingPointId) {
+                      setFormData(prev => ({ ...prev, startingPointId: found.startingPointId }));
+                    }
+                  }
+                }
+              }}
               placeholder={parentTypeFilter === "group" ? "-- Pilih Paket Induk (Bentuk Grup Multi-Tanggal) --" : "-- Pilih Paket Induk (Bentuk Individu 1 Tanggal) --"}
               searchPlaceholder="Cari kode grup, nama paket, atau tanggal..."
             />
@@ -2802,7 +2848,11 @@ export default function GeneratePaketPage() {
                 setLoading(true);
                 try {
                   const childCityName = options?.cities.find(c => c.id === formData.startingPointId)?.name || "Surabaya";
-                  const computedSplitLabel = splitType === "promo" ? (promoLabel || "PROMO SPECIAL") : childCityName;
+                  const computedSplitLabel = splitType === "promo" 
+                    ? (promoLabel || "PROMO SPECIAL") 
+                    : splitType === "spek"
+                    ? (spekLabel || "SPESIFIKASI KHUSUS")
+                    : childCityName;
 
                   const flyerBase64List = flyerFiles.length > 0
                     ? await (async () => {
@@ -2827,7 +2877,13 @@ export default function GeneratePaketPage() {
                     durasiHari: Number(formData.durasiHari || 9),
                     durationDays: Number(formData.durasiHari || 9),
                     departureDates: pairs.map(p => p.childDate),
-                    namaPaket: formData.namaPaket || (splitType === "promo" ? `[PROMO] ${formData.namaPaket || promoLabel || "Umroh Promo"}` : `Umroh ${childCityName}`),
+                    namaPaket: formData.namaPaket || (
+                      splitType === "promo" 
+                        ? `[PROMO] ${formData.namaPaket || promoLabel || "Umroh Promo"}` 
+                        : splitType === "spek"
+                        ? `[SPEK] ${formData.namaPaket || spekLabel || "Umroh Spesifikasi"}`
+                        : `Umroh ${childCityName}`
+                    ),
                     hargaBase: Number(formData.hargaBase || 35000000),
                     hargaPaket: Number(formData.hargaBase || 35000000),
                     hotelMekkahId: formData.hotelMekkahId,
@@ -2838,10 +2894,11 @@ export default function GeneratePaketPage() {
                     isAdaKlaster: formData.isAdaKlaster,
                     clusterConfigs: formData.isAdaKlaster === "ya" ? clusterConfigs : null,
                     paketGrupId: selectedParentGroup.type === "group" ? selectedParentGroupId : undefined,
-                    parentKeberangkatanId: selectedParentGroup.type === "individual" ? selectedParentGroup.keberangkatanId : undefined,
+                    parentKeberangkatanId: selectedParentGroup.type === "individual" ? selectedParentGroup.keberangkatanId : (pairs[0]?.parentId || undefined),
                     splitReason: splitType,
                     splitLabel: computedSplitLabel,
                     promoLabel: splitType === "promo" ? (promoLabel || "PROMO SPECIAL") : undefined,
+                    spekLabel: splitType === "spek" ? (spekLabel || "SPESIFIKASI KHUSUS") : undefined,
                     kodeGrup: selectedParentGroup.kodeGrup,
                     pairedItems: pairs,
                     caption: caption || undefined,

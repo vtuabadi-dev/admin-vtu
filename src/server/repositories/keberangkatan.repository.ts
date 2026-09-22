@@ -69,6 +69,17 @@ function mapKeberangkatan(row: any): Keberangkatan {
     promoLabel: row.promoLabel ?? undefined,
     driveFolderIds: row.driveFolderIds ?? undefined,
     hotelOptions: parsedHotelOptions,
+    notes: (row as any).notes ?? undefined,
+    parentKeberangkatan: (row as any).parentKeberangkatan ? {
+      id: (row as any).parentKeberangkatan.id,
+      kode: (row as any).parentKeberangkatan.kode,
+      namaPaket: (row as any).parentKeberangkatan.namaPaket,
+      startingPoint: (row as any).parentKeberangkatan.startingPoint ? {
+        id: (row as any).parentKeberangkatan.startingPoint.id,
+        name: (row as any).parentKeberangkatan.startingPoint.name,
+        code: (row as any).parentKeberangkatan.startingPoint.code,
+      } : undefined,
+    } : undefined,
     packageType: row.packageType ? {
       id: row.packageType.id,
       name: row.packageType.name,
@@ -88,6 +99,14 @@ const DEFAULT_INCLUDE = {
   hotelMadinahMaster: true,
   startingPoint: true,
   packageType: true,
+  parentKeberangkatan: {
+    select: {
+      id: true,
+      kode: true,
+      namaPaket: true,
+      startingPoint: true,
+    },
+  },
   groups: {
     include: {
       anggota: {
@@ -159,6 +178,7 @@ export const keberangkatanRepo = {
         hotelMadinah: data.hotelMadinah ?? "TBA",
         kuota: data.kuota ?? data.maxSeat ?? 0,
         hotelOptions: data.hotelOptions ? (data.hotelOptions as any) : [],
+        notes: data.notes ?? undefined,
       },
       include: DEFAULT_INCLUDE,
     });
