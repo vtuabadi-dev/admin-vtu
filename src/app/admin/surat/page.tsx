@@ -50,7 +50,7 @@ import {
 } from "@/shared/lib/surat-autocrat-engine";
 import { downloadOfficialLetterPdf } from "@/shared/lib/surat-pdf";
 import { downloadMergedDocx } from "@/shared/lib/docx-mail-merge";
-import { downloadDocxAsPdf } from "@/shared/lib/docx-to-pdf";
+import { downloadDocxAsPdf, convertDocxToA4Html } from "@/shared/lib/docx-to-pdf";
 import { KantorImigrasiCombobox } from "@/shared/components/ui/KantorImigrasiCombobox";
 import { SearchableSelect } from "@/shared/components/ui/SearchableSelect";
 import { getKotaFromKanimName } from "@/shared/lib/kantor-imigrasi";
@@ -501,12 +501,6 @@ function GenerateSuratPageContent() {
     const updated = saveGeneratedSuratLog(logItem);
     setHistoryLogs(updated);
 
-    fetch("/api/surat/generated", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(logItem),
-    }).catch(() => {});
-
     return logItem;
   }, [
     activeTemplate,
@@ -601,12 +595,19 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
     }
   };
 
-  // Delete History Item
-  const handleDeleteHistory = (id: string) => {
-    if (!window.confirm("Hapus riwayat surat ini?")) return;
-    const updated = deleteGeneratedSuratLog(id);
-    setHistoryLogs(updated);
-    fetch(`/api/surat/generated?id=${id}`, { method: "DELETE" }).catch(() => {});
+  // Delete History Group (purges all logs matching this group or nomorSurat)
+  const handleDeleteGroup = (logs: GeneratedSuratLog[], nomorSurat: string) => {
+    if (!window.confirm(`Hapus seluruh riwayat untuk surat ${nomorSurat}?`)) return;
+    const idsToDelete = new Set(logs.map((l) => l.id));
+    
+    // Update local storage for all items
+    logs.forEach((l) => deleteGeneratedSuratLog(l.id));
+    setHistoryLogs((prev) => prev.filter((l) => !idsToDelete.has(l.id) && l.nomorSurat !== nomorSurat));
+
+    // Purge from Supabase by nomorSurat and id
+    const encodedNomor = encodeURIComponent(nomorSurat);
+    const primaryId = logs[0]?.id || "";
+    fetch(`/api/surat/generated?id=${primaryId}&nomorSurat=${encodedNomor}`, { method: "DELETE" }).catch(() => {});
     showToast("Riwayat surat berhasil dihapus");
   };
 
@@ -731,8 +732,58 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
     showToast("Dokumen Word berhasil diunduh!");
   };
 
-  // Print from history log
-  const handleHistoryPrint = (log: GeneratedSuratLog) => {
+  // Print from history log with full Word A4 letterhead & watermark support
+  const handleHistoryPrint = async (log: GeneratedSuratLog, fileIndex: number = 0) => {
+    const tpl = templates.find((t) => t.id === log.templateId || t.slug === log.templateSlug) || activeTemplate;
+    const attached = tpl?.attachedFiles || [];
+    const binary =
+      attached[fileIndex]?.templateFileBase64 ||
+      (fileIndex === 0
+        ? log.templateFileBase64 || tpl?.templateFileBase64
+        : attached[1]?.templateFileBase64 || log.templateFileBase64 || tpl?.templateFileBase64);
+
+    if (binary && log.fieldsData) {
+      try {
+        const { mergeDocxPlaceholders } = await import("@/shared/lib/docx-mail-merge");
+        const mergedBlob = await mergeDocxPlaceholders(binary, log.fieldsData);
+        const a4Html = await convertDocxToA4Html(mergedBlob);
+        const printWin = window.open("", "_blank");
+        if (printWin) {
+          printWin.document.write(`
+            <!DOCTYPE html>
+            <html>
+              <head>
+                <title>${log.nomorSurat} - Cetak Surat Resmi</title>
+                <style>
+                  @page { size: A4 portrait; margin: 0; }
+                  body { margin: 0; padding: 0; background: #fff; }
+                  .docx-pages-container { background: #fff !important; }
+                  .docx-a4-page { margin: 0 !important; page-break-after: always; break-after: page; }
+                  @media print {
+                    body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+                  }
+                </style>
+              </head>
+              <body>
+                ${a4Html}
+                <script>
+                  window.onload = function() {
+                    setTimeout(function() {
+                      window.print();
+                    }, 500);
+                  };
+                </script>
+              </body>
+            </html>
+          `);
+          printWin.document.close();
+          return;
+        }
+      } catch (err) {
+        console.warn("Gagal cetak DOCX A4 HTML:", err);
+      }
+    }
+
     const printWin = window.open("", "_blank");
     if (printWin) {
       printWin.document.write(`
@@ -1702,13 +1753,15 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
                               </div>
                             </div>
 
-                            {/* Document File Rows */}
+                            {/* Document File Rows (Displays exact document variants from primary record) */}
                             <div className="flex flex-col gap-2">
-                              {group.logs.map((log) => {
-                                const docVariants = getDocumentVariants(log);
+                              {(() => {
+                                const primaryLog = group.logs[0];
+                                if (!primaryLog) return null;
+                                const docVariants = getDocumentVariants(primaryLog);
                                 return docVariants.map((variant) => (
                                   <div
-                                    key={`${log.id}-${variant.fileIndex}`}
+                                    key={`${primaryLog.id}-${variant.fileIndex}`}
                                     className="flex items-center justify-between gap-3 bg-white dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/50 rounded-lg px-3.5 py-2.5 shadow-2xs hover:shadow-sm transition-shadow group"
                                   >
                                     <div className="flex items-center gap-2.5 min-w-0">
@@ -1736,7 +1789,7 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
                                       <button
                                         type="button"
                                         className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer"
-                                        onClick={() => handleHistoryRedownloadWord(log, variant.fileIndex)}
+                                        onClick={() => handleHistoryRedownloadWord(primaryLog, variant.fileIndex)}
                                         title={`Download Word (.docx) - ${variant.label}`}
                                       >
                                         <FileDown className="h-3.5 w-3.5" />
@@ -1746,7 +1799,7 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
                                       <button
                                         type="button"
                                         className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors shadow-2xs cursor-pointer"
-                                        onClick={() => handleHistoryRedownloadPdf(log, variant.fileIndex)}
+                                        onClick={() => handleHistoryRedownloadPdf(primaryLog, variant.fileIndex)}
                                         title={`Download PDF - ${variant.label}`}
                                       >
                                         <Download className="h-3.5 w-3.5 text-slate-500" />
@@ -1756,7 +1809,7 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
                                       <button
                                         type="button"
                                         className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors shadow-2xs cursor-pointer"
-                                        onClick={() => handleHistoryPrint(log)}
+                                        onClick={() => handleHistoryPrint(primaryLog, variant.fileIndex)}
                                         title="Cetak dokumen"
                                       >
                                         <Printer className="h-3.5 w-3.5 text-slate-500" />
@@ -1765,7 +1818,7 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
                                     </div>
                                   </div>
                                 ));
-                              })}
+                              })()}
                             </div>
                           </div>
                         </td>
@@ -1788,9 +1841,7 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
                               size="sm"
                               className="h-7 w-7 p-0 text-destructive/60 hover:text-destructive hover:bg-destructive/10"
                               title="Hapus riwayat surat ini"
-                              onClick={() => {
-                                group.logs.forEach((l) => handleDeleteHistory(l.id));
-                              }}
+                              onClick={() => handleDeleteGroup(group.logs, group.nomorSurat)}
                             >
                               <Trash2 className="h-3.5 w-3.5" />
                             </Button>

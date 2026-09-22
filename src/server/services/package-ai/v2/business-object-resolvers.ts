@@ -245,6 +245,7 @@ export function resolveLandingRoute(field: ExtractionField): ExtractionField {
   // Known valid route patterns
   const validRoutes = [
     'JED.D-J', 'JED.C-M', 'JED.C-J', 'MED-J',
+    'JED.TH-J', 'JED.TH-M',
     'UD.D-J', 'UD.D-M', 'TD.D-J', 'TD.C-J', 'TD.C-M',
   ];
 

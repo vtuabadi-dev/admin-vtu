@@ -123,7 +123,11 @@ export async function POST(request: NextRequest) {
       status: "aktif",
     };
 
-    const updatedLogs = [newLog, ...currentLogs.filter((l) => l.id !== newLog.id)];
+    // Deduplicate: replace any existing log with the same nomorSurat OR same id
+    const filtered = currentLogs.filter(
+      (l) => l.id !== newLog.id && l.nomorSurat !== newLog.nomorSurat
+    );
+    const updatedLogs = [newLog, ...filtered];
     await saveGeneratedLogsToDb(updatedLogs, session.user.name || session.user.email || "Admin Operasional");
 
     return NextResponse.json({
@@ -145,10 +149,18 @@ export async function DELETE(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get("id");
-    if (!id) return NextResponse.json({ success: false, message: "Surat ID required" }, { status: 400 });
+    const nomorSurat = searchParams.get("nomorSurat");
+    if (!id && !nomorSurat) {
+      return NextResponse.json({ success: false, message: "Surat ID atau Nomor Surat diperlukan" }, { status: 400 });
+    }
 
     const currentLogs = await getGeneratedLogsFromDb();
-    const updatedLogs = currentLogs.filter((l) => l.id !== id);
+    // Filter out by ID and/or by nomorSurat to ensure complete cleanup
+    const updatedLogs = currentLogs.filter((l) => {
+      if (id && l.id === id) return false;
+      if (nomorSurat && l.nomorSurat === nomorSurat) return false;
+      return true;
+    });
     await saveGeneratedLogsToDb(updatedLogs, session.user.name || session.user.email || "Admin Operasional");
 
     return NextResponse.json({

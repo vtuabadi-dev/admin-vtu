@@ -633,6 +633,89 @@ export function extractBoardType(caption: string): "FB" | "BF" {
   return "FB";
 }
 
+// ── Landing Route (In-Out) Detection ──────────────────────────
+
+const KNOWN_ROUTE_CODES = [
+  "JED.TH-M", "JED.TH-J", "TD.D-J", "TD.C-J", "TD.C-M",
+  "MED-J", "UD.D-J", "UD.D-M", "JED.D-J", "JED.C-M", "JED.C-J"
+];
+
+/**
+ * Extract landing route (Rute In-Out) from caption text.
+ * Rule: All initials following '-' (dash) indicate the OUT route (take off departure from Saudi Arabia):
+ *   -J = Out Jeddah
+ *   -M = Out Madinah
+ */
+export function extractLandingRoute(caption: string): string | undefined {
+  if (!caption) return undefined;
+  const upper = caption.toUpperCase();
+
+  // 1. Direct match for known route codes
+  for (const code of KNOWN_ROUTE_CODES) {
+    const regex = new RegExp(`\\b${code.replace(".", "\\.")}\\b`, "i");
+    if (regex.test(upper)) {
+      return code;
+    }
+  }
+
+  // 2. Explicit In - Out syntax (e.g. "Landing Jeddah Out Madinah", "Jeddah In - Madinah Out")
+  const landingJeddah = /\b(?:LANDING|IN|MASUK)\s*(?:KE\s*)?(?:DI\s*)?JED(?:DAH)?\b/i.test(upper) ||
+                        /\bJED(?:DAH)?\s*(?:IN|LANDING)\b/i.test(upper);
+  const landingMadinah = /\b(?:LANDING|IN|MASUK)\s*(?:KE\s*)?(?:DI\s*)?(?:MADINAH|MEDINA|MEDINAH|MED)\b/i.test(upper) ||
+                         /\b(?:MADINAH|MEDINA|MEDINAH|MED)\s*(?:IN|LANDING)\b/i.test(upper);
+
+  const outJeddah = /\b(?:OUT|PULANG|TAKE\s*OFF|KEPULANGAN)\s*(?:DARI\s*)?(?:VIA\s*)?JED(?:DAH)?\b/i.test(upper) ||
+                    /\bJED(?:DAH)?\s*(?:OUT|TAKE\s*OFF|PULANG)\b/i.test(upper);
+  const outMadinah = /\b(?:OUT|PULANG|TAKE\s*OFF|KEPULANGAN)\s*(?:DARI\s*)?(?:VIA\s*)?(?:MADINAH|MEDINA|MEDINAH|MED)\b/i.test(upper) ||
+                     /\b(?:MADINAH|MEDINA|MEDINAH|MED)\s*(?:OUT|TAKE\s*OFF|PULANG)\b/i.test(upper);
+
+  const hasThaif = /\bTH[AO]'?IF\b/i.test(upper) || /\bTA'?IF\b/i.test(upper);
+
+  // Direct Madinah from Jeddah then Out Jeddah -> JED.D-J
+  const directMadinah = /\bJED(?:DAH)?\s*(?:DIRECT\s*)?(?:LANGSUNG\s*)?(?:KE\s*)?(?:MADINAH|MEDINA|MEDINAH|MED)\b/i.test(upper);
+  if (directMadinah && outJeddah) {
+    return "JED.D-J";
+  }
+
+  // If landing in Madinah, standard out is Jeddah -> MED-J
+  if (landingMadinah) {
+    return "MED-J";
+  }
+
+  // If landing in Jeddah with Thaif
+  if (landingJeddah && hasThaif) {
+    if (outMadinah) return "JED.TH-M";
+    return "JED.TH-J";
+  }
+
+  // If landing in Jeddah
+  if (landingJeddah) {
+    // Check if first destination is Madinah vs Makkah
+    const directMadinah = /\bJED(?:DAH)?\s*(?:DIRECT\s*)?(?:LANGSUNG\s*)?(?:KE\s*)?(?:MADINAH|MEDINA|MEDINAH|MED)\b/i.test(upper);
+    if (directMadinah) {
+      return "JED.D-J";
+    }
+
+    if (outMadinah) {
+      return "JED.C-M";
+    }
+    if (outJeddah) {
+      return "JED.C-J";
+    }
+    return "JED.C-M";
+  }
+
+  // If only out is mentioned
+  if (outMadinah) {
+    return "JED.C-M";
+  }
+  if (outJeddah) {
+    return "JED.C-J";
+  }
+
+  return undefined;
+}
+
 // ── Main Parser ──────────────────────────────────────────────
 
 /**
@@ -647,6 +730,7 @@ export function parseCaption(caption: string): Partial<PackageExtractionResult> 
   const packageType = detectPackageType(trimmed);
   const duration = extractDuration(trimmed);
   const dates = extractDates(trimmed);
+  const landingRoute = extractLandingRoute(trimmed);
   const promo = extractPromo(trimmed);
   const upgrades = extractUpgrade(trimmed);
   const upgradePrices = extractRoomUpgradePrices(trimmed);
@@ -709,6 +793,7 @@ export function parseCaption(caption: string): Partial<PackageExtractionResult> 
     title,
     packageType,
     departureCity,
+    landingRoute,
     airline,
     hotelMekkah,
     hotelMadinah,

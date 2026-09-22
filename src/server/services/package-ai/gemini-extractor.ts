@@ -44,7 +44,8 @@ export async function extractWithGemini(
   imagePath: string,
   rawOcrText: string,
   caption: string,
-  apiKeyOverride?: string
+  apiKeyOverride?: string,
+  additionalImagePaths?: string[]
 ): Promise<Partial<PackageExtractionResult> & { landingRoute?: string; rawText?: string; tipeMakan?: "FB" | "BF" }> {
   const startMs = Date.now();
   const keySequence = await getGeminiApiKeysSequence(apiKeyOverride);
@@ -62,7 +63,7 @@ export async function extractWithGemini(
   const airlineOptions = airlines.data.map(a => a.name).join(", ");
   const cityOptions = cities.data.map(c => c.name).join(", ");
   const typeOptions = packageTypes.data.map(t => t.name).join(", ");
-  const routeOptions = routes.data.map(r => `${r.ruteIn} -> ${r.ruteOut}`).join(", ");
+  const routeOptions = routes.data.map(r => `${r.kode} (${r.ruteIn} -> ${r.ruteOut})`).join(", ");
   
   // Extract all hotel names from Master Hotel table
   const allMasterHotelNames = hotels.data.map(h => h.name);
@@ -98,7 +99,7 @@ export async function extractWithGemini(
   const cleanCaption = caption.replace(/^\[MODUS KLASTER SEAT:.*\]\s*/gi, "").trim();
   const cleanOcrText = rawOcrText.includes("No OCR providers configured") ? "" : rawOcrText;
 
-  const prompt = `Kamu adalah sistem AI data entry travel umroh yang sangat teliti. Analisa GAMBAR FLYER UTAMA (GAMBAR TERLAMPIR), TEKS OCR, dan TEKS CAPTION dengan mengikuti ATURAN HIRARKI PENGAMBILAN DATA berikut.\n\n` +
+  const prompt = `Kamu adalah sistem AI data entry travel umroh yang sangat teliti. Analisa GAMBAR FLYER UTAMA (GAMBAR #1), GAMBAR FLYER ITINERARY TERAKHIR/SEBELUM TERAKHIR (JIKA TERLAMPIR), TEKS OCR, dan TEKS CAPTION dengan mengikuti ATURAN HIRARKI PENGAMBILAN DATA berikut.\n\n` +
     `==========================================================\n` +
     `1. SUMBER DATA: FLYER UTAMA (GAMBAR FLYER #1 & TEKS FLYER)\n` +
     `==========================================================\n` +
@@ -132,35 +133,55 @@ export async function extractWithGemini(
     `• Termasuk Kereta Cepat ('isAdaKeretaCepat'):\n` +
     `  - Jika flyer/caption menyebutkan "Kereta Cepat", "Fast Train", "Haramain", isi 'isAdaKeretaCepat' = "ya", selain itu "tidak".\n` +
     `• Termasuk City Tour Thoif / Thaif ('isAdaThoif'):\n` +
-    `  - ATURAN KESETARAAN MUTLAK (EQUIVALENCE MANDATE): Kata "Thoif" dan "Thaif" (serta "Taif", "Ta'if", "Tha'if", "Tho'if") adalah KATA YANG 100% SAMA (SINONIM IDENTIK)! DILARANG KERAS menganggap "Free city tour Thoif" dan "Free city tour Thaif" sebagai dua kata yang berbeda hanya karena perbedaan huruf 'o' dan 'a'. KEDUANYA ADALAH KATA YANG SAMA PERSIS!\n` +
-    `  - Jika caption atau flyer menyebutkan frasa "Free city tour Thaif", "Free city tour Thoif", "City Tour Thaif", "City Tour Thoif", "Free Thaif", "Free Thoif", "Ziarah Thaif", "Ziarah Thoif", "Thaif", atau "Thoif", maka SUDAH DIPASTIKAN PAKET TERSEBUT MEMILIKI CITY TOUR THOIF/THAIF sehingga WAJIB ISI 'isAdaThoif' = "ya"!\n` +
-    `  - Hanya isi 'isAdaThoif' = "tidak" jika sama sekali TIDAK ADA penyebutan kata Thaif maupun Thoif di flyer dan caption, atau secara eksplisit tertulis belum/tidak termasuk.\n` +
+    `  - ATURAN KESETARAAN MUTLAK: Kata "Thoif" dan "Thaif" (serta "Taif", "Ta'if") adalah KATA YANG 100% SAMA (SINONIM IDENTIK)! Jika ada frasa "City Tour Thaif/Thoif" atau "Free Thaif/Thoif" atau ziarah Thaif/Thoif, isi 'isAdaThoif' = "ya", selain itu "tidak".\n` +
     `• Tipe Makan / Konsumsi ('tipeMakan'):\n` +
     `  - Jika caption atau flyer menyebutkan "makan 3x1 hari", "makan 3x sehari", "3x sehari", "full board", "fullboard", atau "FB", isi 'tipeMakan' = "FB".\n` +
     `  - Jika TIDAK tercantum "makan 3x1 hari" dan tercantum "breakfast only", "bf", "sarapan saja", atau "hanya sarapan", isi 'tipeMakan' = "BF".\n` +
-    `  - Jika tidak ada keterangan spesifik tentang makan/konsumsi, default adalah "FB".\n` +
+    `  - Default adalah "FB".\n` +
     `• Harga Upgrade Kamar Double & Triple:\n` +
     `  - 'upgradeDouble': Nominal upgrade kamar berdua (cth: 7500000 dari "Sekamar Berdua + Rp 7.500.000").\n` +
     `  - 'upgradeTriple': Nominal upgrade kamar bertiga (cth: 5000000 dari "Sekamar Bertiga + Rp 5.000.000").\n\n` +
     `==========================================================\n` +
-    `3. SUMBER DATA: ITINERARY & FLYER UTAMA (ANALISIS RUTE IN-OUT PESAWAT)\n` +
+    `3. SUMBER DATA: ITINERARY & ANALISIS CERMAT RUTE IN-OUT PESAWAT ('landingRoute')\n` +
     `==========================================================\n` +
-    `Cara Menentukan Rute In-Out (Landing Route):\n` +
-    `a) PERIKSA FLYER UTAMA & TEKS OCR:\n` +
-    `   - Cari teks/badge bertuliskan "LANDING [JEDDAH/MADINAH]" dan "OUT [JEDDAH/MADINAH]" pada flyer utama (cth: "FLIGHT BY LANDING JEDDAH OUT MADINAH" atau "LANDING JEDDAH OUT JEDDAH").\n` +
-    `   - Ini memberikan informasi pasti Kota Landing (In) dan Kota Kepulangan (Out).\n` +
-    `b) PERIKSA ITINERARY PERJALANAN (Untuk Kota Tujuan Pertama Setelah Landing):\n` +
-    `   - Untuk menentukan kota tujuan pertama setelah mendarat (apakah langsung ke MAKKAH untuk Umroh (.C) atau ziarah ke MADINAH dulu (.D)), WAJIB periksa urutan itinerary hari pertama/kedua!\n` +
-    `c) KODE RUTE SINKRON:\n` +
-    `   - 1. PAKET REGULER:\n` +
-    `        * JED.D-J: Landing Jeddah, kota tujuan pertama Madinah (.D), selesai Makkah lalu out dari Jeddah (-J).\n` +
-    `        * JED.C-M: Landing Jeddah, kota tujuan pertama Makkah (.C) langsung Umroh, selesai ziarah Madinah lalu out dari Madinah (-M).\n` +
-    `        * JED.C-J: Landing Jeddah, kota tujuan pertama Makkah (.C) langsung Umroh, ziarah Madinah, lalu out kembali via Jeddah (-J).\n` +
-    `        * MED-J / Med-J: Landing di bandara Madinah, ziarah Madinah, lanjut Makkah, lalu out dari Jeddah (-J).\n` +
-    `   - 2. PAKET PLUS (Singgah Negara Lain: Istanbul, Dubai, Qatar, Oman, Taif, Jordan, Cairo, dll):\n` +
-    `        * Umroh Dulu (UD): Ke Arab Saudi dulu untuk ibadah baru tour ke negara plus (UD.D-J, UD.D-M).\n` +
-    `        * Tour Dulu (TD): Tour ke negara plus terlebih dahulu sebelum mendarat di Saudi (TD.D-J, TD.C-J, TD.C-M).\n\n` +
-    `Rute WAJIB dipilih persis dari daftar ini -> [${routeOptions}]\n\n` +
+    `PERHATIKAN STRUKTUR KODE RUTE DENGAN SANGAT CERMAT:\n` +
+    `Semua kode rute memiliki pola: [KODE_IN]-[INISIAL_OUT]\n` +
+    `ATURAN MUTLAK: RUTE OUT HANYA ADA 2 PILIHAN SAJA DI SELURUH SISTEM, YAITU:\n` +
+    `1. INISIAL 'J' = BANDARA JEDDAH (King Abdulaziz International Airport / JED)\n` +
+    `2. INISIAL 'M' = BANDARA MADINAH / MEDINAH (Prince Mohammad bin Abdulaziz International Airport / MED)\n` +
+    `TIDAK ADA INISIAL RUTE OUT LAINNYA SELAIN 'J' ATAU 'M'!\n` +
+    `Semua inisial yang terletak SETELAH tanda '-' (garis/strip/sret) adalah salah satu dari 2 ini:\n` +
+    `• Inisial '-J' = Rute OUT Bandara Jeddah (Take off pulang ke Indonesia dari Bandara Jeddah).\n` +
+    `• Inisial '-M' = Rute OUT Bandara Madinah/Medinah (Take off pulang ke Indonesia dari Bandara Madinah).\n\n` +
+    `CARA MENANGKAP RUTE OUT DENGAN CERMAT DARI FLYER TERAKHIR / SEBELUM TERAKHIR:\n` +
+    `1. Periksa GAMBAR FLYER TERAKHIR atau SEBELUM TERAKHIR (atau jadwal itinerary hari-hari terakhir kepulangan, misal Hari 8, 9, 10, 11, 12, atau bagian Kepulangan):\n` +
+    `   - Jika jadwal hari terakhir/sebelum terakhir tertulis: "Transfer ke Bandara Internasional King Abdulaziz Jeddah", "Bandara Jeddah", "Jeddah - Jakarta/Surabaya", "Take off Jeddah", atau posisi terakhir jamaah berada di Makkah lalu langsung menuju Bandara Jeddah:\n` +
+    `     => MAKA RUTE OUT ADALAH JEDDAH, KODE WAJIB BERAKHIRAN '-J'!\n` +
+    `   - Jika jadwal hari terakhir/sebelum terakhir tertulis: "Transfer ke Bandara Prince Mohammad Bin Abdulaziz Madinah", "Bandara Madinah", "Madinah - Jakarta/Surabaya", "Take off Madinah", atau posisi terakhir jamaah berada di Madinah lalu langsung menuju Bandara Madinah:\n` +
+    `     => MAKA RUTE OUT ADALAH MADINAH, KODE WAJIB BERAKHIRAN '-M'!\n\n` +
+    `CARA MENENTUKAN RUTE IN (LANDING DI SAUDI):\n` +
+    `1. Periksa hari pertama atau kedua pada flyer / itinerary / caption:\n` +
+    `   - Jika mendarat langsung di Bandara Madinah => Rute In: 'MED' (cth: 'MED-J')\n` +
+    `   - Jika mendarat di Bandara Jeddah:\n` +
+    `     * Langsung menuju Makkah untuk ibadah Umroh => 'JED.C' (cth: 'JED.C-M' jika out Madinah, 'JED.C-J' jika out Jeddah)\n` +
+    `     * Langsung menuju Madinah via bus / kereta => 'JED.D' (cth: 'JED.D-J')\n` +
+    `     * Transit / city tour ke Thaif terlebih dahulu => 'JED.TH' (cth: 'JED.TH-M' jika out Madinah, 'JED.TH-J' jika out Jeddah)\n` +
+    `   - Paket Tour Plus (Singgah ke negara lain terlebih dahulu):\n` +
+    `     * Tour Dulu baru ke Makkah => 'TD.C' ('TD.C-J' atau 'TD.C-M')\n` +
+    `     * Tour Dulu baru ke Madinah => 'TD.D' ('TD.D-J')\n` +
+    `     * Umroh Dulu di Makkah lalu Madinah lalu tour => 'UD.D' ('UD.D-J' atau 'UD.D-M')\n\n` +
+    `PILIHAN KODE RUTE WAJIB DIPILIH SALAH SATU DARI 11 KODE MASTER INI -> [${routeOptions}]:\n` +
+    `- JED.C-M  (Jeddah In -> Makkah, Out: Madinah)\n` +
+    `- JED.C-J  (Jeddah In -> Makkah, Out: Jeddah)\n` +
+    `- JED.D-J  (Jeddah In -> Madinah, Out: Jeddah)\n` +
+    `- MED-J    (Madinah In, Out: Jeddah)\n` +
+    `- JED.TH-M (Jeddah In -> Thaif, Out: Madinah)\n` +
+    `- JED.TH-J (Jeddah In -> Thaif, Out: Jeddah)\n` +
+    `- TD.C-M   (Tour Dulu -> Makkah, Out: Madinah)\n` +
+    `- TD.C-J   (Tour Dulu -> Makkah, Out: Jeddah)\n` +
+    `- TD.D-J   (Tour Dulu -> Madinah, Out: Jeddah)\n` +
+    `- UD.D-M   (Umroh Dulu - Madinah, Out: Madinah)\n` +
+    `- UD.D-J   (Umroh Dulu - Madinah, Out: Jeddah)\n\n` +
     `=============================================================================================================\n` +
     `4. ATURAN EKSTRAKSI KLASTER SEAT / KOTAK PAKET & CAPTION HARGA PER-KLASTER\n` +
     `==========================================================\n` +
@@ -176,7 +197,7 @@ export async function extractWithGemini(
     `--- DATA UNTUK DIANALISA ---\n` +
     `1. TEKS HASIL SCAN OCR: ${cleanOcrText}\n\n` +
     `2. TEKS CAPTION: ${cleanCaption}\n\n` +
-    `3. GAMBAR FLYER UTAMA (Telah dilampirkan): Analisa visual flyer utama & rute itinerary.`;
+    `3. GAMBAR TERLAMPIR: Flyer Utama (Gambar #1) dan Flyer Itinerary Terakhir / Sebelum Terakhir (Gambar #2/#3 jika ada).`;
 
   const candidateModels = ["gemini-flash-lite-latest", "gemini-3.5-flash-lite", "gemini-3.5-flash", "gemini-flash-latest", "gemini-pro-latest"];
   let lastError: any = null;
@@ -203,10 +224,19 @@ export async function extractWithGemini(
                 airline: { type: SchemaType.STRING, description: "Maskapai penerbangan dari Flyer Utama" },
                 hotelMekkah: { type: SchemaType.STRING, description: "Hotel Mekkah dari Flyer Utama" },
                 hotelMadinah: { type: SchemaType.STRING, description: "Hotel Madinah dari Flyer Utama" },
-                landingRoute: { type: SchemaType.STRING, description: "Rute In-Out pesawat dari analisis alur itinerary" },
+                landingRoute: {
+                  type: SchemaType.STRING,
+                  format: "enum",
+                  description: "Kode Rute In-Out pesawat persis dari Master Route. RUTE OUT HANYA ADA 2 YAITU: inisial 'J' (Bandara Jeddah) atau inisial 'M' (Bandara Madinah/Medinah). Semua inisial setelah '-' adalah rute out tersebut (-J atau -M). Ambil info rute out ini dari flyer itinerary terakhir atau sebelum terakhir.",
+                  enum: [
+                    "JED.C-M", "JED.C-J", "JED.D-J", "MED-J",
+                    "JED.TH-M", "JED.TH-J", "TD.C-M", "TD.C-J",
+                    "TD.D-J", "UD.D-M", "UD.D-J"
+                  ]
+                },
                 isAdaPerlengkapan: { type: SchemaType.STRING, description: "Dari Caption: 'ya' jika termasuk perlengkapan, 'tidak' jika belum/tidak" },
                 isAdaKeretaCepat: { type: SchemaType.STRING, description: "'ya' jika termasuk kereta cepat Haramain / fast train, 'tidak' jika tidak" },
-                isAdaThoif: { type: SchemaType.STRING, description: "'ya' jika terdapat city tour Thaif / Thoif (kata yang 100% sama: 'Free city tour Thaif' == 'Free city tour Thoif'), 'tidak' jika tidak" },
+                isAdaThoif: { type: SchemaType.STRING, description: "'ya' jika terdapat city tour Thaif / Thoif, 'tidak' jika tidak" },
                 tipeMakan: { type: SchemaType.STRING, description: "'FB' jika full board / makan 3x1 hari, 'BF' jika breakfast only / sarapan saja" },
                 hargaBase: { type: SchemaType.STRING, description: "Harga base paket (hanya angka nominal)" },
                 upgradeDouble: { type: SchemaType.STRING, description: "Harga upgrade kamar double umum dari Caption (hanya angka nominal)" },
@@ -242,15 +272,34 @@ export async function extractWithGemini(
           }
         });
 
-        const result = await model.generateContent([
-          prompt,
-          {
-            inlineData: {
-              data: base64Image,
-              mimeType
+        // Assemble content parts (Prompt + Flyer Utama + Flyer Itinerary Terakhir / Sebelum Terakhir)
+        const contentParts: any[] = [prompt];
+        contentParts.push({
+          inlineData: {
+            data: base64Image,
+            mimeType
+          }
+        });
+
+        if (Array.isArray(additionalImagePaths)) {
+          for (const addPath of additionalImagePaths) {
+            if (addPath && fs.existsSync(addPath)) {
+              try {
+                const addBuf = fs.readFileSync(addPath);
+                contentParts.push({
+                  inlineData: {
+                    data: addBuf.toString("base64"),
+                    mimeType: "image/jpeg"
+                  }
+                });
+              } catch (err) {
+                console.warn("[Gemini Extractor] Failed to attach additional itinerary flyer:", err);
+              }
             }
           }
-        ]);
+        }
+
+        const result = await model.generateContent(contentParts);
 
         const responseText = result.response.text();
         const parsed = JSON.parse(responseText);

@@ -111,18 +111,42 @@ export async function POST(request: NextRequest) {
 
     const isAdaKlaster = formData.get("isAdaKlaster") as string | null;
 
-    // Convert File to Buffer
+    // Convert Main Flyer File to Buffer
     const buffer = Buffer.from(await flyerFile.arrayBuffer());
 
-    // Save flyer to temp storage (validates magic bytes)
+    // Save main flyer to temp storage (validates magic bytes)
     const flyerPath = saveFlyerImage(buffer, fileName);
+
+    // Save additional itinerary flyers if provided (e.g. flyer terakhir & sebelum terakhir)
+    const additionalFlyerPaths: string[] = [];
+    const lastFlyer = formData.get("lastFlyer") as File | null;
+    if (lastFlyer && lastFlyer.size > 1024) {
+      try {
+        const lastBuf = Buffer.from(await lastFlyer.arrayBuffer());
+        const lastSaved = saveFlyerImage(lastBuf, `last_${lastFlyer.name || "itinerary.jpg"}`);
+        additionalFlyerPaths.push(lastSaved);
+      } catch (e) {
+        console.warn("[AI-Import] Failed to save lastFlyer:", e);
+      }
+    }
+
+    const penultimateFlyer = formData.get("penultimateFlyer") as File | null;
+    if (penultimateFlyer && penultimateFlyer.size > 1024) {
+      try {
+        const penBuf = Buffer.from(await penultimateFlyer.arrayBuffer());
+        const penSaved = saveFlyerImage(penBuf, `pen_${penultimateFlyer.name || "itinerary_prev.jpg"}`);
+        additionalFlyerPaths.push(penSaved);
+      } catch (e) {
+        console.warn("[AI-Import] Failed to save penultimateFlyer:", e);
+      }
+    }
 
     const captionWithHint = isAdaKlaster === "ya"
       ? `[MODUS KLASTER SEAT: AKTIF (Ekstrak rincian klaster Bronze, Silver, Gold, Platinum)]\n${caption}`
       : caption;
 
-    // Run AI processing pipeline
-    const extractionResult = await processPackageFlyer(flyerPath, captionWithHint);
+    // Run AI processing pipeline with main flyer and additional itinerary flyers
+    const extractionResult = await processPackageFlyer(flyerPath, captionWithHint, additionalFlyerPaths);
 
     // Create draft (always DRAFT — never auto-publish)
     const draft = await createPackageDraft(extractionResult, flyerPath);

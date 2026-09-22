@@ -73,7 +73,8 @@ function generateDraftId(): string {
  */
 export async function processPackageFlyer(
   imagePath: string,
-  caption: string
+  caption: string,
+  additionalImagePaths?: string[]
 ): Promise<PackageExtractionResult> {
   // Read and validate the image
   const imageBuffer = fs.readFileSync(imagePath);
@@ -94,9 +95,10 @@ export async function processPackageFlyer(
   const hasAirline = !!localParsed.airline;
   const hasCity = !!localParsed.departureCity;
   const hasPrice = !!localParsed.hargaBase;
+  const hasRoute = !!localParsed.landingRoute;
 
-  // If local parser extracted dates, duration, airline, city & price, NO NEED TO CALL GEMINI API!
-  if (hasDates && hasDuration && hasAirline && hasCity && hasPrice) {
+  // If local parser extracted dates, duration, airline, city, price AND route, skip Gemini API!
+  if (hasDates && hasDuration && hasAirline && hasCity && hasPrice && hasRoute) {
     console.log(`[processPackageFlyer] ⚡ 100% Parsed locally via Regex/Parser in ${Date.now() - startMs}ms! Skipping Gemini API call to conserve token quota.`);
     return {
       ...localParsed,
@@ -120,7 +122,7 @@ export async function processPackageFlyer(
 
   try {
     const { extractWithGemini } = await import("./gemini-extractor");
-    geminiData = await extractWithGemini(imagePath, "", caption);
+    geminiData = await extractWithGemini(imagePath, "", caption, undefined, additionalImagePaths);
     isGeminiSuccess = true;
     console.log(`[processPackageFlyer] ✅ Gemini AI completion finished in ${Date.now() - startMs}ms`);
   } catch (error) {

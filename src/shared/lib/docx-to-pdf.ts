@@ -169,6 +169,7 @@ function parseParagraphStyles(pPrXml: string): string {
 
 /**
  * Parses XML paragraph (<w:p>) to HTML string.
+ * Special handling for inline signatures and stamps vs background drawings.
  */
 function parseParagraphXmlToHtml(pXml: string, mediaMap: Record<string, string>): string {
   const pPrMatch = pXml.match(/<w:pPr\b[\s\S]*?<\/w:pPr>/i);
@@ -184,11 +185,19 @@ function parseParagraphXmlToHtml(pXml: string, mediaMap: Record<string, string>)
     const rawElem = elemMatch[0];
 
     if (rawElem.startsWith("<w:drawing")) {
-      // Image in drawing
+      // Check if it's behindDoc (watermark or background) - ignore if full page, or render as watermark
+      const isBehind = /behindDoc="1"/i.test(rawElem);
       const blipMatch = rawElem.match(/<a:blip\b[^>]*r:embed="([^"]+)"/i);
       const rId = blipMatch ? blipMatch[1] : null;
+
       if (rId && mediaMap[rId]) {
-        innerHtml += `<img src="${mediaMap[rId]}" style="max-width: 100%; height: auto; display: inline-block; vertical-align: middle;" />`;
+        if (isBehind) {
+          // Semi-transparent background watermark
+          innerHtml += `<img src="${mediaMap[rId]}" style="position: absolute; top: 45%; left: 50%; transform: translate(-50%, -50%); opacity: 0.12; max-width: 75%; max-height: 75%; z-index: 0; pointer-events: none;" />`;
+        } else {
+          // Inline drawing (Signature, Stamp, QR Code, Logo)
+          innerHtml += `<img src="${mediaMap[rId]}" style="max-height: 85px; max-width: 220px; object-fit: contain; display: inline-block; vertical-align: middle; margin: 2px 4px;" />`;
+        }
       }
       continue;
     }
@@ -202,7 +211,7 @@ function parseParagraphXmlToHtml(pXml: string, mediaMap: Record<string, string>)
     if (insideDrawingMatch && insideDrawingMatch[1]) {
       const rId = insideDrawingMatch[1];
       if (mediaMap[rId]) {
-        innerHtml += `<img src="${mediaMap[rId]}" style="max-width: 100%; height: auto; display: inline-block; vertical-align: middle;" />`;
+        innerHtml += `<img src="${mediaMap[rId]}" style="max-height: 85px; max-width: 220px; object-fit: contain; display: inline-block; vertical-align: middle; margin: 2px 4px;" />`;
       }
     }
 
@@ -279,7 +288,71 @@ function parseTableXmlToHtml(tblXml: string, mediaMap: Record<string, string>): 
 }
 
 /**
- * Converts a merged DOCX document into a clean, printable HTML string with A4 dimensions.
+ * Extracts the background letterhead/watermark image from header XML files.
+ * Word documents put full-page letterheads in header with behindDoc="1" or large EMU bounds.
+ */
+async function extractLetterheadBackground(
+  zip: JSZip,
+  mediaMap: Record<string, string>
+): Promise<{ backgroundLetterhead: string | null; headerBannerHtml: string }> {
+  let backgroundLetterhead: string | null = null;
+  let headerBannerHtml = "";
+
+  const headerFiles = Object.keys(zip.files).filter(
+    (f) => f.startsWith("word/header") && f.endsWith(".xml")
+  );
+  headerFiles.sort();
+
+  for (const hPath of headerFiles) {
+    const hFile = zip.file(hPath);
+    if (!hFile) continue;
+    const hXml = await hFile.async("string");
+
+    // Check for drawings in header
+    const drawingRegex = /<w:drawing\b[\s\S]*?<\/w:drawing>/gi;
+    let dMatch: RegExpExecArray | null;
+
+    while ((dMatch = drawingRegex.exec(hXml)) !== null) {
+      const drawXml = dMatch[0];
+      const isBehind = /behindDoc="1"/i.test(drawXml);
+      const blipMatch = drawXml.match(/<a:blip\b[^>]*r:embed="([^"]+)"/i);
+      const rId = blipMatch ? blipMatch[1] : null;
+
+      if (rId && mediaMap[rId]) {
+        // Check extent size in EMUs
+        const extentMatch = drawXml.match(/<wp:extent\b[^>]*cx="(\d+)"[^>]*cy="(\d+)"/i);
+        const cx = extentMatch ? parseInt(extentMatch[1] || "0", 10) : 0;
+        const cy = extentMatch ? parseInt(extentMatch[2] || "0", 10) : 0;
+
+        // If behindDoc or large full-sheet dimensions (> 5,000,000 EMUs)
+        if (isBehind || (cx > 5000000 && cy > 8000000)) {
+          if (!backgroundLetterhead) {
+            backgroundLetterhead = mediaMap[rId];
+          }
+        } else {
+          // Top banner kop surat
+          headerBannerHtml += `<div style="text-align: center; margin-bottom: 8pt;"><img src="${mediaMap[rId]}" style="max-width: 100%; max-height: 110px; object-fit: contain;" /></div>`;
+        }
+      }
+    }
+
+    // Check for plain paragraphs in header if not drawings
+    if (!backgroundLetterhead && !headerBannerHtml) {
+      const pMatches = hXml.match(/<w:p\b[\s\S]*?<\/w:p>/gi) || [];
+      for (const pXml of pMatches) {
+        const textContent = pXml.replace(/<[^>]+>/g, "").trim();
+        if (textContent) {
+          headerBannerHtml += parseParagraphXmlToHtml(pXml, mediaMap);
+        }
+      }
+    }
+  }
+
+  return { backgroundLetterhead, headerBannerHtml };
+}
+
+/**
+ * Converts a merged DOCX document into a clean, printable HTML string with discrete A4 pages.
  */
 export async function convertDocxToA4Html(
   docxData: string | Uint8Array | ArrayBuffer | Blob
@@ -304,31 +377,15 @@ export async function convertDocxToA4Html(
 
   const zip = await JSZip.loadAsync(arrayBuffer);
   const mediaMap = await extractMediaMap(zip);
+  const { backgroundLetterhead, headerBannerHtml } = await extractLetterheadBackground(zip, mediaMap);
 
-  let fullHtml = "";
+  // Parse document body into distinct pages based on Page Breaks and section breaks
+  const pages: string[] = [];
+  let currentPageBlocks: string[] = [];
 
-  // 1. Process header XMLs (kop surat, logos)
-  const headerFiles = Object.keys(zip.files).filter((f) => f.startsWith("word/header") && f.endsWith(".xml"));
-  headerFiles.sort();
-
-  for (const hPath of headerFiles) {
-    const hFile = zip.file(hPath);
-    if (!hFile) continue;
-    const hXml = await hFile.async("string");
-
-    // Extract drawings or paragraphs from header
-    const pMatches = hXml.match(/<w:p\b[\s\S]*?<\/w:p>/gi) || [];
-    for (const pXml of pMatches) {
-      fullHtml += parseParagraphXmlToHtml(pXml, mediaMap);
-    }
-  }
-
-  // 2. Process document body
   const docFile = zip.file("word/document.xml");
   if (docFile) {
     const docXml = await docFile.async("string");
-
-    // Match top-level paragraphs and tables in order of appearance
     const bodyMatch = docXml.match(/<w:body\b[\s\S]*?<\/w:body>/i);
     const bodyContent = bodyMatch ? bodyMatch[0] : docXml;
 
@@ -337,35 +394,107 @@ export async function convertDocxToA4Html(
 
     while ((blockMatch = blockRegex.exec(bodyContent)) !== null) {
       const rawBlock = blockMatch[0];
-      if (rawBlock.startsWith("<w:tbl")) {
-        fullHtml += parseTableXmlToHtml(rawBlock, mediaMap);
-      } else {
-        fullHtml += parseParagraphXmlToHtml(rawBlock, mediaMap);
+
+      // Detect page break in paragraph or run
+      const hasPageBreak =
+        /<w:br\b[^>]*w:type="page"/i.test(rawBlock) ||
+        /<w:pageBreakBefore(?:\s|\/|>)/i.test(rawBlock) ||
+        /<w:lastRenderedPageBreak(?:\s|\/|>)/i.test(rawBlock);
+
+      if (hasPageBreak && currentPageBlocks.length > 0) {
+        pages.push(currentPageBlocks.join("\n"));
+        currentPageBlocks = [];
       }
+
+      if (rawBlock.startsWith("<w:tbl")) {
+        currentPageBlocks.push(parseTableXmlToHtml(rawBlock, mediaMap));
+      } else {
+        currentPageBlocks.push(parseParagraphXmlToHtml(rawBlock, mediaMap));
+      }
+    }
+
+    if (currentPageBlocks.length > 0) {
+      pages.push(currentPageBlocks.join("\n"));
     }
   }
 
+  if (pages.length === 0) {
+    pages.push("<p>&nbsp;</p>");
+  }
+
+  // Construct discrete A4 page cards
+  const pagesHtml = pages
+    .map(
+      (content, idx) => `
+      <div class="docx-a4-page" data-page="${idx + 1}" style="
+        position: relative;
+        width: 794px;
+        height: 1123px;
+        min-height: 1123px;
+        max-height: 1123px;
+        box-sizing: border-box;
+        background-color: #ffffff;
+        overflow: hidden;
+        margin: 0 0 20px 0;
+        page-break-after: always;
+        break-after: page;
+      ">
+        ${
+          backgroundLetterhead
+            ? `
+          <img src="${backgroundLetterhead}" alt="Kop & Watermark" style="
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 794px;
+            height: 1123px;
+            object-fit: fill;
+            z-index: 0;
+            pointer-events: none;
+          " />
+        `
+            : ""
+        }
+
+        <div class="docx-page-content" style="
+          position: relative;
+          z-index: 1;
+          width: 100%;
+          height: 100%;
+          padding: 40px 48px 36px 48px;
+          box-sizing: border-box;
+          font-family: 'Times New Roman', 'Cambria', Georgia, serif;
+          font-size: 11pt;
+          line-height: 1.35;
+          color: #0f172a;
+          text-rendering: optimizeLegibility;
+          -webkit-font-smoothing: antialiased;
+        ">
+          ${headerBannerHtml}
+          ${content}
+        </div>
+      </div>
+    `
+    )
+    .join("\n");
+
   return `
-    <div class="docx-a4-container" style="
-      width: 794px;
-      min-height: 1123px;
-      padding: 38px 48px;
-      box-sizing: border-box;
-      background-color: #ffffff;
-      color: #0f172a;
-      font-family: 'Times New Roman', 'Cambria', Georgia, serif;
-      font-size: 11.5pt;
-      line-height: 1.35;
-      text-rendering: optimizeLegibility;
-      -webkit-font-smoothing: antialiased;
+    <div class="docx-pages-container" style="
+      background-color: #f1f5f9;
+      padding: 0;
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
     ">
-      ${fullHtml}
+      ${pagesHtml}
     </div>
   `;
 }
 
 /**
  * Merges field values into DOCX template and downloads it directly as an accurate PDF file.
+ * Preserves high fidelity letterhead background, watermark, and multi-page integrity.
  */
 export async function downloadDocxAsPdf(
   docxData: string | Uint8Array | ArrayBuffer | Blob,
@@ -389,10 +518,8 @@ export async function downloadDocxAsPdf(
   document.body.appendChild(container);
 
   try {
-    const targetElement = (container.firstElementChild as HTMLElement) || container;
-
-    // Wait for images to load
-    const images = Array.from(targetElement.querySelectorAll("img"));
+    // Wait for all images (background letterhead, stamps, signatures) to fully load
+    const images = Array.from(container.querySelectorAll("img"));
     if (images.length > 0) {
       await Promise.all(
         images.map(
@@ -408,13 +535,13 @@ export async function downloadDocxAsPdf(
       );
     }
 
-    // Rasterize high-resolution canvas (scale: 2 = 300dpi equivalent)
-    const canvas = await html2canvas(targetElement, {
-      scale: 2,
-      useCORS: true,
-      logging: false,
-      backgroundColor: "#ffffff",
-    });
+    // Small delay to allow CSS font rendering
+    await new Promise((resolve) => setTimeout(resolve, 150));
+
+    // Find all discrete A4 page elements
+    const pageElements = Array.from(
+      container.querySelectorAll(".docx-a4-page")
+    ) as HTMLElement[];
 
     const pdf = new jsPDF({
       orientation: "portrait",
@@ -422,24 +549,40 @@ export async function downloadDocxAsPdf(
       format: "a4",
     });
 
-    const imgData = canvas.toDataURL("image/jpeg", 0.98);
-    const pdfWidth = 210; // A4 mm
-    const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-
-    if (pdfHeight <= 297) {
-      pdf.addImage(imgData, "JPEG", 0, 0, pdfWidth, pdfHeight);
+    if (pageElements.length === 0) {
+      // Fallback single canvas
+      const targetElement = (container.firstElementChild as HTMLElement) || container;
+      const canvas = await html2canvas(targetElement, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        backgroundColor: "#ffffff",
+      });
+      const imgData = canvas.toDataURL("image/jpeg", 0.98);
+      pdf.addImage(imgData, "JPEG", 0, 0, 210, 297);
     } else {
-      // Multi-page slicing if letter exceeds 1 page
-      let remainingHeight = pdfHeight;
-      let yOffset = 0;
+      // Discrete Page Rasterization: 1 Page DOM = 1 Page PDF
+      for (let i = 0; i < pageElements.length; i++) {
+        const pageEl = pageElements[i];
+        if (!pageEl) continue;
 
-      while (remainingHeight > 0) {
-        if (yOffset > 0) {
+        if (i > 0) {
           pdf.addPage();
         }
-        pdf.addImage(imgData, "JPEG", 0, -yOffset, pdfWidth, pdfHeight);
-        yOffset += 297;
-        remainingHeight -= 297;
+
+        const canvas = await html2canvas(pageEl, {
+          scale: 2, // 300 dpi equivalent for crisp print quality
+          useCORS: true,
+          logging: false,
+          backgroundColor: "#ffffff",
+          width: 794,
+          height: 1123,
+          windowWidth: 794,
+          windowHeight: 1123,
+        });
+
+        const imgData = canvas.toDataURL("image/jpeg", 0.98);
+        pdf.addImage(imgData, "JPEG", 0, 0, 210, 297);
       }
     }
 

@@ -709,8 +709,9 @@ export default function GeneratePaketPage() {
       let finalFormData = { ...formData };
       let warningMessages: string[] = [];
 
-      // ── KRITIS: Hanya kirim Foto #1 (Flyer Utama) ke Gemini AI ──
-      // Foto #2, #3, #4 adalah itinerary/jadwal dan TIDAK boleh di-OCR karena akan menghasilkan data salah.
+      // ── Mengirim Flyer Utama dan Flyer Itinerary Terakhir / Sebelum Terakhir ──
+      // Flyer Utama (#1): Informasi dasar paket (harga, maskapai, tanggal, hotel).
+      // Flyer Terakhir & Sebelum Terakhir: Jadwal hari-hari terakhir kepulangan jamaah (menentukan Rute Out -J atau -M).
       const flyerUtama = flyerFiles[0];
       if (!flyerUtama) {
         setOcrWarning("Tidak ada file flyer utama.");
@@ -720,6 +721,19 @@ export default function GeneratePaketPage() {
 
       const bodyData = new FormData();
       bodyData.append("flyer", flyerUtama);
+
+      // Lampirkan flyer terakhir (jadwal kepulangan hari terakhir)
+      if (flyerFiles.length >= 2) {
+        const lastFlyer = flyerFiles[flyerFiles.length - 1];
+        if (lastFlyer) bodyData.append("lastFlyer", lastFlyer);
+      }
+
+      // Lampirkan flyer sebelum terakhir jika ada 3 foto atau lebih
+      if (flyerFiles.length >= 3) {
+        const penultimateFlyer = flyerFiles[flyerFiles.length - 2];
+        if (penultimateFlyer) bodyData.append("penultimateFlyer", penultimateFlyer);
+      }
+
       bodyData.append("caption", caption || `Proses dokumen flyer ${flyerUtama.name}`);
       bodyData.append("isAdaKlaster", formData.isAdaKlaster);
 
@@ -783,39 +797,62 @@ export default function GeneratePaketPage() {
           }
         }
 
-        // ── 4. LANDING ROUTE MATCHING (Preserve dots and dashes in kode) ──
+        // ── 4. LANDING ROUTE MATCHING (Aturan Inisial setelah '-' adalah RUTE OUT) ──
         let mappedLandingRoute = "";
         const routesList = options?.routes && options.routes.length > 0 ? options.routes : MOCK_LANDING_PATTERN;
-        if (result.landingRoute) {
-          const aiRoute = result.landingRoute.toUpperCase().trim();
-          // Exact kode match first (preserve dots/dashes)
-          let found = routesList.find(r => (r.kode || "").toUpperCase().trim() === aiRoute);
-          // Partial kode match
+        const candidateRouteStr = (result.landingRoute || "").toUpperCase().trim();
+
+        if (candidateRouteStr) {
+          // 1. Exact match kode rute (cth: JED.C-M, JED.C-J, JED.TH-M, MED-J, dll)
+          let found = routesList.find(r => (r.kode || "").toUpperCase().trim() === candidateRouteStr);
+
+          // 2. Jika belum persis sama, lakukan pencocokan berdasarkan inisial setelah '-' (RUTE OUT)
+          if (!found) {
+            const hasOutM = candidateRouteStr.endsWith("-M") || candidateRouteStr.includes("OUT MADINAH") || candidateRouteStr.includes("MEDINAH OUT") || candidateRouteStr.includes("MADINAH OUT");
+            const hasOutJ = candidateRouteStr.endsWith("-J") || candidateRouteStr.includes("OUT JEDDAH") || candidateRouteStr.includes("JEDDAH OUT");
+
+            const hasInMed = candidateRouteStr.startsWith("MED") || candidateRouteStr.includes("LANDING MADINAH") || candidateRouteStr.includes("MADINAH IN");
+            const hasInThaif = candidateRouteStr.includes("TH") || candidateRouteStr.includes("THAIF") || candidateRouteStr.includes("TAIF");
+            const hasInJedMakkah = candidateRouteStr.includes("JED.C") || candidateRouteStr.includes("MAKKAH");
+            const hasInJedMadinah = candidateRouteStr.includes("JED.D");
+
+            const targetOut = hasOutM ? "M" : hasOutJ ? "J" : "";
+
+            if (targetOut) {
+              if (hasInMed) {
+                found = routesList.find(r => (r.kode || "").toUpperCase() === `MED-${targetOut}`) ||
+                        routesList.find(r => (r.kode || "").toUpperCase().endsWith(`-${targetOut}`));
+              } else if (hasInThaif) {
+                found = routesList.find(r => (r.kode || "").toUpperCase() === `JED.TH-${targetOut}`);
+              } else if (hasInJedMadinah) {
+                found = routesList.find(r => (r.kode || "").toUpperCase() === `JED.D-${targetOut}`);
+              } else if (hasInJedMakkah) {
+                found = routesList.find(r => (r.kode || "").toUpperCase() === `JED.C-${targetOut}`);
+              } else {
+                found = routesList.find(r => (r.kode || "").toUpperCase().endsWith(`-${targetOut}`));
+              }
+            }
+          }
+
+          // 3. Partial match
           if (!found) {
             found = routesList.find(r => {
               const rKode = (r.kode || "").toUpperCase().trim();
-              return rKode && (aiRoute.includes(rKode) || rKode.includes(aiRoute));
+              return rKode && (candidateRouteStr.includes(rKode) || rKode.includes(candidateRouteStr));
             });
           }
-          // Fallback: match ruteIn/ruteOut
-          if (!found) {
-            const aiClean = aiRoute.toLowerCase().replace(/[^a-z0-9]/g, "");
-            found = routesList.find(r => {
-              const rClean = `${r.ruteIn || ""}${r.ruteOut || ""}`.toLowerCase().replace(/[^a-z0-9]/g, "");
-              return rClean.includes(aiClean) || aiClean.includes(rClean);
-            });
-          }
+
           if (found) mappedLandingRoute = found.id;
         }
-        // Fallback: scan caption for "landing jeddah out madinah"
+
+        // Fallback: scan caption untuk in & out pattern jika belum terdeteksi
         if (!mappedLandingRoute && caption) {
           const captionLower = caption.toLowerCase();
-          const landingMatch = captionLower.match(/landing\s+(jeddah|madinah|medina)/i);
-          const outMatch = captionLower.match(/out\s+(jeddah|madinah|medina)/i);
+          const landingMatch = captionLower.match(/(?:landing|in|masuk)\s+(?:ke\s*)?(?:di\s*)?(jeddah|madinah|medina)/i);
+          const outMatch = captionLower.match(/(?:out|pulang|take\s*off)\s+(?:dari\s*)?(?:via\s*)?(jeddah|madinah|medina)/i);
           if (landingMatch && outMatch) {
             const landing = landingMatch[1]!.toLowerCase().includes("jed") ? "JED" : "MED";
             const out = outMatch[1]!.toLowerCase().includes("jed") ? "J" : "M";
-            // Try to match JED.?-M or JED.?-J pattern
             const found = routesList.find(r => {
               const kode = (r.kode || "").toUpperCase();
               return kode.startsWith(landing) && kode.endsWith(`-${out}`);
