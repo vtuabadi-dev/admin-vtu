@@ -2505,15 +2505,15 @@ function ManifestPageContent() {
           {/* Month Filter Tabs (Only shown when no specific package is selected in the top filter) */}
           {groupedByMonth.length > 0 && (
             <div className="flex items-center gap-2 overflow-x-auto pb-1 pt-1 no-scrollbar scroll-smooth">
-              <div className="flex items-center gap-2 p-1.5 bg-gradient-to-r from-teal-100/70 via-white to-emerald-100/60 dark:from-slate-900 dark:via-slate-850 dark:to-slate-900 rounded-xl border border-teal-400/40 dark:border-teal-700/50 shadow-sm">
+              <div className="flex items-center gap-2 p-1.5 bg-gradient-to-r from-teal-100/80 via-white to-emerald-100/70 dark:from-slate-900 dark:via-slate-850 dark:to-slate-900 rounded-2xl border-2 border-teal-500/50 dark:border-teal-600/50 shadow-[inset_0_2.5px_4px_rgba(255,255,255,0.95),inset_0_-2.5px_4px_rgba(13,148,136,0.3),0_4px_14px_-2px_rgba(13,148,136,0.25)] dark:shadow-[inset_0_2px_3px_rgba(255,255,255,0.1),inset_0_-2px_4px_rgba(0,0,0,0.7),0_4px_12px_rgba(0,0,0,0.5)]">
                 <button
                   type="button"
                   onClick={() => setSelectedMonthTab("ALL")}
                   className={cn(
-                    "px-4 py-2 rounded-lg text-xs font-black transition-all flex items-center gap-2 cursor-pointer whitespace-nowrap shrink-0",
+                    "px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-2 cursor-pointer whitespace-nowrap shrink-0 active:scale-95",
                     selectedMonthTab === "ALL"
-                      ? "bg-gradient-to-r from-teal-600 via-emerald-600 to-teal-700 text-white shadow-md shadow-teal-600/30 border border-teal-400/30"
-                      : "text-teal-950 dark:text-teal-200 hover:text-teal-900 bg-white/90 dark:bg-slate-800/80 hover:bg-white dark:hover:bg-slate-800 border border-teal-200/90 dark:border-teal-800/60 shadow-2xs"
+                      ? "bg-gradient-to-b from-teal-600 via-teal-700 to-emerald-800 text-white shadow-[inset_0_1.5px_1px_rgba(255,255,255,0.5),0_3px_8px_rgba(13,148,136,0.35)] border border-teal-400/50"
+                      : "text-teal-950 dark:text-teal-200 hover:text-teal-900 bg-gradient-to-b from-white via-white/95 to-teal-50/40 dark:from-slate-800 dark:to-slate-850 hover:bg-white dark:hover:bg-slate-800 border border-teal-200/90 dark:border-teal-800/60 shadow-[inset_0_1px_1px_rgba(255,255,255,0.9),0_1.5px_3px_rgba(0,0,0,0.05)]"
                   )}
                 >
                   <CalendarDays className={cn("w-3.5 h-3.5", selectedMonthTab === "ALL" ? "text-amber-300" : "text-teal-600 dark:text-teal-400")} />
@@ -2538,10 +2538,10 @@ function ManifestPageContent() {
                       type="button"
                       onClick={() => setSelectedMonthTab(label)}
                       className={cn(
-                        "px-3.5 py-2 rounded-lg text-xs font-extrabold transition-all flex items-center gap-2 cursor-pointer whitespace-nowrap shrink-0",
+                        "px-3.5 py-2 rounded-xl text-xs font-extrabold transition-all flex items-center gap-2 cursor-pointer whitespace-nowrap shrink-0 active:scale-95",
                         isActive
-                          ? "bg-gradient-to-r from-teal-600 via-emerald-600 to-teal-700 text-white shadow-md shadow-teal-600/30 border border-teal-400/30"
-                          : "text-teal-950 dark:text-teal-200 hover:text-teal-900 bg-white/90 dark:bg-slate-800/80 hover:bg-white dark:hover:bg-slate-800 border border-teal-200/90 dark:border-teal-800/60 shadow-2xs"
+                          ? "bg-gradient-to-b from-teal-600 via-teal-700 to-emerald-800 text-white shadow-[inset_0_1.5px_1px_rgba(255,255,255,0.5),0_3px_8px_rgba(13,148,136,0.35)] border border-teal-400/50"
+                          : "text-teal-950 dark:text-teal-200 hover:text-teal-900 bg-gradient-to-b from-white via-white/95 to-teal-50/40 dark:from-slate-800 dark:to-slate-850 hover:bg-white dark:hover:bg-slate-800 border border-teal-200/90 dark:border-teal-800/60 shadow-[inset_0_1px_1px_rgba(255,255,255,0.9),0_1.5px_3px_rgba(0,0,0,0.05)]"
                       )}
                     >
                       <CalendarDays className={cn("w-3.5 h-3.5", isActive ? "text-amber-300" : "text-teal-600 dark:text-teal-400")} />
@@ -2695,21 +2695,14 @@ function ManifestPageContent() {
                             </div>
                           )}
 
-                          <div
-                            onClick={() => {
-                              setSelectedKeberangkatan(parent.id);
-                              const typeQuery = activeManifestView === "pembayaran" ? "&type=pembayaran" : "";
-                              router.push(`/admin/manifest?paketId=${parent.id}${typeQuery}`);
-                            }}
-                            className="p-4 md:p-5 hover:bg-teal-50/40 dark:hover:bg-teal-950/30 transition-colors cursor-pointer group"
-                          >
+                          <div className="p-4 md:p-5">
                           <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-center">
                             
                             {/* SISI KIRI: INFO PAKET & STARTING (SBY DI ATAS) */}
                             <div className="lg:col-span-3 space-y-2.5 pr-2 border-b lg:border-b-0 lg:border-r border-slate-100 dark:border-slate-800/80 pb-4 lg:pb-0">
                               <div className="flex items-center gap-2">
                                 <span className="w-2.5 h-2.5 rounded-full bg-teal-500 shadow-2xs"></span>
-                                <h3 className="text-base font-black text-slate-900 dark:text-white group-hover:text-teal-600 dark:group-hover:text-teal-300 transition-colors tracking-tight uppercase">
+                                <h3 className="text-base font-black text-slate-900 dark:text-white tracking-tight uppercase">
                                   {getPackageProgramType(parent)}
                                 </h3>
                               </div>
@@ -2724,7 +2717,10 @@ function ManifestPageContent() {
                                         const typeQuery = activeManifestView === "pembayaran" ? "&type=pembayaran" : "";
                                         router.push(`/admin/manifest?paketId=${sbyPkg.id}${typeQuery}`);
                                       }}
-                                      className="bg-gradient-to-b from-white via-teal-50/70 to-teal-100/50 dark:from-teal-950/60 dark:to-teal-900/40 border border-teal-500/35 dark:border-teal-600/40 rounded-lg p-2.5 space-y-1.5 shadow-[0_2px_4px_rgba(13,148,136,0.12)] cursor-pointer hover:ring-2 hover:ring-teal-500/50 transition-all"
+                                      role="button"
+                                      tabIndex={0}
+                                      className="bg-gradient-to-b from-white via-teal-50/70 to-teal-100/50 dark:from-teal-950/60 dark:to-teal-900/40 border border-teal-500/35 dark:border-teal-600/40 rounded-lg p-2.5 space-y-1.5 shadow-[0_2px_4px_rgba(13,148,136,0.12)] cursor-pointer hover:ring-2 hover:ring-teal-500/60 hover:shadow-md transition-all active:scale-[0.99]"
+                                      title="Klik untuk buka manifest keberangkatan Surabaya"
                                     >
                                       <div className="flex items-center justify-between font-bold text-teal-950 dark:text-teal-200">
                                         <span className="flex items-center gap-1.5">
@@ -2753,7 +2749,10 @@ function ManifestPageContent() {
                                         const typeQuery = activeManifestView === "pembayaran" ? "&type=pembayaran" : "";
                                         router.push(`/admin/manifest?paketId=${jktPkg.id}${typeQuery}`);
                                       }}
-                                      className="bg-gradient-to-b from-white via-slate-50/90 to-slate-100/80 dark:from-slate-800/90 dark:to-slate-900/90 border border-slate-300/90 dark:border-slate-700 rounded-lg p-2.5 space-y-1.5 shadow-[0_2px_4px_rgba(0,0,0,0.08)] cursor-pointer hover:ring-2 hover:ring-slate-500/50 transition-all"
+                                      role="button"
+                                      tabIndex={0}
+                                      className="bg-gradient-to-b from-white via-slate-50/90 to-slate-100/80 dark:from-slate-800/90 dark:to-slate-900/90 border border-slate-300/90 dark:border-slate-700 rounded-lg p-2.5 space-y-1.5 shadow-[0_2px_4px_rgba(0,0,0,0.08)] cursor-pointer hover:ring-2 hover:ring-slate-500/60 hover:shadow-md transition-all active:scale-[0.99]"
+                                      title="Klik untuk buka manifest keberangkatan Jakarta"
                                     >
                                       <div className="flex items-center justify-between font-bold text-slate-800 dark:text-slate-200">
                                         <span className="flex items-center gap-1.5">
@@ -2772,7 +2771,18 @@ function ManifestPageContent() {
                                       </div>
                                     </div>
                                   ) : !sbyPkg ? (
-                                    <div className="bg-gradient-to-b from-white via-teal-50/70 to-teal-100/50 dark:from-teal-950/60 dark:to-teal-900/40 border border-teal-500/35 dark:border-teal-600/40 rounded-lg p-2.5 space-y-1.5 shadow-[0_2px_4px_rgba(13,148,136,0.12)]">
+                                    <div 
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setSelectedKeberangkatan(parent.id);
+                                        const typeQuery = activeManifestView === "pembayaran" ? "&type=pembayaran" : "";
+                                        router.push(`/admin/manifest?paketId=${parent.id}${typeQuery}`);
+                                      }}
+                                      role="button"
+                                      tabIndex={0}
+                                      className="bg-gradient-to-b from-white via-teal-50/70 to-teal-100/50 dark:from-teal-950/60 dark:to-teal-900/40 border border-teal-500/35 dark:border-teal-600/40 rounded-lg p-2.5 space-y-1.5 shadow-[0_2px_4px_rgba(13,148,136,0.12)] cursor-pointer hover:ring-2 hover:ring-teal-500/60 hover:shadow-md transition-all active:scale-[0.99]"
+                                      title="Klik untuk buka manifest keberangkatan ini"
+                                    >
                                       <div className="flex items-center justify-between font-bold text-teal-950 dark:text-teal-200">
                                         <span className="flex items-center gap-1.5">
                                           <span className="w-2 h-2 rounded-full bg-teal-500 shadow-2xs"></span>
