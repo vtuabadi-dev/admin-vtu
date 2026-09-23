@@ -123,10 +123,8 @@ export async function POST(request: NextRequest) {
       status: "aktif",
     };
 
-    // Deduplicate: replace any existing log with the same nomorSurat OR same id
-    const filtered = currentLogs.filter(
-      (l) => l.id !== newLog.id && l.nomorSurat !== newLog.nomorSurat
-    );
+    // Deduplicate: replace only if the exact same log ID exists (preserving all generation sessions)
+    const filtered = currentLogs.filter((l) => l.id !== newLog.id);
     const updatedLogs = [newLog, ...filtered];
     await saveGeneratedLogsToDb(updatedLogs, session.user.name || session.user.email || "Admin Operasional");
 
@@ -155,10 +153,10 @@ export async function DELETE(request: NextRequest) {
     }
 
     const currentLogs = await getGeneratedLogsFromDb();
-    // Filter out by ID and/or by nomorSurat to ensure complete cleanup
+    // Filter out target log specifically by ID (preferred) or by nomorSurat
     const updatedLogs = currentLogs.filter((l) => {
-      if (id && l.id === id) return false;
-      if (nomorSurat && l.nomorSurat === nomorSurat) return false;
+      if (id) return l.id !== id;
+      if (nomorSurat) return l.nomorSurat !== nomorSurat;
       return true;
     });
     await saveGeneratedLogsToDb(updatedLogs, session.user.name || session.user.email || "Admin Operasional");

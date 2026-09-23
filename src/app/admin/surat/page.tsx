@@ -27,6 +27,8 @@ import {
   RefreshCw,
   FileDown,
   Info,
+  UploadCloud,
+  AlertTriangle,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/components/ui/Card";
 import { Button } from "@/shared/components/ui/Button";
@@ -39,6 +41,7 @@ import { useOperationalStore } from "@/stores/operational-store";
 import {
   DEFAULT_SURAT_TEMPLATES,
   loadSavedSuratTemplates,
+  saveSuratTemplates,
   loadGeneratedSuratLogs,
   saveGeneratedSuratLog,
   deleteGeneratedSuratLog,
@@ -47,8 +50,8 @@ import {
   getTodayDateInfo,
   isSystemAutoPlaceholder,
   extractPlaceholdersFromText,
+  extractPlaceholdersFromDocxFile,
 } from "@/shared/lib/surat-autocrat-engine";
-import { downloadOfficialLetterPdf } from "@/shared/lib/surat-pdf";
 import { downloadMergedDocx } from "@/shared/lib/docx-mail-merge";
 import { downloadDocxAsPdf, convertDocxToA4Html } from "@/shared/lib/docx-to-pdf";
 import { KantorImigrasiCombobox } from "@/shared/components/ui/KantorImigrasiCombobox";
@@ -56,9 +59,66 @@ import { SearchableSelect } from "@/shared/components/ui/SearchableSelect";
 import { getKotaFromKanimName } from "@/shared/lib/kantor-imigrasi";
 import type {
   SuratTemplate,
+  SuratAttachedFile,
   GeneratedSuratLog,
 } from "@/shared/types/surat";
 import OfficialLetterPreview from "./_components/OfficialLetterPreview";
+
+/**
+ * Checks whether a template has an uploaded .docx template binary attached
+ */
+function checkTemplateHasDocx(tpl: SuratTemplate | null | undefined): boolean {
+  if (!tpl) return false;
+  if (tpl.templateFileBase64 && tpl.templateFileBase64.trim().length > 0) return true;
+  if (tpl.attachedFiles && tpl.attachedFiles.some((f) => f.templateFileBase64 && f.templateFileBase64.trim().length > 0)) return true;
+  return false;
+}
+
+/**
+ * Computes the next sequential letter number from existing logs dynamically (without hardcoding).
+ * Handles templates that consume 1 or 2 numbers (e.g. Surat Rekomendasi).
+ */
+function computeNextNomorUrutFromLogs(
+  logs: GeneratedSuratLog[],
+  template: SuratTemplate | null
+): string {
+  let highestNum = 0;
+
+  logs.forEach((log) => {
+    // Filter logs for the same template if template is defined
+    const isSameTemplate =
+      !template ||
+      log.templateId === template.id ||
+      log.templateSlug === template.slug;
+
+    if (!isSameTemplate) return;
+
+    // 1. Scan log.nomorSurat (e.g. 001/VTA.P/A/IX/2026 or SR-PASPOR/001/VTU/IX/2026)
+    if (log.nomorSurat) {
+      const match = log.nomorSurat.match(/(?:^|\/)(\d{1,5})(?:\/|$)/);
+      if (match?.[1]) {
+        const val = parseInt(match[1], 10);
+        if (!isNaN(val) && val > highestNum) highestNum = val;
+      }
+    }
+
+    // 2. Scan fieldsData for all Nomor Surat keys (e.g. "Nomor Surat 1", "Nomor Surat 2")
+    if (log.fieldsData) {
+      Object.entries(log.fieldsData).forEach(([k, v]) => {
+        if (/nomor\s*surat/i.test(k) && typeof v === "string") {
+          const match = v.match(/(?:^|\/)(\d{1,5})(?:\/|$)/);
+          if (match?.[1]) {
+            const val = parseInt(match[1], 10);
+            if (!isNaN(val) && val > highestNum) highestNum = val;
+          }
+        }
+      });
+    }
+  });
+
+  const nextVal = highestNum + 1;
+  return String(nextVal).padStart(3, "0");
+}
 
 function GenerateSuratPageContent() {
   const searchParams = useSearchParams();
@@ -108,6 +168,11 @@ function GenerateSuratPageContent() {
   // UI helpers
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [previewModalLog, setPreviewModalLog] = useState<GeneratedSuratLog | null>(null);
+
+  // Upload Template Modal State (Mandatory when template DOCX is missing)
+  const [isUploadTemplateModalOpen, setIsUploadTemplateModalOpen] = useState(false);
+  const [isUploadingTemplate, setIsUploadingTemplate] = useState(false);
+  const [uploadModalTargetTemplate, setUploadModalTargetTemplate] = useState<SuratTemplate | null>(null);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -199,6 +264,14 @@ function GenerateSuratPageContent() {
       DEFAULT_SURAT_TEMPLATES[0]
     ) as SuratTemplate;
   }, [templates, selectedTemplateSlug]);
+
+  // Dynamic auto-count nomor urut surat from generated history logs
+  useEffect(() => {
+    if (activeTemplate) {
+      const nextNum = computeNextNomorUrutFromLogs(historyLogs, activeTemplate);
+      setNomorUrutSurat(nextNum);
+    }
+  }, [activeTemplate, historyLogs]);
 
   // Active Selected Keberangkatan Object
   const activeKeberangkatan = useMemo(() => {
@@ -324,6 +397,86 @@ function GenerateSuratPageContent() {
     const files = activeTemplate?.attachedFiles || [];
     return files[selectedDocIndex] || files[0] || null;
   }, [activeTemplate, selectedDocIndex]);
+
+  // Whether active template has an uploaded .docx template file
+  const hasTemplateDocx = useMemo(() => {
+    return checkTemplateHasDocx(activeTemplate);
+  }, [activeTemplate]);
+
+  // Handler to upload a DOCX template file directly from the generator prompt/modal
+  const handleUploadTemplateForTarget = async (file: File, targetTpl?: SuratTemplate) => {
+    const target = targetTpl || uploadModalTargetTemplate || activeTemplate;
+    if (!target) return;
+    if (!file.name.toLowerCase().endsWith(".docx")) {
+      showToast("Hanya file template Microsoft Word (.docx) yang diperbolehkan.");
+      return;
+    }
+    setIsUploadingTemplate(true);
+    try {
+      const reader = new FileReader();
+      const fileBase64 = await new Promise<string>((resolve, reject) => {
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+
+      const scanRes = await extractPlaceholdersFromDocxFile(file);
+
+      const count = Math.max(1, target.jumlahTemplateTerlampir || 1);
+      const existingAttached = target.attachedFiles && target.attachedFiles.length > 0 ? [...target.attachedFiles] : [];
+      const updatedAttached: SuratAttachedFile[] = Array.from({ length: count }, (_, i) => {
+        if (i === 0) {
+          return {
+            index: 1,
+            fileName: file.name,
+            content: scanRes.extractedText,
+            templateFileBase64: fileBase64,
+            formatNamaFile: target.formatNamaFile || `Surat_${target.slug}`,
+            opsiNomorSurat: "same_as_template_1",
+          };
+        }
+        return existingAttached[i] || {
+          index: i + 1,
+          fileName: "",
+          formatNamaFile: `${target.formatNamaFile || "Dokumen"}_Lampiran_${i + 1}`,
+          opsiNomorSurat: "same_as_template_1",
+        };
+      });
+
+      const updatedTemplate: SuratTemplate = {
+        ...target,
+        fileNameUploaded: file.name,
+        templateFileBase64: fileBase64,
+        attachedFiles: updatedAttached,
+        updatedAt: new Date().toISOString(),
+      };
+
+      // Sync to API
+      const res = await fetch("/api/master/surat-templates", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updatedTemplate),
+      });
+
+      if (!res.ok) {
+        throw new Error("Gagal menyimpan template ke server");
+      }
+
+      // Update state & storage
+      const newTemplates = templates.map((t) => (t.id === updatedTemplate.id ? updatedTemplate : t));
+      setTemplates(newTemplates);
+      saveSuratTemplates(newTemplates);
+
+      setIsUploadTemplateModalOpen(false);
+      setUploadModalTargetTemplate(null);
+      showToast(`Template Word (.docx) "${file.name}" berhasil diunggah! Terdeteksi ${scanRes.tags.length} variabel.`);
+    } catch (err) {
+      console.error("Gagal unggah template:", err);
+      showToast("Terjadi kesalahan saat mengunggah template file.");
+    } finally {
+      setIsUploadingTemplate(false);
+    }
+  };
 
   // Prioritize uploaded document text (attachedFiles) over hardcoded templateContent
   const rawTemplateText = useMemo(() => {
@@ -550,6 +703,14 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
   const [isGenerating, setIsGenerating] = useState(false);
   const handleGenerateSurat = async () => {
     if (!activeTemplate) return;
+
+    if (!hasTemplateDocx) {
+      setUploadModalTargetTemplate(activeTemplate);
+      setIsUploadTemplateModalOpen(true);
+      showToast(`Template Word (.docx) untuk "${activeTemplate.nama}" belum diunggah. Silakan unggah template terlebih dahulu.`);
+      return;
+    }
+
     setIsGenerating(true);
 
     try {
@@ -578,6 +739,12 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
 
       // Berkas tersimpan ke Riwayat tanpa auto-download popup, siap diunduh di tab Riwayat
       const hasMultipleVariants = (activeTemplate.attachedFiles?.length || 0) > 1;
+      const countConsumed = (activeTemplate.kebutuhanNomorPerSurat ?? 1) > 1 ? 2 : 1;
+      setNomorUrutSurat((prev) => {
+        const nextVal = (parseInt(prev, 10) || 1) + countConsumed;
+        return String(nextVal).padStart(3, "0");
+      });
+
       if (hasMultipleVariants) {
         showToast(`Surat "${logItem.nomorSurat}" berhasil dibuat! Kedua model template (Dengan TTD & Tanpa TTD) siap diunduh di tab Riwayat.`);
       } else {
@@ -595,19 +762,19 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
     }
   };
 
-  // Delete History Group (purges all logs matching this group or nomorSurat)
+  // Delete History Group / Session
   const handleDeleteGroup = (logs: GeneratedSuratLog[], nomorSurat: string) => {
-    if (!window.confirm(`Hapus seluruh riwayat untuk surat ${nomorSurat}?`)) return;
+    const primaryId = logs[0]?.id || "";
+    const targetNama = logs[0]?.jamaahNama || "";
+    if (!window.confirm(`Hapus riwayat surat ${nomorSurat} (${targetNama})?`)) return;
     const idsToDelete = new Set(logs.map((l) => l.id));
     
     // Update local storage for all items
     logs.forEach((l) => deleteGeneratedSuratLog(l.id));
-    setHistoryLogs((prev) => prev.filter((l) => !idsToDelete.has(l.id) && l.nomorSurat !== nomorSurat));
+    setHistoryLogs((prev) => prev.filter((l) => !idsToDelete.has(l.id)));
 
-    // Purge from Supabase by nomorSurat and id
-    const encodedNomor = encodeURIComponent(nomorSurat);
-    const primaryId = logs[0]?.id || "";
-    fetch(`/api/surat/generated?id=${primaryId}&nomorSurat=${encodedNomor}`, { method: "DELETE" }).catch(() => {});
+    // Purge from Supabase specifically by id
+    fetch(`/api/surat/generated?id=${primaryId}`, { method: "DELETE" }).catch(() => {});
     showToast("Riwayat surat berhasil dihapus");
   };
 
@@ -659,35 +826,23 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
     if (binary && log.fieldsData) {
       try {
         const label = isTtd ? "Dengan TTD & Stempel" : "Tanpa TTD (Cap Basah)";
-        showToast(`Sedang membuat PDF (${label}) dari template asli...`);
+        showToast(`Sedang membuat PDF (${label}) dari template Word asli...`);
         await downloadDocxAsPdf(binary, log.fieldsData, fileName);
-        showToast(`PDF (${label}) berhasil diunduh sesuai template asli!`);
+        showToast(`PDF (${label}) berhasil diunduh sesuai template Word asli!`);
         return;
       } catch (err) {
-        console.warn("Gagal render PDF dari docx template, fallback ke PDF builder:", err);
+        console.error("Gagal render PDF dari template docx:", err);
+        showToast("Gagal mengonversi Word ke PDF.");
+        return;
       }
     }
 
-    if (!tpl || !log.renderedText) {
-      showToast("Data surat tidak tersedia untuk re-download PDF.");
-      return;
+    // Sesuai mandat: Surat TIDAK boleh digenerate dari nol tanpa template
+    showToast(`Template Word (.docx) belum diunggah untuk surat ini. Silakan unggah template terlebih dahulu.`);
+    if (tpl) {
+      setUploadModalTargetTemplate(tpl);
+      setIsUploadTemplateModalOpen(true);
     }
-
-    await downloadOfficialLetterPdf(
-      {
-        template: tpl,
-        rawText: log.renderedText,
-        computedNomorSurat: log.nomorSurat,
-        renderedPerihal: log.perihal,
-        renderedTujuan: tpl.tujuanDefault || "",
-        renderedKotaTujuan: tpl.kotaTujuanDefault || "",
-        todayInfo,
-        effectiveShowBarcode: tpl.penandatangan?.showBarcode ?? true,
-        verificationUrl: log.verificationUrl || "",
-      },
-      fileName
-    );
-    showToast("PDF surat berhasil diunduh!");
   };
 
   // Re-download Word from history log with file variant support (TTD vs non-TTD)
@@ -713,23 +868,18 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
         showToast(`Dokumen Word (.docx - ${label}) berhasil diunduh dari template asli!`);
         return;
       } catch (err) {
-        console.warn("Gagal download docx merge, fallback:", err);
+        console.error("Gagal download docx merge:", err);
+        showToast("Gagal memproses dokumen Word.");
+        return;
       }
     }
 
-    if (!log.renderedText) {
-      showToast("Data surat tidak tersedia untuk download.");
-      return;
+    // Sesuai mandat: Surat TIDAK boleh digenerate dari nol tanpa template
+    showToast(`Template Word (.docx) belum diunggah untuk surat ini. Silakan unggah template terlebih dahulu.`);
+    if (tpl) {
+      setUploadModalTargetTemplate(tpl);
+      setIsUploadTemplateModalOpen(true);
     }
-
-    const blob = new Blob([log.renderedText], { type: "application/msword" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = fileName.replace(/\.docx$/i, ".doc");
-    a.click();
-    URL.revokeObjectURL(url);
-    showToast("Dokumen Word berhasil diunduh!");
   };
 
   // Print from history log with full Word A4 letterhead & watermark support
@@ -784,18 +934,10 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
       }
     }
 
-    const printWin = window.open("", "_blank");
-    if (printWin) {
-      printWin.document.write(`
-        <html>
-          <head><title>${log.nomorSurat}</title></head>
-          <body style="font-family: sans-serif; padding: 40px; white-space: pre-line; line-height: 1.6;">
-            ${log.renderedText || ""}
-          </body>
-        </html>
-      `);
-      printWin.document.close();
-      printWin.print();
+    showToast("Template Word (.docx) belum diunggah untuk surat ini. Silakan unggah template terlebih dahulu.");
+    if (tpl) {
+      setUploadModalTargetTemplate(tpl);
+      setIsUploadTemplateModalOpen(true);
     }
   };
 
@@ -876,40 +1018,25 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
     });
   }, [historyLogs, historySearch, historyFilterTemplate]);
 
-  // Grouped history: group by date + jenis surat (for screenshot-like layout)
+  // Grouped history: each generated surat log represents a distinct generation session
   const groupedHistory = useMemo(() => {
-    const groups: Array<{
-      date: string;
-      jenis: string;
-      nomorSurat: string;
-      logs: GeneratedSuratLog[];
-    }> = [];
-
     // Sort by generatedDate descending
     const sorted = [...filteredHistory].sort(
       (a, b) => new Date(b.generatedDate).getTime() - new Date(a.generatedDate).getTime()
     );
 
-    sorted.forEach((log) => {
+    return sorted.map((log) => {
       const dateStr = formatDate(log.generatedDate);
       const jenis = getShortTemplateName(log);
-      // Find existing group with same date + same nomor surat
-      const existing = groups.find(
-        (g) => g.date === dateStr && g.nomorSurat === log.nomorSurat
-      );
-      if (existing) {
-        existing.logs.push(log);
-      } else {
-        groups.push({
-          date: dateStr,
-          jenis,
-          nomorSurat: log.nomorSurat,
-          logs: [log],
-        });
-      }
+      return {
+        id: log.id,
+        date: dateStr,
+        jenis,
+        nomorSurat: log.nomorSurat,
+        jamaahNama: log.jamaahNama,
+        logs: [log],
+      };
     });
-
-    return groups;
   }, [filteredHistory, templates]);
 
   return (
@@ -1020,6 +1147,7 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
               {templates.map((tpl) => {
                 const isSelected = tpl.slug === activeTemplate?.slug;
+                const hasDocx = checkTemplateHasDocx(tpl);
                 return (
                   <button
                     key={tpl.id}
@@ -1040,9 +1168,20 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
                       </div>
                       <p className="text-xs font-bold line-clamp-1 mt-1">{tpl.nama}</p>
                     </div>
-                    <p className="text-[10px] text-muted-foreground mt-2 line-clamp-1">
-                      {tpl.placeholders.length} Tag Placeholder
-                    </p>
+                    <div className="mt-2 flex items-center justify-between gap-1">
+                      <p className="text-[10px] text-muted-foreground line-clamp-1">
+                        {tpl.placeholders.length} Tag
+                      </p>
+                      {hasDocx ? (
+                        <span className="text-[9px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded">
+                          DOCX ✓
+                        </span>
+                      ) : (
+                        <span className="text-[9px] font-medium text-amber-600 dark:text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded">
+                          Upload DOCX
+                        </span>
+                      )}
+                    </div>
                   </button>
                 );
               })}
@@ -1462,21 +1601,74 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
                 </CardContent>
               </Card>
 
+              {/* ── PERINGATAN BILA TEMPLATE DOCX BELUM DIUNGGAH ── */}
+              {!hasTemplateDocx && (
+                <div className="p-4 rounded-xl border border-amber-300 dark:border-amber-700/60 bg-amber-50/80 dark:bg-amber-950/30 text-xs space-y-2.5">
+                  <div className="flex items-center gap-2 font-bold text-amber-900 dark:text-amber-200">
+                    <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0" />
+                    <span>Template Word (.docx) Wajib Diunggah</span>
+                  </div>
+                  <p className="text-amber-800 dark:text-amber-300 text-[11px] leading-relaxed">
+                    Surat <strong>{activeTemplate.nama}</strong> belum memiliki template Word. Sesuai standar operasional, surat resmi wajib memakai template input asli (tidak dibuat dari nol) agar hasil Word dan PDF 100% presisi.
+                  </p>
+                  <div className="flex flex-wrap items-center gap-2 pt-1">
+                    <Button
+                      type="button"
+                      size="sm"
+                      className="text-xs bg-amber-600 hover:bg-amber-700 text-white font-semibold cursor-pointer shadow-xs"
+                      onClick={() => {
+                        setUploadModalTargetTemplate(activeTemplate);
+                        setIsUploadTemplateModalOpen(true);
+                      }}
+                    >
+                      <UploadCloud className="mr-1.5 h-3.5 w-3.5" />
+                      Unggah Template Word (.docx)
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="text-xs border-amber-300 hover:bg-amber-100 text-amber-900 dark:text-amber-200"
+                      onClick={() => router.push(`/admin/master/surat?id=${activeTemplate.id}`)}
+                    >
+                      <Sliders className="mr-1.5 h-3.5 w-3.5 text-amber-600" />
+                      Buka Master Template Surat
+                    </Button>
+                  </div>
+                </div>
+              )}
+
               {/* ── TOMBOL BUAT SURAT SETELAH BOX KE 3 ── */}
               <div className="pt-2">
                 <Button
                   type="button"
                   size="lg"
-                  className="w-full h-14 bg-emerald-700 hover:bg-emerald-800 text-white font-extrabold text-base rounded-xl shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2.5 cursor-pointer group"
+                  className={cn(
+                    "w-full h-14 text-white font-extrabold text-base rounded-xl shadow-md transition-all flex items-center justify-center gap-2.5 cursor-pointer group",
+                    hasTemplateDocx
+                      ? "bg-emerald-700 hover:bg-emerald-800 hover:shadow-lg"
+                      : "bg-amber-600 hover:bg-amber-700"
+                  )}
                   onClick={handleGenerateSurat}
                   disabled={isGenerating}
                 >
-                  <Sparkles className="h-5 w-5 text-amber-300 group-hover:rotate-12 transition-transform" />
-                  <span>{isGenerating ? "Sedang Membuat Surat..." : "Buat Surat & Buka Riwayat"}</span>
-                  <ArrowRight className="h-5 w-5 group-hover:translate-x-1.5 transition-transform" />
+                  {hasTemplateDocx ? (
+                    <>
+                      <Sparkles className="h-5 w-5 text-amber-300 group-hover:rotate-12 transition-transform" />
+                      <span>{isGenerating ? "Sedang Membuat Surat..." : "Buat Surat & Buka Riwayat"}</span>
+                      <ArrowRight className="h-5 w-5 group-hover:translate-x-1.5 transition-transform" />
+                    </>
+                  ) : (
+                    <>
+                      <UploadCloud className="h-5 w-5 text-white animate-bounce" />
+                      <span>Unggah Template Word Dulu</span>
+                    </>
+                  )}
                 </Button>
                 <p className="text-center text-[11px] text-muted-foreground mt-2 font-medium">
-                  Surat akan dicatat ke Riwayat dan Anda langsung diarahkan ke laman unduh dokumen (Word, PDF, Cetak).
+                  {hasTemplateDocx
+                    ? "Surat akan dicatat ke Riwayat dan Anda langsung diarahkan ke laman unduh dokumen (Word, PDF, Cetak)."
+                    : "Template Word (.docx) diperlukan sebelum surat dapat dibuat & dikonversi ke PDF."}
                 </p>
               </div>
             </div>
@@ -1682,8 +1874,8 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
                       </td>
                     </tr>
                   ) : (
-                    groupedHistory.map((group, gIdx) => (
-                      <tr key={`${group.nomorSurat}-${gIdx}`} className="hover:bg-slate-50/50 dark:hover:bg-slate-900/30 transition-colors align-top">
+                    groupedHistory.map((group) => (
+                      <tr key={group.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-900/30 transition-colors align-top">
                         {/* ── TANGGAL ── */}
                         <td className="py-4 px-5 align-top">
                           <span className="text-sm text-slate-600 dark:text-slate-300 font-medium whitespace-nowrap">
@@ -1694,12 +1886,19 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
                         {/* ── JENIS & NOMOR SURAT ── */}
                         <td className="py-4 px-5 align-top">
                           <div className="flex flex-col gap-3">
-                            {/* Template Name & Nomor */}
+                            {/* Template Name, Nomor & Nama Jamaah */}
                             <div className="flex items-start gap-3">
                               <div>
-                                <p className="text-sm font-bold text-slate-900 dark:text-slate-100 leading-tight">
-                                  {group.jenis}
-                                </p>
+                                <div className="flex items-center gap-2">
+                                  <p className="text-sm font-bold text-slate-900 dark:text-slate-100 leading-tight">
+                                    {group.jenis}
+                                  </p>
+                                  {group.jamaahNama && (
+                                    <span className="text-[11px] font-semibold text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-700">
+                                      👤 {group.jamaahNama}
+                                    </span>
+                                  )}
+                                </div>
                                 <p className="text-xs text-slate-500 dark:text-slate-400 font-mono mt-0.5">
                                   {group.nomorSurat}
                                 </p>
@@ -1911,6 +2110,97 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
                   Cetak
                 </Button>
               </div>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* ── MODAL UPLOAD TEMPLATE SURAT WORD (.DOCX) ── */}
+      {isUploadTemplateModalOpen && (
+        <Modal
+          open={isUploadTemplateModalOpen}
+          onClose={() => {
+            if (!isUploadingTemplate) {
+              setIsUploadTemplateModalOpen(false);
+              setUploadModalTargetTemplate(null);
+            }
+          }}
+          title={`Unggah Template Word: ${uploadModalTargetTemplate?.nama || activeTemplate?.nama}`}
+          size="default"
+        >
+          <div className="space-y-4">
+            <div className="p-3.5 rounded-xl bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900/40 text-xs text-blue-900 dark:text-blue-300 leading-relaxed">
+              <p className="font-bold flex items-center gap-1.5 mb-1 text-blue-950 dark:text-blue-200">
+                <Info className="h-4 w-4 text-blue-600 shrink-0" />
+                Template Word (.docx) Sebagai Sumber Kebenaran Dokumen
+              </p>
+              Surat resmi PT. VTU Abadi wajib menggunakan file template Word (.docx) yang di-input (tidak dibuat dari nol). Dokumen Word dan PDF akan langsung digenerate dari file template ini dengan 100% presisi.
+            </div>
+
+            <div
+              className={cn(
+                "border-2 border-dashed rounded-2xl p-6 text-center transition-all cursor-pointer",
+                isUploadingTemplate
+                  ? "border-primary bg-primary/5 opacity-70 pointer-events-none"
+                  : "border-stone-300 dark:border-stone-700 hover:border-primary hover:bg-primary/5 bg-card/60"
+              )}
+              onClick={() => {
+                const el = document.getElementById("docx-template-file-input");
+                el?.click();
+              }}
+            >
+              <input
+                id="docx-template-file-input"
+                type="file"
+                accept=".docx"
+                className="hidden"
+                disabled={isUploadingTemplate}
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) handleUploadTemplateForTarget(f);
+                }}
+              />
+              <div className="flex flex-col items-center justify-center gap-2">
+                <div className="p-3 rounded-full bg-primary/10 text-primary">
+                  <UploadCloud className="h-8 w-8 animate-bounce" />
+                </div>
+                <p className="text-sm font-bold text-foreground">
+                  {isUploadingTemplate
+                    ? "Sedang Membaca & Menyimpan Template..."
+                    : "Klik atau Seret File Template Word (.docx) ke Sini"}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Hanya format <strong>.docx</strong> (Microsoft Word)
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between border-t pt-3">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-xs"
+                disabled={isUploadingTemplate}
+                onClick={() => {
+                  setIsUploadTemplateModalOpen(false);
+                  setUploadModalTargetTemplate(null);
+                }}
+              >
+                Batal
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-xs"
+                onClick={() => {
+                  const targetId = uploadModalTargetTemplate?.id || activeTemplate?.id;
+                  setIsUploadTemplateModalOpen(false);
+                  router.push(`/admin/master/surat?id=${targetId}`);
+                }}
+              >
+                <Sliders className="mr-1.5 h-3.5 w-3.5 text-primary" />
+                Buka Konfigurasi Lengkap di Master Surat
+              </Button>
             </div>
           </div>
         </Modal>
