@@ -10,7 +10,7 @@ import {
   MOCK_LANDING_PATTERN, 
   MOCK_KLASTER
 } from "@/shared/lib/mock-data";
-import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X, Split, Layers, Tag, Edit3 } from "lucide-react";
+import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X, Split, Layers, Tag, Edit3, RefreshCw } from "lucide-react";
 import { generateVtuGroupCode } from "@/shared/lib/group-code.helper";
 import { PairingCanvas } from "./components/PairingCanvas";
 import { useOperationalStore } from "@/stores/operational-store";
@@ -424,6 +424,13 @@ export default function GeneratePaketPage() {
   useEffect(() => {
     fetchExistingGroups();
   }, [fetchExistingGroups]);
+
+  // Auto-refetch when user switches into "split" or "edit" mode
+  useEffect(() => {
+    if (generateMode === "split" || generateMode === "edit") {
+      fetchExistingGroups();
+    }
+  }, [generateMode, fetchExistingGroups]);
 
   const handleSelectPackageForEdit = async (pkgId: string) => {
     setSelectedEditPackageId(pkgId);
@@ -2623,7 +2630,19 @@ export default function GeneratePaketPage() {
               <label className="text-xs font-bold text-blue-900 dark:text-blue-200 flex items-center gap-1.5">
                 <Edit3 className="h-4 w-4 text-blue-600" /> Langkah 1: Pilih Paket yang Akan Dirubah Spesifikasinya
               </label>
-              <span className="text-[11px] text-blue-700 font-medium">Auto-fill spesifikasi paket eksisting</span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => fetchExistingGroups()}
+                  disabled={loadingGroups}
+                  title="Muat ulang paket eksisting"
+                  className="px-2.5 py-1 text-xs font-bold rounded-md border border-blue-300 dark:border-blue-700 bg-white dark:bg-card hover:bg-blue-100/70 text-blue-900 dark:text-blue-200 transition-all flex items-center gap-1.5 shadow-xs disabled:opacity-60 cursor-pointer"
+                >
+                  <RefreshCw className={cn("h-3.5 w-3.5 text-blue-600", loadingGroups && "animate-spin")} />
+                  <span>Refresh</span>
+                </button>
+                <span className="text-[11px] text-blue-700 font-medium hidden sm:inline">Auto-fill spesifikasi paket eksisting</span>
+              </div>
             </div>
             <select
               value={selectedEditPackageId}
@@ -2724,38 +2743,51 @@ export default function GeneratePaketPage() {
                 {loadingGroups && <Loader2 className="h-3.5 w-3.5 animate-spin text-amber-600 ml-1" />}
               </span>
 
-              {/* Type Filter Tabs: Group vs Individual */}
-              <div className="flex items-center gap-1 bg-amber-100/80 dark:bg-amber-900/60 p-1 rounded-lg border border-amber-300 dark:border-amber-700">
+              <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => {
-                    setParentTypeFilter("group");
-                    setSelectedParentGroupId("");
-                  }}
-                  className={cn(
-                    "px-3 py-1 text-xs font-bold rounded-md transition-all flex items-center gap-1.5",
-                    parentTypeFilter === "group"
-                      ? "bg-amber-600 text-white shadow-xs"
-                      : "text-amber-900 dark:text-amber-200 hover:bg-amber-200/50"
-                  )}
+                  onClick={() => fetchExistingGroups()}
+                  disabled={loadingGroups}
+                  title="Muat ulang paket induk eksisting"
+                  className="px-2.5 py-1 text-xs font-bold rounded-md border border-amber-300 dark:border-amber-700 bg-white dark:bg-card hover:bg-amber-100/70 text-amber-900 dark:text-amber-200 transition-all flex items-center gap-1.5 shadow-xs disabled:opacity-60 cursor-pointer"
                 >
-                  🏷️ Paket Grup ({existingGroupsData.groups.length})
+                  <RefreshCw className={cn("h-3.5 w-3.5 text-amber-600", loadingGroups && "animate-spin")} />
+                  <span>Refresh</span>
                 </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setParentTypeFilter("individual");
-                    setSelectedParentGroupId("");
-                  }}
-                  className={cn(
-                    "px-3 py-1 text-xs font-bold rounded-md transition-all flex items-center gap-1.5",
-                    parentTypeFilter === "individual"
-                      ? "bg-amber-600 text-white shadow-xs"
-                      : "text-amber-900 dark:text-amber-200 hover:bg-amber-200/50"
-                  )}
-                >
-                  👤 Paket Individu ({existingGroupsData.individuals.length})
-                </button>
+
+                {/* Type Filter Tabs: Group vs Individual */}
+                <div className="flex items-center gap-1 bg-amber-100/80 dark:bg-amber-900/60 p-1 rounded-lg border border-amber-300 dark:border-amber-700">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setParentTypeFilter("group");
+                      setSelectedParentGroupId("");
+                    }}
+                    className={cn(
+                      "px-3 py-1 text-xs font-bold rounded-md transition-all flex items-center gap-1.5",
+                      parentTypeFilter === "group"
+                        ? "bg-amber-600 text-white shadow-xs"
+                        : "text-amber-900 dark:text-amber-200 hover:bg-amber-200/50"
+                    )}
+                  >
+                    🏷️ Paket Grup ({existingGroupsData.groups.length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setParentTypeFilter("individual");
+                      setSelectedParentGroupId("");
+                    }}
+                    className={cn(
+                      "px-3 py-1 text-xs font-bold rounded-md transition-all flex items-center gap-1.5",
+                      parentTypeFilter === "individual"
+                        ? "bg-amber-600 text-white shadow-xs"
+                        : "text-amber-900 dark:text-amber-200 hover:bg-amber-200/50"
+                    )}
+                  >
+                    👤 Paket Individu ({existingGroupsData.individuals.length})
+                  </button>
+                </div>
               </div>
             </div>
 

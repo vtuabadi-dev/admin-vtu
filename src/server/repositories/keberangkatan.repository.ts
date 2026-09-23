@@ -476,6 +476,7 @@ export const keberangkatanRepo = {
           startingPoint: true,
           maskapaiMaster: true,
           packageType: true,
+          paketGrup: true,
         },
         orderBy: { tanggalBerangkat: "asc" },
       });
@@ -506,10 +507,13 @@ export const keberangkatanRepo = {
 
         const dates = items.map((k: any) => k.tanggalBerangkat.toISOString().split("T")[0]!);
 
+        const actualGroupCode = firstK.paketGrup?.kodeGrup || 
+          (firstK.kode.startsWith("#") ? firstK.kode : (firstK.kodeIndividu || firstK.kode));
+
         groupList.push({
           id: groupId,
           type: "group",
-          kodeGrup: firstK.kode.startsWith("#") ? firstK.kode : (firstK.kodeIndividu || firstK.kode),
+          kodeGrup: actualGroupCode,
           namaPaket: firstK.namaPaket.split("-")[0]?.trim() || firstK.namaPaket,
           startingCity: startingName,
           startingPointId: firstK.startingPointId,

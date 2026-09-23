@@ -171,13 +171,17 @@ export function extractDates(caption: string): string[] {
  */
 export function extractDuration(caption: string): number | undefined {
   const patterns = [
-    // "PAKET UMROH REGULER 12 HARI"
-    /(?:PAKET\s+)?\w+(?:\s+\w+)?\s+(\d{1,2})\s*HARI/i,
-    // "DURASI: 12 HARI"
-    /(?:DURASI|LAMA|LAMA\s+PERJALANAN)\s*[:=]?\s*(\d{1,2})\s*HARI/i,
-    // "12 HARI / 11 MALAM"
-    /(\d{1,2})\s*HARI\s*\/\s*\d{1,2}\s*MALAM/i,
-    // standalone "X HARI"
+    // 1. Durasi dengan kata HARI / DAYS: '13 HARI / 11 MALAM', '13 DAYS', '13 HARI'
+    /(?:DURASI|LAMA|LAMA\s+PERJALANAN|PROGRAM|PROG|PAKET)?\s*[:=]?\s*(\d{1,2})\s*(?:HARI|DAYS?)\b/i,
+    // 2. Format X HARI / Y MALAM atau X DAYS / Y NIGHTS
+    /(\d{1,2})\s*(?:HARI|DAYS?)\s*[\/\-&]\s*\d{1,2}\s*(?:MALAM|NIGHTS?)/i,
+    // 3. Format ringkas dengan konteks: 'PROGRAM 13H', 'PAKET 13 H', 'UMROH 13H', '13H11M', '13D12N'
+    /(?:PROGRAM|PROG|PAKET|UMROH|TOUR)\s*(\d{1,2})\s*[HD](?:\s*[\/\-]?\s*\d{1,2}[MN])?\b/i,
+    // 4. Standalone '13H' atau '13 H' atau '13D' atau '13 D'
+    /\b(\d{1,2})\s*[HD]\b/i,
+    // 5. Keyword DURASI: 13
+    /(?:DURASI|LAMA)\s*[:=]\s*(\d{1,2})\b/i,
+    // 6. Generic 'X HARI'
     /(\d{1,2})\s*HARI/i,
   ];
 

@@ -3,7 +3,6 @@
 import React, { useMemo, useState, useEffect } from "react";
 import QRCode from "qrcode";
 import { QrCode, CheckCircle2, ExternalLink } from "lucide-react";
-import { KOP_SURAT_BASE64 } from "@/server/assets/kop-surat";
 import type { SuratTemplate } from "@/shared/types/surat";
 import { toTitleCase } from "@/shared/lib/utils";
 
@@ -377,16 +376,36 @@ export default function OfficialLetterPreview({
 
   return (
     <div className="bg-white text-stone-950 p-8 sm:p-12 rounded-2xl shadow-xl border border-stone-300 font-serif text-[13px] leading-relaxed max-w-2xl mx-auto space-y-6 print:m-0 print:p-0 print:border-none print:shadow-none min-h-[842px]">
-      {/* ── 1. OFFICIAL LETTERHEAD (KOP SURAT PPIU DARI FORMULIR PENDAFTARAN) ── */}
-      <div className="border-b-2 border-stone-800 pb-1 mb-2 overflow-hidden rounded-t-lg relative">
-        <img
-          src="/templates/template-surat/kop_surat.jpeg"
-          alt="Kop Surat Official PT Vauza Tamma Abadi"
-          className="w-full h-auto object-contain block"
-          onError={(e) => {
-            (e.currentTarget as HTMLImageElement).src = KOP_SURAT_BASE64;
-          }}
-        />
+      {/* ── 1. OFFICIAL LETTERHEAD (KOP SURAT PPIU RESMI) ── */}
+      <div className="border-b-[3px] border-double border-stone-900 pb-3 flex items-center justify-between gap-4">
+        <div className="flex items-center gap-3.5 sm:gap-4">
+          <img
+            src="/images/vauza-tamma-logo-full.png"
+            alt="Logo Resmi PT Vauza Tamma Abadi"
+            className="h-16 sm:h-18 w-auto object-contain shrink-0"
+            onError={(e) => {
+              (e.currentTarget as HTMLImageElement).style.display = "none";
+            }}
+          />
+          <div>
+            <h2 className="text-base sm:text-lg font-black tracking-tight text-emerald-950 dark:text-emerald-900 font-sans uppercase">
+              PT. VAUZA TAMMA ABADI
+            </h2>
+            <p className="text-[11px] sm:text-[11.5px] font-bold text-stone-800 font-sans tracking-wide">
+              Penyelenggara Perjalanan Ibadah Umroh (PPIU) Kemenag RI No. U.400 Tahun 2021 / No. 805 Tahun 2019
+            </p>
+            <p className="text-[9.5px] sm:text-[10px] text-stone-600 font-sans mt-0.5 leading-tight">
+              Kantor Pusat: Jl. Kauman No. 21, Kauman, Klojen, Kota Malang • Telp: (0341) 399059 • Email: info@vauzatamma.co.id
+            </p>
+          </div>
+        </div>
+
+        <div className="hidden sm:flex flex-col items-end text-right shrink-0">
+          <span className="text-[8.5px] font-black font-sans px-2 py-0.5 bg-stone-950 text-amber-300 rounded tracking-wider shadow-2xs">
+            PPIU RESMI
+          </span>
+          <span className="text-[9px] text-stone-500 font-sans mt-1 font-semibold">Akreditasi A</span>
+        </div>
       </div>
 
       {/* ── 2. METADATA SECTION (NOMOR, LAMPIRAN, HAL & TANGGAL) ── */}

@@ -1053,53 +1053,6 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
             {/* ── LEFT COLUMN (5 COLS): CONTROLS & DYNAMIC AUTOCRAT FORM ── */}
             <div className="lg:col-span-5 space-y-4">
-              {/* Template Variant Selector (e.g. Dengan TTD vs Tanpa TTD) */}
-              {activeTemplate.attachedFiles && activeTemplate.attachedFiles.length > 1 && (
-                <Card className="border-blue-200 dark:border-blue-900/40 bg-blue-50/50 dark:bg-blue-950/20">
-                  <CardContent className="p-3.5 space-y-2.5">
-                    <div className="flex items-center justify-between">
-                      <label className="text-xs font-bold text-blue-950 dark:text-blue-200 flex items-center gap-1.5">
-                        <FileSignature className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
-                        Pilih Varian Template Surat:
-                      </label>
-                      <Badge variant="info" size="sm" className="text-[10px] bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-200 border-blue-200">
-                        {activeTemplate.attachedFiles.length} Varian Terupload
-                      </Badge>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-2">
-                      {activeTemplate.attachedFiles.map((doc, idx) => {
-                        const isTtd = idx === 0 || doc.fileName?.toLowerCase().includes("ttd");
-                        const isSelected = selectedDocIndex === idx;
-                        return (
-                          <button
-                            key={doc.index || idx}
-                            type="button"
-                            onClick={() => setSelectedDocIndex(idx)}
-                            className={cn(
-                              "p-2.5 rounded-lg border text-left transition-all cursor-pointer flex flex-col justify-between",
-                              isSelected
-                                ? "bg-white dark:bg-slate-800 border-blue-600 dark:border-blue-500 shadow-xs ring-1 ring-blue-600 text-foreground"
-                                : "bg-white/60 dark:bg-slate-800/40 border-stone-200 dark:border-stone-700 text-muted-foreground hover:bg-white"
-                            )}
-                          >
-                            <div className="flex items-center justify-between">
-                              <span className="text-xs font-bold text-foreground">
-                                {isTtd ? "✓ Dengan TTD & Stempel" : "✍️ Tanpa TTD (Cap Basah)"}
-                              </span>
-                              {isSelected && <Check className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />}
-                            </div>
-                            <span className="text-[10px] text-muted-foreground truncate mt-1">
-                              {doc.fileName || `Template Varian ${idx + 1}`}
-                            </span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-
               {/* Card 1: Data Source Selector (Manifest & Jamaah) */}
               <Card className="border-stone-200 dark:border-stone-800">
                 <CardHeader className="pb-3 border-b border-stone-200 dark:border-stone-800">

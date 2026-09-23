@@ -1,7 +1,6 @@
 import jsPDF from "jspdf";
 import QRCode from "qrcode";
-import { KOP_SURAT_BASE64 } from "@/server/assets/kop-surat";
-import { VAUZA_TAMMA_SIGNATURE_BASE64, VAUZA_TAMMA_QR_BASE64 } from "./invoice-logo";
+import { VAUZA_TAMMA_LOGO_BASE64, VAUZA_TAMMA_SIGNATURE_BASE64, VAUZA_TAMMA_QR_BASE64 } from "./invoice-logo";
 import { toTitleCase } from "./utils";
 import type { SuratTemplate } from "../types/surat";
 
@@ -326,18 +325,49 @@ function renderLetterPage(
   const contentWidth = 210 - marginX * 2; // 178mm
   let y = 10;
 
-  // 1. Official Kop Surat Header (same as PDF Formulir Pendaftaran)
+  // 1. Official Kop Surat Header (Clean Typographic Official Letterhead)
   try {
-    if (KOP_SURAT_BASE64) {
-      const kopWidth = contentWidth; // 178 mm
-      const kopHeight = 36; // compact proportional height ~36mm
-      doc.addImage(KOP_SURAT_BASE64, "JPEG", marginX, y, kopWidth, kopHeight);
-      y += kopHeight + 4;
+    if (VAUZA_TAMMA_LOGO_BASE64) {
+      doc.addImage(VAUZA_TAMMA_LOGO_BASE64, "PNG", marginX, y, 22, 22);
     }
   } catch (err) {
-    console.error("Failed to draw Kop Surat image in PDF:", err);
-    y += 36;
+    console.error("Failed to draw logo in PDF:", err);
   }
+
+  // Header Typography
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(13);
+  doc.setTextColor(6, 78, 59); // Emerald #064E3B
+  const companyTitle =
+    parsed.entityCompany === "trikarsa"
+      ? "PT. VAUZA TRIKARSA UTAMA"
+      : "PT. VAUZA TAMMA ABADI";
+  doc.text(companyTitle, 44, y + 6);
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8.5);
+  doc.setTextColor(30, 41, 59); // Slate #1E293B
+  const kemenagText =
+    parsed.entityCompany === "trikarsa"
+      ? "Penyelenggara Perjalanan Ibadah Umroh (PPIU) Kemenag RI No. U.400 Tahun 2021"
+      : "Penyelenggara Perjalanan Ibadah Umroh (PPIU) Kemenag RI No. U.400 Tahun 2021 / No. 805 Tahun 2019";
+  doc.text(kemenagText, 44, y + 11);
+
+  doc.setFontSize(7.5);
+  doc.setTextColor(100, 116, 139); // Muted #64748B
+  doc.text("Jl. Kauman No. 21, Kauman, Klojen, Kota Malang • Telp: (0341) 399059", 44, y + 16);
+  doc.text("Email: info@vauzatamma.co.id • Website: www.vauzatamma.co.id", 44, y + 20);
+
+  y += 24;
+
+  // Double line border below Kop Surat
+  doc.setDrawColor(6, 78, 59);
+  doc.setLineWidth(0.8);
+  doc.line(marginX, y, marginX + contentWidth, y);
+  doc.setLineWidth(0.25);
+  doc.line(marginX, y + 1.2, marginX + contentWidth, y + 1.2);
+
+  y += 6;
 
   // 2. Metadata Section (Nomor, Lampiran, Perihal on left; Tanggal on right)
   doc.setFontSize(9);

@@ -187,17 +187,17 @@ function parseParagraphXmlToHtml(pXml: string, mediaMap: Record<string, string>)
     if (rawElem.startsWith("<w:drawing")) {
       // Check if it's behindDoc (watermark or background) - ignore if full page, or render as watermark
       const isBehind = /behindDoc="1"/i.test(rawElem);
+      const extentMatch = rawElem.match(/<wp:extent\b[^>]*cx="(\d+)"[^>]*cy="(\d+)"/i);
+      const cx = extentMatch ? parseInt(extentMatch[1] || "0", 10) : 0;
+      const cy = extentMatch ? parseInt(extentMatch[2] || "0", 10) : 0;
+      const isFullPage = isBehind || (cx > 5000000 && cy > 8000000);
+
       const blipMatch = rawElem.match(/<a:blip\b[^>]*r:embed="([^"]+)"/i);
       const rId = blipMatch ? blipMatch[1] : null;
 
-      if (rId && mediaMap[rId]) {
-        if (isBehind) {
-          // Semi-transparent background watermark
-          innerHtml += `<img src="${mediaMap[rId]}" style="position: absolute; top: 45%; left: 50%; transform: translate(-50%, -50%); opacity: 0.12; max-width: 75%; max-height: 75%; z-index: 0; pointer-events: none;" />`;
-        } else {
-          // Inline drawing (Signature, Stamp, QR Code, Logo)
-          innerHtml += `<img src="${mediaMap[rId]}" style="max-height: 85px; max-width: 220px; object-fit: contain; display: inline-block; vertical-align: middle; margin: 2px 4px;" />`;
-        }
+      if (rId && mediaMap[rId] && !isFullPage) {
+        // Inline drawing (Signature, Stamp, QR Code, Logo)
+        innerHtml += `<img src="${mediaMap[rId]}" style="max-height: 85px; max-width: 220px; object-fit: contain; display: inline-block; vertical-align: middle; margin: 2px 4px;" />`;
       }
       continue;
     }
@@ -209,8 +209,14 @@ function parseParagraphXmlToHtml(pXml: string, mediaMap: Record<string, string>)
     // Check for drawing inside run
     const insideDrawingMatch = rawElem.match(/<a:blip\b[^>]*r:embed="([^"]+)"/i) || rawElem.match(/<v:imagedata\b[^>]*r:id="([^"]+)"/i);
     if (insideDrawingMatch && insideDrawingMatch[1]) {
+      const isBehind = /behindDoc="1"/i.test(rawElem);
+      const extentMatch = rawElem.match(/<wp:extent\b[^>]*cx="(\d+)"[^>]*cy="(\d+)"/i);
+      const cx = extentMatch ? parseInt(extentMatch[1] || "0", 10) : 0;
+      const cy = extentMatch ? parseInt(extentMatch[2] || "0", 10) : 0;
+      const isFullPage = isBehind || (cx > 5000000 && cy > 8000000);
+
       const rId = insideDrawingMatch[1];
-      if (mediaMap[rId]) {
+      if (mediaMap[rId] && !isFullPage) {
         innerHtml += `<img src="${mediaMap[rId]}" style="max-height: 85px; max-width: 220px; object-fit: contain; display: inline-block; vertical-align: middle; margin: 2px 4px;" />`;
       }
     }
@@ -379,8 +385,16 @@ export async function convertDocxToA4Html(
   const mediaMap = await extractMediaMap(zip);
   const { backgroundLetterhead, headerBannerHtml } = await extractLetterheadBackground(zip, mediaMap);
 
-  // Parse document body into distinct pages based on Page Breaks and section breaks
-  const pages: string[] = [];
+  interface PageData {
+    blocks: string[];
+    topMarginPx: number;
+    leftMarginPx: number;
+    rightMarginPx: number;
+    bottomMarginPx: number;
+    pageLetterhead: string | null;
+  }
+
+  const pages: PageData[] = [];
   let currentPageBlocks: string[] = [];
 
   const docFile = zip.file("word/document.xml");
@@ -395,37 +409,104 @@ export async function convertDocxToA4Html(
     while ((blockMatch = blockRegex.exec(bodyContent)) !== null) {
       const rawBlock = blockMatch[0];
 
-      // Detect page break in paragraph or run
-      const hasPageBreak =
+      // Detect section break or explicit author page break
+      // CRITICAL: DO NOT use <w:lastRenderedPageBreak> because Word generates that dynamically for pagination caches, causing ghost pages!
+      const sectPrMatch = rawBlock.match(/<w:sectPr\b[\s\S]*?<\/w:sectPr>/i);
+      const hasExplicitBreak =
         /<w:br\b[^>]*w:type="page"/i.test(rawBlock) ||
-        /<w:pageBreakBefore(?:\s|\/|>)/i.test(rawBlock) ||
-        /<w:lastRenderedPageBreak(?:\s|\/|>)/i.test(rawBlock);
+        /<w:pageBreakBefore(?:\s|\/|>)/i.test(rawBlock);
 
-      if (hasPageBreak && currentPageBlocks.length > 0) {
-        pages.push(currentPageBlocks.join("\n"));
-        currentPageBlocks = [];
+      let parsedHtml = "";
+      if (rawBlock.startsWith("<w:tbl")) {
+        parsedHtml = parseTableXmlToHtml(rawBlock, mediaMap);
+      } else {
+        parsedHtml = parseParagraphXmlToHtml(rawBlock, mediaMap);
       }
 
-      if (rawBlock.startsWith("<w:tbl")) {
-        currentPageBlocks.push(parseTableXmlToHtml(rawBlock, mediaMap));
-      } else {
-        currentPageBlocks.push(parseParagraphXmlToHtml(rawBlock, mediaMap));
+      currentPageBlocks.push(parsedHtml);
+
+      if (sectPrMatch || hasExplicitBreak) {
+        let topDxa = 3544; // default ~62.5mm if letterhead present
+        let leftDxa = 993;
+        let rightDxa = 851;
+        let bottomDxa = 567;
+
+        if (sectPrMatch) {
+          const tM = sectPrMatch[0].match(/w:top="(\d+)"/i);
+          const lM = sectPrMatch[0].match(/w:left="(\d+)"/i);
+          const rM = sectPrMatch[0].match(/w:right="(\d+)"/i);
+          const bM = sectPrMatch[0].match(/w:bottom="(\d+)"/i);
+          if (tM && tM[1]) topDxa = parseInt(tM[1], 10);
+          if (lM && lM[1]) leftDxa = parseInt(lM[1], 10);
+          if (rM && rM[1]) rightDxa = parseInt(rM[1], 10);
+          if (bM && bM[1]) bottomDxa = parseInt(bM[1], 10);
+        }
+
+        pages.push({
+          blocks: currentPageBlocks,
+          topMarginPx: Math.max(Math.round(topDxa / 15), backgroundLetterhead ? 220 : 40),
+          leftMarginPx: Math.round(leftDxa / 15),
+          rightMarginPx: Math.round(rightDxa / 15),
+          bottomMarginPx: Math.round(bottomDxa / 15),
+          pageLetterhead: backgroundLetterhead,
+        });
+        currentPageBlocks = [];
       }
     }
 
     if (currentPageBlocks.length > 0) {
-      pages.push(currentPageBlocks.join("\n"));
+      const finalSectPr = bodyContent.match(/<w:sectPr\b[\s\S]*?<\/w:sectPr>(?:\s*<\/w:body>)?$/i);
+      let topDxa = 3544;
+      let leftDxa = 993;
+      let rightDxa = 851;
+      let bottomDxa = 567;
+      if (finalSectPr) {
+        const tM = finalSectPr[0].match(/w:top="(\d+)"/i);
+        const lM = finalSectPr[0].match(/w:left="(\d+)"/i);
+        const rM = finalSectPr[0].match(/w:right="(\d+)"/i);
+        const bM = finalSectPr[0].match(/w:bottom="(\d+)"/i);
+        if (tM && tM[1]) topDxa = parseInt(tM[1], 10);
+        if (lM && lM[1]) leftDxa = parseInt(lM[1], 10);
+        if (rM && rM[1]) rightDxa = parseInt(rM[1], 10);
+        if (bM && bM[1]) bottomDxa = parseInt(bM[1], 10);
+      }
+
+      // Filter out trailing empty page if it contains no meaningful text or content
+      const rawText = currentPageBlocks
+        .join("")
+        .replace(/<[^>]+>/g, "")
+        .replace(/&nbsp;/g, "")
+        .trim();
+      const hasImages = currentPageBlocks.join("").includes("<img");
+
+      if (rawText.length > 20 || (hasImages && rawText.length > 5)) {
+        pages.push({
+          blocks: currentPageBlocks,
+          topMarginPx: Math.max(Math.round(topDxa / 15), backgroundLetterhead ? 220 : 40),
+          leftMarginPx: Math.round(leftDxa / 15),
+          rightMarginPx: Math.round(rightDxa / 15),
+          bottomMarginPx: Math.round(bottomDxa / 15),
+          pageLetterhead: backgroundLetterhead,
+        });
+      }
     }
   }
 
   if (pages.length === 0) {
-    pages.push("<p>&nbsp;</p>");
+    pages.push({
+      blocks: ["<p>&nbsp;</p>"],
+      topMarginPx: 40,
+      leftMarginPx: 48,
+      rightMarginPx: 48,
+      bottomMarginPx: 40,
+      pageLetterhead: backgroundLetterhead,
+    });
   }
 
-  // Construct discrete A4 page cards
+  // Construct discrete A4 page cards with per-page accurate top/left/right/bottom margins
   const pagesHtml = pages
     .map(
-      (content, idx) => `
+      (pageData, idx) => `
       <div class="docx-a4-page" data-page="${idx + 1}" style="
         position: relative;
         width: 794px;
@@ -440,9 +521,9 @@ export async function convertDocxToA4Html(
         break-after: page;
       ">
         ${
-          backgroundLetterhead
+          pageData.pageLetterhead
             ? `
-          <img src="${backgroundLetterhead}" alt="Kop & Watermark" style="
+          <img src="${pageData.pageLetterhead}" alt="Kop & Watermark" style="
             position: absolute;
             top: 0;
             left: 0;
@@ -461,7 +542,7 @@ export async function convertDocxToA4Html(
           z-index: 1;
           width: 100%;
           height: 100%;
-          padding: 40px 48px 36px 48px;
+          padding: ${pageData.topMarginPx}px ${pageData.rightMarginPx}px ${pageData.bottomMarginPx}px ${pageData.leftMarginPx}px;
           box-sizing: border-box;
           font-family: 'Times New Roman', 'Cambria', Georgia, serif;
           font-size: 11pt;
@@ -470,8 +551,8 @@ export async function convertDocxToA4Html(
           text-rendering: optimizeLegibility;
           -webkit-font-smoothing: antialiased;
         ">
-          ${headerBannerHtml}
-          ${content}
+          ${idx === 0 ? headerBannerHtml : ""}
+          ${pageData.blocks.join("\n")}
         </div>
       </div>
     `
