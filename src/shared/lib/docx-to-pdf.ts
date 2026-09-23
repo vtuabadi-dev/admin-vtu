@@ -168,10 +168,106 @@ function parseParagraphStyles(pPrXml: string): string {
 }
 
 /**
- * Parses XML paragraph (<w:p>) to HTML string.
- * Special handling for inline signatures and stamps vs background drawings.
+ * Tries to parse a paragraph containing tabs and colons into an aligned form row.
+ * E.g. "No : ...", "Hal : ...", "Nama : ...", "Jabatan : ...", "Alamat : ...", "TTL : ..."
  */
-function parseParagraphXmlToHtml(pXml: string, mediaMap: Record<string, string>): string {
+function tryParseKeyValueRow(pXml: string): { label: string; value: string; isIndented: boolean } | null {
+  const rMatches = pXml.match(/<w:r\b[\s\S]*?<\/w:r>/gi) || [];
+  let fullText = "";
+  let hasTab = false;
+
+  for (const r of rMatches) {
+    if (r.includes("<w:tab")) {
+      fullText += "\t";
+      hasTab = true;
+    }
+    const tMatches = r.match(/<w:t(?:\s+[^>]*?)?>([\s\S]*?)<\/w:t>/gi) || [];
+    for (const t of tMatches) {
+      fullText += t.replace(/<[^>]+>/g, "");
+    }
+  }
+
+  const colonIdx = fullText.indexOf(":");
+  if (colonIdx === -1) return null;
+
+  const beforeColon = fullText.substring(0, colonIdx);
+  const afterColon = fullText.substring(colonIdx + 1);
+  const cleanLabel = beforeColon.replace(/\t/g, "").trim();
+  const cleanValue = afterColon.replace(/^\t+/, "").trim();
+
+  const knownLabels = ["no", "hal", "nama", "jabatan", "alamat", "ttl", "nomor sk"];
+  const isKnown = knownLabels.includes(cleanLabel.toLowerCase());
+
+  if (isKnown || (hasTab && cleanLabel.length > 0 && cleanLabel.length <= 22 && !cleanLabel.includes("."))) {
+    const isIndented =
+      beforeColon.startsWith("\t") ||
+      /<w:ind\b[^>]*w:firstLine/i.test(pXml) ||
+      /<w:ind\b[^>]*w:left/i.test(pXml) ||
+      ["nama", "jabatan", "alamat", "ttl", "nomor sk"].includes(cleanLabel.toLowerCase());
+    return { label: cleanLabel, value: cleanValue, isIndented };
+  }
+
+  return null;
+}
+
+/**
+ * Parses XML paragraph (<w:p>) to HTML string.
+ * Supports tabs/colons alignment, list numbering, and inline/floating drawings.
+ */
+function parseParagraphXmlToHtml(
+  pXml: string,
+  mediaMap: Record<string, string>,
+  numCounters?: Record<string, number>
+): string {
+  // 1. Check for pure floating drawing paragraph (e.g. signature image anchored above date)
+  const isPureFloatingDrawing =
+    pXml.includes("<w:drawing") &&
+    !pXml.replace(/<[^>]+>/g, "").replace(/-?\d+\s+-?\d+\s+0\s+0/g, "").trim();
+
+  if (isPureFloatingDrawing) {
+    return ""; // Will be rendered in the signature section
+  }
+
+  // 2. Check for List Paragraph (<w:numPr>)
+  const numPrMatch = pXml.match(/<w:numPr\b[\s\S]*?<\/w:numPr>/i);
+  let listPrefix = "";
+  if (numPrMatch && numCounters) {
+    const numIdMatch = numPrMatch[0].match(/<w:numId\s+w:val="(\d+)"/i);
+    const ilvlMatch = numPrMatch[0].match(/<w:ilvl\s+w:val="(\d+)"/i);
+    const numId = numIdMatch ? numIdMatch[1] : "1";
+    const ilvl = ilvlMatch ? ilvlMatch[1] : "0";
+    const key = `${numId}_${ilvl}`;
+    numCounters[key] = (numCounters[key] || 0) + 1;
+    listPrefix = `${numCounters[key]}.`;
+  }
+
+  // 3. Check for Key-Value Metadata row (Tabs / Colon alignment)
+  const kv = tryParseKeyValueRow(pXml);
+  if (kv) {
+    const isHeaderMeta = kv.label.toLowerCase() === "no" || kv.label.toLowerCase() === "hal";
+    const labelWidth = isHeaderMeta ? "45px" : "80px";
+    const indentPx = isHeaderMeta ? "0px" : kv.isIndented ? "24px" : "0px";
+    const isBold = isHeaderMeta;
+
+    return `<div style="display: flex; align-items: baseline; line-height: 1.3; margin: 1.5pt 0; padding-left: ${indentPx}; font-family: 'Times New Roman', serif;">
+      <div style="width: ${labelWidth}; flex-shrink: 0; ${isBold ? "font-weight: bold;" : ""}">${kv.label}</div>
+      <div style="width: 14px; flex-shrink: 0; text-align: center; ${isBold ? "font-weight: bold;" : ""}">:</div>
+      <div style="flex: 1; text-align: left; ${isBold ? "font-weight: bold;" : ""}">${kv.value}</div>
+    </div>`;
+  }
+
+  // 4. Check for List Item rendering with prefix
+  if (listPrefix) {
+    const textMatches = Array.from(pXml.matchAll(/<w:t(?:\s+[^>]*?)?>([\s\S]*?)<\/w:t>/gi))
+      .map((m) => decodeXml(m[1] || ""))
+      .join("");
+
+    return `<div style="display: flex; align-items: baseline; gap: 8px; margin: 3pt 0; text-align: justify; line-height: 1.35; font-family: 'Times New Roman', serif;">
+      <span style="min-width: 18px; font-weight: 500;">${listPrefix}</span>
+      <div style="flex: 1;">${textMatches}</div>
+    </div>`;
+  }
+
   const pPrMatch = pXml.match(/<w:pPr\b[\s\S]*?<\/w:pPr>/i);
   const pStyles = pPrMatch ? parseParagraphStyles(pPrMatch[0]) : "margin: 0; padding: 0; line-height: 1.35; min-height: 1em;";
 
@@ -195,9 +291,9 @@ function parseParagraphXmlToHtml(pXml: string, mediaMap: Record<string, string>)
       const blipMatch = rawElem.match(/<a:blip\b[^>]*r:embed="([^"]+)"/i);
       const rId = blipMatch ? blipMatch[1] : null;
 
-      if (rId && mediaMap[rId] && !isFullPage) {
-        // Inline drawing (Signature, Stamp, QR Code, Logo)
-        innerHtml += `<img src="${mediaMap[rId]}" style="max-height: 85px; max-width: 220px; object-fit: contain; display: inline-block; vertical-align: middle; margin: 2px 4px;" />`;
+      // Note: Floating signatures/stamps attached to PT VAUZA TAMMA ABADI are handled separately
+      if (rId && mediaMap[rId] && !isFullPage && !/PT\s*\.?\s*VAUZA\s+TAMMA\s+ABADI/i.test(pXml)) {
+        innerHtml += `<img src="${mediaMap[rId]}" style="max-height: 80px; max-width: 220px; object-fit: contain; display: inline-block; vertical-align: middle; margin: 2px 4px;" />`;
       }
       continue;
     }
@@ -216,8 +312,8 @@ function parseParagraphXmlToHtml(pXml: string, mediaMap: Record<string, string>)
       const isFullPage = isBehind || (cx > 5000000 && cy > 8000000);
 
       const rId = insideDrawingMatch[1];
-      if (mediaMap[rId] && !isFullPage) {
-        innerHtml += `<img src="${mediaMap[rId]}" style="max-height: 85px; max-width: 220px; object-fit: contain; display: inline-block; vertical-align: middle; margin: 2px 4px;" />`;
+      if (mediaMap[rId] && !isFullPage && !/PT\s*\.?\s*VAUZA\s+TAMMA\s+ABADI/i.test(pXml)) {
+        innerHtml += `<img src="${mediaMap[rId]}" style="max-height: 80px; max-width: 220px; object-fit: contain; display: inline-block; vertical-align: middle; margin: 2px 4px;" />`;
       }
     }
 
@@ -395,7 +491,6 @@ export async function convertDocxToA4Html(
   }
 
   const pages: PageData[] = [];
-  let currentPageBlocks: string[] = [];
 
   const docFile = zip.file("word/document.xml");
   if (docFile) {
@@ -406,36 +501,141 @@ export async function convertDocxToA4Html(
     const blockRegex = /<w:p\b[\s\S]*?<\/w:p>|<w:tbl\b[\s\S]*?<\/w:tbl>/gi;
     let blockMatch: RegExpExecArray | null;
 
+    // Collect raw blocks grouped by discrete pages
+    interface RawPageInfo {
+      rawBlocks: string[];
+      sectPr: string | null;
+    }
+    const rawPages: RawPageInfo[] = [];
+    let currentRawBlocks: string[] = [];
+
     while ((blockMatch = blockRegex.exec(bodyContent)) !== null) {
       const rawBlock = blockMatch[0];
 
-      // Detect section break or explicit author page break
-      // CRITICAL: DO NOT use <w:lastRenderedPageBreak> because Word generates that dynamically for pagination caches, causing ghost pages!
       const sectPrMatch = rawBlock.match(/<w:sectPr\b[\s\S]*?<\/w:sectPr>/i);
       const hasExplicitBreak =
         /<w:br\b[^>]*w:type="page"/i.test(rawBlock) ||
         /<w:pageBreakBefore(?:\s|\/|>)/i.test(rawBlock);
 
-      let parsedHtml = "";
-      if (rawBlock.startsWith("<w:tbl")) {
-        parsedHtml = parseTableXmlToHtml(rawBlock, mediaMap);
-      } else {
-        parsedHtml = parseParagraphXmlToHtml(rawBlock, mediaMap);
-      }
-
-      currentPageBlocks.push(parsedHtml);
+      currentRawBlocks.push(rawBlock);
 
       if (sectPrMatch || hasExplicitBreak) {
+        rawPages.push({
+          rawBlocks: currentRawBlocks,
+          sectPr: sectPrMatch ? sectPrMatch[0] : null,
+        });
+        currentRawBlocks = [];
+      }
+    }
+
+    if (currentRawBlocks.length > 0) {
+      const finalSectPr = bodyContent.match(/<w:sectPr\b[\s\S]*?<\/w:sectPr>(?:\s*<\/w:body>)?$/i);
+      rawPages.push({
+        rawBlocks: currentRawBlocks,
+        sectPr: finalSectPr ? finalSectPr[0] : null,
+      });
+    }
+
+    // Numbering counters across the whole document
+    const numCounters: Record<string, number> = {};
+
+    for (const rawPage of rawPages) {
+      const { rawBlocks, sectPr } = rawPage;
+
+      // Detect floating signature drawing for this page
+      let pageSignatureImg: string | null = null;
+      for (const b of rawBlocks) {
+        if (!b) continue;
+        const blipMatches = Array.from(b.matchAll(/<a:blip\b[^>]*r:embed="([^"]+)"/gi));
+        for (const m of blipMatches) {
+          const rId = m[1];
+          if (rId && mediaMap[rId]) {
+            const extentMatch = b.match(/<wp:extent\b[^>]*cx="(\d+)"[^>]*cy="(\d+)"/i);
+            const cx = extentMatch ? parseInt(extentMatch[1] || "0", 10) : 0;
+            const cy = extentMatch ? parseInt(extentMatch[2] || "0", 10) : 0;
+            const isBehind = /behindDoc="1"/i.test(b);
+            if (!isBehind && cx < 5000000 && cy < 8000000) {
+              pageSignatureImg = mediaMap[rId];
+            }
+          }
+        }
+      }
+
+      const pageBlocks: string[] = [];
+      let inSignatureSpace = false;
+
+      for (let bIdx = 0; bIdx < rawBlocks.length; bIdx++) {
+        const b = rawBlocks[bIdx];
+        if (!b) continue;
+        const cleanRawText = b.replace(/<[^>]+>/g, "").trim();
+
+        // 1. Signature marker: PT. VAUZA TAMMA ABADI
+        if (
+          /PT\s*\.?\s*VAUZA\s+TAMMA\s+ABADI/i.test(cleanRawText) &&
+          (b.includes("Direktur") || rawBlocks.slice(Math.max(0, bIdx - 3), bIdx).some((x) => x && x.includes("Direktur")))
+        ) {
+          pageBlocks.push(
+            `<p style="margin: 0; padding: 0; line-height: 1.35; font-family: 'Times New Roman', serif;">PT. VAUZA TAMMA ABADI</p>`
+          );
+          if (pageSignatureImg) {
+            pageBlocks.push(
+              `<div style="height: 72px; margin: 3px 0; display: flex; align-items: center;">
+                <img src="${pageSignatureImg}" style="max-height: 75px; max-width: 220px; object-fit: contain;" />
+              </div>`
+            );
+          } else {
+            pageBlocks.push(`<div style="height: 55px;"></div>`);
+          }
+          inSignatureSpace = true;
+          continue;
+        }
+
+        // 2. In signature space: wait for signer name, skip empty paragraphs
+        if (inSignatureSpace) {
+          if (/H\.\s*Faisal\s+Wahyudi/i.test(cleanRawText)) {
+            pageBlocks.push(
+              `<p style="margin: 0; padding: 0; line-height: 1.35; font-weight: bold; font-family: 'Times New Roman', serif;">H. Faisal Wahyudi</p>`
+            );
+            inSignatureSpace = false;
+            continue;
+          } else if (!cleanRawText) {
+            // Skip empty spacer paragraphs between PT VAUZA TAMMA and H. Faisal Wahyudi
+            continue;
+          }
+        }
+
+        // 3. Normal paragraph or table
+        let parsedHtml = "";
+        if (b.startsWith("<w:tbl")) {
+          parsedHtml = parseTableXmlToHtml(b, mediaMap);
+        } else {
+          parsedHtml = parseParagraphXmlToHtml(b, mediaMap, numCounters);
+        }
+
+        if (parsedHtml.trim()) {
+          pageBlocks.push(parsedHtml);
+        }
+      }
+
+      // Check if page contains real content (filter empty trailing page)
+      const rawText = pageBlocks
+        .join("")
+        .replace(/<[^>]+>/g, "")
+        .replace(/&nbsp;/g, "")
+        .trim();
+      const hasImages = pageBlocks.join("").includes("<img");
+
+      if (rawText.length > 20 || (hasImages && rawText.length > 5)) {
         let topDxa = 3544; // default ~62.5mm if letterhead present
         let leftDxa = 993;
         let rightDxa = 851;
         let bottomDxa = 567;
 
-        if (sectPrMatch) {
-          const tM = sectPrMatch[0].match(/w:top="(\d+)"/i);
-          const lM = sectPrMatch[0].match(/w:left="(\d+)"/i);
-          const rM = sectPrMatch[0].match(/w:right="(\d+)"/i);
-          const bM = sectPrMatch[0].match(/w:bottom="(\d+)"/i);
+        if (sectPr) {
+          const tM = sectPr.match(/w:top="(\d+)"/i);
+          const lM = sectPr.match(/w:left="(\d+)"/i);
+          const rM = sectPr.match(/w:right="(\d+)"/i);
+          const bM = sectPr.match(/w:bottom="(\d+)"/i);
           if (tM && tM[1]) topDxa = parseInt(tM[1], 10);
           if (lM && lM[1]) leftDxa = parseInt(lM[1], 10);
           if (rM && rM[1]) rightDxa = parseInt(rM[1], 10);
@@ -443,45 +643,7 @@ export async function convertDocxToA4Html(
         }
 
         pages.push({
-          blocks: currentPageBlocks,
-          topMarginPx: Math.max(Math.round(topDxa / 15), backgroundLetterhead ? 220 : 40),
-          leftMarginPx: Math.round(leftDxa / 15),
-          rightMarginPx: Math.round(rightDxa / 15),
-          bottomMarginPx: Math.round(bottomDxa / 15),
-          pageLetterhead: backgroundLetterhead,
-        });
-        currentPageBlocks = [];
-      }
-    }
-
-    if (currentPageBlocks.length > 0) {
-      const finalSectPr = bodyContent.match(/<w:sectPr\b[\s\S]*?<\/w:sectPr>(?:\s*<\/w:body>)?$/i);
-      let topDxa = 3544;
-      let leftDxa = 993;
-      let rightDxa = 851;
-      let bottomDxa = 567;
-      if (finalSectPr) {
-        const tM = finalSectPr[0].match(/w:top="(\d+)"/i);
-        const lM = finalSectPr[0].match(/w:left="(\d+)"/i);
-        const rM = finalSectPr[0].match(/w:right="(\d+)"/i);
-        const bM = finalSectPr[0].match(/w:bottom="(\d+)"/i);
-        if (tM && tM[1]) topDxa = parseInt(tM[1], 10);
-        if (lM && lM[1]) leftDxa = parseInt(lM[1], 10);
-        if (rM && rM[1]) rightDxa = parseInt(rM[1], 10);
-        if (bM && bM[1]) bottomDxa = parseInt(bM[1], 10);
-      }
-
-      // Filter out trailing empty page if it contains no meaningful text or content
-      const rawText = currentPageBlocks
-        .join("")
-        .replace(/<[^>]+>/g, "")
-        .replace(/&nbsp;/g, "")
-        .trim();
-      const hasImages = currentPageBlocks.join("").includes("<img");
-
-      if (rawText.length > 20 || (hasImages && rawText.length > 5)) {
-        pages.push({
-          blocks: currentPageBlocks,
+          blocks: pageBlocks,
           topMarginPx: Math.max(Math.round(topDxa / 15), backgroundLetterhead ? 220 : 40),
           leftMarginPx: Math.round(leftDxa / 15),
           rightMarginPx: Math.round(rightDxa / 15),
