@@ -400,18 +400,54 @@ export function extractRoomUpgradePrices(caption: string): { upgradeDouble?: str
 
 /**
  * Detect equipment inclusion from caption text.
+ * Returns "tidak" if caption indicates equipment is excluded/without equipment.
  * Returns "ya" if caption mentions included equipment ("Perlengkapan umroh", "Free perlengkapan", etc.).
  */
 export function extractEquipmentStatus(caption: string): "ya" | "tidak" | undefined {
-  const upper = caption.toUpperCase();
-  if (upper.includes("PERLENGKAPAN UMROH") || upper.includes("FREE PERLENGKAPAN") || upper.includes("TERMASUK PERLENGKAPAN") || upper.includes("PERLENGKAPAN")) {
-    const tidakIndex = upper.indexOf("TIDAK TERMASUK");
-    const perlengkapanIndex = upper.indexOf("PERLENGKAPAN");
-    if (tidakIndex !== -1 && perlengkapanIndex > tidakIndex) {
+  const lower = caption.toLowerCase();
+
+  // 1. Explicit negation checks (Highest Priority)
+  const hasNegation =
+    /(?:tidak|belum|tanpa|exclude|bukan)\s+(?:termasuk\s+)?perlengkapan/i.test(lower) ||
+    lower.includes("tanpa perlengkapan") ||
+    lower.includes("belum termasuk perlengkapan") ||
+    lower.includes("tidak termasuk perlengkapan") ||
+    lower.includes("perlengkapan tidak wajib") ||
+    lower.includes("perlengkapan tidak termasuk");
+
+  // Check section "Tidak Termasuk" / "Exclude"
+  const lines = lower.split("\n");
+  let inExcludeSection = false;
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
+    if (/^(?:tidak\s+termasuk|belum\s+termasuk|harga\s+tidak\s+termasuk|exclude)\s*[:=-]?/i.test(line)) {
+      inExcludeSection = true;
+    } else if (/^(?:termasuk|harga\s+termasuk|fasilitas\s+termasuk|include|bonus|keunggulan|free)\s*[:=-]?/i.test(line)) {
+      inExcludeSection = false;
+    }
+
+    if (inExcludeSection && line.includes("perlengkapan")) {
       return "tidak";
     }
+  }
+
+  if (hasNegation) {
+    return "tidak";
+  }
+
+  // 2. Explicit positive checks (Only if no negation)
+  const hasPositive =
+    /(?:sudah\s+)?termasuk\s+perlengkapan/i.test(lower) ||
+    lower.includes("free perlengkapan") ||
+    lower.includes("all in perlengkapan") ||
+    lower.includes("include perlengkapan") ||
+    lower.includes("fasilitas perlengkapan") ||
+    lower.includes("perlengkapan umroh");
+
+  if (hasPositive) {
     return "ya";
   }
+
   return undefined;
 }
 
@@ -513,9 +549,12 @@ export function extractClustersFromCaption(caption: string): import("./types").C
   });
 
   const presentClusters = Object.keys(clusterMap);
-  const orderedClusters = presentClusters.length > 0 ? presentClusters : ["SILVER", "GOLD", "PLATINUM"];
+  // CRITICAL INVARIANT: DO NOT invent dummy clusters if no clusters were detected!
+  if (presentClusters.length === 0) {
+    return [];
+  }
 
-  orderedClusters.forEach((cName, idx) => {
+  presentClusters.forEach((cName, idx) => {
     if (!clusterMap[cName]) {
       clusterMap[cName] = { clusterName: `${cName.charAt(0) + cName.slice(1).toLowerCase()} Package` };
     }

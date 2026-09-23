@@ -86,4 +86,60 @@ describe("Package OCR & Route Resolution — Hardened Suite", () => {
       expect(parsed.packageType).toBe("umroh_plus");
     });
   });
+
+  describe("Invariant 4: Equipment (Perlengkapan) Negation & Inclusion Resolution", () => {
+    it("strictly resolves 'tanpa perlengkapan' as 'tidak'", () => {
+      const caption = `
+        Umroh New Season 1448 H
+        Tidak Termasuk :
+        • Paspor Pribadi
+        • Tanpa Perlengkapan
+        Note : paket di atas tidak termasuk perlengkapan.
+      `;
+      const parsed = parseCaption(caption);
+      expect(parsed.isAdaPerlengkapan).toBe("tidak");
+    });
+
+    it("resolves 'termasuk perlengkapan' as 'ya' when no negations are present", () => {
+      const caption = `
+        Umroh Reguler 9 Hari
+        Termasuk :
+        • Tiket PP
+        • Free Perlengkapan Umroh
+      `;
+      const parsed = parseCaption(caption);
+      expect(parsed.isAdaPerlengkapan).toBe("ya");
+    });
+  });
+
+  describe("Invariant 5: Cluster Seat vs Non-Cluster Guarantee", () => {
+    it("does NOT create dummy clusters when caption has no cluster keywords", () => {
+      const caption = `
+        Umroh New Season 1448 H
+        Harga Rp. 35.900.000
+        Hotel Makkah : Makkah Tower 4 malam
+        Hotel Madinah : ODST Al Madinah 3 malam
+      `;
+      const parsed = parseCaption(caption);
+      expect(parsed.clusters).toBeUndefined();
+    });
+
+    it("correctly extracts genuine clusters when Silver, Gold, Platinum are explicitly present", () => {
+      const caption = `
+        Umroh Bintang 5
+        Silver Rp. 38.900.000
+        Gold Rp. 40.900.000
+        Platinum Rp. 44.900.000
+      `;
+      const parsed = parseCaption(caption);
+      expect(parsed.clusters).toBeDefined();
+      expect(parsed.clusters?.length).toBe(3);
+      expect(parsed.clusters?.map(c => c.clusterName)).toEqual([
+        "Silver Package",
+        "Gold Package",
+        "Platinum Package"
+      ]);
+    });
+  });
 });
+

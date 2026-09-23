@@ -737,20 +737,62 @@ export async function convertDocxToA4Html(
 
 /**
  * Merges field values into DOCX template and downloads it directly as an accurate PDF file.
- * Preserves high fidelity letterhead background, watermark, and multi-page integrity.
+ * Uses native DOCX-to-PDF conversion via Google Drive for 100% Word fidelity,
+ * with automatic fallback to client-side renderer if offline.
  */
 export async function downloadDocxAsPdf(
   docxData: string | Uint8Array | ArrayBuffer | Blob,
   fieldValues: Record<string, string>,
   fileName: string
 ): Promise<void> {
-  // 1. Populate placeholders inside the DOCX
+  const cleanPdfName = fileName.endsWith(".pdf") ? fileName : `${fileName}.pdf`;
+
+  // 1. Populate placeholders directly inside the DOCX
+  // (Preserves 100% of formatting, margins, headers, footers, tables, fonts, and layout)
   const mergedBlob = await mergeDocxPlaceholders(docxData, fieldValues);
 
-  // 2. Convert merged DOCX to A4 HTML layout
+  // 2. Primary Method: Direct native DOCX-to-PDF conversion via server endpoint
+  try {
+    const arrayBuffer = await mergedBlob.arrayBuffer();
+    const bytes = new Uint8Array(arrayBuffer);
+    let binary = "";
+    const len = bytes.byteLength;
+    for (let i = 0; i < len; i++) {
+      binary += String.fromCharCode(bytes[i] ?? 0);
+    }
+    const base64 = btoa(binary);
+
+    const res = await fetch("/api/surat/convert-docx-to-pdf", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        docxBase64: base64,
+        fileName: cleanPdfName,
+      }),
+    });
+
+    if (res.ok) {
+      const pdfBlob = await res.blob();
+      if (pdfBlob && pdfBlob.size > 1000) {
+        const url = URL.createObjectURL(pdfBlob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = cleanPdfName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        setTimeout(() => URL.revokeObjectURL(url), 2000);
+        return;
+      }
+    }
+    console.warn("[downloadDocxAsPdf] Server conversion failed, falling back to local renderer.");
+  } catch (err) {
+    console.warn("[downloadDocxAsPdf] Error calling server conversion API, falling back to local renderer:", err);
+  }
+
+  // 3. Fallback Method: Local HTML rasterization (if offline or server conversion unavailable)
   const htmlContent = await convertDocxToA4Html(mergedBlob);
 
-  // 3. Render HTML in an off-screen container in DOM
   const container = document.createElement("div");
   container.style.position = "fixed";
   container.style.top = "-99999px";

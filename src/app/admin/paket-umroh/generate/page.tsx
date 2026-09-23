@@ -889,19 +889,27 @@ export default function GeneratePaketPage() {
         // ── 6a. Termasuk Perlengkapan ──
         const fullCaptionLower = `${caption || ""} ${result.rawCaption || ""} ${result.rawOcrText || ""}`.toLowerCase();
 
-        if (
-          result.isAdaPerlengkapan === "ya" ||
-          fullCaptionLower.includes("termasuk perlengkapan") ||
-          fullCaptionLower.includes("free perlengkapan") ||
-          fullCaptionLower.includes("all in perlengkapan")
-        ) {
-          finalFormData.isAdaPerlengkapan = "ya";
-        } else if (
+        const hasNegationPerlengkapan =
           result.isAdaPerlengkapan === "tidak" ||
+          /(?:tidak|belum|tanpa|exclude|bukan)\s+(?:termasuk\s+)?perlengkapan/i.test(fullCaptionLower) ||
           fullCaptionLower.includes("tanpa perlengkapan") ||
-          fullCaptionLower.includes("belum termasuk perlengkapan")
-        ) {
+          fullCaptionLower.includes("belum termasuk perlengkapan") ||
+          fullCaptionLower.includes("tidak termasuk perlengkapan") ||
+          fullCaptionLower.includes("perlengkapan tidak wajib") ||
+          fullCaptionLower.includes("perlengkapan tidak termasuk");
+
+        const hasPositivePerlengkapan =
+          !hasNegationPerlengkapan &&
+          (result.isAdaPerlengkapan === "ya" ||
+            fullCaptionLower.includes("free perlengkapan") ||
+            fullCaptionLower.includes("all in perlengkapan") ||
+            /(?:^|[^\w])(?:sudah\s+)?termasuk\s+perlengkapan/i.test(fullCaptionLower) ||
+            fullCaptionLower.includes("include perlengkapan"));
+
+        if (hasNegationPerlengkapan) {
           finalFormData.isAdaPerlengkapan = "tidak";
+        } else if (hasPositivePerlengkapan) {
+          finalFormData.isAdaPerlengkapan = "ya";
         } else if (result.isAdaPerlengkapan) {
           finalFormData.isAdaPerlengkapan = result.isAdaPerlengkapan;
         }
@@ -970,12 +978,16 @@ export default function GeneratePaketPage() {
         if (result.upgradeTriple) finalFormData.upgradeTriple = String(result.upgradeTriple).replace(/\D/g, "");
 
         // ── 7. CLUSTER SEAT BOX EXTRACTION ──
-        if (result.clusters && Array.isArray(result.clusters) && result.clusters.length > 0) {
+        const validClusters = Array.isArray(result.clusters)
+          ? result.clusters.filter((c: any) => c && (c.hargaBase || c.hotelMekkah || c.hotelMadinah || c.upgradeDouble))
+          : [];
+
+        if (validClusters.length > 0) {
           finalFormData.isAdaKlaster = "ya";
           const updatedClusterConfigs: Record<string, any> = { ...clusterConfigs };
           const clustersList = options?.clusters && options.clusters.length > 0 ? options.clusters : MOCK_KLASTER;
 
-          console.log("[AI OCR] Clusters from AI:", result.clusters);
+          console.log("[AI OCR] Clusters from AI:", validClusters);
           console.log("[AI OCR] Master Clusters:", clustersList);
 
           result.clusters.forEach((cItem: any) => {
@@ -1015,6 +1027,8 @@ export default function GeneratePaketPage() {
           });
 
           setClusterConfigs(updatedClusterConfigs);
+        } else {
+          finalFormData.isAdaKlaster = "tidak";
         }
 
         // ── 8. DEPARTURE DATES ──
@@ -2961,6 +2975,10 @@ export default function GeneratePaketPage() {
                     kuota: pairs[0]?.childSeat || 20,
                     maxSeat: pairs[0]?.childSeat || 20,
                     isAdaKlaster: formData.isAdaKlaster,
+                    isAdaPerlengkapan: formData.isAdaPerlengkapan,
+                    isAdaKeretaCepat: formData.isAdaKeretaCepat,
+                    isAdaThoif: formData.isAdaThoif,
+                    tipeMakan: formData.tipeMakan || "FB",
                     clusterConfigs: formData.isAdaKlaster === "ya" ? clusterConfigs : null,
                     paketGrupId: selectedParentGroup.type === "group" ? selectedParentGroupId : undefined,
                     parentKeberangkatanId: selectedParentGroup.type === "individual" ? selectedParentGroup.keberangkatanId : (pairs[0]?.parentId || undefined),
