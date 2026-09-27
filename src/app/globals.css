@@ -494,3 +494,48 @@ html.intro-pending body {
 .portal-theme .border-border {
   border-color: rgba(216, 177, 91, 0.22) !important;
 }
+
+/* ── High Contrast Crisp Readability for Terms & Conditions & Rich Text in Portal Theme ── */
+.portal-theme .rich-text-content {
+  color: #f8fafc !important;
+  font-size: 0.9375rem;
+  line-height: 1.75 !important;
+}
+
+.portal-theme .rich-text-content p,
+.portal-theme .rich-text-content li,
+.portal-theme .rich-text-content div,
+.portal-theme .rich-text-content span {
+  color: #f8fafc !important;
+  line-height: 1.75 !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.85);
+}
+
+.portal-theme .rich-text-content li {
+  margin-bottom: 0.5rem !important;
+}
+
+.portal-theme .rich-text-content strong,
+.portal-theme .rich-text-content b {
+  color: #fef08a !important;
+  font-weight: 700 !important;
+}
+
+.portal-theme .rich-text-content h1,
+.portal-theme .rich-text-content h2,
+.portal-theme .rich-text-content h3,
+.portal-theme .rich-text-content h4 {
+  color: #f5d061 !important;
+  font-weight: 800 !important;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.9) !important;
+}
+
+.portal-theme .rich-text-content ol,
+.portal-theme .rich-text-content ul {
+  color: #f8fafc !important;
+}
+
+.portal-theme .rich-text-content a {
+  color: #93c5fd !important;
+  text-decoration: underline !important;
+}

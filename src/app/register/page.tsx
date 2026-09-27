@@ -156,17 +156,24 @@ function CityCombobox({
   placeholder = "Kota Tempat Lahir (contoh: SURABAYA)",
   id,
   onSelectNext,
+  onOpenChange,
 }: {
   value: string;
   onChange: (val: string) => void;
   placeholder?: string;
   id?: string;
   onSelectNext?: () => void;
+  onOpenChange?: (open: boolean) => void;
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState(0);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
+
+  // Notify parent of open state
+  useEffect(() => {
+    onOpenChange?.(isOpen);
+  }, [isOpen, onOpenChange]);
 
   // Close dropdown on click outside
   useEffect(() => {
@@ -240,7 +247,7 @@ function CityCombobox({
   };
 
   return (
-    <div ref={wrapperRef} className="relative w-full">
+    <div ref={wrapperRef} className={cn("relative w-full", isOpen && "z-50")}>
       <div className="relative">
         <input
           id={id}
@@ -333,6 +340,7 @@ export default function RegisterPage() {
   const [members, setMembers] = useState<MemberForm[]>([
     { namaLengkap: "", jenisKelamin: "L", tempatLahir: "", tanggalLahir: "", hubungan: "" },
   ]);
+  const [openComboboxIndex, setOpenComboboxIndex] = useState<number | null>(null);
 
   // Step 5: Package
   const [paketList, setPaketList] = useState<Keberangkatan[]>([]);
@@ -1206,37 +1214,39 @@ export default function RegisterPage() {
         {/* Step 2: Terms */}
         {step === 2 && (
           <div className="space-y-4">
-            <h2 className="text-lg font-semibold text-gray-900">Syarat & Ketentuan Umroh</h2>
+            <h2 className="text-xl font-extrabold text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.95)] tracking-wide">
+              Syarat &amp; Ketentuan Umroh
+            </h2>
             {termsDoc ? (
               <>
                 <div
                   ref={termsContainerRef}
                   onScroll={handleTermsScroll}
                   onWheel={handleTermsWheel}
-                  className="border border-gray-200 rounded-lg p-5 h-[480px] overflow-y-auto text-sm text-gray-700 rich-text-content bg-white shadow-inner focus:outline-none focus:ring-2 focus:ring-blue-500 [overscroll-behavior-y:auto]"
+                  className="border-2 border-emerald-500/40 rounded-2xl p-5 sm:p-6 h-[480px] overflow-y-auto text-sm sm:text-base text-white rich-text-content bg-[#02130c]/90 shadow-inner focus:outline-none focus:ring-2 focus:ring-[#f5d061]/60 [overscroll-behavior-y:auto] select-text"
                 >
                   <div dangerouslySetInnerHTML={{ __html: termsDoc.content }} />
                 </div>
-                <p className="text-xs text-gray-400 mt-1">
+                <p className="text-xs text-emerald-300 font-semibold mt-1.5 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
                   Versi {termsDoc.version || termsVersion} — {termsDoc.title}
                 </p>
               </>
             ) : (
-              <div className="border border-gray-200 rounded-lg p-5 h-[480px] overflow-y-auto flex items-center justify-center text-sm text-gray-400 italic">
-                Memuat Syarat & Ketentuan...
+              <div className="border-2 border-emerald-500/30 rounded-2xl p-5 h-[480px] overflow-y-auto flex items-center justify-center text-sm text-emerald-200/80 italic bg-[#02130c]/80">
+                Memuat Syarat &amp; Ketentuan...
               </div>
             )}
 
             {/* Scroll Status Indicator Banner */}
             {!hasScrolledToBottom ? (
-              <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 flex items-center gap-2 text-amber-800 text-xs font-medium">
-                <FileText className="w-4 h-4 text-amber-600 shrink-0" />
-                <span>Mohon membaca seluruh isi Syarat & Ketentuan di atas hingga bagian akhir untuk mengaktifkan persetujuan.</span>
+              <div className="bg-amber-950/80 border border-amber-400/50 rounded-xl p-3 flex items-center gap-2.5 text-amber-200 text-xs sm:text-sm font-semibold shadow-md">
+                <FileText className="w-4 h-4 text-amber-400 shrink-0" />
+                <span>Mohon membaca seluruh isi Syarat &amp; Ketentuan di atas hingga bagian akhir untuk mengaktifkan persetujuan.</span>
               </div>
             ) : (
-              <div className="bg-green-50 border border-green-200 rounded-xl p-3 flex items-center gap-2 text-green-800 text-xs font-medium">
-                <CheckCircle2 className="w-4 h-4 text-green-600 shrink-0" />
-                <span>Terima kasih, Anda telah membaca seluruh Syarat & Ketentuan di atas.</span>
+              <div className="bg-emerald-950/80 border border-emerald-400/50 rounded-xl p-3 flex items-center gap-2.5 text-emerald-200 text-xs sm:text-sm font-semibold shadow-md">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span>Terima kasih, Anda telah membaca seluruh Syarat &amp; Ketentuan di atas.</span>
               </div>
             )}
 
@@ -1429,7 +1439,16 @@ export default function RegisterPage() {
             })()}
 
             {members.map((member, i) => (
-              <div key={i} className="bg-emerald-950/70 border-2 border-emerald-500/40 rounded-2xl p-5 space-y-4 shadow-lg backdrop-blur-xl">
+              <div
+                key={i}
+                className={cn(
+                  "bg-emerald-950/70 border-2 border-emerald-500/40 rounded-2xl p-5 space-y-4 shadow-lg backdrop-blur-xl relative transition-all",
+                  openComboboxIndex === i ? "border-[#F5D061] ring-2 ring-[#F5D061]/40" : ""
+                )}
+                style={{
+                  zIndex: openComboboxIndex === i ? 60 : (members.length - i) * 10,
+                }}
+              >
                 <div className="flex items-center justify-between border-b border-emerald-800/80 pb-3">
                   <h3 className="text-sm font-extrabold text-white tracking-wide">
                     Jamaah #{i + 1} {i === 0 && "(Ketua Grup)"}
@@ -1514,8 +1533,8 @@ export default function RegisterPage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 relative z-20">
+                  <div className="relative z-30">
                     <label className="block text-xs font-extrabold text-white mb-1.5 drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]">
                       Tempat Lahir
                     </label>
@@ -1527,11 +1546,12 @@ export default function RegisterPage() {
                         const el = document.getElementById(`member_${i}_tglLahir`);
                         if (el) el.focus();
                       }}
+                      onOpenChange={(open) => setOpenComboboxIndex(open ? i : null)}
                       placeholder="Kota Tempat Lahir (contoh: SURABAYA)"
                     />
                   </div>
 
-                  <div>
+                  <div className="relative z-10">
                     <label className="block text-xs font-extrabold text-white mb-1.5 drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]">
                       Tanggal Lahir
                     </label>
@@ -1601,7 +1621,7 @@ export default function RegisterPage() {
                 </div>
 
                 {members.length > 1 && (
-                  <div>
+                  <div className="relative z-10">
                     <label className="block text-xs font-bold text-white mb-1 drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]">
                       {i === 0
                         ? `Hubungan dengan Jamaah #2`
