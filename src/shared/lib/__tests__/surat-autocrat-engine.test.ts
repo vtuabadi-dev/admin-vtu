@@ -8,6 +8,7 @@ import {
   isSystemAutoPlaceholder,
   formatMonthYear,
   toTitleCase,
+  matchTagToManifestField,
 } from "@/shared/lib/surat-autocrat-engine";
 import { searchKantorImigrasi, getKotaFromKanimName } from "@/shared/lib/kantor-imigrasi";
 
@@ -350,7 +351,6 @@ describe("Surat Autocrat Merge Engine", () => {
       ],
       templateContent: "Bulan: {{Bulan Keberangkatan}}",
     };
-
     const mockKeberangkatan = {
       tanggalBerangkat: "2026-06-17",
     };
@@ -358,5 +358,60 @@ describe("Surat Autocrat Merge Engine", () => {
     const resolved = resolveAutocratFieldValues(template, null, mockKeberangkatan, {});
     expect(resolved["Bulan Keberangkatan"]).toBe("Juni 2026");
   });
+
+  it("should correctly map template placeholders from uploaded documents using matchTagToManifestField", () => {
+    expect(matchTagToManifestField("Nama").matchedManifest?.key).toBe("jamaah.namaLengkap");
+    expect(matchTagToManifestField("No Identitas").matchedManifest?.key).toBe("jamaah.nik");
+    expect(matchTagToManifestField("Tanggal Awal").matchedManifest?.key).toBe("keberangkatan.tanggalBerangkat");
+    expect(matchTagToManifestField("Tanggal Akhir").matchedManifest?.key).toBe("keberangkatan.tanggalPulang");
+    expect(matchTagToManifestField("Bulan Awal").matchedManifest?.key).toBe("keberangkatan.bulanKeberangkatan");
+    expect(matchTagToManifestField("Pekerjaan").matchedManifest?.key).toBe("jamaah.pekerjaan");
+    expect(matchTagToManifestField("Jenis No ID").defaultValue).toBe("NIK");
+    expect(matchTagToManifestField("Instansi").sourceType).toBe("manual");
+  });
+
+  it("should auto-resolve values for template tags like Surat Cuti Pekerja seamlessly", () => {
+    const template: any = {
+      id: "tpl-cuti-pekerja",
+      nama: "Surat Permohonan Cuti Pekerja",
+      placeholders: [],
+      templateContent: `Kepada Yth. Pimpinan {{Instansi}}
+Nama: {{Nama}}
+{{Jenis No ID}}: {{No Identitas}}
+Jabatan: {{Jabatan}}
+Pekerjaan: {{Pekerjaan}}
+Periode: {{Tanggal Awal}} s/d {{Tanggal Akhir}}
+Bulan: {{Bulan Awal}}`,
+    };
+
+    const mockJamaah = {
+      namaLengkap: "Ranti Fransiska",
+      nik: "3276015805900010",
+      pekerjaan: "Empl & Mill Services",
+    };
+
+    const mockKeberangkatan = {
+      tanggalBerangkat: "2026-08-31",
+      tanggalPulang: "2026-09-09",
+    };
+
+    const manualFormData = {
+      Instansi: "PT Tjiwi Kimia",
+      Jabatan: "Staff Operasional",
+    };
+
+    const resolved = resolveAutocratFieldValues(template, mockJamaah, mockKeberangkatan, manualFormData);
+
+    expect(resolved.Nama).toBe("Ranti Fransiska");
+    expect(resolved["No Identitas"]).toBe("3276015805900010");
+    expect(resolved["Jenis No ID"]).toBe("NIK");
+    expect(resolved.Pekerjaan).toBe("Empl & Mill Services");
+    expect(resolved.Instansi).toBe("PT Tjiwi Kimia");
+    expect(resolved.Jabatan).toBe("Staff Operasional");
+    expect(resolved["Tanggal Awal"]).toBe("31 Agustus 2026");
+    expect(resolved["Tanggal Akhir"]).toBe("9 September 2026");
+    expect(resolved["Bulan Awal"]).toBe("Agustus 2026");
+  });
 });
+
 

@@ -69,10 +69,33 @@ export function extractFourDigitRegId(code: string): string {
   return "0001";
 }
 
+export function extractFourDigitRegWithMember(code: string): string {
+  if (!code) return "0001";
+  const clean = code.trim();
+  const memberMatch = clean.match(/-(\d+)$/);
+  const memberSuffix = memberMatch ? `-${memberMatch[1]}` : "";
+  const codeWithoutMember = clean.replace(/-\d+$/, "");
+
+  const grpMatch = codeWithoutMember.match(/^GRP-\d{4}-(\d+)$/i);
+  if (grpMatch && grpMatch[1]) {
+    const seq = parseInt(grpMatch[1], 10) || 1;
+    return `${String(seq).padStart(4, "0")}${memberSuffix}`;
+  }
+
+  const numMatch = codeWithoutMember.match(/(\d+)$/);
+  if (numMatch && numMatch[1]) {
+    const seq = parseInt(numMatch[1], 10) || 1;
+    return `${String(seq).padStart(4, "0")}${memberSuffix}`;
+  }
+
+  return `0001${memberSuffix}`;
+}
+
 /**
- * ADR-0014: Standard document file naming format:
- * [no urut manifest]-[4 digit id reg]-[nama manifest].[ext]
- * E.g. "2-0004-MUHAMMAD ATHALLAH RASYID KUSYUDIHYANSYACH.jpg"
+ * Standard document file naming format:
+ * [3 digit no urut manifest]-[4digit id reg dan id unik grup]-[Nama Manifest].[ext]
+ * E.g. "001-0003-1-MUCHAMAD ZAMRONI.jpg"
+ *      "002-0003-2-SM SALEH ISMAIL.jpg"
  */
 export function formatStandardDocumentFileName(
   nomorManifest: number | string,
@@ -81,7 +104,8 @@ export function formatStandardDocumentFileName(
   ext: string
 ): string {
   const cleanExt = ext.replace(/^\./, "").toLowerCase() || "jpg";
-  const fourDigit = extractFourDigitRegId(baseRegCode);
+  const manifestNumPadded = String(nomorManifest || "1").padStart(3, "0");
+  const regIdentifier = extractFourDigitRegWithMember(baseRegCode);
   const cleanName = (namaManifest || "JAMAAH")
     .toUpperCase()
     .trim()
@@ -89,7 +113,7 @@ export function formatStandardDocumentFileName(
     .replace(/[^A-Z0-9 ]/g, "")
     .trim();
 
-  return `${nomorManifest}-${fourDigit}-${cleanName}.${cleanExt}`;
+  return `${manifestNumPadded}-${regIdentifier}-${cleanName}.${cleanExt}`;
 }
 
 /**

@@ -48,6 +48,7 @@ import {
   resolveAutocratFieldValues,
   renderAutocratMergedText,
   getTodayDateInfo,
+  matchTagToManifestField,
 } from "@/shared/lib/surat-autocrat-engine";
 import type {
   SuratTemplate,
@@ -237,6 +238,38 @@ Demikian Surat Tugas ini dibuat dengan sebenarnya agar dapat dipergunakan sebaga
       cloned.attachedFiles = current;
     }
 
+    // If template has attached document files with content, prune placeholders to match the document tags
+    const hasAttachedDocs = (cloned.attachedFiles || []).some(
+      (f) => f.content && f.content.trim().length > 0
+    );
+    if (hasAttachedDocs) {
+      const fileText = (cloned.attachedFiles || []).map((f) => f.content || "").join("\n");
+      const fileTags = extractPlaceholdersFromText(fileText).filter((t) => !isSystemAutoPlaceholder(t));
+      if (fileTags.length > 0) {
+        const syncedPlaceholders: SuratPlaceholderMapping[] = [];
+        fileTags.forEach((tag) => {
+          const found = cloned.placeholders.find(
+            (p) => p.key.toLowerCase().trim() === tag.toLowerCase().trim()
+          );
+          if (found) {
+            syncedPlaceholders.push({ ...found, key: tag });
+          } else {
+            const matchRes = matchTagToManifestField(tag);
+            syncedPlaceholders.push({
+              key: tag,
+              label: tag.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
+              sourceType: matchRes.sourceType,
+              manifestField: matchRes.matchedManifest?.key,
+              inputType: matchRes.defaultType,
+              defaultValue: matchRes.defaultValue,
+              required: true,
+            });
+          }
+        });
+        cloned.placeholders = syncedPlaceholders;
+      }
+    }
+
     setEditingTemplate(cloned);
     setEditorActiveTab("konfigurasi");
     setShowFormatHelper(false);
@@ -329,22 +362,20 @@ Demikian Surat Tugas ini dibuat dengan sebenarnya agar dapat dipergunakan sebaga
 
       // Collect all text sources across template body + attached files.
       // CRITICAL: If attached document files exist (e.g. Dokumen 1, Dokumen 2 .docx),
-      // they supersede the hardcoded default dummy templateContent!
-      // Do NOT include prev.templateContent to prevent dummy variables from bloating the configuration.
+      // they strictly supersede and define the placeholders!
+      // Do NOT include non-template strings (formatNamaFile, perihal, tujuan) to avoid phantom variables!
       const textSources: string[] = [];
       if (hasAttachedDocs) {
         textSources.push(...currentAttached.map((f: SuratAttachedFile) => f.content || ""));
       } else {
-        textSources.push(prev.templateContent);
+        textSources.push(
+          prev.templateContent,
+          prev.formatNamaFile || "",
+          prev.perihalDefault || "",
+          prev.tujuanDefault || "",
+          prev.kotaTujuanDefault || ""
+        );
       }
-
-      textSources.push(
-        prev.formatNamaFile || "",
-        ...currentAttached.map((f: SuratAttachedFile) => f.formatNamaFile || ""),
-        prev.perihalDefault || "",
-        prev.tujuanDefault || "",
-        prev.kotaTujuanDefault || ""
-      );
 
       const allTags = extractPlaceholdersFromText(textSources.join("\n"));
 
@@ -366,74 +397,14 @@ Demikian Surat Tugas ini dibuat dengan sebenarnya agar dapat dipergunakan sebaga
             key: tag,
           });
         } else {
-          const cleanTag = tag.toLowerCase().replace(/[\s_\-\.]/g, "");
-          const matchedManifest = MANIFEST_FIELD_OPTIONS.find((opt) => {
-            const sub = (opt.key.split(".")[1] || "").toLowerCase().replace(/[\s_\-\.]/g, "");
-            const full = opt.key.toLowerCase().replace(/[\s_\-\.]/g, "");
-            const lbl = opt.label.toLowerCase().replace(/[\s_\-\.]/g, "");
-            return (
-              cleanTag.includes(sub) ||
-              sub.includes(cleanTag) ||
-              cleanTag.includes(full) ||
-              lbl.includes(cleanTag) ||
-              cleanTag.includes(lbl)
-            );
-          });
-
-          let detectedType: SuratInputType = "text";
-          const tagLower = tag.toLowerCase();
-
-          if (
-            tagLower.includes("kanim") ||
-            tagLower.includes("imigrasi")
-          ) {
-            if (tagLower.includes("kota")) {
-              detectedType = "city";
-            } else {
-              detectedType = "kantor_imigrasi";
-            }
-          } else if (
-            (tagLower.includes("tanggal") ||
-              tagLower.includes("tgl") ||
-              tagLower.includes("date") ||
-              (tagLower.includes("lahir") && !tagLower.includes("tempat") && !tagLower.includes("pob")) ||
-              tagLower.includes("berangkat") ||
-              tagLower.includes("pulang")) &&
-            !tagLower.includes("bulan")
-          ) {
-            detectedType = "date";
-          } else if (
-            tagLower.includes("kota") ||
-            tagLower.includes("tempat") ||
-            tagLower.includes("cabang") ||
-            tagLower.includes("city") ||
-            tagLower.includes("wilayah")
-          ) {
-            detectedType = "city";
-          } else if (
-            tagLower.includes("jumlah") ||
-            tagLower.includes("hari") ||
-            tagLower.includes("nominal") ||
-            tagLower.includes("biaya") ||
-            tagLower.includes("umur")
-          ) {
-            detectedType = "number";
-          } else if (
-            tagLower.includes("deskripsi") ||
-            tagLower.includes("keterangan") ||
-            tagLower.includes("alamat") ||
-            tagLower.includes("kronologi")
-          ) {
-            detectedType = "textarea";
-          }
-
+          const matchRes = matchTagToManifestField(tag);
           newMappings.push({
             key: tag,
             label: tag.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
-            sourceType: matchedManifest ? "manifest" : "manual",
-            manifestField: matchedManifest ? matchedManifest.key : undefined,
-            inputType: detectedType,
-            defaultValue: "",
+            sourceType: matchRes.sourceType,
+            manifestField: matchRes.matchedManifest?.key,
+            inputType: matchRes.defaultType,
+            defaultValue: matchRes.defaultValue,
             required: true,
           });
         }
@@ -508,16 +479,14 @@ Demikian Surat Tugas ini dibuat dengan sebenarnya agar dapat dipergunakan sebaga
         ...(editingTemplate.attachedFiles?.map((f) => f.content || "") || [])
       );
     } else {
-      textPieces.push(editingTemplate.templateContent);
+      textPieces.push(
+        editingTemplate.templateContent,
+        editingTemplate.formatNamaFile || "",
+        editingTemplate.perihalDefault || "",
+        editingTemplate.tujuanDefault || "",
+        editingTemplate.kotaTujuanDefault || ""
+      );
     }
-
-    textPieces.push(
-      editingTemplate.formatNamaFile || "",
-      ...(editingTemplate.attachedFiles?.map((f) => f.formatNamaFile || "") || []),
-      editingTemplate.perihalDefault || "",
-      editingTemplate.tujuanDefault || "",
-      editingTemplate.kotaTujuanDefault || ""
-    );
 
     const allText = textPieces.join("\n");
     const tags = extractPlaceholdersFromText(allText);
@@ -543,73 +512,14 @@ Demikian Surat Tugas ini dibuat dengan sebenarnya agar dapat dipergunakan sebaga
           key: tag,
         });
       } else {
-        const cleanTag = tag.toLowerCase().replace(/[\s_\-\.]/g, "");
-        const matchedManifest = MANIFEST_FIELD_OPTIONS.find((opt) => {
-          const sub = (opt.key.split(".")[1] || "").toLowerCase().replace(/[\s_\-\.]/g, "");
-          const full = opt.key.toLowerCase().replace(/[\s_\-\.]/g, "");
-          const lbl = opt.label.toLowerCase().replace(/[\s_\-\.]/g, "");
-          return (
-            cleanTag.includes(sub) ||
-            sub.includes(cleanTag) ||
-            cleanTag.includes(full) ||
-            lbl.includes(cleanTag) ||
-            cleanTag.includes(lbl)
-          );
-        });
-        let detectedType: SuratInputType = "text";
-        const tagLower = tag.toLowerCase();
-
-        if (
-          tagLower.includes("kanim") ||
-          tagLower.includes("imigrasi")
-        ) {
-          if (tagLower.includes("kota")) {
-            detectedType = "city";
-          } else {
-            detectedType = "kantor_imigrasi";
-          }
-        } else if (
-          (tagLower.includes("tanggal") ||
-            tagLower.includes("tgl") ||
-            tagLower.includes("date") ||
-            (tagLower.includes("lahir") && !tagLower.includes("tempat") && !tagLower.includes("pob")) ||
-            tagLower.includes("berangkat") ||
-            tagLower.includes("pulang")) &&
-          !tagLower.includes("bulan")
-        ) {
-          detectedType = "date";
-        } else if (
-          tagLower.includes("kota") ||
-          tagLower.includes("tempat") ||
-          tagLower.includes("cabang") ||
-          tagLower.includes("city") ||
-          tagLower.includes("wilayah")
-        ) {
-          detectedType = "city";
-        } else if (
-          tagLower.includes("jumlah") ||
-          tagLower.includes("hari") ||
-          tagLower.includes("nominal") ||
-          tagLower.includes("biaya") ||
-          tagLower.includes("umur")
-        ) {
-          detectedType = "number";
-        } else if (
-          tagLower.includes("deskripsi") ||
-          tagLower.includes("keterangan") ||
-          tagLower.includes("alamat") ||
-          tagLower.includes("kronologi")
-        ) {
-          detectedType = "textarea";
-        }
-
+        const matchRes = matchTagToManifestField(tag);
         newMappings.push({
           key: tag,
           label: tag.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
-          sourceType: matchedManifest ? "manifest" : "manual",
-          manifestField: matchedManifest ? matchedManifest.key : undefined,
-          inputType: detectedType,
-          defaultValue: "",
+          sourceType: matchRes.sourceType,
+          manifestField: matchRes.matchedManifest?.key,
+          inputType: matchRes.defaultType,
+          defaultValue: matchRes.defaultValue,
           required: true,
         });
       }
@@ -759,16 +669,14 @@ Demikian Surat Tugas ini dibuat dengan sebenarnya agar dapat dipergunakan sebaga
         ...(editingTemplate.attachedFiles?.map((f) => f.content || "") || [])
       );
     } else {
-      textPieces.push(editingTemplate.templateContent);
+      textPieces.push(
+        editingTemplate.templateContent,
+        editingTemplate.formatNamaFile || "",
+        editingTemplate.perihalDefault || "",
+        editingTemplate.tujuanDefault || "",
+        editingTemplate.kotaTujuanDefault || ""
+      );
     }
-
-    textPieces.push(
-      editingTemplate.formatNamaFile || "",
-      ...(editingTemplate.attachedFiles?.map((f) => f.formatNamaFile || "") || []),
-      editingTemplate.perihalDefault || "",
-      editingTemplate.tujuanDefault || "",
-      editingTemplate.kotaTujuanDefault || ""
-    );
 
     return extractPlaceholdersFromText(textPieces.join("\n"));
   }, [editingTemplate]);
@@ -806,74 +714,14 @@ Demikian Surat Tugas ini dibuat dengan sebenarnya agar dapat dipergunakan sebaga
       if (found) {
         newMappings.push({ ...found, key: tag });
       } else {
-        const cleanTag = tag.toLowerCase().replace(/[\s_\-\.]/g, "");
-        const matchedManifest = MANIFEST_FIELD_OPTIONS.find((opt) => {
-          const sub = (opt.key.split(".")[1] || "").toLowerCase().replace(/[\s_\-\.]/g, "");
-          const full = opt.key.toLowerCase().replace(/[\s_\-\.]/g, "");
-          const lbl = opt.label.toLowerCase().replace(/[\s_\-\.]/g, "");
-          return (
-            cleanTag.includes(sub) ||
-            sub.includes(cleanTag) ||
-            cleanTag.includes(full) ||
-            lbl.includes(cleanTag) ||
-            cleanTag.includes(lbl)
-          );
-        });
-
-        let detectedType: SuratInputType = "text";
-        const tagLower = tag.toLowerCase();
-
-        if (
-          tagLower.includes("kanim") ||
-          tagLower.includes("imigrasi")
-        ) {
-          if (tagLower.includes("kota")) {
-            detectedType = "city";
-          } else {
-            detectedType = "kantor_imigrasi";
-          }
-        } else if (
-          (tagLower.includes("tanggal") ||
-            tagLower.includes("tgl") ||
-            tagLower.includes("date") ||
-            (tagLower.includes("lahir") && !tagLower.includes("tempat") && !tagLower.includes("pob")) ||
-            tagLower.includes("berangkat") ||
-            tagLower.includes("pulang")) &&
-          !tagLower.includes("bulan")
-        ) {
-          detectedType = "date";
-        } else if (
-          tagLower.includes("kota") ||
-          tagLower.includes("tempat") ||
-          tagLower.includes("cabang") ||
-          tagLower.includes("city") ||
-          tagLower.includes("wilayah")
-        ) {
-          detectedType = "city";
-        } else if (
-          tagLower.includes("jumlah") ||
-          tagLower.includes("hari") ||
-          tagLower.includes("nominal") ||
-          tagLower.includes("biaya") ||
-          tagLower.includes("umur")
-        ) {
-          detectedType = "number";
-        } else if (
-          tagLower.includes("deskripsi") ||
-          tagLower.includes("keterangan") ||
-          tagLower.includes("alamat") ||
-          tagLower.includes("kronologi")
-        ) {
-          detectedType = "textarea";
-        }
-
+        const matchRes = matchTagToManifestField(tag);
         newMappings.push({
           key: tag,
           label: tag.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
-          sourceType: matchedManifest ? "manifest" : "manual",
-          manifestField: matchedManifest ? matchedManifest.key : undefined,
-          inputType: detectedType,
-          defaultValue: "",
+          sourceType: matchRes.sourceType,
+          manifestField: matchRes.matchedManifest?.key,
+          inputType: matchRes.defaultType,
+          defaultValue: matchRes.defaultValue,
           required: true,
         });
       }

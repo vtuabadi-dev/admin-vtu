@@ -21,6 +21,7 @@ import {
   Split,
   Layers,
   CreditCard,
+  RefreshCw,
 } from "lucide-react";
 import { Card, CardContent } from "@/shared/components/ui/Card";
 import { Button } from "@/shared/components/ui/Button";
@@ -767,6 +768,7 @@ function ManifestPageContent() {
   const [bulkDeleteMode, setBulkDeleteMode] = useState<"soft" | "hard">("soft");
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
   const [bulkDeleteConfirmText, setBulkDeleteConfirmText] = useState("");
+  const [syncingDrive, setSyncingDrive] = useState(false);
 
   const urlType = searchParams.get("type") || "";
   const [activeManifestView, setActiveManifestView] = useState<"operasional" | "pembayaran">(
@@ -1540,6 +1542,33 @@ function ManifestPageContent() {
     }
   }
 
+  async function handleSyncDriveDocuments() {
+    if (!activePackage) return;
+    const confirmed = confirm(
+      `Apakah Anda ingin menyinkronkan seluruh nama file dokumen di Google Drive untuk paket "${activePackage.namaPaket}" agar sesuai nomor urut (001, 002, ...) dan nama manifest terbaru?`
+    );
+    if (!confirmed) return;
+
+    setSyncingDrive(true);
+    try {
+      const res = await fetch(`/api/manifests/${activePackage.id}/sync-drive-files`, {
+        method: "POST",
+      });
+      const json = await res.json();
+      if (res.ok && json.success) {
+        alert(json.message || "Nama dokumen di Google Drive berhasil disinkronkan.");
+        await loadAllData();
+      } else {
+        alert(`Gagal: ${json.message || "Terjadi kesalahan sinkronisasi"}`);
+      }
+    } catch (err: any) {
+      console.error("Failed to sync drive documents:", err);
+      alert(`Error: ${err?.message || "Kesalahan jaringan"}`);
+    } finally {
+      setSyncingDrive(false);
+    }
+  }
+
   // ADR-0014: Counter variable for global sequential NO JAMAAH
   // Starts from 2 if package has a Tour Leader (No. 1 reserved for TL), or 1 if without TL
   const packageHasTL = hasPackageTourLeader(activePackage);
@@ -1576,18 +1605,39 @@ function ManifestPageContent() {
         </div>
         <div className="flex items-center gap-2">
           {activePackage && (
-            <Button
-              variant="secondary"
-              className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs"
-              onClick={() => {
-                setExcelFile(null);
-                setExcelPreviewRows([]);
-                setImportModalOpen(true);
-              }}
-            >
-              <FileSpreadsheet className="mr-2 h-4 w-4" />
-              Import Excel Manifest
-            </Button>
+            <>
+              <Button
+                variant="outline"
+                disabled={syncingDrive}
+                className="bg-white dark:bg-stone-900 border-amber-300 dark:border-amber-700 text-amber-900 dark:text-amber-200 hover:bg-amber-50 dark:hover:bg-amber-950/40 shadow-xs cursor-pointer font-medium text-xs"
+                onClick={handleSyncDriveDocuments}
+                title="Sinkronkan nomor urut (001, 002...) dan nama file dokumen di Google Drive dengan manifest terbaru"
+              >
+                {syncingDrive ? (
+                  <>
+                    <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin text-amber-600" />
+                    Menyinkronkan Drive...
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="mr-2 h-3.5 w-3.5 text-amber-600" />
+                    Sinkronkan Nama Dokumen Drive
+                  </>
+                )}
+              </Button>
+              <Button
+                variant="secondary"
+                className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs cursor-pointer text-xs"
+                onClick={() => {
+                  setExcelFile(null);
+                  setExcelPreviewRows([]);
+                  setImportModalOpen(true);
+                }}
+              >
+                <FileSpreadsheet className="mr-2 h-4 w-4" />
+                Import Excel Manifest
+              </Button>
+            </>
           )}
         </div>
       </div>

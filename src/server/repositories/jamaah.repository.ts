@@ -186,6 +186,16 @@ export const jamaahRepo = {
     if (data.hotelMadinah !== undefined) updateData.hotelMadinah = data.hotelMadinah;
 
     const row = await prisma.jamaah.update({ where: { id }, data: updateData, include: { dokumen: true } });
+
+    // Auto-sync Google Drive document names if namaLengkap was updated
+    if (data.namaLengkap) {
+      import("@/server/services/manifest-drive-sync.service").then(({ syncJamaahDocumentFileNamesToDrive }) => {
+        syncJamaahDocumentFileNamesToDrive(id, { newName: data.namaLengkap }).catch((err) => {
+          console.warn("[JamaahRepo] Failed to auto-sync Google Drive document filename:", err);
+        });
+      }).catch(() => {});
+    }
+
     return mapJamaah(row);
   },
 

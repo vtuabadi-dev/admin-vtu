@@ -3,6 +3,7 @@ import type {
   SuratTemplate,
   GeneratedSuratLog,
   ManifestFieldOption,
+  SuratInputType,
 } from "@/shared/types/surat";
 import { formatDate, toTitleCase } from "@/shared/lib/utils";
 import { DAFTAR_KANTOR_IMIGRASI, getKotaFromKanimName } from "@/shared/lib/kantor-imigrasi";
@@ -92,6 +93,7 @@ export const MANIFEST_FIELD_OPTIONS: ManifestFieldOption[] = [
   { key: "jamaah.namaAyah", label: "Nama Ayah Kandung", group: "Jamaah", sampleValue: "H. Ahmad Sofwan" },
   { key: "jamaah.alamat", label: "Alamat Domisili Lengkap", group: "Jamaah", sampleValue: "Jl. Raya Taman No. 45, Sidoarjo, Jawa Timur" },
   { key: "jamaah.nomorTelepon", label: "Nomor Telepon / WhatsApp", group: "Jamaah", sampleValue: "081234567890" },
+  { key: "jamaah.pekerjaan", label: "Pekerjaan Jamaah", group: "Jamaah", sampleValue: "Karyawan Swasta" },
   { key: "jamaah.registrationId", label: "Nomor Registrasi / Pendaftaran", group: "Jamaah", sampleValue: "REG-2026-0814" },
 
   // Keberangkatan & Paket
@@ -119,6 +121,225 @@ export const MANIFEST_FIELD_OPTIONS: ManifestFieldOption[] = [
   { key: "imigrasi.kanim", label: "Kantor Imigrasi / Layanan Paspor", group: "Dokumen & Paspor", sampleValue: "Kantor Imigrasi Kelas I Khusus TPI Surabaya" },
   { key: "imigrasi.kotaKanim", label: "Kota Kantor Imigrasi", group: "Dokumen & Paspor", sampleValue: "Surabaya" },
 ];
+
+/**
+ * Intelligently matches any raw template tag to a suitable manifest field or manual form input type.
+ * Ensures consistent behavior across both admin/master/surat and admin/surat generator.
+ */
+export function matchTagToManifestField(tag: string): {
+  matchedManifest?: ManifestFieldOption;
+  defaultType: SuratInputType;
+  defaultValue: string;
+  sourceType: "manifest" | "manual";
+} {
+  const cleanTag = tag.toLowerCase().replace(/[\s_\-\.]/g, "");
+  const tagLower = tag.toLowerCase();
+
+  // 1. Direct semantic mappings to Manifest
+  if (
+    cleanTag === "nama" ||
+    cleanTag.includes("namajamaah") ||
+    cleanTag.includes("namalengkap") ||
+    cleanTag.includes("namakaryawan") ||
+    cleanTag.includes("namasiswa") ||
+    cleanTag.includes("namapeserta") ||
+    cleanTag.includes("namatertanggung")
+  ) {
+    const opt = MANIFEST_FIELD_OPTIONS.find((o) => o.key === "jamaah.namaLengkap");
+    return { matchedManifest: opt, defaultType: "text", defaultValue: "", sourceType: "manifest" };
+  }
+
+  // Jenis No ID special case
+  if (cleanTag.includes("jenisnoid") || cleanTag.includes("jenisid") || cleanTag.includes("tipeid")) {
+    return { defaultType: "text", defaultValue: "NIK", sourceType: "manual" };
+  }
+
+  if (
+    cleanTag === "nik" ||
+    cleanTag.includes("ktp") ||
+    cleanTag.includes("noidentitas") ||
+    cleanTag.includes("nomoridentitas") ||
+    cleanTag.includes("nikkaryawan") ||
+    cleanTag === "noid" ||
+    cleanTag === "nomorid"
+  ) {
+    const opt = MANIFEST_FIELD_OPTIONS.find((o) => o.key === "jamaah.nik");
+    return { matchedManifest: opt, defaultType: "text", defaultValue: "", sourceType: "manifest" };
+  }
+
+  if (cleanTag.includes("paspor")) {
+    const opt = MANIFEST_FIELD_OPTIONS.find((o) => o.key === "jamaah.nomorPaspor");
+    return { matchedManifest: opt, defaultType: "text", defaultValue: "", sourceType: "manifest" };
+  }
+
+  if (cleanTag.includes("tempatlahir") || (cleanTag.includes("tempat") && cleanTag.includes("lahir"))) {
+    const opt = MANIFEST_FIELD_OPTIONS.find((o) => o.key === "jamaah.tempatLahir");
+    return { matchedManifest: opt, defaultType: "city", defaultValue: "", sourceType: "manifest" };
+  }
+
+  if (cleanTag.includes("tanggallahir") || (cleanTag.includes("tgl") && cleanTag.includes("lahir"))) {
+    const opt = MANIFEST_FIELD_OPTIONS.find((o) => o.key === "jamaah.tanggalLahir");
+    return { matchedManifest: opt, defaultType: "date", defaultValue: "", sourceType: "manifest" };
+  }
+
+  if (cleanTag.includes("jeniskelamin") || cleanTag.includes("gender")) {
+    const opt = MANIFEST_FIELD_OPTIONS.find((o) => o.key === "jamaah.jenisKelamin");
+    return { matchedManifest: opt, defaultType: "select", defaultValue: "LAKI-LAKI", sourceType: "manifest" };
+  }
+
+  if (cleanTag.includes("ayah") || cleanTag.includes("orangtua")) {
+    const opt = MANIFEST_FIELD_OPTIONS.find((o) => o.key === "jamaah.namaAyah");
+    return { matchedManifest: opt, defaultType: "text", defaultValue: "", sourceType: "manifest" };
+  }
+
+  if (cleanTag.includes("alamat")) {
+    const opt = MANIFEST_FIELD_OPTIONS.find((o) => o.key === "jamaah.alamat");
+    return { matchedManifest: opt, defaultType: "textarea", defaultValue: "", sourceType: "manifest" };
+  }
+
+  if (
+    cleanTag.includes("telepon") ||
+    cleanTag.includes("nohp") ||
+    cleanTag.includes("phone") ||
+    cleanTag.includes("whatsapp") ||
+    cleanTag === "wa" ||
+    cleanTag.startsWith("wa_") ||
+    cleanTag.endsWith("_wa")
+  ) {
+    const opt = MANIFEST_FIELD_OPTIONS.find((o) => o.key === "jamaah.nomorTelepon");
+    return { matchedManifest: opt, defaultType: "text", defaultValue: "", sourceType: "manifest" };
+  }
+
+  if (cleanTag.includes("pekerjaan") || cleanTag.includes("profesi")) {
+    const opt = MANIFEST_FIELD_OPTIONS.find((o) => o.key === "jamaah.pekerjaan");
+    return { matchedManifest: opt, defaultType: "text", defaultValue: "Karyawan Swasta", sourceType: "manifest" };
+  }
+
+  if (
+    cleanTag.includes("tanggalberangkat") ||
+    cleanTag.includes("tglberangkat") ||
+    cleanTag.includes("tanggalawal") ||
+    cleanTag.includes("tglawal") ||
+    cleanTag.includes("tanggalmulai") ||
+    cleanTag.includes("tglmulai")
+  ) {
+    const opt = MANIFEST_FIELD_OPTIONS.find((o) => o.key === "keberangkatan.tanggalBerangkat");
+    return { matchedManifest: opt, defaultType: "date", defaultValue: "", sourceType: "manifest" };
+  }
+
+  if (
+    cleanTag.includes("tanggalpulang") ||
+    cleanTag.includes("tglpulang") ||
+    cleanTag.includes("tanggalkembali") ||
+    cleanTag.includes("tanggalakhir") ||
+    cleanTag.includes("tglakhir") ||
+    cleanTag.includes("tanggalselesai") ||
+    cleanTag.includes("tglselesai")
+  ) {
+    const opt = MANIFEST_FIELD_OPTIONS.find((o) => o.key === "keberangkatan.tanggalPulang");
+    return { matchedManifest: opt, defaultType: "date", defaultValue: "", sourceType: "manifest" };
+  }
+
+  if (
+    cleanTag.includes("bulankeberangkatan") ||
+    cleanTag.includes("bulanberangkat") ||
+    cleanTag.includes("bulanawal") ||
+    cleanTag.includes("bulanmulai") ||
+    cleanTag === "bulanpaket" ||
+    cleanTag === "bulan"
+  ) {
+    const opt = MANIFEST_FIELD_OPTIONS.find((o) => o.key === "keberangkatan.bulanKeberangkatan");
+    return { matchedManifest: opt, defaultType: "text", defaultValue: "", sourceType: "manifest" };
+  }
+
+  if (cleanTag.includes("bulanakhir") || cleanTag.includes("bulanselesai")) {
+    const opt = MANIFEST_FIELD_OPTIONS.find((o) => o.key === "keberangkatan.bulanKeberangkatan");
+    return { matchedManifest: opt, defaultType: "text", defaultValue: "", sourceType: "manifest" };
+  }
+
+  if (cleanTag.includes("namapaket") || cleanTag === "paket") {
+    const opt = MANIFEST_FIELD_OPTIONS.find((o) => o.key === "keberangkatan.namaPaket");
+    return { matchedManifest: opt, defaultType: "text", defaultValue: "", sourceType: "manifest" };
+  }
+
+  if (cleanTag.includes("kodepaket") || cleanTag.includes("kodemanifest")) {
+    const opt = MANIFEST_FIELD_OPTIONS.find((o) => o.key === "keberangkatan.kode");
+    return { matchedManifest: opt, defaultType: "text", defaultValue: "", sourceType: "manifest" };
+  }
+
+  if (cleanTag.includes("programhari") || cleanTag === "durasi" || cleanTag.includes("lamacuti")) {
+    const opt = MANIFEST_FIELD_OPTIONS.find((o) => o.key === "keberangkatan.programHari");
+    return { matchedManifest: opt, defaultType: "text", defaultValue: "9 Hari", sourceType: "manifest" };
+  }
+
+  if (cleanTag.includes("maskapai")) {
+    const opt = MANIFEST_FIELD_OPTIONS.find((o) => o.key === "keberangkatan.maskapai");
+    return { matchedManifest: opt, defaultType: "text", defaultValue: "", sourceType: "manifest" };
+  }
+
+  if (cleanTag.includes("hotelmekkah") || cleanTag.includes("hotelmakkah")) {
+    const opt = MANIFEST_FIELD_OPTIONS.find((o) => o.key === "keberangkatan.hotelMekkah");
+    return { matchedManifest: opt, defaultType: "text", defaultValue: "", sourceType: "manifest" };
+  }
+
+  if (cleanTag.includes("hotelmadinah")) {
+    const opt = MANIFEST_FIELD_OPTIONS.find((o) => o.key === "keberangkatan.hotelMadinah");
+    return { matchedManifest: opt, defaultType: "text", defaultValue: "", sourceType: "manifest" };
+  }
+
+  if (cleanTag.includes("kanim") || cleanTag.includes("imigrasi")) {
+    if (cleanTag.includes("kota")) {
+      const opt = MANIFEST_FIELD_OPTIONS.find((o) => o.key === "imigrasi.kotaKanim");
+      return { matchedManifest: opt, defaultType: "city", defaultValue: "Surabaya", sourceType: "manifest" };
+    }
+    const opt = MANIFEST_FIELD_OPTIONS.find((o) => o.key === "imigrasi.kanim");
+    return { matchedManifest: opt, defaultType: "kantor_imigrasi", defaultValue: "", sourceType: "manifest" };
+  }
+
+  // 2. Jenis No ID special case
+  if (cleanTag.includes("jenisnoid") || cleanTag.includes("jenisid") || cleanTag.includes("tipeid")) {
+    return { defaultType: "text", defaultValue: "NIK", sourceType: "manual" };
+  }
+
+  // 3. Fallback generic type detection
+  let detectedType: SuratInputType = "text";
+  if (
+    (tagLower.includes("tanggal") ||
+      tagLower.includes("tgl") ||
+      tagLower.includes("date") ||
+      tagLower.includes("lahir") ||
+      tagLower.includes("berangkat") ||
+      tagLower.includes("pulang")) &&
+    !tagLower.includes("bulan")
+  ) {
+    detectedType = "date";
+  } else if (
+    tagLower.includes("kota") ||
+    tagLower.includes("tempat") ||
+    tagLower.includes("cabang") ||
+    tagLower.includes("city") ||
+    tagLower.includes("wilayah")
+  ) {
+    detectedType = "city";
+  } else if (
+    tagLower.includes("jumlah") ||
+    tagLower.includes("hari") ||
+    tagLower.includes("nominal") ||
+    tagLower.includes("biaya") ||
+    tagLower.includes("umur")
+  ) {
+    detectedType = "number";
+  } else if (
+    tagLower.includes("deskripsi") ||
+    tagLower.includes("keterangan") ||
+    tagLower.includes("alamat") ||
+    tagLower.includes("kronologi")
+  ) {
+    detectedType = "textarea";
+  }
+
+  return { defaultType: detectedType, defaultValue: "", sourceType: "manual" };
+}
 
 // ────────────────────────────────────────────────────────────
 // SCANNER FOR EXTRACTING {TAG}, {{TAG}}, <<TAG>>, «TAG» FROM TEMPLATE TEXT
@@ -1103,6 +1324,14 @@ export function resolveManifestFieldValue(
       }
       case "nomorTelepon":
         return jamaah.nomorTelepon || jamaah.noHp || jamaah.phone || "-";
+      case "pekerjaan": {
+        const direct = jamaah.pekerjaan && jamaah.pekerjaan.trim() !== "-" ? jamaah.pekerjaan : "";
+        const occ = jamaah.occupation && jamaah.occupation.trim() !== "-" ? jamaah.occupation : "";
+        const ktpDoc = jamaah.dokumen?.find?.((d: any) => d.jenis === "ktp");
+        const docPekerjaan = ktpDoc?.manualData?.pekerjaan || ktpDoc?.ocrData?.pekerjaan || "";
+        const res = direct || occ || docPekerjaan || "Karyawan Swasta";
+        return toTitleCase(res);
+      }
       case "registrationId":
         return jamaah.registrationId || jamaah.nomorPeserta || jamaah.id || "-";
       default:
@@ -1215,7 +1444,18 @@ function autoDetectManifestValue(
   if (cleanK.includes("ayah") || cleanK.includes("orangtua")) {
     return resolveManifestFieldValue("jamaah.namaAyah", jamaah, keberangkatan, today, options);
   }
-  if (cleanK === "nik" || cleanK.includes("ktp") || cleanK.includes("nikkaryawan")) {
+  if (cleanK.includes("jenisnoid") || cleanK.includes("jenisid") || cleanK.includes("tipeid")) {
+    return manualFormData[key] || "NIK";
+  }
+  if (
+    cleanK === "nik" ||
+    cleanK.includes("ktp") ||
+    cleanK.includes("nikkaryawan") ||
+    cleanK.includes("noidentitas") ||
+    cleanK.includes("nomoridentitas") ||
+    cleanK === "noid" ||
+    cleanK === "nomorid"
+  ) {
     return resolveManifestFieldValue("jamaah.nik", jamaah, keberangkatan, today, options);
   }
   if (cleanK.includes("paspor")) {
@@ -1233,8 +1473,20 @@ function autoDetectManifestValue(
   if (cleanK.includes("alamat")) {
     return resolveManifestFieldValue("jamaah.alamat", jamaah, keberangkatan, today, options);
   }
-  if (cleanK.includes("telepon") || cleanK.includes("nohp") || cleanK.includes("hp") || cleanK.includes("wa") || cleanK.includes("kontak")) {
+  if (
+    cleanK.includes("telepon") ||
+    cleanK.includes("nohp") ||
+    cleanK.includes("phone") ||
+    cleanK.includes("whatsapp") ||
+    cleanK === "wa" ||
+    cleanK.startsWith("wa_") ||
+    cleanK.endsWith("_wa") ||
+    cleanK.includes("kontak")
+  ) {
     return resolveManifestFieldValue("jamaah.nomorTelepon", jamaah, keberangkatan, today, options);
+  }
+  if (cleanK.includes("pekerjaan") || cleanK.includes("profesi") || cleanK.includes("occupation")) {
+    return resolveManifestFieldValue("jamaah.pekerjaan", jamaah, keberangkatan, today, options);
   }
   if (cleanK.includes("namapaket") || cleanK === "paket") {
     return resolveManifestFieldValue("keberangkatan.namaPaket", jamaah, keberangkatan, today, options);
@@ -1242,19 +1494,40 @@ function autoDetectManifestValue(
   if (cleanK.includes("kodepaket") || cleanK.includes("kodekeberangkatan") || cleanK.includes("kodemanifest") || cleanK.includes("koderombongan")) {
     return resolveManifestFieldValue("keberangkatan.kode", jamaah, keberangkatan, today, options);
   }
-  if (cleanK.includes("tanggalberangkat") || cleanK.includes("tglberangkat")) {
+  if (
+    cleanK.includes("tanggalberangkat") ||
+    cleanK.includes("tglberangkat") ||
+    cleanK.includes("tanggalawal") ||
+    cleanK.includes("tglawal") ||
+    cleanK.includes("tanggalmulai") ||
+    cleanK.includes("tglmulai")
+  ) {
     return resolveManifestFieldValue("keberangkatan.tanggalBerangkat", jamaah, keberangkatan, today, options);
   }
   if (
     cleanK.includes("bulankeberangkatan") ||
     cleanK.includes("bulanberangkat") ||
+    cleanK.includes("bulanawal") ||
+    cleanK.includes("bulanmulai") ||
     cleanK === "bulanpaket" ||
     cleanK === "bulan" ||
     (cleanK.includes("bulan") && (cleanK.includes("berangkat") || cleanK.includes("paket")))
   ) {
     return resolveManifestFieldValue("keberangkatan.bulanKeberangkatan", jamaah, keberangkatan, today, options);
   }
-  if (cleanK.includes("tanggalpulang") || cleanK.includes("tglpulang") || cleanK.includes("tanggalkembali")) {
+  if (cleanK.includes("bulanakhir") || cleanK.includes("bulanselesai")) {
+    const pulangDate = keberangkatan?.tanggalPulang || keberangkatan?.returnDate;
+    return pulangDate ? formatMonthYear(pulangDate) : resolveManifestFieldValue("keberangkatan.bulanKeberangkatan", jamaah, keberangkatan, today, options);
+  }
+  if (
+    cleanK.includes("tanggalpulang") ||
+    cleanK.includes("tglpulang") ||
+    cleanK.includes("tanggalkembali") ||
+    cleanK.includes("tanggalakhir") ||
+    cleanK.includes("tglakhir") ||
+    cleanK.includes("tanggalselesai") ||
+    cleanK.includes("tglselesai")
+  ) {
     return resolveManifestFieldValue("keberangkatan.tanggalPulang", jamaah, keberangkatan, today, options);
   }
   if (cleanK.includes("maskapai")) {

@@ -51,6 +51,7 @@ import {
   isSystemAutoPlaceholder,
   extractPlaceholdersFromText,
   extractPlaceholdersFromDocxFile,
+  matchTagToManifestField,
 } from "@/shared/lib/surat-autocrat-engine";
 import { downloadMergedDocx } from "@/shared/lib/docx-mail-merge";
 import { downloadDocxAsPdf, convertDocxToA4Html } from "@/shared/lib/docx-to-pdf";
@@ -61,6 +62,7 @@ import type {
   SuratTemplate,
   SuratAttachedFile,
   GeneratedSuratLog,
+  SuratPlaceholderMapping,
 } from "@/shared/types/surat";
 import OfficialLetterPreview from "./_components/OfficialLetterPreview";
 
@@ -443,11 +445,37 @@ function GenerateSuratPageContent() {
         };
       });
 
+      // Build clean placeholders strictly from the uploaded docx tags
+      const fileTags = (scanRes.tags || []).filter((t) => !isSystemAutoPlaceholder(t));
+      const existingPlaceholders = target.placeholders || [];
+      const updatedPlaceholders: SuratPlaceholderMapping[] = [];
+
+      fileTags.forEach((tag) => {
+        const found = existingPlaceholders.find(
+          (p) => p.key.toLowerCase().trim() === tag.toLowerCase().trim()
+        );
+        if (found) {
+          updatedPlaceholders.push({ ...found, key: tag });
+        } else {
+          const matchRes = matchTagToManifestField(tag);
+          updatedPlaceholders.push({
+            key: tag,
+            label: tag.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
+            sourceType: matchRes.sourceType,
+            manifestField: matchRes.matchedManifest?.key,
+            inputType: matchRes.defaultType,
+            defaultValue: matchRes.defaultValue,
+            required: true,
+          });
+        }
+      });
+
       const updatedTemplate: SuratTemplate = {
         ...target,
         fileNameUploaded: file.name,
         templateFileBase64: fileBase64,
         attachedFiles: updatedAttached,
+        placeholders: updatedPlaceholders.length > 0 ? updatedPlaceholders : target.placeholders,
         updatedAt: new Date().toISOString(),
       };
 
@@ -508,34 +536,58 @@ function GenerateSuratPageContent() {
     return hasNomor && hasTujuan;
   }, [rawTemplateText]);
 
-  // Effective Placeholders list combining template.placeholders with placeholders extracted from template text
+  // Effective Placeholders list strictly following the template document file
   const effectivePlaceholders = useMemo(() => {
-    const map = new Map<string, any>();
     const normalize = (s: string) =>
       s.toLowerCase().trim().replace(/[\u2018\u2019\u201A\u201B']/g, "'").replace(/[\s_\-\.]/g, "");
 
-    (activeTemplate?.placeholders || []).forEach((p) => {
-      if (!isSystemAutoPlaceholder(p.key)) {
-        map.set(normalize(p.key), p);
-      }
-    });
+    const extractedTags = rawTemplateText
+      ? extractPlaceholdersFromText(rawTemplateText).filter((k) => !isSystemAutoPlaceholder(k))
+      : [];
 
-    if (rawTemplateText) {
-      const extracted = extractPlaceholdersFromText(rawTemplateText);
-      extracted.forEach((k) => {
-        const clean = normalize(k);
-        if (!map.has(clean) && !isSystemAutoPlaceholder(k)) {
-          map.set(clean, {
-            key: k,
-            label: k,
-            sourceType: "manifest",
-            inputType: "text",
+    // If template has extracted tags from the template document/text,
+    // the document tags MUST BE the single source of truth!
+    if (extractedTags.length > 0) {
+      const existingMap = new Map<string, any>();
+      (activeTemplate?.placeholders || []).forEach((p) => {
+        if (!isSystemAutoPlaceholder(p.key)) {
+          existingMap.set(normalize(p.key), p);
+        }
+      });
+
+      const result: any[] = [];
+      const seen = new Set<string>();
+
+      extractedTags.forEach((tag) => {
+        const norm = normalize(tag);
+        if (seen.has(norm)) return;
+        seen.add(norm);
+
+        const existing = existingMap.get(norm);
+        if (existing) {
+          result.push({
+            ...existing,
+            key: tag,
+          });
+        } else {
+          const matchRes = matchTagToManifestField(tag);
+          result.push({
+            key: tag,
+            label: tag.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
+            sourceType: matchRes.sourceType,
+            manifestField: matchRes.matchedManifest?.key,
+            inputType: matchRes.defaultType,
+            defaultValue: matchRes.defaultValue,
+            required: true,
           });
         }
       });
+
+      return result;
     }
 
-    return Array.from(map.values());
+    // Fallback: If no document text is extracted yet, use template's configured placeholders (excluding system auto tags)
+    return (activeTemplate?.placeholders || []).filter((p) => !isSystemAutoPlaceholder(p.key));
   }, [activeTemplate, rawTemplateText]);
 
   // Autocrat Merged Field Values

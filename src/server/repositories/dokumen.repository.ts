@@ -141,6 +141,16 @@ async function syncJamaahAndManifestFromDocData(jamaahId: string, data: Record<s
       data: manifestUpdates,
     }).catch((err) => console.warn("[DokumenRepo] Failed to sync ManifestRow from OCR:", err));
   }
+
+  // Auto-sync Google Drive document names if name changed
+  const newName = manifestUpdates.namaLengkap || jamaahUpdates.namaLengkap;
+  if (newName) {
+    import("@/server/services/manifest-drive-sync.service").then(({ syncJamaahDocumentFileNamesToDrive }) => {
+      syncJamaahDocumentFileNamesToDrive(jamaahId, { newName }).catch((err) => {
+        console.warn("[DokumenRepo] Failed to auto-sync Google Drive document filename:", err);
+      });
+    }).catch(() => {});
+  }
 }
 
 export const dokumenRepo = {
