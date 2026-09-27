@@ -587,6 +587,44 @@ export function createGoogleDriveAdapter(): StorageAdapter {
         cleanId = cleanId.split("id=")[1]?.split("&")[0] || cleanId;
       }
       cleanId = cleanId.replace(/^https?:\/\/[^\/]+\//, "").replace(/^\//, "");
+
+      const isDriveId = /^[a-zA-Z0-9_-]{20,}$/.test(cleanId) && !cleanId.includes(".");
+
+      if (isDriveId) {
+        try {
+          const res = await apiFetch(`${DRIVE_API}/files/${cleanId}?alt=media`);
+          if (res.ok) {
+            const arrayBuffer = await res.arrayBuffer();
+            return Buffer.from(arrayBuffer);
+          }
+        } catch (directErr) {
+          console.warn(`[Google Drive direct download failed for ID "${cleanId}"]:`, directErr);
+        }
+      }
+
+      // If cleanId is a path or filename, or direct download failed, search Google Drive by filename
+      const fileName = cleanId.split(/[/\\]/).pop() || cleanId;
+      try {
+        const query = `name = '${fileName.replace(/'/g, "\\'")}' and trashed = false`;
+        const searchRes = await apiFetch(
+          `${DRIVE_API}/files?q=${encodeURIComponent(query)}&fields=files(id,name)&supportsAllDrives=true&includeItemsFromAllDrives=true`
+        );
+        if (searchRes.ok) {
+          const data = await searchRes.json();
+          if (data.files && data.files.length > 0) {
+            const matchedFileId = data.files[0].id;
+            const res = await apiFetch(`${DRIVE_API}/files/${matchedFileId}?alt=media`);
+            if (res.ok) {
+              const arrayBuffer = await res.arrayBuffer();
+              return Buffer.from(arrayBuffer);
+            }
+          }
+        }
+      } catch (searchErr) {
+        console.warn(`[Google Drive search download failed for filename "${fileName}"]:`, searchErr);
+      }
+
+      // Final attempt: direct fetch
       const res = await apiFetch(`${DRIVE_API}/files/${cleanId}?alt=media`);
       const arrayBuffer = await res.arrayBuffer();
       return Buffer.from(arrayBuffer);

@@ -124,6 +124,7 @@ function PaymentReviewTabContent() {
   const [endDate, setEndDate] = useState<string>("");
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
+  const [previewImageError, setPreviewImageError] = useState<boolean>(false);
   const [zoomLevel, setZoomLevel] = useState<number>(1);
 
   // Form Invoice States (Canvas Kanan)
@@ -1380,6 +1381,7 @@ function PaymentReviewTabContent() {
                                   title="Lihat Bukti Transfer"
                                   onClick={() => {
                                     setPreviewImageUrl(resolveDocumentImageUrl(p.buktiUrl));
+                                    setPreviewImageError(false);
                                     setZoomLevel(1);
                                   }}
                                 >
@@ -1815,6 +1817,7 @@ function PaymentReviewTabContent() {
                       className="h-7 text-[11px] font-bold border-amber-500/40 text-amber-700 dark:text-amber-300"
                       onClick={() => {
                         setPreviewImageUrl(resolveDocumentImageUrl(selectedPayment.buktiUrl));
+                        setPreviewImageError(false);
                         setZoomLevel(1);
                       }}
                     >
@@ -2418,7 +2421,10 @@ function PaymentReviewTabContent() {
       {/* ========================================================= */}
       <Modal
         open={previewImageUrl !== null}
-        onClose={() => setPreviewImageUrl(null)}
+        onClose={() => {
+          setPreviewImageUrl(null);
+          setPreviewImageError(false);
+        }}
         title="Pratinjau Bukti Transfer Pembayaran"
         size="lg"
       >
@@ -2463,15 +2469,36 @@ function PaymentReviewTabContent() {
             )}
           </div>
 
-          <div className="max-h-[60vh] overflow-auto flex items-center justify-center p-4 bg-muted/20 rounded-xl border">
-            {previewImageUrl && (
+          <div className="max-h-[60vh] min-h-[220px] overflow-auto flex items-center justify-center p-4 bg-muted/20 rounded-xl border">
+            {previewImageUrl && !previewImageError ? (
               <img
                 src={resolveDocumentImageUrl(previewImageUrl)}
                 alt="Bukti Transfer"
                 style={{ transform: `scale(${zoomLevel})`, transformOrigin: "center center" }}
                 className="transition-transform duration-200 rounded-lg shadow-md max-w-full h-auto object-contain"
+                onError={() => setPreviewImageError(true)}
               />
-            )}
+            ) : previewImageUrl && previewImageError ? (
+              <div className="flex flex-col items-center justify-center p-6 text-center space-y-3">
+                <div className="p-3 bg-amber-500/10 text-amber-600 dark:text-amber-400 rounded-full">
+                  <FileText className="w-8 h-8" />
+                </div>
+                <div className="space-y-1">
+                  <p className="text-sm font-bold text-foreground">File Bukti Tidak Dapat Dipratinjau Langsung</p>
+                  <p className="text-xs text-muted-foreground max-w-md">
+                    Dokumen mungkin bertipe non-gambar (seperti PDF) atau memerlukan unduhan langsung. Silakan buka melalui tautan di bawah.
+                  </p>
+                </div>
+                <a
+                  href={resolveDocumentImageUrl(previewImageUrl)}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold transition-colors shadow-sm"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" /> Buka atau Unduh Dokumen Asli
+                </a>
+              </div>
+            ) : null}
           </div>
         </div>
       </Modal>

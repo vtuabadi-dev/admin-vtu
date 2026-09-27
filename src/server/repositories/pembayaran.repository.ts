@@ -350,6 +350,7 @@ export const pembayaranRepo = {
                 catatan: true,
                 invoiceId: true,
                 invoiceDriveId: true,
+                buktiUrl: true,
               },
               orderBy: { tanggal: "asc" },
             },

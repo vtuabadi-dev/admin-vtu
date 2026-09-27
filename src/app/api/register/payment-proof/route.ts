@@ -71,8 +71,18 @@ export async function POST(request: NextRequest) {
 
     let buktiUrl = "";
     if (fileBuffer && fileBuffer.length > 0) {
-      const storage = getStorageAdapter();
       const storagePath = `BUKTI_TRANSFER/${kodeRegistrasi}_${Date.now()}.jpg`;
+
+      // Always save a copy to local vault for immediate local preview fallback
+      try {
+        const { createLocalAdapter } = await import("@/server/storage/local");
+        const localVault = createLocalAdapter();
+        await localVault.upload(storagePath, fileBuffer, fileMime);
+      } catch (localCacheErr) {
+        console.warn("[payment-proof] Local cache transit warning:", localCacheErr);
+      }
+
+      const storage = getStorageAdapter();
       try {
         const { getOrCreateFolder, isGoogleDriveConfigured, provisionPackageStorage } = await import("@/server/storage/google-drive");
         let targetFolderId: string | undefined = undefined;
@@ -96,14 +106,14 @@ export async function POST(request: NextRequest) {
             targetFolderId = await getOrCreateFolder("PEMBAYARAN");
           }
         }
-        await storage.upload(storagePath, fileBuffer, fileMime, targetFolderId);
-        buktiUrl = await storage.getUrl(storagePath);
+        const uploadedFileId = await storage.upload(storagePath, fileBuffer, fileMime, targetFolderId);
+        buktiUrl = await storage.getUrl(uploadedFileId || storagePath);
       } catch (uploadErr) {
         console.warn("[payment-proof] Storage upload warning, saving to local vault:", uploadErr);
         const { createLocalAdapter } = await import("@/server/storage/local");
         const localVault = createLocalAdapter();
-        await localVault.upload(storagePath, fileBuffer, fileMime);
-        buktiUrl = await localVault.getUrl(storagePath);
+        const uploadedFileId = await localVault.upload(storagePath, fileBuffer, fileMime);
+        buktiUrl = await localVault.getUrl(uploadedFileId || storagePath);
       }
     }
 
