@@ -270,7 +270,11 @@ function CityCombobox({
       {isOpen && (
         <div
           ref={listRef}
-          className="absolute z-50 left-0 right-0 mt-1 max-h-[252px] overflow-y-auto bg-[#2D1B0E] border-2 border-[#D4AF37] rounded-xl shadow-2xl divide-y divide-[#D4AF37]/30"
+          className="absolute z-50 left-0 right-0 mt-1 max-h-[185px] overflow-y-auto bg-[#2D1B0E] border-2 border-[#D4AF37] rounded-xl shadow-2xl divide-y divide-[#D4AF37]/30"
+          style={{
+            scrollbarWidth: "thin",
+            scrollbarColor: "rgba(212, 175, 55, 0.6) rgba(45, 27, 14, 0.9)",
+          }}
         >
           {filteredCities.length > 0 ? (
             filteredCities.map((city, idx) => {
