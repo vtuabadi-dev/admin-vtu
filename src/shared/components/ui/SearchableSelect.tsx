@@ -170,7 +170,7 @@ export function SearchableSelect({
   const isPortal = variant === "portal";
 
   return (
-    <div ref={containerRef} className={cn("relative w-full", open && "z-30", className)}>
+    <div ref={containerRef} className={cn("relative w-full", open && "z-50", className)}>
       {/* In-Place Direct Input */}
       <div className="relative flex items-center">
         <input

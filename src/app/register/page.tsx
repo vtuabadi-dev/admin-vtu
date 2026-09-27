@@ -71,11 +71,11 @@ const VERY_LARGE_GROUP_THRESHOLD = 60;
 
 const INDONESIAN_CITIES = [
   "Banda Aceh", "Lhokseumawe", "Langsa", "Sabang", "Subulussalam",
-  "Medan", "Pematangsiantar", "Sibolga", "Tanjungbalai", "Binjai", "Tebing Tinggi", "Padangsidimpuan", "Gunungsitoli",
+  "Medan", "Pematangsiantar", "Sibolga", "Tanjungbalai", "Binjai", "Tebing Tinggi", "Padangsidimpuan", "Gunungsitoli", "Barus",
   "Padang", "Bukittinggi", "Payakumbuh", "Solok", "Sawahlunto", "Padang Panjang", "Pariaman",
   "Pekanbaru", "Dumai",
   "Jambi", "Sungaipenuh",
-  "Palembang", "Prabumulih", "Pagar Alam", "Lubuklinggau",
+  "Palembang", "Prabumulih", "Pagar Alam", "Lubuklinggau", "Baturaja",
   "Bengkulu",
   "Bandar Lampung", "Metro",
   "Pangkalpinang",
@@ -91,12 +91,12 @@ const INDONESIAN_CITIES = [
   "Kupang", "Ende", "Maumere",
   "Pontianak", "Singkawang",
   "Palangkaraya",
-  "Banjarmasin", "Banjarbaru",
+  "Banjarmasin", "Banjarbaru", "Barabai", "Barito",
   "Samarinda", "Balikpapan", "Bontang",
   "Tanjung Selor", "Tarakan",
   "Manado", "Bitung", "Tomohon", "Kotamobagu",
   "Palu",
-  "Makassar", "Parepare", "Palopo",
+  "Makassar", "Parepare", "Palopo", "Barru", "Bantaeng", "Banggai",
   "Kendari", "Baubau",
   "Gorontalo",
   "Mamuju",
@@ -186,11 +186,40 @@ function CityCombobox({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Filter cities live as user types
+  // Filter cities live with prefix-priority similarity sorting
   const filteredCities = useMemo(() => {
     if (!value || value.trim() === "") return INDONESIAN_CITIES;
-    const query = value.toLowerCase().trim();
-    return INDONESIAN_CITIES.filter((c) => c.toLowerCase().includes(query));
+    const q = value.toLowerCase().trim();
+
+    return INDONESIAN_CITIES
+      .filter((c) => c.toLowerCase().includes(q))
+      .sort((a, b) => {
+        const aLower = a.toLowerCase();
+        const bLower = b.toLowerCase();
+
+        // 1. Exact match has highest priority
+        const aExact = aLower === q;
+        const bExact = bLower === q;
+        if (aExact !== bExact) return aExact ? -1 : 1;
+
+        // 2. Starts with query on FIRST word (highest word-order priority: e.g. BARUS, BARRU, BARABAI)
+        const aStarts = aLower.startsWith(q);
+        const bStarts = bLower.startsWith(q);
+        if (aStarts !== bStarts) return aStarts ? -1 : 1;
+
+        // 3. Query matches subsequent word start (second word, e.g. "Jakarta Barat")
+        const aSubsequentWord = aLower.split(/\s+/).slice(1).some((w) => w.startsWith(q));
+        const bSubsequentWord = bLower.split(/\s+/).slice(1).some((w) => w.startsWith(q));
+        if (aSubsequentWord !== bSubsequentWord) return aSubsequentWord ? -1 : 1;
+
+        // 4. Earlier index position of match (for contains matches)
+        const aIdx = aLower.indexOf(q);
+        const bIdx = bLower.indexOf(q);
+        if (aIdx !== bIdx) return aIdx - bIdx;
+
+        // 5. Alphabetical order A-Z (e.g. "Barabai" with 'a' comes before "Barru" with 'r', then "Barus" with 'u')
+        return a.localeCompare(b);
+      });
   }, [value]);
 
   // Reset highlighted index to 0 whenever value/filter changes
@@ -253,6 +282,9 @@ function CityCombobox({
           id={id}
           type="text"
           value={value}
+          autoComplete="off"
+          autoCorrect="off"
+          spellCheck={false}
           onFocus={() => setIsOpen(true)}
           onKeyDown={handleKeyDown}
           onChange={(e) => {
@@ -270,7 +302,7 @@ function CityCombobox({
       {isOpen && (
         <div
           ref={listRef}
-          className="absolute z-50 left-0 right-0 mt-1 max-h-[185px] overflow-y-auto bg-[#2D1B0E] border-2 border-[#D4AF37] rounded-xl shadow-2xl divide-y divide-[#D4AF37]/30"
+          className="absolute z-50 left-0 right-0 mt-1 max-h-[230px] overflow-y-auto bg-[#2D1B0E] border-2 border-[#D4AF37] rounded-xl shadow-2xl divide-y divide-[#D4AF37]/30"
           style={{
             scrollbarWidth: "thin",
             scrollbarColor: "rgba(212, 175, 55, 0.6) rgba(45, 27, 14, 0.9)",
@@ -368,11 +400,9 @@ export default function RegisterPage() {
             })
           : "";
         const maskapai = p.maskapai || "";
-        const harga = p.hargaPaket || p.paketUmroh?.hargaBase;
         const sub = [
           tgl ? `Tgl: ${tgl}` : "",
           maskapai ? `Flight: ${maskapai}` : "",
-          harga ? `Rp ${Number(harga).toLocaleString("id-ID")}` : "",
         ]
           .filter(Boolean)
           .join(" • ");
@@ -1118,7 +1148,7 @@ export default function RegisterPage() {
       </div>
 
       {/* Step content — Dark Green Hijau Tua Syariah Card Container */}
-      <div className="bg-gradient-to-br from-[#062118]/95 via-[#041710]/98 to-[#030e0b]/99 backdrop-blur-xl p-6 sm:p-8 rounded-3xl border-2 border-emerald-500/40 shadow-2xl shadow-black/80 relative overflow-hidden">
+      <div className="bg-gradient-to-br from-[#062118]/95 via-[#041710]/98 to-[#030e0b]/99 backdrop-blur-xl p-6 sm:p-8 rounded-3xl border-2 border-emerald-500/40 shadow-2xl shadow-black/80 relative overflow-visible">
         {/* Step 1: Representative */}
         {step === 1 && (
           <div className="space-y-4">
@@ -1685,7 +1715,7 @@ export default function RegisterPage() {
             ) : (
               <div className="space-y-5">
                 {/* Package Select Dropdown (Searchable) */}
-                <div>
+                <div className="relative z-30">
                   <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1.5">
                     Nama Paket Keberangkatan
                   </label>

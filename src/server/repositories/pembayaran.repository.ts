@@ -179,9 +179,29 @@ export const pembayaranRepo = {
         ? (reg.members as any[]).sort((a, b) => (a.urutan || 0) - (b.urutan || 0))
         : [{ namaLengkap: reg.namaPerwakilan, jenisKelamin: "L", tempatLahir: "-", tanggalLahir: "2000-01-01", urutan: 1 }];
 
-      // Ensure RegistrationGroup exists FIRST so Jamaah has a valid groupId foreign key
       if (!group) {
-        const totalTagihan = (reg.keberangkatan?.hargaPaket || 0) * (reg.paxCount || memberList.length || 1);
+        const pax = reg.paxCount || memberList.length || 1;
+        const basePaket = (reg.keberangkatan?.hargaPaket || 0) * pax;
+        let roomSurcharge = 0;
+        const roomType = (reg.roomUpgrade || "").toLowerCase().trim();
+        let upDouble = 2500000;
+        let upTriple = 1500000;
+        try {
+          const hOpts = typeof reg.keberangkatan?.hotelOptions === "string"
+            ? JSON.parse(reg.keberangkatan.hotelOptions)
+            : reg.keberangkatan?.hotelOptions;
+          if (Array.isArray(hOpts) && hOpts[0]) {
+            if (Number(hOpts[0].upgradeDouble) > 0) upDouble = Number(hOpts[0].upgradeDouble);
+            if (Number(hOpts[0].upgradeTriple) > 0) upTriple = Number(hOpts[0].upgradeTriple);
+          }
+        } catch {}
+
+        if (roomType.includes("double")) {
+          roomSurcharge = upDouble * pax;
+        } else if (roomType.includes("triple")) {
+          roomSurcharge = upTriple * pax;
+        }
+        const totalTagihan = basePaket + roomSurcharge;
         group = await prisma.registrationGroup.create({
           data: {
             kodeRegistrasi: reg.kodeRegistrasi,
@@ -305,10 +325,19 @@ export const pembayaranRepo = {
                 tanggalPulang: true,
                 hotelMekkah: true,
                 hotelMadinah: true,
+                hotelOptions: true,
                 packageType: {
                   select: { name: true },
                 },
               },
+            },
+            registrationRequests: {
+              select: {
+                roomUpgrade: true,
+                hotelUpgrade: true,
+                paxCount: true,
+              },
+              take: 1,
             },
             pembayaran: {
               select: {
@@ -373,6 +402,8 @@ export const pembayaranRepo = {
       ...mapPembayaran(r),
       kodeRegistrasi: (r as any).group?.kodeRegistrasi,
       namaGroup: (r as any).group?.namaGroup,
+      roomUpgrade: (r as any).group?.registrationRequests?.[0]?.roomUpgrade || (r as any).group?.roomUpgrade || null,
+      hotelUpgrade: (r as any).group?.registrationRequests?.[0]?.hotelUpgrade || (r as any).group?.hotelUpgrade || null,
       group: (r as any).group,
     }));
   },

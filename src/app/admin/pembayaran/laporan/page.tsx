@@ -783,7 +783,7 @@ const SplitInvoiceModal = dynamic(
                                       <p className="text-foreground">{item.nama}</p>
                                       {item.allocatedJamaah && item.allocatedJamaah.length > 0 && (
                                         <span className="inline-block text-[9.5px] font-semibold text-amber-700 dark:text-amber-300 bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20 mt-0.5">
-                                          ًں›ڈï¸ڈ Peruntukan: {item.allocatedJamaah.join(", ")}
+                                          Peruntukan: {item.allocatedJamaah.join(", ")}
                                         </span>
                                       )}
                                       {item.catatan && (
@@ -1281,7 +1281,7 @@ const SplitInvoiceModal = dynamic(
             <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg space-y-2">
               <div className="flex items-center justify-between">
                 <label className="text-xs font-bold text-amber-900 dark:text-amber-200 flex items-center gap-1.5">
-                  ًں›ڈï¸ڈ Alokasikan Kamar ke Jamaah:
+                  Alokasikan Kamar ke Jamaah:
                 </label>
                 <span className="text-[10px] font-bold text-amber-700 dark:text-amber-300 bg-amber-500/20 px-2 py-0.5 rounded">
                   {newBillingAllocatedMembers.length} Jamaah Terpilih

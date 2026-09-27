@@ -69,6 +69,47 @@ async function downloadInvoicePdf(payload: any, filename?: string) {
   download(payload, filename);
 }
 
+// Helper untuk sinkronisasi item upgrade kamar dengan tipe kamar anggota jamaah
+function syncRoomOrderItems(
+  currentRoomMap: Record<string, string>,
+  existingOrderItems: InvoiceOrderItem[],
+  paymentObj: any
+): InvoiceOrderItem[] {
+  // Pertahankan item non-kamar (diskon, perlengkapan, dsb)
+  const nonRoomItems = existingOrderItems.filter((it) => !isRoomUpgradeItem(it.nama));
+
+  // Kelompokkan jamaah per tipe kamar upgrade (selain Quad dan Mix)
+  const roomGroups: Record<string, string[]> = {};
+  Object.entries(currentRoomMap).forEach(([nama, rType]) => {
+    const norm = detectRoomTypeFromName(rType);
+    if (norm !== "Quad" && norm !== "Mix") {
+      if (!roomGroups[norm]) roomGroups[norm] = [];
+      roomGroups[norm].push(nama);
+    }
+  });
+
+  const newRoomItems: InvoiceOrderItem[] = [];
+  Object.entries(roomGroups).forEach(([rType, allocated]) => {
+    if (allocated.length > 0) {
+      const hargaSatuan = getPackageUpgradePrice(paymentObj, rType);
+      if (hargaSatuan > 0) {
+        newRoomItems.push({
+          id: `item-room-${rType.toLowerCase()}-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+          nama: `Upgrade Kamar ${rType}`,
+          nominal: hargaSatuan * allocated.length,
+          qty: allocated.length,
+          hargaSatuan,
+          tipe: "penambahan",
+          kategori: "tambahan",
+          allocatedJamaah: allocated,
+        });
+      }
+    }
+  });
+
+  return [...nonRoomItems, ...newRoomItems];
+}
+
 export default
 function PaymentReviewTabContent() {
   const initialQueue = getInitialReviewQueue();
@@ -464,14 +505,15 @@ function PaymentReviewTabContent() {
     // Anggota List & Split Support + Room Types Initialization
     const memberNames: string[] = [];
     const initialRoomTypes: Record<string, string> = {};
-    const defaultGroupRoom = detectRoomTypeFromName(payment.group?.roomUpgrade || payment.roomUpgrade || "Quad");
+    const rawUpgrade = payment.roomUpgrade || payment.group?.registrationRequests?.[0]?.roomUpgrade || payment.group?.roomUpgrade || "";
+    const defaultGroupRoom = rawUpgrade ? detectRoomTypeFromName(rawUpgrade) : "Quad";
 
     if (payment.group?.anggota && payment.group.anggota.length > 0) {
       const sorted = sortGroupMembers(payment.group.anggota);
       sorted.forEach((m: any) => {
         if (m.namaLengkap) {
           memberNames.push(m.namaLengkap);
-          const mRoom = m.tipeKamar || m.roomType || defaultGroupRoom;
+          const mRoom = m.tipeKamar || m.roomType || (rawUpgrade ? defaultGroupRoom : "Quad");
           initialRoomTypes[m.namaLengkap] = detectRoomTypeFromName(mRoom);
         }
       });
@@ -482,6 +524,10 @@ function PaymentReviewTabContent() {
     setAvailableAnggota(memberNames);
     setSelectedAnggota(memberNames);
     setMemberRoomTypes(initialRoomTypes);
+
+    // Otomatis isi rincian tagihan invoice dengan spesifikasi upgrade kamar yang dipilih saat pendaftaran
+    const initialOrderItems = syncRoomOrderItems(initialRoomTypes, [], payment);
+    setOrderItems(initialOrderItems);
   };
 
   const handleApprove = useCallback(async (payment: any) => {
@@ -572,15 +618,16 @@ function PaymentReviewTabContent() {
     const totalDiskon = adjustedOrderItemsWa
       .filter((it) => it.tipe === "pengurangan")
       .reduce((sum, it) => sum + (it.nominal || 0), 0);
-    const tagihanBase = p.group?.totalTagihan || p.jumlah || nominal || 0;
-    const tagihanDisesuaikan = Math.max(0, tagihanBase + totalBeban - totalDiskon);
+    const basePackageUnit = p.group?.keberangkatan?.hargaPaket || (p.group?.totalTagihan ? Math.round(p.group.totalTagihan / Math.max(1, totalAnggotaWa)) : 0);
+    const baseMainBillingTotal = basePackageUnit * splitPaxWa;
+    const tagihanDisesuaikan = Math.max(0, baseMainBillingTotal + totalBeban - totalDiskon);
 
     const orderLines = adjustedOrderItemsWa.length > 0 ? [
       ``,
-      `ًں“‹ *Rincian Tambahan Layanan / Penyesuaian:*`,
+      `📋 *Rincian Tambahan Layanan / Penyesuaian:*`,
       ...adjustedOrderItemsWa.map((item) => {
         const allocText = item.allocatedJamaah && item.allocatedJamaah.length > 0 ? ` (Peruntukan: ${item.allocatedJamaah.join(", ")})` : "";
-        return `â€¢ [${item.tipe === "penambahan" ? "+" : "-"}] ${item.nama}${allocText} (${item.qty}x @ Rp ${(item.hargaSatuan || (item.nominal / (item.qty || 1))).toLocaleString("id-ID")}): Rp ${item.nominal.toLocaleString("id-ID")}`;
+        return `• [${item.tipe === "penambahan" ? "+" : "-"}] ${item.nama}${allocText} (${item.qty}x @ Rp ${(item.hargaSatuan || (item.nominal / (item.qty || 1))).toLocaleString("id-ID")}): Rp ${item.nominal.toLocaleString("id-ID")}`;
       }),
       `*Total Tagihan Disesuaikan:* Rp ${tagihanDisesuaikan.toLocaleString("id-ID")}`,
     ] : [];
@@ -622,31 +669,31 @@ function PaymentReviewTabContent() {
     }
 
     return [
-      `*INVOICE PEMBAYARAN RESMI â€” VTU ABADI TRAVEL*`,
+      `*INVOICE PEMBAYARAN RESMI — VTU ABADI TRAVEL*`,
       `--------------------------------------------------`,
       `Assalamu'alaikum Warahmatullahi Wabarakatuh.`,
       ``,
       `Yth. *${groupName}* (Kode Reg: *${kodeReg}*)`,
       `Alhamdulillah, pembayaran Anda telah berhasil kami verifikasi dengan rincian sebagai berikut:`,
       ``,
-      `ًں“„ *No. Invoice:* ${invNum}`,
-      `ًں“¦ *Paket Umroh:* ${paketName}`,
-      `ًں’³ *Jenis Pembayaran:* ${formJenis || "DP Pendaftaran"}`,
-      `ًں’° *Nominal Terverifikasi:* Rp ${nominal.toLocaleString("id-ID")}`,
+      `📄 *No. Invoice:* ${invNum}`,
+      `📦 *Paket Umroh:* ${paketName}`,
+      `💳 *Jenis Pembayaran:* ${formJenis || "DP Pendaftaran"}`,
+      `💰 *Nominal Terverifikasi:* Rp ${nominal.toLocaleString("id-ID")}`,
       ...orderLines,
-      `ًں“… *Tanggal Transaksi:* ${tgl}`,
-      `ًںڈ¦ *Metode / Bank:* ${bank}`,
-      `âœ… *Status:* LUNAS / TERVERIFIKASI`,
+      `📅 *Tanggal Transaksi:* ${tgl}`,
+      `🏦 *Metode / Bank:* ${bank}`,
+      `✅ *Status:* LUNAS / TERVERIFIKASI`,
       ``,
-      `ًں“¥ *Unduh Dokumen PDF Resmi Secara Online (Direct Download):*`,
-      `ًں‘‰ ${downloadPdfUrl}`,
+      `📥 *Unduh Dokumen PDF Resmi Secara Online (Direct Download):*`,
+      `👉 ${downloadPdfUrl}`,
       ``,
       `Dokumen kuitansi & invoice ini merupakan bukti pembayaran resmi yang diterbitkan oleh PT Vauza Tamma Abadi (VTU ABADI Travel).`,
       `Semoga Allah SWT senantiasa memberikan kelancaran dan kemudahan dalam persiapan ibadah ke Baitullah.`,
       ``,
       `Wassalamu'alaikum Warahmatullahi Wabarakatuh.`,
-      `*Finance & Operational Team â€” VTU ABADI Travel*`,
-      `ًںŒگ https://vtuabadi.com`,
+      `*Finance & Operational Team — VTU ABADI Travel*`,
+      `🌐 https://vtuabadi.com`,
     ].join("\n");
   }, [formJenis, formBank, orderItems, customWaInvoiceTemplate, selectedAnggota, availableAnggota]);
 
@@ -686,7 +733,8 @@ function PaymentReviewTabContent() {
       .filter((it) => it.tipe === "pengurangan")
       .reduce((sum, it) => sum + (it.nominal || 0), 0);
 
-    const totalTagihanBase = p.group?.totalTagihan || p.jumlah || nominal || 0;
+    const basePackageUnit = p.group?.keberangkatan?.hargaPaket || (p.group?.totalTagihan ? Math.round(p.group.totalTagihan / Math.max(1, totalAnggotaPdf)) : 0);
+    const totalTagihanBase = basePackageUnit * splitPaxPdf;
     const totalTagihanDisesuaikan = Math.max(0, totalTagihanBase + totalBeban - totalDiskon);
     const totalBayarVal = p.group?.totalPembayaran || 0;
     const sisaTagihanVal = Math.max(0, totalTagihanDisesuaikan - (totalBayarVal + (p.status === "verified" ? 0 : nominal)));
@@ -1105,8 +1153,10 @@ function PaymentReviewTabContent() {
     .filter((it) => it.tipe === "pengurangan")
     .reduce((sum, it) => sum + (it.nominal || 0), 0);
 
-  const groupTotalTagihanBase = selectedPayment?.group?.totalTagihan || selectedPayment?.jumlah || 0;
-  const groupTotalTagihanDisesuaikan = Math.max(0, groupTotalTagihanBase + totalBebanTambahan - totalPengurangan);
+  const basePackageUnit = selectedPayment?.group?.keberangkatan?.hargaPaket || (selectedPayment?.group?.totalTagihan && displayTotalAnggota > 0 ? Math.round(selectedPayment.group.totalTagihan / displayTotalAnggota) : 0);
+  const baseMainBillingTotal = basePackageUnit * displaySplitPax;
+  const groupTotalTagihanBase = baseMainBillingTotal;
+  const groupTotalTagihanDisesuaikan = Math.max(0, baseMainBillingTotal + totalBebanTambahan - totalPengurangan);
   const groupTotalBayar = selectedPayment?.group?.totalPembayaran || 0;
   const groupSisaTagihan = Math.max(
     0,
@@ -1143,7 +1193,7 @@ function PaymentReviewTabContent() {
                 onChange={(e) => setDatePreset(e.target.value)}
                 className="pl-8 pr-2.5 py-1.5 bg-background border rounded-lg text-xs font-medium focus:outline-none focus:ring-1 focus:ring-primary"
               >
-                <option value="all">ًں“… Semua Tanggal</option>
+                <option value="all">Semua Tanggal</option>
                 <option value="today">Hari Ini</option>
                 <option value="yesterday">Kemarin</option>
                 <option value="this_week">7 Hari Terakhir</option>
@@ -1616,7 +1666,7 @@ function PaymentReviewTabContent() {
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="inline-flex items-center px-2 py-0.5 rounded text-[10.5px] font-extrabold bg-amber-500/15 text-amber-800 dark:text-amber-300 border border-amber-500/30">
-                        ًںڈ·ï¸ڈ Klaster Pendaftaran: {resolveKlasterName(selectedPayment)}
+                        Klaster Pendaftaran: {resolveKlasterName(selectedPayment)}
                       </span>
                       <Badge variant="outline" className="text-[10px]">
                         {selectedAnggota.length} / {availableAnggota.length || 1} Jamaah
@@ -1676,7 +1726,7 @@ function PaymentReviewTabContent() {
                           >
                             Pilih Semua
                           </button>
-                          <span className="text-[10px] text-muted-foreground">â€¢</span>
+                          <span className="text-[10px] text-muted-foreground">•</span>
                           <button
                             type="button"
                             onClick={() => setSelectedAnggota([])}
@@ -1722,14 +1772,18 @@ function PaymentReviewTabContent() {
                                   value={currentRoom}
                                   onChange={(e) => {
                                     const newRoom = e.target.value;
-                                    setMemberRoomTypes((prev) => ({ ...prev, [nama]: newRoom }));
+                                    setMemberRoomTypes((prev) => {
+                                      const next = { ...prev, [nama]: newRoom };
+                                      setOrderItems((prevOrders) => syncRoomOrderItems(next, prevOrders, selectedPayment));
+                                      return next;
+                                    });
                                   }}
                                   className={`text-[10px] font-bold px-2 py-0.5 rounded-md border cursor-pointer bg-background transition-all hover:scale-102 ${badgeStyle}`}
                                   title={`Tipe Kamar: ${currentRoom} (Klik untuk ubah)`}
                                 >
                                   {ROOM_TYPE_OPTIONS.map((opt) => (
                                     <option key={opt.value} value={opt.value}>
-                                      ًں›ڈï¸ڈ {opt.label}
+                                      {opt.label}
                                     </option>
                                   ))}
                                 </select>
@@ -1739,7 +1793,7 @@ function PaymentReviewTabContent() {
                         })}
                       </div>
                       <p className="text-[9.5px] text-muted-foreground">
-                        ًں’، Centang nama anggota yang ditagihkan. Anda juga dapat menentukan tipe kamar per-jamaah (Quad, Double, Triple, Mix, dll).
+                        Centang nama anggota yang ditagihkan. Anda juga dapat menentukan tipe kamar per-jamaah (Quad, Double, Triple, Mix, dll).
                       </p>
                     </div>
                   )}
@@ -1839,13 +1893,13 @@ function PaymentReviewTabContent() {
                             {displaySplitPax} Pax
                           </td>
                           <td className="py-2 px-2.5 text-right font-mono tabular-nums text-stone-600 dark:text-stone-400">
-                            {formatCurrency(selectedPayment.group?.keberangkatan?.hargaPaket || (groupTotalTagihanBase / Math.max(1, displayTotalAnggota)))}
+                            {formatCurrency(basePackageUnit)}
                           </td>
                           <td className="py-2 px-2.5 text-right font-mono font-bold text-emerald-700 dark:text-emerald-400 tabular-nums">
-                            {formatCurrency((selectedPayment.group?.keberangkatan?.hargaPaket || (groupTotalTagihanBase / Math.max(1, displayTotalAnggota))) * displaySplitPax)}
+                            {formatCurrency(baseMainBillingTotal)}
                           </td>
                           <td className="py-2 px-2.5 text-center">
-                            <span className="text-stone-300 dark:text-stone-700 select-none">â€”</span>
+                            <span className="text-stone-300 dark:text-stone-700 select-none">—</span>
                           </td>
                         </tr>
 
@@ -1860,7 +1914,7 @@ function PaymentReviewTabContent() {
                                   {item.allocatedJamaah && item.allocatedJamaah.length > 0 ? (
                                     <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
                                       <span className="text-[9.5px] font-semibold text-amber-700 dark:text-amber-300 bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20">
-                                        ًں›ڈï¸ڈ Peruntukan: {item.allocatedJamaah.join(", ")}
+                                        Peruntukan: {item.allocatedJamaah.join(", ")}
                                       </span>
                                       <button
                                         type="button"
@@ -2318,7 +2372,7 @@ function PaymentReviewTabContent() {
             <div className="p-2.5 bg-amber-500/10 border border-amber-500/30 rounded-lg flex items-start gap-2 text-[11px] text-amber-950 dark:text-amber-200">
               <FileText className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
               <div>
-                <span className="font-extrabold block">ًں“ژ CARA MENGIRIM FILE PDF ASLI DI WA WEB:</span>
+                <span className="font-extrabold block">📌 CARA MENGIRIM FILE PDF ASLI DI WA WEB:</span>
                 <span>
                   Saat klik tombol hijau di bawah, <strong>File PDF Invoice asli</strong> akan otomatis terunduh dan WA Web terbuka ke chat Jamaah. Tarik/geser file PDF yang terunduh di baris bawah browser ke ruang chat WA Web, lalu tekan <strong>Kirim (Enter)</strong>!
                 </span>
@@ -2700,7 +2754,7 @@ function PaymentReviewTabContent() {
                   </Button>
                 </div>
                 <p className="text-[10px] text-muted-foreground">
-                  âœ¨ Jenis baru ini akan otomatis tersimpan sebagai opsi pilihan berikutnya.
+                  ✨ Jenis baru ini akan otomatis tersimpan sebagai opsi pilihan berikutnya.
                 </p>
               </div>
             ) : (
@@ -2727,7 +2781,7 @@ function PaymentReviewTabContent() {
                     {opt}
                   </option>
                 ))}
-                <option value="__ADD_NEW__">â‍• + Tambah Jenis Baru...</option>
+                <option value="__ADD_NEW__">+ Tambah Jenis Baru...</option>
               </select>
             )}
           </div>
@@ -2750,7 +2804,7 @@ function PaymentReviewTabContent() {
             <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg space-y-2">
               <div className="flex items-center justify-between">
                 <label className="text-xs font-bold text-amber-900 dark:text-amber-200 flex items-center gap-1.5">
-                  ًں›ڈï¸ڈ Alokasikan Kamar ke Jamaah:
+                  Alokasikan Kamar ke Jamaah:
                 </label>
                 <span className="text-[10px] font-bold text-amber-700 dark:text-amber-300 bg-amber-500/20 px-2 py-0.5 rounded">
                   {newOrderAllocatedMembers.length} Jamaah Terpilih

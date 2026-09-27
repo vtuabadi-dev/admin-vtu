@@ -161,7 +161,31 @@ export async function POST(request: NextRequest) {
 
     if (!group) {
       const ketua = createdJamaah[0];
-      const totalTagihan = (reg.keberangkatan?.hargaPaket || 0) * (reg.paxCount || memberList.length || 1);
+      const pax = reg.paxCount || memberList.length || 1;
+      const basePaket = (reg.keberangkatan?.hargaPaket || 0) * pax;
+
+      // Calculate room upgrade surcharge if selected during registration
+      let roomSurcharge = 0;
+      const roomType = (reg.roomUpgrade || "").toLowerCase().trim();
+      let upDouble = 2500000;
+      let upTriple = 1500000;
+      try {
+        const hOpts = typeof reg.keberangkatan?.hotelOptions === "string"
+          ? JSON.parse(reg.keberangkatan.hotelOptions)
+          : reg.keberangkatan?.hotelOptions;
+        if (Array.isArray(hOpts) && hOpts[0]) {
+          if (Number(hOpts[0].upgradeDouble) > 0) upDouble = Number(hOpts[0].upgradeDouble);
+          if (Number(hOpts[0].upgradeTriple) > 0) upTriple = Number(hOpts[0].upgradeTriple);
+        }
+      } catch {}
+
+      if (roomType.includes("double")) {
+        roomSurcharge = upDouble * pax;
+      } else if (roomType.includes("triple")) {
+        roomSurcharge = upTriple * pax;
+      }
+
+      const totalTagihan = basePaket + roomSurcharge;
       const pkgInc = Array.isArray(reg.keberangkatan?.include) ? reg.keberangkatan.include : [];
       group = await prisma.registrationGroup.create({
         data: {
