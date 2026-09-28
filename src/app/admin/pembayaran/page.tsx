@@ -104,17 +104,14 @@ function TableHeaderGradientIcon({ className = "w-4 h-4" }: { className?: string
         className="stroke-sky-600/70 dark:stroke-sky-400/80 fill-white dark:fill-slate-900"
         strokeWidth="1.2"
       />
-      {/* Top Header Row with Gradient & Rounded Top Corners */}
+      {/* Top Header Row with Seamless Gradient & Rounded Top Corners (Option 4) */}
       <path
         d="M2.5 5C2.5 3.61929 3.61929 2.5 5 2.5H15C16.3807 2.5 17.5 3.61929 17.5 5V7.5H2.5V5Z"
         fill="url(#tbl-hdr-gradient)"
       />
-      {/* Header column dividers */}
-      <line x1="7.5" y1="2.5" x2="7.5" y2="7.5" stroke="#ffffff" strokeOpacity="0.6" strokeWidth="0.8" />
-      <line x1="12.5" y1="2.5" x2="12.5" y2="7.5" stroke="#ffffff" strokeOpacity="0.6" strokeWidth="0.8" />
-      {/* Body horizontal divider */}
+      {/* Body horizontal divider (3 deret baris total: Header, Baris 2, Baris 3) */}
       <line x1="2.5" y1="12.5" x2="17.5" y2="12.5" className="stroke-slate-200 dark:stroke-slate-700" strokeWidth="0.8" />
-      {/* Body vertical column dividers */}
+      {/* Body vertical dividers (3 deret kolom total: Kolom 1, Kolom 2, Kolom 3) */}
       <line x1="7.5" y1="7.5" x2="7.5" y2="17.5" className="stroke-slate-200 dark:stroke-slate-700" strokeWidth="0.8" />
       <line x1="12.5" y1="7.5" x2="12.5" y2="17.5" className="stroke-slate-200 dark:stroke-slate-700" strokeWidth="0.8" />
     </svg>
