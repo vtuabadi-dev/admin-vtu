@@ -29,7 +29,6 @@ import {
   AlertCircle,
   CheckCircle2,
   Clock,
-  Table as TableIcon,
 } from "lucide-react";
 
 // ============================================================
@@ -77,6 +76,50 @@ const statusFilterOptions = [
 // ============================================================
 let memoryCachedSummaries: GroupPaymentSummary[] | null = null;
 let memoryCachedKbrList: Keberangkatan[] | null = null;
+
+// ============================================================
+// CUSTOM TABLE ICON (OPSI 4: GRADIENT HEADER)
+// ============================================================
+function TableHeaderGradientIcon({ className = "w-4 h-4" }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 20 20"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      className={className}
+    >
+      <defs>
+        <linearGradient id="tbl-hdr-gradient" x1="2.5" y1="2.5" x2="17.5" y2="7.5" gradientUnits="userSpaceOnUse">
+          <stop stopColor="#0284c7" />
+          <stop offset="1" stopColor="#06b6d4" />
+        </linearGradient>
+      </defs>
+      {/* Outer table container */}
+      <rect
+        x="2.5"
+        y="2.5"
+        width="15"
+        height="15"
+        rx="2.5"
+        className="stroke-sky-600/70 dark:stroke-sky-400/80 fill-white dark:fill-slate-900"
+        strokeWidth="1.2"
+      />
+      {/* Top Header Row with Gradient & Rounded Top Corners */}
+      <path
+        d="M2.5 5C2.5 3.61929 3.61929 2.5 5 2.5H15C16.3807 2.5 17.5 3.61929 17.5 5V7.5H2.5V5Z"
+        fill="url(#tbl-hdr-gradient)"
+      />
+      {/* Header column dividers */}
+      <line x1="7.5" y1="2.5" x2="7.5" y2="7.5" stroke="#ffffff" strokeOpacity="0.6" strokeWidth="0.8" />
+      <line x1="12.5" y1="2.5" x2="12.5" y2="7.5" stroke="#ffffff" strokeOpacity="0.6" strokeWidth="0.8" />
+      {/* Body horizontal divider */}
+      <line x1="2.5" y1="12.5" x2="17.5" y2="12.5" className="stroke-slate-200 dark:stroke-slate-700" strokeWidth="0.8" />
+      {/* Body vertical column dividers */}
+      <line x1="7.5" y1="7.5" x2="7.5" y2="17.5" className="stroke-slate-200 dark:stroke-slate-700" strokeWidth="0.8" />
+      <line x1="12.5" y1="7.5" x2="12.5" y2="17.5" className="stroke-slate-200 dark:stroke-slate-700" strokeWidth="0.8" />
+    </svg>
+  );
+}
 
 // ============================================================
 // MAIN PAGE
@@ -530,12 +573,11 @@ export default function PembayaranMonitoringPage() {
                       return (
                         <tr
                           key={pkg.paketId}
-                          className="hover:bg-muted/40 transition-colors cursor-pointer"
-                          onClick={() => setPaketFilter(pkg.paketId)}
+                          className="hover:bg-muted/20 transition-colors"
                         >
-                          <td className="py-3.5 px-4 font-mono text-muted-foreground">{idx + 1}</td>
-                          <td className="py-3.5 px-4">
-                            <p className="font-bold text-sm text-foreground hover:text-amber-600 transition-colors">
+                          <td className="py-3.5 px-3 font-mono text-muted-foreground">{idx + 1}</td>
+                          <td className="py-3.5 px-3">
+                            <p className="font-bold text-sm text-foreground">
                               {pkg.namaPaket}
                             </p>
                             <p className="text-[11px] text-muted-foreground flex items-center gap-1.5 pt-0.5 font-medium">
@@ -716,13 +758,13 @@ export default function PembayaranMonitoringPage() {
                             variant="outline"
                             title="Lihat Detail Grup"
                             aria-label="Lihat Detail Grup"
-                            className="h-8 w-8 p-0 rounded-lg border-amber-500/40 text-amber-700 hover:bg-amber-500 hover:text-white dark:text-amber-300 dark:hover:bg-amber-600/80 shadow-2xs transition-colors mx-auto cursor-pointer"
+                            className="h-8 w-8 p-0 rounded-lg border-sky-500/30 hover:border-sky-500/70 bg-sky-50/50 hover:bg-sky-100/70 dark:bg-sky-950/20 dark:hover:bg-sky-900/40 shadow-2xs transition-all mx-auto cursor-pointer flex items-center justify-center"
                             onClick={(e) => {
                               e.stopPropagation();
                               setPaketFilter(pkg.paketId);
                             }}
                           >
-                            <TableIcon className="w-4 h-4" />
+                            <TableHeaderGradientIcon className="w-4.5 h-4.5" />
                           </Button>
                         </td>
                       </tr>
