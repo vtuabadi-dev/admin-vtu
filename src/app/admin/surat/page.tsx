@@ -1616,6 +1616,7 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
                       resolvedVal = resolvedVal ?? "";
                       const rawDisplay = manualVal !== undefined ? manualVal : resolvedVal;
                       const displayValue = rawDisplay === "-" ? "" : rawDisplay;
+                      const cleanDisplayLabel = (p.label || p.key).replace(/[{}]/g, "").trim();
 
                       return (
                         <div
@@ -1628,9 +1629,8 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
                           )}
                         >
                           <div className="flex items-center justify-between">
-                            <label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-                              <span className="font-mono text-[10px] text-muted-foreground">&#123;{p.key}&#125;</span>
-                              <span>{p.label || p.key}</span>
+                            <label className="text-xs font-semibold text-foreground">
+                              <span>{cleanDisplayLabel}</span>
                             </label>
 
                             {isEndorsementActive && isNamaJamaahField ? (
@@ -1711,7 +1711,7 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
                                 setManualFormData((prev) => ({ ...prev, [p.key]: e.target.value }))
                               }
                               className="w-full p-2.5 text-xs rounded-lg border bg-background text-foreground focus:ring-2 focus:ring-primary/20 focus:border-primary focus:outline-none"
-                              placeholder={p.placeholderHint || `Masukkan ${p.label || p.key}...`}
+                              placeholder={p.placeholderHint || `Masukkan ${cleanDisplayLabel}...`}
                             />
                           ) : p.inputType === "select" && validOptions.length > 0 ? (
                             isSearchableSelect ? (
@@ -1721,8 +1721,8 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
                                   setManualFormData((prev) => ({ ...prev, [p.key]: val }))
                                 }
                                 options={validOptions.map((opt: string) => ({ value: opt, label: opt }))}
-                                placeholder={p.placeholderHint || `Pilih atau cari ${p.label}...`}
-                                searchPlaceholder={`Cari opsi ${p.label}...`}
+                                placeholder={p.placeholderHint || `Pilih atau cari ${cleanDisplayLabel}...`}
+                                searchPlaceholder={`Cari opsi ${cleanDisplayLabel}...`}
                                 size="sm"
                                 allowCustomText={true}
                                 className="text-xs w-full"
@@ -1840,7 +1840,7 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
                                 p.placeholderHint ||
                                 (isKotaKanimField
                                   ? "Otomatis terisi saat memilih Kantor Imigrasi..."
-                                  : `Masukkan ${p.label || p.key}...`)
+                                  : `Masukkan ${cleanDisplayLabel}...`)
                               }
                               className="text-xs h-9 bg-background text-foreground"
                             />

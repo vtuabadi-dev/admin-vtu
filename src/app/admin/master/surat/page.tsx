@@ -59,6 +59,44 @@ import type {
 } from "@/shared/types/surat";
 import { KOP_SURAT_BASE64 } from "@/server/assets/kop-surat";
 
+function SelectOptionsInput({
+  options,
+  onOptionsChange,
+}: {
+  options: string[];
+  onOptionsChange: (opts: string[]) => void;
+}) {
+  const [text, setText] = useState(() => (options || []).join(", "));
+
+  useEffect(() => {
+    const currentParsed = text
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    if (JSON.stringify(currentParsed) !== JSON.stringify(options || [])) {
+      setText((options || []).join(", "));
+    }
+  }, [options]);
+
+  return (
+    <input
+      type="text"
+      value={text}
+      onChange={(e) => {
+        const val = e.target.value;
+        setText(val);
+        const opts = val
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean);
+        onOptionsChange(opts);
+      }}
+      placeholder="Cth: Opsi 1, Opsi 2, Opsi 3, Opsi 4, Opsi 5 (pisahkan tiap pilihan dengan koma)"
+      className="w-full flex-1 h-9 px-3 text-xs rounded-md border border-blue-300 dark:border-blue-700 bg-background text-foreground font-semibold focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 focus:outline-none transition-all shadow-sm placeholder:text-muted-foreground placeholder:font-normal"
+    />
+  );
+}
+
 export default function MasterSuratPage() {
   const router = useRouter();
 
@@ -1581,15 +1619,9 @@ Demikian Surat Tugas ini dibuat dengan sebenarnya agar dapat dipergunakan sebaga
                                   <ListFilter className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
                                   Opsi Pilihan (Koma):
                                 </span>
-                                <input
-                                  type="text"
-                                  value={(mapping.options || []).join(", ")}
-                                  onChange={(e) => {
-                                    const val = e.target.value;
-                                    const opts = val
-                                      .split(",")
-                                      .map((s) => s.trim())
-                                      .filter(Boolean);
+                                <SelectOptionsInput
+                                  options={mapping.options || []}
+                                  onOptionsChange={(opts) => {
                                     setEditingTemplate((prev) => {
                                       if (!prev) return null;
                                       const updated = [...prev.placeholders];
@@ -1598,8 +1630,6 @@ Demikian Surat Tugas ini dibuat dengan sebenarnya agar dapat dipergunakan sebaga
                                       return { ...prev, placeholders: updated };
                                     });
                                   }}
-                                  placeholder="Cth: Opsi 1, Opsi 2, Opsi 3, Opsi 4, Opsi 5 (pisahkan tiap pilihan dengan koma)"
-                                  className="w-full flex-1 h-9 px-3 text-xs rounded-md border border-blue-300 dark:border-blue-700 bg-background text-foreground font-semibold focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 focus:outline-none transition-all shadow-sm placeholder:text-muted-foreground placeholder:font-normal"
                                 />
                               </div>
                               <div className="flex flex-wrap items-center justify-between gap-1 text-[10px] text-muted-foreground pl-1">
