@@ -404,8 +404,8 @@ function NotifikasiSettings() {
 // ── Aturan Operasional ──
 function AturanOperasional() {
   const [saved, setSaved] = useState(false);
-  const [bankName, setBankName] = useState("Bank Syariah Indonesia (BSI)");
-  const [bankAccount, setBankAccount] = useState("7123 4567 89");
+  const [bankName, setBankName] = useState("Bank Mandiri");
+  const [bankAccount, setBankAccount] = useState("144-00-0018881-0");
   const [bankHolder, setBankHolder] = useState("PT VTU ABADI TRAVEL");
   const [minDpPerPax, setMinDpPerPax] = useState("5000000");
   const [waInvoiceTemplate, setWaInvoiceTemplate] = useState<string>(DEFAULT_WA_INVOICE_TPL);
@@ -481,7 +481,7 @@ function AturanOperasional() {
             className="h-9 w-64 rounded-md border border-input bg-background px-3 py-1 text-sm font-mono font-bold text-blue-900 dark:text-blue-300"
             value={bankAccount}
             onChange={(e) => setBankAccount(e.target.value)}
-            placeholder="7123 4567 89"
+            placeholder="144-00-0018881-0"
           />
         </SettingRow>
         <SettingRow label="Atas Nama (A/N)" desc="Nama pemilik rekening sesuai buku tabungan">
@@ -492,6 +492,18 @@ function AturanOperasional() {
             placeholder="PT VTU ABADI TRAVEL"
           />
         </SettingRow>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-2 border-t border-border/50">
+          <p className="text-[11px] text-muted-foreground">
+            💡 Data ini langsung disinkronkan ke Langkah 8 Formulir Pendaftaran Online seluruh jamaah.
+          </p>
+          <div className="flex items-center gap-2">
+            <Button onClick={handleSave} size="sm" className="gap-1.5 h-8 text-xs">
+              <Save className="h-3.5 w-3.5" />
+              Simpan Rekening
+            </Button>
+            {saved && <span className="text-xs text-success font-semibold">Tersimpan!</span>}
+          </div>
+        </div>
       </SettingSection>
 
       <SettingSection title="Aturan Pembayaran" desc="Konfigurasi skema pembayaran dan toleransi keterlambatan">

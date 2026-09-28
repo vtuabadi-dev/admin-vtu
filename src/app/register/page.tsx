@@ -461,6 +461,57 @@ export default function RegisterPage() {
   const [customDpAmount, setCustomDpAmount] = useState("");
   const [paymentMethodOption, setPaymentMethodOption] = useState<"transfer" | "tunai">("transfer");
 
+  // Dynamic bank & DP settings from server database
+  const [bankSettings, setBankSettings] = useState<{
+    bankName: string;
+    bankAccount: string;
+    bankHolder: string;
+    minDpPerPax: number;
+  }>({
+    bankName: "Bank Mandiri",
+    bankAccount: "144-00-0018881-0",
+    bankHolder: "PT VTU ABADI TRAVEL",
+    minDpPerPax: 5000000,
+  });
+
+  useEffect(() => {
+    // 1. Check local storage if available as instant preview
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("vtu_bank_config");
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          setBankSettings((prev) => ({
+            bankName: parsed.bankName || prev.bankName,
+            bankAccount: parsed.bankAccount || prev.bankAccount,
+            bankHolder: parsed.bankHolder || prev.bankHolder,
+            minDpPerPax: parseInt(parsed.minDpPerPax, 10) || prev.minDpPerPax,
+          }));
+        } catch {}
+      }
+    }
+
+    // 2. Fetch authoritative bank settings from server database
+    fetch("/api/register/bank-settings")
+      .then((res) => res.json())
+      .then((json) => {
+        if (json.success && json.data) {
+          setBankSettings({
+            bankName: json.data.bankName || "Bank Mandiri",
+            bankAccount: json.data.bankAccount || "144-00-0018881-0",
+            bankHolder: json.data.bankHolder || "PT VTU ABADI TRAVEL",
+            minDpPerPax: parseInt(json.data.minDpPerPax, 10) || 5000000,
+          });
+          if (typeof window !== "undefined") {
+            localStorage.setItem("vtu_bank_config", JSON.stringify(json.data));
+          }
+        }
+      })
+      .catch((err) => {
+        console.warn("[Register] Failed to fetch server bank settings:", err);
+      });
+  }, []);
+
   // Draft auto-resume indicator
   const [isRestoredDraft, setIsRestoredDraft] = useState(false);
   const [hasInitializedDraft, setHasInitializedDraft] = useState(false);
@@ -2827,16 +2878,7 @@ export default function RegisterPage() {
                     {selectedPaket && (() => {
                       const price = (selectedPaket as any).hargaStartingFrom ?? (selectedPaket as any).hargaPaket ?? (selectedPaket as any).paketUmroh?.hargaQuad ?? 30000000;
                       const totalEstimasi = price * paxCount;
-                      let defaultDpPerPax = 5000000;
-                      if (typeof window !== "undefined") {
-                        const saved = localStorage.getItem("vtu_bank_config");
-                        if (saved) {
-                          try {
-                            const parsed = JSON.parse(saved);
-                            if (parsed.minDpPerPax) defaultDpPerPax = parseInt(parsed.minDpPerPax, 10) || 5000000;
-                          } catch (e) { }
-                        }
-                      }
+                      const defaultDpPerPax = bankSettings.minDpPerPax || 5000000;
                       const minimalDpStandard = defaultDpPerPax * paxCount;
                       const parsedCustomDp = parseInt(customDpAmount.replace(/\D/g, ""), 10) || 0;
                       const effectiveDp = isCustomDp && parsedCustomDp > 0 ? parsedCustomDp : minimalDpStandard;
@@ -2922,20 +2964,9 @@ export default function RegisterPage() {
 
                       <div className="space-y-3 text-xs">
                         {(() => {
-                          let bankName = "Bank Syariah Indonesia (BSI)";
-                          let bankAccount = "7123 4567 89";
-                          let bankHolder = "PT VTU ABADI TRAVEL";
-                          if (typeof window !== "undefined") {
-                            const saved = localStorage.getItem("vtu_bank_config");
-                            if (saved) {
-                              try {
-                                const parsed = JSON.parse(saved);
-                                if (parsed.bankName) bankName = parsed.bankName;
-                                if (parsed.bankAccount) bankAccount = parsed.bankAccount;
-                                if (parsed.bankHolder) bankHolder = parsed.bankHolder;
-                              } catch (e) { }
-                            }
-                          }
+                          const bankName = bankSettings.bankName || "Bank Mandiri";
+                          const bankAccount = bankSettings.bankAccount || "144-00-0018881-0";
+                          const bankHolder = bankSettings.bankHolder || "PT VTU ABADI TRAVEL";
                           const rawAccountNum = bankAccount.replace(/\s+/g, "");
 
                           return (
