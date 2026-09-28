@@ -1547,6 +1547,7 @@ Demikian Surat Tugas ini dibuat dengan sebenarnya agar dapat dipergunakan sebaga
                                 options={[
                                   { value: "text", label: "Teks Singkat" },
                                   { value: "date", label: "Tanggal" },
+                                  { value: "date_range", label: "Rentang Tanggal (Mulai s/d Selesai)" },
                                   { value: "city", label: "Kota / Tempat" },
                                   { value: "number", label: "Angka / Nomor" },
                                   { value: "textarea", label: "Teks Panjang / Paragraf" },

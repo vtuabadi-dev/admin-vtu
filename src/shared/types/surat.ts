@@ -8,7 +8,7 @@ export type SuratKategori =
 
 export type SuratFieldSourceType = "manifest" | "manual";
 
-export type SuratInputType = "text" | "date" | "city" | "number" | "select" | "textarea" | "kantor_imigrasi";
+export type SuratInputType = "text" | "date" | "date_range" | "city" | "number" | "select" | "textarea" | "kantor_imigrasi";
 
 export interface SuratPlaceholderMapping {
   key: string;               // e.g. "nama_lengkap" or "Nama Pegawai"

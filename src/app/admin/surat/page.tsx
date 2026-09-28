@@ -32,6 +32,7 @@ import {
   Database,
   PenTool,
   Calendar,
+  CalendarDays,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/components/ui/Card";
 import { Button } from "@/shared/components/ui/Button";
@@ -59,6 +60,8 @@ import {
   generateSuratFileName,
   parseDateToIsoString,
   formatIsoToIndonesianDate,
+  formatIsoToIndonesianDateRange,
+  parseDateRangeToIsoStrings,
   parseMonthYearToIsoString,
   formatIsoToIndonesianMonthYear,
 } from "@/shared/lib/surat-autocrat-engine";
@@ -1544,15 +1547,24 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
                         cleanLabel.includes("nama jama") ||
                         cleanLabel.includes("nama lengkap");
 
+                      const isDateRangeField =
+                        p.inputType === "date_range" ||
+                        cleanKey.includes("rentangtanggal") ||
+                        cleanKey.includes("periodetanggal") ||
+                        cleanLabel.includes("rentang tanggal") ||
+                        cleanLabel.includes("periode tanggal");
+
                       const isBulanField =
-                        cleanKey.includes("bulankeberangkatan") ||
+                        !isDateRangeField &&
+                        (cleanKey.includes("bulankeberangkatan") ||
                         cleanKey.includes("bulanberangkat") ||
                         cleanKey.includes("bulanpaket") ||
                         cleanLabel.includes("bulan keberangkatan") ||
-                        p.manifestField === "keberangkatan.bulanKeberangkatan";
+                        p.manifestField === "keberangkatan.bulanKeberangkatan");
 
                       const isDateField =
                         !isBulanField &&
+                        !isDateRangeField &&
                         (p.inputType === "date" ||
                           p.manifestField === "jamaah.tanggalLahir" ||
                           p.manifestField === "keberangkatan.tanggalBerangkat" ||
@@ -1644,8 +1656,18 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
                               </span>
                             ) : dataSourceMode === "manual" ? (
                               <span className="text-[10px] font-semibold text-blue-600 dark:text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded flex items-center gap-1">
-                                {isDateField || isBulanField ? <Calendar className="h-2.5 w-2.5" /> : null}
-                                {isDateField ? "Pilih Tanggal" : isBulanField ? "Pilih Bulan" : "Input Manual"}
+                                {isDateRangeField ? (
+                                  <CalendarDays className="h-2.5 w-2.5 text-blue-600 dark:text-blue-400" />
+                                ) : isDateField || isBulanField ? (
+                                  <Calendar className="h-2.5 w-2.5" />
+                                ) : null}
+                                {isDateRangeField
+                                  ? "Rentang Tanggal"
+                                  : isDateField
+                                  ? "Pilih Tanggal"
+                                  : isBulanField
+                                  ? "Pilih Bulan"
+                                  : "Input Manual"}
                               </span>
                             ) : isManifest ? (
                               <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded flex items-center gap-1">
@@ -1737,6 +1759,67 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
                                 className="text-xs h-9 bg-background text-foreground"
                               />
                             )
+                          ) : isDateRangeField ? (
+                            <div className="space-y-1.5 p-2.5 rounded-lg bg-emerald-500/5 border border-emerald-500/20">
+                              <div className="relative">
+                                <Input
+                                  type="text"
+                                  value={displayValue}
+                                  onChange={(e) =>
+                                    setManualFormData((prev) => ({ ...prev, [p.key]: e.target.value }))
+                                  }
+                                  placeholder={p.placeholderHint || "Contoh: 10 s/d 25 Oktober 2026"}
+                                  className="text-xs h-9 bg-background text-foreground pr-8 font-medium shadow-xs"
+                                />
+                                <CalendarDays className="h-4 w-4 text-emerald-600 dark:text-emerald-400 absolute right-2.5 top-2.5 pointer-events-none" />
+                              </div>
+
+                              {(() => {
+                                const [startIso, endIso] = parseDateRangeToIsoStrings(displayValue);
+                                return (
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-0.5">
+                                    <div className="space-y-1">
+                                      <label className="text-[10px] font-bold text-muted-foreground flex items-center gap-1">
+                                        <Calendar className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
+                                        Tanggal Mulai:
+                                      </label>
+                                      <input
+                                        type="date"
+                                        value={startIso}
+                                        onChange={(e) => {
+                                          const newStart = e.target.value;
+                                          const newFormatted = formatIsoToIndonesianDateRange(newStart, endIso);
+                                          setManualFormData((prev) => ({ ...prev, [p.key]: newFormatted }));
+                                        }}
+                                        className="h-8 w-full text-xs px-2.5 rounded-md border border-input bg-background text-foreground cursor-pointer focus:ring-1 focus:ring-emerald-500"
+                                      />
+                                    </div>
+                                    <div className="space-y-1">
+                                      <label className="text-[10px] font-bold text-muted-foreground flex items-center gap-1">
+                                        <Calendar className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
+                                        Tanggal Selesai:
+                                      </label>
+                                      <input
+                                        type="date"
+                                        value={endIso}
+                                        onChange={(e) => {
+                                          const newEnd = e.target.value;
+                                          const newFormatted = formatIsoToIndonesianDateRange(startIso, newEnd);
+                                          setManualFormData((prev) => ({ ...prev, [p.key]: newFormatted }));
+                                        }}
+                                        className="h-8 w-full text-xs px-2.5 rounded-md border border-input bg-background text-foreground cursor-pointer focus:ring-1 focus:ring-emerald-500"
+                                      />
+                                    </div>
+                                  </div>
+                                );
+                              })()}
+
+                              {displayValue && (
+                                <p className="text-[10px] text-muted-foreground">
+                                  Format surat: <strong className="text-foreground">{displayValue}</strong>
+                                </p>
+                              )}
+                            </div>
                           ) : isDateField ? (
                             <div className="space-y-1">
                               <div className="flex items-center gap-2">

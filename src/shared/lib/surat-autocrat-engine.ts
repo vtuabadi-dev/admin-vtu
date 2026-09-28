@@ -305,6 +305,13 @@ export function matchTagToManifestField(tag: string): {
   // 3. Fallback generic type detection
   let detectedType: SuratInputType = "text";
   if (
+    tagLower.includes("rentang") ||
+    tagLower.includes("periode") ||
+    (tagLower.includes("cuti") && tagLower.includes("tanggal")) ||
+    (tagLower.includes("tanggal") && (tagLower.includes("mulai") || tagLower.includes("sampai") || tagLower.includes("sd")))
+  ) {
+    detectedType = "date_range";
+  } else if (
     (tagLower.includes("tanggal") ||
       tagLower.includes("tgl") ||
       tagLower.includes("date") ||
@@ -1385,6 +1392,85 @@ export function formatIsoToIndonesianDate(isoStr?: string | null): string {
   }
 
   return trimmed;
+}
+
+/**
+ * Formats a date range into standard Indonesian official letter format:
+ * - Same start & end date: "10 Oktober 2026"
+ * - Same month & year: "10 s/d 25 Oktober 2026"
+ * - Different month, same year: "28 Oktober s/d 10 November 2026"
+ * - Different year: "28 Desember 2026 s/d 10 Januari 2027"
+ */
+export function formatIsoToIndonesianDateRange(startDateIso?: string | null, endDateIso?: string | null): string {
+  if (!startDateIso && !endDateIso) return "";
+  if (startDateIso && !endDateIso) return formatIsoToIndonesianDate(startDateIso);
+  if (!startDateIso && endDateIso) return formatIsoToIndonesianDate(endDateIso);
+
+  const startFormatted = formatIsoToIndonesianDate(startDateIso);
+  const endFormatted = formatIsoToIndonesianDate(endDateIso);
+
+  if (startDateIso === endDateIso) return startFormatted;
+
+  const startMatch = (startDateIso || "").trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  const endMatch = (endDateIso || "").trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
+
+  if (startMatch && endMatch) {
+    const BULAN = [
+      "Januari", "Februari", "Maret", "April", "Mei", "Juni",
+      "Juli", "Agustus", "September", "Oktober", "November", "Desember"
+    ];
+    const sYear = startMatch[1] || "";
+    const sMonthIdx = parseInt(startMatch[2] || "1", 10) - 1;
+    const sDay = parseInt(startMatch[3] || "1", 10);
+
+    const eYear = endMatch[1] || "";
+    const eMonthIdx = parseInt(endMatch[2] || "1", 10) - 1;
+    const eDay = parseInt(endMatch[3] || "1", 10);
+
+    if (sYear === eYear && sMonthIdx === eMonthIdx) {
+      return `${sDay} s/d ${eDay} ${BULAN[sMonthIdx]} ${sYear}`;
+    } else if (sYear === eYear) {
+      return `${sDay} ${BULAN[sMonthIdx]} s/d ${eDay} ${BULAN[eMonthIdx]} ${sYear}`;
+    } else {
+      return `${sDay} ${BULAN[sMonthIdx]} ${sYear} s/d ${eDay} ${BULAN[eMonthIdx]} ${eYear}`;
+    }
+  }
+
+  return `${startFormatted} s/d ${endFormatted}`;
+}
+
+/**
+ * Parses an Indonesian date range string into [startDateIso, endDateIso]
+ */
+export function parseDateRangeToIsoStrings(rangeStr?: string | null): [string, string] {
+  if (!rangeStr || typeof rangeStr !== "string") return ["", ""];
+  const trimmed = rangeStr.trim();
+  if (!trimmed) return ["", ""];
+
+  const parts = trimmed.split(/\s+(?:s\/d|-|sampai dengan|sd)\s+/i);
+  if (parts.length >= 2 && parts[0] !== undefined && parts[1] !== undefined) {
+    const rawStart = parts[0].trim();
+    const rawEnd = parts[1].trim();
+
+    const endIso = parseDateToIsoString(rawEnd);
+    if (/^\d{1,2}$/.test(rawStart) && endIso) {
+      const [year, month] = endIso.split("-");
+      const startDay = rawStart.padStart(2, "0");
+      return [`${year}-${month}-${startDay}`, endIso];
+    }
+
+    if (endIso && !/\d{4}/.test(rawStart)) {
+      const [year] = endIso.split("-");
+      const startIso = parseDateToIsoString(`${rawStart} ${year}`);
+      if (startIso) return [startIso, endIso];
+    }
+
+    const startIso = parseDateToIsoString(rawStart);
+    return [startIso || "", endIso || ""];
+  }
+
+  const singleIso = parseDateToIsoString(trimmed);
+  return [singleIso || "", ""];
 }
 
 /**

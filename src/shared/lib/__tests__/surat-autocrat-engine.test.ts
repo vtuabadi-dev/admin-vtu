@@ -13,6 +13,8 @@ import {
   generateSuratFileName,
   parseDateToIsoString,
   formatIsoToIndonesianDate,
+  formatIsoToIndonesianDateRange,
+  parseDateRangeToIsoStrings,
   parseMonthYearToIsoString,
   formatIsoToIndonesianMonthYear,
 } from "@/shared/lib/surat-autocrat-engine";
@@ -479,6 +481,22 @@ Bulan: {{Bulan Awal}}`,
       expect(formatIsoToIndonesianMonthYear("2026-09")).toBe("September 2026");
       expect(parseMonthYearToIsoString("September 2026")).toBe("2026-09");
       expect(parseMonthYearToIsoString("2026-09")).toBe("2026-09");
+    });
+
+    it("should correctly format and parse date ranges in Indonesian official letter format", () => {
+      // Same month & year
+      expect(formatIsoToIndonesianDateRange("2026-10-10", "2026-10-25")).toBe("10 s/d 25 Oktober 2026");
+      // Different month, same year
+      expect(formatIsoToIndonesianDateRange("2026-10-28", "2026-11-10")).toBe("28 Oktober s/d 10 November 2026");
+      // Different year
+      expect(formatIsoToIndonesianDateRange("2026-12-28", "2027-01-10")).toBe("28 Desember 2026 s/d 10 Januari 2027");
+      // Same date
+      expect(formatIsoToIndonesianDateRange("2026-10-10", "2026-10-10")).toBe("10 Oktober 2026");
+
+      // Parsing range string to ISOs
+      expect(parseDateRangeToIsoStrings("10 s/d 25 Oktober 2026")).toEqual(["2026-10-10", "2026-10-25"]);
+      expect(parseDateRangeToIsoStrings("28 Oktober s/d 10 November 2026")).toEqual(["2026-10-28", "2026-11-10"]);
+      expect(parseDateRangeToIsoStrings("28 Desember 2026 s/d 10 Januari 2027")).toEqual(["2026-12-28", "2027-01-10"]);
     });
   });
 });
