@@ -539,7 +539,7 @@ export default function PembayaranMonitoringPage() {
                                 )}
                                 <span className="text-[10px] text-muted-foreground font-medium flex items-center gap-1 whitespace-nowrap pt-0.5">
                                   <Calendar className="w-2.5 h-2.5 text-amber-500 shrink-0" />
-                                  <span>{formatDate(pkg.deadlineDate)} (Target H-{globalDeadlineDays})</span>
+                                  <span>{formatDate(pkg.deadlineDate)} (H-{globalDeadlineDays})</span>
                                 </span>
                               </div>
                             ) : (
