@@ -54,6 +54,8 @@ interface PackageSummaryItem {
   totalSisa: number;
   deadlineDate?: string;
   sisaHariDeadline?: number;
+  reminderAwalDate?: string;
+  sisaHariReminderAwal?: number;
 }
 
 // ============================================================
@@ -107,6 +109,22 @@ export default function PembayaranMonitoringPage() {
     return 40;
   });
 
+  // Reminder Awal Days (Default H-45 sebelum tanggal keberangkatan / sesuai reminder tahap pertama)
+  const [reminderAwalDays, setReminderAwalDays] = useState<number>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const savedStages = localStorage.getItem("vtu_custom_reminder_stages_v2");
+        if (savedStages) {
+          const parsed = JSON.parse(savedStages);
+          if (Array.isArray(parsed) && parsed.length > 0 && parsed[0]?.daysBefore) {
+            return parsed[0].daysBefore;
+          }
+        }
+      } catch {}
+    }
+    return 45;
+  });
+
   useEffect(() => {
     let isMounted = true;
 
@@ -134,9 +152,17 @@ export default function PembayaranMonitoringPage() {
         }
         if (settingsRes && settingsRes.ok) {
           const settingsJson = await settingsRes.json();
-          if (settingsJson?.success && settingsJson?.data?.globalDeadlineDays) {
-            setGlobalDeadlineDays(settingsJson.data.globalDeadlineDays);
-            localStorage.setItem("vtu_global_deadline_days", String(settingsJson.data.globalDeadlineDays));
+          if (settingsJson?.success && settingsJson?.data) {
+            if (settingsJson.data.globalDeadlineDays) {
+              setGlobalDeadlineDays(settingsJson.data.globalDeadlineDays);
+              localStorage.setItem("vtu_global_deadline_days", String(settingsJson.data.globalDeadlineDays));
+            }
+            if (Array.isArray(settingsJson.data.stages) && settingsJson.data.stages.length > 0) {
+              const firstStage = settingsJson.data.stages[0];
+              if (firstStage?.daysBefore) {
+                setReminderAwalDays(firstStage.daysBefore);
+              }
+            }
           }
         }
       } catch (err) {
@@ -268,21 +294,34 @@ export default function PembayaranMonitoringPage() {
 
         let deadlineDate: string | undefined = undefined;
         let sisaHariDeadline: number | undefined = undefined;
+        let reminderAwalDate: string | undefined = undefined;
+        let sisaHariReminderAwal: number | undefined = undefined;
 
         if (kbr.tanggalBerangkat) {
           const dBerangkat = new Date(kbr.tanggalBerangkat);
           if (!isNaN(dBerangkat.getTime())) {
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+
+            // 1. Official Deadline (H-40)
             const dDeadline = new Date(dBerangkat);
             dDeadline.setDate(dDeadline.getDate() - globalDeadlineDays);
             deadlineDate = dDeadline.toISOString();
 
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
             const dDeadlineZero = new Date(dDeadline);
             dDeadlineZero.setHours(0, 0, 0, 0);
-
             const diffMs = dDeadlineZero.getTime() - today.getTime();
             sisaHariDeadline = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+
+            // 2. Reminder Awal (H-45)
+            const dReminder = new Date(dBerangkat);
+            dReminder.setDate(dReminder.getDate() - reminderAwalDays);
+            reminderAwalDate = dReminder.toISOString();
+
+            const dReminderZero = new Date(dReminder);
+            dReminderZero.setHours(0, 0, 0, 0);
+            const diffReminderMs = dReminderZero.getTime() - today.getTime();
+            sisaHariReminderAwal = Math.ceil(diffReminderMs / (1000 * 60 * 60 * 24));
           }
         }
 
@@ -299,13 +338,15 @@ export default function PembayaranMonitoringPage() {
           totalSisa,
           deadlineDate,
           sisaHariDeadline,
+          reminderAwalDate,
+          sisaHariReminderAwal,
         };
       })
       .filter((pkg) => {
         if (monthFilter !== "semua" && pkg.monthLabel !== monthFilter) return false;
         return pkg.totalGrup > 0;
       });
-  }, [kbrList, enriched, statusFilter, monthFilter, globalDeadlineDays]);
+  }, [kbrList, enriched, statusFilter, monthFilter, globalDeadlineDays, reminderAwalDays]);
 
   // Overall Stats
   const stats = useMemo(
@@ -470,13 +511,14 @@ export default function PembayaranMonitoringPage() {
                 <table className="w-full text-xs border-collapse">
                   <thead>
                     <tr className="border-b text-left font-bold text-muted-foreground uppercase tracking-wider bg-muted/40">
-                      <th className="py-3 px-4 w-10">No</th>
-                      <th className="py-3 px-4">Paket Keberangkatan &amp; Jadwal</th>
-                      <th className="py-3 px-4 text-center">Grup Pendaftar</th>
-                      <th className="py-3 px-4 text-center">Status Pelunasan Grup</th>
-                      <th className="py-3 px-4 text-center">Deadline Pelunasan</th>
-                      <th className="py-3 px-4 text-center min-w-[220px]">Sisa Pembayaran</th>
-                      <th className="py-3 px-4 text-center">Aksi Detail</th>
+                      <th className="py-3 px-3 w-10">No</th>
+                      <th className="py-3 px-3">Paket Keberangkatan &amp; Jadwal</th>
+                      <th className="py-3 px-3 text-center">Grup Pendaftar</th>
+                      <th className="py-3 px-3 text-center">Status Pelunasan Grup</th>
+                      <th className="py-3 px-3 text-center">Reminder Awal</th>
+                      <th className="py-3 px-3 text-center">Deadline Pelunasan</th>
+                      <th className="py-3 px-3 text-center min-w-[200px]">Sisa Pembayaran</th>
+                      <th className="py-3 px-3 text-center">Aksi Detail</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
@@ -526,7 +568,61 @@ export default function PembayaranMonitoringPage() {
                               )}
                             </div>
                           </td>
-                          <td className="py-3.5 px-4 text-center">
+                          {/* Reminder Awal (H-45) */}
+                          <td className="py-3.5 px-3 text-center">
+                            {pkg.reminderAwalDate && pkg.sisaHariReminderAwal !== undefined ? (
+                              <div className="flex flex-col items-center justify-center gap-1">
+                                {pkg.totalSisa <= 0 ? (
+                                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30">
+                                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                                    <span>Lunas (Aman)</span>
+                                  </span>
+                                ) : pkg.sisaHariReminderAwal < 0 ? (
+                                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-2xl text-[11px] font-bold bg-amber-500/15 text-amber-800 dark:text-amber-200 border border-amber-500/30">
+                                    <Clock className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                                    <span className="flex flex-col text-center leading-tight">
+                                      <span className="font-bold">Lewat Jadwal</span>
+                                      <span className="text-[10px] font-black text-amber-900 dark:text-amber-100 whitespace-nowrap">
+                                        ({Math.abs(pkg.sisaHariReminderAwal)} Hari)
+                                      </span>
+                                    </span>
+                                  </span>
+                                ) : pkg.sisaHariReminderAwal === 0 ? (
+                                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-2xl text-[11px] font-black bg-amber-500/25 text-amber-900 dark:text-amber-100 border border-amber-500/50 animate-pulse">
+                                    <Clock className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                                    <span className="flex flex-col text-center leading-tight">
+                                      <span className="text-xs font-black">H-0</span>
+                                      <span className="text-[10px] font-bold whitespace-nowrap">Hari Ini Reminder!</span>
+                                    </span>
+                                  </span>
+                                ) : pkg.sisaHariReminderAwal <= 7 ? (
+                                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-2xl text-[11px] font-black bg-amber-500/20 text-amber-800 dark:text-amber-200 border border-amber-500/40">
+                                    <Clock className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                                    <span className="flex flex-col text-center leading-tight">
+                                      <span className="text-xs font-black tracking-wide">H-{pkg.sisaHariReminderAwal}</span>
+                                      <span className="text-[10px] font-semibold whitespace-nowrap">Menuju Reminder</span>
+                                    </span>
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-2xl text-[11px] font-bold bg-sky-500/15 text-sky-700 dark:text-sky-300 border border-sky-500/30">
+                                    <Clock className="w-3.5 h-3.5 text-sky-600 shrink-0" />
+                                    <span className="flex flex-col text-center leading-tight">
+                                      <span className="text-xs font-black tracking-wide">H-{pkg.sisaHariReminderAwal}</span>
+                                      <span className="text-[10px] font-semibold whitespace-nowrap">Menuju Reminder</span>
+                                    </span>
+                                  </span>
+                                )}
+                                <span className="text-[10px] text-muted-foreground font-medium flex items-center gap-1 whitespace-nowrap pt-0.5">
+                                  <Calendar className="w-2.5 h-2.5 text-amber-500 shrink-0" />
+                                  <span>{formatDate(pkg.reminderAwalDate)} (H-{reminderAwalDays})</span>
+                                </span>
+                              </div>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">-</span>
+                            )}
+                          </td>
+                          {/* Deadline Pelunasan (H-40) */}
+                          <td className="py-3.5 px-3 text-center">
                             {pkg.deadlineDate && pkg.sisaHariDeadline !== undefined ? (
                               <div className="flex flex-col items-center justify-center gap-1">
                                 {pkg.totalSisa <= 0 ? (
