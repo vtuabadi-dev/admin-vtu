@@ -29,6 +29,7 @@ import {
   ChevronRight,
   AlertCircle,
   CheckCircle2,
+  Clock,
 } from "lucide-react";
 
 // ============================================================
@@ -51,6 +52,8 @@ interface PackageSummaryItem {
   totalTagihan: number;
   totalDibayar: number;
   totalSisa: number;
+  deadlineDate?: string;
+  sisaHariDeadline?: number;
 }
 
 // ============================================================
@@ -84,12 +87,27 @@ export default function PembayaranMonitoringPage() {
   const [monthFilter, setMonthFilter] = useState("semua");
   const [statusFilter, setStatusFilter] = useState("semua");
 
+  // Global Deadline Days (Default H-40 sebelum tanggal keberangkatan)
+  const [globalDeadlineDays, setGlobalDeadlineDays] = useState<number>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem("vtu_global_deadline_days");
+        if (saved) {
+          const val = parseInt(saved, 10);
+          if (!isNaN(val) && val > 0) return val;
+        }
+      } catch {}
+    }
+    return 40;
+  });
+
   useEffect(() => {
     async function load() {
       try {
-        const [groupsRes, kbrRes] = await Promise.all([
+        const [groupsRes, kbrRes, settingsRes] = await Promise.all([
           fetch("/api/groups"),
           fetch("/api/keberangkatan"),
+          fetch("/api/admin/settings/reminder").catch(() => null),
         ]);
         if (groupsRes.ok) {
           const json = await groupsRes.json();
@@ -98,6 +116,13 @@ export default function PembayaranMonitoringPage() {
         if (kbrRes.ok) {
           const json = await kbrRes.json();
           setKbrList(json.data ?? []);
+        }
+        if (settingsRes && settingsRes.ok) {
+          const settingsJson = await settingsRes.json();
+          if (settingsJson?.success && settingsJson?.data?.globalDeadlineDays) {
+            setGlobalDeadlineDays(settingsJson.data.globalDeadlineDays);
+            localStorage.setItem("vtu_global_deadline_days", String(settingsJson.data.globalDeadlineDays));
+          }
         }
       } catch (err) {
         console.error("Failed to load payment data:", err);
@@ -222,6 +247,26 @@ export default function PembayaranMonitoringPage() {
         const totalDibayar = activeGroups.reduce((sum, g) => sum + g.totalPembayaran, 0);
         const totalSisa = activeGroups.reduce((sum, g) => sum + g.sisaPembayaran, 0);
 
+        let deadlineDate: string | undefined = undefined;
+        let sisaHariDeadline: number | undefined = undefined;
+
+        if (kbr.tanggalBerangkat) {
+          const dBerangkat = new Date(kbr.tanggalBerangkat);
+          if (!isNaN(dBerangkat.getTime())) {
+            const dDeadline = new Date(dBerangkat);
+            dDeadline.setDate(dDeadline.getDate() - globalDeadlineDays);
+            deadlineDate = dDeadline.toISOString();
+
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const dDeadlineZero = new Date(dDeadline);
+            dDeadlineZero.setHours(0, 0, 0, 0);
+
+            const diffMs = dDeadlineZero.getTime() - today.getTime();
+            sisaHariDeadline = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+          }
+        }
+
         return {
           paketId: kbr.id,
           namaPaket: pkgName,
@@ -233,13 +278,15 @@ export default function PembayaranMonitoringPage() {
           totalTagihan,
           totalDibayar,
           totalSisa,
+          deadlineDate,
+          sisaHariDeadline,
         };
       })
       .filter((pkg) => {
         if (monthFilter !== "semua" && pkg.monthLabel !== monthFilter) return false;
         return pkg.totalGrup > 0;
       });
-  }, [kbrList, enriched, statusFilter, monthFilter]);
+  }, [kbrList, enriched, statusFilter, monthFilter, globalDeadlineDays]);
 
   // Overall Stats
   const stats = useMemo(
@@ -395,61 +442,132 @@ export default function PembayaranMonitoringPage() {
                       <th className="py-3 px-4">Paket Keberangkatan &amp; Jadwal</th>
                       <th className="py-3 px-4 text-center">Grup Pendaftar</th>
                       <th className="py-3 px-4 text-center">Status Pelunasan Grup</th>
-                      <th className="py-3 px-4 text-right">Total Tagihan</th>
-                      <th className="py-3 px-4 text-right">Sisa Pembayaran</th>
+                      <th className="py-3 px-4 text-center">Deadline Pelunasan</th>
+                      <th className="py-3 px-4 text-center min-w-[220px]">Sisa Pembayaran</th>
                       <th className="py-3 px-4 text-center">Aksi Detail</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
-                    {packageSummaries.map((pkg, idx) => (
-                      <tr
-                        key={pkg.paketId}
-                        className="hover:bg-muted/40 transition-colors cursor-pointer"
-                        onClick={() => setPaketFilter(pkg.paketId)}
-                      >
-                        <td className="py-3.5 px-4 font-mono text-muted-foreground">{idx + 1}</td>
-                        <td className="py-3.5 px-4">
-                          <p className="font-bold text-sm text-foreground hover:text-amber-600 transition-colors">
-                            {pkg.namaPaket}
-                          </p>
-                          <p className="text-[11px] text-muted-foreground flex items-center gap-1.5 pt-0.5 font-medium">
-                            <Calendar className="w-3 h-3 text-amber-500" />
-                            <span>Berangkat: <strong>{formatDate(pkg.tanggalBerangkat)}</strong></span>
-                          </p>
-                        </td>
-                        <td className="py-3.5 px-4 text-center">
-                          <span className="inline-flex items-center px-2.5 py-1 rounded-md font-extrabold bg-blue-500/10 text-blue-700 dark:text-blue-300 border border-blue-500/20 text-xs">
-                            {pkg.totalGrup} Group Pendaftar
-                          </span>
-                        </td>
-                        <td className="py-3.5 px-4 text-center">
-                          <div className="flex items-center justify-center gap-1.5 flex-wrap">
-                            {pkg.grupBelumLunas > 0 ? (
-                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30">
-                                <AlertCircle className="w-3 h-3 text-amber-600" />
-                                {pkg.grupBelumLunas} Grup Belum Lunas
-                              </span>
+                    {packageSummaries.map((pkg, idx) => {
+                      const percent = pkg.totalTagihan > 0
+                        ? Math.min(100, Math.max(0, Math.round((pkg.totalDibayar / pkg.totalTagihan) * 100)))
+                        : 100;
+
+                      return (
+                        <tr
+                          key={pkg.paketId}
+                          className="hover:bg-muted/40 transition-colors cursor-pointer"
+                          onClick={() => setPaketFilter(pkg.paketId)}
+                        >
+                          <td className="py-3.5 px-4 font-mono text-muted-foreground">{idx + 1}</td>
+                          <td className="py-3.5 px-4">
+                            <p className="font-bold text-sm text-foreground hover:text-amber-600 transition-colors">
+                              {pkg.namaPaket}
+                            </p>
+                            <p className="text-[11px] text-muted-foreground flex items-center gap-1.5 pt-0.5 font-medium">
+                              <Calendar className="w-3 h-3 text-amber-500" />
+                              <span>Berangkat: <strong>{formatDate(pkg.tanggalBerangkat)}</strong></span>
+                            </p>
+                          </td>
+                          <td className="py-3.5 px-4 text-center">
+                            <span className="inline-flex items-center px-2.5 py-1 rounded-md font-extrabold bg-blue-500/10 text-blue-700 dark:text-blue-300 border border-blue-500/20 text-xs">
+                              {pkg.totalGrup} Group Pendaftar
+                            </span>
+                          </td>
+                          <td className="py-3.5 px-4 text-center">
+                            <div className="flex items-center justify-center gap-1.5 flex-wrap">
+                              {pkg.grupBelumLunas > 0 ? (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30">
+                                  <AlertCircle className="w-3 h-3 text-amber-600" />
+                                  {pkg.grupBelumLunas} Grup Belum Lunas
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30">
+                                  <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                                  100% Lunas
+                                </span>
+                              )}
+                              {pkg.grupLunas > 0 && pkg.grupBelumLunas > 0 && (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/10 text-emerald-600">
+                                  ({pkg.grupLunas} Lunas)
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="py-3.5 px-4 text-center">
+                            {pkg.deadlineDate && pkg.sisaHariDeadline !== undefined ? (
+                              <div className="flex flex-col items-center justify-center gap-1">
+                                {pkg.totalSisa <= 0 ? (
+                                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30">
+                                    <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                                    Lunas (Aman)
+                                  </span>
+                                ) : pkg.sisaHariDeadline < 0 ? (
+                                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-rose-500/15 text-rose-700 dark:text-rose-300 border border-rose-500/30">
+                                    <AlertCircle className="w-3 h-3 text-rose-600" />
+                                    Lewat Deadline ({Math.abs(pkg.sisaHariDeadline)} hari)
+                                  </span>
+                                ) : pkg.sisaHariDeadline === 0 ? (
+                                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-black bg-rose-500/20 text-rose-800 dark:text-rose-200 border border-rose-500/40 animate-pulse">
+                                    <Clock className="w-3 h-3 text-rose-600" />
+                                    H-0 (Hari Ini Deadline!)
+                                  </span>
+                                ) : pkg.sisaHariDeadline <= 7 ? (
+                                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-black bg-amber-500/20 text-amber-800 dark:text-amber-200 border border-amber-500/40">
+                                    <Clock className="w-3 h-3 text-amber-600" />
+                                    H-{pkg.sisaHariDeadline} Menuju Deadline
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-blue-500/15 text-blue-700 dark:text-blue-300 border border-blue-500/30">
+                                    <Clock className="w-3 h-3 text-blue-600" />
+                                    H-{pkg.sisaHariDeadline} Menuju Deadline
+                                  </span>
+                                )}
+                                <span className="text-[10px] text-muted-foreground font-medium flex items-center gap-1">
+                                  <Calendar className="w-2.5 h-2.5 text-amber-500" />
+                                  {formatDate(pkg.deadlineDate)} (Target H-{globalDeadlineDays})
+                                </span>
+                              </div>
                             ) : (
-                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30">
-                                <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                                100% Lunas
-                              </span>
+                              <span className="text-xs text-muted-foreground">-</span>
                             )}
-                            {pkg.grupLunas > 0 && pkg.grupBelumLunas > 0 && (
-                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/10 text-emerald-600">
-                                ({pkg.grupLunas} Lunas)
-                              </span>
+                          </td>
+                          {/* Sisa Pembayaran & Indikator Pil Menjadi Satu */}
+                          <td className="py-3.5 px-4 text-center min-w-[220px]">
+                            {pkg.totalSisa <= 0 ? (
+                              <div className="space-y-1.5 w-44 sm:w-52 mx-auto">
+                                <div className="text-xs font-black text-emerald-600 dark:text-emerald-400 flex items-center justify-center gap-1.5">
+                                  <CheckCircle2 className="w-3.5 h-3.5" />
+                                  <span>Lunas</span>
+                                </div>
+                                <div className="w-full h-2.5 rounded-full bg-emerald-500/20 border border-emerald-500/40 overflow-hidden shadow-2xs">
+                                  <div className="w-full h-full bg-emerald-500 rounded-full" />
+                                </div>
+                                <div className="text-[10px] text-emerald-700 dark:text-emerald-300 font-semibold text-center">
+                                  Terpenuhi 100%
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="space-y-1.5 w-44 sm:w-52 mx-auto">
+                                <div className="flex items-center justify-between text-xs font-bold">
+                                  <span className="text-muted-foreground font-semibold">Sisa:</span>
+                                  <span className="text-destructive font-black tracking-tight">
+                                    {formatCurrency(pkg.totalSisa)}
+                                  </span>
+                                </div>
+                                <div className="relative w-full h-2.5 rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-300/80 dark:border-slate-700 overflow-hidden shadow-inner">
+                                  <div
+                                    className="h-full bg-gradient-to-r from-amber-500 to-emerald-500 rounded-full transition-all duration-300"
+                                    style={{ width: `${percent}%` }}
+                                  />
+                                </div>
+                                <div className="flex items-center justify-between text-[10px] text-muted-foreground font-semibold px-0.5">
+                                  <span>Terbayar {percent}%</span>
+                                  <span>Target: {formatCurrency(pkg.totalTagihan)}</span>
+                                </div>
+                              </div>
                             )}
-                          </div>
-                        </td>
-                        <td className="py-3.5 px-4 text-right font-medium tabular-nums">
-                          {formatCurrency(pkg.totalTagihan)}
-                        </td>
-                        <td className="py-3.5 px-4 text-right font-bold tabular-nums">
-                          <span className={pkg.totalSisa > 0 ? "text-destructive" : "text-emerald-600"}>
-                            {formatCurrency(pkg.totalSisa)}
-                          </span>
-                        </td>
+                          </td>
                         <td className="py-3.5 px-4 text-center">
                           <Button
                             size="sm"
@@ -465,7 +583,8 @@ export default function PembayaranMonitoringPage() {
                           </Button>
                         </td>
                       </tr>
-                    ))}
+                    );
+                  })}
                   </tbody>
                 </table>
               </div>

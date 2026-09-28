@@ -7,7 +7,6 @@ import { Card, CardContent } from "@/shared/components/ui/Card";
 import { StatCard } from "@/shared/components/ui/StatCard";
 import { StatusBadge } from "@/shared/components/ui/Badge";
 import { Button } from "@/shared/components/ui/Button";
-import { Input } from "@/shared/components/ui/Input";
 import { Table } from "@/shared/components/ui/Table";
 import { Tabs } from "@/shared/components/ui/Tabs";
 import { ErrorState } from "@/shared/components/ui/ErrorState";
@@ -31,8 +30,19 @@ export default function JamaahListPage() {
   const [groups, setGroups] = useState<RegistrationGroup[]>(storeGroups || []);
   const [loading, setLoading] = useState(!storeJamaah || storeJamaah.length === 0);
   const [error, setError] = useState<Error | null>(null);
-  const [search, setSearch] = useState("");
   const [activeTab, setActiveTab] = useState("semua");
+
+  // --- Smart 4-Digit GRP Lookup State (Sesuai Gambar 2) ---
+  const [searchYear, setSearchYear] = useState("2026");
+  const [searchSeq, setSearchSeq] = useState("");
+  const [appliedSearch, setAppliedSearch] = useState("");
+
+  const currentFullCode = useMemo(() => {
+    if (!searchSeq.trim()) return "";
+    const clean = searchSeq.trim();
+    const padded = clean.length <= 4 ? clean.padStart(4, "0") : clean.padStart(5, "0");
+    return `GRP-${searchYear}-${padded}`;
+  }, [searchYear, searchSeq]);
 
   const load = useCallback(async (showLoading = false) => {
     try {
@@ -107,37 +117,88 @@ export default function JamaahListPage() {
     return { total, dokumenLengkap, dokumenKurang };
   }, [jamaahList]);
 
+  // Sync URL search query on mount if present
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const s = params.get("search");
+      if (s && s.toUpperCase().includes("GRP-")) {
+        const m = s.toUpperCase().match(/GRP-(\d{4})-(\d+)/);
+        if (m && m[1] && m[2]) {
+          setSearchYear(m[1]);
+          setSearchSeq(m[2]);
+          setAppliedSearch(`GRP-${m[1]}-${m[2].padStart(4, "0")}`);
+        }
+      }
+    }
+  }, []);
+
+  function handleCariGroup() {
+    if (!searchSeq.trim()) {
+      setAppliedSearch("");
+      return;
+    }
+    const clean = searchSeq.trim();
+    const padded = clean.length <= 4 ? clean.padStart(4, "0") : clean.padStart(5, "0");
+    setAppliedSearch(`GRP-${searchYear}-${padded}`);
+  }
+
+  function handleResetSearch() {
+    setSearchSeq("");
+    setAppliedSearch("");
+  }
+
+  const baseListForCounts = useMemo(() => {
+    if (!appliedSearch) return jamaahList;
+    const q = appliedSearch.toUpperCase();
+    const parts = q.split("-");
+    let altCode = "";
+    if (parts.length >= 3 && parts[1] && parts[2]) {
+      const yr = parts[1];
+      const rawSeq = parts[2].replace(/\D/g, "");
+      const pad4 = `GRP-${yr}-${rawSeq.padStart(4, "0")}`;
+      const pad5 = `GRP-${yr}-${rawSeq.padStart(5, "0")}`;
+      altCode = q === pad4 ? pad5 : pad4;
+    }
+
+    return jamaahList.filter((j) => {
+      const regId = (j.registrationId || "").toUpperCase();
+      const g = groups.find((grp) => grp.id === j.groupId);
+      const groupKode = (g?.kodeRegistrasi || "").toUpperCase();
+      const pesId = (j.nomorPeserta || "").toUpperCase();
+
+      return (
+        regId.includes(q) ||
+        (altCode && regId.includes(altCode)) ||
+        groupKode.includes(q) ||
+        (altCode && groupKode.includes(altCode)) ||
+        pesId.includes(q) ||
+        (altCode && pesId.includes(altCode))
+      );
+    });
+  }, [jamaahList, appliedSearch, groups]);
+
   const counts = useMemo(
     () => ({
-      semua: jamaahList.length,
-      dokumen_lengkap: jamaahList.filter(
+      semua: baseListForCounts.length,
+      dokumen_lengkap: baseListForCounts.filter(
         (j) => getStatusDokumen(j) === "lengkap"
       ).length,
-      dokumen_kurang: jamaahList.filter(
+      dokumen_kurang: baseListForCounts.filter(
         (j) => getStatusDokumen(j) !== "lengkap"
       ).length,
-      lunas: jamaahList.filter(
+      lunas: baseListForCounts.filter(
         (j) => getStatusPembayaran(j.id) === "lunas"
       ).length,
-      draft: jamaahList.filter(
+      draft: baseListForCounts.filter(
         (j) => getStatusPembayaran(j.id) === "draft"
       ).length,
     }),
-    [jamaahList, getStatusPembayaran]
+    [baseListForCounts, getStatusPembayaran]
   );
 
   const filteredList = useMemo(() => {
-    let list = jamaahList;
-
-    if (search) {
-      const q = search.toLowerCase();
-      list = list.filter(
-        (j) =>
-          j.namaLengkap.toLowerCase().includes(q) ||
-          j.nomorPeserta.toLowerCase().includes(q) ||
-          j.nomorPaspor.toLowerCase().includes(q)
-      );
-    }
+    let list = baseListForCounts;
 
     switch (activeTab) {
       case "dokumen_lengkap":
@@ -173,7 +234,7 @@ export default function JamaahListPage() {
 
       return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
     });
-  }, [jamaahList, groups, search, activeTab, getStatusPembayaran]);
+  }, [baseListForCounts, groups, activeTab, getStatusPembayaran]);
 
   // --- Loading state ---
 
@@ -226,16 +287,104 @@ export default function JamaahListPage() {
         />
       </div>
 
-      {/* Search bar */}
-      <div className="flex items-center gap-3">
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Cari nama, nomor peserta, atau paspor..."
-            className="pl-9"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
+      {/* Group lookup: SMART 4/5-DIGIT LOOKUP CONTROL (Sesuai Gambar 2) */}
+      <div className="p-3.5 bg-amber-500/10 border border-amber-500/30 rounded-xl space-y-2 relative shadow-xs">
+        <div className="flex items-center justify-between">
+          <label className="text-xs font-bold uppercase tracking-wider text-amber-900 dark:text-amber-200 flex items-center gap-1.5">
+            <Search className="h-4 w-4 text-amber-600" />
+            1. Cari &amp; Pilih Group Registrasi Jamaah (Dikunci 4 Digit)
+          </label>
+          <div className="flex items-center gap-2">
+            {appliedSearch && (
+              <span className="font-mono text-[11px] font-extrabold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 px-2 py-0.5 rounded border border-emerald-300">
+                Filter Aktif: {appliedSearch}
+              </span>
+            )}
+            {currentFullCode && !appliedSearch && (
+              <span className="font-mono text-[11px] font-extrabold bg-amber-200 text-amber-900 px-2 py-0.5 rounded">
+                Target: {currentFullCode}
+              </span>
+            )}
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          {/* Visual GRP Prefix */}
+          <span className="px-3 py-2 bg-[#cb6806] text-white font-mono font-bold rounded-lg shrink-0 text-sm shadow-xs">
+            GRP-
+          </span>
+
+          {/* Year Select Dropdown */}
+          <select
+            value={searchYear}
+            onChange={(e) => setSearchYear(e.target.value)}
+            className="px-2.5 py-2 bg-background border border-slate-300 dark:border-slate-700 font-mono font-bold rounded-lg text-sm shrink-0 cursor-pointer shadow-xs focus:ring-2 focus:ring-amber-500 focus:outline-none"
+          >
+            <option value="2026">2026</option>
+            <option value="2025">2025</option>
+            <option value="2027">2027</option>
+            <option value="2028">2028</option>
+          </select>
+
+          <span className="font-mono font-bold text-amber-800 dark:text-amber-200">-</span>
+
+          {/* 4-Digit Sequence Input */}
+          <div className="relative flex-1">
+            <input
+              type="text"
+              maxLength={7}
+              placeholder="0004"
+              value={searchSeq}
+              onChange={(e) => {
+                const raw = e.target.value;
+                if (raw.toUpperCase().includes("GRP-")) {
+                  const m = raw.toUpperCase().match(/GRP-(\d{4})-(\d+)/);
+                  if (m && m[1] && m[2]) {
+                    setSearchYear(m[1]);
+                    setSearchSeq(m[2]);
+                    return;
+                  }
+                }
+                const val = raw.replace(/\D/g, "").slice(0, 7);
+                setSearchSeq(val);
+              }}
+              onBlur={() => {
+                if (searchSeq.trim()) {
+                  const clean = searchSeq.trim();
+                  const padded = clean.length <= 4 ? clean.padStart(4, "0") : clean.padStart(5, "0");
+                  setSearchSeq(padded);
+                }
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  handleCariGroup();
+                }
+              }}
+              className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 font-mono font-bold rounded-lg text-sm tracking-widest text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-amber-500 focus:outline-none shadow-xs"
+            />
+          </div>
+
+          <Button
+            type="button"
+            onClick={handleCariGroup}
+            disabled={!searchSeq.trim() && !appliedSearch}
+            className="bg-[#e3a869] hover:bg-[#d69554] text-white font-bold px-5 py-2 rounded-lg shrink-0 shadow-xs cursor-pointer"
+          >
+            <Search className="mr-1.5 h-4 w-4" />
+            Cari Group
+          </Button>
+
+          {appliedSearch && (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleResetSearch}
+              className="px-3 py-2 text-xs font-semibold shrink-0 cursor-pointer"
+            >
+              Reset
+            </Button>
+          )}
         </div>
       </div>
 

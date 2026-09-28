@@ -302,9 +302,18 @@ export default function DokumenPage() {
 
   // --- Upload Dokumen Tab State ---
   const [uploadSearchId, setUploadSearchId] = useState("");
+  const [searchYear, setSearchYear] = useState("2026");
+  const [searchSeq, setSearchSeq] = useState("");
   const [uploadSearching, setUploadSearching] = useState(false);
   const [uploadError, setUploadError] = useState("");
   const [selectedJamaah, setSelectedJamaah] = useState<any>(null);
+
+  const currentFullCode = useMemo(() => {
+    if (!searchSeq.trim()) return "";
+    const clean = searchSeq.trim();
+    const padded = clean.length <= 4 ? clean.padStart(4, "0") : clean.padStart(5, "0");
+    return `GRP-${searchYear}-${padded}`;
+  }, [searchYear, searchSeq]);
   const [foundMembers, setFoundMembers] = useState<any[]>([]);
   const [uploadDocuments, setUploadDocuments] = useState<any[]>([]);
   const [uploadPreviews, setUploadPreviews] = useState<Record<string, string>>({});
@@ -783,9 +792,16 @@ export default function DokumenPage() {
     } catch { /* graceful */ }
   }
 
-  async function handleSearchJamaah() {
-    const q = uploadSearchId.trim();
+  async function handleSearchJamaah(overrideQuery?: string) {
+    let q = (overrideQuery || currentFullCode || searchSeq || uploadSearchId).trim();
     if (!q) return;
+
+    // If only sequence digits were typed (e.g. "3" or "0003")
+    if (/^\d+$/.test(q)) {
+      const padded = q.length <= 4 ? q.padStart(4, "0") : q.padStart(5, "0");
+      q = `GRP-${searchYear}-${padded}`;
+    }
+
     setUploadSearching(true);
     setUploadError("");
     setSelectedJamaah(null);
@@ -798,19 +814,43 @@ export default function DokumenPage() {
     setActiveDocType("paspor");
 
     try {
-      const res = await fetch(`/api/jamaah?search=${encodeURIComponent(q)}&limit=50`);
+      let res = await fetch(`/api/jamaah?search=${encodeURIComponent(q)}&limit=50`);
       if (!res.ok) throw new Error("Gagal mencari data jamaah");
       
-      const json = await res.json();
+      let json = await res.json();
       let jamaahList = json.data ?? [];
 
-      // Fallback search if needed (e.g. without trailing member suffix or with 7-digit ID)
+      // Alternate padding if GRP code (e.g. 5-digit vs 4-digit)
+      if (jamaahList.length === 0 && q.toUpperCase().startsWith("GRP-")) {
+        const parts = q.split("-");
+        if (parts.length >= 3 && parts[1] && parts[2]) {
+          const yr = parts[1];
+          const rawNum = parts[2].replace(/\D/g, "");
+          const alt4 = `GRP-${yr}-${rawNum.padStart(4, "0")}`;
+          const alt5 = `GRP-${yr}-${rawNum.padStart(5, "0")}`;
+          const altQuery = q.toUpperCase() === alt4.toUpperCase() ? alt5 : alt4;
+          const altRes = await fetch(`/api/jamaah?search=${encodeURIComponent(altQuery)}&limit=50`);
+          if (altRes.ok) {
+            const altJson = await altRes.json();
+            if (altJson.data && altJson.data.length > 0) {
+              jamaahList = altJson.data;
+              setSearchYear(yr);
+              const altSeq = altQuery.split("-")[2];
+              if (altSeq) setSearchSeq(altSeq);
+            }
+          }
+        }
+      }
+
+      // Fallback search without trailing member suffix
       if (jamaahList.length === 0) {
         const cleanQ = q.replace(/-\d+$/, "");
-        const fallbackRes = await fetch(`/api/jamaah?search=${encodeURIComponent(cleanQ)}&limit=50`);
-        if (fallbackRes.ok) {
-          const fbJson = await fallbackRes.json();
-          jamaahList = fbJson.data ?? [];
+        if (cleanQ !== q) {
+          const fallbackRes = await fetch(`/api/jamaah?search=${encodeURIComponent(cleanQ)}&limit=50`);
+          if (fallbackRes.ok) {
+            const fbJson = await fallbackRes.json();
+            jamaahList = fbJson.data ?? [];
+          }
         }
       }
       
@@ -828,8 +868,18 @@ export default function DokumenPage() {
       });
 
       setFoundMembers(sortedMatches);
+
+      // Sync year and sequence if found
+      const firstMember = sortedMatches[0];
+      const foundRegId = firstMember.group?.kodeRegistrasi || firstMember.registrationId || "";
+      if (foundRegId.toUpperCase().startsWith("GRP-")) {
+        const p = foundRegId.split("-");
+        if (p[1]) setSearchYear(p[1]);
+        if (p[2]) setSearchSeq(p[2].replace(/\D/g, ""));
+      }
+
       // Automatically select the first member (Ketua)
-      await selectJamaahMember(sortedMatches[0]);
+      await selectJamaahMember(firstMember);
     } catch (err) {
       setUploadError((err as Error).message);
     } finally {
@@ -845,6 +895,7 @@ export default function DokumenPage() {
     setOcrResults({});
     setSavedOcrDocs({});
     setEditingOcrDocs({});
+    setSearchSeq("");
     setUploadSearchId("");
     setUploadError("");
     setActiveDocType("paspor");
@@ -1960,46 +2011,98 @@ export default function DokumenPage() {
             {/* ================================================================ */}
             {activeTab === "upload" && (
               <div className="space-y-4">
-                {/* Jamaah Search */}
-                <Card>
-                  <CardContent className="pt-4">
-                    <div className="flex items-center gap-3">
-                      <div className="flex-1">
-                        <label className="text-sm font-medium">Cari Jamaah berdasarkan ID Registrasi</label>
-                        <div className="flex gap-2 mt-2">
-                          <Input
-                            placeholder="Masukkan Kode Grup (GRP-2026-00003), No. Peserta, ID Registrasi, atau Nama Jamaah"
-                            value={uploadSearchId}
-                            onChange={(e) => setUploadSearchId(e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") {
-                                e.preventDefault();
-                                handleSearchJamaah();
-                              }
-                            }}
-                            className="flex-1"
-                          />
-                          <Button
-                            onClick={handleSearchJamaah}
-                            disabled={!uploadSearchId.trim() || uploadSearching}
-                          >
-                            {uploadSearching ? (
-                              <RefreshCw className="h-4 w-4 animate-spin" />
-                            ) : (
-                              <Search className="h-4 w-4" />
-                            )}
-                            Cari
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                    {uploadError && (
-                      <div className="mt-2 rounded-md bg-destructive/10 p-2 text-sm text-destructive">
-                        {uploadError}
-                      </div>
+                {/* 1. SMART 4/5-DIGIT LOOKUP CONTROL (Sesuai Gambar 3) */}
+                <div className="p-3.5 bg-amber-500/10 border border-amber-500/30 rounded-xl space-y-2 relative shadow-xs">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold uppercase tracking-wider text-amber-900 dark:text-amber-200 flex items-center gap-1.5">
+                      <Search className="h-4 w-4 text-amber-600" />
+                      1. Cari &amp; Pilih Group Registrasi Jamaah (Dikunci 4 Digit)
+                    </label>
+                    {currentFullCode && (
+                      <span className="font-mono text-[11px] font-extrabold bg-amber-200 text-amber-900 px-2 py-0.5 rounded">
+                        Target: {currentFullCode}
+                      </span>
                     )}
-                  </CardContent>
-                </Card>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    {/* Visual GRP Prefix */}
+                    <span className="px-3 py-2 bg-[#cb6806] text-white font-mono font-bold rounded-lg shrink-0 text-sm shadow-xs">
+                      GRP-
+                    </span>
+
+                    {/* Year Select Dropdown */}
+                    <select
+                      value={searchYear}
+                      onChange={(e) => setSearchYear(e.target.value)}
+                      className="px-2.5 py-2 bg-background border border-slate-300 dark:border-slate-700 font-mono font-bold rounded-lg text-sm shrink-0 cursor-pointer shadow-xs focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                    >
+                      <option value="2026">2026</option>
+                      <option value="2025">2025</option>
+                      <option value="2027">2027</option>
+                      <option value="2028">2028</option>
+                    </select>
+
+                    <span className="font-mono font-bold text-amber-800 dark:text-amber-200">-</span>
+
+                    {/* 4-Digit Sequence Input */}
+                    <div className="relative flex-1">
+                      <input
+                        type="text"
+                        maxLength={5}
+                        placeholder="0004"
+                        value={searchSeq}
+                        onChange={(e) => {
+                          const raw = e.target.value;
+                          if (raw.toUpperCase().includes("GRP-")) {
+                            const m = raw.toUpperCase().match(/GRP-(\d{4})-(\d+)/);
+                            if (m && m[1] && m[2]) {
+                              setSearchYear(m[1]);
+                              setSearchSeq(m[2]);
+                              return;
+                            }
+                          }
+                          const val = raw.replace(/\D/g, "").slice(0, 5);
+                          setSearchSeq(val);
+                        }}
+                        onBlur={() => {
+                          if (searchSeq.trim()) {
+                            const clean = searchSeq.trim();
+                            const padded = clean.length <= 4 ? clean.padStart(4, "0") : clean.padStart(5, "0");
+                            setSearchSeq(padded);
+                          }
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            handleSearchJamaah();
+                          }
+                        }}
+                        className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 font-mono font-bold rounded-lg text-sm tracking-widest text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-amber-500 focus:outline-none shadow-xs"
+                      />
+                    </div>
+
+                    <Button
+                      type="button"
+                      onClick={() => handleSearchJamaah()}
+                      disabled={uploadSearching || !searchSeq.trim()}
+                      className="bg-[#e3a869] hover:bg-[#d69554] text-white font-bold px-5 py-2 rounded-lg shrink-0 shadow-xs cursor-pointer"
+                    >
+                      {uploadSearching ? (
+                        <RefreshCw className="mr-1.5 h-4 w-4 animate-spin" />
+                      ) : (
+                        <Search className="mr-1.5 h-4 w-4" />
+                      )}
+                      {uploadSearching ? "Mencari..." : "Cari Group"}
+                    </Button>
+                  </div>
+
+                  {uploadError && (
+                    <div className="mt-2 rounded-md bg-destructive/10 p-2 text-sm text-destructive">
+                      {uploadError}
+                    </div>
+                  )}
+                </div>
 
                 {/* Selected Jamaah Info & Rombongan Switcher */}
                 {selectedJamaah && (
