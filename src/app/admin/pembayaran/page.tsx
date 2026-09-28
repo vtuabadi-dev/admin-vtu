@@ -31,9 +31,8 @@ import {
   CheckCircle2,
   Clock,
   History,
-  MessageSquare,
+  MessageCircle,
   ExternalLink,
-  Check,
 } from "lucide-react";
 
 // ============================================================
@@ -76,134 +75,7 @@ const statusFilterOptions = [
   { value: "overdue", label: "Overdue" },
 ];
 
-// ============================================================
-// REMINDER STAGE CONFIG & DEFAULTS
-// ============================================================
-interface ReminderStageConfig {
-  id: string;
-  title: string;
-  daysBefore: number;
-  template: string;
-}
 
-const DEFAULT_STAGES: ReminderStageConfig[] = [
-  {
-    id: "stage-1",
-    title: "Reminder #1 (Pengingat Awal H-50)",
-    daysBefore: 50,
-    template: `Assalamu'alaikum Wr. Wb.
-
-Yth. Bapak/Ibu {NAMA_GROUP} ({NAMA_JAMAAH})
-
-Kami menginfokan bahwa pendaftaran paket {NAMA_PAKET} (Keberangkatan: {TANGGAL_BERANGKAT}) telah memasuki periode pengingat H-50.
-
-Batas akhir pelunasan resmi jatuh pada tanggal {DEADLINE_DATE} (tersisa {SISA_HARI_DEADLINE} hari lagi). Saat ini sisa tagihan rombongan Anda sebesar Rp{SISA_TAGIHAN}.
-
-Mohon dapat dipersiapkan pelunasannya sebelum tanggal deadline tersebut. Terima kasih.
-
-*VTU Travel Operational*`,
-  },
-  {
-    id: "stage-2",
-    title: "Reminder #2 (Pengingat Kedua H-45)",
-    daysBefore: 45,
-    template: `Assalamu'alaikum Wr. Wb.
-
-Yth. Bapak/Ibu {NAMA_GROUP} ({NAMA_JAMAAH})
-
-Pengingat kedua untuk pendaftaran paket {NAMA_PAKET} (Keberangkatan: {TANGGAL_BERANGKAT}).
-
-Batas akhir pelunasan resmi jatuh pada tanggal {DEADLINE_DATE} (tinggal {SISA_HARI_DEADLINE} hari lagi ke deadline H-{DEADLINE_DAYS}). Saat ini masih terdapat sisa tagihan sebesar Rp{SISA_TAGIHAN}.
-
-Mohon segera melakukan konfirmasi dan pelunasan. Terima kasih.
-
-*VTU Travel Operational*`,
-  },
-  {
-    id: "stage-3",
-    title: "Reminder #3 (Peringatan Batas Akhir H-40)",
-    daysBefore: 40,
-    template: `Assalamu'alaikum Wr. Wb.
-
-Yth. Bapak/Ibu {NAMA_GROUP} ({NAMA_JAMAAH})
-
-PERINGATAN DEADLINE: Hari ini adalah batas akhir pelunasan resmi tanggal {DEADLINE_DATE} (H-{DEADLINE_DAYS} sebelum keberangkatan).
-
-Sisa tagihan rombongan sebesar Rp{SISA_TAGIHAN} WAJIB dilunasi sekarang untuk pemrosesan visa dan perlengkapan jamaah.
-
-Terima kasih atas perhatian dan kerja samanya.
-
-*VTU Travel Operational*`,
-  },
-];
-
-const FALLBACK_STAGE: ReminderStageConfig = DEFAULT_STAGES[0]!;
-
-function getMatchingReminderStage(stages: ReminderStageConfig[], daysBeforeDeparture: number): ReminderStageConfig {
-  if (!stages || stages.length === 0) return FALLBACK_STAGE;
-  const sorted = [...stages].sort((a, b) => b.daysBefore - a.daysBefore);
-
-  // Exact match
-  const exact = sorted.find((s) => s.daysBefore === daysBeforeDeparture);
-  if (exact) return exact;
-
-  // Past the latest stage (e.g. <= 40)
-  const lastStage = sorted[sorted.length - 1];
-  if (lastStage && daysBeforeDeparture <= lastStage.daysBefore) {
-    return lastStage;
-  }
-
-  // Before earliest stage (e.g. >= 50)
-  const firstStage = sorted[0];
-  if (firstStage && daysBeforeDeparture >= firstStage.daysBefore) {
-    return firstStage;
-  }
-
-  // Bracket match
-  for (let i = 0; i < sorted.length - 1; i++) {
-    const higher = sorted[i];
-    const lower = sorted[i + 1];
-    if (higher && lower && daysBeforeDeparture <= higher.daysBefore && daysBeforeDeparture > lower.daysBefore) {
-      return higher;
-    }
-  }
-
-  return sorted[0] || FALLBACK_STAGE;
-}
-
-function renderReminderMessage(
-  template: string,
-  g: EnrichedSummary,
-  pkgName: string,
-  tglBerangkat: string,
-  daysBeforeReminder: number,
-  globalDeadlineDays: number = 40
-): string {
-  const mainJamaah = g.anggota && g.anggota.length > 0 && g.anggota[0] ? g.anggota[0].namaLengkap : g.namaGroup;
-
-  let officialDeadlineStr = "-";
-  if (tglBerangkat) {
-    const b = new Date(tglBerangkat);
-    if (!isNaN(b.getTime())) {
-      const d = new Date(b);
-      d.setDate(d.getDate() - globalDeadlineDays);
-      officialDeadlineStr = formatDate(d.toISOString());
-    }
-  }
-
-  const sisaHariKeOfficialDeadline = Math.max(0, daysBeforeReminder - globalDeadlineDays);
-
-  return template
-    .replace(/\{NAMA_GROUP\}/g, g.namaGroup)
-    .replace(/\{NAMA_JAMAAH\}/g, mainJamaah)
-    .replace(/\{NAMA_PAKET\}/g, pkgName || g.namaPaket)
-    .replace(/\{TANGGAL_BERANGKAT\}/g, tglBerangkat ? formatDate(tglBerangkat) : "-")
-    .replace(/\{DEADLINE_DATE\}/g, officialDeadlineStr)
-    .replace(/\{SISA_HARI_DEADLINE\}/g, String(sisaHariKeOfficialDeadline))
-    .replace(/\{DEADLINE_DAYS\}/g, String(globalDeadlineDays))
-    .replace(/\{TARGET_HARI_REMINDER\}/g, String(daysBeforeReminder))
-    .replace(/\{SISA_TAGIHAN\}/g, g.sisaPembayaran.toLocaleString("id-ID"));
-}
 
 // ============================================================
 // CLIENT-SIDE IN-MEMORY CACHE FOR INSTANT 0MS NAVIGATION (SWR)
@@ -299,25 +171,8 @@ export default function PembayaranMonitoringPage() {
     return 45;
   });
 
-  // Dynamic Multi Reminder Stages
-  const [reminderStages, setReminderStages] = useState<ReminderStageConfig[]>(() => {
-    if (typeof window !== "undefined") {
-      try {
-        const savedStages = localStorage.getItem("vtu_custom_reminder_stages_v2");
-        if (savedStages) {
-          const parsed = JSON.parse(savedStages);
-          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-        }
-      } catch {}
-    }
-    return DEFAULT_STAGES;
-  });
-
   // Modal State for Payment History
   const [historyModalGroup, setHistoryModalGroup] = useState<EnrichedSummary | null>(null);
-
-  // Toast / Copy notification for missing phone numbers
-  const [copiedInfo, setCopiedInfo] = useState<string | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -352,8 +207,6 @@ export default function PembayaranMonitoringPage() {
               localStorage.setItem("vtu_global_deadline_days", String(settingsJson.data.globalDeadlineDays));
             }
             if (Array.isArray(settingsJson.data.stages) && settingsJson.data.stages.length > 0) {
-              setReminderStages(settingsJson.data.stages);
-              localStorage.setItem("vtu_custom_reminder_stages_v2", JSON.stringify(settingsJson.data.stages));
               const firstStage = settingsJson.data.stages[0];
               if (firstStage?.daysBefore) {
                 setReminderAwalDays(firstStage.daysBefore);
@@ -569,6 +422,60 @@ export default function PembayaranMonitoringPage() {
     if (paketFilter === "semua") return null;
     return kbrList.find((k) => k.id === paketFilter) || null;
   }, [paketFilter, kbrList]);
+
+  // Handler: WhatsApp Message Dispatch (Sama persis dengan format di Manifest Pembayaran)
+  const handleSendWhatsApp = useCallback((row: EnrichedSummary) => {
+    const mainJamaah = row.anggota && row.anggota.length > 0 && row.anggota[0] ? row.anggota[0].namaLengkap : row.namaGroup;
+    let rawPhone = "";
+    if (row.anggota && row.anggota.length > 0) {
+      const p = (row.anggota[0] as any).noHp || (row.anggota[0] as any).telepon || "";
+      rawPhone = String(p).replace(/\D/g, "");
+    }
+
+    if (!rawPhone) {
+      const inputPhone = prompt(`Masukkan nomor WhatsApp untuk ${mainJamaah}:`, "08");
+      if (!inputPhone) return;
+      rawPhone = inputPhone.replace(/\D/g, "");
+    }
+
+    if (rawPhone.startsWith("0")) {
+      rawPhone = "62" + rawPhone.slice(1);
+    } else if (!rawPhone.startsWith("62")) {
+      rawPhone = "62" + rawPhone;
+    }
+
+    const paxCount = row.jumlahAnggota || row.anggota?.length || 1;
+    const paxInfo = paxCount > 1 ? ` (${paxCount} Pax)` : "";
+    const memberNames = row.anggota ? row.anggota.map((a: any) => a.namaLengkap).filter(Boolean) : [];
+    const memberListText = memberNames.length > 1 ? `\n• Anggota: ${memberNames.join(", ")}` : "";
+
+    const lastInvoiceNo =
+      row.invoices && row.invoices.length > 0
+        ? row.invoices[row.invoices.length - 1]?.nomorInvoice || row.invoices[0]?.nomorInvoice || "-"
+        : row.pembayaran && row.pembayaran.length > 0
+        ? (row.pembayaran[row.pembayaran.length - 1] as any)?.invoiceNumber || "-"
+        : `INV/${row.kodeRegistrasi}`;
+
+    const statusPembayaran = row.sisaPembayaran <= 0 ? "LUNAS" : row.totalPembayaran > 0 ? "CICILAN" : "BELUM BAYAR";
+    const pkgName = selectedPackageObject?.namaPaket || row.namaPaket;
+
+    const text = `Assalamu'alaikum Wr. Wb. Bapak/Ibu ${mainJamaah} (PIC Rombongan ${row.namaGroup}),
+
+Berikut rincian status tagihan & pembayaran keberangkatan Umroh Anda${paxInfo} di VTU ABADI Travel:
+• Paket: ${pkgName}
+• Kode Registrasi: ${row.kodeRegistrasi}
+• No. Invoice: ${lastInvoiceNo}${memberListText}
+• Total Tagihan: Rp ${row.totalTagihan.toLocaleString("id-ID")}
+• Total Pembayaran: Rp ${row.totalPembayaran.toLocaleString("id-ID")}
+• Kurang Bayar (Sisa): Rp ${row.sisaPembayaran.toLocaleString("id-ID")}
+• Status: ${statusPembayaran}
+
+Mohon konfirmasi jika ada pertanyaan. Terima kasih.
+PT VAUZA TAMMA ABADI`;
+
+    const waUrl = getWhatsAppUrl(rawPhone, text);
+    window.open(waUrl, "_blank");
+  }, [selectedPackageObject]);
 
   if (loading && summaries.length === 0) {
     return (
@@ -1009,96 +916,31 @@ export default function PembayaranMonitoringPage() {
                 {
                   key: "aksi",
                   header: "Aksi",
-                  className: "text-center w-28",
+                  className: "text-center w-20",
                   headerClassName: "text-center",
-                  accessor: (r) => {
-                    // 1. Calculate days before departure for this group
-                    let daysBefore = 0;
-                    if (r.tanggalBerangkat) {
-                      const dBerangkat = new Date(r.tanggalBerangkat);
-                      if (!isNaN(dBerangkat.getTime())) {
-                        const today = new Date();
-                        today.setHours(0, 0, 0, 0);
-                        const dZero = new Date(dBerangkat);
-                        dZero.setHours(0, 0, 0, 0);
-                        daysBefore = Math.ceil((dZero.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-                      }
-                    }
+                  accessor: (r) => (
+                    <div className="flex items-center justify-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                      {/* Aksi 1: Buka Detail & Riwayat Pembayaran (Sama persis dengan Manifest Pembayaran) */}
+                      <button
+                        type="button"
+                        onClick={() => setHistoryModalGroup(r)}
+                        title="Buka Detail & Riwayat Pembayaran"
+                        className="p-1 rounded-md text-stone-600 hover:text-emerald-700 hover:bg-emerald-50 dark:text-stone-400 dark:hover:text-emerald-300 dark:hover:bg-stone-800 transition-colors cursor-pointer"
+                      >
+                        <CreditCard className="w-3.5 h-3.5" />
+                      </button>
 
-                    // 2. Determine matching reminder stage
-                    const stage = getMatchingReminderStage(reminderStages, daysBefore);
-
-                    // 3. Render message text for the matching H- stage
-                    const pkgName = selectedPackageObject?.namaPaket || r.namaPaket;
-                    const messageText = renderReminderMessage(
-                      stage.template,
-                      r,
-                      pkgName,
-                      r.tanggalBerangkat,
-                      stage.daysBefore,
-                      globalDeadlineDays
-                    );
-
-                    // 4. Contact Phone & WhatsApp URL
-                    const firstPhone =
-                      r.anggota && r.anggota.length > 0
-                        ? ((r.anggota[0] as any).noHp || (r.anggota[0] as any).telepon || "")
-                        : "";
-                    const cleanPhone = firstPhone.replace(/[^0-9]/g, "").replace(/^0/, "62");
-                    const waUrl = cleanPhone ? getWhatsAppUrl(cleanPhone, messageText) : "";
-                    const isLunas = r.sisaPembayaran <= 0;
-
-                    return (
-                      <div className="flex items-center justify-center gap-1.5" onClick={(e) => e.stopPropagation()}>
-                        {/* Icon 1: Tampilkan History Pembayaran */}
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          title="Lihat Histori Pembayaran"
-                          aria-label="Lihat Histori Pembayaran"
-                          className="h-8 w-8 p-0 rounded-lg border-sky-500/30 hover:border-sky-500/60 bg-sky-50/50 hover:bg-sky-100/70 dark:bg-sky-950/20 dark:hover:bg-sky-900/40 text-sky-600 dark:text-sky-400 shadow-2xs transition-all cursor-pointer flex items-center justify-center"
-                          onClick={() => setHistoryModalGroup(r)}
-                        >
-                          <History className="w-4 h-4" />
-                        </Button>
-
-                        {/* Icon 2: Kirim Reminder Pembayaran via WhatsApp Hyperlink */}
-                        {isLunas ? (
-                          <div
-                            title="Pembayaran sudah Lunas (Tidak memerlukan reminder)"
-                            className="h-8 w-8 rounded-lg border border-slate-200 dark:border-slate-800 bg-muted/30 text-muted-foreground/40 flex items-center justify-center cursor-not-allowed"
-                          >
-                            <CheckCircle2 className="w-4 h-4 text-emerald-600/40" />
-                          </div>
-                        ) : waUrl ? (
-                          <a
-                            href={waUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            title={`Kirim Pesan Reminder (${stage.title || `H-${stage.daysBefore}`}) ke ${firstPhone || cleanPhone}`}
-                            className="h-8 w-8 rounded-lg border border-emerald-500/30 hover:border-emerald-500/60 bg-emerald-50/50 hover:bg-emerald-100/70 dark:bg-emerald-950/20 dark:hover:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400 shadow-2xs transition-all flex items-center justify-center cursor-pointer"
-                          >
-                            <MessageSquare className="w-4 h-4" />
-                          </a>
-                        ) : (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            title="No. WA belum terdaftar - Klik untuk menyalin pesan reminder"
-                            aria-label="Salin Pesan Reminder"
-                            className="h-8 w-8 p-0 rounded-lg border-amber-500/30 hover:border-amber-500/60 bg-amber-50/50 hover:bg-amber-100/70 dark:bg-amber-950/20 dark:hover:bg-amber-900/40 text-amber-600 dark:text-amber-400 shadow-2xs transition-all cursor-pointer flex items-center justify-center"
-                            onClick={() => {
-                              navigator.clipboard.writeText(messageText);
-                              setCopiedInfo(`Pesan reminder (${stage.title || `H-${stage.daysBefore}`}) disalin ke clipboard! (No WA jamaah belum terdata)`);
-                              setTimeout(() => setCopiedInfo(null), 4000);
-                            }}
-                          >
-                            <MessageSquare className="w-4 h-4" />
-                          </Button>
-                        )}
-                      </div>
-                    );
-                  },
+                      {/* Aksi 2: Kirim Rincian via WhatsApp (Sama persis dengan Manifest Pembayaran) */}
+                      <button
+                        type="button"
+                        onClick={() => handleSendWhatsApp(r)}
+                        title="Kirim Rincian via WhatsApp"
+                        className="p-1 rounded-md text-emerald-600 hover:text-emerald-700 hover:bg-emerald-100 dark:text-emerald-400 dark:hover:bg-emerald-950/80 transition-colors cursor-pointer"
+                      >
+                        <MessageCircle className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ),
                 },
               ]}
               data={filteredGroups}
@@ -1234,13 +1076,6 @@ export default function PembayaranMonitoringPage() {
         </Modal>
       )}
 
-      {/* Toast Notification when reminder text copied */}
-      {copiedInfo && (
-        <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 px-4 py-2.5 rounded-xl shadow-xl text-xs font-semibold flex items-center gap-2 animate-in fade-in slide-in-from-bottom-2">
-          <Check className="w-4 h-4 text-emerald-400" />
-          <span>{copiedInfo}</span>
-        </div>
-      )}
     </div>
   );
 }
