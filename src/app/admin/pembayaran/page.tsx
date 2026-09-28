@@ -71,16 +71,22 @@ const statusFilterOptions = [
 ];
 
 // ============================================================
+// CLIENT-SIDE IN-MEMORY CACHE FOR INSTANT 0MS NAVIGATION (SWR)
+// ============================================================
+let memoryCachedSummaries: GroupPaymentSummary[] | null = null;
+let memoryCachedKbrList: Keberangkatan[] | null = null;
+
+// ============================================================
 // MAIN PAGE
 // ============================================================
 
 export default function PembayaranMonitoringPage() {
   const router = useRouter();
 
-  // Data
-  const [summaries, setSummaries] = useState<GroupPaymentSummary[]>([]);
-  const [kbrList, setKbrList] = useState<Keberangkatan[]>([]);
-  const [loading, setLoading] = useState(true);
+  // Data with In-Memory Stale-While-Revalidate (Instant 0ms frame-1 load)
+  const [summaries, setSummaries] = useState<GroupPaymentSummary[]>(() => memoryCachedSummaries || []);
+  const [kbrList, setKbrList] = useState<Keberangkatan[]>(() => memoryCachedKbrList || []);
+  const [loading, setLoading] = useState(() => !memoryCachedSummaries || memoryCachedSummaries.length === 0);
 
   // Filters
   const [paketFilter, setPaketFilter] = useState("semua");
@@ -102,6 +108,8 @@ export default function PembayaranMonitoringPage() {
   });
 
   useEffect(() => {
+    let isMounted = true;
+
     async function load() {
       try {
         const [groupsRes, kbrRes, settingsRes] = await Promise.all([
@@ -109,13 +117,20 @@ export default function PembayaranMonitoringPage() {
           fetch("/api/keberangkatan"),
           fetch("/api/admin/settings/reminder").catch(() => null),
         ]);
+
+        if (!isMounted) return;
+
         if (groupsRes.ok) {
           const json = await groupsRes.json();
-          setSummaries(json.data ?? []);
+          const data = json.data ?? [];
+          setSummaries(data);
+          memoryCachedSummaries = data;
         }
         if (kbrRes.ok) {
           const json = await kbrRes.json();
-          setKbrList(json.data ?? []);
+          const data = json.data ?? [];
+          setKbrList(data);
+          memoryCachedKbrList = data;
         }
         if (settingsRes && settingsRes.ok) {
           const settingsJson = await settingsRes.json();
@@ -127,10 +142,14 @@ export default function PembayaranMonitoringPage() {
       } catch (err) {
         console.error("Failed to load payment data:", err);
       } finally {
-        setLoading(false);
+        if (isMounted) setLoading(false);
       }
     }
     load();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   // Enrich summaries with paket info
@@ -314,10 +333,23 @@ export default function PembayaranMonitoringPage() {
     return kbrList.find((k) => k.id === paketFilter) || null;
   }, [paketFilter, kbrList]);
 
-  if (loading) {
+  if (loading && summaries.length === 0) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <p className="text-muted-foreground font-semibold">Memuat data monitoring pembayaran...</p>
+      <div className="space-y-6 animate-pulse">
+        <div>
+          <div className="h-7 w-64 bg-slate-200 dark:bg-slate-800 rounded-md" />
+          <div className="h-4 w-96 bg-slate-100 dark:bg-slate-800/60 rounded-md mt-2" />
+        </div>
+        <div className="h-20 bg-slate-100 dark:bg-slate-800/40 rounded-xl border border-slate-200/60 dark:border-slate-800" />
+        <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="h-24 bg-slate-100 dark:bg-slate-800/40 rounded-xl border border-slate-200/60 dark:border-slate-800" />
+          ))}
+        </div>
+        <div className="h-64 bg-slate-50 dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 flex flex-col items-center justify-center gap-2">
+          <p className="text-sm font-semibold text-slate-600 dark:text-slate-400">Memuat data monitoring pembayaran...</p>
+          <p className="text-xs text-muted-foreground">Menyiapkan ringkasan jadwal paket dan pelunasan grup</p>
+        </div>
       </div>
     );
   }
