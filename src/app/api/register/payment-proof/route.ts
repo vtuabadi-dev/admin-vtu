@@ -35,8 +35,13 @@ export async function POST(request: NextRequest) {
       if (file && file.size > 0) {
         fileBuffer = Buffer.from(await file.arrayBuffer());
         fileMime = file.type || "image/jpeg";
-      } else if (metodePembayaran !== "cash" && metodePembayaran !== "tunai") {
-        return NextResponse.json({ success: false, message: "File bukti transfer wajib diunggah untuk metode transfer" }, { status: 400 });
+      } else if (
+        metodePembayaran !== "cash" &&
+        metodePembayaran !== "tunai" &&
+        metodePembayaran !== "transfer_wa" &&
+        metodePembayaran !== "wa"
+      ) {
+        return NextResponse.json({ success: false, message: "File bukti transfer wajib diunggah untuk metode upload manual" }, { status: 400 });
       }
     } else {
       const body = await request.json();
@@ -224,13 +229,17 @@ export async function POST(request: NextRequest) {
 
     groupId = group.id;
 
+    const isCash = metodePembayaran === "cash" || metodePembayaran === "tunai";
+    const isWa = metodePembayaran === "transfer_wa" || metodePembayaran === "wa";
+    const paymentMethod = isCash ? "cash" : "transfer";
+    const catatanText = isCash
+      ? `DP Pendaftaran (Tunai / Bayar di Kantor) ${reg.paxCount} Pax - ${reg.namaPerwakilan} (${reg.kodeRegistrasi})`
+      : isWa
+      ? `DP Pendaftaran (Transfer - Bukti via WhatsApp) ${reg.paxCount} Pax - ${reg.namaPerwakilan} (${reg.kodeRegistrasi})`
+      : `DP Pendaftaran (Transfer Bank) ${reg.paxCount} Pax - ${reg.namaPerwakilan} (${reg.kodeRegistrasi})`;
+
     // Create Pembayaran entry for the review queue
     if (groupId) {
-      const isCash = metodePembayaran === "cash" || metodePembayaran === "tunai";
-      const paymentMethod = isCash ? "cash" : "transfer";
-      const catatanText = isCash
-        ? `DP Pendaftaran (Tunai / Bayar di Kantor) ${reg.paxCount} Pax - ${reg.namaPerwakilan} (${reg.kodeRegistrasi})`
-        : `DP Pendaftaran ${reg.paxCount} Pax - ${reg.namaPerwakilan} (${reg.kodeRegistrasi})`;
 
       const existingPembayaran = await prisma.pembayaran.findFirst({
         where: { groupId },
@@ -265,7 +274,7 @@ export async function POST(request: NextRequest) {
     // Update Registration Request status, groupId, and catatanAdmin
     const updatedNotes = [
       reg.catatanAdmin || "",
-      `[Metode DP ${metodePembayaran.toUpperCase()} at ${new Date().toISOString()}]: ${buktiUrl || (metodePembayaran === "cash" ? "Bayar Tunai di Kantor" : "File received")}`,
+      `[Metode DP ${metodePembayaran.toUpperCase()} at ${new Date().toISOString()}]: ${buktiUrl || (isCash ? "Bayar Tunai di Kantor" : isWa ? "Konfirmasi Bukti Transfer via WhatsApp (Menunggu Approval Admin)" : "File received")}`,
     ].filter(Boolean).join("\n");
 
     await prisma.registrationRequest.update({

@@ -30,6 +30,7 @@ import {
   Copy,
   ShieldCheck,
   Sparkles,
+  MessageCircle,
 } from "lucide-react";
 import { SearchableSelect } from "@/shared/components/ui/SearchableSelect";
 import type { JenisKelamin, Keberangkatan } from "@/shared/types";
@@ -460,6 +461,7 @@ export default function RegisterPage() {
   const [isCustomDp, setIsCustomDp] = useState(false);
   const [customDpAmount, setCustomDpAmount] = useState("");
   const [paymentMethodOption, setPaymentMethodOption] = useState<"transfer" | "tunai">("transfer");
+  const [transferProofMethod, setTransferProofMethod] = useState<"upload" | "wa">("upload");
 
   // Dynamic bank & DP settings from server database
   const [bankSettings, setBankSettings] = useState<{
@@ -467,12 +469,21 @@ export default function RegisterPage() {
     bankAccount: string;
     bankHolder: string;
     minDpPerPax: number;
+    companyPhone?: string;
   }>({
     bankName: "Bank Mandiri",
     bankAccount: "144-00-0018881-0",
     bankHolder: "PT VTU ABADI TRAVEL",
     minDpPerPax: 5000000,
+    companyPhone: "08113008800",
   });
+
+  const effectiveDp = useMemo(() => {
+    const defaultDpPerPax = bankSettings.minDpPerPax || 5000000;
+    const minimalDpStandard = defaultDpPerPax * (paxCount || 1);
+    const parsedCustomDp = parseInt(customDpAmount.replace(/\D/g, ""), 10) || 0;
+    return isCustomDp && parsedCustomDp > 0 ? parsedCustomDp : minimalDpStandard;
+  }, [bankSettings.minDpPerPax, paxCount, isCustomDp, customDpAmount]);
 
   useEffect(() => {
     // 1. Check local storage if available as instant preview
@@ -486,6 +497,7 @@ export default function RegisterPage() {
             bankAccount: parsed.bankAccount || prev.bankAccount,
             bankHolder: parsed.bankHolder || prev.bankHolder,
             minDpPerPax: parseInt(parsed.minDpPerPax, 10) || prev.minDpPerPax,
+            companyPhone: parsed.companyPhone || prev.companyPhone,
           }));
         } catch {}
       }
@@ -496,12 +508,13 @@ export default function RegisterPage() {
       .then((res) => res.json())
       .then((json) => {
         if (json.success && json.data) {
-          setBankSettings({
-            bankName: json.data.bankName || "Bank Mandiri",
-            bankAccount: json.data.bankAccount || "144-00-0018881-0",
-            bankHolder: json.data.bankHolder || "PT VTU ABADI TRAVEL",
-            minDpPerPax: parseInt(json.data.minDpPerPax, 10) || 5000000,
-          });
+          setBankSettings((prev) => ({
+            bankName: json.data.bankName || prev.bankName,
+            bankAccount: json.data.bankAccount || prev.bankAccount,
+            bankHolder: json.data.bankHolder || prev.bankHolder,
+            minDpPerPax: parseInt(json.data.minDpPerPax, 10) || prev.minDpPerPax,
+            companyPhone: json.data.companyPhone || prev.companyPhone,
+          }));
           if (typeof window !== "undefined") {
             localStorage.setItem("vtu_bank_config", JSON.stringify(json.data));
           }
@@ -801,7 +814,7 @@ export default function RegisterPage() {
 
   // Handle payment proof upload & submission for Step 8
   const handlePaymentProofSubmit = async () => {
-    if (paymentMethodOption === "transfer" && !paymentProofFile && !paymentProofPreview) {
+    if (paymentMethodOption === "transfer" && transferProofMethod === "upload" && !paymentProofFile && !paymentProofPreview) {
       setPaymentProofError("Silakan pilih/unggah foto bukti transfer DP.");
       return;
     }
@@ -817,15 +830,18 @@ export default function RegisterPage() {
     try {
       const formData = new FormData();
       formData.append("kodeRegistrasi", kodeReg);
-      formData.append("metodePembayaran", paymentMethodOption === "tunai" ? "cash" : "transfer");
 
-      const defaultDpPerPax = 5000000;
-      const minimalDpStandard = defaultDpPerPax * paxCount;
-      const parsedCustomDp = parseInt(customDpAmount.replace(/\D/g, ""), 10) || 0;
-      const effectiveDp = isCustomDp && parsedCustomDp > 0 ? parsedCustomDp : minimalDpStandard;
+      const effectiveMetode =
+        paymentMethodOption === "tunai"
+          ? "cash"
+          : transferProofMethod === "wa"
+          ? "transfer_wa"
+          : "transfer";
+
+      formData.append("metodePembayaran", effectiveMetode);
       formData.append("nominalDp", effectiveDp.toString());
 
-      if (paymentProofFile) {
+      if (paymentProofFile && transferProofMethod === "upload") {
         formData.append("file", paymentProofFile);
       }
 
@@ -838,6 +854,16 @@ export default function RegisterPage() {
       if (data.success) {
         setPaymentProofSubmitted(true);
         clearDraftFromStorage();
+
+        if (effectiveMetode === "transfer_wa") {
+          const rawPhone = (process.env.NEXT_PUBLIC_ADMIN_WHATSAPP || bankSettings.companyPhone || "08113008800").replace(/[^0-9]/g, "");
+          const cleanWa = rawPhone.startsWith("0") ? "62" + rawPhone.slice(1) : rawPhone.startsWith("62") ? rawPhone : "62" + rawPhone;
+          const waMessage = `Assalamu'alaikum Admin VTU ABADI Travel,\n\nSaya ingin konfirmasi pembayaran Down Payment (DP) pendaftaran Umroh:\n• Kode Registrasi: *${kodeReg}*\n• Nama PIC / Pendaftar: *${namaPerwakilan}*\n• Jumlah Jamaah: *${paxCount} Orang*\n• Paket Umroh: *${selectedPaket?.namaPaket || selectedPaket?.paketUmroh?.namaPaket || "-"}*\n• Nominal DP: *Rp ${effectiveDp.toLocaleString("id-ID")}*\n• Rekening Tujuan: *${bankSettings.bankName} (${bankSettings.bankAccount})*\n\nBerikut saya lampirkan foto bukti transfernya. Mohon untuk diverifikasi dan disetujui. Terima kasih.`;
+          const waUrl = `https://wa.me/${cleanWa}?text=${encodeURIComponent(waMessage)}`;
+          if (typeof window !== "undefined") {
+            window.open(waUrl, "_blank");
+          }
+        }
       } else {
         setPaymentProofError(data.message || "Gagal memproses pembayaran DP.");
       }
@@ -2727,8 +2753,10 @@ export default function RegisterPage() {
                   <Check className="w-8 h-8 text-green-600" />
                 </div>
                 <h2 className="text-2xl font-extrabold text-gray-900">
-                  {paymentMethodOption === "tunai" 
-                    ? "Registrasi Tunai Berhasil Dicatat! 🎉" 
+                  {paymentMethodOption === "tunai"
+                    ? "Registrasi Tunai Berhasil Dicatat! 🎉"
+                    : transferProofMethod === "wa"
+                    ? "Konfirmasi via WhatsApp Berhasil Disimpan! 🎉"
                     : "Bukti Pembayaran DP Berhasil Diunggah! 🎉"}
                 </h2>
                 <p className="text-sm text-gray-600 max-w-md mx-auto">
@@ -2738,7 +2766,15 @@ export default function RegisterPage() {
                       <span className="font-mono font-bold text-blue-800">
                         {submitResult?.kodeRegistrasi || (submitResult as any)?.data?.kodeRegistrasi || "-"}
                       </span>{" "}
-                      dengan metode <strong>Pembayaran Tunai (Bayar di Kantor)</strong> telah berhasil dicatat. Silakan kunjungi kantor VTU Travel untuk menyelesaikan pembayaran DP tunai Anda.
+                      dengan metode <strong>Pembayaran Tunai (Bayar di Kantor)</strong> telah berhasil dicatat. Silakan kunjungi kantor VTU Travel untuk menyelesaikan pembayaran DP tunai Anda. Admin kami akan meninjau dan menyetujui pendaftaran Anda.
+                    </>
+                  ) : transferProofMethod === "wa" ? (
+                    <>
+                      Terima kasih <strong>{namaPerwakilan}</strong>. Registrasi rombongan Anda untuk kode registrasi{" "}
+                      <span className="font-mono font-bold text-blue-800">
+                        {submitResult?.kodeRegistrasi || (submitResult as any)?.data?.kodeRegistrasi || "-"}
+                      </span>{" "}
+                      dengan konfirmasi bukti transfer via WhatsApp telah berhasil dicatat. Admin kami akan memvalidasi bukti transfer yang Anda kirimkan untuk menyetujui pendaftaran rombongan Anda.
                     </>
                   ) : (
                     <>
@@ -2783,7 +2819,7 @@ export default function RegisterPage() {
                 </div>
 
                 {/* Payment Method Selector (Transfer vs Tunai) */}
-                <div className="space-y-2.5">
+                <div className="space-y-3">
                   <label className="text-xs font-bold text-emerald-200 uppercase tracking-wider block">
                     Pilih Metode Pembayaran DP:
                   </label>
@@ -2804,10 +2840,10 @@ export default function RegisterPage() {
                       <div className="space-y-1">
                         <div className="flex items-center gap-2 font-bold text-sm text-white">
                           <CreditCard className="w-4 h-4 text-amber-400" />
-                          <span>1. Transfer Bank (BSI / Online)</span>
+                          <span>1. Transfer Bank ({bankSettings.bankName || "Online"})</span>
                         </div>
                         <p className="text-xs text-emerald-200/90 leading-snug">
-                          Transfer ke rekening resmi VTU &amp; upload foto bukti transfer.
+                          Transfer ke rekening resmi VTU (Upload langsung di web / Kirim via WA).
                         </p>
                       </div>
                       {paymentMethodOption === "transfer" && (
@@ -2834,7 +2870,7 @@ export default function RegisterPage() {
                           <span>2. Pembayaran Tunai (Cash di Kantor)</span>
                         </div>
                         <p className="text-xs text-amber-200/90 leading-snug">
-                          Bayar langsung di kantor VTU Travel atau melalui perwakilan resmi.
+                          Bayar langsung di kantor VTU Travel. Validasi dilakukan oleh Admin saat meninjau pendaftaran.
                         </p>
                       </div>
                       {paymentMethodOption === "tunai" && (
@@ -2842,6 +2878,59 @@ export default function RegisterPage() {
                       )}
                     </button>
                   </div>
+
+                  {/* Sub-selector khusus Metode Transfer Bank: Upload Manual vs Kirim WA */}
+                  {paymentMethodOption === "transfer" && (
+                    <div className="bg-slate-900/90 border border-emerald-500/30 rounded-2xl p-4 sm:p-5 space-y-2.5">
+                      <label className="text-xs font-bold text-emerald-200 uppercase tracking-wider block">
+                        Pilihan Konfirmasi Bukti Transfer:
+                      </label>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setTransferProofMethod("upload");
+                            setPaymentProofError("");
+                          }}
+                          className={cn(
+                            "p-3.5 rounded-xl border-2 text-left transition-all flex items-start gap-2.5 cursor-pointer",
+                            transferProofMethod === "upload"
+                              ? "border-emerald-400 bg-emerald-950/90 text-white ring-2 ring-emerald-400/30 shadow-md"
+                              : "border-slate-700 bg-slate-900/60 hover:bg-slate-800 text-slate-300"
+                          )}
+                        >
+                          <Upload className={cn("w-4 h-4 mt-0.5 shrink-0", transferProofMethod === "upload" ? "text-amber-400" : "text-slate-400")} />
+                          <div className="space-y-0.5">
+                            <p className="text-xs font-bold text-white flex items-center gap-1.5">
+                              Upload File Langsung (Manual)
+                              {transferProofMethod === "upload" && <span className="text-[10px] text-amber-300 font-normal bg-amber-400/20 px-1.5 py-0.2 rounded">Default</span>}
+                            </p>
+                            <p className="text-[11px] text-emerald-200/80 leading-snug">Unggah file/foto struk bukti transfer Anda di web ini.</p>
+                          </div>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setTransferProofMethod("wa");
+                            setPaymentProofError("");
+                          }}
+                          className={cn(
+                            "p-3.5 rounded-xl border-2 text-left transition-all flex items-start gap-2.5 cursor-pointer",
+                            transferProofMethod === "wa"
+                              ? "border-emerald-400 bg-emerald-950/90 text-white ring-2 ring-emerald-400/30 shadow-md"
+                              : "border-slate-700 bg-slate-900/60 hover:bg-slate-800 text-slate-300"
+                          )}
+                        >
+                          <MessageCircle className={cn("w-4 h-4 mt-0.5 shrink-0", transferProofMethod === "wa" ? "text-emerald-400" : "text-slate-400")} />
+                          <div className="space-y-0.5">
+                            <p className="text-xs font-bold text-white">Kirim Bukti via WhatsApp</p>
+                            <p className="text-[11px] text-emerald-200/80 leading-snug">Kirim bukti transfer ke WA Admin. Validasi dilakukan oleh Admin.</p>
+                          </div>
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Summary & Bank Details Grid */}
@@ -3081,100 +3170,190 @@ export default function RegisterPage() {
                   )}
                 </div>
 
-                {/* Upload File Box — Friendly Dropzone for Elderly Jamaah */}
-                <div className="bg-slate-900/90 border-2 border-emerald-500/40 rounded-2xl p-5 sm:p-6 shadow-lg space-y-4">
-                  <h3 className="text-sm font-bold text-emerald-200 flex items-center gap-2">
-                    <Upload className="w-4 h-4 text-amber-400" />
-                    {paymentMethodOption === "tunai" 
-                      ? "Upload Foto Kuitansi / Tanda Terima Tunai (Opsional)" 
-                      : "Upload Foto / File Bukti Transfer DP"}
-                  </h3>
-
-                  <div className="border-2 border-dashed border-emerald-400/60 bg-emerald-950/50 hover:bg-emerald-900/60 rounded-2xl p-6 sm:p-8 text-center space-y-3 transition-all cursor-pointer shadow-inner">
-                    {paymentProofPreview ? (
-                      <div className="space-y-3">
-                        <img
-                          src={paymentProofPreview}
-                          alt="Kuitansi / Bukti Pembayaran DP"
-                          className="max-h-56 max-w-full mx-auto rounded-xl shadow-lg border-2 border-amber-400/50 object-contain"
-                        />
-                        <p className="text-xs text-emerald-200 font-medium font-mono">{paymentProofFile?.name}</p>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setPaymentProofFile(null);
-                            setPaymentProofPreview("");
-                          }}
-                          className="px-3 py-1 bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/40 rounded-lg text-xs font-bold transition-colors cursor-pointer"
-                        >
-                          Ganti Foto Bukti
-                        </button>
-                      </div>
-                    ) : (
-                      <label className="cursor-pointer block space-y-3">
-                        <Upload className="w-12 h-12 text-emerald-400 mx-auto animate-bounce" />
-                        <div className="space-y-1">
-                          <p className="text-base sm:text-lg font-extrabold text-white">
-                            {paymentMethodOption === "tunai" 
-                              ? "Sentuh Di Sini Untuk Memilih Foto Kuitansi Pembayaran" 
-                              : "Sentuh / Klik Di Sini Untuk Memilih Foto Bukti Transfer"}
-                          </p>
-                          <p className="text-xs sm:text-sm font-semibold text-emerald-100">Ambil foto struk transfer atau pilih gambar dari galeri HP Anda</p>
-                          <p className="text-[11px] text-amber-300 font-mono font-bold pt-1">Format: JPG, JPEG, PNG, PDF (Maksimal 5 MB)</p>
-                        </div>
-                        <input
-                          type="file"
-                          accept="image/jpeg,image/png,image/jpg,application/pdf"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0];
-                            if (file) {
-                              setPaymentProofFile(file);
-                              if (file.type.startsWith("image/")) {
-                                setPaymentProofPreview(URL.createObjectURL(file));
-                              } else {
-                                setPaymentProofPreview("");
-                              }
-                            }
-                          }}
-                          className="hidden"
-                        />
-                      </label>
-                    )}
-                  </div>
-
-                  {paymentProofError && (
-                    <div className="p-3.5 bg-rose-950/80 border border-rose-500/50 rounded-xl text-xs font-bold text-rose-200 flex items-center gap-2">
-                      <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
-                      <span>{paymentProofError}</span>
+                {/* Bagian Aksi Konfirmasi / Upload Bukti */}
+                {paymentMethodOption === "tunai" ? (
+                  /* KASUS 1: PEMBAYARAN TUNAI (CASH DI KANTOR) - TIDAK PERLU UPLOAD */
+                  <div className="bg-slate-900/90 border-2 border-amber-500/40 rounded-2xl p-5 sm:p-6 shadow-lg space-y-4">
+                    <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs space-y-1.5">
+                      <p className="font-bold flex items-center gap-1.5 text-amber-300 text-sm">
+                        <Building2 className="w-4 h-4 text-amber-400" />
+                        Konfirmasi Pendaftaran Pembayaran Tunai
+                      </p>
+                      <p className="leading-relaxed">
+                        Anda memilih metode <strong>Pembayaran Tunai di Kantor</strong>. Anda <strong>tidak perlu mengunggah foto kuitansi atau tanda terima</strong> di sini. Silakan klik tombol di bawah untuk menyelesaikan pendaftaran rombongan. Tim Admin kami akan memverifikasi dan menyetujui pendaftaran Anda saat pembayaran DP tunai dilakukan di kantor.
+                      </p>
                     </div>
-                  )}
 
-                  <div className="pt-2">
+                    {paymentProofError && (
+                      <div className="p-3.5 bg-rose-950/80 border border-rose-500/50 rounded-xl text-xs font-bold text-rose-200 flex items-center gap-2">
+                        <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+                        <span>{paymentProofError}</span>
+                      </div>
+                    )}
+
                     <button
                       type="button"
                       onClick={handlePaymentProofSubmit}
                       disabled={isUploadingProof}
                       className={cn(
-                        "w-full py-4 px-6 bg-gradient-to-r from-amber-400 via-amber-500 to-emerald-400 hover:from-amber-300 hover:to-emerald-300 text-slate-950 font-black text-base sm:text-lg rounded-xl shadow-2xl transition-all flex items-center justify-center gap-2 cursor-pointer border-2 border-amber-200",
+                        "w-full py-4 px-6 bg-gradient-to-r from-amber-400 via-amber-500 to-amber-600 hover:from-amber-300 hover:to-amber-500 text-slate-950 font-black text-base sm:text-lg rounded-xl shadow-2xl transition-all flex items-center justify-center gap-2 cursor-pointer border-2 border-amber-200",
                         "disabled:opacity-50 disabled:cursor-not-allowed"
                       )}
                     >
                       {isUploadingProof ? (
                         <>
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                          Memproses Pembayaran...
+                          <Loader2 className="w-5 h-5 animate-spin" />
+                          Menyimpan Pendaftaran...
                         </>
                       ) : (
                         <>
-                          <Check className="w-4 h-4" />
-                          {paymentMethodOption === "tunai" 
-                            ? "Konfirmasi Pendaftaran & Bayar di Kantor" 
-                            : "Kirim Bukti Pembayaran DP"}
+                          <Check className="w-5 h-5 text-slate-950" />
+                          Konfirmasi Pendaftaran &amp; Bayar di Kantor
                         </>
                       )}
                     </button>
                   </div>
-                </div>
+                ) : transferProofMethod === "wa" ? (
+                  /* KASUS 2: TRANSFER BANK VIA WHATSAPP - TIDAK PERLU UPLOAD */
+                  <div className="bg-slate-900/90 border-2 border-emerald-500/40 rounded-2xl p-5 sm:p-6 shadow-lg space-y-4">
+                    <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-200 text-xs space-y-2.5">
+                      <p className="font-bold flex items-center gap-1.5 text-emerald-300 text-sm">
+                        <MessageCircle className="w-4 h-4 text-emerald-400" />
+                        Konfirmasi Bukti Transfer via WhatsApp Admin
+                      </p>
+                      <p className="leading-relaxed">
+                        Anda memilih konfirmasi via WhatsApp. Anda <strong>tidak perlu mengunggah foto bukti transfer</strong> di sini.
+                      </p>
+                      <div className="p-3 bg-slate-950/70 rounded-lg border border-emerald-500/20 space-y-1 font-mono text-[11px] text-emerald-100">
+                        <p>• <strong>Kode Registrasi:</strong> <span className="text-amber-300 font-bold">{submitResult?.kodeRegistrasi || (submitResult as any)?.data?.kodeRegistrasi || "-"}</span></p>
+                        <p>• <strong>Nama PIC:</strong> {namaPerwakilan || "-"}</p>
+                        <p>• <strong>Nominal Transfer DP:</strong> Rp {effectiveDp.toLocaleString("id-ID")}</p>
+                        <p>• <strong>Rekening Tujuan:</strong> {bankSettings.bankName} ({bankSettings.bankAccount})</p>
+                      </div>
+                      <p className="text-[11px] text-emerald-300/90 italic">
+                        💡 Setelah menekan tombol di bawah, pendaftaran Anda akan langsung tersimpan dan WhatsApp akan terbuka otomatis agar Anda dapat mengirimkan foto bukti transfer ke Admin. Tim Admin kami akan memvalidasi pembayaran Anda.
+                      </p>
+                    </div>
+
+                    {paymentProofError && (
+                      <div className="p-3.5 bg-rose-950/80 border border-rose-500/50 rounded-xl text-xs font-bold text-rose-200 flex items-center gap-2">
+                        <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+                        <span>{paymentProofError}</span>
+                      </div>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={handlePaymentProofSubmit}
+                      disabled={isUploadingProof}
+                      className={cn(
+                        "w-full py-4 px-6 bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 hover:from-emerald-400 hover:to-teal-400 text-white font-black text-base sm:text-lg rounded-xl shadow-2xl transition-all flex items-center justify-center gap-2 cursor-pointer border-2 border-emerald-300",
+                        "disabled:opacity-50 disabled:cursor-not-allowed"
+                      )}
+                    >
+                      {isUploadingProof ? (
+                        <>
+                          <Loader2 className="w-5 h-5 animate-spin" />
+                          Menyimpan &amp; Membuka WhatsApp...
+                        </>
+                      ) : (
+                        <>
+                          <MessageCircle className="w-5 h-5 text-white" />
+                          Konfirmasi Pendaftaran &amp; Buka WhatsApp Admin
+                        </>
+                      )}
+                    </button>
+                  </div>
+                ) : (
+                  /* KASUS 3: TRANSFER BANK UPLOAD MANUAL - TAMPILKAN DROPZONE */
+                  <div className="bg-slate-900/90 border-2 border-emerald-500/40 rounded-2xl p-5 sm:p-6 shadow-lg space-y-4">
+                    <h3 className="text-sm font-bold text-emerald-200 flex items-center gap-2">
+                      <Upload className="w-4 h-4 text-amber-400" />
+                      Upload Foto / File Bukti Transfer DP
+                    </h3>
+
+                    <div className="border-2 border-dashed border-emerald-400/60 bg-emerald-950/50 hover:bg-emerald-900/60 rounded-2xl p-6 sm:p-8 text-center space-y-3 transition-all cursor-pointer shadow-inner">
+                      {paymentProofPreview ? (
+                        <div className="space-y-3">
+                          <img
+                            src={paymentProofPreview}
+                            alt="Bukti Transfer DP"
+                            className="max-h-56 max-w-full mx-auto rounded-xl shadow-lg border-2 border-amber-400/50 object-contain"
+                          />
+                          <p className="text-xs text-emerald-200 font-medium font-mono">{paymentProofFile?.name}</p>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setPaymentProofFile(null);
+                              setPaymentProofPreview("");
+                            }}
+                            className="px-3 py-1 bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/40 rounded-lg text-xs font-bold transition-colors cursor-pointer"
+                          >
+                            Ganti Foto Bukti
+                          </button>
+                        </div>
+                      ) : (
+                        <label className="cursor-pointer block space-y-3">
+                          <Upload className="w-12 h-12 text-emerald-400 mx-auto animate-bounce" />
+                          <div className="space-y-1">
+                            <p className="text-base sm:text-lg font-extrabold text-white">
+                              Sentuh / Klik Di Sini Untuk Memilih Foto Bukti Transfer
+                            </p>
+                            <p className="text-xs sm:text-sm font-semibold text-emerald-100">Ambil foto struk transfer atau pilih gambar dari galeri HP Anda</p>
+                            <p className="text-[11px] text-amber-300 font-mono font-bold pt-1">Format: JPG, JPEG, PNG, PDF (Maksimal 5 MB)</p>
+                          </div>
+                          <input
+                            type="file"
+                            accept="image/jpeg,image/png,image/jpg,application/pdf"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                setPaymentProofFile(file);
+                                if (file.type.startsWith("image/")) {
+                                  setPaymentProofPreview(URL.createObjectURL(file));
+                                } else {
+                                  setPaymentProofPreview("");
+                                }
+                              }
+                            }}
+                            className="hidden"
+                          />
+                        </label>
+                      )}
+                    </div>
+
+                    {paymentProofError && (
+                      <div className="p-3.5 bg-rose-950/80 border border-rose-500/50 rounded-xl text-xs font-bold text-rose-200 flex items-center gap-2">
+                        <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+                        <span>{paymentProofError}</span>
+                      </div>
+                    )}
+
+                    <div className="pt-2">
+                      <button
+                        type="button"
+                        onClick={handlePaymentProofSubmit}
+                        disabled={isUploadingProof}
+                        className={cn(
+                          "w-full py-4 px-6 bg-gradient-to-r from-amber-400 via-amber-500 to-emerald-400 hover:from-amber-300 hover:to-emerald-300 text-slate-950 font-black text-base sm:text-lg rounded-xl shadow-2xl transition-all flex items-center justify-center gap-2 cursor-pointer border-2 border-amber-200",
+                          "disabled:opacity-50 disabled:cursor-not-allowed"
+                        )}
+                      >
+                        {isUploadingProof ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            Memproses Bukti Pembayaran...
+                          </>
+                        ) : (
+                          <>
+                            <Check className="w-4 h-4" />
+                            Kirim Bukti Pembayaran DP
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
