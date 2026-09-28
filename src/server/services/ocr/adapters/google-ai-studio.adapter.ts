@@ -192,13 +192,13 @@ Ekstrak dalam format JSON valid (tanpa markdown wrapper):
   "rawText": "Teks mentah Buku Nikah"
 }`;
     case "akta":
-      return `Analisis gambar Akta Lahir ini dan ekstrak data terstruktur berikut dalam format JSON:
+      return `Analisis gambar Akta Lahir / Surat Kelahiran Indonesia ini dan ekstrak data terstruktur berikut dalam format JSON valid (tanpa markdown wrapper):
 {
-  "namaLengkap": "Nama lengkap",
-  "nik": "NIK jika ada",
-  "tanggalLahir": "YYYY-MM-DD",
-  "tempatLahir": "Tempat lahir",
-  "rawText": "Teks mentah Akta"
+  "namaLengkap": "Nama lengkap anak / orang yang tercantum pada Akta Kelahiran",
+  "tempatLahir": "Tempat kelahiran (Kota atau Kabupaten)",
+  "tanggalLahir": "Tanggal lahir dalam format YYYY-MM-DD",
+  "namaAyah": "Nama lengkap ayah kandung yang tertera di Akta Kelahiran (contoh: anak dari suami-istri ... atau anak laki-laki/perempuan dari ayah ...)",
+  "rawText": "Teks mentah Akta Kelahiran"
 }`;
     case "vaksin":
       return `Analisis gambar Sertifikat Vaksin ini dan ekstrak data terstruktur berikut dalam format JSON:

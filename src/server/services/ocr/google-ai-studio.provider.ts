@@ -209,6 +209,15 @@ Ekstrak dalam format JSON valid:
   "kotaKabupaten": "Kota atau Kabupaten KUA",
   "rawText": "Teks mentah lengkap Buku Nikah"
 }`
+          : jenis === "akta"
+          ? `Analisis gambar Akta Lahir / Surat Kelahiran Indonesia ini dan ekstrak data terstruktur berikut dalam format JSON:
+{
+  "namaLengkap": "Nama lengkap anak / orang yang tercantum pada Akta Kelahiran",
+  "tempatLahir": "Tempat kelahiran (Kota atau Kabupaten)",
+  "tanggalLahir": "Tanggal lahir format YYYY-MM-DD",
+  "namaAyah": "Nama lengkap ayah kandung yang tertera di Akta Kelahiran",
+  "rawText": "Teks mentah Akta Kelahiran"
+}`
           : `Analisis gambar dokumen ${jenis} ini dan ekstrak data terstruktur berikut dalam format JSON:
 {
   "namaLengkap": "Nama lengkap pemegang paspor / dokumen",

@@ -87,6 +87,12 @@ function generateOcrData(jenis: string, jamaah: Jamaah): OcrReviewData {
       { label: "Nama Lengkap", key: "namaLengkap" },
       { label: "Nama Ayah", key: "namaAyah" },
     ],
+    akta: [
+      { label: "Nama Lengkap", key: "namaLengkap" },
+      { label: "Tempat Lahir", key: "tempatLahir" },
+      { label: "Tanggal Lahir", key: "tanggalLahir" },
+      { label: "Nama Ayah", key: "namaAyah" },
+    ],
   };
 
   const fields = fieldMap[jenis] ?? [

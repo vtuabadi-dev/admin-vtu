@@ -771,9 +771,9 @@ export default function DokumenPage() {
         if (!initialOcr["akta"]) {
           initialOcr["akta"] = {
             namaLengkap: member.namaLengkap || "",
-            nik: member.nik && member.nik !== "-" ? member.nik : "",
             tempatLahir: member.tempatLahir || "",
             tanggalLahir: member.tanggalLahir ? new Date(member.tanggalLahir).toISOString().split("T")[0] : "",
+            namaAyah: member.namaAyah && member.namaAyah !== "-" ? member.namaAyah : "",
           };
         }
 
@@ -918,15 +918,25 @@ export default function DokumenPage() {
               ? existingDocs.map((d: any, idx: number) => (idx === docIndex ? { ...d, ...newDocItem } : d))
               : [...existingDocs, newDocItem];
 
+            const hasExistingName = Boolean(j.namaLengkap && j.namaLengkap !== "-");
+            const hasExistingTempatLahir = Boolean(j.tempatLahir && j.tempatLahir !== "-");
+            const hasExistingTanggalLahir = Boolean(j.tanggalLahir && j.tanggalLahir !== "-" && new Date(j.tanggalLahir).getFullYear() > 1970);
+            const hasExistingNamaAyah = Boolean(j.namaAyah && j.namaAyah !== "-");
+
+            const updateName = jenis === "akta" ? (!hasExistingName && ocrData.namaLengkap) : (ocrData.namaLengkap && (jenis === "paspor" || !hasPassport));
+            const updateTempatLahir = jenis === "akta" ? (!hasExistingTempatLahir && ocrData.tempatLahir) : Boolean(ocrData.tempatLahir);
+            const updateTanggalLahir = jenis === "akta" ? (!hasExistingTanggalLahir && ocrData.tanggalLahir) : Boolean(ocrData.tanggalLahir);
+            const updateNamaAyah = jenis === "akta" ? (!hasExistingNamaAyah && ocrData.namaAyah) : Boolean(ocrData.namaAyah);
+
             return {
               ...j,
               dokumen: updatedDocs,
-              ...(ocrData.namaLengkap && (jenis === "paspor" || !hasPassport) ? { namaLengkap: ocrData.namaLengkap } : {}),
-              ...(ocrData.namaAyah ? { namaAyah: ocrData.namaAyah } : {}),
-              ...(ocrData.nik ? { nik: ocrData.nik } : {}),
+              ...(updateName ? { namaLengkap: ocrData.namaLengkap } : {}),
+              ...(updateNamaAyah ? { namaAyah: ocrData.namaAyah } : {}),
+              ...(ocrData.nik && jenis !== "akta" ? { nik: ocrData.nik } : {}),
               ...(ocrData.nomorPaspor ? { nomorPaspor: ocrData.nomorPaspor } : {}),
-              ...(ocrData.tanggalLahir ? { tanggalLahir: ocrData.tanggalLahir } : {}),
-              ...(ocrData.tempatLahir ? { tempatLahir: ocrData.tempatLahir } : {}),
+              ...(updateTanggalLahir ? { tanggalLahir: ocrData.tanggalLahir } : {}),
+              ...(updateTempatLahir ? { tempatLahir: ocrData.tempatLahir } : {}),
               ...(ocrData.statusPerkawinan ? { statusMenikah: ocrData.statusPerkawinan.includes("BELUM") ? "Belum Menikah" : "Menikah" } : {}),
               ...(ocrData.provinsi ? { provinsi: ocrData.provinsi } : {}),
               ...(ocrData.kota || ocrData.kotaKabupaten ? { kota: ocrData.kota || ocrData.kotaKabupaten } : {}),
@@ -2889,18 +2899,6 @@ export default function DokumenPage() {
                                     {/* Akta Fields */}
                                     {activeDocType === "akta" && (
                                       <>
-                                        <div className="space-y-1">
-                                          <label className="text-[11px] font-semibold text-stone-600 dark:text-stone-400">
-                                            NIK (Nomor Induk Kependudukan):
-                                          </label>
-                                          <Input
-                                            value={ocrResults[activeDocType]?.nik || ""}
-                                            onChange={(e) => handleOcrFieldChange(activeDocType, "nik", e.target.value)}
-                                            disabled={savedOcrDocs[activeDocType] && !editingOcrDocs[activeDocType]}
-                                            placeholder="16 digit NIK"
-                                            className="h-8 text-xs font-mono font-medium"
-                                          />
-                                        </div>
                                         <div className="grid grid-cols-2 gap-2">
                                           <div className="space-y-1">
                                             <label className="text-[11px] font-semibold text-stone-600 dark:text-stone-400">
@@ -2910,7 +2908,7 @@ export default function DokumenPage() {
                                               value={ocrResults[activeDocType]?.tempatLahir || ""}
                                               onChange={(e) => handleOcrFieldChange(activeDocType, "tempatLahir", e.target.value)}
                                               disabled={savedOcrDocs[activeDocType] && !editingOcrDocs[activeDocType]}
-                                              placeholder="Kota Lahir"
+                                              placeholder="Kota / Kab. Lahir"
                                               className="h-8 text-xs"
                                             />
                                           </div>
@@ -2926,6 +2924,27 @@ export default function DokumenPage() {
                                               className="h-8 text-xs font-mono"
                                             />
                                           </div>
+                                        </div>
+
+                                        <div className="space-y-1.5 p-3 rounded-lg bg-emerald-500/5 dark:bg-emerald-500/10 border border-emerald-500/30">
+                                          <div className="flex items-center justify-between">
+                                            <label className="text-[11px] font-bold text-emerald-900 dark:text-emerald-300 flex items-center gap-1.5">
+                                              <span>Nama Ayah Kandung:</span>
+                                              <span className="text-[9px] bg-emerald-600 text-white font-semibold px-1.5 py-0.2 rounded">
+                                                Wajib Siskopatuh & Visa
+                                              </span>
+                                            </label>
+                                          </div>
+                                          <Input
+                                            value={ocrResults[activeDocType]?.namaAyah || ""}
+                                            onChange={(e) => handleOcrFieldChange(activeDocType, "namaAyah", e.target.value.toUpperCase())}
+                                            disabled={savedOcrDocs[activeDocType] && !editingOcrDocs[activeDocType]}
+                                            placeholder="NAMA AYAH KANDUNG (HASIL EKSTRAKSI AKTA LAHIR)"
+                                            className="h-9 text-xs font-bold text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700 bg-white dark:bg-stone-900 focus-visible:ring-emerald-500"
+                                          />
+                                          <p className="text-[10px] text-stone-500 dark:text-stone-400">
+                                            * Diekstrak dari nama orang tua / ayah kandung pada Akta Kelahiran dan disinkronkan ke Manifest jika data belum ada di manifest.
+                                          </p>
                                         </div>
                                       </>
                                     )}

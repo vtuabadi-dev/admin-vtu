@@ -26,7 +26,7 @@ function mapDokumen(doc: any): DokumenItem {
 // Queries
 // ────────────────────────────────────────────────────────────
 
-async function syncJamaahAndManifestFromDocData(jamaahId: string, data: Record<string, any>) {
+async function syncJamaahAndManifestFromDocData(jamaahId: string, data: Record<string, any>, jenis?: DokumenJenis) {
   if (!jamaahId || !data) return;
 
   const jamaahUpdates: Record<string, any> = {};
@@ -45,85 +45,124 @@ async function syncJamaahAndManifestFromDocData(jamaahId: string, data: Record<s
 
   const isPassportData = Boolean(data.nomorPaspor || data.tempatTerbitPaspor);
 
-  if (typeof data.namaLengkap === "string" && data.namaLengkap.trim()) {
-    const cleanedName = data.namaLengkap.trim().toUpperCase();
-    // Only update name if it's passport data OR if jamaah has no passport name yet
-    if (isPassportData || !hasPassportName) {
+  // Jika dokumen adalah Akta Lahir: hanya masukkan data ke manifest/jamaah apabila data ini belum ada di manifest
+  if (jenis === "akta") {
+    // 1. Nama Lengkap: hanya masukkan jika belum ada di manifest/jamaah
+    const hasExistingName = Boolean(currentJamaah?.namaLengkap && currentJamaah.namaLengkap.trim() !== "" && currentJamaah.namaLengkap.trim() !== "-");
+    if (!hasExistingName && typeof data.namaLengkap === "string" && data.namaLengkap.trim()) {
+      const cleanedName = data.namaLengkap.trim().toUpperCase();
       jamaahUpdates.namaLengkap = cleanedName;
       manifestUpdates.namaLengkap = cleanedName;
     }
-  }
 
-  if (typeof data.nomorPaspor === "string" && data.nomorPaspor.trim()) {
-    const cleanedPaspor = data.nomorPaspor.trim().toUpperCase();
-    jamaahUpdates.nomorPaspor = cleanedPaspor;
-    manifestUpdates.nomorPaspor = cleanedPaspor;
-  }
-
-  if (data.tanggalKadaluarsa) {
-    const expDate = new Date(data.tanggalKadaluarsa);
-    if (!isNaN(expDate.getTime())) {
-      jamaahUpdates.masaBerlakuPaspor = expDate;
+    // 2. Tempat Lahir: hanya masukkan jika belum ada di manifest/jamaah
+    const hasExistingTempatLahir = Boolean(currentJamaah?.tempatLahir && currentJamaah.tempatLahir.trim() !== "" && currentJamaah.tempatLahir.trim() !== "-");
+    if (!hasExistingTempatLahir && typeof data.tempatLahir === "string" && data.tempatLahir.trim()) {
+      const cleanedTempat = data.tempatLahir.trim();
+      jamaahUpdates.tempatLahir = cleanedTempat;
+      manifestUpdates.tempatLahir = cleanedTempat;
     }
-  } else if (data.masaBerlaku) {
-    const expDate = new Date(data.masaBerlaku);
-    if (!isNaN(expDate.getTime())) {
-      jamaahUpdates.masaBerlakuPaspor = expDate;
+
+    // 3. Tanggal Lahir: hanya masukkan jika belum ada di manifest/jamaah
+    const hasExistingTanggalLahir = Boolean(
+      currentJamaah?.tanggalLahir &&
+      !isNaN(new Date(currentJamaah.tanggalLahir).getTime()) &&
+      new Date(currentJamaah.tanggalLahir).getFullYear() > 1970
+    );
+    if (!hasExistingTanggalLahir && data.tanggalLahir) {
+      const dob = new Date(data.tanggalLahir);
+      if (!isNaN(dob.getTime())) {
+        jamaahUpdates.tanggalLahir = dob;
+        manifestUpdates.tanggalLahir = data.tanggalLahir;
+      }
     }
-  }
 
-  if (typeof data.tempatLahir === "string" && data.tempatLahir.trim()) {
-    jamaahUpdates.tempatLahir = data.tempatLahir.trim();
-    manifestUpdates.tempatLahir = data.tempatLahir.trim();
-  }
-
-  if (data.tanggalLahir) {
-    const dob = new Date(data.tanggalLahir);
-    if (!isNaN(dob.getTime())) {
-      jamaahUpdates.tanggalLahir = dob;
-      manifestUpdates.tanggalLahir = data.tanggalLahir;
+    // 4. Nama Ayah: hanya masukkan jika belum ada di manifest/jamaah
+    const hasExistingNamaAyah = Boolean(currentJamaah?.namaAyah && currentJamaah.namaAyah.trim() !== "" && currentJamaah.namaAyah.trim() !== "-");
+    if (!hasExistingNamaAyah && typeof data.namaAyah === "string" && data.namaAyah.trim() && data.namaAyah.trim() !== "-") {
+      jamaahUpdates.namaAyah = data.namaAyah.trim().toUpperCase();
     }
-  }
+  } else {
+    if (typeof data.namaLengkap === "string" && data.namaLengkap.trim()) {
+      const cleanedName = data.namaLengkap.trim().toUpperCase();
+      // Only update name if it's passport data OR if jamaah has no passport name yet
+      if (isPassportData || !hasPassportName) {
+        jamaahUpdates.namaLengkap = cleanedName;
+        manifestUpdates.namaLengkap = cleanedName;
+      }
+    }
 
-  if (typeof data.nik === "string" && data.nik.trim()) {
-    jamaahUpdates.nik = data.nik.trim();
-  }
+    if (typeof data.nomorPaspor === "string" && data.nomorPaspor.trim()) {
+      const cleanedPaspor = data.nomorPaspor.trim().toUpperCase();
+      jamaahUpdates.nomorPaspor = cleanedPaspor;
+      manifestUpdates.nomorPaspor = cleanedPaspor;
+    }
 
-  if (typeof data.namaAyah === "string" && data.namaAyah.trim() && data.namaAyah.trim() !== "-") {
-    jamaahUpdates.namaAyah = data.namaAyah.trim().toUpperCase();
-  } else if (typeof data.namaAyahSuami === "string" && data.namaAyahSuami.trim() && currentJamaah?.jenisKelamin === "L") {
-    jamaahUpdates.namaAyah = data.namaAyahSuami.trim().toUpperCase();
-  } else if (typeof data.namaAyahIstri === "string" && data.namaAyahIstri.trim() && currentJamaah?.jenisKelamin === "P") {
-    jamaahUpdates.namaAyah = data.namaAyahIstri.trim().toUpperCase();
-  }
+    if (data.tanggalKadaluarsa) {
+      const expDate = new Date(data.tanggalKadaluarsa);
+      if (!isNaN(expDate.getTime())) {
+        jamaahUpdates.masaBerlakuPaspor = expDate;
+      }
+    } else if (data.masaBerlaku) {
+      const expDate = new Date(data.masaBerlaku);
+      if (!isNaN(expDate.getTime())) {
+        jamaahUpdates.masaBerlakuPaspor = expDate;
+      }
+    }
 
-  if (typeof data.statusPerkawinan === "string" && data.statusPerkawinan.trim()) {
-    const s = data.statusPerkawinan.trim().toUpperCase();
-    jamaahUpdates.statusMenikah = s.includes("BELUM") ? "Belum Menikah" : s.includes("KAWIN") || s.includes("MENIKAH") ? "Menikah" : s;
-  }
+    if (typeof data.tempatLahir === "string" && data.tempatLahir.trim()) {
+      jamaahUpdates.tempatLahir = data.tempatLahir.trim();
+      manifestUpdates.tempatLahir = data.tempatLahir.trim();
+    }
 
-  if (typeof data.provinsi === "string" && data.provinsi.trim()) {
-    jamaahUpdates.provinsi = data.provinsi.trim();
-  }
+    if (data.tanggalLahir) {
+      const dob = new Date(data.tanggalLahir);
+      if (!isNaN(dob.getTime())) {
+        jamaahUpdates.tanggalLahir = dob;
+        manifestUpdates.tanggalLahir = data.tanggalLahir;
+      }
+    }
 
-  if (typeof data.kota === "string" && data.kota.trim()) {
-    jamaahUpdates.kota = data.kota.trim();
-  } else if (typeof data.kotaKabupaten === "string" && data.kotaKabupaten.trim()) {
-    jamaahUpdates.kota = data.kotaKabupaten.trim();
-  }
+    if (typeof data.nik === "string" && data.nik.trim()) {
+      jamaahUpdates.nik = data.nik.trim();
+    }
 
-  if (typeof data.kecamatan === "string" && data.kecamatan.trim()) {
-    jamaahUpdates.kecamatan = data.kecamatan.trim();
-  }
+    if (typeof data.namaAyah === "string" && data.namaAyah.trim() && data.namaAyah.trim() !== "-") {
+      jamaahUpdates.namaAyah = data.namaAyah.trim().toUpperCase();
+    } else if (typeof data.namaAyahSuami === "string" && data.namaAyahSuami.trim() && currentJamaah?.jenisKelamin === "L") {
+      jamaahUpdates.namaAyah = data.namaAyahSuami.trim().toUpperCase();
+    } else if (typeof data.namaAyahIstri === "string" && data.namaAyahIstri.trim() && currentJamaah?.jenisKelamin === "P") {
+      jamaahUpdates.namaAyah = data.namaAyahIstri.trim().toUpperCase();
+    }
 
-  if (typeof data.kelurahan === "string" && data.kelurahan.trim()) {
-    jamaahUpdates.kelurahan = data.kelurahan.trim();
-  }
+    if (typeof data.statusPerkawinan === "string" && data.statusPerkawinan.trim()) {
+      const s = data.statusPerkawinan.trim().toUpperCase();
+      jamaahUpdates.statusMenikah = s.includes("BELUM") ? "Belum Menikah" : s.includes("KAWIN") || s.includes("MENIKAH") ? "Menikah" : s;
+    }
 
-  if (typeof data.alamatLengkap === "string" && data.alamatLengkap.trim()) {
-    jamaahUpdates.alamat = data.alamatLengkap.trim();
-  } else if (typeof data.alamat === "string" && data.alamat.trim()) {
-    jamaahUpdates.alamat = data.alamat.trim();
+    if (typeof data.provinsi === "string" && data.provinsi.trim()) {
+      jamaahUpdates.provinsi = data.provinsi.trim();
+    }
+
+    if (typeof data.kota === "string" && data.kota.trim()) {
+      jamaahUpdates.kota = data.kota.trim();
+    } else if (typeof data.kotaKabupaten === "string" && data.kotaKabupaten.trim()) {
+      jamaahUpdates.kota = data.kotaKabupaten.trim();
+    }
+
+    if (typeof data.kecamatan === "string" && data.kecamatan.trim()) {
+      jamaahUpdates.kecamatan = data.kecamatan.trim();
+    }
+
+    if (typeof data.kelurahan === "string" && data.kelurahan.trim()) {
+      jamaahUpdates.kelurahan = data.kelurahan.trim();
+    }
+
+    if (typeof data.alamatLengkap === "string" && data.alamatLengkap.trim()) {
+      jamaahUpdates.alamat = data.alamatLengkap.trim();
+    } else if (typeof data.alamat === "string" && data.alamat.trim()) {
+      jamaahUpdates.alamat = data.alamat.trim();
+    }
   }
 
   // Update Jamaah if there are updates
@@ -195,7 +234,7 @@ export const dokumenRepo = {
       },
     });
     if (row.jamaahId && manualData) {
-      await syncJamaahAndManifestFromDocData(row.jamaahId, manualData as Record<string, any>);
+      await syncJamaahAndManifestFromDocData(row.jamaahId, manualData as Record<string, any>, row.jenis as DokumenJenis);
     }
     return mapDokumen(row);
   },
@@ -229,7 +268,7 @@ export const dokumenRepo = {
     }
 
     if (jamaahId && manualData) {
-      await syncJamaahAndManifestFromDocData(jamaahId, manualData);
+      await syncJamaahAndManifestFromDocData(jamaahId, manualData, jenis);
     }
     return mapDokumen(doc);
   },
@@ -246,7 +285,7 @@ export const dokumenRepo = {
       },
     });
     if (row.jamaahId && ocrData) {
-      await syncJamaahAndManifestFromDocData(row.jamaahId, ocrData as Record<string, any>);
+      await syncJamaahAndManifestFromDocData(row.jamaahId, ocrData as Record<string, any>, row.jenis as DokumenJenis);
     }
     return mapDokumen(row);
   },

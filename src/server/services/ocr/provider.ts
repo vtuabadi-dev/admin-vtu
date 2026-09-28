@@ -87,7 +87,7 @@ export const DOCUMENT_FIELD_MAPS: Record<string, string[]> = {
     "kuaKecamatan",
     "kotaKabupaten",
   ],
-  akta: ["namaLengkap", "nik", "tanggalLahir", "tempatLahir"],
+  akta: ["namaLengkap", "tempatLahir", "tanggalLahir", "namaAyah"],
   surat_lansia: ["namaLengkap"],
 };
 
