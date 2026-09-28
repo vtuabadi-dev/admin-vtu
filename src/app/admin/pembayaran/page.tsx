@@ -26,10 +26,10 @@ import {
   Calendar,
   Layers,
   ArrowLeft,
-  ChevronRight,
   AlertCircle,
   CheckCircle2,
   Clock,
+  Table as TableIcon,
 } from "lucide-react";
 
 // ============================================================
@@ -618,14 +618,15 @@ export default function PembayaranMonitoringPage() {
                           <Button
                             size="sm"
                             variant="outline"
-                            className="h-7 text-[11px] font-bold border-amber-500/40 text-amber-700 hover:bg-amber-50 dark:text-amber-300 gap-1 shadow-2xs"
+                            title="Lihat Detail Grup"
+                            aria-label="Lihat Detail Grup"
+                            className="h-8 w-8 p-0 rounded-lg border-amber-500/40 text-amber-700 hover:bg-amber-500 hover:text-white dark:text-amber-300 dark:hover:bg-amber-600/80 shadow-2xs transition-colors mx-auto cursor-pointer"
                             onClick={(e) => {
                               e.stopPropagation();
                               setPaketFilter(pkg.paketId);
                             }}
                           >
-                            <span>Lihat Detail Group</span>
-                            <ChevronRight className="w-3 h-3 text-amber-600" />
+                            <TableIcon className="w-4 h-4" />
                           </Button>
                         </td>
                       </tr>
