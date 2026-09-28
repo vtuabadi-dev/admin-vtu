@@ -4,6 +4,7 @@ import type {
   GeneratedSuratLog,
   ManifestFieldOption,
   SuratInputType,
+  SuratPlaceholderMapping,
 } from "@/shared/types/surat";
 import { formatDate, toTitleCase } from "@/shared/lib/utils";
 import { DAFTAR_KANTOR_IMIGRASI, getKotaFromKanimName } from "@/shared/lib/kantor-imigrasi";
@@ -1158,6 +1159,284 @@ export function resolveAutocratFieldValues(
   });
 
   return values;
+}
+
+// ────────────────────────────────────────────────────────────
+// EXTRACT JAMA'AH / APPLICANT NAME FROM FORM COLUMN (GAMBAR 3)
+// ────────────────────────────────────────────────────────────
+
+/**
+ * Extracts the person's name directly from Autocrat form fields (Gambar 3 column).
+ * Takes absolute priority over the selected manifest card (Gambar 2).
+ */
+export function extractNamaFromAutocratFields(
+  fieldsData?: Record<string, any> | null,
+  manualData?: Record<string, any> | null,
+  placeholders?: SuratPlaceholderMapping[] | null
+): string {
+  const dataSources = [manualData, fieldsData].filter(Boolean) as Record<string, any>[];
+
+  // 1. Check placeholders specifically designated for the person's name
+  if (placeholders && placeholders.length > 0) {
+    for (const p of placeholders) {
+      const cleanK = (p.key || "").toLowerCase().replace(/[\u2018\u2019\u201A\u201B']/g, "").replace(/[\s_\-\.]/g, "");
+      const cleanL = (p.label || "").toLowerCase().replace(/[\u2018\u2019\u201A\u201B']/g, "").replace(/[\s_\-\.]/g, "");
+
+      const isNameField =
+        cleanK === "namajamaah" ||
+        cleanK === "namalengkap" ||
+        cleanK === "nama" ||
+        cleanK === "namapemohon" ||
+        cleanK === "namapegawai" ||
+        cleanK === "namapetugas" ||
+        cleanK === "namatertanggung" ||
+        cleanK === "namakaryawan" ||
+        cleanK === "namasiswa" ||
+        cleanK === "namasantri" ||
+        cleanL.includes("nama jama") ||
+        cleanL.includes("nama lengkap") ||
+        cleanL.includes("nama pemohon") ||
+        cleanL.includes("nama pegawai") ||
+        cleanL === "nama";
+
+      if (isNameField) {
+        for (const ds of dataSources) {
+          const val = ds[p.key];
+          if (val && typeof val === "string" && val.trim() && val.trim() !== "-") {
+            return val.trim();
+          }
+        }
+      }
+    }
+  }
+
+  // 2. Scan all keys in manualData and fieldsData for name tags
+  const targetPatterns = [
+    /nama[_\s-]*jama['`’]?ah/i,
+    /nama[_\s-]*lengkap/i,
+    /^nama$/i,
+    /nama[_\s-]*pemohon/i,
+    /nama[_\s-]*pegawai/i,
+    /nama[_\s-]*petugas/i,
+    /nama[_\s-]*tertanggung/i,
+    /nama[_\s-]*karyawan/i,
+    /nama[_\s-]*siswa/i,
+    /nama[_\s-]*santri/i,
+  ];
+
+  for (const ds of dataSources) {
+    for (const pat of targetPatterns) {
+      for (const [k, v] of Object.entries(ds)) {
+        if (pat.test(k) && v && typeof v === "string" && v.trim() && v.trim() !== "-") {
+          return v.trim();
+        }
+      }
+    }
+  }
+
+  // 3. Fallback: Any key containing 'nama' (excluding irrelevant fields like ayah, paket, perusahaan, etc.)
+  for (const ds of dataSources) {
+    for (const [k, v] of Object.entries(ds)) {
+      const lk = k.toLowerCase().replace(/[\s_\-\.]/g, "");
+      if (
+        lk.includes("nama") &&
+        !lk.includes("ayah") &&
+        !lk.includes("perusahaan") &&
+        !lk.includes("paket") &&
+        !lk.includes("hotel") &&
+        !lk.includes("kantor") &&
+        !lk.includes("instansi") &&
+        !lk.includes("bank") &&
+        !lk.includes("rs") &&
+        !lk.includes("asuransi")
+      ) {
+        if (v && typeof v === "string" && v.trim() && v.trim() !== "-") {
+          return v.trim();
+        }
+      }
+    }
+  }
+
+  return "";
+}
+
+/**
+ * Generates the clean file name for an exported or downloaded Surat (.pdf or .docx).
+ * Crucially adheres to the user rule: The name in the filename is sourced directly from
+ * the name column/tag in the Autocrat form (Gambar 3), NOT from the manifest card (Gambar 2).
+ */
+export function generateSuratFileName(
+  nomorSurat: string,
+  fieldsData: Record<string, any>,
+  manualData?: Record<string, any> | null,
+  options?: {
+    formatNamaFile?: string;
+    isTtd?: boolean;
+    ext?: "pdf" | "docx";
+    placeholders?: SuratPlaceholderMapping[];
+    fallbackNama?: string;
+  }
+): string {
+  const cleanNomor = (nomorSurat || "").replace(/[/\\?%*:|"<>]/g, "-").trim();
+  const nameFromColumn =
+    extractNamaFromAutocratFields(fieldsData, manualData, options?.placeholders) ||
+    options?.fallbackNama ||
+    "Jamaah";
+  const cleanName = nameFromColumn.trim().replace(/[/\\?%*:|"<>]/g, "").replace(/\s+/g, "_");
+  const ext = options?.ext || "pdf";
+
+  const targetFormat = options?.formatNamaFile?.trim();
+  if (targetFormat && (targetFormat.includes("{{") || targetFormat.includes("{"))) {
+    // Merge placeholders in targetFormat using fieldsData (or merged manualData)
+    const mergedData = { ...fieldsData, ...(manualData || {}) };
+    const mergedName = renderAutocratMergedText(targetFormat, mergedData);
+    const sanitized = mergedName.replace(/[/\\?%*:|"<>]/g, "").replace(/\s+/g, "_");
+    if (sanitized && sanitized !== "_") {
+      return `${sanitized}.${ext}`;
+    }
+  }
+
+  const suffix = options?.isTtd ? "TTD_" : "";
+  return `${cleanNomor}_${suffix}${cleanName}.${ext}`;
+}
+
+// ────────────────────────────────────────────────────────────
+// DATE & MONTH FORMATTING & PARSING HELPERS (AUTOCRAT FORMS)
+// ────────────────────────────────────────────────────────────
+
+/**
+ * Parses an Indonesian date string (e.g. '10 Juni 1990', '10-06-1990', '1990-06-10') into 'YYYY-MM-DD' for date inputs.
+ */
+export function parseDateToIsoString(dateStr?: string | null): string {
+  if (!dateStr || typeof dateStr !== "string") return "";
+  const trimmed = dateStr.trim();
+  if (!trimmed || trimmed === "-") return "";
+
+  // 1. Direct match YYYY-MM-DD
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+    return trimmed;
+  }
+
+  // 2. Match DD-MM-YYYY or DD/MM/YYYY
+  const dmyMatch = trimmed.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/);
+  if (dmyMatch && dmyMatch[1] && dmyMatch[2] && dmyMatch[3]) {
+    const day = dmyMatch[1].padStart(2, "0");
+    const month = dmyMatch[2].padStart(2, "0");
+    const year = dmyMatch[3];
+    return `${year}-${month}-${day}`;
+  }
+
+  // 3. Match DD MonthName YYYY (e.g. '10 Juni 1990' or '10 Jun 1990')
+  const MONTHS_MAP: Record<string, string> = {
+    januari: "01", jan: "01",
+    februari: "02", feb: "02",
+    maret: "03", mar: "03",
+    april: "04", apr: "04",
+    mei: "05", may: "05",
+    juni: "06", jun: "06",
+    juli: "07", jul: "07",
+    agustus: "08", agu: "08", ags: "08", aug: "08",
+    september: "09", sep: "09", sept: "09",
+    oktober: "10", okt: "10", oct: "10",
+    november: "11", nov: "11",
+    desember: "12", des: "12", dec: "12",
+  };
+
+  const textMatch = trimmed.match(/^(\d{1,2})\s+([a-zA-Z]+)\s+(\d{4})$/);
+  if (textMatch && textMatch[1] && textMatch[2] && textMatch[3]) {
+    const day = textMatch[1].padStart(2, "0");
+    const monthName = textMatch[2].toLowerCase();
+    const year = textMatch[3];
+    const monthNum = MONTHS_MAP[monthName];
+    if (monthNum) {
+      return `${year}-${monthNum}-${day}`;
+    }
+  }
+
+  // 4. Try JS Date parse
+  const d = new Date(trimmed);
+  if (!isNaN(d.getTime())) {
+    return d.toISOString().split("T")[0] || "";
+  }
+
+  return "";
+}
+
+/**
+ * Formats a YYYY-MM-DD string or Date into standard Indonesian official letter format 'DD MMMM YYYY' (e.g. '10 Juni 1990').
+ */
+export function formatIsoToIndonesianDate(isoStr?: string | null): string {
+  if (!isoStr || typeof isoStr !== "string") return "";
+  const trimmed = isoStr.trim();
+  if (!trimmed) return "";
+
+  const match = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (match && match[1] && match[2] && match[3]) {
+    const year = match[1];
+    const monthIdx = parseInt(match[2], 10) - 1;
+    const day = parseInt(match[3], 10);
+    const BULAN = [
+      "Januari", "Februari", "Maret", "April", "Mei", "Juni",
+      "Juli", "Agustus", "September", "Oktober", "November", "Desember"
+    ];
+    if (monthIdx >= 0 && monthIdx < 12) {
+      return `${day} ${BULAN[monthIdx]} ${year}`;
+    }
+  }
+
+  return trimmed;
+}
+
+/**
+ * Parses Month-Year string (e.g. 'September 2026' or '2026-09') into 'YYYY-MM'.
+ */
+export function parseMonthYearToIsoString(str?: string | null): string {
+  if (!str || typeof str !== "string") return "";
+  const trimmed = str.trim();
+  if (/^\d{4}-\d{2}$/.test(trimmed)) return trimmed;
+
+  const MONTHS_MAP: Record<string, string> = {
+    januari: "01", jan: "01",
+    februari: "02", feb: "02",
+    maret: "03", mar: "03",
+    april: "04", apr: "04",
+    mei: "05",
+    juni: "06", jun: "06",
+    juli: "07", jul: "07",
+    agustus: "08", agu: "08", ags: "08",
+    september: "09", sep: "09",
+    oktober: "10", okt: "10",
+    november: "11", nov: "11",
+    desember: "12", des: "12",
+  };
+
+  const match = trimmed.match(/([a-zA-Z]+)\s+(\d{4})/);
+  if (match && match[1] && match[2]) {
+    const m = MONTHS_MAP[match[1].toLowerCase()];
+    if (m) return `${match[2]}-${m}`;
+  }
+  return "";
+}
+
+/**
+ * Formats YYYY-MM into 'MMMM YYYY' in Indonesian (e.g. 'September 2026').
+ */
+export function formatIsoToIndonesianMonthYear(isoMonth?: string | null): string {
+  if (!isoMonth || typeof isoMonth !== "string") return "";
+  const trimmed = isoMonth.trim();
+  const match = trimmed.match(/^(\d{4})-(\d{2})$/);
+  if (match && match[1] && match[2]) {
+    const year = match[1];
+    const monthIdx = parseInt(match[2], 10) - 1;
+    const BULAN = [
+      "Januari", "Februari", "Maret", "April", "Mei", "Juni",
+      "Juli", "Agustus", "September", "Oktober", "November", "Desember"
+    ];
+    if (monthIdx >= 0 && monthIdx < 12) {
+      return `${BULAN[monthIdx]} ${year}`;
+    }
+  }
+  return trimmed;
 }
 
 // ────────────────────────────────────────────────────────────

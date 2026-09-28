@@ -9,6 +9,12 @@ import {
   formatMonthYear,
   toTitleCase,
   matchTagToManifestField,
+  extractNamaFromAutocratFields,
+  generateSuratFileName,
+  parseDateToIsoString,
+  formatIsoToIndonesianDate,
+  parseMonthYearToIsoString,
+  formatIsoToIndonesianMonthYear,
 } from "@/shared/lib/surat-autocrat-engine";
 import { searchKantorImigrasi, getKotaFromKanimName } from "@/shared/lib/kantor-imigrasi";
 
@@ -411,6 +417,69 @@ Bulan: {{Bulan Awal}}`,
     expect(resolved["Tanggal Awal"]).toBe("31 Agustus 2026");
     expect(resolved["Tanggal Akhir"]).toBe("9 September 2026");
     expect(resolved["Bulan Awal"]).toBe("Agustus 2026");
+  });
+
+  describe("File Name Generation — Sourced from Autocrat Form Column (Gambar 3)", () => {
+    it("should prioritize name from form column {Nama Jama'ah} over manifest card name", () => {
+      // Manifest card has "Rini", but operator edited form column to "Rini Binti Sutrisno"
+      const fieldsData = {
+        "Nama Jama'ah": "Rini Binti Sutrisno",
+        "Tempat Lahir": "Malang",
+      };
+      const manualData = {
+        "Nama Jama'ah": "Rini Binti Sutrisno",
+      };
+
+      const extracted = extractNamaFromAutocratFields(fieldsData, manualData);
+      expect(extracted).toBe("Rini Binti Sutrisno");
+
+      const fileName = generateSuratFileName("237/VTA.P/A/IX/2026", fieldsData, manualData, {
+        isTtd: true,
+        ext: "pdf",
+        fallbackNama: "Rini", // Manifest card name should NOT be used when column is filled
+      });
+
+      expect(fileName).toBe("237-VTA.P-A-IX-2026_TTD_Rini_Binti_Sutrisno.pdf");
+      expect(fileName).not.toContain("TTD_Rini.pdf");
+    });
+
+    it("should respect formatNamaFile with placeholders using form column value", () => {
+      const fieldsData = {
+        "Nama Jama'ah": "Rini Binti Sutrisno",
+      };
+      const fileName = generateSuratFileName("237/VTA.P/A/IX/2026", fieldsData, null, {
+        formatNamaFile: "Surat_Rekom_TTD_{{Nama Jama'ah}}",
+        ext: "docx",
+      });
+
+      expect(fileName).toBe("Surat_Rekom_TTD_Rini_Binti_Sutrisno.docx");
+    });
+
+    it("should support name keys like nama_lengkap, Nama Lengkap, Nama Pegawai, Nama Pemohon", () => {
+      expect(extractNamaFromAutocratFields({ nama_lengkap: "Ahmad Dahlan" })).toBe("Ahmad Dahlan");
+      expect(extractNamaFromAutocratFields({ "Nama Pegawai": "Budi Santoso" })).toBe("Budi Santoso");
+      expect(extractNamaFromAutocratFields({ "Nama Pemohon": "Siti Nurhaliza" })).toBe("Siti Nurhaliza");
+    });
+
+    it("should gracefully handle null jamaah and null keberangkatan when no package is selected", () => {
+      const template = DEFAULT_SURAT_TEMPLATES[0]!;
+      const resolved = resolveAutocratFieldValues(template, null, null, {});
+      expect(resolved).toBeDefined();
+      expect(resolved.nama_lengkap || "").toBe("");
+    });
+
+    it("should correctly convert between ISO dates and Indonesian letter date format", () => {
+      expect(formatIsoToIndonesianDate("1990-06-10")).toBe("10 Juni 1990");
+      expect(parseDateToIsoString("10 Juni 1990")).toBe("1990-06-10");
+      expect(parseDateToIsoString("10-06-1990")).toBe("1990-06-10");
+      expect(parseDateToIsoString("1990-06-10")).toBe("1990-06-10");
+    });
+
+    it("should correctly convert between ISO month and Indonesian month year format", () => {
+      expect(formatIsoToIndonesianMonthYear("2026-09")).toBe("September 2026");
+      expect(parseMonthYearToIsoString("September 2026")).toBe("2026-09");
+      expect(parseMonthYearToIsoString("2026-09")).toBe("2026-09");
+    });
   });
 });
 

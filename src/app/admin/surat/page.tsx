@@ -29,6 +29,9 @@ import {
   Info,
   UploadCloud,
   AlertTriangle,
+  Database,
+  PenTool,
+  Calendar,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/components/ui/Card";
 import { Button } from "@/shared/components/ui/Button";
@@ -52,6 +55,12 @@ import {
   extractPlaceholdersFromText,
   extractPlaceholdersFromDocxFile,
   matchTagToManifestField,
+  extractNamaFromAutocratFields,
+  generateSuratFileName,
+  parseDateToIsoString,
+  formatIsoToIndonesianDate,
+  parseMonthYearToIsoString,
+  formatIsoToIndonesianMonthYear,
 } from "@/shared/lib/surat-autocrat-engine";
 import { downloadMergedDocx } from "@/shared/lib/docx-mail-merge";
 import { downloadDocxAsPdf, convertDocxToA4Html } from "@/shared/lib/docx-to-pdf";
@@ -147,6 +156,16 @@ function GenerateSuratPageContent() {
   const [selectedPackageId, setSelectedPackageId] = useState<string>("");
   const [selectedJamaahId, setSelectedJamaahId] = useState<string>("");
   const [selectedDocIndex, setSelectedDocIndex] = useState<number>(0);
+  const [dataSourceMode, setDataSourceMode] = useState<"manifest" | "manual">("manifest");
+
+  const handleSwitchMode = (mode: "manifest" | "manual") => {
+    setDataSourceMode(mode);
+    if (mode === "manual") {
+      setSelectedPackageId("");
+      setSelectedJamaahId("");
+      setManualFormData({});
+    }
+  };
 
   // Reset selected document index when template changes
   useEffect(() => {
@@ -277,14 +296,14 @@ function GenerateSuratPageContent() {
 
   // Active Selected Keberangkatan Object
   const activeKeberangkatan = useMemo(() => {
-    if (!selectedPackageId) return storeKbrList[0] || null;
-    return storeKbrList.find((k: any) => k.id === selectedPackageId) || storeKbrList[0] || null;
-  }, [storeKbrList, selectedPackageId]);
+    if (dataSourceMode === "manual" || !selectedPackageId) return null;
+    return storeKbrList.find((k: any) => k.id === selectedPackageId) || null;
+  }, [storeKbrList, selectedPackageId, dataSourceMode]);
 
   // Filtered Jamaah for selected package
   const availableJamaahList = useMemo(() => {
     if (!storeJamaah || storeJamaah.length === 0) return [];
-    if (!selectedPackageId) return storeJamaah;
+    if (dataSourceMode === "manual" || !selectedPackageId) return [];
     const activePkg = storeKbrList.find((k: any) => k.id === selectedPackageId);
     const pkgJamaahIds = new Set<string>(activePkg?.jamaahIds || []);
 
@@ -296,8 +315,8 @@ function GenerateSuratPageContent() {
       if (j.packageId === selectedPackageId) return true;
       return false;
     });
-    return filtered.length > 0 ? filtered : storeJamaah;
-  }, [storeJamaah, selectedPackageId, storeKbrList]);
+    return filtered;
+  }, [storeJamaah, selectedPackageId, storeKbrList, dataSourceMode]);
 
   // Memoized Searchable Options for Paket Keberangkatan
   const packageOptions = useMemo(() => {
@@ -335,9 +354,9 @@ function GenerateSuratPageContent() {
 
   // Active Selected Jamaah Object
   const activeJamaah = useMemo(() => {
-    if (!selectedJamaahId) return availableJamaahList[0] || null;
-    return availableJamaahList.find((j: any) => j.id === selectedJamaahId) || availableJamaahList[0] || null;
-  }, [availableJamaahList, selectedJamaahId]);
+    if (dataSourceMode === "manual" || !selectedJamaahId) return null;
+    return availableJamaahList.find((j: any) => j.id === selectedJamaahId) || null;
+  }, [availableJamaahList, selectedJamaahId, dataSourceMode]);
 
   // Reset form when template changes
   useEffect(() => {
@@ -654,10 +673,14 @@ function GenerateSuratPageContent() {
   const verificationUrl = useMemo(() => {
     const baseUrl = typeof window !== "undefined" ? window.location.origin : "https://vtuabadi.com";
     const regId = activeJamaah?.registrationId || activeJamaah?.id || "";
-    const jamNama = encodeURIComponent(activeJamaah?.namaLengkap || "");
+    const effectiveNama =
+      extractNamaFromAutocratFields(resolvedFieldValues, manualFormData, effectivePlaceholders) ||
+      activeJamaah?.namaLengkap ||
+      "Jamaah";
+    const jamNama = encodeURIComponent(effectiveNama);
     const pkgNama = encodeURIComponent(activeKeberangkatan?.namaPaket || "");
     return `${baseUrl}/track/surat?no=${encodeURIComponent(computedNomorSurat)}&reg=${regId}&nama=${jamNama}&paket=${pkgNama}`;
-  }, [computedNomorSurat, activeJamaah, activeKeberangkatan]);
+  }, [computedNomorSurat, activeJamaah, activeKeberangkatan, resolvedFieldValues, manualFormData, effectivePlaceholders]);
 
   // ────────────────────────────────────────────────────────────
   // ACTIONS: SAVE TO LOG, PRINT, DOWNLOAD, SHARE WHATSAPP
@@ -667,10 +690,7 @@ function GenerateSuratPageContent() {
     if (!activeTemplate) return;
 
     const effectiveNama =
-      resolvedFieldValues["Nama Jama'ah"] ||
-      resolvedFieldValues["nama_lengkap"] ||
-      resolvedFieldValues["nama_jamaah"] ||
-      resolvedFieldValues["Nama"] ||
+      extractNamaFromAutocratFields(resolvedFieldValues, manualFormData, effectivePlaceholders) ||
       activeJamaah?.namaLengkap ||
       "Jamaah";
 
@@ -683,11 +703,23 @@ function GenerateSuratPageContent() {
       kategori: activeTemplate.kategori,
       jamaahId: activeJamaah?.id,
       jamaahNama: toTitleCase(effectiveNama),
-      jamaahPaspor: activeJamaah?.nomorPaspor || "-",
-      jamaahNik: activeJamaah?.nik || "-",
+      jamaahPaspor:
+        activeJamaah?.nomorPaspor ||
+        resolvedFieldValues["Nomor Paspor"] ||
+        resolvedFieldValues["nomor_paspor"] ||
+        resolvedFieldValues["Paspor"] ||
+        resolvedFieldValues["paspor"] ||
+        "-",
+      jamaahNik:
+        activeJamaah?.nik ||
+        resolvedFieldValues["NIK"] ||
+        resolvedFieldValues["nik"] ||
+        "-",
       packageId: activeKeberangkatan?.id,
       packageKode: activeKeberangkatan?.kode,
-      packageName: activeKeberangkatan?.namaPaket || "Paket Umroh",
+      packageName:
+        activeKeberangkatan?.namaPaket ||
+        (dataSourceMode === "manual" ? "Manual / Non-Manifest" : "Paket Umroh"),
       departureDate: activeKeberangkatan?.tanggalBerangkat,
       returnDate: activeKeberangkatan?.tanggalPulang,
       perihal: renderedPerihal,
@@ -716,6 +748,10 @@ function GenerateSuratPageContent() {
     resolvedFieldValues,
     renderedLetterBody,
     verificationUrl,
+    activeAttachedFile,
+    manualFormData,
+    effectivePlaceholders,
+    dataSourceMode,
   ]);
 
   // Action: Share WhatsApp
@@ -725,10 +761,7 @@ function GenerateSuratPageContent() {
     const phone = activeJamaah?.nomorTelepon || "";
     const cleanPhone = phone.replace(/[^0-9]/g, "").replace(/^0/, "62");
     const effectiveNama =
-      resolvedFieldValues["Nama Jama'ah"] ||
-      resolvedFieldValues["nama_lengkap"] ||
-      resolvedFieldValues["nama_jamaah"] ||
-      resolvedFieldValues["Nama"] ||
+      extractNamaFromAutocratFields(resolvedFieldValues, manualFormData, effectivePlaceholders) ||
       activeJamaah?.namaLengkap ||
       "Jamaah";
 
@@ -862,12 +895,18 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
   // Re-download PDF from history log with file variant support (TTD vs non-TTD) using the uploaded template file!
   const handleHistoryRedownloadPdf = async (log: GeneratedSuratLog, fileIndex: number = 0) => {
     const tpl = templates.find((t) => t.id === log.templateId || t.slug === log.templateSlug) || activeTemplate;
-    const cleanNomor = log.nomorSurat.replace(/[/\\?%*:|"<>]/g, "-");
     const attached = tpl?.attachedFiles || [];
     const hasMultiple = attached.length > 1;
     const isTtd = fileIndex === 0 && hasMultiple;
-    const suffix = isTtd ? "TTD_" : "";
-    const fileName = `${cleanNomor}_${suffix}${log.jamaahNama.replace(/\s+/g, "_")}.pdf`;
+    const targetFormat = attached[fileIndex]?.formatNamaFile || (fileIndex === 0 ? tpl?.formatNamaFile : "");
+
+    const fileName = generateSuratFileName(log.nomorSurat, log.fieldsData || {}, null, {
+      formatNamaFile: targetFormat,
+      isTtd,
+      ext: "pdf",
+      placeholders: tpl?.placeholders,
+      fallbackNama: log.jamaahNama,
+    });
 
     const binary =
       attached[fileIndex]?.templateFileBase64 ||
@@ -900,12 +939,18 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
   // Re-download Word from history log with file variant support (TTD vs non-TTD)
   const handleHistoryRedownloadWord = async (log: GeneratedSuratLog, fileIndex: number = 0) => {
     const tpl = templates.find((t) => t.id === log.templateId || t.slug === log.templateSlug) || activeTemplate;
-    const cleanNomor = log.nomorSurat.replace(/[/\\?%*:|"<>]/g, "-");
     const attached = tpl?.attachedFiles || [];
     const hasMultiple = attached.length > 1;
     const isTtd = fileIndex === 0 && hasMultiple;
-    const suffix = isTtd ? "TTD_" : "";
-    const fileName = `${cleanNomor}_${suffix}${log.jamaahNama.replace(/\s+/g, "_")}.docx`;
+    const targetFormat = attached[fileIndex]?.formatNamaFile || (fileIndex === 0 ? tpl?.formatNamaFile : "");
+
+    const fileName = generateSuratFileName(log.nomorSurat, log.fieldsData || {}, null, {
+      formatNamaFile: targetFormat,
+      isTtd,
+      ext: "docx",
+      placeholders: tpl?.placeholders,
+      fallbackNama: log.jamaahNama,
+    });
 
     const binary =
       attached[fileIndex]?.templateFileBase64 ||
@@ -1244,113 +1289,162 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
             {/* ── LEFT COLUMN (5 COLS): CONTROLS & DYNAMIC AUTOCRAT FORM ── */}
             <div className="lg:col-span-5 space-y-4">
-              {/* Card 1: Data Source Selector (Manifest & Jamaah) */}
-              <Card className="border-stone-200 dark:border-stone-800">
-                <CardHeader className="pb-3 border-b border-stone-200 dark:border-stone-800">
-                  <CardTitle className="text-xs font-bold flex items-center justify-between">
-                    <span className="flex items-center gap-1.5 text-foreground">
-                      <Plane className="h-4 w-4 text-primary" />
-                      1. Pilih Paket & Jamaah dari Manifest
-                    </span>
-                    <Badge variant="success" size="sm" className="text-[10px]">
-                      Auto-Fill Active
-                    </Badge>
-                  </CardTitle>
-                </CardHeader>
-
-                <CardContent className="pt-4 space-y-3.5">
-                  {/* Select Keberangkatan (Searchable Combobox) */}
-                  <div>
-                    <label className="text-xs font-semibold text-foreground flex items-center justify-between mb-1">
-                      <span className="flex items-center gap-1.5">
-                        <Plane className="h-3.5 w-3.5 text-primary" />
-                        Paket Keberangkatan
-                      </span>
-                      <span className="text-[11px] text-muted-foreground font-normal">
-                        {storeKbrList.length} Paket Terdaftar
-                      </span>
-                    </label>
-                    <SearchableSelect
-                      value={selectedPackageId}
-                      onChange={(val) => {
-                        setSelectedPackageId(val);
-                        setSelectedJamaahId("");
-                      }}
-                      placeholder="Cari atau pilih paket keberangkatan..."
-                      searchPlaceholder="Ketik nama paket, kode, tanggal..."
-                      options={packageOptions}
-                      size="sm"
-                    />
-                  </div>
-
-                  {/* Select Jamaah (Searchable Combobox) */}
-                  <div>
-                    <label className="text-xs font-semibold text-foreground flex items-center justify-between mb-1">
-                      <span className="flex items-center gap-1.5">
-                        <User className="h-3.5 w-3.5 text-primary" />
-                        Pilih Jamaah Penerima Surat
-                      </span>
-                      <span className="text-[11px] text-muted-foreground font-normal">
-                        {availableJamaahList.length} Jamaah Tersedia
-                      </span>
-                    </label>
-                    <SearchableSelect
-                      value={selectedJamaahId}
-                      onChange={(val) => {
-                        setSelectedJamaahId(val);
-                        if (val && !selectedPackageId) {
-                          const jam = storeJamaah.find((j: any) => j.id === val) as any;
-                          if (jam) {
-                            const jamPkgId =
-                              jam.group?.keberangkatanId ||
-                              jam.group?.paketKeberangkatanId ||
-                              jam.keberangkatanId ||
-                              jam.packageId;
-                            if (jamPkgId) {
-                              setSelectedPackageId(jamPkgId);
-                            }
-                          }
-                        }
-                      }}
-                      placeholder={
-                        availableJamaahList.length === 0
-                          ? "Belum ada jamaah pada paket ini"
-                          : "Cari nama jamaah, NIK, nomor paspor, kota lahir..."
-                      }
-                      searchPlaceholder="Ketik nama jamaah, paspor, NIK..."
-                      options={jamaahOptions}
-                      disabled={availableJamaahList.length === 0}
-                      size="sm"
-                    />
-                  </div>
-
-                  {/* Summary of Active Jamaah Manifest Data */}
-                  {activeJamaah && (
-                    <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-xs space-y-1.5">
-                      <div className="flex items-center justify-between font-bold text-emerald-900 dark:text-emerald-300">
-                        <span className="flex items-center gap-1.5">
-                          <User className="h-3.5 w-3.5" />
-                          {toTitleCase(activeJamaah.namaLengkap)}
-                        </span>
-                        <span className="font-mono text-[10px]">{activeJamaah.registrationId || "Terdaftar"}</span>
-                      </div>
-                      <div className="grid grid-cols-2 gap-2 text-[11px] text-emerald-800 dark:text-emerald-400">
-                        <div>NIK: <strong>{activeJamaah.nik || "-"}</strong></div>
-                        <div>Paspor: <strong>{activeJamaah.nomorPaspor || "-"}</strong></div>
-                        <div>Lahir: <strong>{toTitleCase(activeJamaah.tempatLahir || "-")}, {activeJamaah.tanggalLahir ? formatDateShort(activeJamaah.tanggalLahir) : "-"}</strong></div>
-                        <div>Paket: <strong>{activeKeberangkatan?.namaPaket || "-"}</strong></div>
-                      </div>
+              {/* Mode Selector: Referensi Manifest vs Input Manual */}
+              <div className="p-3 bg-stone-50 dark:bg-stone-900/60 rounded-xl border border-stone-200 dark:border-stone-800 shadow-2xs space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                    <Sliders className="h-3.5 w-3.5 text-primary" />
+                    Sumber Data Surat
+                  </label>
+                  <span className="text-[10px] text-muted-foreground font-mono">
+                    {dataSourceMode === "manifest" ? "Mode: Manifest" : "Mode: Manual"}
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleSwitchMode("manifest")}
+                    className={cn(
+                      "flex flex-col items-start gap-1 p-2.5 rounded-lg border text-left transition-all",
+                      dataSourceMode === "manifest"
+                        ? "border-primary bg-primary/5 text-primary ring-1 ring-primary/20 shadow-xs"
+                        : "border-stone-200 dark:border-stone-800 hover:border-stone-300 dark:hover:border-stone-700 bg-background text-muted-foreground"
+                    )}
+                  >
+                    <div className="flex items-center gap-1.5 font-bold text-xs">
+                      <Database className="h-3.5 w-3.5 shrink-0" />
+                      <span>Referensi Manifest</span>
                     </div>
-                  )}
-                </CardContent>
-              </Card>
+                    <p className="text-[10px] text-muted-foreground leading-tight">
+                      Pilih paket & nama jamaah, otomatis mengisi variabel
+                    </p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleSwitchMode("manual")}
+                    className={cn(
+                      "flex flex-col items-start gap-1 p-2.5 rounded-lg border text-left transition-all",
+                      dataSourceMode === "manual"
+                        ? "border-primary bg-primary/5 text-primary ring-1 ring-primary/20 shadow-xs"
+                        : "border-stone-200 dark:border-stone-800 hover:border-stone-300 dark:hover:border-stone-700 bg-background text-muted-foreground"
+                    )}
+                  >
+                    <div className="flex items-center gap-1.5 font-bold text-xs">
+                      <PenTool className="h-3.5 w-3.5 shrink-0" />
+                      <span>Input Manual</span>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground leading-tight">
+                      Langsung nomor surat & isian variabel mandiri
+                    </p>
+                  </button>
+                </div>
+              </div>
+
+              {/* Card 1: Data Source Selector (Manifest & Jamaah) - ONLY when dataSourceMode === 'manifest' */}
+              {dataSourceMode === "manifest" && (
+                <Card className="border-stone-200 dark:border-stone-800">
+                  <CardHeader className="pb-3 border-b border-stone-200 dark:border-stone-800">
+                    <CardTitle className="text-xs font-bold flex items-center justify-between">
+                      <span className="flex items-center gap-1.5 text-foreground">
+                        <Plane className="h-4 w-4 text-primary" />
+                        1. Pilih Paket & Jamaah dari Manifest
+                      </span>
+                      <Badge
+                        variant={selectedPackageId && selectedJamaahId && activeJamaah ? "success" : "secondary"}
+                        size="sm"
+                        className="text-[10px]"
+                      >
+                        {selectedPackageId && selectedJamaahId && activeJamaah ? "Auto-Fill Active" : "Belum Dipilih"}
+                      </Badge>
+                    </CardTitle>
+                  </CardHeader>
+
+                  <CardContent className="pt-4 space-y-3.5">
+                    {/* Select Keberangkatan (Searchable Combobox) */}
+                    <div>
+                      <label className="text-xs font-semibold text-foreground flex items-center justify-between mb-1">
+                        <span className="flex items-center gap-1.5">
+                          <Plane className="h-3.5 w-3.5 text-primary" />
+                          Paket Keberangkatan
+                        </span>
+                        <span className="text-[11px] text-muted-foreground font-normal">
+                          {storeKbrList.length} Paket Terdaftar
+                        </span>
+                      </label>
+                      <SearchableSelect
+                        value={selectedPackageId}
+                        onChange={(val) => {
+                          setSelectedPackageId(val);
+                          setSelectedJamaahId("");
+                        }}
+                        placeholder="Cari atau pilih paket keberangkatan..."
+                        searchPlaceholder="Ketik nama paket, kode, tanggal..."
+                        options={packageOptions}
+                        size="sm"
+                      />
+                    </div>
+
+                    {/* Select Jamaah (Searchable Combobox) */}
+                    <div>
+                      <label className="text-xs font-semibold text-foreground flex items-center justify-between mb-1">
+                        <span className="flex items-center gap-1.5">
+                          <User className="h-3.5 w-3.5 text-primary" />
+                          Pilih Jamaah Penerima Surat
+                        </span>
+                        <span className="text-[11px] text-muted-foreground font-normal">
+                          {!selectedPackageId
+                            ? "Pilih paket terlebih dahulu"
+                            : `${availableJamaahList.length} Jamaah Tersedia`}
+                        </span>
+                      </label>
+                      <SearchableSelect
+                        value={selectedJamaahId}
+                        onChange={(val) => {
+                          setSelectedJamaahId(val);
+                        }}
+                        placeholder={
+                          !selectedPackageId
+                            ? "Pilih paket keberangkatan terlebih dahulu..."
+                            : availableJamaahList.length === 0
+                            ? "Belum ada jamaah pada paket ini"
+                            : "Cari nama jamaah, NIK, nomor paspor, kota lahir..."
+                        }
+                        searchPlaceholder="Ketik nama jamaah, paspor, NIK..."
+                        options={jamaahOptions}
+                        disabled={!selectedPackageId || availableJamaahList.length === 0}
+                        size="sm"
+                      />
+                    </div>
+
+                    {/* Summary of Active Jamaah Manifest Data - Only rendered when package & jamaah are selected */}
+                    {selectedPackageId && selectedJamaahId && activeJamaah && (
+                      <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-xs space-y-1.5">
+                        <div className="flex items-center justify-between font-bold text-emerald-900 dark:text-emerald-300">
+                          <span className="flex items-center gap-1.5">
+                            <User className="h-3.5 w-3.5" />
+                            {toTitleCase(activeJamaah.namaLengkap)}
+                          </span>
+                          <span className="font-mono text-[10px]">{activeJamaah.registrationId || "Terdaftar"}</span>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 text-[11px] text-emerald-800 dark:text-emerald-400">
+                          <div>NIK: <strong>{activeJamaah.nik || "-"}</strong></div>
+                          <div>Paspor: <strong>{activeJamaah.nomorPaspor || "-"}</strong></div>
+                          <div>Lahir: <strong>{toTitleCase(activeJamaah.tempatLahir || "-")}, {activeJamaah.tanggalLahir ? formatDateShort(activeJamaah.tanggalLahir) : "-"}</strong></div>
+                          <div>Paket: <strong>{activeKeberangkatan?.namaPaket || "-"}</strong></div>
+                        </div>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
 
               {/* Card 2: Header & Nomor Surat Configuration */}
               <Card className="border-stone-200 dark:border-stone-800">
                 <CardHeader className="pb-3 border-b border-stone-200 dark:border-stone-800">
                   <CardTitle className="text-xs font-bold flex items-center gap-1.5">
                     <FileSignature className="h-4 w-4 text-primary" />
-                    2. Nomor Surat
+                    {dataSourceMode === "manifest" ? "2. Nomor Surat" : "1. Nomor Surat"}
                   </CardTitle>
                 </CardHeader>
 
@@ -1394,7 +1488,9 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
                   <CardTitle className="text-xs font-bold flex items-center justify-between">
                     <span className="flex items-center gap-1.5">
                       <Sparkles className="h-4 w-4 text-primary" />
-                      3. Kolom Isian Data Surat (Autocrat Tags)
+                      {dataSourceMode === "manifest"
+                        ? "3. Kolom Isian Data Surat (Autocrat Tags)"
+                        : "2. Kolom Isian Data Surat (Autocrat Tags)"}
                     </span>
                     <span className="text-[10px] text-muted-foreground">
                       {effectivePlaceholders.length} Tag Terkonfigurasi
@@ -1447,6 +1543,31 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
                         cleanKey === "nama" ||
                         cleanLabel.includes("nama jama") ||
                         cleanLabel.includes("nama lengkap");
+
+                      const isBulanField =
+                        cleanKey.includes("bulankeberangkatan") ||
+                        cleanKey.includes("bulanberangkat") ||
+                        cleanKey.includes("bulanpaket") ||
+                        cleanLabel.includes("bulan keberangkatan") ||
+                        p.manifestField === "keberangkatan.bulanKeberangkatan";
+
+                      const isDateField =
+                        !isBulanField &&
+                        (p.inputType === "date" ||
+                          p.manifestField === "jamaah.tanggalLahir" ||
+                          p.manifestField === "keberangkatan.tanggalBerangkat" ||
+                          p.manifestField === "keberangkatan.tanggalPulang" ||
+                          cleanKey.includes("tanggallahir") ||
+                          cleanKey.includes("tgl_lahir") ||
+                          cleanKey.includes("tgllahir") ||
+                          cleanKey.includes("tanggalberangkat") ||
+                          cleanKey.includes("tanggalpulang") ||
+                          cleanKey.includes("tanggalkembali") ||
+                          cleanLabel.includes("tanggal lahir") ||
+                          cleanLabel.includes("tgl lahir") ||
+                          cleanLabel.includes("tanggal berangkat") ||
+                          cleanLabel.includes("tanggal pulang") ||
+                          (cleanKey.includes("tanggal") && !cleanKey.includes("surat")));
 
                       // Clean and validate options if select
                       const validOptions = (Array.isArray(p.options) ? p.options : [])
@@ -1520,6 +1641,11 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
                             ) : manualVal !== undefined && manualVal !== resolvedVal ? (
                               <span className="text-[10px] font-semibold text-amber-600 dark:text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded flex items-center gap-1">
                                 Diedit Manual
+                              </span>
+                            ) : dataSourceMode === "manual" ? (
+                              <span className="text-[10px] font-semibold text-blue-600 dark:text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded flex items-center gap-1">
+                                {isDateField || isBulanField ? <Calendar className="h-2.5 w-2.5" /> : null}
+                                {isDateField ? "Pilih Tanggal" : isBulanField ? "Pilih Bulan" : "Input Manual"}
                               </span>
                             ) : isManifest ? (
                               <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded flex items-center gap-1">
@@ -1611,6 +1737,98 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
                                 className="text-xs h-9 bg-background text-foreground"
                               />
                             )
+                          ) : isDateField ? (
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-2">
+                                <div className="relative flex-1">
+                                  <Input
+                                    type="text"
+                                    value={displayValue}
+                                    onChange={(e) =>
+                                      setManualFormData((prev) => ({ ...prev, [p.key]: e.target.value }))
+                                    }
+                                    placeholder={p.placeholderHint || "Contoh: 10 Juni 1990"}
+                                    className="text-xs h-9 bg-background text-foreground pr-8 font-medium"
+                                  />
+                                  <Calendar className="h-4 w-4 text-muted-foreground absolute right-2.5 top-2.5 pointer-events-none" />
+                                </div>
+                                <div className="relative shrink-0">
+                                  <input
+                                    type="date"
+                                    value={parseDateToIsoString(displayValue)}
+                                    onChange={(e) => {
+                                      const val = e.target.value;
+                                      if (val) {
+                                        const formatted = formatIsoToIndonesianDate(val);
+                                        setManualFormData((prev) => ({ ...prev, [p.key]: formatted }));
+                                      }
+                                    }}
+                                    className="h-9 w-full opacity-0 absolute inset-0 cursor-pointer z-10"
+                                    title="Klik untuk memilih tanggal dari kalender"
+                                  />
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-9 px-2.5 flex items-center gap-1.5 text-xs text-primary border-primary/30 hover:bg-primary/5 cursor-pointer pointer-events-none"
+                                  >
+                                    <Calendar className="h-3.5 w-3.5 text-primary" />
+                                    <span>Pilih Tanggal</span>
+                                  </Button>
+                                </div>
+                              </div>
+                              {displayValue && (
+                                <p className="text-[10px] text-muted-foreground">
+                                  Format surat: <strong className="text-foreground">{displayValue}</strong>
+                                </p>
+                              )}
+                            </div>
+                          ) : isBulanField ? (
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-2">
+                                <div className="relative flex-1">
+                                  <Input
+                                    type="text"
+                                    value={displayValue}
+                                    onChange={(e) =>
+                                      setManualFormData((prev) => ({ ...prev, [p.key]: e.target.value }))
+                                    }
+                                    placeholder={p.placeholderHint || "Contoh: September 2026"}
+                                    className="text-xs h-9 bg-background text-foreground pr-8 font-medium"
+                                  />
+                                  <Calendar className="h-4 w-4 text-muted-foreground absolute right-2.5 top-2.5 pointer-events-none" />
+                                </div>
+                                <div className="relative shrink-0">
+                                  <input
+                                    type="month"
+                                    value={parseMonthYearToIsoString(displayValue)}
+                                    onChange={(e) => {
+                                      const val = e.target.value;
+                                      if (val) {
+                                        const formatted = formatIsoToIndonesianMonthYear(val);
+                                        setManualFormData((prev) => ({ ...prev, [p.key]: formatted }));
+                                      }
+                                    }}
+                                    className="h-9 w-full opacity-0 absolute inset-0 cursor-pointer z-10"
+                                    title="Klik untuk memilih bulan & tahun"
+                                  />
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-9 px-2.5 flex items-center gap-1.5 text-xs text-primary border-primary/30 hover:bg-primary/5 cursor-pointer pointer-events-none"
+                                  >
+                                    <Calendar className="h-3.5 w-3.5 text-primary" />
+                                    <span>Pilih Bulan</span>
+                                  </Button>
+                                </div>
+                              </div>
+                              {displayValue && (
+                                <p className="text-[10px] text-muted-foreground">
+                                  Format surat: <strong className="text-foreground">{displayValue}</strong>
+                                </p>
+                              )}
+                            </div>
                           ) : (
                             <Input
                               type={p.inputType === "number" ? "number" : "text"}

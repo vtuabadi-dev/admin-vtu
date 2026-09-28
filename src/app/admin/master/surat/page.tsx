@@ -1482,10 +1482,19 @@ Demikian Surat Tugas ini dibuat dengan sebenarnya agar dapat dipergunakan sebaga
                                     if (!cur) return prev;
 
                                     if (val === "manifest") {
+                                      const targetManifest = cur.manifestField || MANIFEST_FIELD_OPTIONS[0]?.key || "";
+                                      const isDate =
+                                        targetManifest === "jamaah.tanggalLahir" ||
+                                        targetManifest === "keberangkatan.tanggalBerangkat" ||
+                                        targetManifest === "keberangkatan.tanggalPulang" ||
+                                        targetManifest === "keberangkatan.bulanKeberangkatan" ||
+                                        cur.key.toLowerCase().includes("tanggal") ||
+                                        cur.key.toLowerCase().includes("bulan");
                                       updated[idx] = {
                                         ...cur,
                                         sourceType: "manifest",
-                                        manifestField: cur.manifestField || MANIFEST_FIELD_OPTIONS[0]?.key,
+                                        manifestField: targetManifest,
+                                        inputType: isDate ? "date" : cur.inputType || "text",
                                       };
                                     } else {
                                       updated[idx] = {
@@ -1540,7 +1549,18 @@ Demikian Surat Tugas ini dibuat dengan sebenarnya agar dapat dipergunakan sebaga
                                       if (!prev) return null;
                                       const updated = [...prev.placeholders];
                                       const cur = updated[idx];
-                                      if (cur) updated[idx] = { ...cur, manifestField: val };
+                                      if (cur) {
+                                        const isDate =
+                                          val === "jamaah.tanggalLahir" ||
+                                          val === "keberangkatan.tanggalBerangkat" ||
+                                          val === "keberangkatan.tanggalPulang" ||
+                                          val === "keberangkatan.bulanKeberangkatan";
+                                        updated[idx] = {
+                                          ...cur,
+                                          manifestField: val,
+                                          inputType: isDate ? "date" : cur.inputType || "text",
+                                        };
+                                      }
                                       return { ...prev, placeholders: updated };
                                     });
                                   }}
