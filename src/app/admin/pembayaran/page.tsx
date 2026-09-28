@@ -498,34 +498,48 @@ export default function PembayaranMonitoringPage() {
                             {pkg.deadlineDate && pkg.sisaHariDeadline !== undefined ? (
                               <div className="flex flex-col items-center justify-center gap-1">
                                 {pkg.totalSisa <= 0 ? (
-                                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30">
-                                    <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                                    Lunas (Aman)
+                                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30">
+                                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                                    <span>Lunas (Aman)</span>
                                   </span>
                                 ) : pkg.sisaHariDeadline < 0 ? (
-                                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-rose-500/15 text-rose-700 dark:text-rose-300 border border-rose-500/30">
-                                    <AlertCircle className="w-3 h-3 text-rose-600" />
-                                    Lewat Deadline ({Math.abs(pkg.sisaHariDeadline)} hari)
+                                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-2xl text-[11px] font-bold bg-rose-500/15 text-rose-700 dark:text-rose-300 border border-rose-500/30">
+                                    <AlertCircle className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+                                    <span className="flex flex-col text-center leading-tight">
+                                      <span className="font-bold">Lewat Deadline</span>
+                                      <span className="text-[10px] font-black text-rose-800 dark:text-rose-200 whitespace-nowrap">
+                                        ({Math.abs(pkg.sisaHariDeadline)} Hari)
+                                      </span>
+                                    </span>
                                   </span>
                                 ) : pkg.sisaHariDeadline === 0 ? (
-                                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-black bg-rose-500/20 text-rose-800 dark:text-rose-200 border border-rose-500/40 animate-pulse">
-                                    <Clock className="w-3 h-3 text-rose-600" />
-                                    H-0 (Hari Ini Deadline!)
+                                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-2xl text-[11px] font-black bg-rose-500/20 text-rose-800 dark:text-rose-200 border border-rose-500/40 animate-pulse">
+                                    <Clock className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+                                    <span className="flex flex-col text-center leading-tight">
+                                      <span className="text-xs font-black">H-0</span>
+                                      <span className="text-[10px] font-bold whitespace-nowrap">Hari Ini Deadline!</span>
+                                    </span>
                                   </span>
                                 ) : pkg.sisaHariDeadline <= 7 ? (
-                                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-black bg-amber-500/20 text-amber-800 dark:text-amber-200 border border-amber-500/40">
-                                    <Clock className="w-3 h-3 text-amber-600" />
-                                    H-{pkg.sisaHariDeadline} Menuju Deadline
+                                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-2xl text-[11px] font-black bg-amber-500/20 text-amber-800 dark:text-amber-200 border border-amber-500/40">
+                                    <Clock className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                                    <span className="flex flex-col text-center leading-tight">
+                                      <span className="text-xs font-black tracking-wide">H-{pkg.sisaHariDeadline}</span>
+                                      <span className="text-[10px] font-semibold whitespace-nowrap">Menuju Deadline</span>
+                                    </span>
                                   </span>
                                 ) : (
-                                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-blue-500/15 text-blue-700 dark:text-blue-300 border border-blue-500/30">
-                                    <Clock className="w-3 h-3 text-blue-600" />
-                                    H-{pkg.sisaHariDeadline} Menuju Deadline
+                                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-2xl text-[11px] font-bold bg-blue-500/15 text-blue-700 dark:text-blue-300 border border-blue-500/30">
+                                    <Clock className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                                    <span className="flex flex-col text-center leading-tight">
+                                      <span className="text-xs font-black tracking-wide">H-{pkg.sisaHariDeadline}</span>
+                                      <span className="text-[10px] font-semibold whitespace-nowrap">Menuju Deadline</span>
+                                    </span>
                                   </span>
                                 )}
-                                <span className="text-[10px] text-muted-foreground font-medium flex items-center gap-1">
-                                  <Calendar className="w-2.5 h-2.5 text-amber-500" />
-                                  {formatDate(pkg.deadlineDate)} (Target H-{globalDeadlineDays})
+                                <span className="text-[10px] text-muted-foreground font-medium flex items-center gap-1 whitespace-nowrap pt-0.5">
+                                  <Calendar className="w-2.5 h-2.5 text-amber-500 shrink-0" />
+                                  <span>{formatDate(pkg.deadlineDate)} (Target H-{globalDeadlineDays})</span>
                                 </span>
                               </div>
                             ) : (
