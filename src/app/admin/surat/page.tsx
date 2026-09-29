@@ -50,6 +50,7 @@ import {
   saveSuratTemplates,
   loadGeneratedSuratLogs,
   saveGeneratedSuratLog,
+  syncGeneratedLogsToStorage,
   deleteGeneratedSuratLog,
   resolveAutocratFieldValues,
   renderAutocratMergedText,
@@ -294,6 +295,7 @@ function GenerateSuratPageContent() {
             const serverIds = new Set(hJson.data.map((l: any) => l.id));
             const merged = [...hJson.data, ...localLogs.filter((l) => !serverIds.has(l.id))];
             setHistoryLogs(merged);
+            syncGeneratedLogsToStorage(merged);
           } else if (localLogs.length > 0) {
             setHistoryLogs(localLogs);
           } else {
@@ -1538,7 +1540,7 @@ function GenerateSuratPageContent() {
       verificationUrl,
     };
 
-    const updated = saveGeneratedSuratLog(logItem);
+    const updated = saveGeneratedSuratLog(logItem, historyLogs);
     setHistoryLogs(updated);
 
     return logItem;
@@ -1616,9 +1618,13 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
           body: JSON.stringify(logItem),
         });
         if (res.ok) {
-          const resJson = await res.json();
-          if (resJson.data) {
-            setHistoryLogs((prev) => [resJson.data, ...prev.filter((p) => p.id !== resJson.data.id)]);
+          const refreshRes = await fetch("/api/surat/generated");
+          if (refreshRes.ok) {
+            const refreshJson = await refreshRes.json();
+            if (refreshJson.data && Array.isArray(refreshJson.data)) {
+              setHistoryLogs(refreshJson.data);
+              syncGeneratedLogsToStorage(refreshJson.data);
+            }
           }
         }
       } catch (err) {
@@ -1679,6 +1685,7 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
           const serverIds = new Set(hJson.data.map((l: any) => l.id));
           const merged = [...hJson.data, ...localLogs.filter((l) => !serverIds.has(l.id))];
           setHistoryLogs(merged);
+          syncGeneratedLogsToStorage(merged);
         } else if (localLogs.length > 0) {
           setHistoryLogs(localLogs);
         } else {

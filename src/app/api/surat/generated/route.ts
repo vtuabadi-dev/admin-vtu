@@ -11,10 +11,6 @@ export const dynamic = "force-dynamic";
 let cachedGeneratedLogs: GeneratedSuratLog[] | null = null;
 
 async function getGeneratedLogsFromDb(): Promise<GeneratedSuratLog[]> {
-  if (cachedGeneratedLogs && cachedGeneratedLogs.length > 0) {
-    return cachedGeneratedLogs;
-  }
-
   try {
     const latestDbRecord = await prisma.auditEntry.findFirst({
       where: { action: "SAVE_GENERATED_SURAT_LOGS" },
@@ -23,9 +19,9 @@ async function getGeneratedLogsFromDb(): Promise<GeneratedSuratLog[]> {
 
     if (latestDbRecord?.after) {
       const parsed = JSON.parse(latestDbRecord.after);
-      if (Array.isArray(parsed)) {
+      if (Array.isArray(parsed) && parsed.length > 0) {
         cachedGeneratedLogs = parsed;
-        return cachedGeneratedLogs!;
+        return parsed;
       }
     }
   } catch (err) {

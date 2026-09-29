@@ -2032,17 +2032,30 @@ export function loadGeneratedSuratLogs(): GeneratedSuratLog[] {
   }
 }
 
-export function saveGeneratedSuratLog(log: GeneratedSuratLog): GeneratedSuratLog[] {
+export function saveGeneratedSuratLog(log: GeneratedSuratLog, existingLogs?: GeneratedSuratLog[]): GeneratedSuratLog[] {
   if (typeof window === "undefined") return [];
   try {
     const current = loadGeneratedSuratLogs();
+    // Combine current with existing in-memory logs from React state
+    const baseList = existingLogs && existingLogs.length > 0
+      ? [...existingLogs, ...current.filter((c) => !existingLogs.some((e) => e.id === c.id))]
+      : current;
     // Filter out if duplicate ID exists
-    const updated = [log, ...current.filter((item) => item.id !== log.id)];
+    const updated = [log, ...baseList.filter((item) => item.id !== log.id)];
     localStorage.setItem(STORAGE_KEY_GENERATED_LOGS, JSON.stringify(updated.slice(0, 500))); // Keep last 500
     return updated;
   } catch (err) {
     console.error("Failed to persist generated surat log", err);
     return [];
+  }
+}
+
+export function syncGeneratedLogsToStorage(logs: GeneratedSuratLog[]): void {
+  if (typeof window === "undefined" || !Array.isArray(logs)) return;
+  try {
+    localStorage.setItem(STORAGE_KEY_GENERATED_LOGS, JSON.stringify(logs.slice(0, 500)));
+  } catch (err) {
+    console.error("Failed to sync generated surat logs to localStorage", err);
   }
 }
 
