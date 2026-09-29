@@ -706,14 +706,35 @@ function GenerateSuratPageContent() {
       const akta = results.akta || {};
       const kk = results.kk || {};
 
-      const namaCandidate = ktp.namaLengkap || akta.namaLengkap || kk.namaLengkap;
-      const nikCandidate = ktp.nik || kk.nik;
+      // 1. Nama Jamaah: Prioritas UTAMA dari KTP
+      const namaFromKtp = ktp.namaLengkap || ktp.nama || ktp.name;
+      const namaCandidate =
+        namaFromKtp ||
+        akta.namaLengkap ||
+        akta.nama ||
+        kk.namaLengkap ||
+        kk.nama;
+
+      // 2. NIK / No Identitas: Prioritas UTAMA dari KTP
+      const nikFromKtp = ktp.nik || ktp.noKtp || ktp.nomorKtp;
+      const nikCandidate = nikFromKtp || kk.nik;
+
+      // 3. Tempat Lahir: KTP lalu Akta
       const tempatLahirCandidate = ktp.tempatLahir || akta.tempatLahir;
+
+      // 4. Tanggal Lahir: KTP lalu Akta
       const tanggalLahirCandidate = ktp.tanggalLahir || akta.tanggalLahir;
+
+      // 5. Jenis Kelamin: KTP
       const jenisKelaminCandidate = ktp.jenisKelamin;
+
+      // 6. Nama Ayah Kandung: Akta lalu KK
       const namaAyahCandidate = akta.namaAyah || kk.namaAyah || kk.namaKepalaKeluarga;
+
+      // 7. Nomor KK: KK
       const noKkCandidate = kk.nomorKk || kk.noKk;
 
+      // 8. Alamat: KTP
       let alamatCandidate = ktp.alamatLengkap || ktp.alamat || "";
       if (!alamatCandidate && (ktp.alamat || ktp.kelurahan || ktp.kecamatan || ktp.kota)) {
         const parts = [
@@ -728,26 +749,80 @@ function GenerateSuratPageContent() {
         alamatCandidate = parts.join(", ");
       }
 
+      const cleanStr = (s?: string) =>
+        (s || "")
+          .toLowerCase()
+          .replace(/[\u2018\u2019\u201A\u201B'"`{}[\]()_.\-:\/\\]/g, "")
+          .replace(/\s+/g, "");
+
       setManualFormData((prev) => {
         const next = { ...prev };
         const newlyFilled = new Set<string>();
 
-        effectivePlaceholders.forEach((p) => {
-          const cleanK = (p.key || "").toLowerCase().replace(/[\s_\-\.]/g, "");
-          const cleanL = (p.label || "").toLowerCase().replace(/[\s_\-\.]/g, "");
+        // Pre-populate standard global keys for direct text merges
+        if (namaCandidate) {
+          const val = toTitleCase(namaCandidate);
+          next["nama"] = val;
+          next["nama_lengkap"] = val;
+          next["Nama"] = val;
+          next["Nama Lengkap"] = val;
+          next["Nama Jamaah"] = val;
+          next["Nama Jama'ah"] = val;
+          next["nama_jamaah"] = val;
+        }
+        if (nikCandidate) {
+          const val = String(nikCandidate).trim();
+          next["nik"] = val;
+          next["NIK"] = val;
+          next["no_identitas"] = val;
+          next["No Identitas"] = val;
+          next["nomor_identitas"] = val;
+        }
+        if (alamatCandidate) {
+          const val = toTitleCase(alamatCandidate);
+          next["alamat"] = val;
+          next["Alamat"] = val;
+          next["alamat_lengkap"] = val;
+          next["Alamat Lengkap"] = val;
+        }
 
-          // 1. Nama Lengkap
-          if (
-            cleanK.includes("namajamaah") ||
-            cleanK.includes("namalengkap") ||
-            cleanK === "nama" ||
-            cleanK === "namapemohon" ||
-            cleanK === "namapeserta" ||
-            cleanK === "namakaryawan" ||
-            cleanK === "namatertanggung" ||
-            cleanL.includes("nama jama") ||
-            cleanL.includes("nama lengkap")
-          ) {
+        effectivePlaceholders.forEach((p) => {
+          const cleanK = cleanStr(p.key);
+          const cleanL = cleanStr(p.label);
+          const mf = (p.manifestField || "").toLowerCase();
+
+          // 1. Nama Jamaah / Nama Lengkap (Utamakan dari KTP)
+          const isNama =
+            !cleanK.includes("ayah") &&
+            !cleanL.includes("ayah") &&
+            !cleanK.includes("orangtua") &&
+            !cleanL.includes("orangtua") &&
+            !cleanK.includes("perusahaan") &&
+            !cleanL.includes("perusahaan") &&
+            !cleanK.includes("pimpinan") &&
+            !cleanL.includes("pimpinan") &&
+            !cleanK.includes("paket") &&
+            !cleanL.includes("paket") &&
+            (cleanK === "nama" ||
+              cleanL === "nama" ||
+              cleanK.includes("namajamaah") ||
+              cleanL.includes("namajamaah") ||
+              cleanK.includes("namalengkap") ||
+              cleanL.includes("namalengkap") ||
+              cleanK === "namapemohon" ||
+              cleanL === "namapemohon" ||
+              cleanK === "namapeserta" ||
+              cleanL === "namapeserta" ||
+              cleanK === "namakaryawan" ||
+              cleanL === "namakaryawan" ||
+              cleanK === "namatertanggung" ||
+              cleanL === "namatertanggung" ||
+              cleanK.startsWith("nama") ||
+              cleanL.startsWith("nama") ||
+              mf === "jamaah.namalengkap" ||
+              (mf.includes("nama") && !mf.includes("ayah") && !mf.includes("paket")));
+
+          if (isNama) {
             if (namaCandidate) {
               next[p.key] = toTitleCase(namaCandidate);
               newlyFilled.add(p.key);
@@ -755,25 +830,66 @@ function GenerateSuratPageContent() {
             return;
           }
 
-          // 2. NIK
-          if (
+          // 2. NIK / No Identitas
+          const isNik =
             cleanK === "nik" ||
-            cleanK.includes("ktp") ||
+            cleanL === "nik" ||
+            cleanK.includes("nik") ||
+            cleanL.includes("nik") ||
             cleanK.includes("noidentitas") ||
+            cleanL.includes("noidentitas") ||
             cleanK.includes("nomoridentitas") ||
+            cleanL.includes("nomoridentitas") ||
+            cleanK.includes("noktp") ||
+            cleanL.includes("noktp") ||
+            cleanK.includes("nomorktp") ||
+            cleanL.includes("nomorktp") ||
             cleanK === "noid" ||
+            cleanL === "noid" ||
             cleanK === "nomorid" ||
-            cleanL.includes("nik")
-          ) {
+            cleanL === "nomorid" ||
+            mf === "jamaah.nik" ||
+            mf.includes("nik");
+
+          if (isNik) {
             if (nikCandidate) {
-              next[p.key] = nikCandidate;
+              next[p.key] = String(nikCandidate).trim();
               newlyFilled.add(p.key);
             }
             return;
           }
 
-          // 3. Tempat Lahir
-          if (cleanK.includes("tempatlahir") || cleanL.includes("tempat lahir")) {
+          // 3. TTL (Tempat & Tanggal Lahir digabung)
+          const isTtl =
+            cleanK === "ttl" ||
+            cleanL === "ttl" ||
+            cleanK.includes("tempattanggallahir") ||
+            cleanL.includes("tempattanggallahir") ||
+            cleanK.includes("tempattgllahir") ||
+            cleanL.includes("tempattgllahir");
+
+          if (isTtl) {
+            const tpt = tempatLahirCandidate ? toTitleCase(tempatLahirCandidate) : "";
+            const tglIso = tanggalLahirCandidate ? parseDateToIsoString(tanggalLahirCandidate) : "";
+            const tglIndo = tglIso ? formatIsoToIndonesianDate(tglIso) : tanggalLahirCandidate || "";
+            const ttlVal = [tpt, tglIndo].filter(Boolean).join(", ");
+            if (ttlVal) {
+              next[p.key] = ttlVal;
+              newlyFilled.add(p.key);
+            }
+            return;
+          }
+
+          // 4. Tempat Lahir
+          const isTempatLahir =
+            cleanK.includes("tempatlahir") ||
+            cleanL.includes("tempatlahir") ||
+            (cleanK.includes("tempat") && cleanK.includes("lahir")) ||
+            (cleanL.includes("tempat") && cleanL.includes("lahir")) ||
+            mf === "jamaah.tempatlahir" ||
+            mf.includes("tempatlahir");
+
+          if (isTempatLahir) {
             if (tempatLahirCandidate) {
               next[p.key] = toTitleCase(tempatLahirCandidate);
               newlyFilled.add(p.key);
@@ -781,13 +897,18 @@ function GenerateSuratPageContent() {
             return;
           }
 
-          // 4. Tanggal Lahir
-          if (
+          // 5. Tanggal Lahir
+          const isTanggalLahir =
             cleanK.includes("tanggallahir") ||
             cleanK.includes("tgllahir") ||
-            cleanL.includes("tanggal lahir") ||
-            cleanL.includes("tgl lahir")
-          ) {
+            cleanL.includes("tanggallahir") ||
+            cleanL.includes("tgllahir") ||
+            (cleanK.includes("tanggal") && cleanK.includes("lahir")) ||
+            (cleanL.includes("tanggal") && cleanL.includes("lahir")) ||
+            mf === "jamaah.tanggallahir" ||
+            mf.includes("tanggallahir");
+
+          if (isTanggalLahir) {
             if (tanggalLahirCandidate) {
               const iso = parseDateToIsoString(tanggalLahirCandidate);
               next[p.key] = p.inputType === "date" ? iso : (formatIsoToIndonesianDate(iso) || tanggalLahirCandidate);
@@ -796,8 +917,16 @@ function GenerateSuratPageContent() {
             return;
           }
 
-          // 5. Jenis Kelamin
-          if (cleanK.includes("jeniskelamin") || cleanK.includes("gender") || cleanL.includes("jenis kelamin")) {
+          // 6. Jenis Kelamin
+          const isJenisKelamin =
+            cleanK.includes("jeniskelamin") ||
+            cleanL.includes("jeniskelamin") ||
+            cleanK.includes("gender") ||
+            cleanL.includes("gender") ||
+            mf === "jamaah.jeniskelamin" ||
+            mf.includes("kelamin");
+
+          if (isJenisKelamin) {
             if (jenisKelaminCandidate) {
               const jkUpper = String(jenisKelaminCandidate).toUpperCase();
               next[p.key] = jkUpper.startsWith("L") ? "LAKI-LAKI" : jkUpper.startsWith("P") ? "PEREMPUAN" : jenisKelaminCandidate;
@@ -806,8 +935,16 @@ function GenerateSuratPageContent() {
             return;
           }
 
-          // 6. Nama Ayah
-          if (cleanK.includes("ayah") || cleanK.includes("orangtua") || cleanL.includes("ayah")) {
+          // 7. Nama Ayah Kandung
+          const isNamaAyah =
+            cleanK.includes("ayah") ||
+            cleanL.includes("ayah") ||
+            cleanK.includes("orangtua") ||
+            cleanL.includes("orangtua") ||
+            mf === "jamaah.namaayah" ||
+            mf.includes("ayah");
+
+          if (isNamaAyah) {
             if (namaAyahCandidate) {
               next[p.key] = toTitleCase(namaAyahCandidate);
               newlyFilled.add(p.key);
@@ -815,8 +952,14 @@ function GenerateSuratPageContent() {
             return;
           }
 
-          // 7. Alamat
-          if (cleanK.includes("alamat") || cleanL.includes("alamat")) {
+          // 8. Alamat Domisili
+          const isAlamat =
+            cleanK.includes("alamat") ||
+            cleanL.includes("alamat") ||
+            mf === "jamaah.alamat" ||
+            mf.includes("alamat");
+
+          if (isAlamat) {
             if (alamatCandidate) {
               next[p.key] = toTitleCase(alamatCandidate);
               newlyFilled.add(p.key);
@@ -824,10 +967,19 @@ function GenerateSuratPageContent() {
             return;
           }
 
-          // 8. Nomor KK
-          if (cleanK.includes("nomorkk") || cleanK.includes("nokk") || cleanL.includes("nomor kk")) {
+          // 9. Nomor KK
+          const isNomorKk =
+            cleanK.includes("nomorkk") ||
+            cleanL.includes("nomorkk") ||
+            cleanK.includes("nokk") ||
+            cleanL.includes("nokk") ||
+            cleanK.includes("kartukeluarga") ||
+            cleanL.includes("kartukeluarga") ||
+            mf.includes("kk");
+
+          if (isNomorKk) {
             if (noKkCandidate) {
-              next[p.key] = noKkCandidate;
+              next[p.key] = String(noKkCandidate).trim();
               newlyFilled.add(p.key);
             }
             return;
@@ -840,6 +992,13 @@ function GenerateSuratPageContent() {
     },
     [effectivePlaceholders]
   );
+
+  // Automatically apply OCR results to form when entering OCR mode or changing template
+  useEffect(() => {
+    if (dataSourceMode === "ocr" && (["ktp", "akta", "kk"] as OcrDocType[]).some((j) => ocrResultsData[j])) {
+      applyAllOcrResultsToForm(ocrResultsData);
+    }
+  }, [dataSourceMode, selectedTemplateSlug, effectivePlaceholders, applyAllOcrResultsToForm, ocrResultsData]);
 
   // Process OCR for specific file
   const handleOcrProcessFile = async (
@@ -2467,7 +2626,7 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
                                 <Sparkles className="h-3 w-3 text-amber-500" />
                                 + Nama Ayah (Endorsement)
                               </span>
-                            ) : ocrFilledFieldKeys.has(p.key) ? (
+                            ) : ocrFilledFieldKeys.has(p.key) || (dataSourceMode === "ocr" && manualVal !== undefined && manualVal !== "") ? (
                               <span className="text-[10px] font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-500/15 border border-emerald-500/30 px-2 py-0.5 rounded flex items-center gap-1 shadow-2xs">
                                 <Sparkles className="h-3 w-3 text-emerald-500" />
                                 Auto OCR
@@ -2491,7 +2650,7 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
                                   ? "Pilih Bulan"
                                   : "Input Manual"}
                               </span>
-                            ) : isManifest ? (
+                            ) : isManifest && dataSourceMode === "manifest" ? (
                               <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded flex items-center gap-1">
                                 <CheckCircle2 className="h-3 w-3" />
                                 Otomatis Manifest
