@@ -67,7 +67,7 @@ import {
   formatIsoToIndonesianMonthYear,
 } from "@/shared/lib/surat-autocrat-engine";
 import { downloadMergedDocx } from "@/shared/lib/docx-mail-merge";
-import { downloadDocxAsPdf, convertDocxToA4Html } from "@/shared/lib/docx-to-pdf";
+import { downloadDocxAsPdf } from "@/shared/lib/docx-to-pdf";
 import { KantorImigrasiCombobox } from "@/shared/components/ui/KantorImigrasiCombobox";
 import { SearchableSelect } from "@/shared/components/ui/SearchableSelect";
 import { getKotaFromKanimName } from "@/shared/lib/kantor-imigrasi";
@@ -1642,10 +1642,22 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
     }
   };
 
-  // Print from history log with full Word A4 letterhead & watermark support
+  // Print from history log with 100% original template Word layout & styling
   const handleHistoryPrint = async (log: GeneratedSuratLog, fileIndex: number = 0) => {
     const tpl = templates.find((t) => t.id === log.templateId || t.slug === log.templateSlug) || activeTemplate;
     const attached = tpl?.attachedFiles || [];
+    const hasMultiple = attached.length > 1;
+    const isTtd = fileIndex === 0 && hasMultiple;
+    const targetFormat = attached[fileIndex]?.formatNamaFile || (fileIndex === 0 ? tpl?.formatNamaFile : "");
+
+    const fileName = generateSuratFileName(log.nomorSurat, log.fieldsData || {}, null, {
+      formatNamaFile: targetFormat,
+      isTtd,
+      ext: "pdf",
+      placeholders: tpl?.placeholders,
+      fallbackNama: log.jamaahNama,
+    });
+
     const binary =
       attached[fileIndex]?.templateFileBase64 ||
       (fileIndex === 0
@@ -1654,43 +1666,15 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
 
     if (binary && log.fieldsData) {
       try {
-        const { mergeDocxPlaceholders } = await import("@/shared/lib/docx-mail-merge");
-        const mergedBlob = await mergeDocxPlaceholders(binary, log.fieldsData);
-        const a4Html = await convertDocxToA4Html(mergedBlob);
-        const printWin = window.open("", "_blank");
-        if (printWin) {
-          printWin.document.write(`
-            <!DOCTYPE html>
-            <html>
-              <head>
-                <title>${log.nomorSurat} - Cetak Surat Resmi</title>
-                <style>
-                  @page { size: A4 portrait; margin: 0; }
-                  body { margin: 0; padding: 0; background: #fff; }
-                  .docx-pages-container { background: #fff !important; }
-                  .docx-a4-page { margin: 0 !important; page-break-after: always; break-after: page; }
-                  @media print {
-                    body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-                  }
-                </style>
-              </head>
-              <body>
-                ${a4Html}
-                <script>
-                  window.onload = function() {
-                    setTimeout(function() {
-                      window.print();
-                    }, 500);
-                  };
-                </script>
-              </body>
-            </html>
-          `);
-          printWin.document.close();
-          return;
-        }
+        const label = isTtd ? "Dengan TTD & Stempel" : "Tanpa TTD (Cap Basah)";
+        showToast(`Menyiapkan cetak (${label}) dari template Word asli...`);
+        const { printDocxAsPdf } = await import("@/shared/lib/docx-to-pdf");
+        await printDocxAsPdf(binary, log.fieldsData, fileName);
+        return;
       } catch (err) {
-        console.warn("Gagal cetak DOCX A4 HTML:", err);
+        console.error("Gagal cetak dari template docx:", err);
+        showToast("Gagal memproses cetak dokumen template.");
+        return;
       }
     }
 

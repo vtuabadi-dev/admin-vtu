@@ -150,19 +150,32 @@ function replacePlaceholdersInXml(xmlContent: string, fieldValues: Record<string
 /**
  * In Microsoft Word, a placeholder like "{nama_lengkap}" can be split across multiple
  * <w:r> (run) and <w:t> (text) tags due to spellchecking or revision marks.
- * This function detects split tags inside <w:p> paragraphs and replaces them cleanly.
+ * This function detects split tags inside <w:p> paragraphs and replaces only the matched character spans,
+ * strictly preserving preceding and following runs (such as labels, tab stops <w:tab/>, and colons).
  */
 function resolveSplitRunsInParagraphs(xmlContent: string, fieldValues: Record<string, string>): string {
   // Regex to match paragraph content: <w:p ...>...</w:p>
   return xmlContent.replace(/<w:p\b[^>]*>([\s\S]*?)<\/w:p>/g, (paragraphMatch) => {
     // Check if paragraph contains opening bracket or curly
-    if (!paragraphMatch.includes("{") && !paragraphMatch.includes("&lt;&lt;") && !paragraphMatch.includes("«") && !paragraphMatch.includes("[")) {
+    if (
+      !paragraphMatch.includes("{") &&
+      !paragraphMatch.includes("&lt;&lt;") &&
+      !paragraphMatch.includes("«") &&
+      !paragraphMatch.includes("[")
+    ) {
       return paragraphMatch;
     }
 
     // Extract all text nodes <w:t ...>text</w:t>
     const textNodeRegex = /(<w:t\b[^>]*>)([\s\S]*?)(<\/w:t>)/g;
-    const matches: { fullMatch: string; prefix: string; text: string; suffix: string; start: number; end: number }[] = [];
+    const matches: {
+      fullMatch: string;
+      prefix: string;
+      text: string;
+      suffix: string;
+      start: number;
+      end: number;
+    }[] = [];
     let match: RegExpExecArray | null;
 
     while ((match = textNodeRegex.exec(paragraphMatch)) !== null) {
@@ -180,49 +193,101 @@ function resolveSplitRunsInParagraphs(xmlContent: string, fieldValues: Record<st
 
     if (matches.length <= 1) return paragraphMatch;
 
-    // Build the concatenated paragraph text
-    const combinedText = matches.map((m) => m.text).join("");
+    // Track segments and their current text
+    const segs: { text: string }[] = matches.map((m) => ({ text: m.text }));
 
-    // Check if any key exists in combined text
-    let hasMatch = false;
-    for (const key of Object.keys(fieldValues)) {
-      const patterns = buildRegexPatternsForKey(key);
-      if (patterns.some((p) => p.test(combinedText))) {
-        hasMatch = true;
-        break;
-      }
-    }
-
-    if (!hasMatch) return paragraphMatch;
-
-    // Apply replacements to the combined text
-    let replacedCombined = combinedText;
+    // Find all placeholder replacements to apply across segments
     for (const [key, rawValue] of Object.entries(fieldValues)) {
       if (rawValue === undefined || rawValue === null) continue;
       const escapedValue = escapeXml(String(rawValue));
       const patterns = buildRegexPatternsForKey(key);
 
       for (const pattern of patterns) {
-        replacedCombined = replacedCombined.replace(pattern, escapedValue);
+        let combined = "";
+        const boundaries: { segIdx: number; startInCombined: number; endInCombined: number }[] = [];
+        let currOffset = 0;
+        for (let i = 0; i < segs.length; i++) {
+          const segText = segs[i]!.text;
+          const start = currOffset;
+          const end = currOffset + segText.length;
+          boundaries.push({ segIdx: i, startInCombined: start, endInCombined: end });
+          combined += segText;
+          currOffset = end;
+        }
+
+        // Collect all occurrences for this pattern
+        const occurrences: { matchStart: number; matchEnd: number }[] = [];
+        let pMatch: RegExpExecArray | null;
+        pattern.lastIndex = 0;
+
+        while ((pMatch = pattern.exec(combined)) !== null) {
+          occurrences.push({
+            matchStart: pMatch.index,
+            matchEnd: pMatch.index + pMatch[0].length,
+          });
+          if (!pattern.global) break;
+        }
+
+        // Apply occurrences in reverse order so character offsets in earlier parts of combined don't shift
+        for (let oIdx = occurrences.length - 1; oIdx >= 0; oIdx--) {
+          const occ = occurrences[oIdx]!;
+          const mStart = occ.matchStart;
+          const mEnd = occ.matchEnd;
+
+          let firstSeg = -1;
+          let lastSeg = -1;
+
+          for (const b of boundaries) {
+            if (mStart < b.endInCombined && mEnd > b.startInCombined) {
+              if (firstSeg === -1) firstSeg = b.segIdx;
+              lastSeg = b.segIdx;
+            }
+          }
+
+          if (firstSeg !== -1 && lastSeg !== -1) {
+            if (firstSeg === lastSeg) {
+              // Entire placeholder is within a single segment
+              const b = boundaries[firstSeg]!;
+              const relStart = mStart - b.startInCombined;
+              const relEnd = mEnd - b.startInCombined;
+              const orig = segs[firstSeg]!.text;
+              segs[firstSeg]!.text = orig.slice(0, relStart) + escapedValue + orig.slice(relEnd);
+            } else {
+              // Placeholder spans multiple segments (split run)
+              const bFirst = boundaries[firstSeg]!;
+              const bLast = boundaries[lastSeg]!;
+
+              const relStart = mStart - bFirst.startInCombined;
+              const relEnd = mEnd - bLast.startInCombined;
+
+              // Put replacement in first segment
+              segs[firstSeg]!.text = segs[firstSeg]!.text.slice(0, relStart) + escapedValue;
+
+              // Clear middle segments that fall completely inside the placeholder
+              for (let mid = firstSeg + 1; mid < lastSeg; mid++) {
+                segs[mid]!.text = "";
+              }
+
+              // Remove matching prefix from last segment
+              segs[lastSeg]!.text = segs[lastSeg]!.text.slice(relEnd);
+            }
+          }
+        }
       }
     }
 
-    // Put all replaced text into the first <w:t> and clear the rest
+    // Now reconstruct paragraphMatch replacing only modified segments
     let newParagraph = paragraphMatch;
     let offset = 0;
 
     for (let i = 0; i < matches.length; i++) {
-      const m = matches[i];
-      if (!m) continue;
-      const actualStart = m.start + offset;
-      const actualEnd = m.end + offset;
-
-      if (i === 0) {
-        const replacement = `<w:t xml:space="preserve">${replacedCombined}</w:t>`;
-        newParagraph = newParagraph.slice(0, actualStart) + replacement + newParagraph.slice(actualEnd);
-        offset += replacement.length - m.fullMatch.length;
-      } else {
-        const replacement = `<w:t></w:t>`;
+      const m = matches[i]!;
+      const newText = segs[i]!.text;
+      if (newText !== m.text) {
+        const actualStart = m.start + offset;
+        const actualEnd = m.end + offset;
+        const preserveAttr = newText.startsWith(" ") || newText.endsWith(" ") ? ' xml:space="preserve"' : "";
+        const replacement = `<w:t${preserveAttr}>${newText}</w:t>`;
         newParagraph = newParagraph.slice(0, actualStart) + replacement + newParagraph.slice(actualEnd);
         offset += replacement.length - m.fullMatch.length;
       }

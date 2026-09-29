@@ -740,11 +740,16 @@ export async function convertDocxToA4Html(
  * Uses native DOCX-to-PDF conversion via Google Drive for 100% Word fidelity,
  * with automatic fallback to client-side renderer if offline.
  */
-export async function downloadDocxAsPdf(
+/**
+ * Generates a pristine PDF Blob from DOCX template with placeholders replaced.
+ * Uses native DOCX-to-PDF conversion via Google Drive for 100% Word fidelity,
+ * with automatic fallback to client-side renderer if offline.
+ */
+export async function generateDocxAsPdfBlob(
   docxData: string | Uint8Array | ArrayBuffer | Blob,
   fieldValues: Record<string, string>,
-  fileName: string
-): Promise<void> {
+  fileName: string = "surat.pdf"
+): Promise<Blob> {
   const cleanPdfName = fileName.endsWith(".pdf") ? fileName : `${fileName}.pdf`;
 
   // 1. Populate placeholders directly inside the DOCX
@@ -774,20 +779,12 @@ export async function downloadDocxAsPdf(
     if (res.ok) {
       const pdfBlob = await res.blob();
       if (pdfBlob && pdfBlob.size > 1000) {
-        const url = URL.createObjectURL(pdfBlob);
-        const link = document.createElement("a");
-        link.href = url;
-        link.download = cleanPdfName;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        setTimeout(() => URL.revokeObjectURL(url), 2000);
-        return;
+        return pdfBlob;
       }
     }
-    console.warn("[downloadDocxAsPdf] Server conversion failed, falling back to local renderer.");
+    console.warn("[generateDocxAsPdfBlob] Server conversion failed, falling back to local renderer.");
   } catch (err) {
-    console.warn("[downloadDocxAsPdf] Error calling server conversion API, falling back to local renderer:", err);
+    console.warn("[generateDocxAsPdfBlob] Error calling server conversion API, falling back to local renderer:", err);
   }
 
   // 3. Fallback Method: Local HTML rasterization (if offline or server conversion unavailable)
@@ -871,9 +868,82 @@ export async function downloadDocxAsPdf(
       }
     }
 
-    const cleanName = fileName.endsWith(".pdf") ? fileName : `${fileName}.pdf`;
-    pdf.save(cleanName);
+    return pdf.output("blob");
   } finally {
     document.body.removeChild(container);
   }
+}
+
+/**
+ * Merges field values into DOCX template and downloads it directly as an accurate PDF file.
+ */
+export async function downloadDocxAsPdf(
+  docxData: string | Uint8Array | ArrayBuffer | Blob,
+  fieldValues: Record<string, string>,
+  fileName: string
+): Promise<void> {
+  const cleanPdfName = fileName.endsWith(".pdf") ? fileName : `${fileName}.pdf`;
+  const pdfBlob = await generateDocxAsPdfBlob(docxData, fieldValues, cleanPdfName);
+  const url = URL.createObjectURL(pdfBlob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = cleanPdfName;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+}
+
+/**
+ * Prints the document generated directly from the DOCX template with placeholders replaced.
+ * Uses the pristine PDF output to guarantee 100% fidelity with the original template.
+ */
+export async function printDocxAsPdf(
+  docxData: string | Uint8Array | ArrayBuffer | Blob,
+  fieldValues: Record<string, string>,
+  fileName: string = "surat.pdf"
+): Promise<void> {
+  const cleanPdfName = fileName.endsWith(".pdf") ? fileName : `${fileName}.pdf`;
+  const pdfBlob = await generateDocxAsPdfBlob(docxData, fieldValues, cleanPdfName);
+  const pdfUrl = URL.createObjectURL(pdfBlob);
+
+  // Hidden iframe to trigger native print dialog
+  const iframe = document.createElement("iframe");
+  iframe.style.position = "fixed";
+  iframe.style.right = "0";
+  iframe.style.bottom = "0";
+  iframe.style.width = "0";
+  iframe.style.height = "0";
+  iframe.style.border = "0";
+  iframe.src = pdfUrl;
+  document.body.appendChild(iframe);
+
+  let hasTriggered = false;
+  iframe.onload = () => {
+    try {
+      setTimeout(() => {
+        iframe.contentWindow?.focus();
+        iframe.contentWindow?.print();
+        hasTriggered = true;
+      }, 350);
+    } catch {
+      // Browser plugin may block direct iframe print
+    }
+  };
+
+  // Safe fallback: open in dedicated print tab if direct iframe print didn't trigger
+  setTimeout(() => {
+    if (!hasTriggered) {
+      const win = window.open(pdfUrl, "_blank");
+      if (win) {
+        win.focus();
+      }
+    }
+    setTimeout(() => {
+      try {
+        document.body.removeChild(iframe);
+        URL.revokeObjectURL(pdfUrl);
+      } catch (_) {}
+    }, 120000);
+  }, 1000);
 }
