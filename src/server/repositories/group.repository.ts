@@ -226,6 +226,8 @@ export const groupRepo = {
         totalPembayaran: data.totalPembayaran,
         sisaPembayaran: data.sisaPembayaran,
         status: data.status,
+        isKeretaCepat: data.isKeretaCepat,
+        isCityTourThoif: data.isCityTourThoif,
       },
       include: { anggota: true },
     });

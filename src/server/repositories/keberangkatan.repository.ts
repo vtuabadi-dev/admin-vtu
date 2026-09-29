@@ -178,6 +178,8 @@ export const keberangkatanRepo = {
         hotelMadinah: data.hotelMadinah ?? "TBA",
         kuota: data.kuota ?? data.maxSeat ?? 0,
         hotelOptions: data.hotelOptions ? (data.hotelOptions as any) : [],
+        include: data.include ? (data.include as any) : [],
+        exclude: data.exclude ? (data.exclude as any) : [],
         notes: data.notes ?? undefined,
       },
       include: DEFAULT_INCLUDE,

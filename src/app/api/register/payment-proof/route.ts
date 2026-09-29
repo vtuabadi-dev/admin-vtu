@@ -166,8 +166,18 @@ export async function POST(request: NextRequest) {
             hotelMekkah: "",
             hotelMadinah: "",
             syaratDisetujui: reg.termsAccepted ?? true,
-            isKeretaCepat: Array.isArray(reg.keberangkatan?.include) && reg.keberangkatan.include.some((inc: string) => /kereta|fast train|haramain/i.test(inc)),
-            isCityTourThoif: Array.isArray(reg.keberangkatan?.include) && reg.keberangkatan.include.some((inc: string) => /thoif|taif|ta'if/i.test(inc)),
+            isKeretaCepat:
+              (reg as any).isKeretaCepat !== undefined
+                ? Boolean((reg as any).isKeretaCepat)
+                : ((Array.isArray(reg.keberangkatan?.include) && reg.keberangkatan.include.some((inc: string) => /kereta|fast train|haramain/i.test(inc))) ||
+                   /kereta|fast train|haramain/i.test(reg.keberangkatan?.namaPaket || "") ||
+                   (reg.keberangkatan as any)?.isAdaKeretaCepat === "ya"),
+            isCityTourThoif:
+              (reg as any).isCityTourThoif !== undefined
+                ? Boolean((reg as any).isCityTourThoif)
+                : ((Array.isArray(reg.keberangkatan?.include) && reg.keberangkatan.include.some((inc: string) => /th[ao]'?if|ta'?if|toif/i.test(inc))) ||
+                   /th[ao]'?if|ta'?if|toif/i.test(reg.keberangkatan?.namaPaket || "") ||
+                   (reg.keberangkatan as any)?.isAdaThoif === "ya"),
           },
         });
       }
@@ -202,6 +212,20 @@ export async function POST(request: NextRequest) {
 
       const totalTagihan = basePaket + roomSurcharge;
       const pkgInc = Array.isArray(reg.keberangkatan?.include) ? reg.keberangkatan.include : [];
+      const hasKC =
+        (reg as any).isKeretaCepat !== undefined
+          ? Boolean((reg as any).isKeretaCepat)
+          : (pkgInc.some((inc: string) => /kereta|fast train|haramain/i.test(inc)) ||
+             /kereta|fast train|haramain/i.test(reg.keberangkatan?.namaPaket || "") ||
+             (reg.keberangkatan as any)?.isAdaKeretaCepat === "ya");
+
+      const hasThoif =
+        (reg as any).isCityTourThoif !== undefined
+          ? Boolean((reg as any).isCityTourThoif)
+          : (pkgInc.some((inc: string) => /th[ao]'?if|ta'?if|toif/i.test(inc)) ||
+             /th[ao]'?if|ta'?if|toif/i.test(reg.keberangkatan?.namaPaket || "") ||
+             (reg.keberangkatan as any)?.isAdaThoif === "ya");
+
       group = await prisma.registrationGroup.create({
         data: {
           kodeRegistrasi: reg.kodeRegistrasi,
@@ -213,8 +237,8 @@ export async function POST(request: NextRequest) {
           totalPembayaran: 0,
           sisaPembayaran: totalTagihan,
           status: "active",
-          isKeretaCepat: pkgInc.some((inc: string) => /kereta|fast train|haramain/i.test(inc)),
-          isCityTourThoif: pkgInc.some((inc: string) => /thoif|taif|ta'if/i.test(inc)),
+          isKeretaCepat: hasKC,
+          isCityTourThoif: hasThoif,
         },
       });
 

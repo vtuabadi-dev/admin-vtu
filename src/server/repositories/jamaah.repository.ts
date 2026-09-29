@@ -153,6 +153,8 @@ export const jamaahRepo = {
         status: data.status,
         hotelMekkah: data.hotelMekkah,
         hotelMadinah: data.hotelMadinah,
+        isKeretaCepat: data.isKeretaCepat,
+        isCityTourThoif: data.isCityTourThoif,
       },
       include: { dokumen: true },
     });
@@ -184,6 +186,8 @@ export const jamaahRepo = {
     if (data.catatanPerlengkapan !== undefined) updateData.catatanPerlengkapan = data.catatanPerlengkapan;
     if (data.hotelMekkah !== undefined) updateData.hotelMekkah = data.hotelMekkah;
     if (data.hotelMadinah !== undefined) updateData.hotelMadinah = data.hotelMadinah;
+    if (data.isKeretaCepat !== undefined) updateData.isKeretaCepat = data.isKeretaCepat;
+    if (data.isCityTourThoif !== undefined) updateData.isCityTourThoif = data.isCityTourThoif;
 
     const row = await prisma.jamaah.update({ where: { id }, data: updateData, include: { dokumen: true } });
 

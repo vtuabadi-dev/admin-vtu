@@ -15,27 +15,59 @@ export async function POST(request: NextRequest) {
   if (!perm.allowed) return NextResponse.json({ success: false, message: perm.reason }, { status: 403 });
 
   try {
-    const { dokumenId, fileUrl, jenis, mode, forceFresh } = await request.json() as {
-      dokumenId: string;
-      fileUrl: string;
-      jenis: DokumenJenis;
-      mode?: string;
-      forceFresh?: boolean;
-    };
+    const contentType = request.headers.get("content-type") || "";
+    let dokumenId: string | undefined;
+    let fileUrl: string | undefined;
+    let jenis: DokumenJenis;
+    let mode: string | undefined;
+    let forceFresh = false;
+    let buffer: Buffer;
 
-    if (!dokumenId || !fileUrl || !jenis) {
-      return NextResponse.json({ success: false, message: "dokumenId, fileUrl, and jenis are required" }, { status: 400 });
+    if (contentType.includes("multipart/form-data")) {
+      const formData = await request.formData();
+      const file = formData.get("file") as File | null;
+      jenis = (formData.get("jenisDokumen") || formData.get("jenis")) as DokumenJenis;
+      dokumenId = (formData.get("dokumenId") as string) || undefined;
+      mode = (formData.get("mode") as string) || undefined;
+      forceFresh = formData.get("forceFresh") === "true";
+
+      if (!file || !jenis) {
+        return NextResponse.json({ success: false, message: "file and jenis are required" }, { status: 400 });
+      }
+
+      buffer = Buffer.from(await file.arrayBuffer());
+    } else {
+      const body = (await request.json()) as {
+        dokumenId?: string;
+        fileUrl?: string;
+        jenis: DokumenJenis;
+        mode?: string;
+        forceFresh?: boolean;
+      };
+
+      dokumenId = body.dokumenId;
+      fileUrl = body.fileUrl;
+      jenis = body.jenis;
+      mode = body.mode;
+      forceFresh = Boolean(body.forceFresh);
+
+      if (!jenis) {
+        return NextResponse.json({ success: false, message: "jenis is required" }, { status: 400 });
+      }
+      if (!fileUrl && !dokumenId) {
+        return NextResponse.json({ success: false, message: "fileUrl or dokumenId is required" }, { status: 400 });
+      }
+
+      // Download file dari storage ke memory buffer — tanpa filesystem
+      let cleanFileId = fileUrl || "";
+      if (cleanFileId.includes("id=")) {
+        cleanFileId = cleanFileId.split("id=")[1]?.split("&")[0] || cleanFileId;
+      }
+      cleanFileId = cleanFileId.replace(/^https?:\/\/[^\/]+\//, "").replace(/^\//, "");
+
+      const storage = getStorageAdapter();
+      buffer = await storage.download(cleanFileId);
     }
-
-    // Download file dari storage ke memory buffer — tanpa filesystem
-    let cleanFileId = fileUrl;
-    if (cleanFileId.includes("id=")) {
-      cleanFileId = cleanFileId.split("id=")[1]?.split("&")[0] || cleanFileId;
-    }
-    cleanFileId = cleanFileId.replace(/^https?:\/\/[^\/]+\//, "").replace(/^\//, "");
-
-    const storage = getStorageAdapter();
-    const buffer = await storage.download(cleanFileId);
 
     // OCR langsung dari buffer — tanpa write/read/delete temp file
     const ocrResult = await processDocument(buffer, jenis, 0, mode, forceFresh);
@@ -61,8 +93,10 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Persist OCR result and sync Jamaah & ManifestRow
-    await dokumenRepo.saveOcrResult(dokumenId, ocrData as any);
+    // Persist OCR result and sync Jamaah & ManifestRow only when dokumenId is provided
+    if (dokumenId) {
+      await dokumenRepo.saveOcrResult(dokumenId, ocrData as any);
+    }
 
     return NextResponse.json({ success: true, data: ocrData });
   } catch (error) {

@@ -33,6 +33,7 @@ import {
   PenTool,
   Calendar,
   CalendarDays,
+  Loader2,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/components/ui/Card";
 import { Button } from "@/shared/components/ui/Button";
@@ -159,14 +160,66 @@ function GenerateSuratPageContent() {
   const [selectedPackageId, setSelectedPackageId] = useState<string>("");
   const [selectedJamaahId, setSelectedJamaahId] = useState<string>("");
   const [selectedDocIndex, setSelectedDocIndex] = useState<number>(0);
-  const [dataSourceMode, setDataSourceMode] = useState<"manifest" | "manual">("manifest");
+  type OcrDocType = "ktp" | "akta" | "kk";
 
-  const handleSwitchMode = (mode: "manifest" | "manual") => {
+  const [dataSourceMode, setDataSourceMode] = useState<"manifest" | "ocr" | "manual">("manifest");
+  const [saveOcrToManifest, setSaveOcrToManifest] = useState<boolean>(false);
+  const [isSavingOcrDocsToManifest, setIsSavingOcrDocsToManifest] = useState<boolean>(false);
+
+  // 3 Document Slots for OCR in Surat: KTP, Akta Lahir, KK
+  const [ocrFiles, setOcrFiles] = useState<Record<OcrDocType, File | null>>({
+    ktp: null,
+    akta: null,
+    kk: null,
+  });
+  const [ocrPreviews, setOcrPreviews] = useState<Record<OcrDocType, string | null>>({
+    ktp: null,
+    akta: null,
+    kk: null,
+  });
+  const [ocrStatuses, setOcrStatuses] = useState<Record<OcrDocType, "idle" | "uploading" | "extracting" | "success" | "error">>({
+    ktp: "idle",
+    akta: "idle",
+    kk: "idle",
+  });
+  const [ocrResultsData, setOcrResultsData] = useState<Record<OcrDocType, Record<string, any> | null>>({
+    ktp: null,
+    akta: null,
+    kk: null,
+  });
+  const [ocrErrors, setOcrErrors] = useState<Record<OcrDocType, string | null>>({
+    ktp: null,
+    akta: null,
+    kk: null,
+  });
+  const [ocrUploadedDocs, setOcrUploadedDocs] = useState<Record<OcrDocType, any | null>>({
+    ktp: null,
+    akta: null,
+    kk: null,
+  });
+  const [ocrFilledFieldKeys, setOcrFilledFieldKeys] = useState<Set<string>>(new Set());
+
+  // Hidden File Input Refs for OCR Uploads
+  const ktpInputRef = React.useRef<HTMLInputElement>(null);
+  const aktaInputRef = React.useRef<HTMLInputElement>(null);
+  const kkInputRef = React.useRef<HTMLInputElement>(null);
+  const docInputRefs: Record<OcrDocType, React.RefObject<HTMLInputElement | null>> = {
+    ktp: ktpInputRef,
+    akta: aktaInputRef,
+    kk: kkInputRef,
+  };
+
+  const handleSwitchMode = (mode: "manifest" | "ocr" | "manual") => {
     setDataSourceMode(mode);
     if (mode === "manual") {
       setSelectedPackageId("");
       setSelectedJamaahId("");
       setManualFormData({});
+    } else if (mode === "ocr") {
+      if (!saveOcrToManifest) {
+        setSelectedPackageId("");
+        setSelectedJamaahId("");
+      }
     }
   };
 
@@ -611,6 +664,355 @@ function GenerateSuratPageContent() {
     // Fallback: If no document text is extracted yet, use template's configured placeholders (excluding system auto tags)
     return (activeTemplate?.placeholders || []).filter((p) => !isSystemAutoPlaceholder(p.key));
   }, [activeTemplate, rawTemplateText]);
+
+  // OCR Document Configuration (KTP, Akta, KK)
+  const OCR_DOC_CONFIG: Record<
+    OcrDocType,
+    {
+      title: string;
+      subtitle: string;
+      badgeText: string;
+      sampleFields: string;
+    }
+  > = {
+    ktp: {
+      title: "KTP",
+      subtitle: "Kartu Tanda Penduduk",
+      badgeText: "NIK & Identitas",
+      sampleFields: "NIK, Nama Lengkap, Tempat/Tgl Lahir, Jenis Kelamin, Alamat",
+    },
+    akta: {
+      title: "Akta Kelahiran",
+      subtitle: "Akta Lahir Resmi",
+      badgeText: "Nama & Orang Tua",
+      sampleFields: "Nama Lengkap, Tempat/Tgl Lahir, Nama Ayah Kandung",
+    },
+    kk: {
+      title: "Kartu Keluarga",
+      subtitle: "KK (Kartu Keluarga)",
+      badgeText: "No. KK & Keluarga",
+      sampleFields: "Nomor KK, Nama Kepala Keluarga / Ayah, NIK",
+    },
+  };
+
+  // Map extracted OCR results to Autocrat Form Placeholders
+  const applyAllOcrResultsToForm = useCallback(
+    (results: Record<OcrDocType, Record<string, any> | null>) => {
+      const ktp = results.ktp || {};
+      const akta = results.akta || {};
+      const kk = results.kk || {};
+
+      const namaCandidate = ktp.namaLengkap || akta.namaLengkap || kk.namaLengkap;
+      const nikCandidate = ktp.nik || kk.nik;
+      const tempatLahirCandidate = ktp.tempatLahir || akta.tempatLahir;
+      const tanggalLahirCandidate = ktp.tanggalLahir || akta.tanggalLahir;
+      const jenisKelaminCandidate = ktp.jenisKelamin;
+      const namaAyahCandidate = akta.namaAyah || kk.namaAyah || kk.namaKepalaKeluarga;
+      const noKkCandidate = kk.nomorKk || kk.noKk;
+
+      let alamatCandidate = ktp.alamatLengkap || ktp.alamat || "";
+      if (!alamatCandidate && (ktp.alamat || ktp.kelurahan || ktp.kecamatan || ktp.kota)) {
+        const parts = [
+          ktp.alamat,
+          ktp.rt && `RT ${ktp.rt}`,
+          ktp.rw && `RW ${ktp.rw}`,
+          ktp.kelurahan && `Kel. ${ktp.kelurahan}`,
+          ktp.kecamatan && `Kec. ${ktp.kecamatan}`,
+          ktp.kota,
+          ktp.provinsi,
+        ].filter(Boolean);
+        alamatCandidate = parts.join(", ");
+      }
+
+      setManualFormData((prev) => {
+        const next = { ...prev };
+        const newlyFilled = new Set<string>();
+
+        effectivePlaceholders.forEach((p) => {
+          const cleanK = (p.key || "").toLowerCase().replace(/[\s_\-\.]/g, "");
+          const cleanL = (p.label || "").toLowerCase().replace(/[\s_\-\.]/g, "");
+
+          // 1. Nama Lengkap
+          if (
+            cleanK.includes("namajamaah") ||
+            cleanK.includes("namalengkap") ||
+            cleanK === "nama" ||
+            cleanK === "namapemohon" ||
+            cleanK === "namapeserta" ||
+            cleanK === "namakaryawan" ||
+            cleanK === "namatertanggung" ||
+            cleanL.includes("nama jama") ||
+            cleanL.includes("nama lengkap")
+          ) {
+            if (namaCandidate) {
+              next[p.key] = toTitleCase(namaCandidate);
+              newlyFilled.add(p.key);
+            }
+            return;
+          }
+
+          // 2. NIK
+          if (
+            cleanK === "nik" ||
+            cleanK.includes("ktp") ||
+            cleanK.includes("noidentitas") ||
+            cleanK.includes("nomoridentitas") ||
+            cleanK === "noid" ||
+            cleanK === "nomorid" ||
+            cleanL.includes("nik")
+          ) {
+            if (nikCandidate) {
+              next[p.key] = nikCandidate;
+              newlyFilled.add(p.key);
+            }
+            return;
+          }
+
+          // 3. Tempat Lahir
+          if (cleanK.includes("tempatlahir") || cleanL.includes("tempat lahir")) {
+            if (tempatLahirCandidate) {
+              next[p.key] = toTitleCase(tempatLahirCandidate);
+              newlyFilled.add(p.key);
+            }
+            return;
+          }
+
+          // 4. Tanggal Lahir
+          if (
+            cleanK.includes("tanggallahir") ||
+            cleanK.includes("tgllahir") ||
+            cleanL.includes("tanggal lahir") ||
+            cleanL.includes("tgl lahir")
+          ) {
+            if (tanggalLahirCandidate) {
+              const iso = parseDateToIsoString(tanggalLahirCandidate);
+              next[p.key] = p.inputType === "date" ? iso : (formatIsoToIndonesianDate(iso) || tanggalLahirCandidate);
+              newlyFilled.add(p.key);
+            }
+            return;
+          }
+
+          // 5. Jenis Kelamin
+          if (cleanK.includes("jeniskelamin") || cleanK.includes("gender") || cleanL.includes("jenis kelamin")) {
+            if (jenisKelaminCandidate) {
+              const jkUpper = String(jenisKelaminCandidate).toUpperCase();
+              next[p.key] = jkUpper.startsWith("L") ? "LAKI-LAKI" : jkUpper.startsWith("P") ? "PEREMPUAN" : jenisKelaminCandidate;
+              newlyFilled.add(p.key);
+            }
+            return;
+          }
+
+          // 6. Nama Ayah
+          if (cleanK.includes("ayah") || cleanK.includes("orangtua") || cleanL.includes("ayah")) {
+            if (namaAyahCandidate) {
+              next[p.key] = toTitleCase(namaAyahCandidate);
+              newlyFilled.add(p.key);
+            }
+            return;
+          }
+
+          // 7. Alamat
+          if (cleanK.includes("alamat") || cleanL.includes("alamat")) {
+            if (alamatCandidate) {
+              next[p.key] = toTitleCase(alamatCandidate);
+              newlyFilled.add(p.key);
+            }
+            return;
+          }
+
+          // 8. Nomor KK
+          if (cleanK.includes("nomorkk") || cleanK.includes("nokk") || cleanL.includes("nomor kk")) {
+            if (noKkCandidate) {
+              next[p.key] = noKkCandidate;
+              newlyFilled.add(p.key);
+            }
+            return;
+          }
+        });
+
+        setOcrFilledFieldKeys((prevSet) => new Set([...Array.from(prevSet), ...Array.from(newlyFilled)]));
+        return next;
+      });
+    },
+    [effectivePlaceholders]
+  );
+
+  // Process OCR for specific file
+  const handleOcrProcessFile = async (
+    file: File,
+    jenis: OcrDocType,
+    forceFresh = false
+  ) => {
+    const maxSize = 10 * 1024 * 1024;
+    if (file.size > maxSize) {
+      setOcrErrors((prev) => ({ ...prev, [jenis]: "Ukuran file melebihi batas maksimal 10MB." }));
+      showToast("Ukuran file melebihi batas maksimal 10MB.");
+      return;
+    }
+
+    const previewUrl = URL.createObjectURL(file);
+    setOcrFiles((prev) => ({ ...prev, [jenis]: file }));
+    setOcrPreviews((prev) => ({ ...prev, [jenis]: previewUrl }));
+    setOcrErrors((prev) => ({ ...prev, [jenis]: null }));
+
+    try {
+      let ocrResultData: any = null;
+
+      if (saveOcrToManifest && selectedJamaahId) {
+        setOcrStatuses((prev) => ({ ...prev, [jenis]: "uploading" }));
+
+        const formData = new FormData();
+        formData.append("file", file);
+        formData.append("jamaahId", selectedJamaahId);
+        formData.append("jenisDokumen", jenis);
+
+        const uploadRes = await fetch("/api/dokumen/upload", {
+          method: "POST",
+          body: formData,
+        });
+
+        const uploadJson = await uploadRes.json();
+        if (!uploadRes.ok) {
+          throw new Error(uploadJson.message || "Gagal mengunggah file ke penyimpanan manifest");
+        }
+
+        const uploadedDoc = uploadJson.data?.dokumen || uploadJson.data;
+        const fileUrl = uploadJson.data?.fileUrl || uploadedDoc?.fileUrl;
+        const docId = uploadedDoc?.id;
+
+        setOcrUploadedDocs((prev) => ({ ...prev, [jenis]: uploadedDoc }));
+
+        setOcrStatuses((prev) => ({ ...prev, [jenis]: "extracting" }));
+        const ocrRes = await fetch("/api/dokumen/ocr", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            dokumenId: docId,
+            fileUrl,
+            jenis,
+            forceFresh,
+          }),
+        });
+
+        const ocrJson = await ocrRes.json();
+        if (!ocrRes.ok) {
+          throw new Error(ocrJson.message || "Gagal memproses ekstraksi OCR");
+        }
+
+        ocrResultData = ocrJson.data;
+      } else {
+        setOcrStatuses((prev) => ({ ...prev, [jenis]: "extracting" }));
+
+        const formData = new FormData();
+        formData.append("file", file);
+        formData.append("jenisDokumen", jenis);
+        if (forceFresh) formData.append("forceFresh", "true");
+
+        const ocrRes = await fetch("/api/dokumen/ocr", {
+          method: "POST",
+          body: formData,
+        });
+
+        const ocrJson = await ocrRes.json();
+        if (!ocrRes.ok) {
+          throw new Error(ocrJson.message || "Gagal memproses ekstraksi OCR dokumen");
+        }
+
+        ocrResultData = ocrJson.data;
+      }
+
+      setOcrResultsData((prev) => {
+        const next = { ...prev, [jenis]: ocrResultData };
+        applyAllOcrResultsToForm(next);
+        return next;
+      });
+
+      setOcrStatuses((prev) => ({ ...prev, [jenis]: "success" }));
+      const docLabel = OCR_DOC_CONFIG[jenis]?.title || jenis.toUpperCase();
+      const conf = ocrResultData?.confidence ? Math.round(ocrResultData.confidence * 100) : 95;
+      showToast(`Ekstraksi ${docLabel} berhasil (${conf}%)! Data variabel telah terisi otomatis.`);
+    } catch (err: any) {
+      console.error(`Error processing OCR for ${jenis}:`, err);
+      setOcrStatuses((prev) => ({ ...prev, [jenis]: "error" }));
+      setOcrErrors((prev) => ({ ...prev, [jenis]: err.message || "Terjadi kesalahan saat memproses OCR" }));
+      showToast(`Gagal memproses OCR: ${err.message || "Terjadi kesalahan"}`);
+    }
+  };
+
+  const handleRemoveOcrFile = (jenis: OcrDocType) => {
+    if (ocrPreviews[jenis]) {
+      URL.revokeObjectURL(ocrPreviews[jenis]!);
+    }
+    setOcrFiles((prev) => ({ ...prev, [jenis]: null }));
+    setOcrPreviews((prev) => ({ ...prev, [jenis]: null }));
+    setOcrStatuses((prev) => ({ ...prev, [jenis]: "idle" }));
+    setOcrResultsData((prev) => {
+      const next = { ...prev, [jenis]: null };
+      applyAllOcrResultsToForm(next);
+      return next;
+    });
+    setOcrErrors((prev) => ({ ...prev, [jenis]: null }));
+    setOcrUploadedDocs((prev) => ({ ...prev, [jenis]: null }));
+  };
+
+  const handleSaveLoadedOcrDocsToManifest = async () => {
+    if (!selectedJamaahId) {
+      showToast("Pilih jamaah terlebih dahulu sebelum menyimpan dokumen.");
+      return;
+    }
+    const unsavedTypes = (["ktp", "akta", "kk"] as OcrDocType[]).filter(
+      (j) => ocrFiles[j] && !ocrUploadedDocs[j]
+    );
+
+    if (unsavedTypes.length === 0) {
+      showToast("Seluruh berkas terunggah sudah tersimpan di profil jamaah.");
+      return;
+    }
+
+    setIsSavingOcrDocsToManifest(true);
+    try {
+      for (const jenis of unsavedTypes) {
+        const file = ocrFiles[jenis];
+        if (!file) continue;
+
+        const formData = new FormData();
+        formData.append("file", file);
+        formData.append("jamaahId", selectedJamaahId);
+        formData.append("jenisDokumen", jenis);
+
+        const uploadRes = await fetch("/api/dokumen/upload", {
+          method: "POST",
+          body: formData,
+        });
+
+        if (uploadRes.ok) {
+          const uploadJson = await uploadRes.json();
+          const uploadedDoc = uploadJson.data?.dokumen || uploadJson.data;
+          const fileUrl = uploadJson.data?.fileUrl || uploadedDoc?.fileUrl;
+          setOcrUploadedDocs((prev) => ({ ...prev, [jenis]: uploadedDoc }));
+
+          const existingOcr = ocrResultsData[jenis];
+          if (uploadedDoc?.id && existingOcr) {
+            await fetch("/api/dokumen/ocr", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                dokumenId: uploadedDoc.id,
+                fileUrl,
+                jenis,
+              }),
+            });
+          }
+        }
+      }
+      showToast(`Berhasil menyimpan & menautkan ${unsavedTypes.length} dokumen ke profil jamaah!`);
+    } catch (err: any) {
+      console.error("Gagal menyimpan dokumen ke manifest:", err);
+      showToast(`Gagal menyimpan dokumen: ${err.message || "Terjadi kesalahan"}`);
+    } finally {
+      setIsSavingOcrDocsToManifest(false);
+    }
+  };
 
   // Autocrat Merged Field Values
   const resolvedFieldValues = useMemo(() => {
@@ -1292,7 +1694,7 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
             {/* ── LEFT COLUMN (5 COLS): CONTROLS & DYNAMIC AUTOCRAT FORM ── */}
             <div className="lg:col-span-5 space-y-4">
-              {/* Mode Selector: Referensi Manifest vs Input Manual */}
+              {/* Mode Selector: Referensi Manifest vs Ekstraksi OCR vs Input Manual */}
               <div className="p-3 bg-stone-50 dark:bg-stone-900/60 rounded-xl border border-stone-200 dark:border-stone-800 shadow-2xs space-y-2">
                 <div className="flex items-center justify-between">
                   <label className="text-xs font-bold text-foreground flex items-center gap-1.5">
@@ -1300,10 +1702,14 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
                     Sumber Data Surat
                   </label>
                   <span className="text-[10px] text-muted-foreground font-mono">
-                    {dataSourceMode === "manifest" ? "Mode: Manifest" : "Mode: Manual"}
+                    {dataSourceMode === "manifest"
+                      ? "Mode: Manifest"
+                      : dataSourceMode === "ocr"
+                      ? "Mode: Ekstraksi OCR"
+                      : "Mode: Manual"}
                   </span>
                 </div>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                   <button
                     type="button"
                     onClick={() => handleSwitchMode("manifest")}
@@ -1320,6 +1726,25 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
                     </div>
                     <p className="text-[10px] text-muted-foreground leading-tight">
                       Pilih paket & nama jamaah, otomatis mengisi variabel
+                    </p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleSwitchMode("ocr")}
+                    className={cn(
+                      "flex flex-col items-start gap-1 p-2.5 rounded-lg border text-left transition-all",
+                      dataSourceMode === "ocr"
+                        ? "border-primary bg-primary/5 text-primary ring-1 ring-primary/20 shadow-xs"
+                        : "border-stone-200 dark:border-stone-800 hover:border-stone-300 dark:hover:border-stone-700 bg-background text-muted-foreground"
+                    )}
+                  >
+                    <div className="flex items-center gap-1.5 font-bold text-xs">
+                      <Sparkles className="h-3.5 w-3.5 shrink-0 text-amber-500" />
+                      <span>Ekstraksi OCR</span>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground leading-tight">
+                      Upload KTP, Akta & KK, auto-fill via AI OCR
                     </p>
                   </button>
 
@@ -1344,7 +1769,7 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
                 </div>
               </div>
 
-              {/* Card 1: Data Source Selector (Manifest & Jamaah) - ONLY when dataSourceMode === 'manifest' */}
+              {/* Card 1 (Manifest Mode): Data Source Selector (Manifest & Jamaah) */}
               {dataSourceMode === "manifest" && (
                 <Card className="border-stone-200 dark:border-stone-800">
                   <CardHeader className="pb-3 border-b border-stone-200 dark:border-stone-800">
@@ -1420,7 +1845,7 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
                       />
                     </div>
 
-                    {/* Summary of Active Jamaah Manifest Data - Only rendered when package & jamaah are selected */}
+                    {/* Summary of Active Jamaah Manifest Data */}
                     {selectedPackageId && selectedJamaahId && activeJamaah && (
                       <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-xs space-y-1.5">
                         <div className="flex items-center justify-between font-bold text-emerald-900 dark:text-emerald-300">
@@ -1442,12 +1867,400 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
                 </Card>
               )}
 
+              {/* Card 1 (OCR Mode): 3 Kolom Upload Dokumen (KTP, Akta Kelahiran, KK) */}
+              {dataSourceMode === "ocr" && (
+                <Card className="border-stone-200 dark:border-stone-800 shadow-sm">
+                  <CardHeader className="pb-3 border-b border-stone-200 dark:border-stone-800">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5">
+                      <div>
+                        <CardTitle className="text-xs font-bold flex items-center gap-1.5 text-foreground">
+                          <Sparkles className="h-4 w-4 text-amber-500" />
+                          1. Ekstraksi Dokumen OCR (KTP, Akta Kelahiran, KK)
+                        </CardTitle>
+                        <p className="text-[11px] text-muted-foreground mt-0.5">
+                          Ekstraksi data otomatis via backend AI OCR sama seperti di laman Dokumen Jamaah.
+                        </p>
+                      </div>
+
+                      {/* Toggler: Simpan ke Manifest */}
+                      <div className="flex items-center gap-2 bg-stone-100 dark:bg-stone-800/80 px-3 py-1.5 rounded-xl border border-stone-200 dark:border-stone-700/80 shrink-0">
+                        <span className="text-[11px] font-semibold text-foreground">
+                          Simpan ke Manifest?
+                        </span>
+                        <button
+                          type="button"
+                          role="switch"
+                          aria-checked={saveOcrToManifest}
+                          onClick={() => setSaveOcrToManifest((prev) => !prev)}
+                          className={cn(
+                            "relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full transition-colors",
+                            saveOcrToManifest ? "bg-primary" : "bg-stone-300 dark:bg-stone-600"
+                          )}
+                          title="Jika aktif, dokumen akan tersimpan ke Google Drive & tertaut ke profil jamaah terpilih"
+                        >
+                          <span
+                            className={cn(
+                              "pointer-events-none block h-4 w-4 rounded-full bg-white shadow-xs transition-transform",
+                              saveOcrToManifest ? "translate-x-4" : "translate-x-0.5"
+                            )}
+                          />
+                        </button>
+                      </div>
+                    </div>
+                  </CardHeader>
+
+                  <CardContent className="pt-4 space-y-4">
+                    {/* Jika Simpan ke Manifest Aktif: Munculkan Pilihan Paket & Jamaah */}
+                    {saveOcrToManifest && (
+                      <div className="p-3.5 rounded-xl bg-primary/5 border border-primary/25 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-primary flex items-center gap-1.5">
+                            <Plane className="h-3.5 w-3.5" />
+                            Pilih Paket & Jamaah Pemilik Dokumen
+                          </span>
+                          <Badge variant="outline" size="sm" className="text-[10px] border-primary/30 text-primary">
+                            Penautan Berkas Aktif
+                          </Badge>
+                        </div>
+
+                        {/* Dropdown Paket */}
+                        <div>
+                          <label className="text-xs font-semibold text-foreground mb-1 block">
+                            Paket Keberangkatan
+                          </label>
+                          <SearchableSelect
+                            value={selectedPackageId}
+                            onChange={(val) => {
+                              setSelectedPackageId(val);
+                              setSelectedJamaahId("");
+                            }}
+                            placeholder="Cari atau pilih paket keberangkatan..."
+                            searchPlaceholder="Ketik nama paket, kode, tanggal..."
+                            options={packageOptions}
+                            size="sm"
+                          />
+                        </div>
+
+                        {/* Dropdown Jamaah */}
+                        <div>
+                          <label className="text-xs font-semibold text-foreground mb-1 block">
+                            Pilih Jamaah Penerima Surat & Pemilik Dokumen
+                          </label>
+                          <SearchableSelect
+                            value={selectedJamaahId}
+                            onChange={(val) => setSelectedJamaahId(val)}
+                            placeholder={
+                              !selectedPackageId
+                                ? "Pilih paket keberangkatan terlebih dahulu..."
+                                : availableJamaahList.length === 0
+                                ? "Belum ada jamaah pada paket ini"
+                                : "Cari nama jamaah, NIK, paspor..."
+                            }
+                            searchPlaceholder="Ketik nama jamaah, paspor, NIK..."
+                            options={jamaahOptions}
+                            disabled={!selectedPackageId || availableJamaahList.length === 0}
+                            size="sm"
+                          />
+                        </div>
+
+                        {/* Jamaah Selected Banner & Link Sync Button */}
+                        {selectedPackageId && selectedJamaahId && activeJamaah && (
+                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 p-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-xs">
+                            <div className="flex items-center gap-2 font-bold text-emerald-800 dark:text-emerald-300">
+                              <User className="h-3.5 w-3.5 shrink-0" />
+                              <span className="truncate">{toTitleCase(activeJamaah.namaLengkap)}</span>
+                              <span className="text-[10px] font-mono font-normal">({activeJamaah.registrationId || "Terdaftar"})</span>
+                            </div>
+                            {(["ktp", "akta", "kk"] as OcrDocType[]).some((j) => ocrFiles[j] && !ocrUploadedDocs[j]) ? (
+                              <Button
+                                type="button"
+                                size="sm"
+                                className="h-7 text-[11px] px-2.5 bg-emerald-600 hover:bg-emerald-700 text-white shrink-0"
+                                onClick={handleSaveLoadedOcrDocsToManifest}
+                                disabled={isSavingOcrDocsToManifest}
+                              >
+                                {isSavingOcrDocsToManifest ? (
+                                  <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                                ) : (
+                                  <UploadCloud className="mr-1 h-3 w-3" />
+                                )}
+                                Simpan Berkas ke Profil
+                              </Button>
+                            ) : (
+                              <span className="text-[10px] text-emerald-700 dark:text-emerald-400 font-semibold shrink-0">
+                                ✓ Siap Tertaut
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* 3 Kolom Upload Dokumen (KTP, Akta Lahir, KK) */}
+                    <div>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        {(["ktp", "akta", "kk"] as OcrDocType[]).map((jenis) => {
+                          const config = OCR_DOC_CONFIG[jenis];
+                          const file = ocrFiles[jenis];
+                          const preview = ocrPreviews[jenis];
+                          const status = ocrStatuses[jenis];
+                          const result = ocrResultsData[jenis];
+                          const errorMsg = ocrErrors[jenis];
+                          const inputRef = docInputRefs[jenis];
+
+                          return (
+                            <div
+                              key={jenis}
+                              className="flex flex-col rounded-xl border border-stone-200 dark:border-stone-800 bg-background/80 p-3 space-y-2.5 shadow-2xs relative"
+                            >
+                              {/* Hidden file input */}
+                              <input
+                                type="file"
+                                ref={inputRef as any}
+                                accept="image/*,application/pdf"
+                                className="hidden"
+                                onChange={(e) => {
+                                  const f = e.target.files?.[0];
+                                  if (f) {
+                                    handleOcrProcessFile(f, jenis);
+                                  }
+                                  e.target.value = "";
+                                }}
+                              />
+
+                              {/* Column Header */}
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-1.5 font-bold text-xs text-foreground">
+                                  <FileText className="h-3.5 w-3.5 text-primary" />
+                                  <span>{config.title}</span>
+                                </div>
+                                <Badge variant="outline" size="sm" className="text-[9px] font-mono">
+                                  {config.badgeText}
+                                </Badge>
+                              </div>
+
+                              {/* Upload Box / Dropzone */}
+                              {!file ? (
+                                <div
+                                  onClick={() => inputRef.current?.click()}
+                                  onDragOver={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                  }}
+                                  onDrop={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    const f = e.dataTransfer.files?.[0];
+                                    if (f) handleOcrProcessFile(f, jenis);
+                                  }}
+                                  className="border-2 border-dashed border-stone-200 dark:border-stone-800 hover:border-primary/60 dark:hover:border-primary/60 rounded-xl p-3.5 text-center cursor-pointer transition-all hover:bg-primary/5 flex flex-col items-center justify-center gap-1.5 min-h-[135px]"
+                                >
+                                  <div className="p-2 rounded-full bg-primary/10 text-primary">
+                                    <UploadCloud className="h-5 w-5" />
+                                  </div>
+                                  <span className="text-xs font-bold text-foreground">
+                                    Pilih / Tarik File {config.title}
+                                  </span>
+                                  <span className="text-[10px] text-muted-foreground">
+                                    JPG, PNG, PDF (Maks. 10MB)
+                                  </span>
+                                  <span className="text-[9px] text-muted-foreground/80 text-center leading-tight mt-0.5 line-clamp-1">
+                                    {config.sampleFields}
+                                  </span>
+                                </div>
+                              ) : (
+                                <div className="space-y-2">
+                                  {/* Thumbnail Preview */}
+                                  <div className="relative rounded-lg overflow-hidden border border-stone-200 dark:border-stone-700 bg-stone-100 dark:bg-stone-900 h-24 flex items-center justify-center">
+                                    {preview && (file.type.startsWith("image/") || file.type === "") ? (
+                                      <img
+                                        src={preview}
+                                        alt={config.title}
+                                        className="h-full w-full object-cover"
+                                      />
+                                    ) : (
+                                      <div className="flex flex-col items-center gap-1 text-muted-foreground">
+                                        <FileText className="h-7 w-7 text-primary" />
+                                        <span className="text-[10px] font-medium">Dokumen PDF Terunggah</span>
+                                      </div>
+                                    )}
+
+                                    {/* Quick replacement overlay on hover */}
+                                    <button
+                                      type="button"
+                                      onClick={() => inputRef.current?.click()}
+                                      className="absolute inset-0 bg-black/40 text-white opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center text-[11px] font-semibold gap-1 backdrop-blur-2xs"
+                                    >
+                                      <UploadCloud className="h-3.5 w-3.5" />
+                                      Ganti File
+                                    </button>
+                                  </div>
+
+                                  {/* File Name & Size */}
+                                  <div className="flex items-center justify-between text-[10px] text-muted-foreground font-medium px-0.5">
+                                    <span className="truncate max-w-[140px]" title={file.name}>
+                                      {file.name}
+                                    </span>
+                                    <span>{(file.size / 1024).toFixed(0)} KB</span>
+                                  </div>
+
+                                  {/* Status Banner */}
+                                  {status === "uploading" && (
+                                    <div className="flex items-center gap-1.5 text-xs text-primary font-medium p-1.5 rounded-lg bg-primary/10">
+                                      <Loader2 className="h-3.5 w-3.5 animate-spin shrink-0" />
+                                      <span className="text-[11px]">Mengunggah ke drive...</span>
+                                    </div>
+                                  )}
+
+                                  {status === "extracting" && (
+                                    <div className="flex items-center gap-1.5 text-xs text-amber-600 dark:text-amber-400 font-medium p-1.5 rounded-lg bg-amber-500/10">
+                                      <Loader2 className="h-3.5 w-3.5 animate-spin shrink-0" />
+                                      <span className="text-[11px]">AI OCR sedang mengekstrak...</span>
+                                    </div>
+                                  )}
+
+                                  {status === "success" && (
+                                    <div className="flex items-center justify-between text-[11px] font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded-lg">
+                                      <span className="flex items-center gap-1">
+                                        <CheckCircle2 className="h-3.5 w-3.5" />
+                                        Ekstraksi Berhasil
+                                      </span>
+                                      <span className="text-[10px] font-mono">
+                                        {result?.confidence ? Math.round(result.confidence * 100) : 95}%
+                                      </span>
+                                    </div>
+                                  )}
+
+                                  {status === "error" && (
+                                    <div className="text-[11px] text-destructive bg-destructive/10 p-1.5 rounded-lg flex items-center justify-between gap-1">
+                                      <span className="truncate text-[10px]">{errorMsg || "Gagal ekstraksi"}</span>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleOcrProcessFile(file, jenis, true)}
+                                        className="text-[10px] font-bold underline shrink-0 hover:opacity-80"
+                                      >
+                                        Ulangi
+                                      </button>
+                                    </div>
+                                  )}
+
+                                  {/* Extracted Fields Summary Box */}
+                                  {result && (
+                                    <div className="p-2 rounded-lg bg-stone-50 dark:bg-stone-900/60 border border-stone-200/60 dark:border-stone-800 text-[10px] space-y-1">
+                                      {jenis === "ktp" && (
+                                        <>
+                                          <div className="flex justify-between gap-1">
+                                            <span className="text-muted-foreground shrink-0">NIK:</span>
+                                            <span className="font-mono font-bold truncate">{result.nik || "-"}</span>
+                                          </div>
+                                          <div className="flex justify-between gap-1">
+                                            <span className="text-muted-foreground shrink-0">Nama:</span>
+                                            <span className="font-semibold truncate">{result.namaLengkap || "-"}</span>
+                                          </div>
+                                          <div className="flex justify-between gap-1">
+                                            <span className="text-muted-foreground shrink-0">Lahir:</span>
+                                            <span className="truncate">{result.tempatLahir || "-"}, {result.tanggalLahir || "-"}</span>
+                                          </div>
+                                        </>
+                                      )}
+                                      {jenis === "akta" && (
+                                        <>
+                                          <div className="flex justify-between gap-1">
+                                            <span className="text-muted-foreground shrink-0">Nama:</span>
+                                            <span className="font-semibold truncate">{result.namaLengkap || "-"}</span>
+                                          </div>
+                                          <div className="flex justify-between gap-1">
+                                            <span className="text-muted-foreground shrink-0">Ayah:</span>
+                                            <span className="font-bold truncate text-primary">{result.namaAyah || "-"}</span>
+                                          </div>
+                                          <div className="flex justify-between gap-1">
+                                            <span className="text-muted-foreground shrink-0">Lahir:</span>
+                                            <span className="truncate">{result.tempatLahir || "-"}, {result.tanggalLahir || "-"}</span>
+                                          </div>
+                                        </>
+                                      )}
+                                      {jenis === "kk" && (
+                                        <>
+                                          <div className="flex justify-between gap-1">
+                                            <span className="text-muted-foreground shrink-0">No. KK:</span>
+                                            <span className="font-mono font-bold truncate">{result.nomorKk || result.noKk || "-"}</span>
+                                          </div>
+                                          <div className="flex justify-between gap-1">
+                                            <span className="text-muted-foreground shrink-0">Ayah/Kepala:</span>
+                                            <span className="font-semibold truncate">{result.namaAyah || result.namaKepalaKeluarga || "-"}</span>
+                                          </div>
+                                          <div className="flex justify-between gap-1">
+                                            <span className="text-muted-foreground shrink-0">NIK:</span>
+                                            <span className="font-mono truncate">{result.nik || "-"}</span>
+                                          </div>
+                                        </>
+                                      )}
+                                    </div>
+                                  )}
+
+                                  {/* Action Buttons */}
+                                  <div className="flex items-center gap-1.5 pt-1">
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      size="sm"
+                                      className="flex-1 h-7 text-[10px] px-2"
+                                      onClick={() => handleOcrProcessFile(file, jenis, true)}
+                                      title="Ekstrak ulang dokumen ini via AI OCR"
+                                    >
+                                      <RefreshCw className="mr-1 h-3 w-3" />
+                                      Ekstrak Ulang
+                                    </Button>
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      size="sm"
+                                      className="h-7 text-[10px] px-2 text-destructive hover:bg-destructive/10 border-stone-200 dark:border-stone-800"
+                                      onClick={() => handleRemoveOcrFile(jenis)}
+                                      title="Hapus dokumen"
+                                    >
+                                      <Trash2 className="h-3 w-3" />
+                                    </Button>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {/* Bottom Help / Re-Apply Banner */}
+                      <div className="mt-3 p-2.5 rounded-xl bg-stone-100/80 dark:bg-stone-800/50 border border-stone-200/80 dark:border-stone-700/60 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-xs">
+                        <div className="flex items-center gap-2 text-muted-foreground text-[11px]">
+                          <Sparkles className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+                          <span>
+                            {(["ktp", "akta", "kk"] as OcrDocType[]).filter((j) => ocrResultsData[j]).length > 0
+                              ? `${(["ktp", "akta", "kk"] as OcrDocType[]).filter((j) => ocrResultsData[j]).length} dokumen berhasil diekstrak via AI OCR. Kolom isian variabel di bawah telah terisi otomatis.`
+                              : "Unggah minimal salah satu dari KTP, Akta Kelahiran, atau KK untuk mengisi variabel surat secara otomatis."}
+                          </span>
+                        </div>
+                        {(["ktp", "akta", "kk"] as OcrDocType[]).some((j) => ocrResultsData[j]) && (
+                          <button
+                            type="button"
+                            onClick={() => applyAllOcrResultsToForm(ocrResultsData)}
+                            className="text-[11px] font-semibold text-primary hover:underline flex items-center gap-1 shrink-0"
+                          >
+                            <RefreshCw className="h-3 w-3" />
+                            Terapkan Ulang Hasil OCR
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
               {/* Card 2: Header & Nomor Surat Configuration */}
               <Card className="border-stone-200 dark:border-stone-800">
                 <CardHeader className="pb-3 border-b border-stone-200 dark:border-stone-800">
                   <CardTitle className="text-xs font-bold flex items-center gap-1.5">
                     <FileSignature className="h-4 w-4 text-primary" />
-                    {dataSourceMode === "manifest" ? "2. Nomor Surat" : "1. Nomor Surat"}
+                    {dataSourceMode === "manual" ? "1. Nomor Surat" : "2. Nomor Surat"}
                   </CardTitle>
                 </CardHeader>
 
@@ -1491,9 +2304,9 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
                   <CardTitle className="text-xs font-bold flex items-center justify-between">
                     <span className="flex items-center gap-1.5">
                       <Sparkles className="h-4 w-4 text-primary" />
-                      {dataSourceMode === "manifest"
-                        ? "3. Kolom Isian Data Surat (Autocrat Tags)"
-                        : "2. Kolom Isian Data Surat (Autocrat Tags)"}
+                      {dataSourceMode === "manual"
+                        ? "2. Kolom Isian Data Surat (Autocrat Tags)"
+                        : "3. Kolom Isian Data Surat (Autocrat Tags)"}
                     </span>
                     <span className="text-[10px] text-muted-foreground">
                       {effectivePlaceholders.length} Tag Terkonfigurasi
@@ -1649,6 +2462,11 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
                               <span className="text-[10px] font-semibold text-amber-700 dark:text-amber-300 bg-amber-500/15 border border-amber-500/30 px-2 py-0.5 rounded flex items-center gap-1 shadow-2xs">
                                 <Sparkles className="h-3 w-3 text-amber-500" />
                                 + Nama Ayah (Endorsement)
+                              </span>
+                            ) : ocrFilledFieldKeys.has(p.key) ? (
+                              <span className="text-[10px] font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-500/15 border border-emerald-500/30 px-2 py-0.5 rounded flex items-center gap-1 shadow-2xs">
+                                <Sparkles className="h-3 w-3 text-emerald-500" />
+                                Auto OCR
                               </span>
                             ) : manualVal !== undefined && manualVal !== resolvedVal ? (
                               <span className="text-[10px] font-semibold text-amber-600 dark:text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded flex items-center gap-1">

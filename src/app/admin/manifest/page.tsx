@@ -626,31 +626,29 @@ function resolveJamaahKeretaCepat(activePackage: any, groupObj: any, j: any): bo
   }
 
   // 4. Registration Request / Package Inclusions Snapshot Comparison
-  const packageHasKC = (activePackage?.include && Array.isArray(activePackage.include) &&
-    activePackage.include.some((inc: string) => /kereta|fast train|haramain/i.test(inc))) ||
-    activePackage?.isAdaKeretaCepat === "ya";
+  const packageHasKC =
+    (activePackage?.include && Array.isArray(activePackage.include) &&
+      activePackage.include.some((inc: string) => /kereta|fast train|haramain/i.test(inc))) ||
+    activePackage?.isAdaKeretaCepat === "ya" ||
+    /kereta|fast train|haramain/i.test(activePackage?.namaPaket || "") ||
+    /kereta|fast train|haramain/i.test(activePackage?.kode || "");
 
-  if (!packageHasKC) return false;
-
-  // Package has Kereta Cepat now. Did this Jamaah/Group register BEFORE or AFTER KC was added?
-  const regTime = new Date(groupObj?.createdAt || j?.createdAt || 0).getTime();
-  const pkgUpdatedTime = new Date(activePackage?.updatedAt || activePackage?.createdAt || 0).getTime();
-
-  // If Jamaah registered significantly before the package update date, they registered under old version without KC
-  if (regTime > 0 && pkgUpdatedTime > 0 && regTime < pkgUpdatedTime - 300000) {
-    return false;
-  }
-
-  return true;
+  return Boolean(packageHasKC);
 }
 
 function resolveJamaahCityTourThoif(activePackage: any, groupObj: any, j: any): boolean {
-  // 1. Direct Jamaah override if manually set
+  // 1. Direct Jamaah override if manually set (check both isCityTourThoif and isThoif)
+  if (j?.isCityTourThoif !== undefined && j?.isCityTourThoif !== null) {
+    return Boolean(j.isCityTourThoif);
+  }
   if (j?.isThoif !== undefined && j?.isThoif !== null) {
     return Boolean(j.isThoif);
   }
 
   // 2. Direct Group snapshot (set at registration time)
+  if (groupObj?.isCityTourThoif !== undefined && groupObj?.isCityTourThoif !== null) {
+    return Boolean(groupObj.isCityTourThoif);
+  }
   if (groupObj?.isThoif !== undefined && groupObj?.isThoif !== null) {
     return Boolean(groupObj.isThoif);
   }
@@ -671,20 +669,15 @@ function resolveJamaahCityTourThoif(activePackage: any, groupObj: any, j: any): 
   }
 
   // 4. Package Inclusions Snapshot Comparison
-  const packageHasThoif = (activePackage?.include && Array.isArray(activePackage.include) &&
-    activePackage.include.some((inc: string) => /th[ao]'?if|ta'?if|toif/i.test(inc))) ||
-    activePackage?.isAdaThoif === "ya";
+  const packageHasThoif =
+    (activePackage?.include && Array.isArray(activePackage.include) &&
+      activePackage.include.some((inc: string) => /th[ao]'?if|ta'?if|toif/i.test(inc))) ||
+    activePackage?.isAdaThoif === "ya" ||
+    /th[ao]'?if|ta'?if|toif/i.test(activePackage?.namaPaket || "") ||
+    /th[ao]'?if|ta'?if|toif/i.test(activePackage?.kode || "") ||
+    /JED\.TH/i.test(activePackage?.kode || "");
 
-  if (!packageHasThoif) return false;
-
-  const regTime = new Date(groupObj?.createdAt || j?.createdAt || 0).getTime();
-  const pkgUpdatedTime = new Date(activePackage?.updatedAt || activePackage?.createdAt || 0).getTime();
-
-  if (regTime > 0 && pkgUpdatedTime > 0 && regTime < pkgUpdatedTime - 300000) {
-    return false;
-  }
-
-  return true;
+  return Boolean(packageHasThoif);
 }
 
 /**
@@ -1574,6 +1567,42 @@ function ManifestPageContent() {
   const packageHasTL = hasPackageTourLeader(activePackage);
   let globalNoJamaahCounter = packageHasTL ? 2 : 1;
 
+  // Toggle individual jamaah facility (Kereta Cepat / City Tour Thoif)
+  const [togglingFacility, setTogglingFacility] = useState<string | null>(null);
+
+  const handleToggleJamaahFacility = async (
+    jamaahId: string,
+    facility: "isKeretaCepat" | "isCityTourThoif",
+    currentValue: boolean
+  ) => {
+    const newValue = !currentValue;
+    setTogglingFacility(`${jamaahId}-${facility}`);
+    // Optimistic UI update
+    setAllJamaah((prev) =>
+      prev.map((jam) => (jam.id === jamaahId ? { ...jam, [facility]: newValue } : jam))
+    );
+
+    try {
+      const res = await fetch(`/api/jamaah/${jamaahId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ [facility]: newValue }),
+      });
+      const data = await res.json();
+      if (!data.success) {
+        throw new Error(data.message || "Gagal mengubah status fasilitas");
+      }
+    } catch (err: any) {
+      // Revert on error
+      setAllJamaah((prev) =>
+        prev.map((jam) => (jam.id === jamaahId ? { ...jam, [facility]: currentValue } : jam))
+      );
+      alert(`Gagal memperbarui status fasilitas jamaah: ${err.message}`);
+    } finally {
+      setTogglingFacility(null);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header Bar */}
@@ -2311,30 +2340,60 @@ function ManifestPageContent() {
 
                                 {/* KERETA CEPAT */}
                                 <td className={`px-3 py-2.5 text-center ${cellBorder}`}>
-                                  {resolveJamaahKeretaCepat(groupPkg, group.groupObj, j) ? (
-                                    <span
-                                      className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 font-extrabold text-xs shadow-2xs mx-auto border border-emerald-300 dark:border-emerald-700 select-none"
-                                      title="Terdaftar dengan layanan Kereta Cepat Haramain"
-                                    >
-                                      ✓
-                                    </span>
-                                  ) : (
-                                    <span className="text-stone-300 dark:text-stone-700 font-mono select-none">—</span>
-                                  )}
+                                  {(() => {
+                                    const isKC = resolveJamaahKeretaCepat(groupPkg, group.groupObj, j);
+                                    const isToggling = togglingFacility === `${j.id}-isKeretaCepat`;
+                                    return (
+                                      <button
+                                        type="button"
+                                        disabled={isToggling}
+                                        onClick={() => handleToggleJamaahFacility(j.id, "isKeretaCepat", isKC)}
+                                        className="inline-flex items-center justify-center cursor-pointer transition-transform hover:scale-110 active:scale-95 disabled:opacity-50"
+                                        title={`Kereta Cepat Haramain: ${isKC ? "INCLUDE (Klik untuk ubah jadi Exclude)" : "EXCLUDE (Klik untuk ubah jadi Include)"}`}
+                                      >
+                                        {isKC ? (
+                                          <span
+                                            className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 font-extrabold text-xs shadow-2xs mx-auto border border-emerald-300 dark:border-emerald-700 select-none hover:bg-emerald-200"
+                                          >
+                                            ✓
+                                          </span>
+                                        ) : (
+                                          <span className="inline-flex items-center justify-center h-6 px-2 rounded-md bg-stone-100 text-stone-500 dark:bg-stone-800 dark:text-stone-400 font-mono text-xs border border-stone-200 dark:border-stone-700 select-none hover:bg-stone-200">
+                                            —
+                                          </span>
+                                        )}
+                                      </button>
+                                    );
+                                  })()}
                                 </td>
 
                                 {/* CITY TOUR THOIF */}
                                 <td className={`px-3 py-2.5 text-center ${cellBorder}`}>
-                                  {resolveJamaahCityTourThoif(groupPkg, group.groupObj, j) ? (
-                                    <span
-                                      className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 font-extrabold text-xs shadow-2xs mx-auto border border-emerald-300 dark:border-emerald-700 select-none"
-                                      title="Terdaftar dengan layanan City Tour Thoif / Thaif"
-                                    >
-                                      ✓
-                                    </span>
-                                  ) : (
-                                    <span className="text-stone-300 dark:text-stone-700 font-mono select-none">—</span>
-                                  )}
+                                  {(() => {
+                                    const isThoif = resolveJamaahCityTourThoif(groupPkg, group.groupObj, j);
+                                    const isToggling = togglingFacility === `${j.id}-isCityTourThoif`;
+                                    return (
+                                      <button
+                                        type="button"
+                                        disabled={isToggling}
+                                        onClick={() => handleToggleJamaahFacility(j.id, "isCityTourThoif", isThoif)}
+                                        className="inline-flex items-center justify-center cursor-pointer transition-transform hover:scale-110 active:scale-95 disabled:opacity-50"
+                                        title={`City Tour Thoif/Thaif: ${isThoif ? "INCLUDE (Klik untuk ubah jadi Exclude)" : "EXCLUDE (Klik untuk ubah jadi Include)"}`}
+                                      >
+                                        {isThoif ? (
+                                          <span
+                                            className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 font-extrabold text-xs shadow-2xs mx-auto border border-emerald-300 dark:border-emerald-700 select-none hover:bg-emerald-200"
+                                          >
+                                            ✓
+                                          </span>
+                                        ) : (
+                                          <span className="inline-flex items-center justify-center h-6 px-2 rounded-md bg-stone-100 text-stone-500 dark:bg-stone-800 dark:text-stone-400 font-mono text-xs border border-stone-200 dark:border-stone-700 select-none hover:bg-stone-200">
+                                            —
+                                          </span>
+                                        )}
+                                      </button>
+                                    );
+                                  })()}
                                 </td>
 
                                 {/* TIPE MAKAN (FB / BF) */}

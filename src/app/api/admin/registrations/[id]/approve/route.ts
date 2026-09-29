@@ -97,8 +97,19 @@ export async function POST(
       const paket = await tx.keberangkatan.findUniqueOrThrow({ where: { id: reg.paketId } });
       const totalTagihan = paket.hargaPaket * reg.paxCount;
       const pkgInc = Array.isArray(paket.include) ? paket.include : [];
-      const hasKC = pkgInc.some((inc: string) => /kereta|fast train|haramain/i.test(inc));
-      const hasThoif = pkgInc.some((inc: string) => /thoif|taif|ta'if/i.test(inc));
+      const hasKC =
+        (reg as any).isKeretaCepat !== undefined
+          ? Boolean((reg as any).isKeretaCepat)
+          : (pkgInc.some((inc: string) => /kereta|fast train|haramain/i.test(inc)) ||
+             /kereta|fast train|haramain/i.test(paket.namaPaket || "") ||
+             (paket as any).isAdaKeretaCepat === "ya");
+
+      const hasThoif =
+        (reg as any).isCityTourThoif !== undefined
+          ? Boolean((reg as any).isCityTourThoif)
+          : (pkgInc.some((inc: string) => /th[ao]'?if|ta'?if|toif/i.test(inc)) ||
+             /th[ao]'?if|ta'?if|toif/i.test(paket.namaPaket || "") ||
+             (paket as any).isAdaThoif === "ya");
 
       const group = await tx.registrationGroup.create({
         data: {
