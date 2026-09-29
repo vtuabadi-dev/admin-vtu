@@ -209,6 +209,10 @@ function GenerateSuratPageContent() {
     kk: kkInputRef,
   };
 
+  // Ref registries for dynamic date and month picker inputs
+  const dateInputsRef = React.useRef<Record<string, HTMLInputElement | null>>({});
+  const monthInputsRef = React.useRef<Record<string, HTMLInputElement | null>>({});
+
   const handleSwitchMode = (mode: "manifest" | "ocr" | "manual") => {
     setDataSourceMode(mode);
     if (mode === "manual") {
@@ -2651,10 +2655,29 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
                                     placeholder={p.placeholderHint || "Contoh: 10 Juni 1990"}
                                     className="text-xs h-9 bg-background text-foreground pr-8 font-medium"
                                   />
-                                  <Calendar className="h-4 w-4 text-muted-foreground absolute right-2.5 top-2.5 pointer-events-none" />
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const el = dateInputsRef.current[p.key];
+                                      if (el) {
+                                        try {
+                                          el.showPicker();
+                                        } catch {
+                                          el.focus();
+                                        }
+                                      }
+                                    }}
+                                    className="h-4 w-4 text-muted-foreground hover:text-primary transition-colors absolute right-2.5 top-2.5 cursor-pointer flex items-center justify-center"
+                                    title="Klik untuk memilih tanggal dari kalender"
+                                  >
+                                    <Calendar className="h-4 w-4" />
+                                  </button>
                                 </div>
                                 <div className="relative shrink-0">
                                   <input
+                                    ref={(el) => {
+                                      dateInputsRef.current[p.key] = el;
+                                    }}
                                     type="date"
                                     value={parseDateToIsoString(displayValue)}
                                     onChange={(e) => {
@@ -2664,14 +2687,26 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
                                         setManualFormData((prev) => ({ ...prev, [p.key]: formatted }));
                                       }
                                     }}
-                                    className="h-9 w-full opacity-0 absolute inset-0 cursor-pointer z-10"
-                                    title="Klik untuk memilih tanggal dari kalender"
+                                    className="absolute inset-0 w-full h-full opacity-0 pointer-events-none"
+                                    tabIndex={-1}
+                                    aria-hidden="true"
                                   />
                                   <Button
                                     type="button"
                                     variant="outline"
                                     size="sm"
-                                    className="h-9 px-2.5 flex items-center gap-1.5 text-xs text-primary border-primary/30 hover:bg-primary/5 cursor-pointer pointer-events-none"
+                                    onClick={() => {
+                                      const el = dateInputsRef.current[p.key];
+                                      if (el) {
+                                        try {
+                                          el.showPicker();
+                                        } catch {
+                                          el.focus();
+                                        }
+                                      }
+                                    }}
+                                    className="h-9 px-2.5 flex items-center gap-1.5 text-xs text-primary border-primary/30 hover:bg-primary/5 cursor-pointer shadow-2xs active:scale-95 transition-all"
+                                    title="Klik untuk memilih tanggal dari kalender"
                                   >
                                     <Calendar className="h-3.5 w-3.5 text-primary" />
                                     <span>Pilih Tanggal</span>
@@ -2697,10 +2732,29 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
                                     placeholder={p.placeholderHint || "Contoh: September 2026"}
                                     className="text-xs h-9 bg-background text-foreground pr-8 font-medium"
                                   />
-                                  <Calendar className="h-4 w-4 text-muted-foreground absolute right-2.5 top-2.5 pointer-events-none" />
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const el = monthInputsRef.current[p.key];
+                                      if (el) {
+                                        try {
+                                          el.showPicker();
+                                        } catch {
+                                          el.focus();
+                                        }
+                                      }
+                                    }}
+                                    className="h-4 w-4 text-muted-foreground hover:text-primary transition-colors absolute right-2.5 top-2.5 cursor-pointer flex items-center justify-center"
+                                    title="Klik untuk memilih bulan & tahun"
+                                  >
+                                    <Calendar className="h-4 w-4" />
+                                  </button>
                                 </div>
                                 <div className="relative shrink-0">
                                   <input
+                                    ref={(el) => {
+                                      monthInputsRef.current[p.key] = el;
+                                    }}
                                     type="month"
                                     value={parseMonthYearToIsoString(displayValue)}
                                     onChange={(e) => {
@@ -2710,14 +2764,26 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
                                         setManualFormData((prev) => ({ ...prev, [p.key]: formatted }));
                                       }
                                     }}
-                                    className="h-9 w-full opacity-0 absolute inset-0 cursor-pointer z-10"
-                                    title="Klik untuk memilih bulan & tahun"
+                                    className="absolute inset-0 w-full h-full opacity-0 pointer-events-none"
+                                    tabIndex={-1}
+                                    aria-hidden="true"
                                   />
                                   <Button
                                     type="button"
                                     variant="outline"
                                     size="sm"
-                                    className="h-9 px-2.5 flex items-center gap-1.5 text-xs text-primary border-primary/30 hover:bg-primary/5 cursor-pointer pointer-events-none"
+                                    onClick={() => {
+                                      const el = monthInputsRef.current[p.key];
+                                      if (el) {
+                                        try {
+                                          el.showPicker();
+                                        } catch {
+                                          el.focus();
+                                        }
+                                      }
+                                    }}
+                                    className="h-9 px-2.5 flex items-center gap-1.5 text-xs text-primary border-primary/30 hover:bg-primary/5 cursor-pointer shadow-2xs active:scale-95 transition-all"
+                                    title="Klik untuk memilih bulan & tahun"
                                   >
                                     <Calendar className="h-3.5 w-3.5 text-primary" />
                                     <span>Pilih Bulan</span>
