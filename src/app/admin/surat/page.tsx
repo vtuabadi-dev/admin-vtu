@@ -34,6 +34,7 @@ import {
   Calendar,
   CalendarDays,
   Loader2,
+  Clipboard,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/components/ui/Card";
 import { Button } from "@/shared/components/ui/Button";
@@ -68,6 +69,7 @@ import {
 } from "@/shared/lib/surat-autocrat-engine";
 import { downloadMergedDocx } from "@/shared/lib/docx-mail-merge";
 import { downloadDocxAsPdf } from "@/shared/lib/docx-to-pdf";
+import { compressOcrDocument } from "@/shared/lib/ocr-image-compressor";
 import { KantorImigrasiCombobox } from "@/shared/components/ui/KantorImigrasiCombobox";
 import { SearchableSelect } from "@/shared/components/ui/SearchableSelect";
 import { getKotaFromKanimName } from "@/shared/lib/kantor-imigrasi";
@@ -198,6 +200,8 @@ function GenerateSuratPageContent() {
     kk: null,
   });
   const [ocrFilledFieldKeys, setOcrFilledFieldKeys] = useState<Set<string>>(new Set());
+  const [activeOcrColumn, setActiveOcrColumn] = useState<OcrDocType>("ktp");
+  const [hoveredOcrColumn, setHoveredOcrColumn] = useState<OcrDocType | null>(null);
 
   // Hidden File Input Refs for OCR Uploads
   const ktpInputRef = React.useRef<HTMLInputElement>(null);
@@ -1062,6 +1066,110 @@ function GenerateSuratPageContent() {
     }
   }, [dataSourceMode, selectedTemplateSlug, effectivePlaceholders, applyAllOcrResultsToForm, ocrResultsData]);
 
+  // Helper to handle pasted file (from event or clipboard API)
+  const handlePasteFile = useCallback(
+    async (e: React.ClipboardEvent | ClipboardEvent, targetJenis: OcrDocType) => {
+      const items = e.clipboardData?.items;
+      if (!items || items.length === 0) return;
+
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        if (item?.kind === "file") {
+          const rawFile = item.getAsFile();
+          if (rawFile) {
+            e.preventDefault();
+            e.stopPropagation();
+            const ext = rawFile.type.includes("pdf") ? ".pdf" : ".jpg";
+            const customName = `${targetJenis}_pasted_${Date.now()}${ext}`;
+            const validFile = new File(
+              [rawFile],
+              rawFile.name && rawFile.name !== "image.png" ? rawFile.name : customName,
+              { type: rawFile.type || "image/jpeg" }
+            );
+            handleOcrProcessFile(validFile, targetJenis);
+            showToast(`File berhasil di-paste ke ${OCR_DOC_CONFIG[targetJenis]?.title || targetJenis.toUpperCase()}`);
+            return;
+          }
+        }
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [OCR_DOC_CONFIG]
+  );
+
+  // Helper to read clipboard directly via navigator.clipboard API
+  const handleReadClipboard = useCallback(
+    async (targetJenis: OcrDocType) => {
+      try {
+        if (!navigator.clipboard?.read) {
+          showToast("Silakan klik kolom lalu tekan Ctrl+V untuk menempel file.");
+          return;
+        }
+        const clipboardItems = await navigator.clipboard.read();
+        for (const item of clipboardItems) {
+          const imageType = item.types.find((t) => t.startsWith("image/"));
+          if (imageType) {
+            const blob = await item.getType(imageType);
+            const ext = imageType.includes("png") ? ".png" : ".jpg";
+            const file = new File([blob], `${targetJenis}_clipboard_${Date.now()}${ext}`, { type: imageType });
+            handleOcrProcessFile(file, targetJenis);
+            showToast(`File gambar berhasil di-paste ke ${OCR_DOC_CONFIG[targetJenis]?.title}`);
+            return;
+          }
+        }
+        showToast("Tidak ada gambar di clipboard. Silakan salin gambar/screenshot terlebih dahulu.");
+      } catch (err) {
+        console.warn("Clipboard read error:", err);
+        showToast("Klik pada kolom lalu tekan Ctrl+V untuk menempel file gambar.");
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [OCR_DOC_CONFIG]
+  );
+
+  // Global window paste listener for OCR section
+  useEffect(() => {
+    if (dataSourceMode !== "ocr") return;
+
+    const handleWindowPaste = (e: ClipboardEvent) => {
+      const activeEl = document.activeElement as HTMLElement | null;
+      const tagName = activeEl?.tagName?.toLowerCase();
+      if (tagName === "input" || tagName === "textarea" || activeEl?.isContentEditable) {
+        return;
+      }
+
+      const targetCol = hoveredOcrColumn || activeOcrColumn;
+      if (!targetCol) return;
+
+      const items = e.clipboardData?.items;
+      if (!items || items.length === 0) return;
+
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        if (item?.kind === "file") {
+          const rawFile = item.getAsFile();
+          if (rawFile) {
+            e.preventDefault();
+            e.stopPropagation();
+            const ext = rawFile.type.includes("pdf") ? ".pdf" : ".jpg";
+            const customName = `${targetCol}_pasted_${Date.now()}${ext}`;
+            const validFile = new File(
+              [rawFile],
+              rawFile.name && rawFile.name !== "image.png" ? rawFile.name : customName,
+              { type: rawFile.type || "image/jpeg" }
+            );
+            handleOcrProcessFile(validFile, targetCol);
+            showToast(`File berhasil di-paste ke ${OCR_DOC_CONFIG[targetCol]?.title || targetCol.toUpperCase()}`);
+            return;
+          }
+        }
+      }
+    };
+
+    window.addEventListener("paste", handleWindowPaste);
+    return () => window.removeEventListener("paste", handleWindowPaste);
+  }, [dataSourceMode, hoveredOcrColumn, activeOcrColumn, OCR_DOC_CONFIG]);
+
   // Process OCR for specific file
   const handleOcrProcessFile = async (
     file: File,
@@ -1075,8 +1183,18 @@ function GenerateSuratPageContent() {
       return;
     }
 
-    const previewUrl = URL.createObjectURL(file);
-    setOcrFiles((prev) => ({ ...prev, [jenis]: file }));
+    // 1. Kompresi otomatis hingga maksimal 200 KB untuk file gambar
+    let processedFile = file;
+    if (file.type.startsWith("image/") || (!file.type && !file.name.toLowerCase().endsWith(".pdf"))) {
+      try {
+        processedFile = await compressOcrDocument(file, 200 * 1024);
+      } catch (cErr) {
+        console.warn("Kompresi file gagal, melanjutkan dengan file asli:", cErr);
+      }
+    }
+
+    const previewUrl = URL.createObjectURL(processedFile);
+    setOcrFiles((prev) => ({ ...prev, [jenis]: processedFile }));
     setOcrPreviews((prev) => ({ ...prev, [jenis]: previewUrl }));
     setOcrErrors((prev) => ({ ...prev, [jenis]: null }));
 
@@ -1110,7 +1228,7 @@ function GenerateSuratPageContent() {
         setOcrStatuses((prev) => ({ ...prev, [jenis]: "uploading" }));
 
         const formData = new FormData();
-        formData.append("file", file);
+        formData.append("file", processedFile);
         formData.append("jamaahId", selectedJamaahId);
         formData.append("jenisDokumen", jenis);
 
@@ -1155,7 +1273,7 @@ function GenerateSuratPageContent() {
         setOcrStatuses((prev) => ({ ...prev, [jenis]: "extracting" }));
 
         const formData = new FormData();
-        formData.append("file", file);
+        formData.append("file", processedFile);
         formData.append("jenisDokumen", jenis);
         if (forceFresh) formData.append("forceFresh", "true");
         if (targetNamaJamaah) {
@@ -1188,7 +1306,8 @@ function GenerateSuratPageContent() {
       setOcrStatuses((prev) => ({ ...prev, [jenis]: "success" }));
       const docLabel = OCR_DOC_CONFIG[jenis]?.title || jenis.toUpperCase();
       const conf = ocrResultData?.confidence ? Math.round(ocrResultData.confidence * 100) : 95;
-      showToast(`Ekstraksi ${docLabel} berhasil (${conf}%)! Data variabel telah terisi otomatis.`);
+      const sizeKb = Math.round(processedFile.size / 1024);
+      showToast(`Ekstraksi ${docLabel} berhasil (${conf}% • ${sizeKb} KB)! Data variabel telah terisi otomatis.`);
     } catch (err: any) {
       console.error(`Error processing OCR for ${jenis}:`, err);
       setOcrStatuses((prev) => ({ ...prev, [jenis]: "error" }));
@@ -2238,7 +2357,7 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
                       </div>
                     )}
 
-                    {/* 3 Kolom Upload Dokumen (KTP, Akta Lahir, KK) */}
+                    {/* 3 Kolom Upload Dokumen (KTP, Akta Lahir, KK) dengan Paste & Kompresi <= 200 KB */}
                     <div>
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                         {(["ktp", "akta", "kk"] as OcrDocType[]).map((jenis) => {
@@ -2249,11 +2368,23 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
                           const result = ocrResultsData[jenis];
                           const errorMsg = ocrErrors[jenis];
                           const inputRef = docInputRefs[jenis];
+                          const isColActive = activeOcrColumn === jenis;
 
                           return (
                             <div
                               key={jenis}
-                              className="flex flex-col rounded-xl border border-stone-200 dark:border-stone-800 bg-background/80 p-3 space-y-2.5 shadow-2xs relative"
+                              tabIndex={0}
+                              onFocus={() => setActiveOcrColumn(jenis)}
+                              onClick={() => setActiveOcrColumn(jenis)}
+                              onMouseEnter={() => setHoveredOcrColumn(jenis)}
+                              onMouseLeave={() => setHoveredOcrColumn(null)}
+                              onPaste={(e) => handlePasteFile(e, jenis)}
+                              className={cn(
+                                "flex flex-col rounded-xl border p-3 space-y-2.5 shadow-2xs relative transition-all outline-none",
+                                isColActive
+                                  ? "border-primary ring-2 ring-primary/20 bg-background"
+                                  : "border-stone-200 dark:border-stone-800 bg-background/80 hover:border-primary/50"
+                              )}
                             >
                               {/* Hidden file input */}
                               <input
@@ -2271,20 +2402,43 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
                               />
 
                               {/* Column Header */}
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-1.5 font-bold text-xs text-foreground">
-                                  <FileText className="h-3.5 w-3.5 text-primary" />
-                                  <span>{config.title}</span>
+                              <div className="flex items-center justify-between gap-1">
+                                <div className="flex items-center gap-1.5 font-bold text-xs text-foreground truncate">
+                                  <FileText className="h-3.5 w-3.5 text-primary shrink-0" />
+                                  <span className="truncate">{config.title}</span>
+                                  {isColActive && (
+                                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-primary/10 text-primary font-semibold shrink-0">
+                                      Aktif
+                                    </span>
+                                  )}
                                 </div>
-                                <Badge variant="outline" size="sm" className="text-[9px] font-mono">
-                                  {config.badgeText}
-                                </Badge>
+                                <div className="flex items-center gap-1.5 shrink-0">
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setActiveOcrColumn(jenis);
+                                      handleReadClipboard(jenis);
+                                    }}
+                                    className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-stone-100 hover:bg-primary/10 hover:text-primary dark:bg-stone-800 transition-colors border border-stone-200 dark:border-stone-700 cursor-pointer"
+                                    title={`Paste file gambar dari clipboard ke ${config.title} (Ctrl+V)`}
+                                  >
+                                    <Clipboard className="h-3 w-3" />
+                                    <span>Paste</span>
+                                  </button>
+                                  <Badge variant="outline" size="sm" className="text-[9px] font-mono">
+                                    {config.badgeText}
+                                  </Badge>
+                                </div>
                               </div>
 
-                              {/* Upload Box / Dropzone */}
+                              {/* Upload Box / Dropzone / Paste Area */}
                               {!file ? (
                                 <div
-                                  onClick={() => inputRef.current?.click()}
+                                  onClick={() => {
+                                    setActiveOcrColumn(jenis);
+                                    inputRef.current?.click();
+                                  }}
                                   onDragOver={(e) => {
                                     e.preventDefault();
                                     e.stopPropagation();
@@ -2295,25 +2449,41 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
                                     const f = e.dataTransfer.files?.[0];
                                     if (f) handleOcrProcessFile(f, jenis);
                                   }}
-                                  className="border-2 border-dashed border-stone-200 dark:border-stone-800 hover:border-primary/60 dark:hover:border-primary/60 rounded-xl p-3.5 text-center cursor-pointer transition-all hover:bg-primary/5 flex flex-col items-center justify-center gap-1.5 min-h-[135px]"
+                                  className="border-2 border-dashed border-stone-200 dark:border-stone-800 hover:border-primary/60 dark:hover:border-primary/60 rounded-xl p-3 text-center cursor-pointer transition-all hover:bg-primary/5 flex flex-col items-center justify-center gap-1.5 min-h-[135px] group"
                                 >
-                                  <div className="p-2 rounded-full bg-primary/10 text-primary">
+                                  <div className="p-2 rounded-full bg-primary/10 text-primary group-hover:scale-105 transition-transform">
                                     <UploadCloud className="h-5 w-5" />
                                   </div>
-                                  <span className="text-xs font-bold text-foreground">
-                                    Pilih / Tarik File {config.title}
-                                  </span>
-                                  <span className="text-[10px] text-muted-foreground">
-                                    JPG, PNG, PDF (Maks. 10MB)
-                                  </span>
-                                  <span className="text-[9px] text-muted-foreground/80 text-center leading-tight mt-0.5 line-clamp-1">
-                                    {config.sampleFields}
-                                  </span>
+                                  <div className="flex flex-col items-center">
+                                    <span className="text-xs font-bold text-foreground">
+                                      Pilih, Tarik, atau Paste File
+                                    </span>
+                                    <span className="text-[10px] text-muted-foreground flex items-center gap-1 mt-0.5">
+                                      <kbd className="px-1 py-0.5 rounded bg-muted border text-[9px] font-mono font-bold">Ctrl + V</kbd>
+                                      <span>• Maks. 200 KB (Auto)</span>
+                                    </span>
+                                  </div>
+                                  <div className="pt-1 flex items-center gap-1.5">
+                                    <Button
+                                      type="button"
+                                      variant="secondary"
+                                      size="sm"
+                                      className="h-6 text-[10px] px-2 font-medium"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setActiveOcrColumn(jenis);
+                                        handleReadClipboard(jenis);
+                                      }}
+                                    >
+                                      <Clipboard className="h-3 w-3 mr-1" />
+                                      Paste Clipboard
+                                    </Button>
+                                  </div>
                                 </div>
                               ) : (
                                 <div className="space-y-2">
                                   {/* Thumbnail Preview */}
-                                  <div className="relative rounded-lg overflow-hidden border border-stone-200 dark:border-stone-700 bg-stone-100 dark:bg-stone-900 h-24 flex items-center justify-center">
+                                  <div className="relative rounded-lg overflow-hidden border border-stone-200 dark:border-stone-700 bg-stone-100 dark:bg-stone-900 h-24 flex items-center justify-center group">
                                     {preview && (file.type.startsWith("image/") || file.type === "") ? (
                                       <img
                                         src={preview}
@@ -2328,22 +2498,41 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
                                     )}
 
                                     {/* Quick replacement overlay on hover */}
-                                    <button
-                                      type="button"
-                                      onClick={() => inputRef.current?.click()}
-                                      className="absolute inset-0 bg-black/40 text-white opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center text-[11px] font-semibold gap-1 backdrop-blur-2xs"
-                                    >
-                                      <UploadCloud className="h-3.5 w-3.5" />
-                                      Ganti File
-                                    </button>
+                                    <div className="absolute inset-0 bg-black/50 text-white opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 backdrop-blur-2xs">
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          inputRef.current?.click();
+                                        }}
+                                        className="px-2 py-1 rounded bg-white/20 hover:bg-white/30 text-[10px] font-semibold flex items-center gap-1"
+                                      >
+                                        <UploadCloud className="h-3 w-3" />
+                                        Ganti
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setActiveOcrColumn(jenis);
+                                          handleReadClipboard(jenis);
+                                        }}
+                                        className="px-2 py-1 rounded bg-primary text-primary-foreground hover:bg-primary/90 text-[10px] font-semibold flex items-center gap-1"
+                                      >
+                                        <Clipboard className="h-3 w-3" />
+                                        Paste
+                                      </button>
+                                    </div>
                                   </div>
 
                                   {/* File Name & Size */}
                                   <div className="flex items-center justify-between text-[10px] text-muted-foreground font-medium px-0.5">
-                                    <span className="truncate max-w-[140px]" title={file.name}>
+                                    <span className="truncate max-w-[130px]" title={file.name}>
                                       {file.name}
                                     </span>
-                                    <span>{(file.size / 1024).toFixed(0)} KB</span>
+                                    <span className="font-mono text-[9px] text-emerald-600 dark:text-emerald-400 font-bold" title="Ukuran terkompresi otomatis maksimal 200 KB">
+                                      {(file.size / 1024).toFixed(0)} KB (≤200KB)
+                                    </span>
                                   </div>
 
                                   {/* Status Banner */}
