@@ -2451,34 +2451,21 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
                               />
 
                               {/* Column Header */}
-                              <div className="flex items-center justify-between gap-1">
-                                <div className="flex items-center gap-1.5 font-bold text-xs text-foreground truncate">
-                                  <FileText className="h-3.5 w-3.5 text-primary shrink-0" />
-                                  <span className="truncate">{config.title}</span>
+                              <div className="flex items-center justify-between gap-1 pb-1 border-b border-stone-100 dark:border-stone-800/60">
+                                <div className="flex items-center gap-1.5 min-w-0">
+                                  <FileText className="h-4 w-4 text-primary shrink-0" />
+                                  <span className="font-bold text-xs text-foreground truncate">
+                                    {config.title}
+                                  </span>
                                   {isColActive && (
-                                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-primary/10 text-primary font-semibold shrink-0">
+                                    <span className="text-[9px] px-1.5 py-0.2 rounded bg-primary/15 text-primary font-semibold shrink-0">
                                       Aktif
                                     </span>
                                   )}
                                 </div>
-                                <div className="flex items-center gap-1.5 shrink-0">
-                                  <button
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setActiveOcrColumn(jenis);
-                                      handleReadClipboard(jenis);
-                                    }}
-                                    className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-stone-100 hover:bg-primary/10 hover:text-primary dark:bg-stone-800 transition-colors border border-stone-200 dark:border-stone-700 cursor-pointer"
-                                    title={`Paste file gambar dari clipboard ke ${config.title} (Ctrl+V)`}
-                                  >
-                                    <Clipboard className="h-3 w-3" />
-                                    <span>Paste</span>
-                                  </button>
-                                  <Badge variant="outline" size="sm" className="text-[9px] font-mono">
-                                    {config.badgeText}
-                                  </Badge>
-                                </div>
+                                <span className="text-[10px] font-medium text-muted-foreground bg-stone-100 dark:bg-stone-800 px-1.5 py-0.5 rounded shrink-0">
+                                  {config.badgeText}
+                                </span>
                               </div>
 
                               {/* Upload Box / Dropzone / Paste Area */}
@@ -2498,18 +2485,17 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
                                     const f = e.dataTransfer.files?.[0];
                                     if (f) handleOcrProcessFile(f, jenis);
                                   }}
-                                  className="border-2 border-dashed border-stone-200 dark:border-stone-800 hover:border-primary/60 dark:hover:border-primary/60 rounded-xl p-3 text-center cursor-pointer transition-all hover:bg-primary/5 flex flex-col items-center justify-center gap-1.5 min-h-[135px] group"
+                                  className="border-2 border-dashed border-stone-200 dark:border-stone-800 hover:border-primary/60 dark:hover:border-primary/60 rounded-xl p-3 text-center cursor-pointer transition-all hover:bg-primary/5 flex flex-col items-center justify-center gap-1.5 min-h-[140px] group"
                                 >
                                   <div className="p-2 rounded-full bg-primary/10 text-primary group-hover:scale-105 transition-transform">
                                     <UploadCloud className="h-5 w-5" />
                                   </div>
                                   <div className="flex flex-col items-center">
                                     <span className="text-xs font-bold text-foreground">
-                                      Pilih, Tarik, atau Paste File
+                                      Unggah / Paste {config.title}
                                     </span>
-                                    <span className="text-[10px] text-muted-foreground flex items-center gap-1 mt-0.5">
-                                      <kbd className="px-1 py-0.5 rounded bg-muted border text-[9px] font-mono font-bold">Ctrl + V</kbd>
-                                      <span>• Maks. 200 KB (Auto)</span>
+                                    <span className="text-[10px] text-muted-foreground mt-0.5">
+                                      Bebas ukuran asal • Otomatis dikompres ≤ 200 KB
                                     </span>
                                   </div>
                                   <div className="pt-1 flex items-center gap-1.5">
@@ -2517,15 +2503,15 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
                                       type="button"
                                       variant="secondary"
                                       size="sm"
-                                      className="h-6 text-[10px] px-2 font-medium"
+                                      className="h-6 text-[10px] px-2.5 font-medium shadow-2xs border border-stone-200/60 dark:border-stone-700"
                                       onClick={(e) => {
                                         e.stopPropagation();
                                         setActiveOcrColumn(jenis);
                                         handleReadClipboard(jenis);
                                       }}
                                     >
-                                      <Clipboard className="h-3 w-3 mr-1" />
-                                      Paste Clipboard
+                                      <Clipboard className="h-3 w-3 mr-1 text-primary" />
+                                      Paste Clipboard (Ctrl+V)
                                     </Button>
                                   </div>
                                 </div>
