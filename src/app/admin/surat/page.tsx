@@ -699,6 +699,58 @@ function GenerateSuratPageContent() {
     },
   };
 
+  // Helper untuk mencari data baris anggota keluarga jamaah di dokumen KK (tabel 1 & 2 simetris)
+  const findTargetInKk = useCallback(
+    (kkData?: Record<string, any> | null, targetNama?: string, targetNik?: string) => {
+      if (!kkData) return null;
+      let anggotaList: any[] = [];
+      if (Array.isArray(kkData.anggotaKeluarga)) {
+        anggotaList = kkData.anggotaKeluarga;
+      } else if (typeof kkData.anggotaKeluarga === "string") {
+        try {
+          const parsed = JSON.parse(kkData.anggotaKeluarga);
+          if (Array.isArray(parsed)) anggotaList = parsed;
+        } catch (_) {}
+      }
+
+      const clean = (s?: string) =>
+        (s || "")
+          .toLowerCase()
+          .replace(/[\u2018\u2019\u201A\u201B'"`{}[\]()_.\-:\/\\]/g, "")
+          .replace(/\s+/g, "");
+
+      const cNama = clean(targetNama);
+      const cNik = clean(targetNik);
+
+      if (anggotaList.length > 0) {
+        // 1. Cocokkan NIK jika ada
+        if (cNik) {
+          const matchByNik = anggotaList.find((m) => {
+            const mNik = clean(m.nik);
+            return mNik && (mNik === cNik || mNik.includes(cNik) || cNik.includes(mNik));
+          });
+          if (matchByNik) return matchByNik;
+        }
+
+        // 2. Cocokkan Nama Lengkap
+        if (cNama) {
+          const matchByName = anggotaList.find((m) => {
+            const mNama = clean(m.namaLengkap || m.nama);
+            return (
+              mNama &&
+              (mNama === cNama ||
+                (mNama.length > 4 && cNama.includes(mNama)) ||
+                (cNama.length > 4 && mNama.includes(cNama)))
+            );
+          });
+          if (matchByName) return matchByName;
+        }
+      }
+      return null;
+    },
+    []
+  );
+
   // Map extracted OCR results to Autocrat Form Placeholders
   const applyAllOcrResultsToForm = useCallback(
     (results: Record<OcrDocType, Record<string, any> | null>) => {
@@ -728,8 +780,18 @@ function GenerateSuratPageContent() {
       // 5. Jenis Kelamin: KTP
       const jenisKelaminCandidate = ktp.jenisKelamin;
 
-      // 6. Nama Ayah Kandung: Akta lalu KK
-      const namaAyahCandidate = akta.namaAyah || kk.namaAyah || kk.namaKepalaKeluarga;
+      // 6. Nama Ayah Kandung:
+      // Prioritas 1: Ambil dari baris deret jamaah terkait pada tabel KK (misal deret ke-5)
+      const matchedKkMember = findTargetInKk(kk, namaCandidate, nikCandidate);
+      const namaAyahFromKkRow = matchedKkMember?.namaAyah;
+      // Prioritas 2: Akta kelahiran
+      // Prioritas 3: kk.namaAyah (hasil ekstraksi prompt target-aware)
+      // Prioritas 4: Fallback kk.namaKepalaKeluarga (hanya jika jamaah adalah kepala keluarga)
+      const namaAyahCandidate =
+        namaAyahFromKkRow ||
+        akta.namaAyah ||
+        kk.namaAyah ||
+        kk.namaKepalaKeluarga;
 
       // 7. Nomor KK: KK
       const noKkCandidate = kk.nomorKk || kk.noKk;
@@ -1021,6 +1083,29 @@ function GenerateSuratPageContent() {
     try {
       let ocrResultData: any = null;
 
+      // Dapatkan identitas target jamaah untuk membantu resolusi baris KK
+      let targetNamaJamaah = "";
+      let targetNikJamaah = "";
+
+      if (selectedJamaahId) {
+        const jm = availableJamaahList.find((j: any) => j.id === selectedJamaahId) as any;
+        if (jm) {
+          targetNamaJamaah = jm.namaLengkap || jm.nama || jm.name || "";
+          targetNikJamaah = jm.nik || "";
+        }
+      }
+      if (!targetNamaJamaah && ocrResultsData.ktp) {
+        targetNamaJamaah = ocrResultsData.ktp.namaLengkap || ocrResultsData.ktp.nama || "";
+        targetNikJamaah = ocrResultsData.ktp.nik || "";
+      }
+      if (!targetNamaJamaah && ocrResultsData.akta) {
+        targetNamaJamaah = ocrResultsData.akta.namaLengkap || ocrResultsData.akta.nama || "";
+      }
+      if (!targetNamaJamaah) {
+        targetNamaJamaah = manualFormData["nama"] || manualFormData["nama_lengkap"] || "";
+        targetNikJamaah = manualFormData["nik"] || manualFormData["no_identitas"] || "";
+      }
+
       if (saveOcrToManifest && selectedJamaahId) {
         setOcrStatuses((prev) => ({ ...prev, [jenis]: "uploading" }));
 
@@ -1054,6 +1139,9 @@ function GenerateSuratPageContent() {
             fileUrl,
             jenis,
             forceFresh,
+            namaJamaah: targetNamaJamaah || undefined,
+            nikJamaah: targetNikJamaah || undefined,
+            mode: jenis === "kk" && targetNamaJamaah ? `kk_target:${targetNamaJamaah}|${targetNikJamaah}` : undefined,
           }),
         });
 
@@ -1070,6 +1158,13 @@ function GenerateSuratPageContent() {
         formData.append("file", file);
         formData.append("jenisDokumen", jenis);
         if (forceFresh) formData.append("forceFresh", "true");
+        if (targetNamaJamaah) {
+          formData.append("namaJamaah", targetNamaJamaah);
+          formData.append("nikJamaah", targetNikJamaah);
+          if (jenis === "kk") {
+            formData.append("mode", `kk_target:${targetNamaJamaah}|${targetNikJamaah}`);
+          }
+        }
 
         const ocrRes = await fetch("/api/dokumen/ocr", {
           method: "POST",
@@ -2342,22 +2437,44 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
                                           </div>
                                         </>
                                       )}
-                                      {jenis === "kk" && (
-                                        <>
-                                          <div className="flex justify-between gap-1">
-                                            <span className="text-muted-foreground shrink-0">No. KK:</span>
-                                            <span className="font-mono font-bold truncate">{result.nomorKk || result.noKk || "-"}</span>
-                                          </div>
-                                          <div className="flex justify-between gap-1">
-                                            <span className="text-muted-foreground shrink-0">Ayah/Kepala:</span>
-                                            <span className="font-semibold truncate">{result.namaAyah || result.namaKepalaKeluarga || "-"}</span>
-                                          </div>
-                                          <div className="flex justify-between gap-1">
-                                            <span className="text-muted-foreground shrink-0">NIK:</span>
-                                            <span className="font-mono truncate">{result.nik || "-"}</span>
-                                          </div>
-                                        </>
-                                      )}
+                                      {jenis === "kk" && (() => {
+                                        const targetNama =
+                                          ocrResultsData.ktp?.namaLengkap ||
+                                          ocrResultsData.ktp?.nama ||
+                                          manualFormData["nama"] ||
+                                          manualFormData["nama_lengkap"];
+                                        const targetNik =
+                                          ocrResultsData.ktp?.nik ||
+                                          manualFormData["nik"] ||
+                                          manualFormData["no_identitas"];
+                                        const matched = findTargetInKk(result, targetNama, targetNik);
+                                        const ayahDisplay =
+                                          matched?.namaAyah ||
+                                          result.namaAyah ||
+                                          result.namaKepalaKeluarga ||
+                                          "-";
+                                        const nikDisplay = matched?.nik || result.nik || "-";
+                                        const rowInfo = matched?.no ? ` (Deret #${matched.no})` : "";
+
+                                        return (
+                                          <>
+                                            <div className="flex justify-between gap-1">
+                                              <span className="text-muted-foreground shrink-0">No. KK:</span>
+                                              <span className="font-mono font-bold truncate">{result.nomorKk || result.noKk || "-"}</span>
+                                            </div>
+                                            <div className="flex justify-between gap-1">
+                                              <span className="text-muted-foreground shrink-0">Ayah Jamaah:</span>
+                                              <span className="font-semibold text-emerald-700 dark:text-emerald-400 truncate" title={`${ayahDisplay}${rowInfo}`}>
+                                                {ayahDisplay}{rowInfo}
+                                              </span>
+                                            </div>
+                                            <div className="flex justify-between gap-1">
+                                              <span className="text-muted-foreground shrink-0">NIK Jamaah:</span>
+                                              <span className="font-mono truncate">{nikDisplay}</span>
+                                            </div>
+                                          </>
+                                        );
+                                      })()}
                                     </div>
                                   )}
 

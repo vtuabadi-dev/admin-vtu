@@ -28,7 +28,11 @@ export async function POST(request: NextRequest) {
       const file = formData.get("file") as File | null;
       jenis = (formData.get("jenisDokumen") || formData.get("jenis")) as DokumenJenis;
       dokumenId = (formData.get("dokumenId") as string) || undefined;
-      mode = (formData.get("mode") as string) || undefined;
+      const namaJamaah = (formData.get("namaJamaah") as string) || undefined;
+      const nikJamaah = (formData.get("nikJamaah") as string) || undefined;
+      if (!mode && jenis === "kk" && (namaJamaah || nikJamaah)) {
+        mode = `kk_target:${namaJamaah || ""}${nikJamaah ? `|${nikJamaah}` : ""}`;
+      }
       forceFresh = formData.get("forceFresh") === "true";
 
       if (!file || !jenis) {
@@ -42,6 +46,8 @@ export async function POST(request: NextRequest) {
         fileUrl?: string;
         jenis: DokumenJenis;
         mode?: string;
+        namaJamaah?: string;
+        nikJamaah?: string;
         forceFresh?: boolean;
       };
 
@@ -49,6 +55,9 @@ export async function POST(request: NextRequest) {
       fileUrl = body.fileUrl;
       jenis = body.jenis;
       mode = body.mode;
+      if (!mode && jenis === "kk" && (body.namaJamaah || body.nikJamaah)) {
+        mode = `kk_target:${body.namaJamaah || ""}${body.nikJamaah ? `|${body.nikJamaah}` : ""}`;
+      }
       forceFresh = Boolean(body.forceFresh);
 
       if (!jenis) {
@@ -89,7 +98,15 @@ export async function POST(request: NextRequest) {
     // Extract fields from OCR result
     for (const field of ocrResult.fields) {
       if (field.value) {
-        ocrData[field.field] = field.value;
+        try {
+          if (typeof field.value === "string" && (field.value.startsWith("[") || field.value.startsWith("{"))) {
+            ocrData[field.field] = JSON.parse(field.value);
+          } else {
+            ocrData[field.field] = field.value;
+          }
+        } catch {
+          ocrData[field.field] = field.value;
+        }
       }
     }
 

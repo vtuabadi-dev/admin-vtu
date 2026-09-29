@@ -184,15 +184,42 @@ export class GoogleAiStudioOcrProvider implements OcrProvider {
   "rawText": "Teks mentah lengkap KTP"
 }`
           : jenis === "kk"
-          ? `Analisis gambar Kartu Keluarga (KK) Indonesia ini. Di tabel Kartu Keluarga, setiap anggota memiliki kolom 'NAMA AYAH' (atau 'Nama Orang Tua: Ayah').
-Tugas utama adalah mengekstrak NAMA AYAH KANDUNG dari jamaah terkait (BUKAN nama kepala keluarga, karena jamaah bisa berstatus kepala keluarga).
-Ekstrak dalam format JSON valid:
+          ? `Analisis gambar Kartu Keluarga (KK) Indonesia ini dengan sangat teliti.
+STRUKTUR TABEL KARTU KELUARGA INDONESIA:
+Dokumen Kartu Keluarga memiliki DUA tabel yang saling berhubungan:
+1. Tabel Pertama (Bagian Atas): Data Anggota Keluarga (Kolom No 1, 2, 3... Nama Lengkap, NIK, Jenis Kelamin, Tempat Lahir, Tanggal Lahir, Agama, Pendidikan, Jenis Pekerjaan).
+2. Tabel Kedua (Bagian Bawah): Status & Orang Tua (Kolom No 1, 2, 3... Status Perkawinan, Status Hubungan Dalam Keluarga, Kewarganegaraan, No. Paspor, No. KITAP, Nama Orang Tua: AYAH, Nama Orang Tua: IBU).
+
+ATURAN DERET / NOMOR BARIS (SANGAT KRUSIAL):
+- Setiap baris nomor urut (1, 2, 3, 4, 5, dst) pada Tabel Pertama (Atas) BERKORESPONDENSI LANGSUNG 1-ke-1 dengan baris nomor urut yang SAMA pada Tabel Kedua (Bawah).
+- Kolom (16) atau kolom 'Ayah' pada deret nomor X adalah nama ayah kandung untuk anggota keluarga di baris nomor X pada tabel atas.
+- CONTOH NYATA: Jika nama orang yang dicari berada di baris nomor 5 pada tabel atas (misal anak), maka nama ayah kandungnya ada di baris nomor 5 kolom 'Ayah' di tabel bawah (BUKAN nama ayah kepala keluarga di baris nomor 1)!
+
+Ekstrak seluruh informasi dalam format JSON valid (tanpa markdown wrapper):
 {
-  "namaAyah": "Nama Ayah Kandung yang tertera di kolom 'NAMA AYAH' pada baris jamaah terkait (contoh: H. AHMAD SOFWAN / SOLEH ISMAIL)",
-  "namaLengkap": "Nama lengkap jamaah / anggota keluarga terkait",
-  "nik": "16 digit NIK",
-  "nomorKk": "16 digit Nomor Kartu Keluarga jika ada",
-  "rawText": "Teks mentah lengkap KK"
+  "nomorKk": "16 digit Nomor Kartu Keluarga di bagian atas",
+  "namaKepalaKeluarga": "Nama Kepala Keluarga yang tertera di bagian atas formulir KK",
+  "namaAyah": "Nama Ayah kandung dari target jamaah sesuai nomor baris deretnya di tabel bawah",
+  "namaLengkap": "Nama lengkap target jamaah",
+  "nik": "16 digit NIK target jamaah",
+  "alamat": "Alamat / nama jalan yang tertera",
+  "rt": "Nomor RT",
+  "rw": "Nomor RW",
+  "kelurahan": "Nama kelurahan / desa",
+  "kecamatan": "Nama kecamatan",
+  "kota": "Nama kota / kabupaten",
+  "provinsi": "Nama provinsi",
+  "anggotaKeluarga": [
+    {
+      "no": 1,
+      "nama": "Nama lengkap anggota di baris 1 tabel atas",
+      "nik": "16 digit NIK di baris 1 tabel atas",
+      "hubungan": "Status Hubungan (contoh: KEPALA KELUARGA / ISTRI / ANAK)",
+      "namaAyah": "Nama Ayah di baris 1 tabel bawah (kolom Ayah)",
+      "namaIbu": "Nama Ibu di baris 1 tabel bawah (kolom Ibu)"
+    }
+  ],
+  "rawText": "Teks mentah KK"
 }`
           : jenis === "buku_nikah"
           ? `Analisis gambar Buku Nikah (Kementerian Agama RI) ini dan ekstrak data pernikahan serta nasab dalam format JSON valid:
@@ -293,8 +320,8 @@ Ekstrak dalam format JSON valid:
             value = String((passportParsed as any)[field] || "").trim();
           } else if (ktpParsed && field in ktpParsed) {
             value = String((ktpParsed as any)[field] || "").trim();
-          } else if (parsedJson && parsedJson[field]) {
-            value = String(parsedJson[field]).trim();
+          } else if (parsedJson && parsedJson[field] !== undefined && parsedJson[field] !== null) {
+            value = typeof parsedJson[field] === "object" ? JSON.stringify(parsedJson[field]) : String(parsedJson[field]).trim();
           }
           if (!value && ktpParsed) {
             if (field === "kota") value = ktpParsed.kotaKabupaten || ktpParsed.kota || "";
