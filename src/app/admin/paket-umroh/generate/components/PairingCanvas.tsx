@@ -126,15 +126,20 @@ export function PairingCanvas({
             Menyandingkan Paket {parentStartingCity} &amp; {childStartingCity}
           </h2>
           <p className="text-xs text-slate-400 mt-1">
-            Geser (drag &amp; drop) baris di sebelah kanan untuk menyelaraskan urutan keberangkatan {childStartingCity} dengan {parentStartingCity}.
+            Geser baris di sebelah kanan untuk menyandingkan tanggal, dan tentukan pembagian alokasi kuota cabang (memecah kuota dari paket utama, total kapasitas tetap {totalGroupCapacity} seat).
           </p>
         </div>
 
         <div className="flex items-center gap-3 bg-slate-950 px-4 py-2.5 rounded-xl border border-slate-800/80">
           <Users className="h-4 w-4 text-emerald-400" />
           <div className="text-xs">
-            <span className="text-slate-400">Kapasitas Rombongan: </span>
-            <span className="font-bold text-white">{totalGroupCapacity} Seat</span>
+            <div className="flex items-center gap-1.5">
+              <span className="text-slate-400">Total Kuota Rombongan: </span>
+              <span className="font-bold text-white">{totalGroupCapacity} Seat</span>
+            </div>
+            <span className="text-[10px] text-amber-400 block mt-0.5">
+              * Memecah quantity paket utama (total tidak bertambah)
+            </span>
           </div>
         </div>
       </div>

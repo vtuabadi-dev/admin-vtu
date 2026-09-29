@@ -326,9 +326,20 @@ export const packageService = {
         }
       }
 
-      const assignedChildSeat = typeof pairedItemForThisDate?.childSeat === "number"
-        ? pairedItemForThisDate.childSeat
-        : parseInt(data.kapasitas || data.kuota || "45", 10);
+      const isStartingPointSplit = (data.splitReason === "starting_point" || data.splitType === "starting_point");
+      let assignedChildSeat: number;
+
+      if (!isStartingPointSplit && parentRecord) {
+        // Varian selain split starting (Promo, Spek, dsb):
+        // TIDAK split quantity: kuota otomatis mengikuti paket utama (shared pool),
+        // TIDAK menambah quantity ataupun mengambil jatah quantity paket utama.
+        assignedChildSeat = parentRecord.kuota || parentRecord.maxSeat || parseInt(data.kapasitas || data.kuota || "45", 10);
+      } else {
+        // Split starting point: memecah kuota dari paket utama
+        assignedChildSeat = typeof pairedItemForThisDate?.childSeat === "number"
+          ? pairedItemForThisDate.childSeat
+          : parseInt(data.kapasitas || data.kuota || "45", 10);
+      }
 
       const includeList: string[] = Array.isArray(data.include) ? [...data.include] : [];
       if (data.isAdaPerlengkapan === "ya" && !includeList.includes("Perlengkapan Umroh")) {
@@ -387,31 +398,35 @@ export const packageService = {
       createdList.push(created);
     }
 
-    // 4. If pairedItems (parent seat adjustments) passed, update parent departure seat capacities!
-    if (Array.isArray(data.pairedItems) && data.pairedItems.length > 0) {
-      for (const pair of data.pairedItems) {
-        if (pair.parentId && typeof pair.parentSeat === "number") {
+    // 4. Update parent departure seat capacities HANYA JIKA split starting point!
+    // Varian selain starting (Promo / Spek) TIDAK PERNAH membagi quota / memotong jatah quota paket utama.
+    const isStartingPointSplitOverall = (data.splitReason === "starting_point" || data.splitType === "starting_point");
+    if (isStartingPointSplitOverall) {
+      if (Array.isArray(data.pairedItems) && data.pairedItems.length > 0) {
+        for (const pair of data.pairedItems) {
+          if (pair.parentId && typeof pair.parentSeat === "number") {
+            await prisma.keberangkatan.update({
+              where: { id: pair.parentId },
+              data: {
+                kuota: pair.parentSeat,
+                maxSeat: pair.parentSeat,
+              },
+            });
+          }
+        }
+      } else if (initialParentId) {
+        const parent = await prisma.keberangkatan.findUnique({ where: { id: initialParentId } });
+        if (parent) {
+          const childSeat = parseInt(data.kapasitas || data.kuota || "15", 10);
+          const newParentSeat = Math.max(0, (parent.kuota || 45) - childSeat);
           await prisma.keberangkatan.update({
-            where: { id: pair.parentId },
+            where: { id: parent.id },
             data: {
-              kuota: pair.parentSeat,
-              maxSeat: pair.parentSeat,
+              kuota: newParentSeat,
+              maxSeat: newParentSeat,
             },
           });
         }
-      }
-    } else if (data.splitReason === "starting_point" && initialParentId) {
-      const parent = await prisma.keberangkatan.findUnique({ where: { id: initialParentId } });
-      if (parent) {
-        const childSeat = parseInt(data.kapasitas || data.kuota || "15", 10);
-        const newParentSeat = Math.max(0, (parent.kuota || 45) - childSeat);
-        await prisma.keberangkatan.update({
-          where: { id: parent.id },
-          data: {
-            kuota: newParentSeat,
-            maxSeat: newParentSeat,
-          },
-        });
       }
     }
 

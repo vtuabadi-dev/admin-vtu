@@ -10,7 +10,7 @@ import {
   MOCK_LANDING_PATTERN, 
   MOCK_KLASTER
 } from "@/shared/lib/mock-data";
-import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X, Split, Layers, Tag, Edit3, RefreshCw } from "lucide-react";
+import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X, Split, Layers, Tag, Edit3, RefreshCw, Info } from "lucide-react";
 import { generateVtuGroupCode } from "@/shared/lib/group-code.helper";
 import { PairingCanvas } from "./components/PairingCanvas";
 import { useOperationalStore } from "@/stores/operational-store";
@@ -554,6 +554,141 @@ export default function GeneratePaketPage() {
         fetchExistingGroups();
       } else {
         alert(`Gagal merubah spesifikasi paket: ${resJson.message || "Terjadi kesalahan"}`);
+      }
+    } catch (err: any) {
+      alert(`Terjadi kesalahan: ${err?.message || err}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGenerateSplitVariant = async () => {
+    scrollToTop();
+    if (!selectedParentGroup) {
+      alert("Mohon pilih Paket Induk eksisting terlebih dahulu.");
+      return;
+    }
+    if (departureDates.length === 0) {
+      alert("Mohon tentukan minimal satu tanggal keberangkatan pada paket.");
+      return;
+    }
+    if (departureDates.length !== selectedParentGroup.dateCount) {
+      alert(`Jumlah tanggal belum cocok: Paket Induk memiliki ${selectedParentGroup.dateCount} tanggal, sedangkan formulir terisi ${departureDates.length} tanggal.`);
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const computedSplitLabel = splitType === "promo"
+        ? (promoLabel || "PROMO SPECIAL")
+        : (spekLabel || "SPESIFIKASI KHUSUS");
+
+      const flyerBase64List = flyerFiles.length > 0
+        ? await (async () => {
+            const promises = flyerFiles.map((file) => {
+              return new Promise<string>((resolve) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result as string);
+                reader.onerror = () => resolve("");
+                reader.readAsDataURL(file);
+              });
+            });
+            const results = await Promise.all(promises);
+            return results.filter(Boolean);
+          })()
+        : [];
+
+      const parentItems = selectedParentGroup.items || [];
+      const parentCapacity = selectedParentGroup.totalCapacity || parentItems[0]?.seat || 45;
+
+      // Susun pasangan items 1:1 di mana kuota induk tetap utuh (tidak dipotong)
+      // dan kuota varian mengikuti kuota induk secara shared pool (tidak membagi quota)
+      const pairs = parentItems.map((parentItem: any, idx: number) => {
+        const childDate = departureDates[idx] || parentItem.date;
+        const seatVal = parentItem.seat || parentCapacity;
+        return {
+          parentId: parentItem.id,
+          parentName: parentItem.namaPaket || parentItem.name,
+          parentDate: parentItem.date,
+          parentSeat: seatVal, // KUOTA INDUK UTUH (TIDAK DIPOTONG)
+          childTempId: `child-${idx}`,
+          childName: getIndividualNameForDate(childDate) || `${parentItem.namaPaket || parentItem.name} [${computedSplitLabel}]`,
+          childDate: childDate,
+          childSeat: seatVal, // KUOTA VARIAN MENGIKUTI INDUK
+        };
+      });
+
+      let basePrice = Number(formData.hargaBase || 0);
+      if (formData.isAdaKlaster === "ya" && clusterConfigs) {
+        const firstClusterPrice = Object.values(clusterConfigs).find(c => Number(c.hargaBase) > 0)?.hargaBase;
+        if (firstClusterPrice) {
+          basePrice = Number(firstClusterPrice);
+        }
+      }
+      if (!basePrice || basePrice <= 0) {
+        basePrice = 35000000;
+      }
+
+      const payload = {
+        packageTypeId: formData.jenisPaketId,
+        startingPointId: formData.startingPointId,
+        maskapaiId: formData.maskapaiId,
+        landingPatternId: formData.landingPatternId,
+        durasiHari: Number(formData.durasiHari || 9),
+        durationDays: Number(formData.durasiHari || 9),
+        departureDates: pairs.map((p: any) => p.childDate),
+        namaPaket: formData.namaPaket || (
+          splitType === "promo"
+            ? `[PROMO] ${formData.namaPaket || promoLabel || "Umroh Promo"}`
+            : `[SPEK] ${formData.namaPaket || spekLabel || "Umroh Spesifikasi"}`
+        ),
+        hargaBase: basePrice,
+        hargaPaket: basePrice,
+        hotelMekkahId: formData.hotelMekkahId,
+        hotelMadinahId: formData.hotelMadinahId,
+        kapasitas: parentCapacity,
+        kuota: parentCapacity,
+        maxSeat: parentCapacity,
+        isAdaKlaster: formData.isAdaKlaster,
+        isAdaPerlengkapan: formData.isAdaPerlengkapan,
+        isAdaKeretaCepat: formData.isAdaKeretaCepat,
+        isAdaThoif: formData.isAdaThoif,
+        tipeMakan: formData.tipeMakan || "FB",
+        clusterConfigs: formData.isAdaKlaster === "ya" ? clusterConfigs : null,
+        paketGrupId: selectedParentGroup.type === "group" ? selectedParentGroupId : undefined,
+        parentKeberangkatanId: selectedParentGroup.type === "individual" ? selectedParentGroup.keberangkatanId : (pairs[0]?.parentId || undefined),
+        splitReason: splitType,
+        splitLabel: computedSplitLabel,
+        promoLabel: splitType === "promo" ? (promoLabel || "PROMO SPECIAL") : undefined,
+        spekLabel: splitType === "spek" ? (spekLabel || "SPESIFIKASI KHUSUS") : undefined,
+        kodeGrup: selectedParentGroup.kodeGrup,
+        pairedItems: pairs,
+        caption: caption || undefined,
+        flyerBase64List: flyerBase64List,
+      };
+
+      const res = await fetch("/api/keberangkatan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      const resJson = await res.json();
+      if (resJson.success) {
+        setSuccess(true);
+        setGeneratedResult({
+          count: pairs.length,
+          items: pairs.map((p: any) => ({
+            name: p.childName,
+            code: `${computedSplitLabel}-${p.childDate}`,
+            date: p.childDate,
+          })),
+        });
+        useOperationalStore.getState().setIsLoaded(false);
+        useOperationalStore.getState().loadAllData();
+        fetchExistingGroups();
+      } else {
+        alert(resJson.message || "Gagal membuat varian paket.");
       }
     } catch (err: any) {
       alert(`Terjadi kesalahan: ${err?.message || err}`);
@@ -1752,16 +1887,28 @@ export default function GeneratePaketPage() {
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
               <div className="flex flex-col justify-end h-full">
-                <label className="block text-sm font-medium mb-1 min-h-[2.5rem] flex items-end">Kapasitas Seat (Maksimal Jamaah)</label>
+                <label className="block text-sm font-medium mb-1 min-h-[2.5rem] flex items-end">
+                  Kapasitas Seat (Maksimal Jamaah)
+                  {generateMode === "split" && splitType !== "starting_point" && (
+                    <span className="text-[10px] text-amber-600 font-bold ml-1.5">(Mengikuti Paket Induk)</span>
+                  )}
+                </label>
                 <Input 
                   id="field-kapasitas" 
                   type="number" 
                   name="kapasitas" 
-                  value={formData.kapasitas} 
+                  disabled={generateMode === "split" && splitType !== "starting_point"}
+                  value={generateMode === "split" && splitType !== "starting_point" && selectedParentGroup ? (selectedParentGroup.totalCapacity || formData.kapasitas) : formData.kapasitas} 
                   onChange={handleChange} 
                   onKeyDown={(e) => handleKeyDownNext(e, "field-targetMaterialisasi")}
                   placeholder="Misal: 45" 
+                  className={cn(generateMode === "split" && splitType !== "starting_point" && "bg-amber-50/50 border-amber-200 text-amber-900 cursor-not-allowed")}
                 />
+                {generateMode === "split" && splitType !== "starting_point" && (
+                  <span className="text-[10px] text-amber-700 font-medium mt-1">
+                    * Kuota otomatis mengikuti Paket Utama ({selectedParentGroup?.totalCapacity || formData.kapasitas || 45} Seat) secara Shared Pool (tidak membagi kuota).
+                  </span>
+                )}
               </div>
               <div className="flex flex-col justify-end h-full">
                 <label className="block text-sm font-medium mb-1 min-h-[2.5rem] flex items-end">Minimal Seat Materialisasi (Kuota Aman)</label>
@@ -1953,14 +2100,20 @@ export default function GeneratePaketPage() {
               onClick={() => {
                 if (generateMode === "edit") {
                   handleUpdatePackage();
+                } else if (generateMode === "split" && selectedParentGroup) {
+                  if (splitType === "starting_point") {
+                    setShowPairingCanvas(true);
+                  } else {
+                    handleGenerateSplitVariant();
+                  }
                 } else {
                   handleGenerate();
                 }
               }} 
-              disabled={loading || fetching || (generateMode === "edit" && !selectedEditPackageId)}
-              className="px-6 font-bold bg-emerald-700 hover:bg-emerald-800 text-white"
+              disabled={loading || fetching || (generateMode === "split" && (!selectedParentGroupId || (selectedParentGroup && departureDates.length !== selectedParentGroup.dateCount))) || (generateMode === "edit" && !selectedEditPackageId)}
+              className={cn("px-6 font-bold text-white", generateMode === "split" ? "bg-amber-600 hover:bg-amber-500" : generateMode === "edit" ? "bg-blue-600 hover:bg-blue-700" : "bg-emerald-700 hover:bg-emerald-800")}
             >
-              {loading ? "Memproses..." : generateMode === "edit" ? "Simpan Perubahan Spesifikasi Paket" : `Generate ${departureDates.length > 0 ? departureDates.length : ""} Paket`}
+              {loading ? "Memproses..." : generateMode === "edit" ? "Simpan Perubahan Spesifikasi Paket" : generateMode === "split" ? (splitType === "starting_point" ? `Lanjut Canvas Pairing (${departureDates.length} Tanggal)` : `Generate Varian Paket (${departureDates.length} Tanggal)`) : `Generate ${departureDates.length > 0 ? departureDates.length : ""} Paket`}
             </Button>
           </div>
         </div>
@@ -2325,13 +2478,20 @@ export default function GeneratePaketPage() {
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end pt-1">
             <div className="flex flex-col justify-end h-full">
-              <label className="block text-xs font-semibold mb-1 min-h-[2.25rem] flex items-end">Kapasitas Seat (Maksimal Jamaah)</label>
+              <label className="block text-xs font-semibold mb-1 min-h-[2.25rem] flex items-end">
+                Kapasitas Seat (Maksimal Jamaah)
+                {generateMode === "split" && splitType !== "starting_point" && (
+                  <span className="text-[10px] text-amber-400 font-bold ml-1.5">(Shared Pool)</span>
+                )}
+              </label>
               <Input 
                 type="number" 
                 name="kapasitas" 
-                value={formData.kapasitas} 
+                disabled={generateMode === "split" && splitType !== "starting_point"}
+                value={generateMode === "split" && splitType !== "starting_point" && selectedParentGroup ? (selectedParentGroup.totalCapacity || formData.kapasitas) : formData.kapasitas} 
                 onChange={handleChange} 
                 placeholder="45" 
+                className={cn(generateMode === "split" && splitType !== "starting_point" && "bg-amber-950/30 border-amber-600/40 text-amber-300 cursor-not-allowed")}
               />
             </div>
             <div className="flex flex-col justify-end h-full">
@@ -2503,11 +2663,23 @@ export default function GeneratePaketPage() {
         <div className="flex justify-end pt-3 border-t">
           <Button 
             id="field-ocr-submitBtn" 
-            onClick={handleGenerate} 
-            disabled={loading || fetching}
-            className="px-6 font-semibold bg-emerald-700 hover:bg-emerald-800 text-white"
+            onClick={() => {
+              if (generateMode === "edit") {
+                handleUpdatePackage();
+              } else if (generateMode === "split" && selectedParentGroup) {
+                if (splitType === "starting_point") {
+                  setShowPairingCanvas(true);
+                } else {
+                  handleGenerateSplitVariant();
+                }
+              } else {
+                handleGenerate();
+              }
+            }} 
+            disabled={loading || fetching || (generateMode === "split" && (!selectedParentGroupId || (selectedParentGroup && departureDates.length !== selectedParentGroup.dateCount)))}
+            className={cn("px-6 font-semibold text-white", generateMode === "split" ? "bg-amber-600 hover:bg-amber-500" : "bg-emerald-700 hover:bg-emerald-800")}
           >
-            {loading ? "Memproses..." : `Generate ${departureDates.length > 0 ? departureDates.length : ""} Paket`}
+            {loading ? "Memproses..." : generateMode === "split" ? (splitType === "starting_point" ? `Lanjut Canvas Pairing (${departureDates.length} Tanggal)` : `Generate Varian Paket (${departureDates.length} Tanggal)`) : `Generate ${departureDates.length > 0 ? departureDates.length : ""} Paket`}
           </Button>
         </div>
       </div>
@@ -2549,7 +2721,11 @@ export default function GeneratePaketPage() {
               if (generateMode === "edit") {
                 handleUpdatePackage();
               } else if (generateMode === "split" && selectedParentGroup) {
-                setShowPairingCanvas(true);
+                if (splitType === "starting_point") {
+                  setShowPairingCanvas(true);
+                } else {
+                  handleGenerateSplitVariant();
+                }
               } else {
                 handleGenerate();
               }
@@ -2557,7 +2733,7 @@ export default function GeneratePaketPage() {
             disabled={loading || fetching || (generateMode === "split" && (!selectedParentGroupId || (selectedParentGroup && departureDates.length !== selectedParentGroup.dateCount))) || (generateMode === "edit" && !selectedEditPackageId)}
             className={cn(generateMode === "split" ? "bg-amber-600 hover:bg-amber-500 text-white font-bold" : generateMode === "edit" ? "bg-blue-600 hover:bg-blue-700 text-white font-bold" : "bg-emerald-700 hover:bg-emerald-800 text-white font-bold")}
           >
-            {loading ? "Memproses..." : generateMode === "edit" ? "Simpan Perubahan Spesifikasi Paket" : generateMode === "split" ? `Lanjut Canvas Pairing (${departureDates.length} Tanggal)` : `Generate ${departureDates.length > 0 ? departureDates.length : ""} Paket`}
+            {loading ? "Memproses..." : generateMode === "edit" ? "Simpan Perubahan Spesifikasi Paket" : generateMode === "split" ? (splitType === "starting_point" ? `Lanjut Canvas Pairing (${departureDates.length} Tanggal)` : `Generate Varian Paket (${departureDates.length} Tanggal)`) : `Generate ${departureDates.length > 0 ? departureDates.length : ""} Paket`}
           </Button>
         </div>
       </div>
@@ -2704,7 +2880,9 @@ export default function GeneratePaketPage() {
                     name="splitType"
                     value="starting_point"
                     checked={splitType === "starting_point"}
-                    onChange={() => setSplitType("starting_point")}
+                    onChange={() => {
+                      setSplitType("starting_point");
+                    }}
                     className="text-amber-600 focus:ring-amber-500 h-4 w-4"
                   />
                   <span>📍 Tambah Starting Point (Kota Cabang)</span>
@@ -2715,7 +2893,12 @@ export default function GeneratePaketPage() {
                     name="splitType"
                     value="promo"
                     checked={splitType === "promo"}
-                    onChange={() => setSplitType("promo")}
+                    onChange={() => {
+                      setSplitType("promo");
+                      if (selectedParentGroup) {
+                        setFormData(prev => ({ ...prev, kapasitas: String(selectedParentGroup.totalCapacity || prev.kapasitas || 45) }));
+                      }
+                    }}
                     className="text-amber-600 focus:ring-amber-500 h-4 w-4"
                   />
                   <span>🏷️ Paket Promo (Variant Promo / Diskon)</span>
@@ -2726,7 +2909,12 @@ export default function GeneratePaketPage() {
                     name="splitType"
                     value="spek"
                     checked={splitType === "spek"}
-                    onChange={() => setSplitType("spek")}
+                    onChange={() => {
+                      setSplitType("spek");
+                      if (selectedParentGroup) {
+                        setFormData(prev => ({ ...prev, kapasitas: String(selectedParentGroup.totalCapacity || prev.kapasitas || 45) }));
+                      }
+                    }}
                     className="text-amber-600 focus:ring-amber-500 h-4 w-4"
                   />
                   <span>⚙️ Split Varian Spek (Spesifikasi / Fasilitas)</span>
@@ -2883,6 +3071,23 @@ export default function GeneratePaketPage() {
                     <strong className="text-sky-300">{selectedParentGroup.totalCapacity} Seat</strong>
                   </div>
                 </div>
+
+                {/* Variant Quota Rule Banner */}
+                {splitType !== "starting_point" ? (
+                  <div className="p-2.5 bg-amber-500/10 border border-amber-500/30 rounded-lg text-amber-200 text-xs flex items-center gap-2.5">
+                    <Info className="h-4 w-4 shrink-0 text-amber-400" />
+                    <span className="leading-relaxed">
+                      <strong>Aturan Kuota Varian ({splitType === "promo" ? "Paket Promo" : "Varian Spesifikasi"}):</strong> Kuota otomatis mengikuti Paket Utama (<strong>{selectedParentGroup.totalCapacity} Seat</strong>). Varian ini <strong>tidak membagi kuota</strong>, <strong>tidak menambah kuota rombongan</strong>, dan <strong>tidak mengambil jatah kuota Paket Utama</strong> (Shared Pool).
+                    </span>
+                  </div>
+                ) : (
+                  <div className="p-2.5 bg-sky-500/10 border border-sky-500/30 rounded-lg text-sky-200 text-xs flex items-center gap-2.5">
+                    <Split className="h-4 w-4 shrink-0 text-sky-400" />
+                    <span className="leading-relaxed">
+                      <strong>Aturan Kuota Split Starting Point (Kota Cabang):</strong> Kuota paket cabang <strong>memecah quantity dari Paket Utama ({selectedParentGroup.totalCapacity} Seat)</strong> melalui Canvas Pairing, bukan menambah kuota paket utama.
+                    </span>
+                  </div>
+                )}
 
                 {/* List of Individual Package Names inside this Group */}
                 <div className="pt-2 border-t border-slate-800 space-y-1.5">
