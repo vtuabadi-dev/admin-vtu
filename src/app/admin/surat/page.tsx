@@ -851,6 +851,21 @@ function GenerateSuratPageContent() {
           next["alamat_lengkap"] = val;
           next["Alamat Lengkap"] = val;
         }
+        if (tanggalLahirCandidate) {
+          const iso = parseDateToIsoString(tanggalLahirCandidate);
+          const formattedTgl = (iso ? formatIsoToIndonesianDate(iso) : null) || tanggalLahirCandidate;
+          next["tanggal_lahir"] = formattedTgl;
+          next["Tanggal Lahir"] = formattedTgl;
+          next["tgl_lahir"] = formattedTgl;
+          next["Tgl Lahir"] = formattedTgl;
+          next["tanggallahir"] = formattedTgl;
+        }
+        if (tempatLahirCandidate) {
+          const val = toTitleCase(tempatLahirCandidate);
+          next["tempat_lahir"] = val;
+          next["Tempat Lahir"] = val;
+          next["tempatlahir"] = val;
+        }
 
         effectivePlaceholders.forEach((p) => {
           const cleanK = cleanStr(p.key);
@@ -977,7 +992,8 @@ function GenerateSuratPageContent() {
           if (isTanggalLahir) {
             if (tanggalLahirCandidate) {
               const iso = parseDateToIsoString(tanggalLahirCandidate);
-              next[p.key] = p.inputType === "date" ? iso : (formatIsoToIndonesianDate(iso) || tanggalLahirCandidate);
+              const formattedTgl = (iso ? formatIsoToIndonesianDate(iso) : null) || tanggalLahirCandidate;
+              next[p.key] = formattedTgl;
               newlyFilled.add(p.key);
             }
             return;
@@ -1049,6 +1065,11 @@ function GenerateSuratPageContent() {
               newlyFilled.add(p.key);
             }
             return;
+          }
+
+          // Otomatisasi konversi jika field bertipe tanggal masih berisi ISO string
+          if (p.inputType === "date" && next[p.key] && /^\d{4}-\d{2}-\d{2}$/.test(String(next[p.key]).trim())) {
+            next[p.key] = formatIsoToIndonesianDate(String(next[p.key]).trim());
           }
         });
 
@@ -2590,7 +2611,9 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
                                           </div>
                                           <div className="flex justify-between gap-1">
                                             <span className="text-muted-foreground shrink-0">Lahir:</span>
-                                            <span className="truncate">{result.tempatLahir || "-"}, {result.tanggalLahir || "-"}</span>
+                                            <span className="truncate">
+                                              {result.tempatLahir || "-"}, {result.tanggalLahir ? (formatIsoToIndonesianDate(parseDateToIsoString(result.tanggalLahir)) || result.tanggalLahir) : "-"}
+                                            </span>
                                           </div>
                                         </>
                                       )}
@@ -2606,7 +2629,9 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
                                           </div>
                                           <div className="flex justify-between gap-1">
                                             <span className="text-muted-foreground shrink-0">Lahir:</span>
-                                            <span className="truncate">{result.tempatLahir || "-"}, {result.tanggalLahir || "-"}</span>
+                                            <span className="truncate">
+                                              {result.tempatLahir || "-"}, {result.tanggalLahir ? (formatIsoToIndonesianDate(parseDateToIsoString(result.tanggalLahir)) || result.tanggalLahir) : "-"}
+                                            </span>
                                           </div>
                                         </>
                                       )}
