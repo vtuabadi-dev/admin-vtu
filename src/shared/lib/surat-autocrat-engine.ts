@@ -1294,10 +1294,44 @@ export function generateSuratFileName(
 
   const targetFormat = options?.formatNamaFile?.trim();
   if (targetFormat && (targetFormat.includes("{{") || targetFormat.includes("{"))) {
-    // Merge placeholders in targetFormat using fieldsData (or merged manualData)
-    const mergedData = { ...fieldsData, ...(manualData || {}) };
-    const mergedName = renderAutocratMergedText(targetFormat, mergedData);
-    const sanitized = mergedName.replace(/[/\\?%*:|"<>]/g, "").replace(/\s+/g, "_");
+    // Populate standard person name aliases in mergedData so placeholders always resolve
+    const rawName = cleanName.replace(/_/g, " ");
+    const mergedData: Record<string, any> = {
+      nama_lengkap: rawName,
+      nama: rawName,
+      nama_jamaah: rawName,
+      "Nama Lengkap": rawName,
+      "Nama Jamaah": rawName,
+      "Nama Jama'ah": rawName,
+      "Nama": rawName,
+      "Nama Pegawai": rawName,
+      nama_pegawai: rawName,
+      "Nama Karyawan": rawName,
+      nama_karyawan: rawName,
+      ...fieldsData,
+      ...(manualData || {}),
+    };
+
+    // Ensure aliases take effect if fieldsData had empty/undefined values for them
+    if (!mergedData["nama_lengkap"]) mergedData["nama_lengkap"] = rawName;
+    if (!mergedData["Nama Lengkap"]) mergedData["Nama Lengkap"] = rawName;
+    if (!mergedData["Nama Jamaah"]) mergedData["Nama Jamaah"] = rawName;
+
+    let mergedName = renderAutocratMergedText(targetFormat, mergedData);
+    // Strip any unresolved bracketed placeholders (e.g. {{tag}} or {tag})
+    mergedName = mergedName.replace(/(?:\{+|<<|«|\[\[)[^}\]>»]+(?:\}+|>>|»|\]\])/g, "");
+    let sanitized = mergedName.replace(/[/\\?%*:|"<>]/g, "").replace(/\s+/g, "_").replace(/^_+|_+$/g, "");
+
+    // If for any reason the sanitized filename does not contain the person's name, append it!
+    const cleanLower = cleanName.toLowerCase();
+    if (cleanName && cleanName !== "Jamaah" && !sanitized.toLowerCase().includes(cleanLower)) {
+      sanitized = sanitized ? `${sanitized}_${cleanName}` : cleanName;
+    }
+
+    if (options?.isTtd && !sanitized.toUpperCase().includes("TTD")) {
+      sanitized = sanitized.replace(/^([^_]+)/, `$1_TTD`);
+    }
+
     if (sanitized && sanitized !== "_") {
       return `${sanitized}.${ext}`;
     }

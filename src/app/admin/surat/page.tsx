@@ -1696,20 +1696,27 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
   };
 
   // Re-download PDF from history log with file variant support (TTD vs non-TTD) using the uploaded template file!
-  const handleHistoryRedownloadPdf = async (log: GeneratedSuratLog, fileIndex: number = 0) => {
+  const handleHistoryRedownloadPdf = async (
+    log: GeneratedSuratLog,
+    fileIndex: number = 0,
+    preferredFileName?: string
+  ) => {
     const tpl = templates.find((t) => t.id === log.templateId || t.slug === log.templateSlug) || activeTemplate;
     const attached = tpl?.attachedFiles || [];
     const hasMultiple = attached.length > 1;
     const isTtd = fileIndex === 0 && hasMultiple;
     const targetFormat = attached[fileIndex]?.formatNamaFile || (fileIndex === 0 ? tpl?.formatNamaFile : "");
 
-    const fileName = generateSuratFileName(log.nomorSurat, log.fieldsData || {}, null, {
-      formatNamaFile: targetFormat,
-      isTtd,
-      ext: "pdf",
-      placeholders: tpl?.placeholders,
-      fallbackNama: log.jamaahNama,
-    });
+    const effectiveBase = preferredFileName?.trim();
+    const fileName = effectiveBase
+      ? (effectiveBase.endsWith(".pdf") ? effectiveBase : `${effectiveBase}.pdf`)
+      : generateSuratFileName(log.nomorSurat, log.fieldsData || {}, null, {
+          formatNamaFile: targetFormat,
+          isTtd,
+          ext: "pdf",
+          placeholders: tpl?.placeholders,
+          fallbackNama: log.jamaahNama,
+        });
 
     const binary =
       attached[fileIndex]?.templateFileBase64 ||
@@ -1740,20 +1747,27 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
   };
 
   // Re-download Word from history log with file variant support (TTD vs non-TTD)
-  const handleHistoryRedownloadWord = async (log: GeneratedSuratLog, fileIndex: number = 0) => {
+  const handleHistoryRedownloadWord = async (
+    log: GeneratedSuratLog,
+    fileIndex: number = 0,
+    preferredFileName?: string
+  ) => {
     const tpl = templates.find((t) => t.id === log.templateId || t.slug === log.templateSlug) || activeTemplate;
     const attached = tpl?.attachedFiles || [];
     const hasMultiple = attached.length > 1;
     const isTtd = fileIndex === 0 && hasMultiple;
     const targetFormat = attached[fileIndex]?.formatNamaFile || (fileIndex === 0 ? tpl?.formatNamaFile : "");
 
-    const fileName = generateSuratFileName(log.nomorSurat, log.fieldsData || {}, null, {
-      formatNamaFile: targetFormat,
-      isTtd,
-      ext: "docx",
-      placeholders: tpl?.placeholders,
-      fallbackNama: log.jamaahNama,
-    });
+    const effectiveBase = preferredFileName?.trim();
+    const fileName = effectiveBase
+      ? (effectiveBase.endsWith(".docx") ? effectiveBase : `${effectiveBase}.docx`)
+      : generateSuratFileName(log.nomorSurat, log.fieldsData || {}, null, {
+          formatNamaFile: targetFormat,
+          isTtd,
+          ext: "docx",
+          placeholders: tpl?.placeholders,
+          fallbackNama: log.jamaahNama,
+        });
 
     const binary =
       attached[fileIndex]?.templateFileBase64 ||
@@ -1783,20 +1797,27 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
   };
 
   // Print from history log with 100% original template Word layout & styling
-  const handleHistoryPrint = async (log: GeneratedSuratLog, fileIndex: number = 0) => {
+  const handleHistoryPrint = async (
+    log: GeneratedSuratLog,
+    fileIndex: number = 0,
+    preferredFileName?: string
+  ) => {
     const tpl = templates.find((t) => t.id === log.templateId || t.slug === log.templateSlug) || activeTemplate;
     const attached = tpl?.attachedFiles || [];
     const hasMultiple = attached.length > 1;
     const isTtd = fileIndex === 0 && hasMultiple;
     const targetFormat = attached[fileIndex]?.formatNamaFile || (fileIndex === 0 ? tpl?.formatNamaFile : "");
 
-    const fileName = generateSuratFileName(log.nomorSurat, log.fieldsData || {}, null, {
-      formatNamaFile: targetFormat,
-      isTtd,
-      ext: "pdf",
-      placeholders: tpl?.placeholders,
-      fallbackNama: log.jamaahNama,
-    });
+    const effectiveBase = preferredFileName?.trim();
+    const fileName = effectiveBase
+      ? (effectiveBase.endsWith(".pdf") ? effectiveBase : `${effectiveBase}.pdf`)
+      : generateSuratFileName(log.nomorSurat, log.fieldsData || {}, null, {
+          formatNamaFile: targetFormat,
+          isTtd,
+          ext: "pdf",
+          placeholders: tpl?.placeholders,
+          fallbackNama: log.jamaahNama,
+        });
 
     const binary =
       attached[fileIndex]?.templateFileBase64 ||
@@ -3652,8 +3673,8 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
                                       <button
                                         type="button"
                                         className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer"
-                                        onClick={() => handleHistoryRedownloadWord(primaryLog, variant.fileIndex)}
-                                        title={`Download Word (.docx) - ${variant.label}`}
+                                        onClick={() => handleHistoryRedownloadWord(primaryLog, variant.fileIndex, variant.name)}
+                                        title={`Download Word (.docx) - ${variant.name}`}
                                       >
                                         <FileDown className="h-3.5 w-3.5" />
                                         <span>Word (.docx)</span>
@@ -3662,8 +3683,8 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
                                       <button
                                         type="button"
                                         className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors shadow-2xs cursor-pointer"
-                                        onClick={() => handleHistoryRedownloadPdf(primaryLog, variant.fileIndex)}
-                                        title={`Download PDF - ${variant.label}`}
+                                        onClick={() => handleHistoryRedownloadPdf(primaryLog, variant.fileIndex, variant.name)}
+                                        title={`Download PDF - ${variant.name}`}
                                       >
                                         <Download className="h-3.5 w-3.5 text-slate-500" />
                                         <span>PDF</span>
@@ -3672,7 +3693,7 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
                                       <button
                                         type="button"
                                         className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors shadow-2xs cursor-pointer"
-                                        onClick={() => handleHistoryPrint(primaryLog, variant.fileIndex)}
+                                        onClick={() => handleHistoryPrint(primaryLog, variant.fileIndex, variant.name)}
                                         title="Cetak dokumen"
                                       >
                                         <Printer className="h-3.5 w-3.5 text-slate-500" />
@@ -3789,7 +3810,7 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
                   size="sm"
                   className="text-xs bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow-xs"
                   onClick={() => {
-                    if (previewModalLog) handleHistoryRedownloadWord(previewModalLog);
+                    if (previewModalLog) { const defName = getDocumentVariants(previewModalLog)[0]?.name; handleHistoryRedownloadWord(previewModalLog, 0, defName); }
                   }}
                   title="Download Word (.docx) dengan 100% tata letak dan margin template asli"
                 >
@@ -3802,7 +3823,7 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
                   size="sm"
                   className="text-xs text-slate-700 border-slate-200 hover:bg-slate-50"
                   onClick={() => {
-                    if (previewModalLog) handleHistoryRedownloadPdf(previewModalLog);
+                    if (previewModalLog) { const defName = getDocumentVariants(previewModalLog)[0]?.name; handleHistoryRedownloadPdf(previewModalLog, 0, defName); }
                   }}
                   title="Download PDF sesuai format template asli"
                 >
@@ -3814,7 +3835,7 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
                   size="sm"
                   className="text-xs bg-primary text-primary-foreground"
                   onClick={() => {
-                    if (previewModalLog) handleHistoryPrint(previewModalLog);
+                    if (previewModalLog) { const defName = getDocumentVariants(previewModalLog)[0]?.name; handleHistoryPrint(previewModalLog, 0, defName); }
                   }}
                 >
                   <Printer className="mr-1.5 h-3.5 w-3.5" />
