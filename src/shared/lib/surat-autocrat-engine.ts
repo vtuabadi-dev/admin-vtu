@@ -1042,7 +1042,18 @@ export function resolveAutocratFieldValues(
     // Check direct manual form override first
     const directManualVal = getManualOverride(key);
     if (directManualVal !== undefined) {
-      values[key] = directManualVal;
+      const isNamaJamaahKey =
+        cleanK === "nama" ||
+        cleanK === "namajamaah" ||
+        cleanK === "namalengkap" ||
+        cleanK.includes("namajama") ||
+        cleanK.includes("namalengkap");
+
+      if (isEndorsement && isNamaJamaahKey && namaAyahCandidate) {
+        values[key] = formatJamaahNameWithEndorsement(directManualVal, namaAyahCandidate, true);
+      } else {
+        values[key] = directManualVal;
+      }
       return;
     }
 
@@ -1589,8 +1600,17 @@ export function formatJamaahNameWithEndorsement(
 
   if (!cleanAyah || cleanAyah === "-") return toTitleCase(trimmedBase);
 
+  // Periksa apakah nama jamaah memiliki gelar setelah koma (cth: "Shofani, ST")
+  let nameWithoutTitle = trimmedBase;
+  let titleSuffix = "";
+  const commaIdx = trimmedBase.indexOf(",");
+  if (commaIdx !== -1) {
+    nameWithoutTitle = trimmedBase.slice(0, commaIdx).trim();
+    titleSuffix = trimmedBase.slice(commaIdx).trim(); // cth: ", ST"
+  }
+
   // Periksa apakah nama jamaah sudah berakhiran nama ayah tersebut
-  const lowerBase = trimmedBase.toLowerCase();
+  const lowerBase = nameWithoutTitle.toLowerCase();
   const lowerAyah = cleanAyah.toLowerCase();
 
   if (lowerBase.endsWith(lowerAyah)) {
@@ -1598,18 +1618,24 @@ export function formatJamaahNameWithEndorsement(
   }
 
   // Jika kata pertama ayah sudah sama dengan kata terakhir nama jamaah, cegah duplikasi
-  const baseWords = trimmedBase.split(/\s+/);
+  const baseWords = nameWithoutTitle.split(/\s+/);
   const ayahWords = cleanAyah.split(/\s+/);
   const lastBaseWord = baseWords[baseWords.length - 1]?.toLowerCase();
   const firstAyahWord = ayahWords[0]?.toLowerCase();
 
+  let mergedBase = "";
   if (lastBaseWord && firstAyahWord && lastBaseWord === firstAyahWord) {
     const remainingAyah = ayahWords.slice(1).join(" ");
     if (!remainingAyah) return toTitleCase(trimmedBase);
-    return toTitleCase(`${trimmedBase} ${remainingAyah}`);
+    mergedBase = `${nameWithoutTitle} ${remainingAyah}`;
+  } else {
+    mergedBase = `${nameWithoutTitle} ${cleanAyah}`;
   }
 
-  return toTitleCase(`${trimmedBase} ${cleanAyah}`);
+  if (titleSuffix) {
+    return `${toTitleCase(mergedBase)}, ${toTitleCase(titleSuffix.replace(/^,\s*/, ""))}`;
+  }
+  return toTitleCase(mergedBase);
 }
 
 export function resolveManifestFieldValue(

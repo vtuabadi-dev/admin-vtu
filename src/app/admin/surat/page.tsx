@@ -60,6 +60,7 @@ import {
   extractPlaceholdersFromDocxFile,
   matchTagToManifestField,
   extractNamaFromAutocratFields,
+  formatJamaahNameWithEndorsement,
   generateSuratFileName,
   parseDateToIsoString,
   formatIsoToIndonesianDate,
@@ -823,20 +824,48 @@ function GenerateSuratPageContent() {
           .replace(/[\u2018\u2019\u201A\u201B'"`{}[\]()_.\-:\/\\]/g, "")
           .replace(/\s+/g, "");
 
+      // Periksa apakah perihal / hal saat ini adalah endorsement nama
+      const currentHalVal = (
+        manualFormData["Hal"] ||
+        manualFormData["hal"] ||
+        manualFormData["perihal"] ||
+        manualFormData["Perihal"] ||
+        customPerihal ||
+        activeTemplate?.perihalDefault ||
+        ""
+      ).toLowerCase();
+      const isCurrentlyEndorsement = currentHalVal.includes("endorse");
+
       setManualFormData((prev) => {
         const next = { ...prev };
         const newlyFilled = new Set<string>();
 
+        // Simpan nama ayah kandidat ke form
+        if (namaAyahCandidate) {
+          const ayahVal = toTitleCase(namaAyahCandidate);
+          next["namaAyah"] = ayahVal;
+          next["nama_ayah"] = ayahVal;
+          next["Nama Ayah"] = ayahVal;
+          next["ayah"] = ayahVal;
+        }
+
         // Pre-populate standard global keys for direct text merges
         if (namaCandidate) {
-          const val = toTitleCase(namaCandidate);
-          next["nama"] = val;
-          next["nama_lengkap"] = val;
-          next["Nama"] = val;
-          next["Nama Lengkap"] = val;
-          next["Nama Jamaah"] = val;
-          next["Nama Jama'ah"] = val;
-          next["nama_jamaah"] = val;
+          const rawBaseName = toTitleCase(namaCandidate);
+          next["_rawNamaJamaah"] = rawBaseName;
+
+          // Jika perihal adalah endorsement nama, otomatis tambahkan nama ayah di belakang nama jamaah
+          const finalNama = (isCurrentlyEndorsement && namaAyahCandidate)
+            ? formatJamaahNameWithEndorsement(rawBaseName, namaAyahCandidate, true)
+            : rawBaseName;
+
+          next["nama"] = finalNama;
+          next["nama_lengkap"] = finalNama;
+          next["Nama"] = finalNama;
+          next["Nama Lengkap"] = finalNama;
+          next["Nama Jamaah"] = finalNama;
+          next["Nama Jama'ah"] = finalNama;
+          next["nama_jamaah"] = finalNama;
         }
         if (nikCandidate) {
           const val = String(nikCandidate).trim();
@@ -881,11 +910,11 @@ function GenerateSuratPageContent() {
             !cleanK.includes("orangtua") &&
             !cleanL.includes("orangtua") &&
             !cleanK.includes("perusahaan") &&
-            !cleanL.includes("perusahaan") &&
+            !cleanK.includes("perusahaan") &&
             !cleanK.includes("pimpinan") &&
-            !cleanL.includes("pimpinan") &&
+            !cleanK.includes("pimpinan") &&
             !cleanK.includes("paket") &&
-            !cleanL.includes("paket") &&
+            !cleanK.includes("paket") &&
             (cleanK === "nama" ||
               cleanL === "nama" ||
               cleanK.includes("namajamaah") ||
@@ -907,7 +936,11 @@ function GenerateSuratPageContent() {
 
           if (isNama) {
             if (namaCandidate) {
-              next[p.key] = toTitleCase(namaCandidate);
+              const rawBaseName = toTitleCase(namaCandidate);
+              const finalNama = (isCurrentlyEndorsement && namaAyahCandidate)
+                ? formatJamaahNameWithEndorsement(rawBaseName, namaAyahCandidate, true)
+                : rawBaseName;
+              next[p.key] = finalNama;
               newlyFilled.add(p.key);
             }
             return;
@@ -1080,6 +1113,88 @@ function GenerateSuratPageContent() {
       });
     },
     [effectivePlaceholders]
+  );
+
+  // Handler perubahan nilai field input form dengan sinkronisasi otomatis nama endorsement saat Hal berubah
+  const handleUpdateFieldValue = useCallback(
+    (key: string, value: string) => {
+      setManualFormData((prev) => {
+        const next = { ...prev, [key]: value };
+
+        // Jika field yang diubah adalah Hal / Perihal, periksa apakah mode endorsement aktif
+        const cleanK = key.toLowerCase().replace(/[\s_\-\.]/g, "");
+        if (cleanK === "hal" || cleanK === "perihal") {
+          const isEndorse = value.toLowerCase().includes("endorse");
+
+          // Cari nama ayah dari data yang ada
+          const ayah =
+            prev["namaAyah"] ||
+            prev["nama_ayah"] ||
+            prev["Nama Ayah"] ||
+            ocrResultsData.akta?.namaAyah ||
+            ocrResultsData.kk?.namaAyah ||
+            activeJamaah?.namaAyah ||
+            (activeJamaah as any)?.ayahKandung ||
+            "";
+
+          // Cari nama dasar jamaah
+          const rawBase =
+            prev["_rawNamaJamaah"] ||
+            ocrResultsData.ktp?.namaLengkap ||
+            ocrResultsData.akta?.namaLengkap ||
+            activeJamaah?.namaLengkap ||
+            prev["Nama Jama'ah"] ||
+            prev["Nama Jamaah"] ||
+            prev["nama"] ||
+            "";
+
+          if (rawBase) {
+            const cleanRawBase = toTitleCase(rawBase);
+            const targetNama = isEndorse && ayah
+              ? formatJamaahNameWithEndorsement(cleanRawBase, ayah, true)
+              : cleanRawBase;
+
+            // Update semua variasi key nama jamaah di form
+            const namaKeys = ["nama", "nama_lengkap", "Nama", "Nama Lengkap", "Nama Jamaah", "Nama Jama'ah", "nama_jamaah"];
+            namaKeys.forEach((nk) => {
+              if (prev[nk] !== undefined || nk === key) {
+                next[nk] = targetNama;
+              }
+            });
+
+            effectivePlaceholders.forEach((pl) => {
+              const pk = pl.key.toLowerCase().replace(/[\s_\-\.]/g, "");
+              const plbl = (pl.label || "").toLowerCase().replace(/[\s_\-\.]/g, "");
+              if (
+                !pk.includes("ayah") &&
+                !plbl.includes("ayah") &&
+                (pk === "nama" ||
+                  pk.includes("namajamaah") ||
+                  pk.includes("namalengkap") ||
+                  plbl.includes("nama jama") ||
+                  plbl.includes("nama lengkap"))
+              ) {
+                next[pl.key] = targetNama;
+              }
+            });
+          }
+        } else {
+          // Jika user mengedit nama secara manual saat TIDAK sedang mode endorsement, simpan juga sebagai _rawNamaJamaah
+          const isNamaField =
+            !cleanK.includes("ayah") &&
+            (cleanK === "nama" ||
+              cleanK.includes("namajamaah") ||
+              cleanK.includes("namalengkap"));
+          const currentHal = (prev["Hal"] || prev["hal"] || prev["perihal"] || "").toLowerCase();
+          if (isNamaField && !currentHal.includes("endorse")) {
+            next["_rawNamaJamaah"] = value;
+          }
+        }
+
+        return next;
+      });
+    },
+    [ocrResultsData, activeJamaah, effectivePlaceholders]
   );
 
   // Automatically apply OCR results to form when entering OCR mode or changing template
@@ -3042,9 +3157,7 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
                             <textarea
                               rows={3}
                               value={displayValue}
-                              onChange={(e) =>
-                                setManualFormData((prev) => ({ ...prev, [p.key]: e.target.value }))
-                              }
+                              onChange={(e) => handleUpdateFieldValue(p.key, e.target.value)}
                               className="w-full p-2.5 text-xs rounded-lg border bg-background text-foreground focus:ring-2 focus:ring-primary/20 focus:border-primary focus:outline-none"
                               placeholder={p.placeholderHint || `Masukkan ${cleanDisplayLabel}...`}
                             />
@@ -3052,9 +3165,7 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
                             isSearchableSelect ? (
                               <SearchableSelect
                                 value={displayValue}
-                                onChange={(val) =>
-                                  setManualFormData((prev) => ({ ...prev, [p.key]: val }))
-                                }
+                                onChange={(val) => handleUpdateFieldValue(p.key, val)}
                                 options={validOptions.map((opt: string) => ({ value: opt, label: opt }))}
                                 placeholder={p.placeholderHint || `Pilih atau cari ${cleanDisplayLabel}...`}
                                 searchPlaceholder={`Cari opsi ${cleanDisplayLabel}...`}
@@ -3065,9 +3176,7 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
                             ) : (
                               <Select
                                 value={displayValue}
-                                onChange={(e) =>
-                                  setManualFormData((prev) => ({ ...prev, [p.key]: e.target.value }))
-                                }
+                                onChange={(e) => handleUpdateFieldValue(p.key, e.target.value)}
                                 options={validOptions.map((opt: string) => ({ value: opt, label: opt }))}
                                 className="text-xs h-9 bg-background text-foreground"
                               />
@@ -3291,9 +3400,7 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
                             <Input
                               type={p.inputType === "number" ? "number" : "text"}
                               value={displayValue}
-                              onChange={(e) =>
-                                setManualFormData((prev) => ({ ...prev, [p.key]: e.target.value }))
-                              }
+                              onChange={(e) => handleUpdateFieldValue(p.key, e.target.value)}
                               placeholder={
                                 p.placeholderHint ||
                                 (isKotaKanimField
@@ -3313,6 +3420,8 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
                                   {toTitleCase(
                                     manualFormData["namaAyah"] ||
                                     manualFormData["nama_ayah"] ||
+                                    ocrResultsData.akta?.namaAyah ||
+                                    ocrResultsData.kk?.namaAyah ||
                                     activeJamaah?.namaAyah ||
                                     (activeJamaah as any)?.ayahKandung ||
                                     "Ayah Kandung"

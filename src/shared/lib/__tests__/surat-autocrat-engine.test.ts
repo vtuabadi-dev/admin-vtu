@@ -17,6 +17,7 @@ import {
   parseDateRangeToIsoStrings,
   parseMonthYearToIsoString,
   formatIsoToIndonesianMonthYear,
+  formatJamaahNameWithEndorsement,
 } from "@/shared/lib/surat-autocrat-engine";
 import { searchKantorImigrasi, getKotaFromKanimName } from "@/shared/lib/kantor-imigrasi";
 
@@ -497,6 +498,35 @@ Bulan: {{Bulan Awal}}`,
       expect(parseDateRangeToIsoStrings("10 s/d 25 Oktober 2026")).toEqual(["2026-10-10", "2026-10-25"]);
       expect(parseDateRangeToIsoStrings("28 Oktober s/d 10 November 2026")).toEqual(["2026-10-28", "2026-11-10"]);
       expect(parseDateRangeToIsoStrings("28 Desember 2026 s/d 10 Januari 2027")).toEqual(["2026-12-28", "2027-01-10"]);
+    });
+  });
+
+  describe("Endorsement Name Resolution (Akta / Ayah Kandung Integration)", () => {
+    it("should append father's name as last name when endorsement mode is active", () => {
+      // Kasus KTP: "SHOFANI, ST", Akta Ayah: "ZAINUL"
+      expect(formatJamaahNameWithEndorsement("SHOFANI, ST", "ZAINUL")).toBe("Shofani Zainul, St");
+      expect(formatJamaahNameWithEndorsement("Shofani", "ZAINUL")).toBe("Shofani Zainul");
+    });
+
+    it("should not duplicate father's name if already present in jamaah's name", () => {
+      expect(formatJamaahNameWithEndorsement("Shofani Zainul", "Zainul")).toBe("Shofani Zainul");
+      expect(formatJamaahNameWithEndorsement("Muhammad Zainul", "Zainul Abidin")).toBe("Muhammad Zainul Abidin");
+    });
+
+    it("should filter father's honorific titles like H., Haji, Drs.", () => {
+      expect(formatJamaahNameWithEndorsement("Shofani", "H. Zainul")).toBe("Shofani Zainul");
+      expect(formatJamaahNameWithEndorsement("Shofani, ST", "H. Zainul")).toBe("Shofani Zainul, St");
+    });
+
+    it("should automatically apply father's name in resolveAutocratFieldValues when Hal is Endorsements Nama", () => {
+      const template = DEFAULT_SURAT_TEMPLATES[0]!;
+      const manualData = {
+        Hal: "Endorsements Nama",
+        nama_lengkap: "Shofani, St",
+        namaAyah: "Zainul",
+      };
+      const resolved = resolveAutocratFieldValues(template, null, null, manualData);
+      expect(resolved.nama_lengkap).toBe("Shofani Zainul, St");
     });
   });
 });
