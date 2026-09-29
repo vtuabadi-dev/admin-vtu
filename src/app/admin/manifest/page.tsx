@@ -2055,8 +2055,11 @@ function ManifestPageContent() {
                         <th className="px-3 py-3 font-extrabold uppercase tracking-wider text-[10px] text-stone-800 dark:text-stone-100 border-r border-stone-300/80 dark:border-stone-700/80 min-w-[130px] shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
                           KOTA PASPOR
                         </th>
-                        <th className="px-3 py-3 font-extrabold uppercase tracking-wider text-[10px] text-stone-800 dark:text-stone-100 border-r border-stone-300/80 dark:border-stone-700/80 min-w-[155px] shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
-                          KLASTER &amp; PERLENGKAPAN
+                        <th className="px-3 py-3 font-extrabold uppercase tracking-wider text-[10px] text-stone-800 dark:text-stone-100 border-r border-stone-300/80 dark:border-stone-700/80 min-w-[110px] text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
+                          KLASTER
+                        </th>
+                        <th className="px-3 py-3 font-extrabold uppercase tracking-wider text-[10px] text-stone-800 dark:text-stone-100 border-r border-stone-300/80 dark:border-stone-700/80 min-w-[130px] text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
+                          PERLENGKAPAN
                         </th>
                         <th className="px-3 py-3 font-extrabold uppercase tracking-wider text-[10px] text-stone-800 dark:text-stone-100 border-r border-stone-300/80 dark:border-stone-700/80 w-28 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
                           KERETA CEPAT
@@ -2111,7 +2114,7 @@ function ManifestPageContent() {
                     <tbody className="bg-white dark:bg-stone-900">
                       {filteredActiveJamaah.length === 0 ? (
                         <tr>
-                          <td colSpan={isSelectMode ? 24 : 23} className="px-4 py-12 text-center text-stone-500">
+                          <td colSpan={isSelectMode ? 25 : 24} className="px-4 py-12 text-center text-stone-500">
                             <div className="space-y-3">
                               <p>Belum ada data jamaah terdaftar pada paket ini.</p>
                               <Button
@@ -2250,89 +2253,92 @@ function ManifestPageContent() {
                                   {pasporInfo.kotaPaspor}
                                 </td>
 
-                                {/* KLASTER & PERLENGKAPAN */}
-                                <td className={`px-3 py-2.5 ${cellBorder}`}>
+                                {/* KLASTER */}
+                                <td className={`px-3 py-2.5 text-center ${cellBorder}`}>
                                   {(() => {
                                     const rawKlaster = getJamaahCluster(group.groupObj, j);
                                     const klasterName = rawKlaster || "SILVER";
                                     const isPromoKlaster = klasterName.toUpperCase().includes("PROMO") || isPromoVariant(groupPkg);
+
+                                    return isPromoKlaster ? (
+                                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-extrabold bg-purple-500/20 text-purple-800 dark:text-purple-300 border border-purple-500/40 shadow-xs">
+                                        🏷️ {groupPkg?.promoLabel || groupPkg?.splitLabel || klasterName}
+                                      </span>
+                                    ) : (
+                                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-extrabold bg-amber-500/15 text-amber-900 dark:text-amber-300 border border-amber-500/30 shadow-xs">
+                                        🏢 {klasterName}
+                                      </span>
+                                    );
+                                  })()}
+                                </td>
+
+                                {/* PERLENGKAPAN */}
+                                <td className={`px-3 py-2.5 text-center ${cellBorder}`}>
+                                  {(() => {
                                     const resolved = resolveSystemStatusPerlengkapan(groupPkg, group.groupObj, j);
 
                                     return (
-                                      <div className="space-y-1">
-                                        <div>
-                                          {isPromoKlaster ? (
-                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-extrabold bg-purple-500/20 text-purple-800 dark:text-purple-300 border border-purple-500/40">
-                                              🏷️ {groupPkg?.promoLabel || groupPkg?.splitLabel || klasterName}
+                                      <div className="flex flex-col items-center justify-center">
+                                        {resolved.status === "INCLUDE" ? (
+                                          <div>
+                                            <span
+                                              className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-black bg-emerald-600 text-white shadow-sm tracking-wider select-none"
+                                              title={resolved.keterangan}
+                                            >
+                                              INCLUDE
                                             </span>
-                                          ) : (
-                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/15 text-amber-900 dark:text-amber-300 border border-amber-500/30">
-                                              🏢 {klasterName}
+                                            {resolved.physicalStatus === "SUDAH_AMBIL" ? (
+                                              <span className="text-[9px] font-semibold text-emerald-600 dark:text-emerald-400 block mt-0.5">
+                                                ✓ Sudah Diambil
+                                              </span>
+                                            ) : resolved.physicalStatus === "SEBAGIAN" ? (
+                                              <span className="text-[9px] font-semibold text-amber-600 dark:text-amber-400 block mt-0.5">
+                                                ⚡ Ambil Sebagian
+                                              </span>
+                                            ) : (
+                                              <span className="text-[9px] font-medium text-stone-500 dark:text-stone-400 block mt-0.5">
+                                                Belum Diambil
+                                              </span>
+                                            )}
+                                          </div>
+                                        ) : resolved.status === "PAID" ? (
+                                          <div>
+                                            <span
+                                              className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-black bg-blue-600 text-white shadow-sm tracking-wider select-none"
+                                              title={resolved.keterangan}
+                                            >
+                                              PAID
                                             </span>
-                                          )}
-                                        </div>
-                                        <div>
-                                          {resolved.status === "INCLUDE" ? (
-                                            <div>
-                                              <span
-                                                className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-black bg-emerald-600 text-white shadow-sm tracking-wider select-none"
-                                                title={resolved.keterangan}
-                                              >
-                                                INCLUDE
+                                            <span className="text-[9px] font-bold text-blue-600 dark:text-blue-400 block mt-0.5">
+                                              + Tambahan
+                                            </span>
+                                            {resolved.physicalStatus === "SUDAH_AMBIL" ? (
+                                              <span className="text-[9px] font-semibold text-emerald-600 dark:text-emerald-400 block">
+                                                ✓ Sudah Diambil
                                               </span>
-                                              {resolved.physicalStatus === "SUDAH_AMBIL" ? (
-                                                <span className="text-[9px] font-semibold text-emerald-600 dark:text-emerald-400 block mt-0.5">
-                                                  ✓ Sudah Diambil
-                                                </span>
-                                              ) : resolved.physicalStatus === "SEBAGIAN" ? (
-                                                <span className="text-[9px] font-semibold text-amber-600 dark:text-amber-400 block mt-0.5">
-                                                  ⚡ Ambil Sebagian
-                                                </span>
-                                              ) : (
-                                                <span className="text-[9px] font-medium text-stone-500 dark:text-stone-400 block mt-0.5">
-                                                  Belum Diambil
-                                                </span>
-                                              )}
-                                            </div>
-                                          ) : resolved.status === "PAID" ? (
-                                            <div>
-                                              <span
-                                                className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-black bg-blue-600 text-white shadow-sm tracking-wider select-none"
-                                                title={resolved.keterangan}
-                                              >
-                                                PAID
+                                            ) : resolved.physicalStatus === "SEBAGIAN" ? (
+                                              <span className="text-[9px] font-semibold text-amber-600 dark:text-amber-400 block">
+                                                ⚡ Ambil Sebagian
                                               </span>
-                                              <span className="text-[9px] font-bold text-blue-600 dark:text-blue-400 block mt-0.5">
-                                                + Tambahan
+                                            ) : (
+                                              <span className="text-[9px] font-medium text-stone-500 dark:text-stone-400 block">
+                                                Belum Diambil
                                               </span>
-                                              {resolved.physicalStatus === "SUDAH_AMBIL" ? (
-                                                <span className="text-[9px] font-semibold text-emerald-600 dark:text-emerald-400 block">
-                                                  ✓ Sudah Diambil
-                                                </span>
-                                              ) : resolved.physicalStatus === "SEBAGIAN" ? (
-                                                <span className="text-[9px] font-semibold text-amber-600 dark:text-amber-400 block">
-                                                  ⚡ Ambil Sebagian
-                                                </span>
-                                              ) : (
-                                                <span className="text-[9px] font-medium text-stone-500 dark:text-stone-400 block">
-                                                  Belum Diambil
-                                                </span>
-                                              )}
-                                            </div>
-                                          ) : (
-                                            <div>
-                                              <span
-                                                className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-black bg-stone-800 text-stone-200 dark:bg-stone-900 dark:text-stone-300 border border-stone-700 shadow-sm tracking-wider select-none"
-                                                title={resolved.keterangan}
-                                              >
-                                                EXCLUDE
-                                              </span>
-                                              <span className="text-[9px] text-stone-400 block mt-0.5 italic">
-                                                Tanpa perlengkapan
-                                              </span>
-                                            </div>
-                                          )}
-                                        </div>
+                                            )}
+                                          </div>
+                                        ) : (
+                                          <div>
+                                            <span
+                                              className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-black bg-stone-800 text-stone-200 dark:bg-stone-900 dark:text-stone-300 border border-stone-700 shadow-sm tracking-wider select-none"
+                                              title={resolved.keterangan}
+                                            >
+                                              EXCLUDE
+                                            </span>
+                                            <span className="text-[9px] text-stone-400 block mt-0.5 italic">
+                                              Tanpa perlengkapan
+                                            </span>
+                                          </div>
+                                        )}
                                       </div>
                                     );
                                   })()}
