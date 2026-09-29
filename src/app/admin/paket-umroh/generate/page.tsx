@@ -729,13 +729,21 @@ export default function GeneratePaketPage() {
       const bodyData = new FormData();
       bodyData.append("flyer", flyerUtama);
 
-      // Lampirkan flyer terakhir (jadwal kepulangan hari terakhir)
+      // Lampirkan SELURUH flyer tambahan/itinerary (khususnya Flyer #2 yang memuat Hari-1 dan Hari-2, serta hari kepulangan)
+      if (flyerFiles.length > 1) {
+        for (let i = 1; i < flyerFiles.length; i++) {
+          const addFile = flyerFiles[i];
+          if (addFile) {
+            bodyData.append("additionalFlyers", addFile);
+          }
+        }
+      }
+
+      // Backwards compatibility: lampirkan juga lastFlyer dan penultimateFlyer
       if (flyerFiles.length >= 2) {
         const lastFlyer = flyerFiles[flyerFiles.length - 1];
         if (lastFlyer) bodyData.append("lastFlyer", lastFlyer);
       }
-
-      // Lampirkan flyer sebelum terakhir jika ada 3 foto atau lebih
       if (flyerFiles.length >= 3) {
         const penultimateFlyer = flyerFiles[flyerFiles.length - 2];
         if (penultimateFlyer) bodyData.append("penultimateFlyer", penultimateFlyer);
@@ -819,9 +827,11 @@ export default function GeneratePaketPage() {
             const hasOutJ = candidateRouteStr.endsWith("-J") || candidateRouteStr.includes("OUT JEDDAH") || candidateRouteStr.includes("JEDDAH OUT");
 
             const hasInMed = candidateRouteStr.startsWith("MED") || candidateRouteStr.includes("LANDING MADINAH") || candidateRouteStr.includes("MADINAH IN");
-            const hasInThaif = candidateRouteStr.includes("TH") || candidateRouteStr.includes("THAIF") || candidateRouteStr.includes("TAIF");
-            const hasInJedMakkah = candidateRouteStr.includes("JED.C") || candidateRouteStr.includes("MAKKAH");
-            const hasInJedMadinah = candidateRouteStr.includes("JED.D");
+            // Prioritaskan Makkah setelah Jeddah (JED.C)
+            const hasInJedMakkah = candidateRouteStr.includes("JED.C") || candidateRouteStr.includes("MAKKAH") || candidateRouteStr.includes("MEKKAH");
+            const hasInJedMadinah = candidateRouteStr.includes("JED.D") || candidateRouteStr.includes("DIRECT MADINAH");
+            // Thaif hanya jika eksplisit transit/in ke Thaif terlebih dahulu
+            const hasInThaif = candidateRouteStr.includes("JED.TH") || candidateRouteStr.includes("TRANSIT THAIF") || candidateRouteStr.includes("THAIF IN");
 
             const targetOut = hasOutM ? "M" : hasOutJ ? "J" : "";
 
@@ -829,14 +839,15 @@ export default function GeneratePaketPage() {
               if (hasInMed) {
                 found = routesList.find(r => (r.kode || "").toUpperCase() === `MED-${targetOut}`) ||
                         routesList.find(r => (r.kode || "").toUpperCase().endsWith(`-${targetOut}`));
-              } else if (hasInThaif) {
-                found = routesList.find(r => (r.kode || "").toUpperCase() === `JED.TH-${targetOut}`);
-              } else if (hasInJedMadinah) {
-                found = routesList.find(r => (r.kode || "").toUpperCase() === `JED.D-${targetOut}`);
               } else if (hasInJedMakkah) {
                 found = routesList.find(r => (r.kode || "").toUpperCase() === `JED.C-${targetOut}`);
+              } else if (hasInJedMadinah) {
+                found = routesList.find(r => (r.kode || "").toUpperCase() === `JED.D-${targetOut}`);
+              } else if (hasInThaif) {
+                found = routesList.find(r => (r.kode || "").toUpperCase() === `JED.TH-${targetOut}`);
               } else {
-                found = routesList.find(r => (r.kode || "").toUpperCase().endsWith(`-${targetOut}`));
+                found = routesList.find(r => (r.kode || "").toUpperCase() === `JED.C-${targetOut}`) ||
+                        routesList.find(r => (r.kode || "").toUpperCase().endsWith(`-${targetOut}`));
               }
             }
           }

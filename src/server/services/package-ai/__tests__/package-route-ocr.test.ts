@@ -141,5 +141,42 @@ describe("Package OCR & Route Resolution — Hardened Suite", () => {
       ]);
     });
   });
+
+  describe("Invariant 6: Header Itinerary HARI-1 & HARI-2 Resolution (Jeddah -> Makkah vs Thaif)", () => {
+    it("strictly resolves header HARI-1 'JAKARTA-DOHA-JEDDAH-MAKKAH' as JED.C-M even when Day 4 has Ziarah Kota Thaif", () => {
+      const caption = `
+        9 HARI PERJALANAN | STARTING JAKARTA
+        HARI-1 | JAKARTA-DOHA-JEDDAH-MAKKAH
+        • Tiba di Bandara Jeddah lalu melanjutkan ke Kota Makkah
+        HARI-2 | MAKKAH
+        HARI-4 | MAKKAH
+        • Ziarah Kota Thaif, wisata kuliner & pasar buah
+        Out Madinah - Jakarta
+      `;
+      const route = extractLandingRoute(caption);
+      expect(route).toBe("JED.C-M");
+    });
+
+    it("strictly resolves header HARI-1 'JAKARTA-DOHA-JEDDAH-MAKKAH' with out Jeddah as JED.C-J", () => {
+      const caption = `
+        9 HARI PERJALANAN
+        HARI-1 | JAKARTA-DOHA-JEDDAH-MAKKAH
+        HARI-2 | MAKKAH
+        Kepulangan Take Off Bandara Jeddah
+      `;
+      const route = extractLandingRoute(caption);
+      expect(route).toBe("JED.C-J");
+    });
+
+    it("only assigns JED.TH when itinerary header explicitly states transit to Thaif first", () => {
+      const caption = `
+        HARI-1 | JAKARTA-JEDDAH-THAIF
+        HARI-2 | THAIF
+        Out Madinah
+      `;
+      const route = extractLandingRoute(caption);
+      expect(route).toBe("JED.TH-M");
+    });
+  });
 });
 

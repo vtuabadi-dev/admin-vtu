@@ -159,13 +159,22 @@ export async function extractWithGemini(
     `     => MAKA RUTE OUT ADALAH JEDDAH, KODE WAJIB BERAKHIRAN '-J'!\n` +
     `   - Jika jadwal hari terakhir/sebelum terakhir tertulis: "Transfer ke Bandara Prince Mohammad Bin Abdulaziz Madinah", "Bandara Madinah", "Madinah - Jakarta/Surabaya", "Take off Madinah", atau posisi terakhir jamaah berada di Madinah lalu langsung menuju Bandara Madinah:\n` +
     `     => MAKA RUTE OUT ADALAH MADINAH, KODE WAJIB BERAKHIRAN '-M'!\n\n` +
-    `CARA MENENTUKAN RUTE IN (LANDING DI SAUDI):\n` +
-    `1. Periksa hari pertama atau kedua pada flyer / itinerary / caption:\n` +
-    `   - Jika mendarat langsung di Bandara Madinah => Rute In: 'MED' (cth: 'MED-J')\n` +
-    `   - Jika mendarat di Bandara Jeddah:\n` +
-    `     * Langsung menuju Makkah untuk ibadah Umroh => 'JED.C' (cth: 'JED.C-M' jika out Madinah, 'JED.C-J' jika out Jeddah)\n` +
-    `     * Langsung menuju Madinah via bus / kereta => 'JED.D' (cth: 'JED.D-J')\n` +
-    `     * Transit / city tour ke Thaif terlebih dahulu => 'JED.TH' (cth: 'JED.TH-M' jika out Madinah, 'JED.TH-J' jika out Jeddah)\n` +
+    `CARA MENENTUKAN RUTE IN (LANDING DI SAUDI) DARI HEADER TABEL HARI PERTAMA / HARI KEDUA (MANDATORY & PRIORITAS TERTINGGI):\n` +
+    `CUKUP MEMBACA HEADER TABEL HARI PERTAMA (HARI-1) ATAU HARI KEDUA (HARI-2) UNTUK MENENTUKAN KOTA TUJUAN SETELAH JEDDAH:\n` +
+    `1. Periksa judul/header tabel pada Flyer Itinerary (HARI-1 atau HARI-2):\n` +
+    `   - Contoh Header Hari-1: "HARI-1 | JAKARTA-DOHA-JEDDAH-MAKKAH", "HARI 1: CGK-JED-MAKKAH", atau Header Hari-2: "HARI-2 | MAKKAH":\n` +
+    `     => SETELAH KATA 'JEDDAH' TERTULIS 'MAKKAH' (atau Header Hari-2 adalah 'MAKKAH').\n` +
+    `     => MAKA RUTE IN WAJIB KODE 'JED.C' (Jeddah In -> Makkah)!\n` +
+    `     => Rute lengkapnya: 'JED.C-M' (jika Out Madinah) atau 'JED.C-J' (jika Out Jeddah).\n\n` +
+    `   - Contoh Header Hari-1: "HARI-1 | JAKARTA-JEDDAH-MADINAH" atau Header Hari-2: "HARI-2 | MADINAH":\n` +
+    `     => SETELAH KATA 'JEDDAH' TERTULIS 'MADINAH'. Jamaah langsung transfer ke Madinah via bus/kereta.\n` +
+    `     => MAKA RUTE IN WAJIB KODE 'JED.D' (Jeddah In -> Madinah)! Rute lengkap: 'JED.D-J'.\n\n` +
+    `   - Contoh Header Hari-1: "HARI-1 | JAKARTA-MADINAH" (Pesawat mendarat langsung di Bandara Madinah):\n` +
+    `     => MAKA RUTE IN WAJIB KODE 'MED' (Madinah In)! Rute lengkap: 'MED-J'.\n\n` +
+    `2. ATURAN KERAS TENTANG ZIARAH THAIF (JANGAN SALAH PILIH KODE THAIF!):\n` +
+    `   - SANGAT PENTING: Jika di Hari ke-4 atau Hari ke-5 tertulis "Ziarah Kota Thaif", "Wisata Thaif", atau di caption ada teks "Free Ziarah Thaif", ITU HANYALAH TOUR ZIARAH HARIAN SAAT BERADA DI MAKKAH!\n` +
+    `   - DILARANG KERAS MEMILIH 'JED.TH-M' ATAU 'JED.TH-J' JIKA DI HEADER HARI-1/HARI-2 SETELAH JEDDAH ADALAH MAKKAH!\n` +
+    `   - Kode 'JED.TH' HANYA DAN HANYA DIGUNAKAN jika pada HEADER HARI PERTAMA / KEDUA tertulis secara eksplisit bahwa setelah mendarat di Jeddah rombongan langsung pergi ke THAIF terlebih dahulu (cth: "HARI-1 | JEDDAH-THAIF" atau "HARI-2 | THAIF"). Jika header Hari-1 setelah Jeddah adalah Makkah, MAKA KODE RUTE IN TETAP 'JED.C'!\n\n` +
     `   - Paket Tour Plus (Singgah ke negara lain terlebih dahulu):\n` +
     `     * Tour Dulu baru ke Makkah => 'TD.C' ('TD.C-J' atau 'TD.C-M')\n` +
     `     * Tour Dulu baru ke Madinah => 'TD.D' ('TD.D-J')\n` +

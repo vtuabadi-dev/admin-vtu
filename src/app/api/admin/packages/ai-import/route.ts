@@ -117,25 +117,45 @@ export async function POST(request: NextRequest) {
     // Save main flyer to temp storage (validates magic bytes)
     const flyerPath = saveFlyerImage(buffer, fileName);
 
-    // Save additional itinerary flyers if provided (e.g. flyer terakhir & sebelum terakhir)
+    // Save additional itinerary flyers if provided (Flyer #2 yang memuat Hari-1 dan Hari-2, serta hari kepulangan)
     const additionalFlyerPaths: string[] = [];
+    const addedFileNames = new Set<string>();
+
+    const additionalFiles = formData.getAll("additionalFlyers") as File[];
+    for (let i = 0; i < additionalFiles.length; i++) {
+      const file = additionalFiles[i];
+      if (file && file.size > 1024) {
+        try {
+          const buf = Buffer.from(await file.arrayBuffer());
+          const savedPath = saveFlyerImage(buf, `itinerary_${i + 1}_${file.name || "itinerary.jpg"}`);
+          additionalFlyerPaths.push(savedPath);
+          addedFileNames.add(file.name);
+        } catch (e) {
+          console.warn(`[AI-Import] Failed to save additionalFlyer ${i}:`, e);
+        }
+      }
+    }
+
+    // Fallback/Legacy: lastFlyer & penultimateFlyer (jika belum dimasukkan di additionalFlyers)
     const lastFlyer = formData.get("lastFlyer") as File | null;
-    if (lastFlyer && lastFlyer.size > 1024) {
+    if (lastFlyer && lastFlyer.size > 1024 && !addedFileNames.has(lastFlyer.name)) {
       try {
         const lastBuf = Buffer.from(await lastFlyer.arrayBuffer());
         const lastSaved = saveFlyerImage(lastBuf, `last_${lastFlyer.name || "itinerary.jpg"}`);
         additionalFlyerPaths.push(lastSaved);
+        addedFileNames.add(lastFlyer.name);
       } catch (e) {
         console.warn("[AI-Import] Failed to save lastFlyer:", e);
       }
     }
 
     const penultimateFlyer = formData.get("penultimateFlyer") as File | null;
-    if (penultimateFlyer && penultimateFlyer.size > 1024) {
+    if (penultimateFlyer && penultimateFlyer.size > 1024 && !addedFileNames.has(penultimateFlyer.name)) {
       try {
         const penBuf = Buffer.from(await penultimateFlyer.arrayBuffer());
         const penSaved = saveFlyerImage(penBuf, `pen_${penultimateFlyer.name || "itinerary_prev.jpg"}`);
         additionalFlyerPaths.push(penSaved);
+        addedFileNames.add(penultimateFlyer.name);
       } catch (e) {
         console.warn("[AI-Import] Failed to save penultimateFlyer:", e);
       }
