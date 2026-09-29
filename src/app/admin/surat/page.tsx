@@ -1375,8 +1375,11 @@ function GenerateSuratPageContent() {
         const file = ocrFiles[jenis];
         if (!file) continue;
 
+        // Pastikan file yang disimpan ke storage profil jamaah adalah hasil kompresi <= 200 KB (jika > 200 KB)
+        const fileToUpload = await compressOcrDocument(file, 200 * 1024);
+
         const formData = new FormData();
-        formData.append("file", file);
+        formData.append("file", fileToUpload);
         formData.append("jamaahId", selectedJamaahId);
         formData.append("jenisDokumen", jenis);
 

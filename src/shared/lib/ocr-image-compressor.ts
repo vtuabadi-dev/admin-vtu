@@ -15,8 +15,8 @@ export async function compressOcrDocument(
     return file;
   }
 
-  // If already <= maxBytes and is JPEG, return as is
-  if (file.size <= maxBytes && file.type === "image/jpeg") {
+  // Aturan Tegas: Jika ukuran file sudah <= maxBytes (200 KB), tidak perlu dikompres, kembalikan langsung file aslinya
+  if (file.size <= maxBytes) {
     return file;
   }
 

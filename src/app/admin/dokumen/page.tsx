@@ -44,6 +44,7 @@ import { formatDate, formatDateShort, cn, getWhatsAppUrl } from "@/shared/lib/ut
 import { extractFilesFromEvent } from "@/shared/lib/file-drop-utils";
 import PasFotoStudio from "./_components/PasFotoStudio";
 import { autoProcessPasFoto } from "@/shared/lib/pas-foto-utils";
+import { compressOcrDocument } from "@/shared/lib/ocr-image-compressor";
 
 // ============================================================
 // CONSTANTS
@@ -650,8 +651,11 @@ export default function DokumenPage() {
     if (!selectedReview) return;
     setModalUploading(true);
     try {
+      // Kompres dokumen <= 200 KB jika file asli > 200 KB
+      const fileToUpload = await compressOcrDocument(file, 200 * 1024);
+
       const formData = new FormData();
-      formData.append("file", file);
+      formData.append("file", fileToUpload);
       formData.append("jamaahId", selectedReview.jamaah.id);
       formData.append("jenis", selectedReview.dokumen.jenis);
       formData.append("jenisDokumen", selectedReview.dokumen.jenis);
@@ -1061,8 +1065,11 @@ export default function DokumenPage() {
     setUploading(true);
 
     try {
+      // Kompres dokumen <= 200 KB jika file asli > 200 KB
+      const fileToUpload = await compressOcrDocument(file, 200 * 1024);
+
       const formData = new FormData();
-      formData.append("file", file);
+      formData.append("file", fileToUpload);
       formData.append("jamaahId", selectedJamaah.id);
       formData.append("jenisDokumen", jenis);
 
@@ -1239,8 +1246,11 @@ export default function DokumenPage() {
     setUploadingEndorsement(true);
 
     try {
+      // Kompres dokumen <= 200 KB jika file asli > 200 KB
+      const fileToUpload = await compressOcrDocument(file, 200 * 1024);
+
       const formData = new FormData();
-      formData.append("file", file);
+      formData.append("file", fileToUpload);
       formData.append("jamaahId", selectedJamaah.id);
       formData.append("jenisDokumen", "paspor");
 
