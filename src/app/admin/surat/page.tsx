@@ -1321,18 +1321,9 @@ function GenerateSuratPageContent() {
       return;
     }
 
-    // 1. Kompresi otomatis hingga maksimal 200 KB untuk file gambar
-    let processedFile = file;
-    if (file.type.startsWith("image/") || (!file.type && !file.name.toLowerCase().endsWith(".pdf"))) {
-      try {
-        processedFile = await compressOcrDocument(file, 200 * 1024);
-      } catch (cErr) {
-        console.warn("Kompresi file gagal, melanjutkan dengan file asli:", cErr);
-      }
-    }
-
-    const previewUrl = URL.createObjectURL(processedFile);
-    setOcrFiles((prev) => ({ ...prev, [jenis]: processedFile }));
+    // Tampilkan preview awal langsung dari file asli tanpa penurunan kualitas
+    const previewUrl = URL.createObjectURL(file);
+    setOcrFiles((prev) => ({ ...prev, [jenis]: file }));
     setOcrPreviews((prev) => ({ ...prev, [jenis]: previewUrl }));
     setOcrErrors((prev) => ({ ...prev, [jenis]: null }));
 
@@ -1362,17 +1353,60 @@ function GenerateSuratPageContent() {
         targetNikJamaah = manualFormData["nik"] || manualFormData["no_identitas"] || "";
       }
 
+      // ── TAHAP 1: EKSTRAKSI OCR DILAKUKAN DENGAN FILE ASLI (ORIGINAL QUALITY) ──
+      // File asli belum dikompresi agar akurasi AI OCR tetap maksimal dan teks tidak buram
+      setOcrStatuses((prev) => ({ ...prev, [jenis]: "extracting" }));
+
+      const ocrFormData = new FormData();
+      ocrFormData.append("file", file); // File ASLI beresolusi penuh
+      ocrFormData.append("jenisDokumen", jenis);
+      if (forceFresh) ocrFormData.append("forceFresh", "true");
+      if (targetNamaJamaah) {
+        ocrFormData.append("namaJamaah", targetNamaJamaah);
+        ocrFormData.append("nikJamaah", targetNikJamaah);
+        if (jenis === "kk") {
+          ocrFormData.append("mode", `kk_target:${targetNamaJamaah}|${targetNikJamaah}`);
+        }
+      }
+
+      const ocrRes = await fetch("/api/dokumen/ocr", {
+        method: "POST",
+        body: ocrFormData,
+      });
+
+      const ocrJson = await ocrRes.json();
+      if (!ocrRes.ok) {
+        throw new Error(ocrJson.message || "Gagal memproses ekstraksi OCR dokumen");
+      }
+
+      ocrResultData = ocrJson.data;
+
+      // ── TAHAP 2: KOMPRESI DOKUMEN DILAKUKAN SETELAH EKSTRAKSI OCR BERHASIL ──
+      // Kompres file hingga maksimal 200 KB jika ukuran file asli > 200 KB untuk disimpan ke storage
+      let compressedFile = file;
+      if (file.type.startsWith("image/") || (!file.type && !file.name.toLowerCase().endsWith(".pdf"))) {
+        try {
+          compressedFile = await compressOcrDocument(file, 200 * 1024);
+        } catch (cErr) {
+          console.warn("Kompresi file setelah OCR gagal, melanjutkan dengan file asli:", cErr);
+        }
+      }
+
+      // Update state berkas dengan file hasil kompresi (<= 200 KB)
+      setOcrFiles((prev) => ({ ...prev, [jenis]: compressedFile }));
+
+      // ── TAHAP 3: SIMPAN KE PENYIMPANAN STORAGE MANIFEST JIKA AKTIF ──
       if (saveOcrToManifest && selectedJamaahId) {
         setOcrStatuses((prev) => ({ ...prev, [jenis]: "uploading" }));
 
-        const formData = new FormData();
-        formData.append("file", processedFile);
-        formData.append("jamaahId", selectedJamaahId);
-        formData.append("jenisDokumen", jenis);
+        const uploadFormData = new FormData();
+        uploadFormData.append("file", compressedFile); // File hasil kompresi <= 200 KB yang disimpan di storage
+        uploadFormData.append("jamaahId", selectedJamaahId);
+        uploadFormData.append("jenisDokumen", jenis);
 
         const uploadRes = await fetch("/api/dokumen/upload", {
           method: "POST",
-          body: formData,
+          body: uploadFormData,
         });
 
         const uploadJson = await uploadRes.json();
@@ -1386,55 +1420,26 @@ function GenerateSuratPageContent() {
 
         setOcrUploadedDocs((prev) => ({ ...prev, [jenis]: uploadedDoc }));
 
-        setOcrStatuses((prev) => ({ ...prev, [jenis]: "extracting" }));
-        const ocrRes = await fetch("/api/dokumen/ocr", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            dokumenId: docId,
-            fileUrl,
-            jenis,
-            forceFresh,
-            namaJamaah: targetNamaJamaah || undefined,
-            nikJamaah: targetNikJamaah || undefined,
-            mode: jenis === "kk" && targetNamaJamaah ? `kk_target:${targetNamaJamaah}|${targetNikJamaah}` : undefined,
-          }),
-        });
-
-        const ocrJson = await ocrRes.json();
-        if (!ocrRes.ok) {
-          throw new Error(ocrJson.message || "Gagal memproses ekstraksi OCR");
-        }
-
-        ocrResultData = ocrJson.data;
-      } else {
-        setOcrStatuses((prev) => ({ ...prev, [jenis]: "extracting" }));
-
-        const formData = new FormData();
-        formData.append("file", processedFile);
-        formData.append("jenisDokumen", jenis);
-        if (forceFresh) formData.append("forceFresh", "true");
-        if (targetNamaJamaah) {
-          formData.append("namaJamaah", targetNamaJamaah);
-          formData.append("nikJamaah", targetNikJamaah);
-          if (jenis === "kk") {
-            formData.append("mode", `kk_target:${targetNamaJamaah}|${targetNikJamaah}`);
+        // Simpan hasil OCR yang sudah didapatkan langsung ke database dokumen
+        if (docId && ocrResultData) {
+          try {
+            await fetch("/api/dokumen/ocr", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                dokumenId: docId,
+                fileUrl,
+                jenis,
+                ocrData: ocrResultData,
+              }),
+            });
+          } catch {
+            // non-blocking sync
           }
         }
-
-        const ocrRes = await fetch("/api/dokumen/ocr", {
-          method: "POST",
-          body: formData,
-        });
-
-        const ocrJson = await ocrRes.json();
-        if (!ocrRes.ok) {
-          throw new Error(ocrJson.message || "Gagal memproses ekstraksi OCR dokumen");
-        }
-
-        ocrResultData = ocrJson.data;
       }
 
+      // ── TAHAP 4: TERAPKAN VARIABEL OCR KE FORM ──
       setOcrResultsData((prev) => {
         const next = { ...prev, [jenis]: ocrResultData };
         applyAllOcrResultsToForm(next);
@@ -1444,8 +1449,10 @@ function GenerateSuratPageContent() {
       setOcrStatuses((prev) => ({ ...prev, [jenis]: "success" }));
       const docLabel = OCR_DOC_CONFIG[jenis]?.title || jenis.toUpperCase();
       const conf = ocrResultData?.confidence ? Math.round(ocrResultData.confidence * 100) : 95;
-      const sizeKb = Math.round(processedFile.size / 1024);
-      showToast(`Ekstraksi ${docLabel} berhasil (${conf}% • ${sizeKb} KB)! Data variabel telah terisi otomatis.`);
+      const originalKb = Math.round(file.size / 1024);
+      const compressedKb = Math.round(compressedFile.size / 1024);
+      const compressionInfo = originalKb > 200 ? ` (${originalKb} KB → ${compressedKb} KB)` : ` (${compressedKb} KB)`;
+      showToast(`Ekstraksi ${docLabel} berhasil (${conf}%)! File dikompresi ≤200 KB${compressionInfo}. Data variabel telah terisi otomatis.`);
     } catch (err: any) {
       console.error(`Error processing OCR for ${jenis}:`, err);
       setOcrStatuses((prev) => ({ ...prev, [jenis]: "error" }));
@@ -2613,7 +2620,7 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
                                       Unggah / Paste {config.title}
                                     </span>
                                     <span className="text-[10px] text-muted-foreground mt-0.5">
-                                      Bebas ukuran asal • Otomatis dikompres ≤ 200 KB
+                                      Bebas ukuran asal • OCR resolusi asli • Otomatis dikompres ≤ 200 KB
                                     </span>
                                   </div>
                                   <div className="pt-1 flex items-center gap-1.5">

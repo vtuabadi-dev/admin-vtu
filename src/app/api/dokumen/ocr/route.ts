@@ -49,6 +49,7 @@ export async function POST(request: NextRequest) {
         namaJamaah?: string;
         nikJamaah?: string;
         forceFresh?: boolean;
+        ocrData?: Record<string, any>;
       };
 
       dokumenId = body.dokumenId;
@@ -59,6 +60,12 @@ export async function POST(request: NextRequest) {
         mode = `kk_target:${body.namaJamaah || ""}${body.nikJamaah ? `|${body.nikJamaah}` : ""}`;
       }
       forceFresh = Boolean(body.forceFresh);
+
+      // Jika ocrData sudah tersedia dan dokumenId diberikan, langsung simpan ke DB
+      if (dokumenId && body.ocrData) {
+        await dokumenRepo.saveOcrResult(dokumenId, body.ocrData as any);
+        return NextResponse.json({ success: true, data: body.ocrData });
+      }
 
       if (!jenis) {
         return NextResponse.json({ success: false, message: "jenis is required" }, { status: 400 });
