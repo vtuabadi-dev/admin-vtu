@@ -1886,42 +1886,34 @@ export default function GeneratePaketPage() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
-              <div className="flex flex-col justify-end h-full">
-                <label className="block text-sm font-medium mb-1 min-h-[2.5rem] flex items-end">
-                  Kapasitas Seat (Maksimal Jamaah)
-                  {generateMode === "split" && splitType !== "starting_point" && (
-                    <span className="text-[10px] text-amber-600 font-bold ml-1.5">(Mengikuti Paket Induk)</span>
-                  )}
-                </label>
-                <Input 
-                  id="field-kapasitas" 
-                  type="number" 
-                  name="kapasitas" 
-                  disabled={generateMode === "split" && splitType !== "starting_point"}
-                  value={generateMode === "split" && splitType !== "starting_point" && selectedParentGroup ? (selectedParentGroup.totalCapacity || formData.kapasitas) : formData.kapasitas} 
-                  onChange={handleChange} 
-                  onKeyDown={(e) => handleKeyDownNext(e, "field-targetMaterialisasi")}
-                  placeholder="Misal: 45" 
-                  className={cn(generateMode === "split" && splitType !== "starting_point" && "bg-amber-50/50 border-amber-200 text-amber-900 cursor-not-allowed")}
-                />
-                {generateMode === "split" && splitType !== "starting_point" && (
-                  <span className="text-[10px] text-amber-700 font-medium mt-1">
-                    * Kuota otomatis mengikuti Paket Utama ({selectedParentGroup?.totalCapacity || formData.kapasitas || 45} Seat) secara Shared Pool (tidak membagi kuota).
-                  </span>
-                )}
-              </div>
-              <div className="flex flex-col justify-end h-full">
-                <label className="block text-sm font-medium mb-1 min-h-[2.5rem] flex items-end">Minimal Seat Materialisasi (Kuota Aman)</label>
-                <Input 
-                  id="field-targetMaterialisasi" 
-                  type="number" 
-                  name="targetMaterialisasi" 
-                  value={formData.targetMaterialisasi} 
-                  onChange={handleChange} 
-                  onKeyDown={(e) => handleKeyDownNext(e, formData.isAdaKlaster === "tidak" ? "field-hargaBase" : "field-submitBtn")}
-                  placeholder="Misal: 30" 
-                />
-              </div>
+              {!(generateMode === "split" && splitType !== "starting_point") && (
+                <>
+                  <div className="flex flex-col justify-end h-full">
+                    <label className="block text-sm font-medium mb-1 min-h-[2.5rem] flex items-end">Kapasitas Seat (Maksimal Jamaah)</label>
+                    <Input 
+                      id="field-kapasitas" 
+                      type="number" 
+                      name="kapasitas" 
+                      value={formData.kapasitas} 
+                      onChange={handleChange} 
+                      onKeyDown={(e) => handleKeyDownNext(e, "field-targetMaterialisasi")}
+                      placeholder="Misal: 45" 
+                    />
+                  </div>
+                  <div className="flex flex-col justify-end h-full">
+                    <label className="block text-sm font-medium mb-1 min-h-[2.5rem] flex items-end">Minimal Seat Materialisasi (Kuota Aman)</label>
+                    <Input 
+                      id="field-targetMaterialisasi" 
+                      type="number" 
+                      name="targetMaterialisasi" 
+                      value={formData.targetMaterialisasi} 
+                      onChange={handleChange} 
+                      onKeyDown={(e) => handleKeyDownNext(e, formData.isAdaKlaster === "tidak" ? "field-hargaBase" : "field-submitBtn")}
+                      placeholder="Misal: 30" 
+                    />
+                  </div>
+                </>
+              )}
               <div className="flex flex-col justify-end h-full">
                 <label className="block text-xs font-bold text-slate-800 mb-1 min-h-[2.5rem] flex items-end">Termasuk Perlengkapan?</label>
                 <div className="flex items-center gap-2 h-10">
@@ -2477,33 +2469,30 @@ export default function GeneratePaketPage() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end pt-1">
-            <div className="flex flex-col justify-end h-full">
-              <label className="block text-xs font-semibold mb-1 min-h-[2.25rem] flex items-end">
-                Kapasitas Seat (Maksimal Jamaah)
-                {generateMode === "split" && splitType !== "starting_point" && (
-                  <span className="text-[10px] text-amber-400 font-bold ml-1.5">(Shared Pool)</span>
-                )}
-              </label>
-              <Input 
-                type="number" 
-                name="kapasitas" 
-                disabled={generateMode === "split" && splitType !== "starting_point"}
-                value={generateMode === "split" && splitType !== "starting_point" && selectedParentGroup ? (selectedParentGroup.totalCapacity || formData.kapasitas) : formData.kapasitas} 
-                onChange={handleChange} 
-                placeholder="45" 
-                className={cn(generateMode === "split" && splitType !== "starting_point" && "bg-amber-950/30 border-amber-600/40 text-amber-300 cursor-not-allowed")}
-              />
-            </div>
-            <div className="flex flex-col justify-end h-full">
-              <label className="block text-xs font-semibold mb-1 min-h-[2.25rem] flex items-end">Minimal Seat Materialisasi (Kuota Aman)</label>
-              <Input 
-                type="number" 
-                name="targetMaterialisasi" 
-                value={formData.targetMaterialisasi} 
-                onChange={handleChange} 
-                placeholder="30" 
-              />
-            </div>
+            {!(generateMode === "split" && splitType !== "starting_point") && (
+              <>
+                <div className="flex flex-col justify-end h-full">
+                  <label className="block text-xs font-semibold mb-1 min-h-[2.25rem] flex items-end">Kapasitas Seat (Maksimal Jamaah)</label>
+                  <Input 
+                    type="number" 
+                    name="kapasitas" 
+                    value={formData.kapasitas} 
+                    onChange={handleChange} 
+                    placeholder="45" 
+                  />
+                </div>
+                <div className="flex flex-col justify-end h-full">
+                  <label className="block text-xs font-semibold mb-1 min-h-[2.25rem] flex items-end">Minimal Seat Materialisasi (Kuota Aman)</label>
+                  <Input 
+                    type="number" 
+                    name="targetMaterialisasi" 
+                    value={formData.targetMaterialisasi} 
+                    onChange={handleChange} 
+                    placeholder="30" 
+                  />
+                </div>
+              </>
+            )}
             <div className="flex flex-col justify-end h-full">
               <label className="block text-xs font-semibold mb-1 min-h-[2.25rem] flex items-end">Termasuk Perlengkapan?</label>
               <div className="flex items-center gap-2 h-10">
