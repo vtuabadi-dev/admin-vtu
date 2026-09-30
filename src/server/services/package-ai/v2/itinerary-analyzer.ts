@@ -243,16 +243,23 @@ export function resolveRouteFromItineraryChronology(
 
   const landing = nonIndoCities[0];
   const firstDest = nonIndoCities.find(c => c !== landing) || landing;
+  const lastCity = nonIndoCities[nonIndoCities.length - 1];
 
-  let routeCode = 'JED.D-J';
-  if (landing === 'Jeddah') {
-    if (firstDest === 'Madinah') {
-      routeCode = 'JED.D-J';
-    } else if (firstDest === 'Mekkah') {
-      routeCode = 'JED.C-M';
-    }
-  } else if (landing === 'Madinah') {
+  // Tentukan rute out: jika kota terakhir Madinah -> out Madinah, selain itu out Jeddah
+  const isOutMadinah = lastCity === 'Madinah';
+
+  let routeCode = 'JED.C-M';
+  if (landing === 'Madinah') {
     routeCode = 'MED-J';
+  } else if (landing === 'Jeddah') {
+    if (firstDest === 'Taif') {
+      routeCode = isOutMadinah ? 'JED.TH-M' : 'JED.TH-J';
+    } else if (firstDest === 'Madinah') {
+      routeCode = 'JED.D-J';
+    } else {
+      // Default: firstDest Makkah
+      routeCode = isOutMadinah ? 'JED.C-M' : 'JED.C-J';
+    }
   }
 
   return createExtractedField(routeCode, 'itinerary_ocr', 0.85, 'RECOMMENDED', {

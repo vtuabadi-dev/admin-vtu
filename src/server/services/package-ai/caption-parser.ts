@@ -699,17 +699,32 @@ export function extractLandingRoute(caption: string): string | undefined {
     /\bJED\.TH\b/i.test(upper) ||
     /\bJED(?:DAH)?\s*-(?:>|\s)?\s*TH[AO]'?IF\b/i.test(upper);
 
-  // Deteksi Header Itinerary Hari Pertama / Kedua (Priority)
-  // Cth: "HARI-1 | JAKARTA-DOHA-JEDDAH-MAKKAH", "JEDDAH-MAKKAH", "HARI-2 | MAKKAH"
-  const isHeaderJedMakkah =
-    /\bJED(?:DAH)?\s*-\s*MAK(?:KAH)?\b/i.test(upper) ||
-    /\bHARI-?1\b[^\n]*\bJED(?:DAH)?[^\n]*\bMAK(?:KAH)?\b/i.test(upper) ||
-    /\bHARI-?2\b[^\n]*\bMAK(?:KAH)?\b/i.test(upper);
+  // ── DETEKSI AGENDA / HEADER TABEL ITINERARY HARI 1 & HARI 2 ──
+  // Regex untuk mencakup variasi: HARI 1, HARI 01, HARI KE-1, HARI-1, DAY 1, DAY 01, D1, H-1
+  const day1Regex = /\b(?:HARI\s*(?:KE[\s-]*)?0?1|DAY\s*0?1|H-?0?1)\b[^\n]*/i;
+  const day2Regex = /\b(?:HARI\s*(?:KE[\s-]*)?0?2|DAY\s*0?2|H-?0?2)\b[^\n]*/i;
 
+  const day1Match = upper.match(day1Regex);
+  const day2Match = upper.match(day2Regex);
+  const day1Text = day1Match ? day1Match[0] : "";
+  const day2Text = day2Match ? day2Match[0] : "";
+
+  // Landing langsung di Bandara Madinah pada Hari 1 (misal "JAKARTA - MADINAH", "CGK - MED", "LANDING MADINAH")
+  const isHeaderLandingMadinah =
+    (/\b(?:MADINAH|MEDINA|MED)\b/i.test(day1Text) && !/\bJED(?:DAH)?\b/i.test(day1Text)) ||
+    /\b(?:LANDING|TIBA|IN)\s*(?:DI|KE)?\s*(?:BANDARA\s*)?(?:MADINAH|MEDINA)\b/i.test(upper);
+
+  // Tujuan Pertama Makkah setelah Landing Jeddah (panah pertama '-> Makkah'):
+  const isHeaderJedMakkah =
+    /\bJED(?:DAH)?\s*(?:->|-|>)\s*MAK(?:KAH)?\b/i.test(upper) ||
+    (/\bJED(?:DAH)?\b/i.test(day1Text) && /\bMAK(?:KAH)?\b/i.test(day1Text)) ||
+    (/\bMAK(?:KAH)?\b/i.test(day2Text) && !/\bM[AE]D(?:INA|INAH)?\b/i.test(day2Text));
+
+  // Tujuan Pertama Madinah setelah Landing Jeddah (panah pertama '-> Madinah'):
   const isHeaderJedMadinah =
-    /\bJED(?:DAH)?\s*-\s*MED(?:INA|INAH)?\b/i.test(upper) ||
-    /\bHARI-?1\b[^\n]*\bJED(?:DAH)?[^\n]*\bMED(?:INA|INAH)?\b/i.test(upper) ||
-    /\bHARI-?2\b[^\n]*\bMED(?:INA|INAH)?\b/i.test(upper);
+    /\bJED(?:DAH)?\s*(?:->|-|>)\s*M[AE]D(?:INA|INAH)?\b/i.test(upper) ||
+    (/\bJED(?:DAH)?\b/i.test(day1Text) && /\bM[AE]D(?:INA|INAH)?\b/i.test(day1Text)) ||
+    (/\bM[AE]D(?:INA|INAH)?\b/i.test(day2Text) && !/\bMAK(?:KAH)?\b/i.test(day2Text));
 
   // 1. Direct match for known route codes
   for (const code of KNOWN_ROUTE_CODES) {
@@ -730,12 +745,12 @@ export function extractLandingRoute(caption: string): string | undefined {
 
   // 1c. Match flight IATA pairs (e.g. "SUB-JED // MED-SUB" or "CGK-MED // JED-CGK")
   const flightJedThenMed =
-    (/\bJED(?:DAH)?\b/i.test(upper) && /\bMED(?:INAH|INA)?\s*-(?:SUB|CGK|KNO|UPG|SOC|BPN|BDJ|KJT|AAP|DPS|LOP|PLM)\b/i.test(upper)) ||
-    (/\b(?:SUB|CGK|KNO|UPG|SOC|BPN|BDJ|KJT|AAP)-JED\b/i.test(upper) && /\bMED-/i.test(upper)) ||
+    (/\bJED(?:DAH)?\b/i.test(upper) && /\bM[AE]D(?:INAH|INA)?\s*-(?:SUB|CGK|KNO|UPG|SOC|BPN|BDJ|KJT|AAP|DPS|LOP|PLM)\b/i.test(upper)) ||
+    (/\b(?:SUB|CGK|KNO|UPG|SOC|BPN|BDJ|KJT|AAP)-JED\b/i.test(upper) && /\bM[AE]D-/i.test(upper)) ||
     /\bJED(?:DAH)?\b[\s\S]*?\b(?:OUT|PULANG|TAKE\s*OFF|KEPULANGAN)\s*(?:DARI\s*)?(?:VIA\s*)?(?:MADINAH|MEDINA|MED)\b/i.test(upper);
 
   const flightMedThenJed =
-    (/\bMED(?:INAH|INA)?\b/i.test(upper) && /\bJED(?:DAH)?\s*-(?:SUB|CGK|KNO|UPG|SOC|BPN|BDJ|KJT|AAP|DPS|LOP|PLM)\b/i.test(upper)) ||
+    (/\bM[AE]D(?:INAH|INA)?\b/i.test(upper) && /\bJED(?:DAH)?\s*-(?:SUB|CGK|KNO|UPG|SOC|BPN|BDJ|KJT|AAP|DPS|LOP|PLM)\b/i.test(upper)) ||
     (/\b(?:SUB|CGK|KNO|UPG|SOC|BPN|BDJ|KJT|AAP)-MED\b/i.test(upper) && /\bJED-/i.test(upper)) ||
     /\b(?:MADINAH|MEDINA|MED)\b[\s\S]*?\b(?:OUT|PULANG|TAKE\s*OFF|KEPULANGAN)\s*(?:DARI\s*)?(?:VIA\s*)?JED(?:DAH)?\b/i.test(upper);
 
@@ -750,7 +765,8 @@ export function extractLandingRoute(caption: string): string | undefined {
   const landingJeddah = /\b(?:LANDING|IN|MASUK)\s*(?:KE\s*)?(?:DI\s*)?JED(?:DAH)?\b/i.test(upper) ||
                         /\bJED(?:DAH)?\s*(?:IN|LANDING)\b/i.test(upper) ||
                         isHeaderJedMakkah || isHeaderJedMadinah;
-  const landingMadinah = /\b(?:LANDING|IN|MASUK)\s*(?:KE\s*)?(?:DI\s*)?(?:MADINAH|MEDINA|MEDINAH|MED)\b/i.test(upper) ||
+  const landingMadinah = isHeaderLandingMadinah ||
+                         /\b(?:LANDING|IN|MASUK)\s*(?:KE\s*)?(?:DI\s*)?(?:MADINAH|MEDINA|MEDINAH|MED)\b/i.test(upper) ||
                          /\b(?:MADINAH|MEDINA|MEDINAH|MED)\s*(?:IN|LANDING)\b/i.test(upper);
 
   const outJeddah = /\b(?:OUT|PULANG|TAKE\s*OFF|KEPULANGAN)\s*(?:DARI\s*)?(?:VIA\s*)?(?:BANDARA\s*)?(?:AIRPORT\s*)?JED(?:DAH)?\b/i.test(upper) ||
@@ -758,21 +774,21 @@ export function extractLandingRoute(caption: string): string | undefined {
   const outMadinah = /\b(?:OUT|PULANG|TAKE\s*OFF|KEPULANGAN)\s*(?:DARI\s*)?(?:VIA\s*)?(?:BANDARA\s*)?(?:AIRPORT\s*)?(?:MADINAH|MEDINA|MEDINAH|MED)\b/i.test(upper) ||
                      /\b(?:MADINAH|MEDINA|MEDINAH|MED)\s*(?:OUT|TAKE\s*OFF|PULANG)\b/i.test(upper);
 
-  // Direct Madinah from Jeddah then Out Jeddah -> JED.D-J
-  const directMadinah = isHeaderJedMadinah || /\bJED(?:DAH)?\s*(?:DIRECT\s*)?(?:LANGSUNG\s*)?(?:KE\s*)?(?:MADINAH|MEDINA|MEDINAH|MED)\b/i.test(upper);
-  if (directMadinah && outJeddah) {
-    return "JED.D-J";
-  }
-
-  // If landing in Madinah, standard out is Jeddah -> MED-J
+  // 1. If landing in Madinah, standard out is Jeddah -> MED-J (tanpa panah pertama karena Madinah sudah tujuan utama)
   if (landingMadinah) {
     return "MED-J";
   }
 
-  // If landing in Jeddah with explicit transit Thaif first
+  // 2. If landing in Jeddah with explicit transit Thaif first
   if (landingJeddah && isExplicitRouteThaif) {
     if (outMadinah) return "JED.TH-M";
     return "JED.TH-J";
+  }
+
+  // 3. Direct Madinah from Jeddah then Out Jeddah -> JED.D-J
+  const directMadinah = isHeaderJedMadinah || /\bJED(?:DAH)?\s*(?:DIRECT\s*)?(?:LANGSUNG\s*)?(?:KE\s*)?(?:MADINAH|MEDINA|MEDINAH|MED)\b/i.test(upper);
+  if (directMadinah && (outJeddah || !outMadinah)) {
+    return "JED.D-J";
   }
 
   // If landing in Jeddah (default kota setelah Jeddah adalah Makkah)

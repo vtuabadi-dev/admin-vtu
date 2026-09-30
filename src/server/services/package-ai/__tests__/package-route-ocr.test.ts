@@ -178,5 +178,77 @@ describe("Package OCR & Route Resolution — Hardened Suite", () => {
       expect(route).toBe("JED.TH-M");
     });
   });
+
+  describe("Invariant 7: Regular Package 6 Routes & Two-Arrow Semantics (Gambar 4)", () => {
+    it("resolves Landing Madinah directly to MED-J (Madinah → Jeddah) without first arrow", () => {
+      const caption = `
+        PAKET UMROH REGULER 9 HARI
+        HARI 1 | JAKARTA - MADINAH
+        HARI 2 | MADINAH
+        HARI 5 | MAKKAH
+        HARI 9 | JEDDAH - JAKARTA
+      `;
+      const route = extractLandingRoute(caption);
+      expect(route).toBe("MED-J");
+    });
+
+    it("resolves Landing Jeddah with First Destination Madinah to JED.D-J (Jeddah -> Madinah → Jeddah)", () => {
+      const caption = `
+        PAKET REGULER 12 HARI
+        HARI 1: SURABAYA - JEDDAH - MADINAH
+        HARI 2: MADINAH
+        HARI 6: MAKKAH
+        HARI 12: KEPULANGAN VIA BANDARA JEDDAH
+      `;
+      const route = extractLandingRoute(caption);
+      expect(route).toBe("JED.D-J");
+    });
+
+    it("resolves Landing Jeddah with First Destination Makkah and Out Madinah to JED.C-M (Jeddah -> Makkah → Madinah)", () => {
+      const caption = `
+        AGENDA PERJALANAN UMROH REGULER
+        HARI 01: JAKARTA - JEDDAH - MAKKAH
+        HARI 02: MAKKAH
+        HARI 06: MADINAH
+        HARI 09: BANDARA PRINCE MOHAMMAD MADINAH - JAKARTA
+      `;
+      const route = extractLandingRoute(caption);
+      expect(route).toBe("JED.C-M");
+    });
+
+    it("resolves Landing Jeddah with First Destination Makkah and Out Jeddah to JED.C-J (Jeddah -> Makkah → Jeddah)", () => {
+      const caption = `
+        AGENDA PERJALANAN UMROH REGULER
+        HARI 01: JAKARTA - JEDDAH - MAKKAH
+        HARI 02: MAKKAH
+        HARI 06: MADINAH
+        HARI 09: TAKE OFF BANDARA JEDDAH
+      `;
+      const route = extractLandingRoute(caption);
+      expect(route).toBe("JED.C-J");
+    });
+
+    it("resolves Landing Jeddah with First Destination Thaif and Out Madinah to JED.TH-M (Jeddah -> Thaif → Madinah)", () => {
+      const caption = `
+        HARI 1: SURABAYA - JEDDAH - THAIF
+        HARI 2: THAIF - MAKKAH
+        HARI 6: MADINAH
+        HARI 9: TAKE OFF BANDARA MADINAH
+      `;
+      const route = extractLandingRoute(caption);
+      expect(route).toBe("JED.TH-M");
+    });
+
+    it("resolves Landing Jeddah with First Destination Thaif and Out Jeddah to JED.TH-J (Jeddah -> Thaif → Jeddah)", () => {
+      const caption = `
+        HARI 1: SURABAYA - JEDDAH - THAIF
+        HARI 2: THAIF - MAKKAH
+        HARI 6: MADINAH
+        HARI 9: TAKE OFF BANDARA JEDDAH
+      `;
+      const route = extractLandingRoute(caption);
+      expect(route).toBe("JED.TH-J");
+    });
+  });
 });
 

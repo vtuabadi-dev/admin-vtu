@@ -144,22 +144,30 @@ export async function extractWithGemini(
     `==========================================================\n` +
     `3. SUMBER DATA: ITINERARY & ANALISIS CERMAT RUTE IN-OUT PESAWAT ('landingRoute')\n` +
     `==========================================================\n` +
-    `PERHATIKAN STRUKTUR KODE RUTE DENGAN SANGAT CERMAT:\n` +
-    `Semua kode rute memiliki pola: [KODE_IN]-[INISIAL_OUT]\n` +
-    `ATURAN MUTLAK: RUTE OUT HANYA ADA 2 PILIHAN SAJA DI SELURUH SISTEM, YAITU:\n` +
+    `PERHATIKAN STRUKTUR DUA PANAH PADA RUTE PAKET REGULER:\n` +
+    `• Tempat paling awal: Tempat landing pesawat di Saudi Arabia (Bandara Jeddah atau Bandara Madinah).\n` +
+    `• Panah Pertama '->' : Menunjukkan TUJUAN PERTAMA DI SAUDI ARABIA setelah mendarat di Jeddah (apakah -> Makkah, -> Madinah, atau -> Thaif). Dilihat dari header tabel agenda flyer (Hari 1 atau Hari 2: Makkah atau Madinah yang dikunjungi duluan).\n` +
+    `• Panah Kedua '→' : Menunjukkan NAMA KOTA LETAK BANDARA UNTUK OUT dari Saudi Arabia (→ Madinah atau → Jeddah).\n` +
+    `• PENGECUALIAN LANDING MADINAH: Jika mendarat di Bandara Madinah, TIDAK ADA panah pertama '->' karena Madinah sudah merupakan kota tujuan utama pertama di Saudi Arabia. Maka langsung panah kedua '→' menginfokan rute out: 'Madinah → Jeddah' [MED-J].\n\n` +
+    `DAFTAR 6 PILIHAN RUTE STANDAR KHUSUS PAKET REGULER:\n` +
+    `1. JED.TH-M : Jeddah -> Thaif → Madinah (Landing Jeddah, tujuan pertama Thaif, out Bandara Madinah)\n` +
+    `2. JED.TH-J : Jeddah -> Thaif → Jeddah (Landing Jeddah, tujuan pertama Thaif, out Bandara Jeddah)\n` +
+    `3. MED-J    : Madinah → Jeddah (Landing Bandara Madinah langsung tujuan utama, out Bandara Jeddah)\n` +
+    `4. JED.D-J  : Jeddah -> Madinah → Jeddah (Landing Jeddah langsung menuju Madinah di Hari 1/2, out Bandara Jeddah)\n` +
+    `5. JED.C-M  : Jeddah -> Makkah → Madinah (Landing Jeddah langsung ke Makkah di Hari 1/2, out Bandara Madinah)\n` +
+    `6. JED.C-J  : Jeddah -> Makkah → Jeddah (Landing Jeddah langsung ke Makkah di Hari 1/2, out Bandara Jeddah)\n\n` +
+    `ATURAN MUTLAK RUTE OUT (SETELAH TANDA '-' PADA KODE):\n` +
     `1. INISIAL 'J' = BANDARA JEDDAH (King Abdulaziz International Airport / JED)\n` +
-    `2. INISIAL 'M' = BANDARA MADINAH / MEDINAH (Prince Mohammad bin Abdulaziz International Airport / MED)\n` +
-    `TIDAK ADA INISIAL RUTE OUT LAINNYA SELAIN 'J' ATAU 'M'!\n` +
-    `Semua inisial yang terletak SETELAH tanda '-' (garis/strip/sret) adalah salah satu dari 2 ini:\n` +
+    `2. INISIAL 'M' = BANDARA MADINAH (Prince Mohammad bin Abdulaziz International Airport / MED)\n` +
     `• Inisial '-J' = Rute OUT Bandara Jeddah (Take off pulang ke Indonesia dari Bandara Jeddah).\n` +
-    `• Inisial '-M' = Rute OUT Bandara Madinah/Medinah (Take off pulang ke Indonesia dari Bandara Madinah).\n\n` +
-    `CARA MENANGKAP RUTE OUT DENGAN CERMAT DARI FLYER TERAKHIR / SEBELUM TERAKHIR:\n` +
-    `1. Periksa GAMBAR FLYER TERAKHIR atau SEBELUM TERAKHIR (atau jadwal itinerary hari-hari terakhir kepulangan, misal Hari 8, 9, 10, 11, 12, atau bagian Kepulangan):\n` +
-    `   - Jika jadwal hari terakhir/sebelum terakhir tertulis: "Transfer ke Bandara Internasional King Abdulaziz Jeddah", "Bandara Jeddah", "Jeddah - Jakarta/Surabaya", "Take off Jeddah", atau posisi terakhir jamaah berada di Makkah lalu langsung menuju Bandara Jeddah:\n` +
+    `• Inisial '-M' = Rute OUT Bandara Madinah (Take off pulang ke Indonesia dari Bandara Madinah).\n\n` +
+    `CARA MENANGKAP RUTE OUT DARI FLYER TERAKHIR / SEBELUM TERAKHIR:\n` +
+    `1. Periksa jadwal itinerary hari-hari terakhir kepulangan (misal Hari 8, 9, 10, 11, 12, atau bagian Kepulangan):\n` +
+    `   - Jika jadwal kepulangan tertulis: "Transfer ke Bandara Internasional King Abdulaziz Jeddah", "Bandara Jeddah", "Jeddah - Jakarta/Surabaya", "Take off Jeddah", atau posisi terakhir jamaah berada di Makkah lalu langsung menuju Bandara Jeddah:\n` +
     `     => MAKA RUTE OUT ADALAH JEDDAH, KODE WAJIB BERAKHIRAN '-J'!\n` +
-    `   - Jika jadwal hari terakhir/sebelum terakhir tertulis: "Transfer ke Bandara Prince Mohammad Bin Abdulaziz Madinah", "Bandara Madinah", "Madinah - Jakarta/Surabaya", "Take off Madinah", atau posisi terakhir jamaah berada di Madinah lalu langsung menuju Bandara Madinah:\n` +
+    `   - Jika jadwal kepulangan tertulis: "Transfer ke Bandara Prince Mohammad Bin Abdulaziz Madinah", "Bandara Madinah", "Madinah - Jakarta/Surabaya", "Take off Madinah", atau posisi terakhir jamaah berada di Madinah lalu langsung menuju Bandara Madinah:\n` +
     `     => MAKA RUTE OUT ADALAH MADINAH, KODE WAJIB BERAKHIRAN '-M'!\n\n` +
-    `CARA MENENTUKAN RUTE IN (LANDING DI SAUDI) DARI HEADER TABEL HARI PERTAMA / HARI KEDUA (MANDATORY & PRIORITAS TERTINGGI):\n` +
+    `CARA MENENTUKAN KOTA TUJUAN PERTAMA DARI HEADER TABEL HARI PERTAMA / HARI KEDUA (MANDATORY & PRIORITAS TERTINGGI):\n` +
     `CUKUP MEMBACA HEADER TABEL HARI PERTAMA (HARI-1) ATAU HARI KEDUA (HARI-2) UNTUK MENENTUKAN KOTA TUJUAN SETELAH JEDDAH:\n` +
     `1. Periksa judul/header tabel pada Flyer Itinerary (HARI-1 atau HARI-2):\n` +
     `   - Contoh Header Hari-1: "HARI-1 | JAKARTA-DOHA-JEDDAH-MAKKAH", "HARI 1: CGK-JED-MAKKAH", atau Header Hari-2: "HARI-2 | MAKKAH":\n` +
@@ -175,17 +183,17 @@ export async function extractWithGemini(
     `   - SANGAT PENTING: Jika di Hari ke-4 atau Hari ke-5 tertulis "Ziarah Kota Thaif", "Wisata Thaif", atau di caption ada teks "Free Ziarah Thaif", ITU HANYALAH TOUR ZIARAH HARIAN SAAT BERADA DI MAKKAH!\n` +
     `   - DILARANG KERAS MEMILIH 'JED.TH-M' ATAU 'JED.TH-J' JIKA DI HEADER HARI-1/HARI-2 SETELAH JEDDAH ADALAH MAKKAH!\n` +
     `   - Kode 'JED.TH' HANYA DAN HANYA DIGUNAKAN jika pada HEADER HARI PERTAMA / KEDUA tertulis secara eksplisit bahwa setelah mendarat di Jeddah rombongan langsung pergi ke THAIF terlebih dahulu (cth: "HARI-1 | JEDDAH-THAIF" atau "HARI-2 | THAIF"). Jika header Hari-1 setelah Jeddah adalah Makkah, MAKA KODE RUTE IN TETAP 'JED.C'!\n\n` +
-    `   - Paket Tour Plus (Singgah ke negara lain terlebih dahulu):\n` +
+    `   - Paket Tour Plus (Singgah ke negara lain terlebih dahulu - HANYA UNTUK PAKET PLUS):\n` +
     `     * Tour Dulu baru ke Makkah => 'TD.C' ('TD.C-J' atau 'TD.C-M')\n` +
     `     * Tour Dulu baru ke Madinah => 'TD.D' ('TD.D-J')\n` +
     `     * Umroh Dulu di Makkah lalu Madinah lalu tour => 'UD.D' ('UD.D-J' atau 'UD.D-M')\n\n` +
-    `PILIHAN KODE RUTE WAJIB DIPILIH SALAH SATU DARI 11 KODE MASTER INI -> [${routeOptions}]:\n` +
-    `- JED.C-M  (Jeddah In -> Makkah, Out: Madinah)\n` +
-    `- JED.C-J  (Jeddah In -> Makkah, Out: Jeddah)\n` +
-    `- JED.D-J  (Jeddah In -> Madinah, Out: Jeddah)\n` +
-    `- MED-J    (Madinah In, Out: Jeddah)\n` +
-    `- JED.TH-M (Jeddah In -> Thaif, Out: Madinah)\n` +
-    `- JED.TH-J (Jeddah In -> Thaif, Out: Jeddah)\n` +
+    `PILIHAN KODE RUTE WAJIB DIPILIH SALAH SATU DARI DAFTAR MASTER INI -> [${routeOptions}]:\n` +
+    `- JED.TH-M (Jeddah -> Thaif → Madinah)\n` +
+    `- JED.TH-J (Jeddah -> Thaif → Jeddah)\n` +
+    `- MED-J    (Madinah → Jeddah)\n` +
+    `- JED.D-J  (Jeddah -> Madinah → Jeddah)\n` +
+    `- JED.C-M  (Jeddah -> Makkah → Madinah)\n` +
+    `- JED.C-J  (Jeddah -> Makkah → Jeddah)\n` +
     `- TD.C-M   (Tour Dulu -> Makkah, Out: Madinah)\n` +
     `- TD.C-J   (Tour Dulu -> Makkah, Out: Jeddah)\n` +
     `- TD.D-J   (Tour Dulu -> Madinah, Out: Jeddah)\n` +

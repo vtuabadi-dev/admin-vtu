@@ -1448,29 +1448,50 @@ export default function GeneratePaketPage() {
 
   const allRoutes = (options?.routes && options.routes.length > 0 ? options.routes : MOCK_LANDING_PATTERN);
   
-  const filteredRoutes = allRoutes.filter((r) => {
-    const ruteIn = (r.ruteIn || "").toLowerCase();
-    const ruteOut = (r.ruteOut || "").toLowerCase();
-    const kode = (r.kode || "").toLowerCase();
+  // Standard 6 route options for Regular Package (as shown in Gambar 4):
+  // 1. Jeddah -> Thaif → Madinah [JED.TH-M]
+  // 2. Jeddah -> Thaif → Jeddah [JED.TH-J]
+  // 3. Madinah → Jeddah [MED-J]
+  // 4. Jeddah -> Madinah → Jeddah [JED.D-J]
+  // 5. Jeddah -> Makkah → Madinah [JED.C-M]
+  // 6. Jeddah -> Makkah → Jeddah [JED.C-J]
+  const REGULAR_ROUTE_ORDER = [
+    "JED.TH-M",
+    "JED.TH-J",
+    "MED-J",
+    "JED.D-J",
+    "JED.C-M",
+    "JED.C-J"
+  ];
 
-    const isPlusRoute =
-      ruteIn.includes("umroh dulu") ||
-      ruteIn.includes("tour dulu") ||
-      ruteOut.includes("umroh dulu") ||
-      ruteOut.includes("tour dulu") ||
-      kode.startsWith("ud") ||
-      kode.startsWith("td") ||
-      kode.includes(".ud.") ||
-      kode.includes(".td.");
+  const filteredRoutes = isPlusPackage
+    ? allRoutes.filter((r) => {
+        const ruteIn = (r.ruteIn || "").toLowerCase();
+        const ruteOut = (r.ruteOut || "").toLowerCase();
+        const kode = (r.kode || "").toLowerCase();
 
-    if (isPlusPackage) {
-      // Paket Plus -> HANYA tampilkan rute dengan "Umroh Dulu" / "Tour Dulu"
-      return isPlusRoute;
-    } else {
-      // Paket Reguler -> HANYA tampilkan 4 rute Reguler (selain Umroh Dulu & Tour Dulu)
-      return !isPlusRoute;
-    }
-  });
+        const isPlusRoute =
+          ruteIn.includes("umroh dulu") ||
+          ruteIn.includes("tour dulu") ||
+          ruteOut.includes("umroh dulu") ||
+          ruteOut.includes("tour dulu") ||
+          kode.startsWith("ud") ||
+          kode.startsWith("td") ||
+          kode.includes(".ud.") ||
+          kode.includes(".td.");
+
+        return isPlusRoute;
+      })
+    : allRoutes
+        .filter((r) => {
+          const kode = (r.kode || "").toUpperCase();
+          return REGULAR_ROUTE_ORDER.includes(kode);
+        })
+        .sort((a, b) => {
+          const idxA = REGULAR_ROUTE_ORDER.indexOf((a.kode || "").toUpperCase());
+          const idxB = REGULAR_ROUTE_ORDER.indexOf((b.kode || "").toUpperCase());
+          return (idxA === -1 ? 99 : idxA) - (idxB === -1 ? 99 : idxB);
+        });
 
   // Sub-component to render Wizard steps
   const renderWizardSteps = (colMode = false) => {
