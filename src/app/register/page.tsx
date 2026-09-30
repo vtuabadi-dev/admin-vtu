@@ -1225,7 +1225,7 @@ export default function RegisterPage() {
       </div>
 
       {/* Step content — Dark Green Hijau Tua Syariah Card Container */}
-      <div className="bg-gradient-to-br from-[#062118]/95 via-[#041710]/98 to-[#030e0b]/99 backdrop-blur-xl p-6 sm:p-8 rounded-3xl border-2 border-emerald-500/40 shadow-2xl shadow-black/80 relative overflow-visible">
+      <div className="bg-gradient-to-br from-[#062118]/95 via-[#041710]/98 to-[#030e0b]/99 backdrop-blur-xl p-6 sm:p-8 rounded-3xl border-2 border-emerald-500/40 shadow-2xl shadow-black/80 relative z-20 overflow-visible">
         {/* Step 1: Representative */}
         {step === 1 && (
           <div className="space-y-4">
@@ -1792,7 +1792,7 @@ export default function RegisterPage() {
             ) : (
               <div className="space-y-5">
                 {/* Package Select Dropdown (Searchable) */}
-                <div className="relative z-30">
+                <div className="relative z-40">
                   <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1.5">
                     Nama Paket Keberangkatan
                   </label>
@@ -3413,8 +3413,8 @@ export default function RegisterPage() {
       </div>
 
       {/* Footer Pill Link — Dark Green Hijau Tua (High Contrast for Elderly Jamaah) */}
-      <div className="flex justify-center mt-6">
-        <p className="text-center text-xs sm:text-sm font-semibold text-white bg-emerald-950/95 border-2 border-emerald-400/60 shadow-xl backdrop-blur-md py-2.5 px-6 rounded-full inline-flex items-center gap-1.5">
+      <div className="flex justify-center mt-6 relative z-0">
+        <p className="text-center text-xs sm:text-sm font-semibold text-white bg-emerald-950/95 border-2 border-emerald-400/60 shadow-xl backdrop-blur-md py-2.5 px-6 rounded-full inline-flex items-center gap-1.5 relative z-0">
           <span>Sudah punya akun?</span>{" "}
           <a
             href="/login"
