@@ -334,7 +334,9 @@ export default function ManifestDetailPage() {
                 {rows.map((row) => {
                   const isV2 = Boolean(
                     row.isVarian2 ||
-                    row.catatan?.toLowerCase().includes("varian 2") ||
+                    row.catatan?.toLowerCase().includes("varian") ||
+                    row.catatan?.toLowerCase().includes("promo") ||
+                    row.catatan?.toLowerCase().includes("spek") ||
                     row.catatan?.toLowerCase().includes("v2") ||
                     row.statusPerlengkapan === "TANPA"
                   );
@@ -365,7 +367,7 @@ export default function ManifestDetailPage() {
                           </span>
                           {isV2 ? (
                             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-purple-100 text-purple-700 border border-purple-300 dark:bg-purple-900/70 dark:text-purple-200 dark:border-purple-600 shadow-xs">
-                              💜 VARIAN 2 {row.varianName ? `• ${row.varianName}` : ""}
+                              💜 {row.varianName ? `VARIAN • ${row.varianName}` : "VARIAN 2"}
                             </span>
                           ) : (
                             <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-600 border border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700">

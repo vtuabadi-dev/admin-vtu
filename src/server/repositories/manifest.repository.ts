@@ -23,22 +23,38 @@ function mapManifestRow(row: any): ManifestRow {
   const hotelUpgrade = group?.registrationRequests?.[0]?.hotelUpgrade;
   const statusPerlengkapan = j?.statusPerlengkapan;
 
+  const isExplicitMain = Boolean(
+    hotelUpgrade && (
+      hotelUpgrade.toLowerCase().includes("utama") ||
+      hotelUpgrade.toLowerCase() === "reguler"
+    )
+  );
+
   const isV2 = Boolean(
-    row.catatan?.toLowerCase().includes("varian 2") ||
-    row.catatan?.toLowerCase().includes("v2") ||
-    hotelUpgrade?.toLowerCase().includes("varian 2") ||
-    hotelUpgrade?.toLowerCase().includes("tanpa perlengkapan") ||
-    statusPerlengkapan === "TANPA"
+    !isExplicitMain && (
+      row.catatan?.toLowerCase().includes("varian") ||
+      row.catatan?.toLowerCase().includes("promo") ||
+      row.catatan?.toLowerCase().includes("spek") ||
+      row.catatan?.toLowerCase().includes("v2") ||
+      hotelUpgrade?.toLowerCase().includes("varian") ||
+      hotelUpgrade?.toLowerCase().includes("promo") ||
+      hotelUpgrade?.toLowerCase().includes("spek") ||
+      hotelUpgrade?.toLowerCase().includes("tanpa perlengkapan") ||
+      statusPerlengkapan === "TANPA"
+    )
   );
 
   let varianName: string | undefined = undefined;
   if (isV2) {
     if (hotelUpgrade) {
-      varianName = hotelUpgrade.replace(/^Varian 2\s*-\s*/i, "").trim();
+      varianName = hotelUpgrade.replace(/^Varian\s*\d*\s*[-:]*\s*/i, "").trim();
+    } else if (row.catatan && /\[(varian|promo|spek)[^\]]*\]/i.test(row.catatan)) {
+      const match = row.catatan.match(/\[([^\]]+)\]/);
+      varianName = match ? match[1] : undefined;
     } else if (statusPerlengkapan === "TANPA") {
       varianName = "Tanpa Perlengkapan (Saja)";
     } else {
-      varianName = "Spesifikasi Varian 2";
+      varianName = "Varian Khusus";
     }
   }
 
