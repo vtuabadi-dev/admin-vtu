@@ -2143,11 +2143,42 @@ function ManifestPageContent() {
                             const isFirstInGroup = memberIdx === 0;
                             const isLastInGroup = memberIdx === totalInGroup - 1;
 
-                            // Bright distinct separator for the last member of each rombongan/group
+                            // ADR-0021: Detect Varian 2 / Split Variant universally
+                            const rawKlaster = getJamaahCluster(group.groupObj, j);
+                            const klasterName = rawKlaster || "SILVER";
+                            const isVarian2Row = Boolean(
+                              klasterName.toUpperCase().includes("VARIAN") ||
+                              klasterName.toUpperCase().includes("PROMO") ||
+                              klasterName.toUpperCase().includes("SPEK") ||
+                              klasterName.toUpperCase().includes("TANPA PERLENGKAPAN") ||
+                              groupMergeText.toUpperCase().includes("VARIAN") ||
+                              groupMergeText.toUpperCase().includes("PROMO") ||
+                              groupMergeText.toUpperCase().includes("SPEK") ||
+                              groupMergeText.toUpperCase().includes("TANPA PERLENGKAPAN") ||
+                              (group.groupObj as any)?.hotelUpgrade?.toUpperCase().includes("VARIAN") ||
+                              (group.groupObj as any)?.hotelUpgrade?.toUpperCase().includes("PROMO") ||
+                              (group.groupObj as any)?.hotelUpgrade?.toUpperCase().includes("SPEK") ||
+                              (group.groupObj as any)?.hotelUpgrade?.toUpperCase().includes("TANPA PERLENGKAPAN") ||
+                              (j as any)?.statusPerlengkapan === "TANPA" ||
+                              (j as any)?.catatan?.toUpperCase().includes("VARIAN") ||
+                              (j as any)?.catatan?.toUpperCase().includes("V2") ||
+                              (j as any)?.catatan?.toUpperCase().includes("SPEK") ||
+                              (j as any)?.catatan?.toUpperCase().includes("PROMO") ||
+                              isSameFlightVariant(groupPkg)
+                            );
+
+                            // Distinct separator for the last member of each rombongan/group (purple for variant, amber for regular)
                             const rowBorderClass = isLastInGroup
-                              ? "border-b-[2.5px] border-b-amber-400 dark:border-b-amber-500 shadow-[0_1px_0_rgba(245,158,11,0.2)]"
-                              : "border-b border-stone-200/60 dark:border-stone-800/60";
-                            const cellBorder = `border-r border-stone-200/50 dark:border-stone-800/50 ${rowBorderClass}`;
+                              ? (isVarian2Row
+                                  ? "border-b-[2.5px] border-b-purple-500 dark:border-b-purple-600 shadow-[0_1px_0_rgba(168,85,247,0.3)]"
+                                  : "border-b-[2.5px] border-b-amber-400 dark:border-b-amber-500 shadow-[0_1px_0_rgba(245,158,11,0.2)]")
+                              : (isVarian2Row
+                                  ? "border-b border-purple-200/70 dark:border-purple-900/50"
+                                  : "border-b border-stone-200/60 dark:border-stone-800/60");
+
+                            const cellBorder = isVarian2Row
+                              ? `border-r border-purple-200/60 dark:border-purple-900/50 ${rowBorderClass}`
+                              : `border-r border-stone-200/50 dark:border-stone-800/50 ${rowBorderClass}`;
 
                             // Single Source of Truth Name, Paspor, NIK & Alamat Resolution
                             const namaSot = getSingleSourceOfTruthName(j);
@@ -2182,13 +2213,21 @@ function ManifestPageContent() {
                             return (
                               <tr
                                 key={j.id}
-                                className={`hover:bg-amber-50/40 dark:hover:bg-amber-950/20 transition-colors ${
-                                  selectedJamaahIds.includes(j.id) ? "bg-amber-50/60 dark:bg-amber-950/30 font-semibold" : ""
-                                }`}
+                                className={cn(
+                                  "transition-colors",
+                                  isVarian2Row
+                                    ? "bg-purple-100/75 hover:bg-purple-200/80 dark:bg-purple-950/45 dark:hover:bg-purple-900/50 text-purple-950 dark:text-purple-100"
+                                    : "hover:bg-amber-50/40 dark:hover:bg-amber-950/20",
+                                  selectedJamaahIds.includes(j.id) && (
+                                    isVarian2Row
+                                      ? "bg-purple-200/90 dark:bg-purple-900/90 font-semibold"
+                                      : "bg-amber-50/60 dark:bg-amber-950/30 font-semibold"
+                                  )
+                                )}
                               >
                                 {/* CHECKBOX COL */}
                                 {isSelectMode && (
-                                  <td className={`px-2 py-2.5 text-center sticky left-0 bg-white dark:bg-stone-900 z-10 ${cellBorder}`}>
+                                  <td className={`px-2 py-2.5 text-center sticky left-0 ${isVarian2Row ? "bg-purple-100/95 dark:bg-purple-950/80" : "bg-white dark:bg-stone-900"} z-10 ${cellBorder}`}>
                                     <input
                                       type="checkbox"
                                       className="h-4 w-4 rounded border-stone-300 text-amber-600 focus:ring-amber-500 cursor-pointer"
@@ -2203,25 +2242,37 @@ function ManifestPageContent() {
                                 {isFirstInGroup && (
                                   <td
                                     rowSpan={totalInGroup}
-                                    className="p-3 text-center align-middle font-bold text-[11px] bg-amber-50/80 dark:bg-amber-950/30 text-amber-950 dark:text-amber-200 border-r-2 border-r-amber-400 dark:border-r-amber-700 border-b-[2.5px] border-b-amber-400 dark:border-b-amber-500 shadow-xs"
+                                    className={cn(
+                                      "p-3 text-center align-middle font-bold text-[11px] shadow-xs border-r-2 border-b-[2.5px]",
+                                      isVarian2Row
+                                        ? "bg-purple-200/90 dark:bg-purple-900/70 text-purple-950 dark:text-purple-100 border-r-purple-500 dark:border-r-purple-600 border-b-purple-500 dark:border-b-purple-600"
+                                        : "bg-amber-50/80 dark:bg-amber-950/30 text-amber-950 dark:text-amber-200 border-r-amber-400 dark:border-r-amber-700 border-b-amber-400 dark:border-b-amber-500"
+                                    )}
                                   >
                                     <span>{groupMergeText}</span>
                                   </td>
                                 )}
 
                                 {/* NO JAMAAH */}
-                                <td className={`px-2 py-2.5 text-center font-bold font-mono text-stone-700 dark:text-stone-300 ${cellBorder}`}>
+                                <td className={`px-2 py-2.5 text-center font-bold font-mono ${cellBorder} ${isVarian2Row ? "text-purple-900 dark:text-purple-200 font-extrabold" : "text-stone-700 dark:text-stone-300"}`}>
                                   {currentNoJamaah}
                                 </td>
 
                                 {/* ID REGISTER */}
-                                <td className={`px-3 py-2.5 font-mono font-semibold text-stone-800 dark:text-stone-200 ${cellBorder}`}>
+                                <td className={`px-3 py-2.5 font-mono font-semibold ${cellBorder} ${isVarian2Row ? "text-purple-950 dark:text-purple-100 font-bold" : "text-stone-800 dark:text-stone-200"}`}>
                                   {idRegister}
                                 </td>
 
                                 {/* NAMA */}
-                                <td className={`px-3 py-2.5 font-bold text-stone-900 dark:text-white ${cellBorder}`}>
-                                  {namaSot}
+                                <td className={`px-3 py-2.5 font-bold ${cellBorder} ${isVarian2Row ? "text-purple-950 dark:text-purple-100" : "text-stone-900 dark:text-white"}`}>
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <span>{namaSot}</span>
+                                    {isVarian2Row && (
+                                      <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-black bg-purple-600 text-white shadow-2xs">
+                                        💜 V2
+                                      </span>
+                                    )}
+                                  </div>
                                 </td>
 
                                 {/* NIK */}
@@ -2256,10 +2307,14 @@ function ManifestPageContent() {
                                 {/* KLASTER */}
                                 <td className={`px-3 py-2.5 text-center ${cellBorder}`}>
                                   {(() => {
-                                    const rawKlaster = getJamaahCluster(group.groupObj, j);
-                                    const klasterName = rawKlaster || "SILVER";
+                                    if (isVarian2Row) {
+                                      return (
+                                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-black bg-purple-600 text-white border border-purple-400 dark:bg-purple-700 dark:border-purple-500 shadow-xs">
+                                          💜 {klasterName}
+                                        </span>
+                                      );
+                                    }
                                     const isPromoKlaster = klasterName.toUpperCase().includes("PROMO") || isPromoVariant(groupPkg);
-
                                     return isPromoKlaster ? (
                                       <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-extrabold bg-purple-500/20 text-purple-800 dark:text-purple-300 border border-purple-500/40 shadow-xs">
                                         🏷️ {groupPkg?.promoLabel || groupPkg?.splitLabel || klasterName}
@@ -2491,7 +2546,7 @@ function ManifestPageContent() {
                                 </td>
 
                                 {/* AKSI */}
-                                <td className={`px-3 py-2.5 text-center sticky right-0 bg-white dark:bg-stone-900 shadow-[-4px_0_6px_-4px_rgba(0,0,0,0.15)] border-l border-stone-200/50 dark:border-stone-800/50 z-10 ${rowBorderClass}`}>
+                                <td className={`px-3 py-2.5 text-center sticky right-0 ${isVarian2Row ? "bg-purple-100/95 dark:bg-purple-950/85" : "bg-white dark:bg-stone-900"} shadow-[-4px_0_6px_-4px_rgba(0,0,0,0.15)] border-l ${isVarian2Row ? "border-purple-300/60 dark:border-purple-800/60" : "border-stone-200/50 dark:border-stone-800/50"} z-10 ${rowBorderClass}`}>
                                   <div className="flex items-center justify-center gap-2">
                                     {isFirstInGroup && (
                                       <Button

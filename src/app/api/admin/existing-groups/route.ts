@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { keberangkatanRepo } from "@/server/repositories/keberangkatan.repository";
 
+export const dynamic = "force-dynamic";
+
 export async function GET() {
   try {
     const groups = await keberangkatanRepo.findExistingGroupsForSplit();
