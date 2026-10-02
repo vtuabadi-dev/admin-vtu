@@ -821,11 +821,16 @@ function ManifestPageContent() {
     }
     setError(null);
     try {
+      const timestamp = Date.now();
+      const noCacheOpts = {
+        cache: "no-store" as RequestCache,
+        headers: { "Cache-Control": "no-cache, no-store, must-revalidate" },
+      };
       const [resMan, resKbr, resJam, resGrp] = await Promise.all([
-        fetch("/api/manifests"),
-        fetch("/api/keberangkatan"),
-        fetch("/api/jamaah"),
-        fetch("/api/groups"),
+        fetch(`/api/manifests?_t=${timestamp}`, noCacheOpts),
+        fetch(`/api/keberangkatan?_t=${timestamp}`, noCacheOpts),
+        fetch(`/api/jamaah?_t=${timestamp}`, noCacheOpts),
+        fetch(`/api/groups?_t=${timestamp}`, noCacheOpts),
       ]);
 
       if (!resMan.ok || !resKbr.ok || !resJam.ok) {
@@ -847,9 +852,9 @@ function ManifestPageContent() {
       setGroups(grpData);
 
       // Hydrate operational store for fast instant navigation
-      if (kbrData.length > 0) setStoreKeberangkatan(kbrData);
-      if (jamData.length > 0) setStoreJamaah(jamData);
-      if (grpData.length > 0) setStoreGroups(grpData);
+      setStoreKeberangkatan(kbrData);
+      setStoreJamaah(jamData);
+      setStoreGroups(grpData);
     } catch (err: any) {
       setError(err instanceof Error ? err : new Error("Database Connection Error"));
     } finally {
@@ -1211,17 +1216,25 @@ function ManifestPageContent() {
   async function handleBulkDeleteJamaah() {
     if (selectedJamaahIds.length === 0) return;
     setIsBulkDeleting(true);
+    const idsToDelete = [...selectedJamaahIds];
     try {
       const res = await fetch("/api/jamaah/bulk-delete", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ids: selectedJamaahIds, mode: bulkDeleteMode }),
+        body: JSON.stringify({ ids: idsToDelete, mode: bulkDeleteMode }),
       });
       const json = await res.json();
       if (res.ok && json.success) {
         setBulkDeleteModalOpen(false);
         setSelectedJamaahIds([]);
+
+        // 1. Optimistic UI update: instantly remove deleted jamaah from local state & store
+        setAllJamaah((prev) => prev.filter((j) => !idsToDelete.includes(j.id)));
+        const currentStoreJamaah = useOperationalStore.getState().jamaahList;
+        useOperationalStore.getState().setJamaahList(currentStoreJamaah.filter((j) => !idsToDelete.includes(j.id)));
         useOperationalStore.getState().setIsLoaded(false);
+
+        // 2. Fresh background sync
         await loadAllData();
         router.refresh();
       } else {
@@ -1491,13 +1504,24 @@ function ManifestPageContent() {
   async function handleDeleteJamaah() {
     if (!jamaahToDelete) return;
     setIsDeleting(true);
+    const targetId = jamaahToDelete.id;
     try {
-      const res = await fetch(`/api/jamaah/${jamaahToDelete.id}?mode=${deleteMode}`, { method: "DELETE" });
+      const res = await fetch(`/api/jamaah/${targetId}?mode=${deleteMode}`, { method: "DELETE" });
       const json = await res.json();
       if (res.ok && json.success) {
         setDeleteModalOpen(false);
         setJamaahToDelete(null);
+
+        // 1. Optimistic UI update: instantly remove deleted jamaah from local state & store
+        setAllJamaah((prev) => prev.filter((j) => j.id !== targetId));
+        setSelectedJamaahIds((prev) => prev.filter((id) => id !== targetId));
+        const currentStoreJamaah = useOperationalStore.getState().jamaahList;
+        useOperationalStore.getState().setJamaahList(currentStoreJamaah.filter((j) => j.id !== targetId));
+        useOperationalStore.getState().setIsLoaded(false);
+
+        // 2. Fresh background sync
         await loadAllData();
+        router.refresh();
       } else {
         alert(json.message || "Gagal menghapus jamaah");
       }
@@ -1512,8 +1536,9 @@ function ManifestPageContent() {
   async function handleMoveGroup() {
     if (!groupToMove || !targetPaketId) return;
     setIsMoving(true);
+    const movedGroupId = groupToMove.groupId;
     try {
-      const res = await fetch(`/api/groups/${groupToMove.groupId}`, {
+      const res = await fetch(`/api/groups/${movedGroupId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ paketKeberangkatanId: targetPaketId }),
@@ -1523,7 +1548,14 @@ function ManifestPageContent() {
         setMoveModalOpen(false);
         setGroupToMove(null);
         setTargetPaketId("");
+
+        // 1. Optimistic UI update: instantly remove moved group members from current active manifest
+        setAllJamaah((prev) => prev.filter((j) => j.groupId !== movedGroupId));
+        useOperationalStore.getState().setIsLoaded(false);
+
+        // 2. Fresh background sync
         await loadAllData();
+        router.refresh();
       } else {
         alert(json.message || "Gagal memindahkan grup jamaah");
       }

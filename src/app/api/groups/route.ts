@@ -4,6 +4,8 @@ import { auth } from "@/server/auth";
 import { checkServerPermission } from "@/shared/lib/rbac-utils";
 import { groupRepo } from "@/server/repositories";
 
+export const dynamic = "force-dynamic";
+
 export async function GET(request: NextRequest) {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
@@ -18,7 +20,14 @@ export async function GET(request: NextRequest) {
 
   try {
     const result = await groupRepo.findAll({ status, keberangkatanId, limit, offset });
-    return NextResponse.json({ success: true, data: result.data, total: result.total });
+    return NextResponse.json(
+      { success: true, data: result.data, total: result.total },
+      {
+        headers: {
+          "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+        },
+      }
+    );
   } catch (error) {
     return NextResponse.json({ success: false, message: (error as Error).message }, { status: 500 });
   }

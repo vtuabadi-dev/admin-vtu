@@ -98,7 +98,18 @@ export default function ManifestDetailPage() {
       });
       const data = await res.json();
       if (data.success) {
+        const deletedRowId = deleteTargetRow.id;
         setDeleteTargetRow(null);
+        setRows((prev) => prev.filter((r) => r.id !== deletedRowId));
+        setManifest((prev) =>
+          prev
+            ? {
+                ...prev,
+                totalPax: Math.max(0, (prev.totalPax || 1) - 1),
+                rows: (prev.rows || []).filter((r: any) => r.id !== deletedRowId),
+              }
+            : prev
+        );
         loadData();
       } else {
         window.alert(data.message || "Gagal menghapus jamaah dari manifest");
