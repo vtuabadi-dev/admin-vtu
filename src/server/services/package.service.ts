@@ -191,7 +191,105 @@ export const packageService = {
       }];
     }
 
-    // 3. Create Keberangkatan for each date
+    // ADR-0021: Single Manifest & Varian Penyatuan
+    // Split Varian (Promo / Spek) TIDAK membuat Keberangkatan baru, melainkan disatukan ke parent hotelOptions
+    const isVariantSplit = data.splitReason === "promo" || data.splitReason === "spek";
+    if (isVariantSplit) {
+      const updatedList: any[] = [];
+      const variantLabel = data.splitReason === "promo"
+        ? (data.promoLabel || data.splitLabel || "Promo Special")
+        : (data.spekLabel || data.splitLabel || "Spesifikasi Khusus");
+
+      for (let i = 0; i < departureDates.length; i++) {
+        const depDate = departureDates[i]!;
+        const depDateStr = depDate.toISOString().split("T")[0];
+
+        const pairedItemForThisDate = Array.isArray(data.pairedItems)
+          ? data.pairedItems.find((p: any) => p.childDate === depDateStr || p.parentDate === depDateStr) || data.pairedItems[i]
+          : null;
+
+        const targetParentId = pairedItemForThisDate?.parentId || initialParentId;
+
+        let targetParent: any = null;
+        if (targetParentId) {
+          targetParent = await prisma.keberangkatan.findUnique({
+            where: { id: targetParentId },
+          });
+        }
+
+        if (!targetParent) {
+          // Cari berdasarkan tanggal berangkat
+          targetParent = await prisma.keberangkatan.findFirst({
+            where: {
+              tanggalBerangkat: {
+                gte: new Date(`${depDateStr}T00:00:00.000Z`),
+                lte: new Date(`${depDateStr}T23:59:59.999Z`),
+              },
+              splitReason: null,
+            },
+          });
+        }
+
+        if (targetParent) {
+          let existingOptions: any[] = Array.isArray(targetParent.hotelOptions) ? [...targetParent.hotelOptions] : [];
+          if (existingOptions.length === 0) {
+            existingOptions = [{
+              clusterName: "Reguler (Varian Utama)",
+              hotelMekkah: targetParent.hotelMekkah,
+              hotelMadinah: targetParent.hotelMadinah,
+              hargaBase: targetParent.hargaPaket,
+              isVarianUtama: true,
+            }];
+          } else if (!existingOptions.some((o: any) => o.isVarianUtama)) {
+            existingOptions[0] = {
+              ...existingOptions[0],
+              clusterName: existingOptions[0].clusterName || "Reguler (Varian Utama)",
+              isVarianUtama: true,
+            };
+          }
+
+          const newVariant = {
+            clusterName: `Varian 2 - ${variantLabel}`,
+            variantName: variantLabel,
+            isVarian2: true,
+            hotelMekkah: finalHotelMekkah,
+            hotelMadinah: finalHotelMadinah,
+            hargaBase: Number(data.hargaBase || data.hargaPaket || targetParent.hargaPaket || 0),
+            isTanpaPerlengkapan: data.isAdaPerlengkapan === "tidak",
+            perlengkapan: data.isAdaPerlengkapan === "tidak" ? "EXCLUDE" : "INCLUDE",
+            isPromo: data.splitReason === "promo",
+            promoText: data.splitReason === "promo" ? variantLabel : undefined,
+            upgradeDouble: Number(data.upgradeDouble || 0),
+            upgradeTriple: Number(data.upgradeTriple || 0),
+          };
+
+          const existIdx = existingOptions.findIndex((o: any) =>
+            o.isVarian2 || o.variantName === variantLabel || o.clusterName === newVariant.clusterName
+          );
+
+          if (existIdx >= 0) {
+            existingOptions[existIdx] = { ...existingOptions[existIdx], ...newVariant };
+          } else {
+            existingOptions.push(newVariant);
+          }
+
+          const updated = await prisma.keberangkatan.update({
+            where: { id: targetParent.id },
+            data: {
+              hotelOptions: existingOptions,
+            },
+          });
+
+          updatedList.push(updated);
+        }
+      }
+
+      if (updatedList.length > 0) {
+        return departureDates.length === 1 ? updatedList[0] : updatedList;
+      }
+    }
+
+    // 3. Create Keberangkatan for each date (Hanya untuk Paket Baru atau Split Starting Point)
     const createdList = [];
 
     for (let i = 0; i < departureDates.length; i++) {

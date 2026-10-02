@@ -1869,7 +1869,7 @@ export default function RegisterPage() {
                       {isMultiCluster && clusters && (
                         <div className="space-y-3">
                           <label className="block text-xs font-bold text-amber-200 uppercase tracking-wider">
-                            🏢 Pilih Klaster Hotel &amp; Fasilitas
+                            🏢 Pilih Klaster Hotel &amp; Varian Paket
                           </label>
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                             {clusters.map((cl: any, idx: number) => {
@@ -1877,6 +1877,7 @@ export default function RegisterPage() {
                               const clPrice = Number(cl.hargaBase || 0);
                               const isPromo = cl.isPromo || cl.clusterName?.toUpperCase().includes("PROMO") || (cl as any).promo;
                               const isTanpaPerlengkapan = cl.perlengkapan === "EXCLUDE" || cl.tanpaPerlengkapan || (cl as any).isTanpaPerlengkapan;
+                              const isVarian2 = cl.isVarian2 || cl.clusterName?.toUpperCase().includes("VARIAN 2") || (cl as any).variantName;
 
                               return (
                                 <button
@@ -1889,7 +1890,9 @@ export default function RegisterPage() {
                                   className={cn(
                                     "p-3.5 rounded-2xl border-2 text-left transition-all relative flex flex-col justify-between gap-2.5 cursor-pointer shadow-md",
                                     isSelected
-                                      ? "border-amber-400 bg-amber-500 text-slate-950 ring-2 ring-amber-300 shadow-xl"
+                                      ? (isVarian2
+                                          ? "border-purple-400 bg-purple-900/90 text-white ring-2 ring-purple-400 shadow-xl"
+                                          : "border-amber-400 bg-amber-500 text-slate-950 ring-2 ring-amber-300 shadow-xl")
                                       : "border-amber-500/30 bg-[#160D07]/80 text-white hover:border-amber-400 hover:bg-[#24150B]"
                                   )}
                                 >
@@ -1898,10 +1901,15 @@ export default function RegisterPage() {
                                       <div className="flex items-center gap-1.5 flex-wrap">
                                         <span className={cn(
                                           "font-extrabold text-sm",
-                                          isSelected ? "text-slate-950" : "text-white"
+                                          isSelected ? (isVarian2 ? "text-white" : "text-slate-950") : "text-white"
                                         )}>
                                           {cl.clusterName || `Klaster ${idx + 1}`}
                                         </span>
+                                        {isVarian2 && (
+                                          <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-black bg-purple-500 text-white border border-purple-300">
+                                            💜 VARIAN 2
+                                          </span>
+                                        )}
                                         {isPromo && (
                                           <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-400 text-slate-950 border border-amber-300">
                                             🏷️ PROMO DEAL
@@ -1922,7 +1930,7 @@ export default function RegisterPage() {
                                         )}
                                       </div>
                                     </div>
-                                    {isSelected && <CheckCircle2 className="w-5 h-5 shrink-0 text-slate-950" />}
+                                    {isSelected && <CheckCircle2 className={cn("w-5 h-5 shrink-0", isVarian2 ? "text-purple-300" : "text-slate-950")} />}
                                   </div>
 
                                   <div className={cn("text-xs space-y-0.5 p-2 rounded-xl border", isSelected ? "bg-amber-600/30 text-slate-950 border-amber-600/40 font-bold" : "bg-[#100804]/70 text-amber-100 border-amber-500/20")}>

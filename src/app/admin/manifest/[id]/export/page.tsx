@@ -27,6 +27,7 @@ interface ColumnOption {
 const allColumns: ColumnOption[] = [
   { key: "nomorUrut", label: "No. Urut", default: true },
   { key: "namaLengkap", label: "Nama Lengkap", default: true },
+  { key: "varian", label: "Varian Paket", default: true },
   { key: "nomorPaspor", label: "No. Paspor", default: true },
   { key: "tempatLahir", label: "Tempat Lahir", default: true },
   { key: "tanggalLahir", label: "Tanggal Lahir", default: true },
@@ -39,6 +40,7 @@ function getRowValue(row: ManifestRow, key: string): string | undefined {
   switch (key) {
     case "nomorUrut": return String(row.nomorUrut);
     case "namaLengkap": return row.namaLengkap;
+    case "varian": return row.isVarian2 ? (row.varianName ? `Varian 2 (${row.varianName})` : "Varian 2") : "Varian Utama";
     case "nomorPaspor": return row.nomorPaspor;
     case "tempatLahir": return row.tempatLahir;
     case "tanggalLahir": return row.tanggalLahir;
@@ -52,6 +54,7 @@ function getRowValue(row: ManifestRow, key: string): string | undefined {
 const headerMap: Record<string, string> = {
   nomorUrut: "No",
   namaLengkap: "Nama Lengkap",
+  varian: "Varian Paket",
   nomorPaspor: "No Paspor",
   tempatLahir: "Tempat Lahir",
   tanggalLahir: "Tanggal Lahir",

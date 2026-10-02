@@ -136,6 +136,29 @@ export async function POST(request: NextRequest) {
       ? reg.members.sort((a, b) => (a.urutan || 0) - (b.urutan || 0))
       : [{ namaLengkap: reg.namaPerwakilan, jenisKelamin: "L", tempatLahir: "-", tanggalLahir: "2000-01-01", urutan: 1 }];
 
+    // ADR-0021: Resolve Varian / Klaster jika ada reg.hotelUpgrade
+    let rawHOpts: any[] = [];
+    try {
+      rawHOpts = typeof reg.keberangkatan?.hotelOptions === "string"
+        ? JSON.parse(reg.keberangkatan.hotelOptions)
+        : (reg.keberangkatan?.hotelOptions || []);
+    } catch {}
+    const hOptsList = Array.isArray(rawHOpts) ? rawHOpts : [];
+    const matchedVariant = reg.hotelUpgrade
+      ? hOptsList.find((o: any) =>
+          o.clusterName === reg.hotelUpgrade ||
+          o.variantName === reg.hotelUpgrade ||
+          (o.variantName && reg.hotelUpgrade?.includes(o.variantName))
+        )
+      : null;
+
+    const isTanpaPerlengkapan = matchedVariant
+      ? (matchedVariant.isTanpaPerlengkapan || matchedVariant.perlengkapan === "EXCLUDE")
+      : (reg.hotelUpgrade ? reg.hotelUpgrade.toLowerCase().includes("tanpa perlengkapan") : false);
+    const assignedStatusPerlengkapan = isTanpaPerlengkapan ? "TANPA" : "BELUM_AMBIL";
+    const assignedMekkah = matchedVariant?.hotelMekkah || reg.keberangkatan?.hotelMekkah || "";
+    const assignedMadinah = matchedVariant?.hotelMadinah || reg.keberangkatan?.hotelMadinah || "";
+
     const createdJamaah: any[] = [];
     for (let i = 0; i < memberList.length; i++) {
       const m = memberList[i]!;
@@ -163,8 +186,9 @@ export async function POST(request: NextRequest) {
             kecamatan: "-",
             kelurahan: "-",
             status: "registered",
-            hotelMekkah: "",
-            hotelMadinah: "",
+            hotelMekkah: assignedMekkah,
+            hotelMadinah: assignedMadinah,
+            statusPerlengkapan: assignedStatusPerlengkapan,
             syaratDisetujui: reg.termsAccepted ?? true,
             isKeretaCepat:
               (reg as any).isKeretaCepat !== undefined
@@ -187,22 +211,18 @@ export async function POST(request: NextRequest) {
     if (!group) {
       const ketua = createdJamaah[0];
       const pax = reg.paxCount || memberList.length || 1;
-      const basePaket = (reg.keberangkatan?.hargaPaket || 0) * pax;
+      const basePricePerPax = matchedVariant?.hargaBase ? Number(matchedVariant.hargaBase) : (reg.keberangkatan?.hargaPaket || 0);
+      const basePaket = basePricePerPax * pax;
 
       // Calculate room upgrade surcharge if selected during registration
       let roomSurcharge = 0;
       const roomType = (reg.roomUpgrade || "").toLowerCase().trim();
-      let upDouble = 2500000;
-      let upTriple = 1500000;
-      try {
-        const hOpts = typeof reg.keberangkatan?.hotelOptions === "string"
-          ? JSON.parse(reg.keberangkatan.hotelOptions)
-          : reg.keberangkatan?.hotelOptions;
-        if (Array.isArray(hOpts) && hOpts[0]) {
-          if (Number(hOpts[0].upgradeDouble) > 0) upDouble = Number(hOpts[0].upgradeDouble);
-          if (Number(hOpts[0].upgradeTriple) > 0) upTriple = Number(hOpts[0].upgradeTriple);
-        }
-      } catch {}
+      let upDouble = Number(matchedVariant?.upgradeDouble || 2500000);
+      let upTriple = Number(matchedVariant?.upgradeTriple || 1500000);
+      if (hOptsList[0]) {
+        if (!matchedVariant && Number(hOptsList[0].upgradeDouble) > 0) upDouble = Number(hOptsList[0].upgradeDouble);
+        if (!matchedVariant && Number(hOptsList[0].upgradeTriple) > 0) upTriple = Number(hOptsList[0].upgradeTriple);
+      }
 
       if (roomType.includes("double")) {
         roomSurcharge = upDouble * pax;

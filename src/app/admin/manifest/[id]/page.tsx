@@ -331,32 +331,58 @@ export default function ManifestDetailPage() {
                 </tr>
               </thead>
               <tbody className="[&_tr:last-child]:border-0">
-                {rows.map((row) => (
-                  <tr
-                    key={row.id}
-                    className="border-b transition-colors hover:bg-muted/30"
-                  >
-                    {/* Drag handle */}
-                    <td className="px-2 py-1.5 align-middle">
-                      <span className="block cursor-grab text-muted-foreground hover:text-foreground">
-                        <GripVertical className="h-3.5 w-3.5" />
-                      </span>
-                    </td>
-                    <td className="px-3 py-1.5 align-middle text-xs text-muted-foreground">
-                      {row.nomorUrut}
-                    </td>
-                    <td className="px-3 py-1.5 align-middle text-xs font-medium">
-                      {row.namaLengkap}
-                    </td>
-                    <td className="px-3 py-1.5 align-middle text-xs font-mono">
-                      {row.nomorPaspor}
-                    </td>
-                    <td className="px-3 py-1.5 align-middle text-xs">
-                      {row.tempatLahir}
-                    </td>
-                    <td className="px-3 py-1.5 align-middle text-xs">
-                      {row.tanggalLahir}
-                    </td>
+                {rows.map((row) => {
+                  const isV2 = Boolean(
+                    row.isVarian2 ||
+                    row.catatan?.toLowerCase().includes("varian 2") ||
+                    row.catatan?.toLowerCase().includes("v2") ||
+                    row.statusPerlengkapan === "TANPA"
+                  );
+
+                  return (
+                    <tr
+                      key={row.id}
+                      className={cn(
+                        "border-b transition-colors",
+                        isV2
+                          ? "bg-purple-50/80 dark:bg-purple-950/30 border-l-4 border-l-purple-500 hover:bg-purple-100/80 dark:hover:bg-purple-900/40"
+                          : "hover:bg-muted/30"
+                      )}
+                    >
+                      {/* Drag handle */}
+                      <td className="px-2 py-1.5 align-middle">
+                        <span className="block cursor-grab text-muted-foreground hover:text-foreground">
+                          <GripVertical className="h-3.5 w-3.5" />
+                        </span>
+                      </td>
+                      <td className="px-3 py-1.5 align-middle text-xs text-muted-foreground">
+                        {row.nomorUrut}
+                      </td>
+                      <td className="px-3 py-1.5 align-middle text-xs font-medium">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className={cn(isV2 ? "font-bold text-purple-950 dark:text-purple-100" : "")}>
+                            {row.namaLengkap}
+                          </span>
+                          {isV2 ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-purple-100 text-purple-700 border border-purple-300 dark:bg-purple-900/70 dark:text-purple-200 dark:border-purple-600 shadow-xs">
+                              💜 VARIAN 2 {row.varianName ? `• ${row.varianName}` : ""}
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-600 border border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700">
+                              Varian Utama
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-3 py-1.5 align-middle text-xs font-mono">
+                        {row.nomorPaspor}
+                      </td>
+                      <td className="px-3 py-1.5 align-middle text-xs">
+                        {row.tempatLahir}
+                      </td>
+                      <td className="px-3 py-1.5 align-middle text-xs">
+                        {row.tanggalLahir}
+                      </td>
                     {/* Editable: No. Kursi */}
                     <td className="px-3 py-1.5 align-middle text-xs">
                       {editingCell?.rowId === row.id && editingCell?.field === "nomorKursi" ? (
@@ -434,7 +460,8 @@ export default function ManifestDetailPage() {
                       </Button>
                     </td>
                   </tr>
-                ))}
+                );
+              })}
               </tbody>
             </table>
           </div>

@@ -95,7 +95,29 @@ export async function POST(
       const ketua = jamaahRecords[0]!;
       const namaGroup = `GRUP ${reg.namaPerwakilan}`;
       const paket = await tx.keberangkatan.findUniqueOrThrow({ where: { id: reg.paketId } });
-      const totalTagihan = paket.hargaPaket * reg.paxCount;
+
+      // ADR-0021: Resolve Varian / Klaster jika ada reg.hotelUpgrade
+      const hotelOptionsList = Array.isArray(paket.hotelOptions) ? (paket.hotelOptions as any[]) : [];
+      const matchedVariant = reg.hotelUpgrade
+        ? hotelOptionsList.find((o: any) =>
+            o.clusterName === reg.hotelUpgrade ||
+            o.variantName === reg.hotelUpgrade ||
+            (o.variantName && reg.hotelUpgrade?.includes(o.variantName))
+          )
+        : null;
+
+      const basePaxPrice = matchedVariant?.hargaBase ? Number(matchedVariant.hargaBase) : paket.hargaPaket;
+      const totalTagihan = basePaxPrice * reg.paxCount;
+
+      const assignedMekkah = matchedVariant?.hotelMekkah || paket.hotelMekkah || "-";
+      const assignedMadinah = matchedVariant?.hotelMadinah || paket.hotelMadinah || "-";
+
+      const isTanpaPerlengkapan = matchedVariant
+        ? (matchedVariant.isTanpaPerlengkapan || matchedVariant.perlengkapan === "EXCLUDE")
+        : (reg.hotelUpgrade ? reg.hotelUpgrade.toLowerCase().includes("tanpa perlengkapan") : false);
+
+      const assignedStatusPerlengkapan = isTanpaPerlengkapan ? "TANPA" : "BELUM_AMBIL";
+
       const pkgInc = Array.isArray(paket.include) ? paket.include : [];
       const hasKC =
         (reg as any).isKeretaCepat !== undefined
@@ -133,6 +155,9 @@ export async function POST(
           where: { id: j.id },
           data: {
             groupId: group.id,
+            hotelMekkah: assignedMekkah,
+            hotelMadinah: assignedMadinah,
+            statusPerlengkapan: assignedStatusPerlengkapan,
             isKeretaCepat: hasKC,
             isCityTourThoif: hasThoif,
           },

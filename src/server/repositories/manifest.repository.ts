@@ -18,6 +18,30 @@ function mapManifest(row: any): Manifest {
 }
 
 function mapManifestRow(row: any): ManifestRow {
+  const j = row.jamaah;
+  const group = j?.group;
+  const hotelUpgrade = group?.registrationRequests?.[0]?.hotelUpgrade;
+  const statusPerlengkapan = j?.statusPerlengkapan;
+
+  const isV2 = Boolean(
+    row.catatan?.toLowerCase().includes("varian 2") ||
+    row.catatan?.toLowerCase().includes("v2") ||
+    hotelUpgrade?.toLowerCase().includes("varian 2") ||
+    hotelUpgrade?.toLowerCase().includes("tanpa perlengkapan") ||
+    statusPerlengkapan === "TANPA"
+  );
+
+  let varianName: string | undefined = undefined;
+  if (isV2) {
+    if (hotelUpgrade) {
+      varianName = hotelUpgrade.replace(/^Varian 2\s*-\s*/i, "").trim();
+    } else if (statusPerlengkapan === "TANPA") {
+      varianName = "Tanpa Perlengkapan (Saja)";
+    } else {
+      varianName = "Spesifikasi Varian 2";
+    }
+  }
+
   return {
     id: row.id,
     nomorUrut: row.nomorUrut,
@@ -29,8 +53,30 @@ function mapManifestRow(row: any): ManifestRow {
     nomorKursi: row.nomorKursi ?? undefined,
     nomorKamar: row.nomorKamar ?? undefined,
     catatan: row.catatan ?? undefined,
+    isKeretaCepat: row.isKeretaCepat ?? j?.isKeretaCepat ?? undefined,
+    isCityTourThoif: row.isCityTourThoif ?? j?.isCityTourThoif ?? undefined,
+    isVarian2: isV2,
+    varianName: isV2 ? varianName : undefined,
+    statusPerlengkapan: statusPerlengkapan ?? undefined,
   };
 }
+
+const defaultRowInclude = {
+  orderBy: { nomorUrut: "asc" as const },
+  include: {
+    jamaah: {
+      include: {
+        group: {
+          include: {
+            registrationRequests: {
+              select: { hotelUpgrade: true, roomUpgrade: true },
+            },
+          },
+        },
+      },
+    },
+  },
+};
 
 // ────────────────────────────────────────────────────────────
 // Queries
@@ -43,21 +89,21 @@ export const manifestRepo = {
     if (params?.status) where.status = params.status;
 
     const [rows, total] = await Promise.all([
-      prisma.manifest.findMany({ where, include: { rows: { orderBy: { nomorUrut: "asc" } } }, take: params?.limit, skip: params?.offset, orderBy: { createdAt: "desc" } }),
+      prisma.manifest.findMany({ where, include: { rows: defaultRowInclude }, take: params?.limit, skip: params?.offset, orderBy: { createdAt: "desc" } }),
       prisma.manifest.count({ where }),
     ]);
     return { data: rows.map(mapManifest), total };
   },
 
   async findById(id: string) {
-    const row = await prisma.manifest.findUnique({ where: { id }, include: { rows: { orderBy: { nomorUrut: "asc" } } } });
+    const row = await prisma.manifest.findUnique({ where: { id }, include: { rows: defaultRowInclude } });
     return row ? mapManifest(row) : null;
   },
 
   async findByKeberangkatan(keberangkatanId: string) {
     const rows = await prisma.manifest.findMany({
       where: { keberangkatanId },
-      include: { rows: { orderBy: { nomorUrut: "asc" } } },
+      include: { rows: defaultRowInclude },
       orderBy: { createdAt: "desc" },
     });
     return rows.map(mapManifest);
