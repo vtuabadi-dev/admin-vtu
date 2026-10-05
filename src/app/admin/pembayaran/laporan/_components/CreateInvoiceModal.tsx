@@ -10,8 +10,6 @@ import {
   ArrowDownLeft,
   AlertTriangle,
   Package,
-  ArrowRight,
-  CheckCircle2,
 } from "lucide-react";
 import { cn, formatDateShort } from "@/shared/lib/utils";
 import { Button } from "@/shared/components/ui/Button";
@@ -42,7 +40,6 @@ export default function CreateInvoiceModal({
   const [scopePembatalan, setScopePembatalan] = useState<"SEBAGIAN" | "SELURUH">("SEBAGIAN");
   const [refundStatus, setRefundStatus] = useState<"NON_REFUND" | "WITH_REFUND">("NON_REFUND");
   const [refundType, setRefundType] = useState<"KELEBIHAN_BAYAR" | "DEPOSIT">("KELEBIHAN_BAYAR");
-  const [pindahPaketDetail, setPindahPaketDetail] = useState("");
   const [tambahPaxCount, setTambahPaxCount] = useState<number>(1);
 
   // Group search states
@@ -205,7 +202,6 @@ export default function CreateInvoiceModal({
     setH40Warning(null);
     setTargetPaketId("");
     setPricingOption("HARGA_BARU");
-    setPindahPaketDetail("");
     setKategori("PEMBAYARAN");
   }
 

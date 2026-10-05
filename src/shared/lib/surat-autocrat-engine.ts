@@ -2186,24 +2186,7 @@ export function parseWaFormText(
   const normalize = (str: string) =>
     str.toLowerCase().replace(/[^a-z0-9]/g, "");
 
-  // Domain-specific synonym dictionary for Umroh / Indonesian letters
-  const SYNONYMS: Record<string, string[]> = {
-    nama: ["nama", "namalengkap", "namajamaah", "namapeserta", "namakaryawan", "namapemohon", "namaasli", "fullname", "name"],
-    nik: ["nik", "noktp", "nomorktp", "noidentitas", "nomoridentitas", "ktp", "noid", "nomorid", "nikktp", "nikkaryawan"],
-    paspor: ["paspor", "nopaspor", "nomorpaspor", "passport", "passportno"],
-    tempat_lahir: ["tempatlahir", "tmplahir", "kotalahir", "tempatkelahiran", "tempat"],
-    tanggal_lahir: ["tanggallahir", "tgllahir", "tglkelahiran", "tanggallahirjamaah", "tgllahirjamaah"],
-    jenis_kelamin: ["jeniskelamin", "kelamin", "gender", "jk", "sex"],
-    alamat: ["alamat", "alamatrumah", "alamattinggal", "alamatdomisili", "alamatlengkap", "tempattinggal"],
-    nomor_telepon: ["nomortelepon", "telepon", "nohp", "nomorhp", "hp", "whatsapp", "wa", "kontak", "notelp", "nomorwa"],
-    nama_ayah: ["namaayah", "ayah", "ayahkandung", "namaayahkandung", "bapak", "orangtua"],
-    instansi: ["instansi", "perusahaan", "kantor", "namaperusahaan", "namakantor", "sekolah", "kampus", "universitas", "tujuan", "namainstansi", "tempatkerja", "perusahaankantor", "namasekolah"],
-    jabatan: ["jabatan", "posisi", "pekerjaan", "profesi", "bagian", "divisi", "statuskepegawaian"],
-    alamat_instansi: ["alamatinstansi", "alamatkantor", "alamatperusahaan", "alamatsekolah"],
-    tanggal_mulai: ["tanggalmulai", "tglmulai", "mulaicuti", "daritanggal", "awaldinas", "tanggalawal", "tglawal", "berangkat", "tanggalberangkat"],
-    tanggal_selesai: ["tanggalselesai", "tglselesai", "sampaitanggal", "hinggatanggal", "akhirdinas", "tanggalakhir", "tglakhir", "selesaicuti", "kembali", "tanggalpulang"],
-    kota: ["kota", "kotakantor", "kotatujuan", "kotaimigrasi", "kotakanim", "kotadomisili"],
-  };
+
 
   const findMatchingPlaceholder = (rawKey: string): SuratPlaceholderMapping | null => {
     const cleanKey = normalize(rawKey);
@@ -2319,8 +2302,8 @@ export function parseWaFormText(
   const lines = rawText.split(/\r?\n/);
   let lastMatchedPlaceholder: SuratPlaceholderMapping | null = null;
 
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i].trim();
+  for (const rawLine of lines) {
+    const line = (rawLine || "").trim();
     if (!line) continue;
 
     // Skip greeting and footer texts
@@ -2417,9 +2400,9 @@ export function parseWaFormText(
       const prevVal = result[lastMatchedPlaceholder.key] || "";
       const newVal = `${prevVal} ${line}`.trim();
       result[lastMatchedPlaceholder.key] = newVal;
-      const idx = matchedFields.findIndex((m) => m.key === lastMatchedPlaceholder!.key);
-      if (idx !== -1) {
-        matchedFields[idx].value = newVal;
+      const target = matchedFields.find((m) => m.key === lastMatchedPlaceholder!.key);
+      if (target) {
+        target.value = newVal;
       }
       continue;
     }

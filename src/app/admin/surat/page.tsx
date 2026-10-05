@@ -170,6 +170,7 @@ function GenerateSuratPageContent() {
   const [selectedPackageId, setSelectedPackageId] = useState<string>("");
   const [selectedJamaahId, setSelectedJamaahId] = useState<string>("");
   const [selectedDocIndex, setSelectedDocIndex] = useState<number>(0);
+  type OcrDocType = "ktp" | "akta" | "kk";
   type DataSourceMode = "manifest" | "ocr" | "wa_text" | "manual";
 
   const [dataSourceMode, setDataSourceMode] = useState<DataSourceMode>("manifest");

@@ -88,6 +88,24 @@ export interface RegistrationGroup {
   pembayaran?: Pembayaran[];
   createdAt: string;
   updatedAt: string;
+  keberangkatan?: {
+    id: string;
+    kode: string;
+    namaPaket: string;
+    hargaPaket: number;
+    tanggalBerangkat?: string;
+    tanggalPulang?: string;
+    maskapai?: string;
+  };
+  paketKeberangkatan?: {
+    id: string;
+    kode: string;
+    namaPaket: string;
+    hargaPaket: number;
+    tanggalBerangkat?: string;
+    tanggalPulang?: string;
+    maskapai?: string;
+  };
 }
 
 // ============================================================

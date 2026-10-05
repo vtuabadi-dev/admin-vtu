@@ -105,8 +105,7 @@ export default function ManifestDetailPage() {
           prev
             ? {
                 ...prev,
-                totalPax: Math.max(0, (prev.totalPax || 1) - 1),
-                rows: (prev.rows || []).filter((r: any) => r.id !== deletedRowId),
+                data: (prev.data || []).filter((r: any) => r.id !== deletedRowId),
               }
             : prev
         );
