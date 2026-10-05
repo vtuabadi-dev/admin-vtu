@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo, useCallback, Suspense } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import {
   Printer,
@@ -38,6 +38,7 @@ import {
   MessageSquare,
   Send,
   ClipboardCheck,
+  ChevronDown,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/components/ui/Card";
 import { Button } from "@/shared/components/ui/Button";
@@ -167,6 +168,21 @@ function GenerateSuratPageContent() {
   // Local state
   const [templates, setTemplates] = useState<SuratTemplate[]>(DEFAULT_SURAT_TEMPLATES);
   const [selectedTemplateSlug, setSelectedTemplateSlug] = useState<string>("rekom-paspor");
+  const [isTemplateDropdownOpen, setIsTemplateDropdownOpen] = useState<boolean>(false);
+  const [templateSearchQuery, setTemplateSearchQuery] = useState<string>("");
+  const templateDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close template dropdown on outside click
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (templateDropdownRef.current && !templateDropdownRef.current.contains(e.target as Node)) {
+        setIsTemplateDropdownOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
   const [selectedPackageId, setSelectedPackageId] = useState<string>("");
   const [selectedJamaahId, setSelectedJamaahId] = useState<string>("");
   const [selectedDocIndex, setSelectedDocIndex] = useState<number>(0);
@@ -367,6 +383,19 @@ function GenerateSuratPageContent() {
       DEFAULT_SURAT_TEMPLATES[0]
     ) as SuratTemplate;
   }, [templates, selectedTemplateSlug]);
+
+  // Filtered templates for dropdown search
+  const filteredDropdownTemplates = useMemo(() => {
+    if (!templateSearchQuery.trim()) return templates;
+    const q = templateSearchQuery.toLowerCase();
+    return templates.filter(
+      (t) =>
+        t.nama.toLowerCase().includes(q) ||
+        (t.kodeNomorDefault && t.kodeNomorDefault.toLowerCase().includes(q)) ||
+        (t.perihalDefault && t.perihalDefault.toLowerCase().includes(q)) ||
+        (t.deskripsi && t.deskripsi.toLowerCase().includes(q))
+    );
+  }, [templates, templateSearchQuery]);
 
   // Dynamic auto-count nomor urut surat from generated history logs
   useEffect(() => {
@@ -2239,63 +2268,172 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
       {/* ══════════════════════════════════════════════════════════ */}
       {activeMainTab === "generator" && (
         <div className="space-y-6">
-          {/* Template Selector Pills */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
+          {/* Template Selector Dropdown */}
+          <div className="p-3 bg-stone-50/80 dark:bg-stone-900/60 rounded-xl border border-stone-200 dark:border-stone-800 shadow-2xs space-y-2">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
               <label className="text-xs font-bold text-foreground flex items-center gap-1.5">
                 <Layers className="h-3.5 w-3.5 text-primary" />
                 Pilih Template Surat:
               </label>
               <button
+                type="button"
                 onClick={() => router.push("/admin/master/surat")}
-                className="text-[11px] font-semibold text-primary hover:underline flex items-center gap-1"
+                className="text-[11px] font-semibold text-primary hover:underline flex items-center gap-1 self-start sm:self-auto"
               >
                 + Kelola / Tambah Template di Master Surat
                 <ArrowRight className="h-3 w-3" />
               </button>
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
-              {templates.map((tpl) => {
-                const isSelected = tpl.slug === activeTemplate?.slug;
-                const hasDocx = checkTemplateHasDocx(tpl);
-                return (
-                  <button
-                    key={tpl.id}
-                    onClick={() => setSelectedTemplateSlug(tpl.slug)}
-                    className={cn(
-                      "p-3 rounded-xl border text-left transition-all relative flex flex-col justify-between",
-                      isSelected
-                        ? "bg-primary/10 border-primary text-primary shadow-sm ring-1 ring-primary"
-                        : "bg-card hover:bg-muted/60 border-stone-200 dark:border-stone-800 text-foreground"
-                    )}
-                  >
-                    <div className="space-y-1">
-                      <div className="flex items-center justify-between">
-                        <Badge variant="outline" size="sm" className="text-[9px] font-mono">
-                          {tpl.kodeNomorDefault}
+            {/* Interactive Dropdown Button */}
+            <div className="relative" ref={templateDropdownRef}>
+              <button
+                type="button"
+                onClick={() => setIsTemplateDropdownOpen((prev) => !prev)}
+                className={cn(
+                  "w-full flex items-center justify-between gap-3 px-3.5 py-2.5 rounded-xl border text-left transition-all",
+                  isTemplateDropdownOpen
+                    ? "border-primary ring-2 ring-primary/20 bg-card shadow-xs"
+                    : "border-stone-200 dark:border-stone-800 bg-card hover:bg-muted/40 hover:border-stone-300 dark:hover:border-stone-700"
+                )}
+              >
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="h-8 w-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                    <FileText className="h-4 w-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-xs font-bold text-foreground truncate">
+                        {activeTemplate?.nama || "Pilih Template Surat"}
+                      </span>
+                      {activeTemplate?.kodeNomorDefault && (
+                        <Badge variant="outline" size="sm" className="text-[10px] font-mono px-1.5 py-0">
+                          {activeTemplate.kodeNomorDefault}
                         </Badge>
-                        {isSelected && <Check className="h-3.5 w-3.5 text-primary" />}
-                      </div>
-                      <p className="text-xs font-bold line-clamp-1 mt-1">{tpl.nama}</p>
-                    </div>
-                    <div className="mt-2 flex items-center justify-between gap-1">
-                      <p className="text-[10px] text-muted-foreground line-clamp-1">
-                        {tpl.placeholders.length} Tag
-                      </p>
-                      {hasDocx ? (
-                        <span className="text-[9px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded">
-                          DOCX ✓
-                        </span>
-                      ) : (
-                        <span className="text-[9px] font-medium text-amber-600 dark:text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded">
-                          Upload DOCX
-                        </span>
                       )}
                     </div>
-                  </button>
-                );
-              })}
+                    <p className="text-[10px] text-muted-foreground truncate">
+                      {activeTemplate?.perihalDefault || activeTemplate?.deskripsi || "Template Autocrat Engine"}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0">
+                  <span className="text-[10px] text-muted-foreground hidden sm:inline-block font-mono bg-muted/80 px-2 py-0.5 rounded border border-stone-200 dark:border-stone-800">
+                    {activeTemplate?.placeholders?.length || 0} Tag
+                  </span>
+                  {checkTemplateHasDocx(activeTemplate) ? (
+                    <span className="text-[9px] font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded">
+                      DOCX ✓
+                    </span>
+                  ) : (
+                    <span className="text-[9px] font-medium text-amber-700 dark:text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded">
+                      Upload DOCX
+                    </span>
+                  )}
+                  <ChevronDown
+                    className={cn(
+                      "h-4 w-4 text-muted-foreground transition-transform duration-200",
+                      isTemplateDropdownOpen && "rotate-180 text-primary"
+                    )}
+                  />
+                </div>
+              </button>
+
+              {/* Dropdown Menu Popup */}
+              {isTemplateDropdownOpen && (
+                <div className="absolute top-full left-0 right-0 mt-1.5 z-40 bg-card border border-stone-200 dark:border-stone-800 rounded-xl shadow-xl overflow-hidden animate-in fade-in-50 duration-100">
+                  {/* Search inside Dropdown */}
+                  <div className="p-2 border-b border-stone-200 dark:border-stone-800 bg-muted/30">
+                    <div className="relative">
+                      <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                      <input
+                        type="text"
+                        value={templateSearchQuery}
+                        onChange={(e) => setTemplateSearchQuery(e.target.value)}
+                        placeholder="Cari template surat (nama, kode, atau perihal)..."
+                        className="w-full pl-8 pr-3 py-1.5 text-xs bg-background rounded-lg border border-stone-200 dark:border-stone-800 focus:outline-none focus:ring-1 focus:ring-primary"
+                        autoFocus
+                      />
+                    </div>
+                  </div>
+
+                  {/* List of Templates */}
+                  <div className="max-h-64 overflow-y-auto p-1.5 space-y-1">
+                    {filteredDropdownTemplates.length === 0 ? (
+                      <div className="p-4 text-center text-xs text-muted-foreground">
+                        Tidak ada template yang cocok dengan pencarian
+                      </div>
+                    ) : (
+                      filteredDropdownTemplates.map((tpl) => {
+                        const isSelected = tpl.slug === activeTemplate?.slug;
+                        const hasDocx = checkTemplateHasDocx(tpl);
+                        return (
+                          <button
+                            key={tpl.id}
+                            type="button"
+                            onClick={() => {
+                              setSelectedTemplateSlug(tpl.slug);
+                              setIsTemplateDropdownOpen(false);
+                              setTemplateSearchQuery("");
+                            }}
+                            className={cn(
+                              "w-full flex items-center justify-between gap-3 p-2.5 rounded-lg text-left transition-all",
+                              isSelected
+                                ? "bg-primary/10 text-primary font-semibold ring-1 ring-primary/20"
+                                : "hover:bg-muted text-foreground"
+                            )}
+                          >
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <Badge variant="outline" size="sm" className="text-[10px] font-mono px-1.5 py-0 shrink-0">
+                                {tpl.kodeNomorDefault}
+                              </Badge>
+                              <div className="min-w-0">
+                                <p className="text-xs font-medium truncate">{tpl.nama}</p>
+                                {tpl.perihalDefault && (
+                                  <p className="text-[10px] text-muted-foreground truncate">{tpl.perihalDefault}</p>
+                                )}
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-2 shrink-0">
+                              <span className="text-[10px] text-muted-foreground font-mono">
+                                {tpl.placeholders.length} Tag
+                              </span>
+                              {hasDocx ? (
+                                <span className="text-[9px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded">
+                                  DOCX ✓
+                                </span>
+                              ) : (
+                                <span className="text-[9px] font-medium text-amber-600 dark:text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded">
+                                  Upload DOCX
+                                </span>
+                              )}
+                              {isSelected && <Check className="h-4 w-4 text-primary shrink-0 ml-1" />}
+                            </div>
+                          </button>
+                        );
+                      })
+                    )}
+                  </div>
+
+                  {/* Footer info in Dropdown */}
+                  <div className="p-2 border-t border-stone-200 dark:border-stone-800 bg-muted/40 flex items-center justify-between text-[11px] text-muted-foreground">
+                    <span>{templates.length} template terdaftar</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsTemplateDropdownOpen(false);
+                        router.push("/admin/master/surat");
+                      }}
+                      className="text-primary hover:underline font-medium flex items-center gap-1"
+                    >
+                      Buka Master Surat
+                      <ExternalLink className="h-3 w-3" />
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
