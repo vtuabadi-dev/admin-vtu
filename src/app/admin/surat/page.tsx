@@ -35,6 +35,9 @@ import {
   CalendarDays,
   Loader2,
   Clipboard,
+  MessageSquare,
+  Send,
+  ClipboardCheck,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/components/ui/Card";
 import { Button } from "@/shared/components/ui/Button";
@@ -68,6 +71,9 @@ import {
   parseDateRangeToIsoStrings,
   parseMonthYearToIsoString,
   formatIsoToIndonesianMonthYear,
+  generateWaTemplateText,
+  parseWaFormText,
+  type ParsedWaResult,
 } from "@/shared/lib/surat-autocrat-engine";
 import { downloadMergedDocx } from "@/shared/lib/docx-mail-merge";
 import { downloadDocxAsPdf } from "@/shared/lib/docx-to-pdf";
@@ -164,11 +170,17 @@ function GenerateSuratPageContent() {
   const [selectedPackageId, setSelectedPackageId] = useState<string>("");
   const [selectedJamaahId, setSelectedJamaahId] = useState<string>("");
   const [selectedDocIndex, setSelectedDocIndex] = useState<number>(0);
-  type OcrDocType = "ktp" | "akta" | "kk";
+  type DataSourceMode = "manifest" | "ocr" | "wa_text" | "manual";
 
-  const [dataSourceMode, setDataSourceMode] = useState<"manifest" | "ocr" | "manual">("manifest");
+  const [dataSourceMode, setDataSourceMode] = useState<DataSourceMode>("manifest");
   const [saveOcrToManifest, setSaveOcrToManifest] = useState<boolean>(false);
   const [isSavingOcrDocsToManifest, setIsSavingOcrDocsToManifest] = useState<boolean>(false);
+
+  // States for WhatsApp Template Form & Smart Text Parser
+  const [waInputText, setWaInputText] = useState<string>("");
+  const [parsedWaFilledFieldKeys, setParsedWaFilledFieldKeys] = useState<Set<string>>(new Set());
+  const [parsedWaSummary, setParsedWaSummary] = useState<ParsedWaResult | null>(null);
+  const [isCopiedWaTemplate, setIsCopiedWaTemplate] = useState<boolean>(false);
 
   // 3 Document Slots for OCR in Surat: KTP, Akta Lahir, KK
   const [ocrFiles, setOcrFiles] = useState<Record<OcrDocType, File | null>>({
@@ -219,7 +231,7 @@ function GenerateSuratPageContent() {
   const dateInputsRef = React.useRef<Record<string, HTMLInputElement | null>>({});
   const monthInputsRef = React.useRef<Record<string, HTMLInputElement | null>>({});
 
-  const handleSwitchMode = (mode: "manifest" | "ocr" | "manual") => {
+  const handleSwitchMode = (mode: DataSourceMode) => {
     setDataSourceMode(mode);
     if (mode === "manual") {
       setSelectedPackageId("");
@@ -230,6 +242,8 @@ function GenerateSuratPageContent() {
         setSelectedPackageId("");
         setSelectedJamaahId("");
       }
+    } else if (mode === "wa_text") {
+      // WA mode can operate standalone or reference
     }
   };
 
@@ -1539,6 +1553,65 @@ function GenerateSuratPageContent() {
     }
   };
 
+  // ────────────────────────────────────────────────────────────
+  // WHATSAPP TEMPLATE FORM & SMART TEXT PARSER HANDLERS
+  // ────────────────────────────────────────────────────────────
+
+  // Generate WhatsApp formatted text from current active template & placeholders
+  const currentWaTemplateText = useMemo(() => {
+    if (!activeTemplate) return "";
+    return generateWaTemplateText(activeTemplate, effectivePlaceholders, manualFormData);
+  }, [activeTemplate, effectivePlaceholders, manualFormData]);
+
+  // Copy WhatsApp Form Template to Clipboard
+  const handleCopyWaTemplate = async () => {
+    try {
+      await navigator.clipboard.writeText(currentWaTemplateText);
+      setIsCopiedWaTemplate(true);
+      showToast("Format formulir WhatsApp berhasil disalin! Silakan kirimkan ke jamaah.");
+      setTimeout(() => setIsCopiedWaTemplate(false), 3000);
+    } catch {
+      showToast("Gagal menyalin ke clipboard. Silakan salin teks secara manual.");
+    }
+  };
+
+  // Parse Text pasted from Jamaah
+  const handleParseWaText = (textToParse?: string) => {
+    const raw = typeof textToParse === "string" ? textToParse : waInputText;
+    if (!raw || !raw.trim()) {
+      showToast("Silakan tempel (paste) teks balasan dari WhatsApp jamaah terlebih dahulu.");
+      return;
+    }
+
+    const parseRes = parseWaFormText(raw, effectivePlaceholders);
+    setParsedWaSummary(parseRes);
+
+    if (parseRes.detectedCount === 0) {
+      showToast("Tidak ditemukan data variabel yang cocok. Pastikan format teks berisi 'Nama Kolom : Isian'.");
+      return;
+    }
+
+    // Apply parsed values to manualFormData
+    const newlyFilled = new Set<string>();
+    setManualFormData((prev) => {
+      const next = { ...prev };
+      Object.entries(parseRes.parsedMap).forEach(([k, v]) => {
+        next[k] = v;
+        newlyFilled.add(k);
+      });
+      return next;
+    });
+
+    setParsedWaFilledFieldKeys(newlyFilled);
+    showToast(`✓ Berhasil mem-parsing ${parseRes.detectedCount} variabel surat dari teks WhatsApp!`);
+  };
+
+  const handleClearWaText = () => {
+    setWaInputText("");
+    setParsedWaSummary(null);
+    setParsedWaFilledFieldKeys(new Set());
+  };
+
   // Autocrat Merged Field Values
   const resolvedFieldValues = useMemo(() => {
     if (!activeTemplate) return {};
@@ -2229,7 +2302,7 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
             {/* ── LEFT COLUMN (5 COLS): CONTROLS & DYNAMIC AUTOCRAT FORM ── */}
             <div className="lg:col-span-5 space-y-4">
-              {/* Mode Selector: Referensi Manifest vs Ekstraksi OCR vs Input Manual */}
+              {/* Mode Selector: Referensi Manifest vs Ekstraksi OCR vs Format Teks WA vs Input Manual */}
               <div className="p-3 bg-stone-50 dark:bg-stone-900/60 rounded-xl border border-stone-200 dark:border-stone-800 shadow-2xs space-y-2">
                 <div className="flex items-center justify-between">
                   <label className="text-xs font-bold text-foreground flex items-center gap-1.5">
@@ -2241,10 +2314,12 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
                       ? "Mode: Manifest"
                       : dataSourceMode === "ocr"
                       ? "Mode: Ekstraksi OCR"
+                      : dataSourceMode === "wa_text"
+                      ? "Mode: Format Teks WA"
                       : "Mode: Manual"}
                   </span>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                   <button
                     type="button"
                     onClick={() => handleSwitchMode("manifest")}
@@ -2280,6 +2355,25 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
                     </div>
                     <p className="text-[10px] text-muted-foreground leading-tight">
                       Upload KTP, Akta & KK, auto-fill via AI OCR
+                    </p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleSwitchMode("wa_text")}
+                    className={cn(
+                      "flex flex-col items-start gap-1 p-2.5 rounded-lg border text-left transition-all",
+                      dataSourceMode === "wa_text"
+                        ? "border-emerald-500 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 ring-1 ring-emerald-500/30 shadow-xs"
+                        : "border-stone-200 dark:border-stone-800 hover:border-emerald-500/40 bg-background text-muted-foreground"
+                    )}
+                  >
+                    <div className="flex items-center gap-1.5 font-bold text-xs">
+                      <MessageSquare className="h-3.5 w-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                      <span>Format Teks WA</span>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground leading-tight">
+                      Salin form ke jamaah via WA & parse balasan
                     </p>
                   </button>
 
@@ -2872,6 +2966,193 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
                 </Card>
               )}
 
+              {/* Card 1 (Format Teks WA Mode): WhatsApp Template Generator & Smart Text Parser */}
+              {dataSourceMode === "wa_text" && (
+                <Card className="border-emerald-500/30 dark:border-emerald-500/20 shadow-xs">
+                  <CardHeader className="pb-3 border-b border-emerald-500/20 dark:border-emerald-500/20 bg-emerald-50/50 dark:bg-emerald-950/20">
+                    <CardTitle className="text-xs font-bold flex items-center justify-between">
+                      <span className="flex items-center gap-1.5 text-emerald-800 dark:text-emerald-300">
+                        <MessageSquare className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                        1. Format Isian WhatsApp & Smart Parser
+                      </span>
+                      <Badge variant="outline" size="sm" className="text-[10px] border-emerald-500/40 text-emerald-700 dark:text-emerald-300 bg-emerald-500/10">
+                        {effectivePlaceholders.length} Variabel
+                      </Badge>
+                    </CardTitle>
+                  </CardHeader>
+
+                  <CardContent className="pt-4 space-y-4">
+                    {/* BAGIAN A: TEMPLATE TEKS SIAP SALIN KE WHATSAPP JAMAAH */}
+                    <div className="p-3 bg-stone-50 dark:bg-stone-900/60 rounded-xl border border-stone-200 dark:border-stone-800 space-y-2.5">
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                          <Clipboard className="h-3.5 w-3.5 text-emerald-600" />
+                          Template Teks Form (Kirimkan ke WhatsApp Jamaah)
+                        </label>
+                        <span className="text-[10px] text-muted-foreground font-mono">
+                          Format Otomatis dari Tag Surat
+                        </span>
+                      </div>
+
+                      <p className="text-[11px] text-muted-foreground leading-relaxed">
+                        Salin format template formulir di bawah ini, kirimkan ke chat WhatsApp calon jamaah agar mereka melengkapi isian data yang dibutuhkan.
+                      </p>
+
+                      {/* Box Preview Format WA */}
+                      <div className="relative">
+                        <pre className="p-2.5 rounded-lg bg-background border border-stone-200 dark:border-stone-800 text-[11px] font-mono text-foreground whitespace-pre-wrap max-h-36 overflow-y-auto leading-relaxed select-all">
+                          {currentWaTemplateText}
+                        </pre>
+                      </div>
+
+                      {/* Action Buttons */}
+                      <div className="flex flex-wrap items-center gap-2 pt-1">
+                        <Button
+                          type="button"
+                          size="sm"
+                          onClick={handleCopyWaTemplate}
+                          className={cn(
+                            "h-8 text-xs font-bold text-white transition-all flex items-center gap-1.5",
+                            isCopiedWaTemplate
+                              ? "bg-emerald-700 hover:bg-emerald-800"
+                              : "bg-emerald-600 hover:bg-emerald-700"
+                          )}
+                        >
+                          {isCopiedWaTemplate ? (
+                            <>
+                              <ClipboardCheck className="h-3.5 w-3.5" />
+                              Tersalin ke Clipboard!
+                            </>
+                          ) : (
+                            <>
+                              <Clipboard className="h-3.5 w-3.5" />
+                              Salin Format Teks WA
+                            </>
+                          )}
+                        </Button>
+
+                        <a
+                          href={getWhatsAppUrl("", currentWaTemplateText)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg border border-emerald-500/40 text-emerald-700 dark:text-emerald-300 bg-emerald-500/10 hover:bg-emerald-500/20 text-xs font-semibold transition-all"
+                        >
+                          <Send className="h-3.5 w-3.5" />
+                          Buka di WhatsApp
+                        </a>
+                      </div>
+                    </div>
+
+                    {/* BAGIAN B: TEMPEL BALASAN JAMAAH & PARSING OTOMATIS */}
+                    <div className="p-3 bg-emerald-50/40 dark:bg-emerald-950/20 rounded-xl border border-emerald-500/30 dark:border-emerald-500/20 space-y-2.5">
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs font-bold text-emerald-900 dark:text-emerald-200 flex items-center gap-1.5">
+                          <Sparkles className="h-3.5 w-3.5 text-emerald-600" />
+                          Tempel (Paste) Teks Balasan dari Jamaah
+                        </label>
+                        {waInputText.trim() && (
+                          <span className="text-[10px] text-emerald-700 dark:text-emerald-400 font-mono">
+                            {waInputText.split("\n").filter((l) => l.trim()).length} baris teks
+                          </span>
+                        )}
+                      </div>
+
+                      <p className="text-[11px] text-muted-foreground leading-relaxed">
+                        Setelah jamaah membalas pesan di WhatsApp, salin seluruh teks balasan tersebut dan tempelkan ke kolom berikut untuk di-parsing otomatis ke masing-masing variabel surat.
+                      </p>
+
+                      <textarea
+                        rows={5}
+                        value={waInputText}
+                        onChange={(e) => {
+                          setWaInputText(e.target.value);
+                        }}
+                        onPaste={(e) => {
+                          const pasted = e.clipboardData.getData("text");
+                          if (pasted && pasted.trim()) {
+                            setTimeout(() => handleParseWaText(pasted), 100);
+                          }
+                        }}
+                        placeholder={`Tempel (Paste) teks balasan WhatsApp dari jamaah di sini...\n\nContoh:\n*Nama Lengkap* : Muhammad Irfan Arsyad\n*NIK* : 3507123456780001\n*Instansi* : SMA Al Izzah Batu\n*Jabatan* : Guru Pengajar\n...`}
+                        className="w-full p-2.5 text-xs font-mono rounded-lg border border-emerald-500/30 dark:border-emerald-500/30 bg-background text-foreground focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 focus:outline-none placeholder:text-muted-foreground/60 leading-relaxed"
+                      />
+
+                      {/* Action Parse Row */}
+                      <div className="flex items-center justify-between gap-2 pt-0.5">
+                        <div className="flex items-center gap-2">
+                          <Button
+                            type="button"
+                            size="sm"
+                            onClick={() => handleParseWaText()}
+                            disabled={!waInputText.trim()}
+                            className="h-8 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs flex items-center gap-1.5"
+                          >
+                            <Sparkles className="h-3.5 w-3.5" />
+                            ⚡ Parse & Terapkan ke Form
+                          </Button>
+
+                          {waInputText.trim() && (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={handleClearWaText}
+                              className="h-8 text-xs text-muted-foreground hover:text-destructive"
+                            >
+                              <Trash2 className="h-3.5 w-3.5 mr-1" />
+                              Bersihkan
+                            </Button>
+                          )}
+                        </div>
+
+                        {parsedWaSummary && (
+                          <span className="text-[11px] font-bold text-emerald-700 dark:text-emerald-400">
+                            ✓ {parsedWaSummary.detectedCount} variabel terisi
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Parsing Result Summary Box */}
+                      {parsedWaSummary && (
+                        <div className="mt-2.5 p-2.5 rounded-lg bg-background border border-emerald-500/30 space-y-2 text-xs">
+                          <div className="flex items-center justify-between text-[11px] font-bold text-emerald-800 dark:text-emerald-300">
+                            <span className="flex items-center gap-1">
+                              <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+                              Hasil Ekstraksi Teks WhatsApp ({parsedWaSummary.detectedCount} dari {parsedWaSummary.totalFields} Field)
+                            </span>
+                            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-700 dark:text-emerald-300">
+                              {Math.round((parsedWaSummary.detectedCount / Math.max(1, parsedWaSummary.totalFields)) * 100)}% Cocok
+                            </span>
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-36 overflow-y-auto pr-1">
+                            {parsedWaSummary.matchedFields.map((f) => (
+                              <div
+                                key={f.key}
+                                className="p-1.5 rounded bg-emerald-50/50 dark:bg-emerald-950/30 border border-emerald-500/20 text-[10.5px] flex flex-col justify-between"
+                              >
+                                <span className="text-muted-foreground text-[10px] truncate">
+                                  {f.label}:
+                                </span>
+                                <span className="font-bold text-foreground truncate">
+                                  {f.value}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+
+                          {parsedWaSummary.detectedCount < parsedWaSummary.totalFields && (
+                            <p className="text-[10px] text-muted-foreground">
+                              ℹ️ Variabel yang belum terisi dapat dilengkapi langsung pada <strong>Kolom Isian Data Surat</strong> di bawah.
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
               {/* Card 2: Header & Nomor Surat Configuration */}
               <Card className="border-stone-200 dark:border-stone-800">
                 <CardHeader className="pb-3 border-b border-stone-200 dark:border-stone-800">
@@ -3079,6 +3360,11 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
                               <span className="text-[10px] font-semibold text-amber-700 dark:text-amber-300 bg-amber-500/15 border border-amber-500/30 px-2 py-0.5 rounded flex items-center gap-1 shadow-2xs">
                                 <Sparkles className="h-3 w-3 text-amber-500" />
                                 + Nama Ayah (Endorsement)
+                              </span>
+                            ) : parsedWaFilledFieldKeys.has(p.key) || (dataSourceMode === "wa_text" && manualVal !== undefined && manualVal !== "") ? (
+                              <span className="text-[10px] font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-500/15 border border-emerald-500/30 px-2 py-0.5 rounded flex items-center gap-1 shadow-2xs">
+                                <MessageSquare className="h-3 w-3 text-emerald-500" />
+                                Parse Teks WA
                               </span>
                             ) : ocrFilledFieldKeys.has(p.key) || (dataSourceMode === "ocr" && manualVal !== undefined && manualVal !== "") ? (
                               <span className="text-[10px] font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-500/15 border border-emerald-500/30 px-2 py-0.5 rounded flex items-center gap-1 shadow-2xs">

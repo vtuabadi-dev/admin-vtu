@@ -9,8 +9,11 @@ import {
   XCircle,
   ArrowDownLeft,
   AlertTriangle,
+  Package,
+  ArrowRight,
+  CheckCircle2,
 } from "lucide-react";
-import { cn } from "@/shared/lib/utils";
+import { cn, formatDateShort } from "@/shared/lib/utils";
 import { Button } from "@/shared/components/ui/Button";
 import { Input } from "@/shared/components/ui/Input";
 import { CurrencyInput } from "@/shared/components/ui/CurrencyInput";
@@ -18,6 +21,7 @@ import { Modal } from "@/shared/components/ui/Modal";
 import {
   getGroupByKode,
   getGroupList,
+  getKeberangkatanList,
   createInvoice,
 } from "@/server/actions/api";
 
@@ -53,15 +57,21 @@ export default function CreateInvoiceModal({
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [searching, setSearching] = useState(false);
 
+  // Pindah Paket specific states
+  const [keberangkatanList, setKeberangkatanList] = useState<any[]>([]);
+  const [targetPaketId, setTargetPaketId] = useState<string>("");
+  const [pricingOption, setPricingOption] = useState<"HARGA_LAMA" | "HARGA_BARU">("HARGA_BARU");
+
   const [nominal, setNominal] = useState<number>(0);
   const [jatuhTempo, setJatuhTempo] = useState("");
   const [catatan, setCatatan] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // Load active groups for live search suggestions
+  // Load active groups and departure packages
   useEffect(() => {
     if (open) {
       getGroupList().then((list) => setAvailableGroups(list || [])).catch(() => {});
+      getKeberangkatanList().then((list) => setKeberangkatanList(list || [])).catch(() => {});
     }
   }, [open]);
 
@@ -76,6 +86,7 @@ export default function CreateInvoiceModal({
     setLookupError("");
     setGroupInfo(null);
     setH40Warning(null);
+    setTargetPaketId("");
     setShowSuggestions(false);
     if (!codeToSearch.trim()) {
       setLookupError("Masukkan 4 digit nomor sekuensial group");
@@ -100,6 +111,7 @@ export default function CreateInvoiceModal({
     setGroupInfo(group);
     setLookupError("");
     setShowSuggestions(false);
+    setTargetPaketId("");
 
     // Auto extract year & 4-digit sequence into inputs
     if (group.kodeRegistrasi) {
@@ -149,14 +161,115 @@ export default function CreateInvoiceModal({
     ).slice(0, 6);
   }, [availableGroups, seqInput]);
 
+  // Current package belonging to selected group
+  const currentPackage = useMemo(() => {
+    if (!groupInfo) return null;
+    return (
+      groupInfo.keberangkatan ||
+      groupInfo.paketKeberangkatan ||
+      keberangkatanList.find((k) => k.id === groupInfo.paketKeberangkatanId) ||
+      null
+    );
+  }, [groupInfo, keberangkatanList]);
+
+  // Target destination package
+  const targetPackage = useMemo(() => {
+    if (!targetPaketId) return null;
+    return keberangkatanList.find((k) => k.id === targetPaketId) || null;
+  }, [targetPaketId, keberangkatanList]);
+
+  // Pindah Paket calculations
+  const paxCount = groupInfo?.jumlahAnggota || groupInfo?.anggotaIds?.length || 1;
+  const oldPrice = currentPackage?.hargaPaket || (groupInfo?.totalTagihan ? Math.round(groupInfo.totalTagihan / paxCount) : 0);
+  const newPrice = targetPackage?.hargaPaket || 0;
+  const diffPerPax = newPrice - oldPrice;
+  const totalDiff = diffPerPax * paxCount;
+
+  // Auto-set nominal for Pindah Paket based on pricing option
+  useEffect(() => {
+    if (kategori === "PINDAH_PAKET") {
+      if (pricingOption === "HARGA_BARU" && totalDiff > 0) {
+        setNominal(totalDiff);
+      } else {
+        setNominal(0);
+      }
+    }
+  }, [kategori, pricingOption, totalDiff]);
+
+  function handleReset() {
+    setSeqInput("");
+    setNominal(0);
+    setJatuhTempo("");
+    setCatatan("");
+    setGroupInfo(null);
+    setH40Warning(null);
+    setTargetPaketId("");
+    setPricingOption("HARGA_BARU");
+    setPindahPaketDetail("");
+    setKategori("PEMBAYARAN");
+  }
+
   async function handleSubmit() {
-    if (!groupInfo || nominal <= 0) return;
+    if (!groupInfo) return;
+
+    if (kategori === "PINDAH_PAKET") {
+      if (!targetPaketId) {
+        alert("Pilih paket tujuan baru terlebih dahulu");
+        return;
+      }
+      if (targetPaketId === currentPackage?.id) {
+        alert("Paket tujuan tidak boleh sama dengan paket saat ini");
+        return;
+      }
+      setLoading(true);
+      try {
+        // 1. Move group via API
+        const resMove = await fetch(`/api/groups/${groupInfo.id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            paketKeberangkatanId: targetPaketId,
+            pricingOption,
+            totalDiff: pricingOption === "HARGA_BARU" ? totalDiff : 0,
+          }),
+        });
+        const moveJson = await resMove.json();
+        if (!resMove.ok || !moveJson.success) {
+          throw new Error(moveJson.message || "Gagal memproses pemindahan paket");
+        }
+
+        // 2. If harga baru and positive difference, create invoice for difference
+        let resultInvNumber = `PINDAH-${groupInfo.kodeRegistrasi || groupInfo.id.slice(-6).toUpperCase()}`;
+        let finalAmount = 0;
+        if (pricingOption === "HARGA_BARU" && totalDiff > 0) {
+          const inv = await createInvoice({
+            groupId: groupInfo.id,
+            kategori: "PINDAH_PAKET",
+            subKategori: "pindah_paket",
+            nominal: totalDiff,
+            catatan: `Invoice selisih pindah paket ke ${targetPackage?.namaPaket || targetPaketId} (${paxCount} pax @ selisih Rp ${diffPerPax.toLocaleString("id-ID")})`,
+          });
+          resultInvNumber = inv.nomorInvoice || inv.id;
+          finalAmount = totalDiff;
+        }
+
+        onSuccess(resultInvNumber, finalAmount);
+        handleReset();
+      } catch (e: any) {
+        console.error("Failed to move package:", e);
+        alert(e.message || "Gagal memproses pemindahan paket.");
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
+    if (nominal <= 0) return;
     setLoading(true);
 
     let finalCatatan = catatan.trim();
     if (!finalCatatan) {
       if (kategori === "PEMBAYARAN") finalCatatan = `Invoice pembayaran untuk group ${groupInfo.kodeRegistrasi}`;
-      else if (kategori === "PINDAH_PAKET") finalCatatan = `Invoice penyesuaian pindah paket (${pindahPaketDetail || "Perubahan Jadwal/Paket"}) untuk ${groupInfo.kodeRegistrasi}`;
       else if (kategori === "TAMBAH_JAMAAH") finalCatatan = `Invoice penambahan ${tambahPaxCount} pax jamaah untuk group ${groupInfo.kodeRegistrasi}`;
       else if (kategori === "PEMBATALAN") finalCatatan = `Biaya pembatalan (${scopePembatalan === "SEBAGIAN" ? "Sebagian Jamaah" : "Seluruh Grup"} - ${refundStatus === "NON_REFUND" ? "Non-Refund / Biaya Hangus" : "Dengan Refund"}) untuk group ${groupInfo.kodeRegistrasi}`;
       else if (kategori === "REFUND_MURNI") finalCatatan = `Pengembalian dana (${refundType === "KELEBIHAN_BAYAR" ? "Kelebihan Bayar" : "Pengembalian Deposit"}) untuk group ${groupInfo.kodeRegistrasi}`;
@@ -180,13 +293,7 @@ export default function CreateInvoiceModal({
       });
 
       onSuccess(res.nomorInvoice || res.id, nominal);
-      setSeqInput("");
-      setNominal(0);
-      setJatuhTempo("");
-      setCatatan("");
-      setGroupInfo(null);
-      setH40Warning(null);
-      setKategori("PEMBAYARAN");
+      handleReset();
     } catch (e) {
       console.error("Failed to create invoice:", e);
       alert("Gagal menerbitkan invoice.");
@@ -395,6 +502,197 @@ export default function CreateInvoiceModal({
         {/* 2. DYNAMIC CATEGORY FORMS */}
         <div className="space-y-3 pt-1">
 
+          {/* DYNAMIC FORM FOR PINDAH PAKET */}
+          {kategori === "PINDAH_PAKET" && (
+            <div className="space-y-3">
+              {/* A. TAMPILAN PAKET TERKINI */}
+              {groupInfo && (
+                <div className="p-3 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-xl space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                      <Package className="h-3.5 w-3.5 text-blue-600" />
+                      Paket Terkini (Saat Ini)
+                    </span>
+                    <span className="text-[11px] font-mono font-bold bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300 px-2 py-0.5 rounded">
+                      {currentPackage?.kode || groupInfo.paketKeberangkatanId || "TBA"}
+                    </span>
+                  </div>
+                  <p className="font-bold text-slate-900 dark:text-slate-100 text-xs">
+                    {currentPackage?.namaPaket || "Memuat informasi paket..."}
+                  </p>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-[11px] text-muted-foreground pt-1.5 border-t border-slate-200 dark:border-slate-800">
+                    <div>
+                      <span className="block opacity-75">Tgl Berangkat:</span>
+                      <strong className="text-foreground">
+                        {currentPackage?.tanggalBerangkat ? formatDateShort(currentPackage.tanggalBerangkat) : "-"}
+                      </strong>
+                    </div>
+                    <div>
+                      <span className="block opacity-75">Harga Paket:</span>
+                      <strong className="text-foreground">Rp {(oldPrice || 0).toLocaleString("id-ID")} / pax</strong>
+                    </div>
+                    <div>
+                      <span className="block opacity-75">Jumlah Rombongan:</span>
+                      <strong className="text-foreground">{paxCount} Pax</strong>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* B. KOLOM GANTI KE PAKET APA */}
+              {groupInfo && (
+                <div className="p-3 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-xl space-y-2">
+                  <label className="text-[11px] font-bold text-blue-900 dark:text-blue-200 uppercase flex items-center justify-between">
+                    <span className="flex items-center gap-1.5">
+                      <RefreshCw className="h-3.5 w-3.5 text-blue-600" />
+                      Ganti Ke Paket Apa (Pilih Paket Tujuan)
+                    </span>
+                    {targetPackage && (
+                      <span className="text-[10px] font-mono bg-blue-200 text-blue-900 px-1.5 py-0.5 rounded">
+                        {targetPackage.kode}
+                      </span>
+                    )}
+                  </label>
+                  <select
+                    value={targetPaketId}
+                    onChange={(e) => setTargetPaketId(e.target.value)}
+                    className="w-full px-3 py-2 bg-background border border-blue-300 dark:border-blue-700 font-bold rounded-lg text-xs focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">-- Pilih Paket Keberangkatan Tujuan --</option>
+                    {keberangkatanList
+                      .filter((k) => k.id !== currentPackage?.id)
+                      .map((k) => (
+                        <option key={k.id} value={k.id}>
+                          {k.kode} — {k.namaPaket} (Tgl: {k.tanggalBerangkat ? formatDateShort(k.tanggalBerangkat) : "-"}) - Rp {(k.hargaPaket || 0).toLocaleString("id-ID")}
+                        </option>
+                      ))}
+                  </select>
+
+                  {targetPackage && (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-[11px] text-blue-950 dark:text-blue-200 pt-1.5 border-t border-blue-200 dark:border-blue-800/60">
+                      <div>
+                        <span className="block opacity-75">Tgl Berangkat Baru:</span>
+                        <strong>{targetPackage.tanggalBerangkat ? formatDateShort(targetPackage.tanggalBerangkat) : "-"}</strong>
+                      </div>
+                      <div>
+                        <span className="block opacity-75">Tarif Resmi Paket Baru:</span>
+                        <strong>Rp {(targetPackage.hargaPaket || 0).toLocaleString("id-ID")} / pax</strong>
+                      </div>
+                      <div>
+                        <span className="block opacity-75">Sisa Seat Paket:</span>
+                        <strong>{Math.max(0, (targetPackage.maxSeat || targetPackage.kuota || 45) - (targetPackage.terisi || 0))} Seat Tersedia</strong>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* C. TOGGLE PILIHAN HARGA PAKET BARU / HARGA PAKET LAMA */}
+              {groupInfo && targetPackage && (
+                <div className="p-3 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-xl space-y-2">
+                  <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300 uppercase">
+                    Pilihan Penyesuaian Tarif Biaya
+                  </label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {/* Opsi 1: Harga Paket Lama */}
+                    <div
+                      onClick={() => setPricingOption("HARGA_LAMA")}
+                      className={cn(
+                        "p-2.5 rounded-lg border cursor-pointer transition-all space-y-1",
+                        pricingOption === "HARGA_LAMA"
+                          ? "bg-blue-50/80 dark:bg-blue-950/40 border-blue-500 shadow-2xs"
+                          : "bg-background border-border hover:bg-muted/40"
+                      )}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-xs text-foreground flex items-center gap-1.5">
+                          <input
+                            type="radio"
+                            name="pricingOption"
+                            checked={pricingOption === "HARGA_LAMA"}
+                            onChange={() => setPricingOption("HARGA_LAMA")}
+                            className="h-3.5 w-3.5 text-blue-600"
+                          />
+                          Gunakan Harga Paket Lama
+                        </span>
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                          Biaya Rp 0
+                        </span>
+                      </div>
+                      <p className="text-[10.5px] text-muted-foreground pl-5">
+                        Mempertahankan harga paket pendaftaran awal (Rp {(oldPrice || 0).toLocaleString("id-ID")}/pax). Tidak ada tagihan selisih.
+                      </p>
+                    </div>
+
+                    {/* Opsi 2: Harga Paket Baru */}
+                    <div
+                      onClick={() => setPricingOption("HARGA_BARU")}
+                      className={cn(
+                        "p-2.5 rounded-lg border cursor-pointer transition-all space-y-1",
+                        pricingOption === "HARGA_BARU"
+                          ? "bg-blue-50/80 dark:bg-blue-950/40 border-blue-500 shadow-2xs"
+                          : "bg-background border-border hover:bg-muted/40"
+                      )}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-xs text-foreground flex items-center gap-1.5">
+                          <input
+                            type="radio"
+                            name="pricingOption"
+                            checked={pricingOption === "HARGA_BARU"}
+                            onChange={() => setPricingOption("HARGA_BARU")}
+                            className="h-3.5 w-3.5 text-blue-600"
+                          />
+                          Gunakan Harga Paket Baru
+                        </span>
+                        <span className={cn(
+                          "text-[10px] font-bold px-1.5 py-0.5 rounded",
+                          totalDiff > 0
+                            ? "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300"
+                            : totalDiff < 0
+                            ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
+                            : "bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300"
+                        )}>
+                          {totalDiff > 0 ? `+Rp ${totalDiff.toLocaleString("id-ID")}` : totalDiff < 0 ? `-Rp ${Math.abs(totalDiff).toLocaleString("id-ID")}` : "Rp 0"}
+                        </span>
+                      </div>
+                      <p className="text-[10.5px] text-muted-foreground pl-5">
+                        Menyesuaikan dengan tarif resmi paket baru (Rp {(newPrice || 0).toLocaleString("id-ID")}/pax).
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Summary Calculation Box */}
+                  <div className="p-2.5 bg-background border rounded-lg text-xs space-y-1 mt-1">
+                    <div className="flex items-center justify-between text-muted-foreground">
+                      <span>Kalkulasi Selisih Biaya ({paxCount} Pax):</span>
+                      <span className="font-bold text-foreground">
+                        {pricingOption === "HARGA_LAMA"
+                          ? "Rp 0 (Memakai Harga Lama)"
+                          : `Rp ${totalDiff.toLocaleString("id-ID")} (${diffPerPax >= 0 ? "+" : ""}${diffPerPax.toLocaleString("id-ID")}/pax)`}
+                      </span>
+                    </div>
+                    {pricingOption === "HARGA_BARU" && totalDiff > 0 && (
+                      <p className="text-[11px] text-amber-600 dark:text-amber-400 font-medium">
+                        ℹ️ Invoice penambahan biaya sebesar <strong>Rp {totalDiff.toLocaleString("id-ID")}</strong> akan otomatis diterbitkan.
+                      </p>
+                    )}
+                    {pricingOption === "HARGA_BARU" && totalDiff < 0 && (
+                      <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">
+                        ℹ️ Tagihan rombongan akan disesuaikan berkurang sebesar <strong>Rp {Math.abs(totalDiff).toLocaleString("id-ID")}</strong>.
+                      </p>
+                    )}
+                    {pricingOption === "HARGA_LAMA" && (
+                      <p className="text-[11px] text-blue-600 dark:text-blue-400 font-medium">
+                        ℹ️ Rombongan dipindahkan ke paket baru tanpa ada penambahan tagihan invoice.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* DYNAMIC FORM FOR PEMBATALAN */}
           {kategori === "PEMBATALAN" && (
             <div className="p-3 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-xl space-y-3">
@@ -483,21 +781,6 @@ export default function CreateInvoiceModal({
             </div>
           )}
 
-          {/* DYNAMIC FORM FOR PINDAH PAKET */}
-          {kategori === "PINDAH_PAKET" && (
-            <div className="p-3 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-xl space-y-2">
-              <label className="text-[11px] font-bold text-blue-900 dark:text-blue-200 uppercase">
-                Keterangan Pindah Paket / Selisih Biaya
-              </label>
-              <Input
-                placeholder="Contoh: Pindah dari Paket Reguler ke Paket VIP Double (+ Selisih Rp 5.000.000)"
-                value={pindahPaketDetail}
-                onChange={(e) => setPindahPaketDetail(e.target.value)}
-                className="text-xs"
-              />
-            </div>
-          )}
-
           {/* DYNAMIC FORM FOR TAMBAH JAMAAH */}
           {kategori === "TAMBAH_JAMAAH" && (
             <div className="p-3 bg-purple-50 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800 rounded-xl space-y-2">
@@ -520,67 +803,77 @@ export default function CreateInvoiceModal({
             </div>
           )}
 
-          {/* 3. NOMINAL TRANSACTION */}
-          <div>
-            <label className="text-xs font-bold uppercase tracking-wider text-foreground">
-              2. Nominal {kategori === "PEMBATALAN" ? "Biaya Pembatalan / Refund" : kategori === "REFUND_MURNI" ? "Pengembalian Dana" : "Tagihan Invoice"} (Rp)
-            </label>
-            <CurrencyInput
-              placeholder="Masukkan nominal angka"
-              value={nominal}
-              onChange={(val) => setNominal(val)}
-              className="mt-1 font-bold text-base"
-            />
-          </div>
+          {/* 3. NOMINAL TRANSACTION (Disederhanakan / Dihilangkan untuk PINDAH_PAKET) */}
+          {kategori !== "PINDAH_PAKET" && (
+            <>
+              <div>
+                <label className="text-xs font-bold uppercase tracking-wider text-foreground">
+                  2. Nominal {kategori === "PEMBATALAN" ? "Biaya Pembatalan / Refund" : kategori === "REFUND_MURNI" ? "Pengembalian Dana" : "Tagihan Invoice"} (Rp)
+                </label>
+                <CurrencyInput
+                  placeholder="Masukkan nominal angka"
+                  value={nominal}
+                  onChange={(val) => setNominal(val)}
+                  className="mt-1 font-bold text-base"
+                />
+              </div>
 
-          {/* 4. JATUH TEMPO */}
-          <div>
-            <div className="flex items-center justify-between">
-              <label className="text-xs font-bold uppercase tracking-wider text-foreground">
-                3. Tanggal Jatuh Tempo (Batas Akhir Pelunasan)
-              </label>
-              {h40Warning && (
-                <span
-                  className={`text-[9.5px] font-bold px-1.5 py-0.5 rounded border ${
-                    h40Warning.isLate
-                      ? "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300 border-red-300 dark:border-red-800 animate-pulse"
-                      : "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800"
-                  }`}
-                >
-                  {h40Warning.isLate ? "âڑ ï¸ڈ â‰¤ H-40 Mepet" : "Standar H-40"}
-                </span>
-              )}
-            </div>
-            <Input
-              type="date"
-              value={jatuhTempo}
-              onChange={(e) => setJatuhTempo(e.target.value)}
-              className={`mt-1 text-sm ${h40Warning?.isLate ? "border-red-500 font-bold bg-red-50/30" : ""}`}
-            />
-          </div>
+              {/* 4. JATUH TEMPO (Disembunyikan saat PINDAH_PAKET sesuai instruksi) */}
+              <div>
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold uppercase tracking-wider text-foreground">
+                    3. Tanggal Jatuh Tempo (Batas Akhir Pelunasan)
+                  </label>
+                  {h40Warning && (
+                    <span
+                      className={`text-[9.5px] font-bold px-1.5 py-0.5 rounded border ${
+                        h40Warning.isLate
+                          ? "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300 border-red-300 dark:border-red-800 animate-pulse"
+                          : "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800"
+                      }`}
+                    >
+                      {h40Warning.isLate ? "⚠️ ≤ H-40 Mepet" : "Standar H-40"}
+                    </span>
+                  )}
+                </div>
+                <Input
+                  type="date"
+                  value={jatuhTempo}
+                  onChange={(e) => setJatuhTempo(e.target.value)}
+                  className={`mt-1 text-sm ${h40Warning?.isLate ? "border-red-500 font-bold bg-red-50/30" : ""}`}
+                />
+              </div>
 
-          {/* 5. CATATAN */}
-          <div>
-            <label className="text-xs font-bold uppercase tracking-wider text-foreground">
-              4. Catatan / Rincian Tagihan Invoice
-            </label>
-            <Input
-              placeholder="Contoh: Catatan rincian tagihan atau penjelasan tambahan"
-              value={catatan}
-              onChange={(e) => setCatatan(e.target.value)}
-              className="mt-1 text-sm"
-            />
-          </div>
+              {/* 5. CATATAN (Disembunyikan saat PINDAH_PAKET sesuai instruksi) */}
+              <div>
+                <label className="text-xs font-bold uppercase tracking-wider text-foreground">
+                  4. Catatan / Rincian Tagihan Invoice
+                </label>
+                <Input
+                  placeholder="Contoh: Catatan rincian tagihan atau penjelasan tambahan"
+                  value={catatan}
+                  onChange={(e) => setCatatan(e.target.value)}
+                  className="mt-1 text-sm"
+                />
+              </div>
+            </>
+          )}
         </div>
 
         {/* FOOTER ACTIONS */}
         <div className="flex justify-end gap-2 pt-3 border-t">
-          <Button variant="outline" onClick={onClose}>
+          <Button variant="outline" onClick={onClose} disabled={loading}>
             Batal
           </Button>
           <Button
             onClick={handleSubmit}
-            disabled={!groupInfo || nominal <= 0 || loading}
+            disabled={
+              loading ||
+              !groupInfo ||
+              (kategori === "PINDAH_PAKET"
+                ? !targetPaketId || targetPaketId === currentPackage?.id
+                : nominal <= 0)
+            }
             className={cn(
               "font-bold text-white",
               kategori === "PEMBATALAN"
@@ -595,16 +888,19 @@ export default function CreateInvoiceModal({
             )}
           >
             {loading
-              ? "Menerbitkan..."
-              : kategori === "PEMBATALAN"
-                ? "Terbitkan Credit Note Pembatalan"
-                : kategori === "REFUND_MURNI"
-                  ? "Terbitkan Bukti Refund"
-                  : "Terbitkan Invoice"}
+              ? "Memproses..."
+              : kategori === "PINDAH_PAKET"
+                ? (pricingOption === "HARGA_BARU" && totalDiff > 0
+                    ? "Pindahkan Paket & Terbitkan Invoice Selisih"
+                    : "Pindahkan Paket")
+                : kategori === "PEMBATALAN"
+                  ? "Terbitkan Credit Note Pembatalan"
+                  : kategori === "REFUND_MURNI"
+                    ? "Terbitkan Bukti Refund"
+                    : "Terbitkan Invoice"}
           </Button>
         </div>
       </div>
     </Modal>
   );
 }
-

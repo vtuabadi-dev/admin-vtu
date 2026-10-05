@@ -2097,3 +2097,351 @@ export function deleteGeneratedSuratLog(id: string): GeneratedSuratLog[] {
     return [];
   }
 }
+
+// ────────────────────────────────────────────────────────────
+// WHATSAPP TEMPLATE FORM GENERATOR & SMART TEXT PARSER ENGINE
+// ────────────────────────────────────────────────────────────
+
+export interface ParsedWaResult {
+  parsedMap: Record<string, string>;
+  detectedCount: number;
+  totalFields: number;
+  matchedFields: Array<{
+    key: string;
+    label: string;
+    value: string;
+    rawMatchedKey: string;
+  }>;
+  unmatchedLines: string[];
+}
+
+/**
+ * Generates ready-to-share WhatsApp formatted message containing all required form placeholders.
+ * Admins copy this message and send it to jamaah on WhatsApp.
+ */
+export function generateWaTemplateText(
+  template: SuratTemplate,
+  placeholders: SuratPlaceholderMapping[],
+  currentFormData: Record<string, string> = {}
+): string {
+  const cleanPlaceholders = placeholders.filter((p) => !isSystemAutoPlaceholder(p.key));
+  const tplName = (template.nama || "Surat Resmi").trim();
+
+  const lines: string[] = [
+    `*FORMULIR DATA: ${tplName.toUpperCase()}*`,
+    `_PT. Vauza Tamma Abadi (VTU ABADI)_`,
+    ``,
+    `Assalamu'alaikum Warahmatullahi Wabarakatuh,`,
+    `Bapak/Ibu Calon Jamaah yang dirahmati Allah,`,
+    `Mohon melengkapi data berikut untuk penerbitan dokumen *${tplName}*.`,
+    `Silakan isi jawaban di sebelah kanan tanda titik dua (:), lalu kirimkan kembali seluruh pesan ini:`,
+    ``,
+  ];
+
+  cleanPlaceholders.forEach((p, idx) => {
+    const cleanLabel = (p.label || p.key)
+      .replace(/_/g, " ")
+      .replace(/\b\w/g, (c) => c.toUpperCase());
+    const existingVal = currentFormData[p.key] || "";
+    lines.push(`${idx + 1}. *${cleanLabel}* : ${existingVal}`);
+  });
+
+  lines.push(``);
+  lines.push(`*(Catatan: Mohon pastikan ejaan nama, nomor NIK/identitas, dan tanggal telah sesuai)*`);
+  lines.push(`Terima kasih atas kerja samanya. 🙏`);
+
+  return lines.join("\n");
+}
+
+/**
+ * Smart Text Parser to extract field values from WhatsApp message replies.
+ * Robust against bolding (*), dashes (-), numbering (1.), colons (:), equals (=),
+ * and supports fuzzy synonym matching for Indonesian travel/umroh document terms.
+ */
+export function parseWaFormText(
+  rawText: string,
+  placeholders: SuratPlaceholderMapping[]
+): ParsedWaResult {
+  const cleanPlaceholders = placeholders.filter((p) => !isSystemAutoPlaceholder(p.key));
+
+  if (!rawText || !rawText.trim()) {
+    return {
+      parsedMap: {},
+      detectedCount: 0,
+      totalFields: cleanPlaceholders.length,
+      matchedFields: [],
+      unmatchedLines: [],
+    };
+  }
+
+  const result: Record<string, string> = {};
+  const matchedFields: Array<{
+    key: string;
+    label: string;
+    value: string;
+    rawMatchedKey: string;
+  }> = [];
+  const unmatchedLines: string[] = [];
+
+  const normalize = (str: string) =>
+    str.toLowerCase().replace(/[^a-z0-9]/g, "");
+
+  // Domain-specific synonym dictionary for Umroh / Indonesian letters
+  const SYNONYMS: Record<string, string[]> = {
+    nama: ["nama", "namalengkap", "namajamaah", "namapeserta", "namakaryawan", "namapemohon", "namaasli", "fullname", "name"],
+    nik: ["nik", "noktp", "nomorktp", "noidentitas", "nomoridentitas", "ktp", "noid", "nomorid", "nikktp", "nikkaryawan"],
+    paspor: ["paspor", "nopaspor", "nomorpaspor", "passport", "passportno"],
+    tempat_lahir: ["tempatlahir", "tmplahir", "kotalahir", "tempatkelahiran", "tempat"],
+    tanggal_lahir: ["tanggallahir", "tgllahir", "tglkelahiran", "tanggallahirjamaah", "tgllahirjamaah"],
+    jenis_kelamin: ["jeniskelamin", "kelamin", "gender", "jk", "sex"],
+    alamat: ["alamat", "alamatrumah", "alamattinggal", "alamatdomisili", "alamatlengkap", "tempattinggal"],
+    nomor_telepon: ["nomortelepon", "telepon", "nohp", "nomorhp", "hp", "whatsapp", "wa", "kontak", "notelp", "nomorwa"],
+    nama_ayah: ["namaayah", "ayah", "ayahkandung", "namaayahkandung", "bapak", "orangtua"],
+    instansi: ["instansi", "perusahaan", "kantor", "namaperusahaan", "namakantor", "sekolah", "kampus", "universitas", "tujuan", "namainstansi", "tempatkerja", "perusahaankantor", "namasekolah"],
+    jabatan: ["jabatan", "posisi", "pekerjaan", "profesi", "bagian", "divisi", "statuskepegawaian"],
+    alamat_instansi: ["alamatinstansi", "alamatkantor", "alamatperusahaan", "alamatsekolah"],
+    tanggal_mulai: ["tanggalmulai", "tglmulai", "mulaicuti", "daritanggal", "awaldinas", "tanggalawal", "tglawal", "berangkat", "tanggalberangkat"],
+    tanggal_selesai: ["tanggalselesai", "tglselesai", "sampaitanggal", "hinggatanggal", "akhirdinas", "tanggalakhir", "tglakhir", "selesaicuti", "kembali", "tanggalpulang"],
+    kota: ["kota", "kotakantor", "kotatujuan", "kotaimigrasi", "kotakanim", "kotadomisili"],
+  };
+
+  const findMatchingPlaceholder = (rawKey: string): SuratPlaceholderMapping | null => {
+    const cleanKey = normalize(rawKey);
+    if (!cleanKey) return null;
+
+    // 1. Direct match on placeholder.key
+    for (const p of cleanPlaceholders) {
+      if (normalize(p.key) === cleanKey) return p;
+    }
+
+    // 2. Direct match on placeholder.label
+    for (const p of cleanPlaceholders) {
+      if (normalize(p.label || "") === cleanKey) return p;
+    }
+
+    // 3. Direct match on manifestField
+    for (const p of cleanPlaceholders) {
+      if (p.manifestField && normalize(p.manifestField) === cleanKey) return p;
+    }
+
+    // 4. Token & Rule-based scoring with disambiguation
+    let bestMatch: SuratPlaceholderMapping | null = null;
+    let highestScore = 0;
+
+    for (const p of cleanPlaceholders) {
+      const pNormKey = normalize(p.key);
+      const pNormLabel = normalize(p.label || "");
+      let score = 0;
+
+      // Disambiguation Flags
+      const isInputAlamat = cleanKey.includes("alamat");
+      const isPlaceAlamat = pNormKey.includes("alamat") || pNormLabel.includes("alamat");
+
+      const isInputKota = cleanKey.includes("kota");
+      const isPlaceKota = pNormKey.includes("kota") || pNormLabel.includes("kota");
+
+      const isInputPerusahaan = (cleanKey.includes("perusahaan") || cleanKey.includes("kantor") || cleanKey.includes("instansi") || cleanKey.includes("sekolah") || cleanKey.includes("universitas") || cleanKey.includes("kampus")) && !isInputAlamat && !isInputKota;
+      const isPlacePerusahaan = (pNormKey.includes("perusahaan") || pNormKey.includes("kantor") || pNormKey.includes("instansi") || pNormKey.includes("sekolah") || pNormLabel.includes("perusahaan") || pNormLabel.includes("instansi") || pNormLabel.includes("kantor")) && !isPlaceAlamat && !isPlaceKota;
+
+      const isInputAyah = cleanKey.includes("ayah") || cleanKey.includes("bapak");
+      const isPlaceAyah = pNormKey.includes("ayah") || pNormLabel.includes("ayah");
+
+      const isInputPaket = cleanKey.includes("paket");
+      const isPlacePaket = pNormKey.includes("paket") || pNormLabel.includes("paket");
+
+      const isInputPaspor = cleanKey.includes("paspor") || cleanKey.includes("passport");
+      const isPlacePaspor = pNormKey.includes("paspor") || pNormLabel.includes("paspor");
+
+      const isInputNik = cleanKey.includes("nik") || cleanKey.includes("ktp") || cleanKey.includes("noidentitas");
+      const isPlaceNik = pNormKey.includes("nik") || pNormKey.includes("ktp") || pNormLabel.includes("nik") || pNormLabel.includes("ktp");
+
+      const isInputJabatan = cleanKey.includes("jabatan") || cleanKey.includes("posisi") || cleanKey.includes("pekerjaan") || cleanKey.includes("profesi");
+      const isPlaceJabatan = pNormKey.includes("jabatan") || pNormKey.includes("pekerjaan") || pNormLabel.includes("jabatan") || pNormLabel.includes("pekerjaan");
+
+      const isInputLama = cleanKey.includes("lama") || cleanKey.includes("durasi") || cleanKey.includes("jumlahhari");
+      const isPlaceLama = pNormKey.includes("lama") || pNormKey.includes("durasi") || pNormLabel.includes("lama");
+
+      const isInputMulai = cleanKey.includes("mulai") || cleanKey.includes("berangkat") || cleanKey.includes("daritanggal") || cleanKey.includes("awal");
+      const isPlaceMulai = pNormKey.includes("berangkat") || pNormKey.includes("mulai") || pNormKey.includes("awal") || pNormLabel.includes("berangkat") || pNormLabel.includes("mulai");
+
+      const isInputSelesai = cleanKey.includes("pulang") || cleanKey.includes("selesai") || cleanKey.includes("sampaitanggal") || cleanKey.includes("akhir") || cleanKey.includes("kembali");
+      const isPlaceSelesai = pNormKey.includes("pulang") || pNormKey.includes("selesai") || pNormKey.includes("kembali") || pNormLabel.includes("pulang") || pNormLabel.includes("selesai");
+
+      const isInputNamaJamaah = cleanKey.includes("nama") && !isInputPerusahaan && !isInputAyah && !isInputPaket;
+      const isPlaceNamaJamaah = (pNormKey === "nama" || pNormKey === "namalengkap" || pNormKey === "namajamaah" || pNormLabel.includes("nama lengkap") || pNormLabel === "nama") && !isPlacePerusahaan && !isPlaceAyah && !isPlacePaket;
+
+      if (isInputPerusahaan && isPlacePerusahaan) score += 50;
+      if (isInputAyah && isPlaceAyah) score += 50;
+      if (isInputPaket && isPlacePaket) score += 50;
+      if (isInputPaspor && isPlacePaspor) score += 50;
+      if (isInputNik && isPlaceNik) score += 50;
+      if (isInputJabatan && isPlaceJabatan) score += 50;
+      if (isInputKota && isPlaceKota) score += 50;
+      if (isInputLama && isPlaceLama) score += 50;
+      if (isInputMulai && isPlaceMulai) score += 50;
+      if (isInputSelesai && isPlaceSelesai) score += 50;
+      if (isInputAlamat && isPlaceAlamat) score += 50;
+      if (isInputNamaJamaah && isPlaceNamaJamaah) score += 60;
+
+      // Penalize cross mismatches
+      if (isInputPerusahaan && isPlaceNamaJamaah) score -= 40;
+      if (isInputAyah && isPlaceNamaJamaah) score -= 40;
+      if (isInputPaket && isPlaceNamaJamaah) score -= 40;
+      if (isInputAlamat && isPlacePerusahaan) score -= 40;
+      if (isInputKota && isPlacePerusahaan) score -= 40;
+      if (!isInputPerusahaan && isPlacePerusahaan) score -= 25;
+      if (!isInputAyah && isPlaceAyah) score -= 25;
+      if (isInputAlamat && !isPlaceAlamat) score -= 50;
+      if (!isInputLama && isPlaceLama) score -= 50;
+      if (isInputLama && !isPlaceLama) score -= 50;
+      if (!isInputMulai && isPlaceMulai) score -= 30;
+      if (!isInputSelesai && isPlaceSelesai) score -= 30;
+
+      // Substring containment
+      if (cleanKey.length >= 4 && pNormKey.includes(cleanKey)) score += 20;
+      if (cleanKey.length >= 4 && pNormLabel.includes(cleanKey)) score += 20;
+      if (pNormKey.length >= 4 && cleanKey.includes(pNormKey)) score += 15;
+      if (pNormLabel.length >= 4 && cleanKey.includes(pNormLabel)) score += 15;
+
+      if (score > highestScore) {
+        highestScore = score;
+        bestMatch = p;
+      }
+    }
+
+    if (highestScore >= 20) {
+      return bestMatch;
+    }
+
+    return null;
+  };
+
+  const lines = rawText.split(/\r?\n/);
+  let lastMatchedPlaceholder: SuratPlaceholderMapping | null = null;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line) continue;
+
+    // Skip greeting and footer texts
+    const lineLower = line.toLowerCase();
+    if (
+      lineLower.startsWith("*formulir data") ||
+      lineLower.startsWith("formulir data") ||
+      lineLower.startsWith("pt. vauza") ||
+      lineLower.startsWith("_pt. vauza") ||
+      lineLower.startsWith("assalamu'alaikum") ||
+      lineLower.startsWith("assalamualaikum") ||
+      lineLower.startsWith("kepada yth") ||
+      lineLower.startsWith("mohon melengkapi") ||
+      lineLower.startsWith("bapak/ibu calon") ||
+      lineLower.startsWith("silakan isi") ||
+      lineLower.startsWith("*(catatan") ||
+      lineLower.startsWith("(catatan") ||
+      lineLower.startsWith("terima kasih") ||
+      lineLower.startsWith("_terima kasih") ||
+      lineLower.startsWith("wassalamu")
+    ) {
+      continue;
+    }
+
+    // Identify key-value separator (: or =)
+    const colonIndex = line.indexOf(":");
+    const equalsIndex = line.indexOf("=");
+    let splitIndex = -1;
+
+    if (colonIndex !== -1 && equalsIndex !== -1) {
+      splitIndex = Math.min(colonIndex, equalsIndex);
+    } else if (colonIndex !== -1) {
+      splitIndex = colonIndex;
+    } else if (equalsIndex !== -1) {
+      splitIndex = equalsIndex;
+    }
+
+    if (splitIndex !== -1) {
+      const rawLeft = line.substring(0, splitIndex).trim();
+      let rawRight = line.substring(splitIndex + 1).trim();
+
+      // Clean key label
+      const cleanLabel = rawLeft
+        .replace(/^[\s\-\*•\d\.\)\(\]]+/, "")
+        .replace(/[\*\_~]/g, "")
+        .trim();
+
+      // Clean rawRight value
+      rawRight = rawRight
+        .replace(/^[\"\'\s]+|[\"\'\s]+$/g, "")
+        .replace(/[\*\_~]/g, "")
+        .trim();
+
+      // If empty or placeholder text, skip
+      if (
+        !rawRight ||
+        rawRight.toLowerCase() === "[isi di sini]" ||
+        rawRight.toLowerCase() === "isi di sini" ||
+        rawRight === "..." ||
+        rawRight === "-"
+      ) {
+        continue;
+      }
+
+      const matchedPlaceholder = findMatchingPlaceholder(cleanLabel);
+      if (matchedPlaceholder) {
+        let finalVal = rawRight;
+        const normK = normalize(matchedPlaceholder.key);
+        if (
+          matchedPlaceholder.inputType === "date" ||
+          normK.includes("tanggal") ||
+          normK.includes("tgl")
+        ) {
+          const parsedIso = parseDateToIsoString(rawRight);
+          if (parsedIso) {
+            finalVal = formatIsoToIndonesianDate(parsedIso);
+          }
+        }
+
+        result[matchedPlaceholder.key] = finalVal;
+        matchedFields.push({
+          key: matchedPlaceholder.key,
+          label: matchedPlaceholder.label || matchedPlaceholder.key,
+          value: finalVal,
+          rawMatchedKey: cleanLabel,
+        });
+        lastMatchedPlaceholder = matchedPlaceholder;
+        continue;
+      }
+    }
+
+    // Multiline continuation (e.g. Alamat)
+    if (lastMatchedPlaceholder && !line.includes(":") && !line.includes("=")) {
+      const prevVal = result[lastMatchedPlaceholder.key] || "";
+      const newVal = `${prevVal} ${line}`.trim();
+      result[lastMatchedPlaceholder.key] = newVal;
+      const idx = matchedFields.findIndex((m) => m.key === lastMatchedPlaceholder!.key);
+      if (idx !== -1) {
+        matchedFields[idx].value = newVal;
+      }
+      continue;
+    }
+
+    unmatchedLines.push(line);
+  }
+
+  // Deduplicate matched fields
+  const uniqueMatchedFields: typeof matchedFields = [];
+  const seenKeys = new Set<string>();
+  for (const m of matchedFields) {
+    if (!seenKeys.has(m.key)) {
+      seenKeys.add(m.key);
+      uniqueMatchedFields.push(m);
+    }
+  }
+
+  return {
+    parsedMap: result,
+    detectedCount: uniqueMatchedFields.length,
+    totalFields: cleanPlaceholders.length,
+    matchedFields: uniqueMatchedFields,
+    unmatchedLines,
+  };
+}

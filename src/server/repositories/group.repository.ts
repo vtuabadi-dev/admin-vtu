@@ -29,6 +29,24 @@ function mapGroup(row: any): RegistrationGroup {
     pembayaran: (row.pembayaran ?? []).map(mapPembayaran),
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
+    keberangkatan: row.keberangkatan ? {
+      id: row.keberangkatan.id,
+      kode: row.keberangkatan.kode,
+      namaPaket: row.keberangkatan.namaPaket,
+      hargaPaket: row.keberangkatan.hargaPaket,
+      tanggalBerangkat: row.keberangkatan.tanggalBerangkat?.toISOString(),
+      tanggalPulang: row.keberangkatan.tanggalPulang?.toISOString(),
+      maskapai: row.keberangkatan.maskapai,
+    } : undefined,
+    paketKeberangkatan: row.keberangkatan ? {
+      id: row.keberangkatan.id,
+      kode: row.keberangkatan.kode,
+      namaPaket: row.keberangkatan.namaPaket,
+      hargaPaket: row.keberangkatan.hargaPaket,
+      tanggalBerangkat: row.keberangkatan.tanggalBerangkat?.toISOString(),
+      tanggalPulang: row.keberangkatan.tanggalPulang?.toISOString(),
+      maskapai: row.keberangkatan.maskapai,
+    } : undefined,
   };
 }
 
@@ -103,6 +121,7 @@ export const groupRepo = {
         where,
         include: {
           anggota: true,
+          keberangkatan: { include: { paketUmroh: true } },
           registrationRequests: { select: { hotelUpgrade: true, roomUpgrade: true } },
           invoices: { include: { items: true } },
           pembayaran: { include: { alokasi: true } },
@@ -121,6 +140,7 @@ export const groupRepo = {
       where: { id },
       include: {
         anggota: true,
+        keberangkatan: { include: { paketUmroh: true } },
         registrationRequests: { select: { hotelUpgrade: true, roomUpgrade: true } },
         invoices: { include: { items: true } },
         pembayaran: { include: { alokasi: true } },

@@ -65,81 +65,158 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
     const wasActive = jamaah.status !== "batal";
     const paketId = jamaah.group?.paketKeberangkatanId;
 
+    // ADR-0022: Cek apakah jamaah yang dihapus adalah PIC / Ketua Rombongan
+    const isPIC = Boolean(
+      (jamaah.group && jamaah.group.ketuaGroupId === jamaah.id) ||
+      jamaah.nomorPeserta?.endsWith("/1") ||
+      jamaah.registrationId?.endsWith("-1")
+    );
+
     if (mode === "hard") {
-      const otherMembers = jamaah.groupId
-        ? await prisma.jamaah.findMany({
-            where: { groupId: jamaah.groupId, id: { not: jamaah.id } },
-          })
-        : [];
-
       await prisma.$transaction(async (tx) => {
-        // 1. Delete all child references belonging to this jamaah
-        await tx.dokumenItem.deleteMany({ where: { jamaahId: jamaah.id } }).catch(() => {});
-        await tx.manifestRow.deleteMany({ where: { jamaahId: jamaah.id } }).catch(() => {});
-        await tx.penghuniKamar.deleteMany({ where: { jamaahId: jamaah.id } }).catch(() => {});
-        await tx.alokasiPembayaran.deleteMany({ where: { jamaahId: jamaah.id } }).catch(() => {});
+        if (isPIC && jamaah.groupId) {
+          // ============================================================
+          // KONDISI A: Hapus PIC -> Cascade Delete Seluruh Rombongan & Anggota
+          // ============================================================
+          const allMembers = await tx.jamaah.findMany({
+            where: { groupId: jamaah.groupId },
+            select: { id: true, namaLengkap: true, status: true },
+          });
+          const allMemberIds = allMembers.map((m) => m.id);
+          const activeMembersCount = allMembers.filter((m) => m.status !== "batal").length;
 
-        // 2. Handle RegistrationGroup update or cleanup BEFORE jamaah is deleted
-        if (jamaah.groupId && jamaah.group) {
-          if (otherMembers.length > 0) {
-            // Re-assign group leader if deleted jamaah was leader
-            if (jamaah.group.ketuaGroupId === jamaah.id && otherMembers[0]) {
-              await tx.registrationGroup.update({
-                where: { id: jamaah.groupId },
-                data: {
-                  ketuaGroupId: otherMembers[0].id,
-                  jumlahAnggota: otherMembers.length,
-                },
-              });
-            } else {
-              await tx.registrationGroup.update({
-                where: { id: jamaah.groupId },
-                data: { jumlahAnggota: otherMembers.length },
-              });
-            }
-            // No other members left in group -> clean up billing, registrations & delete empty group FIRST
-            if (jamaah.group.kodeRegistrasi) {
-              const regReq = await tx.registrationRequest.findUnique({
-                where: { kodeRegistrasi: jamaah.group.kodeRegistrasi },
-                select: { id: true },
-              });
-              if (regReq) {
-                await tx.registrationMember.deleteMany({ where: { requestId: regReq.id } }).catch(() => {});
-                await tx.registrationRequest.delete({ where: { id: regReq.id } }).catch(() => {});
-              }
-            }
-
+          // 1. Hapus child references untuk SEMUA anggota rombongan
+          if (allMemberIds.length > 0) {
             await Promise.all([
-              tx.invoiceItem.deleteMany({ where: { invoice: { groupId: jamaah.groupId } } }).catch(() => {}),
-              tx.invoice.deleteMany({ where: { groupId: jamaah.groupId } }).catch(() => {}),
-              tx.pembayaran.deleteMany({ where: { groupId: jamaah.groupId } }).catch(() => {}),
-              tx.invoiceSplitConfig.deleteMany({ where: { groupId: jamaah.groupId } }).catch(() => {}),
-              tx.reminder.deleteMany({ where: { groupId: jamaah.groupId } }).catch(() => {}),
+              tx.dokumenItem.deleteMany({ where: { jamaahId: { in: allMemberIds } } }).catch(() => {}),
+              tx.manifestRow.deleteMany({ where: { jamaahId: { in: allMemberIds } } }).catch(() => {}),
+              tx.penghuniKamar.deleteMany({ where: { jamaahId: { in: allMemberIds } } }).catch(() => {}),
+              tx.alokasiPembayaran.deleteMany({ where: { jamaahId: { in: allMemberIds } } }).catch(() => {}),
+              tx.pengambilanPerlengkapanItem.deleteMany({ where: { jamaahId: { in: allMemberIds } } }).catch(() => {}),
             ]);
+          }
+
+          // 2. Hapus request pendaftaran awal & member
+          if (jamaah.group?.kodeRegistrasi) {
+            const regReq = await tx.registrationRequest.findUnique({
+              where: { kodeRegistrasi: jamaah.group.kodeRegistrasi },
+              select: { id: true },
+            });
+            if (regReq) {
+              await tx.registrationMember.deleteMany({ where: { requestId: regReq.id } }).catch(() => {});
+              await tx.registrationRequest.delete({ where: { id: regReq.id } }).catch(() => {});
+            }
+          }
+
+          for (const m of allMembers) {
+            if (m.namaLengkap) {
+              await tx.registrationMember.deleteMany({ where: { namaLengkap: m.namaLengkap } }).catch(() => {});
+            }
+          }
+
+          // 3. Hapus seluruh data invoice, pembayaran, dan reminder rombongan
+          await Promise.all([
+            tx.invoiceItem.deleteMany({ where: { invoice: { groupId: jamaah.groupId } } }).catch(() => {}),
+            tx.invoice.deleteMany({ where: { groupId: jamaah.groupId } }).catch(() => {}),
+            tx.pembayaran.deleteMany({ where: { groupId: jamaah.groupId } }).catch(() => {}),
+            tx.invoiceSplitConfig.deleteMany({ where: { groupId: jamaah.groupId } }).catch(() => {}),
+            tx.reminder.deleteMany({ where: { groupId: jamaah.groupId } }).catch(() => {}),
+          ]);
+
+          // 4. Hapus entitas grup pendaftaran
+          await tx.$executeRawUnsafe(
+            `DELETE FROM "registration_groups" WHERE "id" = '${jamaah.groupId.replace(/'/g, "''")}'`
+          );
+
+          // 5. Hapus seluruh anggota dari tabel jamaah
+          if (allMemberIds.length > 0) {
+            const memberIn = allMemberIds.map((id) => `'${id.replace(/'/g, "''")}'`).join(",");
             await tx.$executeRawUnsafe(
-              `DELETE FROM "registration_groups" WHERE "id" = '${jamaah.groupId.replace(/'/g, "''")}'`
+              `DELETE FROM "jamaah" WHERE "id" IN (${memberIn})`
             );
           }
-        }
 
-        // Clean up any registration member associated with this person
-        if (jamaah.namaLengkap) {
-          await tx.registrationMember.deleteMany({ where: { namaLengkap: jamaah.namaLengkap } }).catch(() => {});
-        }
+          // 6. Kurangi kuota paket terisi sejumlah total anggota aktif yang terhapus
+          if (activeMembersCount > 0 && paketId) {
+            const kbr = await tx.keberangkatan.findUnique({ where: { id: paketId } });
+            if (kbr && kbr.terisi > 0) {
+              await tx.keberangkatan.update({
+                where: { id: paketId },
+                data: { terisi: Math.max(0, kbr.terisi - activeMembersCount) },
+              });
+            }
+          }
+        } else {
+          // ============================================================
+          // KONDISI B: Hapus Anggota Biasa (Bukan PIC)
+          // ============================================================
+          // 1. Hapus child references jamaah ini saja
+          await Promise.all([
+            tx.dokumenItem.deleteMany({ where: { jamaahId: jamaah.id } }).catch(() => {}),
+            tx.manifestRow.deleteMany({ where: { jamaahId: jamaah.id } }).catch(() => {}),
+            tx.penghuniKamar.deleteMany({ where: { jamaahId: jamaah.id } }).catch(() => {}),
+            tx.alokasiPembayaran.deleteMany({ where: { jamaahId: jamaah.id } }).catch(() => {}),
+            tx.pengambilanPerlengkapanItem.deleteMany({ where: { jamaahId: jamaah.id } }).catch(() => {}),
+          ]);
 
-        // 3. Delete the jamaah record
-        await tx.$executeRawUnsafe(
-          `DELETE FROM "jamaah" WHERE "id" = '${jamaah.id.replace(/'/g, "''")}'`
-        );
+          if (jamaah.namaLengkap) {
+            await tx.registrationMember.deleteMany({ where: { namaLengkap: jamaah.namaLengkap } }).catch(() => {});
+          }
 
-        // 4. Decrement package capacity if active
-        if (wasActive && paketId) {
-          const kbr = await tx.keberangkatan.findUnique({ where: { id: paketId } });
-          if (kbr && kbr.terisi > 0) {
-            await tx.keberangkatan.update({
-              where: { id: paketId },
-              data: { terisi: { decrement: 1 } },
+          // 2. Hapus jamaah ini dari database
+          await tx.$executeRawUnsafe(
+            `DELETE FROM "jamaah" WHERE "id" = '${jamaah.id.replace(/'/g, "''")}'`
+          );
+
+          // 3. Periksa anggota tersisa di grup
+          if (jamaah.groupId) {
+            const remainingMembers = await tx.jamaah.findMany({
+              where: { groupId: jamaah.groupId },
+              select: { id: true },
             });
+
+            if (remainingMembers.length > 0) {
+              // Masih ada anggota lain: cukup update jumlahAnggota grup
+              await tx.registrationGroup.update({
+                where: { id: jamaah.groupId },
+                data: { jumlahAnggota: remainingMembers.length },
+              });
+            } else {
+              // Jika ini anggota terakhir yang tersisa di grup: bersihkan grup kosong
+              if (jamaah.group?.kodeRegistrasi) {
+                const regReq = await tx.registrationRequest.findUnique({
+                  where: { kodeRegistrasi: jamaah.group.kodeRegistrasi },
+                  select: { id: true },
+                });
+                if (regReq) {
+                  await tx.registrationMember.deleteMany({ where: { requestId: regReq.id } }).catch(() => {});
+                  await tx.registrationRequest.delete({ where: { id: regReq.id } }).catch(() => {});
+                }
+              }
+
+              await Promise.all([
+                tx.invoiceItem.deleteMany({ where: { invoice: { groupId: jamaah.groupId } } }).catch(() => {}),
+                tx.invoice.deleteMany({ where: { groupId: jamaah.groupId } }).catch(() => {}),
+                tx.pembayaran.deleteMany({ where: { groupId: jamaah.groupId } }).catch(() => {}),
+                tx.invoiceSplitConfig.deleteMany({ where: { groupId: jamaah.groupId } }).catch(() => {}),
+                tx.reminder.deleteMany({ where: { groupId: jamaah.groupId } }).catch(() => {}),
+              ]);
+
+              await tx.$executeRawUnsafe(
+                `DELETE FROM "registration_groups" WHERE "id" = '${jamaah.groupId.replace(/'/g, "''")}'`
+              );
+            }
+          }
+
+          // 4. Kurangi kuota paket keberangkatan sebanyak 1
+          if (wasActive && paketId) {
+            const kbr = await tx.keberangkatan.findUnique({ where: { id: paketId } });
+            if (kbr && kbr.terisi > 0) {
+              await tx.keberangkatan.update({
+                where: { id: paketId },
+                data: { terisi: Math.max(0, kbr.terisi - 1) },
+              });
+            }
           }
         }
       }, {
@@ -147,21 +224,49 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
         maxWait: 10000,
       });
 
-      return NextResponse.json({ success: true, message: "Jamaah berhasil dihapus permanen" });
+      return NextResponse.json({
+        success: true,
+        message: isPIC && jamaah.groupId
+          ? "Rombongan dan seluruh anggota berhasil dihapus permanen"
+          : "Jamaah berhasil dihapus permanen",
+      });
     } else {
+      // Soft delete (batal)
       await prisma.$transaction(async (tx) => {
-        await tx.jamaah.update({
-          where: { id: jamaah.id },
-          data: { status: "batal" },
-        });
+        if (isPIC && jamaah.groupId) {
+          const activeMembers = await tx.jamaah.findMany({
+            where: { groupId: jamaah.groupId, status: { not: "batal" } },
+            select: { id: true },
+          });
 
-        if (wasActive && paketId) {
-          const kbr = await tx.keberangkatan.findUnique({ where: { id: paketId } });
-          if (kbr && kbr.terisi > 0) {
-            await tx.keberangkatan.update({
-              where: { id: paketId },
-              data: { terisi: { decrement: 1 } },
-            });
+          await tx.jamaah.updateMany({
+            where: { groupId: jamaah.groupId },
+            data: { status: "batal" },
+          });
+
+          if (activeMembers.length > 0 && paketId) {
+            const kbr = await tx.keberangkatan.findUnique({ where: { id: paketId } });
+            if (kbr && kbr.terisi > 0) {
+              await tx.keberangkatan.update({
+                where: { id: paketId },
+                data: { terisi: Math.max(0, kbr.terisi - activeMembers.length) },
+              });
+            }
+          }
+        } else {
+          await tx.jamaah.update({
+            where: { id: jamaah.id },
+            data: { status: "batal" },
+          });
+
+          if (wasActive && paketId) {
+            const kbr = await tx.keberangkatan.findUnique({ where: { id: paketId } });
+            if (kbr && kbr.terisi > 0) {
+              await tx.keberangkatan.update({
+                where: { id: paketId },
+                data: { terisi: Math.max(0, kbr.terisi - 1) },
+              });
+            }
           }
         }
       }, {
@@ -169,7 +274,12 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
         maxWait: 10000,
       });
 
-      return NextResponse.json({ success: true, message: "Jamaah berhasil dibatalkan (soft delete)" });
+      return NextResponse.json({
+        success: true,
+        message: isPIC && jamaah.groupId
+          ? "Rombongan dan seluruh anggota berhasil dibatalkan (soft delete)"
+          : "Jamaah berhasil dibatalkan (soft delete)",
+      });
     }
   } catch (error) {
     console.error("[DELETE /api/jamaah/[id]] Error:", error);

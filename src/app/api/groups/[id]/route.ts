@@ -139,6 +139,52 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
         }
       }
 
+      // 4. Update quotas (terisi) on old and target packages
+      const movingPaxCount = existingGroup.anggota.filter((a) => a.status !== "batal").length;
+      if (movingPaxCount > 0) {
+        if (existingGroup.keberangkatan && existingGroup.keberangkatan.terisi > 0) {
+          await prisma.keberangkatan.update({
+            where: { id: existingGroup.keberangkatan.id },
+            data: { terisi: Math.max(0, existingGroup.keberangkatan.terisi - movingPaxCount) },
+          }).catch(() => {});
+        }
+        await prisma.keberangkatan.update({
+          where: { id: targetPaket.id },
+          data: { terisi: { increment: movingPaxCount } },
+        }).catch(() => {});
+      }
+
+      // 5. Move manifest rows to target package manifest
+      try {
+        let targetManifest = await prisma.manifest.findFirst({
+          where: { keberangkatanId: targetPaket.id },
+          orderBy: { createdAt: "desc" },
+        });
+        if (!targetManifest) {
+          const d = new Date(targetPaket.tanggalBerangkat);
+          const mStr = d.toLocaleString("en-US", { month: "short" }).toUpperCase();
+          const dStr = String(d.getDate()).padStart(2, "0");
+          const yStr = d.getFullYear();
+          targetManifest = await prisma.manifest.create({
+            data: {
+              keberangkatanId: targetPaket.id,
+              kode: `MAN/${yStr}/${mStr}${dStr}/001`,
+              namaManifest: `MANIFEST UMRAH ${dStr} ${mStr} ${yStr}`,
+              status: "draft",
+            },
+          });
+        }
+        if (targetManifest) {
+          const movingMemberIds = existingGroup.anggota.map((a) => a.id);
+          await prisma.manifestRow.updateMany({
+            where: { jamaahId: { in: movingMemberIds } },
+            data: { manifestId: targetManifest.id },
+          });
+        }
+      } catch (manErr) {
+        console.warn("[Package Transfer] Manifest row re-link notice:", manErr);
+      }
+
       // Ensure updatedAt reflects now so group sorts chronologically at the end of new package
       body.updatedAt = new Date();
 
@@ -156,7 +202,20 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
       } catch { /* non-blocking */ }
     }
 
-    const group = await groupRepo.update(params.id, body);
+    // Sanitize body fields before sending to groupRepo.update
+    const cleanUpdateData: any = { ...body };
+    delete cleanUpdateData.pricingOption;
+    delete cleanUpdateData.newPrice;
+    delete cleanUpdateData.oldPrice;
+
+    if (body.pricingOption === "HARGA_BARU" && typeof body.totalDiff === "number") {
+      const newTotalTagihan = Math.max(0, existingGroup.totalTagihan + body.totalDiff);
+      cleanUpdateData.totalTagihan = newTotalTagihan;
+      cleanUpdateData.sisaPembayaran = Math.max(0, newTotalTagihan - existingGroup.totalPembayaran);
+    }
+    delete cleanUpdateData.totalDiff;
+
+    const group = await groupRepo.update(params.id, cleanUpdateData);
     return NextResponse.json({ success: true, data: group });
   } catch (error) {
     return NextResponse.json({ success: false, message: (error as Error).message }, { status: 500 });
