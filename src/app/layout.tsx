@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import AppIntroWrapper from "@/shared/components/AppIntroWrapper";
+import { RealtimeProvider } from "@/shared/providers/RealtimeProvider";
 
 export const metadata: Metadata = {
   title: "VTU — Travel Operational System",
@@ -43,7 +44,9 @@ export default function RootLayout({
         />
       </head>
       <body className="min-h-screen bg-slate-50 text-slate-900 font-sans antialiased selection:bg-emerald-600/20 selection:text-emerald-900">
-        <AppIntroWrapper>{children}</AppIntroWrapper>
+        <RealtimeProvider>
+          <AppIntroWrapper>{children}</AppIntroWrapper>
+        </RealtimeProvider>
       </body>
     </html>
   );

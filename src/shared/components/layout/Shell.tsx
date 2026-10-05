@@ -9,6 +9,7 @@ import { useAdminStore } from "@/stores/admin-store";
 import { useSession } from "@/shared/hooks/use-session";
 import { useKeyboardShortcut } from "@/shared/hooks/use-keyboard-shortcut";
 import { NotificationBell } from "@/shared/components/NotificationBell";
+import { RealtimeStatusBadge } from "@/shared/components/RealtimeStatusBadge";
 import { SearchOverlay } from "@/shared/components/SearchOverlay";
 import { CommandPalette } from "@/shared/components/CommandPalette";
 import {
@@ -146,6 +147,8 @@ export function Shell({ children, role }: ShellProps) {
             >
               <Search className="h-4 w-4" />
             </button>
+
+            <RealtimeStatusBadge />
 
             <NotificationBell />
 

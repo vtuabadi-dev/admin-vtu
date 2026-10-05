@@ -22,6 +22,7 @@ import {
   getKeberangkatanList,
   createInvoice,
 } from "@/server/actions/api";
+import { broadcastMutation } from "@/shared/lib/realtime-bus";
 
 export default function CreateInvoiceModal({
   open,
@@ -250,6 +251,9 @@ export default function CreateInvoiceModal({
         }
 
         onSuccess(resultInvNumber, finalAmount);
+        broadcastMutation("registration_groups", "UPDATE", { id: groupInfo.id });
+        broadcastMutation("keberangkatan", "UPDATE");
+        broadcastMutation("invoices", "INSERT");
         handleReset();
       } catch (e: any) {
         console.error("Failed to move package:", e);
@@ -289,6 +293,9 @@ export default function CreateInvoiceModal({
       });
 
       onSuccess(res.nomorInvoice || res.id, nominal);
+      broadcastMutation("invoices", "INSERT", { id: res.id, groupId: groupInfo.id });
+      broadcastMutation("pembayaran", "UPDATE", { groupId: groupInfo.id });
+      broadcastMutation("registration_groups", "UPDATE", { id: groupInfo.id });
       handleReset();
     } catch (e) {
       console.error("Failed to create invoice:", e);

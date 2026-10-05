@@ -18,6 +18,7 @@ import {
 } from "@/shared/components/ui";
 import type { GroupPaymentSummary, Keberangkatan } from "@/shared/types";
 import { formatCurrency, formatDate, getWhatsAppUrl } from "@/shared/lib/utils";
+import { useRealtimeListener } from "@/shared/providers/RealtimeProvider";
 import {
   CreditCard,
   Banknote,
@@ -174,58 +175,56 @@ export default function PembayaranMonitoringPage() {
   // Modal State for Payment History
   const [historyModalGroup, setHistoryModalGroup] = useState<EnrichedSummary | null>(null);
 
-  useEffect(() => {
-    let isMounted = true;
+  const loadData = useCallback(async () => {
+    try {
+      const [groupsRes, kbrRes, settingsRes] = await Promise.all([
+        fetch("/api/groups"),
+        fetch("/api/keberangkatan"),
+        fetch("/api/admin/settings/reminder").catch(() => null),
+      ]);
 
-    async function load() {
-      try {
-        const [groupsRes, kbrRes, settingsRes] = await Promise.all([
-          fetch("/api/groups"),
-          fetch("/api/keberangkatan"),
-          fetch("/api/admin/settings/reminder").catch(() => null),
-        ]);
-
-        if (!isMounted) return;
-
-        if (groupsRes.ok) {
-          const json = await groupsRes.json();
-          const data = json.data ?? [];
-          setSummaries(data);
-          memoryCachedSummaries = data;
-        }
-        if (kbrRes.ok) {
-          const json = await kbrRes.json();
-          const data = json.data ?? [];
-          setKbrList(data);
-          memoryCachedKbrList = data;
-        }
-        if (settingsRes && settingsRes.ok) {
-          const settingsJson = await settingsRes.json();
-          if (settingsJson?.success && settingsJson?.data) {
-            if (settingsJson.data.globalDeadlineDays) {
-              setGlobalDeadlineDays(settingsJson.data.globalDeadlineDays);
-              localStorage.setItem("vtu_global_deadline_days", String(settingsJson.data.globalDeadlineDays));
-            }
-            if (Array.isArray(settingsJson.data.stages) && settingsJson.data.stages.length > 0) {
-              const firstStage = settingsJson.data.stages[0];
-              if (firstStage?.daysBefore) {
-                setReminderAwalDays(firstStage.daysBefore);
-              }
+      if (groupsRes.ok) {
+        const json = await groupsRes.json();
+        const data = json.data ?? [];
+        setSummaries(data);
+        memoryCachedSummaries = data;
+      }
+      if (kbrRes.ok) {
+        const json = await kbrRes.json();
+        const data = json.data ?? [];
+        setKbrList(data);
+        memoryCachedKbrList = data;
+      }
+      if (settingsRes && settingsRes.ok) {
+        const settingsJson = await settingsRes.json();
+        if (settingsJson?.success && settingsJson?.data) {
+          if (settingsJson.data.globalDeadlineDays) {
+            setGlobalDeadlineDays(settingsJson.data.globalDeadlineDays);
+            localStorage.setItem("vtu_global_deadline_days", String(settingsJson.data.globalDeadlineDays));
+          }
+          if (Array.isArray(settingsJson.data.stages) && settingsJson.data.stages.length > 0) {
+            const firstStage = settingsJson.data.stages[0];
+            if (firstStage?.daysBefore) {
+              setReminderAwalDays(firstStage.daysBefore);
             }
           }
         }
-      } catch (err) {
-        console.error("Failed to load payment data:", err);
-      } finally {
-        if (isMounted) setLoading(false);
       }
+    } catch (err) {
+      console.error("Failed to load payment data:", err);
+    } finally {
+      setLoading(false);
     }
-    load();
-
-    return () => {
-      isMounted = false;
-    };
   }, []);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  // Realtime synchronization: auto-reload data when payments, invoices, or groups change
+  useRealtimeListener(["pembayaran", "invoices", "registration_groups", "keberangkatan"], () => {
+    loadData();
+  });
 
   // Enrich summaries with paket info
   const enriched: EnrichedSummary[] = useMemo(() => {

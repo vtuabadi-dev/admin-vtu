@@ -38,6 +38,8 @@ import { extractFilesFromEvent } from "@/shared/lib/file-drop-utils";
 import { resolveHotelForKlaster } from "@/shared/lib/hotel-utils";
 import { hasPackageTourLeader } from "@/shared/lib/file-standardization";
 import { ManifestPembayaranTable } from "./components/ManifestPembayaranTable";
+import { useRealtimeListener } from "@/shared/providers/RealtimeProvider";
+import { broadcastMutation } from "@/shared/lib/realtime-bus";
 
 // ── Helper Utilities ─────────────────────────────────────────
 
@@ -866,6 +868,11 @@ function ManifestPageContent() {
     loadAllData();
   }, [loadAllData]);
 
+  // Realtime live subscription: auto-reload manifest master table on any change
+  useRealtimeListener(["manifest", "manifest_rows", "jamaah", "registration_groups", "keberangkatan"], () => {
+    loadAllData();
+  });
+
   // Selected package details
   const activePackage = useMemo(() => {
     if (!selectedKeberangkatan) return null;
@@ -1234,7 +1241,10 @@ function ManifestPageContent() {
         useOperationalStore.getState().setJamaahList(currentStoreJamaah.filter((j) => !idsToDelete.includes(j.id)));
         useOperationalStore.getState().setIsLoaded(false);
 
-        // 2. Fresh background sync
+        // 2. Fresh background sync & broadcast
+        broadcastMutation("jamaah", "DELETE", { ids: idsToDelete });
+        broadcastMutation("registration_groups", "UPDATE");
+        broadcastMutation("keberangkatan", "UPDATE");
         await loadAllData();
         router.refresh();
       } else {
@@ -1519,7 +1529,10 @@ function ManifestPageContent() {
         useOperationalStore.getState().setJamaahList(currentStoreJamaah.filter((j) => j.id !== targetId));
         useOperationalStore.getState().setIsLoaded(false);
 
-        // 2. Fresh background sync
+        // 2. Fresh background sync & broadcast
+        broadcastMutation("jamaah", "DELETE", { id: targetId });
+        broadcastMutation("registration_groups", "UPDATE");
+        broadcastMutation("keberangkatan", "UPDATE");
         await loadAllData();
         router.refresh();
       } else {
@@ -1553,7 +1566,10 @@ function ManifestPageContent() {
         setAllJamaah((prev) => prev.filter((j) => j.groupId !== movedGroupId));
         useOperationalStore.getState().setIsLoaded(false);
 
-        // 2. Fresh background sync
+        // 2. Fresh background sync & broadcast
+        broadcastMutation("registration_groups", "UPDATE", { id: movedGroupId });
+        broadcastMutation("keberangkatan", "UPDATE");
+        broadcastMutation("manifest", "UPDATE");
         await loadAllData();
         router.refresh();
       } else {

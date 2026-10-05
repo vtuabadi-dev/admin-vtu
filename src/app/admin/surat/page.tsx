@@ -48,6 +48,8 @@ import { Badge } from "@/shared/components/ui/Badge";
 import { Modal } from "@/shared/components/ui/Modal";
 import { formatDate, formatDateShort, cn, getWhatsAppUrl, toTitleCase } from "@/shared/lib/utils";
 import { useOperationalStore } from "@/stores/operational-store";
+import { useRealtimeListener } from "@/shared/providers/RealtimeProvider";
+import { broadcastMutation } from "@/shared/lib/realtime-bus";
 import {
   DEFAULT_SURAT_TEMPLATES,
   loadSavedSuratTemplates,
@@ -298,70 +300,76 @@ function GenerateSuratPageContent() {
   };
 
   // Load Templates & History
-  useEffect(() => {
-    async function loadAll() {
-      // 1. Templates
-      try {
-        const res = await fetch("/api/master/surat-templates");
-        if (res.ok) {
-          const json = await res.json();
-          if (json.data && Array.isArray(json.data) && json.data.length > 0) {
-            setTemplates(json.data);
-          } else {
-            setTemplates(loadSavedSuratTemplates());
-          }
+  const loadAll = useCallback(async () => {
+    // 1. Templates
+    try {
+      const res = await fetch("/api/master/surat-templates");
+      if (res.ok) {
+        const json = await res.json();
+        if (json.data && Array.isArray(json.data) && json.data.length > 0) {
+          setTemplates(json.data);
         } else {
           setTemplates(loadSavedSuratTemplates());
         }
-      } catch {
+      } else {
         setTemplates(loadSavedSuratTemplates());
       }
+    } catch {
+      setTemplates(loadSavedSuratTemplates());
+    }
 
-      // 2. History logs
-      try {
-        const localLogs = loadGeneratedSuratLogs();
-        const hRes = await fetch("/api/surat/generated");
-        if (hRes.ok) {
-          const hJson = await hRes.json();
-          if (hJson.data && Array.isArray(hJson.data) && hJson.data.length > 0) {
-            const serverIds = new Set(hJson.data.map((l: any) => l.id));
-            const merged = [...hJson.data, ...localLogs.filter((l) => !serverIds.has(l.id))];
-            setHistoryLogs(merged);
-            syncGeneratedLogsToStorage(merged);
-          } else if (localLogs.length > 0) {
-            setHistoryLogs(localLogs);
-          } else {
-            setHistoryLogs([]);
-          }
+    // 2. History logs
+    try {
+      const localLogs = loadGeneratedSuratLogs();
+      const hRes = await fetch("/api/surat/generated");
+      if (hRes.ok) {
+        const hJson = await hRes.json();
+        if (hJson.data && Array.isArray(hJson.data) && hJson.data.length > 0) {
+          const serverIds = new Set(hJson.data.map((l: any) => l.id));
+          const merged = [...hJson.data, ...localLogs.filter((l) => !serverIds.has(l.id))];
+          setHistoryLogs(merged);
+          syncGeneratedLogsToStorage(merged);
         } else if (localLogs.length > 0) {
           setHistoryLogs(localLogs);
+        } else {
+          setHistoryLogs([]);
         }
-      } catch {
-        setHistoryLogs(loadGeneratedSuratLogs());
+      } else if (localLogs.length > 0) {
+        setHistoryLogs(localLogs);
       }
+    } catch {
+      setHistoryLogs(loadGeneratedSuratLogs());
+    }
 
-      // 3. Operational store data
-      if (storeKbrList.length === 0 || !storeJamaah || storeJamaah.length === 0) {
-        try {
-          const [kbrRes, jamRes] = await Promise.all([
-            fetch("/api/keberangkatan"),
-            fetch("/api/jamaah?groupId=&limit=200"),
-          ]);
-          if (kbrRes.ok) {
-            const kJson = await kbrRes.json();
-            setStoreKbrList(kJson.data ?? []);
-          }
-          if (jamRes.ok) {
-            const jJson = await jamRes.json();
-            setStoreJamaah(jJson.data ?? []);
-          }
-        } catch (err) {
-          console.error("Failed to load initial data for surat:", err);
+    // 3. Operational store data
+    if (storeKbrList.length === 0 || !storeJamaah || storeJamaah.length === 0) {
+      try {
+        const [kbrRes, jamRes] = await Promise.all([
+          fetch("/api/keberangkatan"),
+          fetch("/api/jamaah?groupId=&limit=200"),
+        ]);
+        if (kbrRes.ok) {
+          const kJson = await kbrRes.json();
+          setStoreKbrList(kJson.data ?? []);
         }
+        if (jamRes.ok) {
+          const jJson = await jamRes.json();
+          setStoreJamaah(jJson.data ?? []);
+        }
+      } catch (err) {
+        console.error("Failed to load initial data for surat:", err);
       }
     }
-    loadAll();
   }, [storeKbrList.length, storeJamaah, setStoreKbrList, setStoreJamaah]);
+
+  useEffect(() => {
+    loadAll();
+  }, [loadAll]);
+
+  // Realtime synchronization: auto-reload surat templates and logs
+  useRealtimeListener(["surat_templates", "generated_surat_logs", "jamaah", "keberangkatan"], () => {
+    loadAll();
+  });
 
   // Sync template from URL param
   useEffect(() => {
@@ -1852,6 +1860,7 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
             if (refreshJson.data && Array.isArray(refreshJson.data)) {
               setHistoryLogs(refreshJson.data);
               syncGeneratedLogsToStorage(refreshJson.data);
+              broadcastMutation("generated_surat_logs", "INSERT", logItem);
             }
           }
         }
@@ -1897,6 +1906,7 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
 
     // Purge from Supabase specifically by id
     fetch(`/api/surat/generated?id=${primaryId}`, { method: "DELETE" }).catch(() => {});
+    broadcastMutation("generated_surat_logs", "DELETE", { id: primaryId });
     showToast("Riwayat surat berhasil dihapus");
   };
 

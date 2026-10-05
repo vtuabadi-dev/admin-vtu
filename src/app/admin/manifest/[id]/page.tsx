@@ -25,6 +25,8 @@ import { StatusBadge } from "@/shared/components/ui/Badge";
 import { Modal } from "@/shared/components/ui/Modal";
 import { RequirePermission } from "@/shared/components/RequirePermission";
 import { cn, formatDate } from "@/shared/lib/utils";
+import { useRealtimeListener } from "@/shared/providers/RealtimeProvider";
+import { broadcastMutation } from "@/shared/lib/realtime-bus";
 import {
   getManifestById,
   getKeberangkatanById,
@@ -89,6 +91,11 @@ export default function ManifestDetailPage() {
     loadData();
   }, [loadData]);
 
+  // Realtime synchronization: auto-reload manifest when jamaah, manifest_rows, or package changes
+  useRealtimeListener(["manifest", "manifest_rows", "jamaah", "registration_groups", "keberangkatan"], () => {
+    loadData();
+  });
+
   const handleDeleteRow = async () => {
     if (!deleteTargetRow) return;
     setIsDeletingRow(true);
@@ -109,6 +116,7 @@ export default function ManifestDetailPage() {
               }
             : prev
         );
+        broadcastMutation("manifest", "DELETE", { rowId: deletedRowId, manifestId: id });
         loadData();
       } else {
         window.alert(data.message || "Gagal menghapus jamaah dari manifest");

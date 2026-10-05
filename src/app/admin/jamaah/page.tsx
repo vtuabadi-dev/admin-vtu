@@ -16,8 +16,8 @@ import {
   getGroupList,
 } from "@/server/actions/api";
 import type { Jamaah, Invoice, RegistrationGroup } from "@/shared/types";
-
 import { useOperationalStore } from "@/stores/operational-store";
+import { useRealtimeListener } from "@/shared/providers/RealtimeProvider";
 
 export default function JamaahListPage() {
   const router = useRouter();
@@ -76,6 +76,11 @@ export default function JamaahListPage() {
       load(true);
     }
   }, [storeJamaah, storeGroups, storeInvoices, load]);
+
+  // Realtime synchronization: auto-reload jamaah, groups, and invoice data
+  useRealtimeListener(["jamaah", "registration_groups", "invoices"], () => {
+    load(false);
+  });
 
   // --- Helper: derive aggregate statuses ---
 
