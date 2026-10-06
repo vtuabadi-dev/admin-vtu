@@ -1405,89 +1405,30 @@ export default function RegisterPage() {
                   </div>
                 </div>
 
-                <div className="relative z-10">
-                  <div className="flex items-center justify-between mb-1.5">
-                    <label className="text-xs font-extrabold text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]">
-                      Tanggal Lahir
-                    </label>
-                    <span className="text-[11px] font-semibold text-amber-300/80">
-                      (Opsional / Boleh Dikosongkan)
-                    </span>
-                  </div>
-                  <input
-                    id={`member_${i}_tglLahir`}
-                    type="date"
-                    value={member.tanggalLahir || ""}
-                    onChange={(e) => updateMember(i, "tanggalLahir", e.target.value)}
-                    style={{ colorScheme: "dark" }}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        const nextElem = document.getElementById(`member_${i}_hubungan`);
-                        if (nextElem) {
-                          nextElem.focus();
-                        } else if (i < members.length - 1) {
-                          const nextMemberName = document.getElementById(`member_${i + 1}_nama`);
-                          if (nextMemberName) nextMemberName.focus();
-                        } else {
-                          const btnNext = document.getElementById("btn_next_step");
-                          if (btnNext) btnNext.focus();
-                        }
-                      }
-                    }}
-                    className="w-full h-11 px-3.5 py-2 border-2 border-[#D4AF37] rounded-xl text-sm font-bold text-white bg-[#2D1B0E] shadow-inner transition-all [color-scheme:dark] focus:outline-none focus:ring-2 focus:ring-[#F5D061]/50 focus:border-[#F5D061]"
-                  />
-                  {member.tanggalLahir && (() => {
-                    const ageInfo = calculateAge(member.tanggalLahir);
-                    if (!ageInfo) return null;
-                    return (
-                      <div className="mt-2 space-y-1.5">
-                        <div className="flex items-center gap-1.5">
-                          <span
-                            className={cn(
-                              "text-[11px] font-semibold px-2.5 py-0.5 rounded-full inline-flex items-center gap-1",
-                              ageInfo.isLansia
-                                ? "bg-amber-100 text-amber-900 border border-amber-300"
-                                : "bg-emerald-100 text-emerald-800"
-                            )}
-                          >
-                            🎂 Usia: {ageInfo.age} tahun ({ageInfo.category})
-                          </span>
-                        </div>
-                        {ageInfo.isLansia && (
-                          <div className="bg-amber-50 border border-amber-200 rounded-lg p-2.5 flex items-start gap-2 text-xs text-amber-900">
-                            <FileText className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-                            <div>
-                              <span className="font-semibold text-amber-950">Berkas Mandatory Lansia:</span>
-                              <p className="mt-0.5 text-amber-800">
-                                Wajib melampirkan <strong>Surat Pernyataan Keluarga Lansia</strong> pada proses penyerahan dokumen.
-                              </p>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })()}
-                </div>
-
-                {members.length > 1 && (
+                <div className={cn("grid gap-3.5 items-start", members.length > 1 ? "grid-cols-1 md:grid-cols-2" : "grid-cols-1")}>
+                  {/* KIRI: Tanggal Lahir */}
                   <div className="relative z-10">
-                    <label className="block text-xs font-bold text-white mb-1 drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)] flex items-center justify-between">
-                      <span>
-                        {i === 0
-                          ? `Hubungan dengan Jamaah #2`
-                          : `Hubungan dengan Jamaah #1 (${members[0]?.namaLengkap ? members[0].namaLengkap.toUpperCase() : "Ketua Grup"})`}
-                        <span className="text-red-400 ml-1 font-black">*</span>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="text-xs font-extrabold text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]">
+                        Tanggal Lahir
+                      </label>
+                      <span className="text-[11px] font-semibold text-amber-300/80">
+                        (Opsional / Boleh Dikosongkan)
                       </span>
-                    </label>
-                    <select
-                      id={`member_${i}_hubungan`}
-                      value={member.hubungan}
-                      onChange={(e) => updateMember(i, "hubungan", e.target.value)}
+                    </div>
+                    <input
+                      id={`member_${i}_tglLahir`}
+                      type="date"
+                      value={member.tanggalLahir || ""}
+                      onChange={(e) => updateMember(i, "tanggalLahir", e.target.value)}
+                      style={{ colorScheme: "dark" }}
                       onKeyDown={(e) => {
                         if (e.key === "Enter") {
                           e.preventDefault();
-                          if (i < members.length - 1) {
+                          const nextElem = document.getElementById(`member_${i}_hubungan`);
+                          if (nextElem) {
+                            nextElem.focus();
+                          } else if (i < members.length - 1) {
                             const nextMemberName = document.getElementById(`member_${i + 1}_nama`);
                             if (nextMemberName) nextMemberName.focus();
                           } else {
@@ -1496,28 +1437,93 @@ export default function RegisterPage() {
                           }
                         }
                       }}
-                      className={cn(
-                        "w-full h-11 px-3.5 border-2 rounded-xl text-sm font-bold text-white bg-[#2D1B0E] focus:outline-none focus:ring-2 focus:ring-[#F5D061]/50 focus:border-[#F5D061] cursor-pointer shadow-inner",
-                        errors[`member_${i}_hubungan`]
-                          ? "border-red-500 bg-red-950/50 text-red-100"
-                          : "border-[#D4AF37]"
-                      )}
-                    >
-                      <option value="" className="text-white bg-[#2D1B0E] font-extrabold py-2">Pilih hubungan (wajib)...</option>
-                      <option value="Suami" className="text-white bg-[#2D1B0E] font-bold py-1.5">Suami</option>
-                      <option value="Istri" className="text-white bg-[#2D1B0E] font-bold py-1.5">Istri</option>
-                      <option value="Ayah / Ibu" className="text-white bg-[#2D1B0E] font-bold py-1.5">Ayah / Ibu</option>
-                      <option value="Anak" className="text-white bg-[#2D1B0E] font-bold py-1.5">Anak</option>
-                      <option value="Kakak / Adik" className="text-white bg-[#2D1B0E] font-bold py-1.5">Kakak / Adik</option>
-                      <option value="Keluarga / Mahram" className="text-white bg-[#2D1B0E] font-bold py-1.5">Keluarga / Mahram</option>
-                      <option value="Teman / Rekan" className="text-white bg-[#2D1B0E] font-bold py-1.5">Teman / Rekan</option>
-                      <option value="Lainnya" className="text-white bg-[#2D1B0E] font-bold py-1.5">Lainnya</option>
-                    </select>
-                    {errors[`member_${i}_hubungan`] && (
-                      <p className="text-xs text-red-400 mt-1 font-extrabold">{errors[`member_${i}_hubungan`]}</p>
-                    )}
+                      className="w-full h-11 px-3.5 py-2 border-2 border-[#D4AF37] rounded-xl text-sm font-bold text-white bg-[#2D1B0E] shadow-inner transition-all [color-scheme:dark] focus:outline-none focus:ring-2 focus:ring-[#F5D061]/50 focus:border-[#F5D061]"
+                    />
+                    {member.tanggalLahir && (() => {
+                      const ageInfo = calculateAge(member.tanggalLahir);
+                      if (!ageInfo) return null;
+                      return (
+                        <div className="mt-2 space-y-1.5">
+                          <div className="flex items-center gap-1.5">
+                            <span
+                              className={cn(
+                                "text-[11px] font-semibold px-2.5 py-0.5 rounded-full inline-flex items-center gap-1",
+                                ageInfo.isLansia
+                                  ? "bg-amber-100 text-amber-900 border border-amber-300"
+                                  : "bg-emerald-100 text-emerald-800"
+                              )}
+                            >
+                              🎂 Usia: {ageInfo.age} tahun ({ageInfo.category})
+                            </span>
+                          </div>
+                          {ageInfo.isLansia && (
+                            <div className="bg-amber-50 border border-amber-200 rounded-lg p-2.5 flex items-start gap-2 text-xs text-amber-900">
+                              <FileText className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                              <div>
+                                <span className="font-semibold text-amber-950">Berkas Mandatory Lansia:</span>
+                                <p className="mt-0.5 text-amber-800">
+                                  Wajib melampirkan <strong>Surat Pernyataan Keluarga Lansia</strong> pada proses penyerahan dokumen.
+                                </p>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
                   </div>
-                )}
+
+                  {/* KANAN: Hubungan dengan Jamaah */}
+                  {members.length > 1 && (
+                    <div className="relative z-10">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <label className="text-xs font-bold text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)] flex items-center">
+                          <span>
+                            {i === 0
+                              ? `Hubungan dengan Jamaah #2`
+                              : `Hubungan dengan Jamaah #1 (${members[0]?.namaLengkap ? members[0].namaLengkap.toUpperCase() : "Ketua Grup"})`}
+                            <span className="text-red-400 ml-1 font-black">*</span>
+                          </span>
+                        </label>
+                      </div>
+                      <select
+                        id={`member_${i}_hubungan`}
+                        value={member.hubungan}
+                        onChange={(e) => updateMember(i, "hubungan", e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            if (i < members.length - 1) {
+                              const nextMemberName = document.getElementById(`member_${i + 1}_nama`);
+                              if (nextMemberName) nextMemberName.focus();
+                            } else {
+                              const btnNext = document.getElementById("btn_next_step");
+                              if (btnNext) btnNext.focus();
+                            }
+                          }
+                        }}
+                        className={cn(
+                          "w-full h-11 px-3.5 border-2 rounded-xl text-sm font-bold text-white bg-[#2D1B0E] focus:outline-none focus:ring-2 focus:ring-[#F5D061]/50 focus:border-[#F5D061] cursor-pointer shadow-inner",
+                          errors[`member_${i}_hubungan`]
+                            ? "border-red-500 bg-red-950/50 text-red-100"
+                            : "border-[#D4AF37]"
+                        )}
+                      >
+                        <option value="" className="text-white bg-[#2D1B0E] font-extrabold py-2">Pilih hubungan (wajib)...</option>
+                        <option value="Suami" className="text-white bg-[#2D1B0E] font-bold py-1.5">Suami</option>
+                        <option value="Istri" className="text-white bg-[#2D1B0E] font-bold py-1.5">Istri</option>
+                        <option value="Ayah / Ibu" className="text-white bg-[#2D1B0E] font-bold py-1.5">Ayah / Ibu</option>
+                        <option value="Anak" className="text-white bg-[#2D1B0E] font-bold py-1.5">Anak</option>
+                        <option value="Kakak / Adik" className="text-white bg-[#2D1B0E] font-bold py-1.5">Kakak / Adik</option>
+                        <option value="Keluarga / Mahram" className="text-white bg-[#2D1B0E] font-bold py-1.5">Keluarga / Mahram</option>
+                        <option value="Teman / Rekan" className="text-white bg-[#2D1B0E] font-bold py-1.5">Teman / Rekan</option>
+                        <option value="Lainnya" className="text-white bg-[#2D1B0E] font-bold py-1.5">Lainnya</option>
+                      </select>
+                      {errors[`member_${i}_hubungan`] && (
+                        <p className="text-xs text-red-400 mt-1 font-extrabold">{errors[`member_${i}_hubungan`]}</p>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
             ))}
           </div>
