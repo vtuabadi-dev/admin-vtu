@@ -63,33 +63,35 @@ export function Modal({
   if (!isShown) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
       <div
         className="fixed inset-0 bg-black/50 transition-opacity"
         onClick={onClose}
       />
       <div
         className={cn(
-          "relative z-50 w-full rounded-lg border bg-background p-6 shadow-lg",
+          "relative z-50 w-full max-h-[90vh] flex flex-col rounded-xl border bg-background p-5 sm:p-6 shadow-2xl my-auto",
           modalSizeVariants({ size }),
           className
         )}
       >
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center justify-between mb-3 shrink-0">
           <div>
-            {title && <h2 className="text-lg font-semibold">{title}</h2>}
+            {title && <h2 className="text-lg font-bold text-foreground">{title}</h2>}
             {description && (
               <p className="text-sm text-muted-foreground">{description}</p>
             )}
           </div>
           <button
             onClick={onClose}
-            className="rounded-md p-1 hover:bg-muted transition-colors"
+            className="rounded-md p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
           >
             <X className="h-4 w-4" />
           </button>
         </div>
-        {children}
+        <div className="overflow-y-auto flex-1 pr-1 overscroll-contain">
+          {children}
+        </div>
       </div>
     </div>
   );

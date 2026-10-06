@@ -1173,7 +1173,7 @@ export default function CreateInvoiceModal({
         </div>
 
         {/* FOOTER ACTIONS */}
-        <div className="flex justify-end gap-2 pt-3 border-t">
+        <div className="flex justify-end gap-2 pt-3 border-t sticky bottom-0 bg-background/95 backdrop-blur-xs z-20 mt-2 pb-1">
           <Button variant="outline" onClick={onClose} disabled={loading}>
             Batal
           </Button>
