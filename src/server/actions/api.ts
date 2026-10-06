@@ -467,3 +467,192 @@ export async function getPackageIntelligence(_keberangkatanId: string) {
 export async function submitRegistrasi(_data: any) {
   return null as any;
 }
+
+export async function addJamaahToGroup(data: {
+  groupId: string;
+  jamaahList: Array<{
+    namaLengkap: string;
+    jenisKelamin: "L" | "P";
+    hubungan?: string;
+  }>;
+}) {
+  try {
+    const group = await prisma.registrationGroup.findUnique({
+      where: { id: data.groupId },
+      include: {
+        anggota: { orderBy: { createdAt: "asc" } },
+        keberangkatan: true,
+        ketuaGroup: true,
+        invoices: { orderBy: { createdAt: "asc" } },
+        registrationRequests: { include: { members: true } },
+      },
+    });
+
+    if (!group) {
+      return { success: false, message: "Group tidak ditemukan" };
+    }
+
+    if (!data.jamaahList || data.jamaahList.length === 0) {
+      return { success: false, message: "Daftar jamaah tambahan tidak boleh kosong" };
+    }
+
+    // Determine max index for registrationId: GRP-YYYY-NNNN-X
+    let maxIndex = group.anggota.length;
+    for (const a of group.anggota) {
+      const match = a.registrationId?.match(/-(\d+)$/);
+      if (match && match[1]) {
+        const idxNum = parseInt(match[1], 10);
+        if (!isNaN(idxNum) && idxNum > maxIndex) {
+          maxIndex = idxNum;
+        }
+      }
+    }
+
+    const regPrefix = group.kodeRegistrasi || `GRP-2026-${group.id.slice(-4).toUpperCase()}`;
+
+    // Create Jamaah records
+    for (let i = 0; i < data.jamaahList.length; i++) {
+      const item = data.jamaahList[i]!;
+      const memberIndex = maxIndex + i + 1;
+      const registrationId = `${regPrefix}-${memberIndex}`;
+      const nomorPeserta = registrationId;
+
+      await prisma.jamaah.create({
+        data: {
+          registrationId,
+          groupId: group.id,
+          nomorPeserta,
+          namaLengkap: item.namaLengkap.trim(),
+          namaAyah: "",
+          jenisKelamin: item.jenisKelamin as any,
+          tempatLahir: "-",
+          tanggalLahir: new Date("2000-01-01"),
+          nik: "",
+          nomorPaspor: "",
+          masaBerlakuPaspor: new Date("2030-01-01"),
+          nomorTelepon: group.ketuaGroup?.nomorTelepon || "-",
+          email: group.ketuaGroup?.email || "-",
+          alamat: group.ketuaGroup?.alamat || "-",
+          provinsi: group.ketuaGroup?.provinsi || "-",
+          kota: group.ketuaGroup?.kota || "-",
+          kecamatan: group.ketuaGroup?.kecamatan || "-",
+          kelurahan: group.ketuaGroup?.kelurahan || "-",
+          status: "registered",
+          hotelMekkah: group.keberangkatan?.hotelMekkah || "-",
+          hotelMadinah: group.keberangkatan?.hotelMadinah || "-",
+          syaratDisetujui: true,
+        },
+      });
+
+      // If group has linked registrationRequest, also record RegistrationMember
+      if (group.registrationRequests && group.registrationRequests.length > 0) {
+        const regReq = group.registrationRequests[0]!;
+        const curMemberCount = regReq.members?.length || 0;
+        await prisma.registrationMember.create({
+          data: {
+            requestId: regReq.id,
+            namaLengkap: item.namaLengkap.trim(),
+            jenisKelamin: item.jenisKelamin as any,
+            hubungan: item.hubungan?.trim() || "-",
+            urutan: curMemberCount + i + 1,
+          },
+        }).catch((err) => console.warn("Failed creating registrationMember:", err));
+      }
+    }
+
+    if (group.registrationRequests && group.registrationRequests.length > 0) {
+      const regReq = group.registrationRequests[0]!;
+      await prisma.registrationRequest.update({
+        where: { id: regReq.id },
+        data: { paxCount: { increment: data.jamaahList.length } },
+      }).catch(() => {});
+    }
+
+    // Calculate additional price based on package
+    const baseTarif = group.keberangkatan?.hargaPaket || (group.jumlahAnggota > 0 ? Math.round(group.totalTagihan / group.jumlahAnggota) : 0);
+    const nominalTambahan = baseTarif * data.jamaahList.length;
+
+    // Update group total tagihan, sisa pembayaran, jumlah anggota
+    const newJumlahAnggota = group.jumlahAnggota + data.jamaahList.length;
+    const newTotalTagihan = group.totalTagihan + nominalTambahan;
+    const newSisa = Math.max(0, newTotalTagihan - group.totalPembayaran);
+
+    await prisma.registrationGroup.update({
+      where: { id: group.id },
+      data: {
+        jumlahAnggota: newJumlahAnggota,
+        totalTagihan: newTotalTagihan,
+        sisaPembayaran: newSisa,
+      },
+    });
+
+    // Update keberangkatan seats (terisi)
+    if (group.paketKeberangkatanId) {
+      await prisma.keberangkatan.update({
+        where: { id: group.paketKeberangkatanId },
+        data: { terisi: { increment: data.jamaahList.length } },
+      }).catch(() => {});
+    }
+
+    // Determine due date (jatuh tempo) following group's existing invoice or departure H-40
+    let targetJatuhTempo: Date;
+    const firstInvoice = group.invoices?.[0];
+    if (firstInvoice?.jatuhTempo) {
+      targetJatuhTempo = new Date(firstInvoice.jatuhTempo);
+    } else if (group.keberangkatan?.tanggalBerangkat) {
+      const h40 = new Date(group.keberangkatan.tanggalBerangkat);
+      h40.setDate(h40.getDate() - 40);
+      targetJatuhTempo = h40;
+    } else {
+      targetJatuhTempo = new Date(Date.now() + 14 * 86400000);
+    }
+
+    // Create Invoice for the additional pax so it can be reviewed before issuance
+    const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+    const randomSuffix = String(Math.floor(Math.random() * 9000) + 1000);
+    const nomorInvoice = `INV-PAX-${dateStr}-${randomSuffix}`;
+    const rincianAnggota = data.jamaahList
+      .map((j, idx) => `${idx + 1}. ${j.namaLengkap} (${j.jenisKelamin === "L" ? "Laki-laki" : "Perempuan"}${j.hubungan ? `, ${j.hubungan}` : ""})`)
+      .join("; ");
+
+    const createdInvoice = await prisma.invoice.create({
+      data: {
+        id: nomorInvoice,
+        nomorInvoice,
+        groupId: group.id,
+        tipe: "tambahan",
+        jumlah: nominalTambahan,
+        sisaTagihan: nominalTambahan,
+        status: "unpaid",
+        jatuhTempo: targetJatuhTempo,
+      },
+    });
+
+    await prisma.invoiceItem.create({
+      data: {
+        invoiceId: createdInvoice.id,
+        kategori: "Paket Umroh",
+        deskripsi: `Penambahan ${data.jamaahList.length} pax jamaah: ${rincianAnggota}`,
+        qty: data.jamaahList.length,
+        hargaSatuan: baseTarif,
+        jumlah: nominalTambahan,
+        status: "active",
+      },
+    }).catch(() => {});
+
+    return {
+      success: true,
+      invoiceNumber: nomorInvoice,
+      amount: nominalTambahan,
+      addedCount: data.jamaahList.length,
+      group: {
+        id: group.id,
+        jumlahAnggota: newJumlahAnggota,
+        totalTagihan: newTotalTagihan,
+      },
+    };
+  } catch (err: any) {
+    console.error("addJamaahToGroup error:", err);
+    return { success: false, message: err.message || "Gagal menambahkan jamaah ke grup" };
+  }
+}

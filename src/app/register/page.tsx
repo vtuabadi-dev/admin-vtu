@@ -6,7 +6,6 @@ import { cn } from "@/shared/lib/utils";
 import {
   ChevronLeft,
   ChevronRight,
-  ChevronDown,
   Check,
   User,
   Phone,
@@ -70,46 +69,10 @@ const MAX_GROUP_SIZE = 100;
 const LARGE_GROUP_THRESHOLD = 30;
 const VERY_LARGE_GROUP_THRESHOLD = 60;
 
-const INDONESIAN_CITIES = [
-  "Banda Aceh", "Lhokseumawe", "Langsa", "Sabang", "Subulussalam",
-  "Medan", "Pematangsiantar", "Sibolga", "Tanjungbalai", "Binjai", "Tebing Tinggi", "Padangsidimpuan", "Gunungsitoli", "Barus",
-  "Padang", "Bukittinggi", "Payakumbuh", "Solok", "Sawahlunto", "Padang Panjang", "Pariaman",
-  "Pekanbaru", "Dumai",
-  "Jambi", "Sungaipenuh",
-  "Palembang", "Prabumulih", "Pagar Alam", "Lubuklinggau", "Baturaja",
-  "Bengkulu",
-  "Bandar Lampung", "Metro",
-  "Pangkalpinang",
-  "Batam", "Tanjungpinang",
-  "Jakarta Pusat", "Jakarta Utara", "Jakarta Barat", "Jakarta Selatan", "Jakarta Timur",
-  "Bandung", "Bogor", "Depok", "Bekasi", "Cimahi", "Cirebon", "Sukabumi", "Tasikmalaya", "Banjar",
-  "Semarang", "Surakarta", "Magelang", "Pekalongan", "Salatiga", "Tegal", "Kudus", "Jepara", "Pati", "Banyumas", "Cilacap", "Purwokerto", "Wonosobo", "Kebumen", "Boyolali", "Karanganyar", "Sukoharjo", "Sragen", "Klaten", "Grobogan",
-  "Yogyakarta", "Sleman", "Bantul", "Gunungkidul", "Kulon Progo",
-  "Surabaya", "Malang", "Madiun", "Kediri", "Blitar", "Probolinggo", "Pasuruan", "Mojokerto", "Batu", "Sidoarjo", "Gresik", "Jember", "Banyuwangi", "Tuban", "Lamongan", "Bojonegoro", "Ngawi", "Nganjuk", "Tulungagung", "Trenggalek", "Ponorogo", "Pacitan", "Sumenep", "Pamekasan", "Sampang", "Bangkalan",
-  "Serang", "Tangerang", "Cilegon", "Tangerang Selatan", "Pandeglang", "Lebak",
-  "Denpasar", "Singaraja", "Tabanan", "Gianyar", "Badung",
-  "Mataram", "Bima", "Sumbawa",
-  "Kupang", "Ende", "Maumere",
-  "Pontianak", "Singkawang",
-  "Palangkaraya",
-  "Banjarmasin", "Banjarbaru", "Barabai", "Barito",
-  "Samarinda", "Balikpapan", "Bontang",
-  "Tanjung Selor", "Tarakan",
-  "Manado", "Bitung", "Tomohon", "Kotamobagu",
-  "Palu",
-  "Makassar", "Parepare", "Palopo", "Barru", "Bantaeng", "Banggai",
-  "Kendari", "Baubau",
-  "Gorontalo",
-  "Mamuju",
-  "Ambon", "Tual",
-  "Ternate", "Tidore",
-  "Jayapura", "Sorong", "Merauke", "Manokwari"
-];
-
 interface MemberForm {
   namaLengkap: string;
   jenisKelamin: JenisKelamin;
-  tempatLahir: string;
+  tempatLahir?: string;
   tanggalLahir: string;
   hubungan: string;
   tipeKamar?: string;
@@ -151,204 +114,6 @@ function calculateAge(birthDateStr?: string): { age: number; category: string; i
   return { age, category, isLansia };
 }
 
-function CityCombobox({
-  value,
-  onChange,
-  placeholder = "Kota Tempat Lahir (contoh: SURABAYA)",
-  id,
-  onSelectNext,
-  onOpenChange,
-}: {
-  value: string;
-  onChange: (val: string) => void;
-  placeholder?: string;
-  id?: string;
-  onSelectNext?: () => void;
-  onOpenChange?: (open: boolean) => void;
-}) {
-  const [isOpen, setIsOpen] = useState(false);
-  const [highlightedIndex, setHighlightedIndex] = useState(0);
-  const wrapperRef = useRef<HTMLDivElement>(null);
-  const listRef = useRef<HTMLDivElement>(null);
-
-  // Notify parent of open state
-  useEffect(() => {
-    onOpenChange?.(isOpen);
-  }, [isOpen, onOpenChange]);
-
-  // Close dropdown on click outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
-        setIsOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
-  // Filter cities live with prefix-priority similarity sorting
-  const filteredCities = useMemo(() => {
-    if (!value || value.trim() === "") return INDONESIAN_CITIES;
-    const q = value.toLowerCase().trim();
-
-    return INDONESIAN_CITIES
-      .filter((c) => c.toLowerCase().includes(q))
-      .sort((a, b) => {
-        const aLower = a.toLowerCase();
-        const bLower = b.toLowerCase();
-
-        // 1. Exact match has highest priority
-        const aExact = aLower === q;
-        const bExact = bLower === q;
-        if (aExact !== bExact) return aExact ? -1 : 1;
-
-        // 2. Starts with query on FIRST word (highest word-order priority: e.g. BARUS, BARRU, BARABAI)
-        const aStarts = aLower.startsWith(q);
-        const bStarts = bLower.startsWith(q);
-        if (aStarts !== bStarts) return aStarts ? -1 : 1;
-
-        // 3. Query matches subsequent word start (second word, e.g. "Jakarta Barat")
-        const aSubsequentWord = aLower.split(/\s+/).slice(1).some((w) => w.startsWith(q));
-        const bSubsequentWord = bLower.split(/\s+/).slice(1).some((w) => w.startsWith(q));
-        if (aSubsequentWord !== bSubsequentWord) return aSubsequentWord ? -1 : 1;
-
-        // 4. Earlier index position of match (for contains matches)
-        const aIdx = aLower.indexOf(q);
-        const bIdx = bLower.indexOf(q);
-        if (aIdx !== bIdx) return aIdx - bIdx;
-
-        // 5. Alphabetical order A-Z (e.g. "Barabai" with 'a' comes before "Barru" with 'r', then "Barus" with 'u')
-        return a.localeCompare(b);
-      });
-  }, [value]);
-
-  // Reset highlighted index to 0 whenever value/filter changes
-  useEffect(() => {
-    setHighlightedIndex(0);
-  }, [value]);
-
-  // Keep highlighted item in view when scrolling via keyboard
-  useEffect(() => {
-    if (isOpen && listRef.current) {
-      const items = listRef.current.querySelectorAll("button");
-      if (items[highlightedIndex]) {
-        items[highlightedIndex].scrollIntoView({ block: "nearest" });
-      }
-    }
-  }, [highlightedIndex, isOpen]);
-
-  // Handle keyboard events (Enter key selects top/highlighted item)
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (!isOpen) {
-      if (e.key === "ArrowDown" || e.key === "ArrowUp") {
-        setIsOpen(true);
-        e.preventDefault();
-      } else if (e.key === "Enter") {
-        e.preventDefault();
-        if (onSelectNext) {
-          onSelectNext();
-        }
-      }
-      return;
-    }
-
-    if (e.key === "Enter") {
-      e.preventDefault(); // Prevent form submit
-      if (filteredCities.length > 0) {
-        const targetCity = filteredCities[highlightedIndex] || filteredCities[0];
-        if (targetCity) {
-          onChange(targetCity.toUpperCase());
-        }
-      }
-      setIsOpen(false);
-      if (onSelectNext) {
-        setTimeout(() => onSelectNext(), 50);
-      }
-    } else if (e.key === "ArrowDown") {
-      e.preventDefault();
-      setHighlightedIndex((prev) => (prev < filteredCities.length - 1 ? prev + 1 : 0));
-    } else if (e.key === "ArrowUp") {
-      e.preventDefault();
-      setHighlightedIndex((prev) => (prev > 0 ? prev - 1 : filteredCities.length - 1));
-    } else if (e.key === "Escape") {
-      setIsOpen(false);
-    }
-  };
-
-  return (
-    <div ref={wrapperRef} className={cn("relative w-full", isOpen && "z-50")}>
-      <div className="relative">
-        <input
-          id={id}
-          type="text"
-          value={value}
-          autoComplete="off"
-          autoCorrect="off"
-          spellCheck={false}
-          onFocus={() => setIsOpen(true)}
-          onKeyDown={handleKeyDown}
-          onChange={(e) => {
-            onChange(e.target.value.toUpperCase());
-            if (!isOpen) setIsOpen(true);
-          }}
-          className="w-full h-11 px-3.5 py-2 border-2 border-[#D4AF37] rounded-xl text-sm font-bold uppercase transition-all focus:outline-none focus:ring-2 focus:ring-[#F5D061]/50 focus:border-[#F5D061] pr-8 bg-[#2D1B0E] text-white shadow-inner placeholder:text-[#D4AF37]/60 placeholder:font-normal placeholder:normal-case"
-          placeholder={placeholder}
-        />
-        <ChevronDown
-          className="w-4 h-4 text-[#D4AF37] absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none"
-        />
-      </div>
-
-      {isOpen && (
-        <div
-          ref={listRef}
-          className="absolute z-50 left-0 right-0 mt-1 max-h-[230px] overflow-y-auto bg-[#2D1B0E] border-2 border-[#D4AF37] rounded-xl shadow-2xl divide-y divide-[#D4AF37]/30"
-          style={{
-            scrollbarWidth: "thin",
-            scrollbarColor: "rgba(212, 175, 55, 0.6) rgba(45, 27, 14, 0.9)",
-          }}
-        >
-          {filteredCities.length > 0 ? (
-            filteredCities.map((city, idx) => {
-              const isSelected = value.toUpperCase() === city.toUpperCase();
-              const isHighlighted = idx === highlightedIndex;
-              return (
-                <button
-                  key={city}
-                  type="button"
-                  onMouseEnter={() => setHighlightedIndex(idx)}
-                  onMouseDown={(e) => {
-                    e.preventDefault();
-                    onChange(city.toUpperCase());
-                    setIsOpen(false);
-                  }}
-                  className={cn(
-                    "w-full text-left px-3.5 py-2 text-sm transition-colors flex items-center justify-between",
-                    isHighlighted
-                      ? "bg-[#3D2513] text-amber-300 font-extrabold"
-                      : isSelected
-                        ? "bg-[#D4AF37] text-slate-950 font-black"
-                        : "text-white hover:bg-[#3D2513]"
-                  )}
-                >
-                  <span>{city}</span>
-                  {isSelected && (
-                    <Check className="w-4 h-4 text-slate-950 shrink-0 stroke-[3]" />
-                  )}
-                </button>
-              );
-            })
-          ) : (
-            <div className="px-3.5 py-2.5 text-xs text-emerald-200/60 italic">
-              Kota &quot;{value}&quot; (Bisa digunakan / tekan Lanjut)
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -377,7 +142,6 @@ export default function RegisterPage() {
   const [members, setMembers] = useState<MemberForm[]>([
     { namaLengkap: "", jenisKelamin: "L", tempatLahir: "", tanggalLahir: "", hubungan: "" },
   ]);
-  const [openComboboxIndex, setOpenComboboxIndex] = useState<number | null>(null);
 
   // Step 5: Package
   const [paketList, setPaketList] = useState<Keberangkatan[]>([]);
@@ -777,8 +541,11 @@ export default function RegisterPage() {
 
     if (s === 4) {
       members.forEach((m, i) => {
-        if (!m.namaLengkap.trim()) errs[`member_${i}_nama`] = "Nama wajib diisi";
-        if (!m.tanggalLahir) errs[`member_${i}_tglLahir`] = "Tanggal lahir wajib diisi";
+        if (!m.namaLengkap.trim()) errs[`member_${i}_nama`] = "Nama lengkap wajib diisi";
+        if (!m.jenisKelamin) errs[`member_${i}_gender`] = "Jenis kelamin wajib dipilih";
+        if (members.length > 1 && !m.hubungan?.trim()) {
+          errs[`member_${i}_hubungan`] = "Hubungan dengan jamaah wajib dipilih";
+        }
       });
     }
 
@@ -1552,13 +1319,7 @@ export default function RegisterPage() {
             {members.map((member, i) => (
               <div
                 key={i}
-                className={cn(
-                  "bg-emerald-950/70 border-2 border-emerald-500/40 rounded-2xl p-5 space-y-4 shadow-lg backdrop-blur-xl relative transition-all",
-                  openComboboxIndex === i ? "border-[#F5D061] ring-2 ring-[#F5D061]/40" : ""
-                )}
-                style={{
-                  zIndex: openComboboxIndex === i ? 60 : (members.length - i) * 10,
-                }}
+                className="bg-emerald-950/70 border-2 border-emerald-500/40 rounded-2xl p-5 space-y-4 shadow-lg backdrop-blur-xl relative transition-all"
               >
                 <div className="flex items-center justify-between border-b border-emerald-800/80 pb-3">
                   <h3 className="text-sm font-extrabold text-white tracking-wide">
@@ -1614,7 +1375,7 @@ export default function RegisterPage() {
                         onKeyDown={(e) => {
                           if (e.key === "Enter") {
                             e.preventDefault();
-                            const nextElem = document.getElementById(`member_${i}_tempatLahir`);
+                            const nextElem = document.getElementById(`member_${i}_tglLahir`);
                             if (nextElem) nextElem.focus();
                           }
                         }}
@@ -1633,7 +1394,7 @@ export default function RegisterPage() {
                         onKeyDown={(e) => {
                           if (e.key === "Enter") {
                             e.preventDefault();
-                            const nextElem = document.getElementById(`member_${i}_tempatLahir`);
+                            const nextElem = document.getElementById(`member_${i}_tglLahir`);
                             if (nextElem) nextElem.focus();
                           }
                         }}
@@ -1644,99 +1405,80 @@ export default function RegisterPage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 relative z-20">
-                  <div className="relative z-30">
-                    <label className="block text-xs font-extrabold text-white mb-1.5 drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]">
-                      Tempat Lahir
-                    </label>
-                    <CityCombobox
-                      id={`member_${i}_tempatLahir`}
-                      value={member.tempatLahir || ""}
-                      onChange={(val) => updateMember(i, "tempatLahir", val)}
-                      onSelectNext={() => {
-                        const el = document.getElementById(`member_${i}_tglLahir`);
-                        if (el) el.focus();
-                      }}
-                      onOpenChange={(open) => setOpenComboboxIndex(open ? i : null)}
-                      placeholder="Kota Tempat Lahir (contoh: SURABAYA)"
-                    />
-                  </div>
-
-                  <div className="relative z-10">
-                    <label className="block text-xs font-extrabold text-white mb-1.5 drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]">
+                <div className="relative z-10">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="text-xs font-extrabold text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]">
                       Tanggal Lahir
                     </label>
-                    <input
-                      id={`member_${i}_tglLahir`}
-                      type="date"
-                      value={member.tanggalLahir || ""}
-                      onChange={(e) => updateMember(i, "tanggalLahir", e.target.value)}
-                      style={{ colorScheme: "dark" }}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          e.preventDefault();
-                          const nextElem = document.getElementById(`member_${i}_hubungan`);
-                          if (nextElem) {
-                            nextElem.focus();
-                          } else if (i < members.length - 1) {
-                            const nextMemberName = document.getElementById(`member_${i + 1}_nama`);
-                            if (nextMemberName) nextMemberName.focus();
-                          } else {
-                            const btnNext = document.getElementById("btn_next_step");
-                            if (btnNext) btnNext.focus();
-                          }
-                        }
-                      }}
-                      className={cn(
-                        "w-full h-11 px-3.5 py-2 border-2 border-[#D4AF37] rounded-xl text-sm font-bold text-white bg-[#2D1B0E] shadow-inner transition-all",
-                        "[color-scheme:dark]",
-                        "focus:outline-none focus:ring-2 focus:ring-[#F5D061]/50 focus:border-[#F5D061]",
-                        errors[`member_${i}_tglLahir`] ? "border-red-500 bg-red-950/50 text-red-100" : ""
-                      )}
-                    />
-                    {member.tanggalLahir && (() => {
-                      const ageInfo = calculateAge(member.tanggalLahir);
-                      if (!ageInfo) return null;
-                      return (
-                        <div className="mt-2 space-y-1.5">
-                          <div className="flex items-center gap-1.5">
-                            <span
-                              className={cn(
-                                "text-[11px] font-semibold px-2.5 py-0.5 rounded-full inline-flex items-center gap-1",
-                                ageInfo.isLansia
-                                  ? "bg-amber-100 text-amber-900 border border-amber-300"
-                                  : "bg-emerald-100 text-emerald-800"
-                              )}
-                            >
-                              🎂 Usia: {ageInfo.age} tahun ({ageInfo.category})
-                            </span>
-                          </div>
-                          {ageInfo.isLansia && (
-                            <div className="bg-amber-50 border border-amber-200 rounded-lg p-2.5 flex items-start gap-2 text-xs text-amber-900">
-                              <FileText className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-                              <div>
-                                <span className="font-semibold text-amber-950">Berkas Mandatory Lansia:</span>
-                                <p className="mt-0.5 text-amber-800">
-                                  Wajib melampirkan <strong>Surat Pernyataan Keluarga Lansia</strong> pada proses penyerahan dokumen.
-                                </p>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })()}
-                    {errors[`member_${i}_tglLahir`] && (
-                      <p className="text-xs text-red-500 mt-1">{errors[`member_${i}_tglLahir`]}</p>
-                    )}
+                    <span className="text-[11px] font-semibold text-amber-300/80">
+                      (Opsional / Boleh Dikosongkan)
+                    </span>
                   </div>
+                  <input
+                    id={`member_${i}_tglLahir`}
+                    type="date"
+                    value={member.tanggalLahir || ""}
+                    onChange={(e) => updateMember(i, "tanggalLahir", e.target.value)}
+                    style={{ colorScheme: "dark" }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        const nextElem = document.getElementById(`member_${i}_hubungan`);
+                        if (nextElem) {
+                          nextElem.focus();
+                        } else if (i < members.length - 1) {
+                          const nextMemberName = document.getElementById(`member_${i + 1}_nama`);
+                          if (nextMemberName) nextMemberName.focus();
+                        } else {
+                          const btnNext = document.getElementById("btn_next_step");
+                          if (btnNext) btnNext.focus();
+                        }
+                      }
+                    }}
+                    className="w-full h-11 px-3.5 py-2 border-2 border-[#D4AF37] rounded-xl text-sm font-bold text-white bg-[#2D1B0E] shadow-inner transition-all [color-scheme:dark] focus:outline-none focus:ring-2 focus:ring-[#F5D061]/50 focus:border-[#F5D061]"
+                  />
+                  {member.tanggalLahir && (() => {
+                    const ageInfo = calculateAge(member.tanggalLahir);
+                    if (!ageInfo) return null;
+                    return (
+                      <div className="mt-2 space-y-1.5">
+                        <div className="flex items-center gap-1.5">
+                          <span
+                            className={cn(
+                              "text-[11px] font-semibold px-2.5 py-0.5 rounded-full inline-flex items-center gap-1",
+                              ageInfo.isLansia
+                                ? "bg-amber-100 text-amber-900 border border-amber-300"
+                                : "bg-emerald-100 text-emerald-800"
+                            )}
+                          >
+                            🎂 Usia: {ageInfo.age} tahun ({ageInfo.category})
+                          </span>
+                        </div>
+                        {ageInfo.isLansia && (
+                          <div className="bg-amber-50 border border-amber-200 rounded-lg p-2.5 flex items-start gap-2 text-xs text-amber-900">
+                            <FileText className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                            <div>
+                              <span className="font-semibold text-amber-950">Berkas Mandatory Lansia:</span>
+                              <p className="mt-0.5 text-amber-800">
+                                Wajib melampirkan <strong>Surat Pernyataan Keluarga Lansia</strong> pada proses penyerahan dokumen.
+                              </p>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </div>
 
                 {members.length > 1 && (
                   <div className="relative z-10">
-                    <label className="block text-xs font-bold text-white mb-1 drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]">
-                      {i === 0
-                        ? `Hubungan dengan Jamaah #2`
-                        : `Hubungan dengan Jamaah #1 (${members[0]?.namaLengkap ? members[0].namaLengkap.toUpperCase() : "Ketua Grup"})`}
+                    <label className="block text-xs font-bold text-white mb-1 drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)] flex items-center justify-between">
+                      <span>
+                        {i === 0
+                          ? `Hubungan dengan Jamaah #2`
+                          : `Hubungan dengan Jamaah #1 (${members[0]?.namaLengkap ? members[0].namaLengkap.toUpperCase() : "Ketua Grup"})`}
+                        <span className="text-red-400 ml-1 font-black">*</span>
+                      </span>
                     </label>
                     <select
                       id={`member_${i}_hubungan`}
@@ -1754,9 +1496,14 @@ export default function RegisterPage() {
                           }
                         }
                       }}
-                      className="w-full h-11 px-3.5 border-2 border-[#D4AF37] rounded-xl text-sm font-bold text-white bg-[#2D1B0E] focus:outline-none focus:ring-2 focus:ring-[#F5D061]/50 focus:border-[#F5D061] cursor-pointer shadow-inner"
+                      className={cn(
+                        "w-full h-11 px-3.5 border-2 rounded-xl text-sm font-bold text-white bg-[#2D1B0E] focus:outline-none focus:ring-2 focus:ring-[#F5D061]/50 focus:border-[#F5D061] cursor-pointer shadow-inner",
+                        errors[`member_${i}_hubungan`]
+                          ? "border-red-500 bg-red-950/50 text-red-100"
+                          : "border-[#D4AF37]"
+                      )}
                     >
-                      <option value="" className="text-white bg-[#2D1B0E] font-extrabold py-2">Pilih hubungan...</option>
+                      <option value="" className="text-white bg-[#2D1B0E] font-extrabold py-2">Pilih hubungan (wajib)...</option>
                       <option value="Suami" className="text-white bg-[#2D1B0E] font-bold py-1.5">Suami</option>
                       <option value="Istri" className="text-white bg-[#2D1B0E] font-bold py-1.5">Istri</option>
                       <option value="Ayah / Ibu" className="text-white bg-[#2D1B0E] font-bold py-1.5">Ayah / Ibu</option>
@@ -1766,6 +1513,9 @@ export default function RegisterPage() {
                       <option value="Teman / Rekan" className="text-white bg-[#2D1B0E] font-bold py-1.5">Teman / Rekan</option>
                       <option value="Lainnya" className="text-white bg-[#2D1B0E] font-bold py-1.5">Lainnya</option>
                     </select>
+                    {errors[`member_${i}_hubungan`] && (
+                      <p className="text-xs text-red-400 mt-1 font-extrabold">{errors[`member_${i}_hubungan`]}</p>
+                    )}
                   </div>
                 )}
               </div>
@@ -2610,9 +2360,9 @@ export default function RegisterPage() {
                       <span className="font-semibold text-slate-900">{emailPerwakilan || "-"}</span>
                     </div>
                     <div className="flex">
-                      <span className="w-44 text-slate-500 font-medium shrink-0">Tempat & Tanggal Lahir:</span>
+                      <span className="w-44 text-slate-500 font-medium shrink-0">Tanggal Lahir:</span>
                       <span className="font-bold text-slate-900">
-                        {members[0]?.tempatLahir ? members[0].tempatLahir.toUpperCase() : "-"} / {members[0]?.tanggalLahir || "-"}
+                        {members[0]?.tanggalLahir || "-"}
                       </span>
                     </div>
                   </div>
@@ -2632,7 +2382,7 @@ export default function RegisterPage() {
                         <tr className="bg-slate-100 text-slate-700 font-bold border-b border-slate-200">
                           <th className="p-2 border-r border-slate-200 w-8 text-center">No.</th>
                           <th className="p-2 border-r border-slate-200">Nama Anggota</th>
-                          <th className="p-2 border-r border-slate-200">Tempat Lahir</th>
+                          <th className="p-2 border-r border-slate-200 text-center">Jenis Kelamin</th>
                           <th className="p-2 border-r border-slate-200 text-center">Tanggal Lahir</th>
                           <th className="p-2 text-center">Hubungan</th>
                         </tr>
@@ -2642,7 +2392,7 @@ export default function RegisterPage() {
                           <tr key={i} className="hover:bg-slate-50">
                             <td className="p-2 border-r border-slate-200 text-center font-bold text-slate-600">{i + 1}</td>
                             <td className="p-2 border-r border-slate-200 font-bold text-slate-900 uppercase">{m.namaLengkap}</td>
-                            <td className="p-2 border-r border-slate-200 text-slate-700">{m.tempatLahir ? m.tempatLahir.toUpperCase() : "-"}</td>
+                            <td className="p-2 border-r border-slate-200 text-center font-bold text-slate-700">{m.jenisKelamin === "L" ? "Laki-laki (L)" : "Perempuan (P)"}</td>
                             <td className="p-2 border-r border-slate-200 text-center text-slate-700">{m.tanggalLahir || "-"}</td>
                             <td className="p-2 text-center text-slate-700 font-medium">{m.hubungan || (i === 0 ? "Ketua Grup" : "-")}</td>
                           </tr>

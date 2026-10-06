@@ -22,6 +22,7 @@ import {
   getGroupList,
   getKeberangkatanList,
   createInvoice,
+  addJamaahToGroup,
 } from "@/server/actions/api";
 import { broadcastMutation } from "@/shared/lib/realtime-bus";
 
@@ -43,6 +44,35 @@ export default function CreateInvoiceModal({
   const [refundStatus, setRefundStatus] = useState<"NON_REFUND" | "WITH_REFUND">("NON_REFUND");
   const [refundType, setRefundType] = useState<"KELEBIHAN_BAYAR" | "DEPOSIT">("KELEBIHAN_BAYAR");
   const [tambahPaxCount, setTambahPaxCount] = useState<number>(1);
+  const [tambahJamaahList, setTambahJamaahList] = useState<
+    Array<{ nama: string; gender: "L" | "P"; hubungan: string }>
+  >([{ nama: "", gender: "L", hubungan: "" }]);
+
+  function handlePaxCountChange(count: number) {
+    const cleanCount = Math.max(1, Math.min(30, count));
+    setTambahPaxCount(cleanCount);
+    setTambahJamaahList((prev) => {
+      const next = [...prev];
+      if (cleanCount > next.length) {
+        for (let i = next.length; i < cleanCount; i++) {
+          next.push({ nama: "", gender: "L", hubungan: "" });
+        }
+      } else {
+        return next.slice(0, cleanCount);
+      }
+      return next;
+    });
+  }
+
+  function updateJamaahItem(index: number, field: "nama" | "gender" | "hubungan", val: string) {
+    setTambahJamaahList((prev) => {
+      const next = [...prev];
+      if (next[index]) {
+        next[index] = { ...next[index], [field]: val };
+      }
+      return next;
+    });
+  }
 
   // Group search states
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
@@ -249,6 +279,8 @@ export default function CreateInvoiceModal({
     setSelectedClusterIndex(0);
     setPricingOption("HARGA_BARU");
     setKategori("PEMBAYARAN");
+    setTambahPaxCount(1);
+    setTambahJamaahList([{ nama: "", gender: "L", hubungan: "" }]);
   }
 
   async function handleSubmit() {
@@ -312,13 +344,48 @@ export default function CreateInvoiceModal({
       return;
     }
 
+    if (kategori === "TAMBAH_JAMAAH") {
+      const hasEmptyName = tambahJamaahList.some((j) => !j.nama.trim());
+      if (hasEmptyName) {
+        alert("Mohon isi nama lengkap untuk seluruh jamaah tambahan");
+        return;
+      }
+      setLoading(true);
+      try {
+        const res = await addJamaahToGroup({
+          groupId: groupInfo.id,
+          jamaahList: tambahJamaahList.map((j) => ({
+            namaLengkap: j.nama.trim(),
+            jenisKelamin: j.gender,
+            hubungan: j.hubungan.trim(),
+          })),
+        });
+
+        if (!res.success) {
+          throw new Error(res.message || "Gagal menambahkan jamaah ke grup");
+        }
+
+        onSuccess(res.invoiceNumber || `INV-PAX-${groupInfo.kodeRegistrasi}`, res.amount || 0);
+        broadcastMutation("registration_groups", "UPDATE", { id: groupInfo.id });
+        broadcastMutation("jamaah", "INSERT", { groupId: groupInfo.id });
+        broadcastMutation("keberangkatan", "UPDATE");
+        broadcastMutation("invoices", "INSERT");
+        handleReset();
+      } catch (e: any) {
+        console.error("Failed to add jamaah:", e);
+        alert(e.message || "Gagal menambahkan jamaah ke grup.");
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
     if (nominal <= 0) return;
     setLoading(true);
 
     let finalCatatan = catatan.trim();
     if (!finalCatatan) {
       if (kategori === "PEMBAYARAN") finalCatatan = `Invoice pembayaran untuk group ${groupInfo.kodeRegistrasi}`;
-      else if (kategori === "TAMBAH_JAMAAH") finalCatatan = `Invoice penambahan ${tambahPaxCount} pax jamaah untuk group ${groupInfo.kodeRegistrasi}`;
       else if (kategori === "PEMBATALAN") finalCatatan = `Biaya pembatalan (${scopePembatalan === "SEBAGIAN" ? "Sebagian Jamaah" : "Seluruh Grup"} - ${refundStatus === "NON_REFUND" ? "Non-Refund / Biaya Hangus" : "Dengan Refund"}) untuk group ${groupInfo.kodeRegistrasi}`;
       else if (kategori === "REFUND_MURNI") finalCatatan = `Pengembalian dana (${refundType === "KELEBIHAN_BAYAR" ? "Kelebihan Bayar" : "Pengembalian Deposit"}) untuk group ${groupInfo.kodeRegistrasi}`;
     }
@@ -909,28 +976,147 @@ export default function CreateInvoiceModal({
 
           {/* DYNAMIC FORM FOR TAMBAH JAMAAH */}
           {kategori === "TAMBAH_JAMAAH" && (
-            <div className="p-3 bg-purple-50 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800 rounded-xl space-y-2">
-              <div className="flex items-center justify-between">
-                <label className="text-[11px] font-bold text-purple-900 dark:text-purple-200 uppercase">
-                  Jumlah Tambahan Jamaah (Pax)
-                </label>
-                <div className="flex items-center gap-2">
-                  <span className="font-bold text-xs">{tambahPaxCount} Pax</span>
+            <div className="p-3.5 bg-gradient-to-r from-purple-50/90 to-fuchsia-50/70 dark:from-purple-950/40 dark:to-fuchsia-950/30 border border-purple-200 dark:border-purple-800 rounded-xl space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-purple-200/60 dark:border-purple-800/60 pb-2.5">
+                <div>
+                  <label className="text-[11px] font-bold text-purple-950 dark:text-purple-200 uppercase flex items-center gap-1.5">
+                    <UserPlus className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400" />
+                    Jumlah Tambahan Jamaah (Pax)
+                  </label>
+                  <p className="text-[10.5px] text-muted-foreground mt-0.5">
+                    Tentukan jumlah jamaah tambahan yang akan digabungkan ke grup ini.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 self-start sm:self-auto">
+                  <button
+                    type="button"
+                    onClick={() => handlePaxCountChange(tambahPaxCount - 1)}
+                    disabled={tambahPaxCount <= 1}
+                    className="h-8 w-8 rounded-lg border border-purple-300 dark:border-purple-700 bg-white dark:bg-purple-900/50 hover:bg-purple-100 flex items-center justify-center font-bold text-sm disabled:opacity-40"
+                  >
+                    -
+                  </button>
                   <input
                     type="number"
                     min={1}
-                    max={20}
+                    max={30}
                     value={tambahPaxCount}
-                    onChange={(e) => setTambahPaxCount(Math.max(1, parseInt(e.target.value, 10) || 1))}
-                    className="w-16 px-2 py-1 border rounded text-xs text-center font-bold"
+                    onChange={(e) => handlePaxCountChange(parseInt(e.target.value, 10) || 1)}
+                    className="w-14 h-8 px-2 border border-purple-300 dark:border-purple-700 rounded-lg text-xs text-center font-bold bg-white dark:bg-slate-900"
                   />
+                  <button
+                    type="button"
+                    onClick={() => handlePaxCountChange(tambahPaxCount + 1)}
+                    disabled={tambahPaxCount >= 30}
+                    className="h-8 w-8 rounded-lg border border-purple-300 dark:border-purple-700 bg-white dark:bg-purple-900/50 hover:bg-purple-100 flex items-center justify-center font-bold text-sm disabled:opacity-40"
+                  >
+                    +
+                  </button>
+                  <span className="font-bold text-xs text-purple-900 dark:text-purple-300 pl-1">
+                    Pax
+                  </span>
                 </div>
+              </div>
+
+              {/* Dynamic list of additional jamaah cards */}
+              <div className="space-y-2.5 max-h-[320px] overflow-y-auto pr-1">
+                {tambahJamaahList.map((item, idx) => (
+                  <div
+                    key={idx}
+                    className="p-3 bg-white dark:bg-slate-900 border border-purple-200/90 dark:border-purple-800/70 rounded-xl space-y-2 shadow-2xs"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-xs text-purple-950 dark:text-purple-200 flex items-center gap-1.5">
+                        <span className="w-5 h-5 rounded-full bg-purple-100 dark:bg-purple-900/80 text-purple-700 dark:text-purple-300 text-[11px] font-extrabold flex items-center justify-center">
+                          {idx + 1}
+                        </span>
+                        Jamaah Tambahan #{idx + 1}
+                      </span>
+                      <span className="text-[10px] bg-purple-100/80 dark:bg-purple-900/60 text-purple-800 dark:text-purple-300 font-semibold px-2 py-0.5 rounded-full">
+                        Pax {idx + 1}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 pt-1 items-end">
+                      {/* Kolom Nama */}
+                      <div className="sm:col-span-5 space-y-1">
+                        <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300">
+                          Nama Lengkap <span className="text-red-500">*</span>
+                        </label>
+                        <Input
+                          placeholder="Masukkan nama jamaah..."
+                          value={item.nama}
+                          onChange={(e) => updateJamaahItem(idx, "nama", e.target.value)}
+                          className="text-xs h-9"
+                        />
+                      </div>
+
+                      {/* Kolom Gender */}
+                      <div className="sm:col-span-3 space-y-1">
+                        <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300">
+                          Gender
+                        </label>
+                        <select
+                          value={item.gender}
+                          onChange={(e) => updateJamaahItem(idx, "gender", e.target.value as "L" | "P")}
+                          className="w-full h-9 px-2.5 bg-background border border-slate-300 dark:border-slate-700 rounded-lg text-xs font-semibold focus:ring-2 focus:ring-purple-500"
+                        >
+                          <option value="L">Laki-laki (L)</option>
+                          <option value="P">Perempuan (P)</option>
+                        </select>
+                      </div>
+
+                      {/* Kolom Hubungan dengan PIC */}
+                      <div className="sm:col-span-4 space-y-1">
+                        <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300">
+                          Hubungan dengan PIC
+                        </label>
+                        <input
+                          type="text"
+                          list={`hubungan-list-${idx}`}
+                          placeholder="Contoh: Istri / Anak / dll"
+                          value={item.hubungan}
+                          onChange={(e) => updateJamaahItem(idx, "hubungan", e.target.value)}
+                          className="w-full h-9 px-2.5 bg-background border border-slate-300 dark:border-slate-700 rounded-lg text-xs font-medium focus:ring-2 focus:ring-purple-500"
+                        />
+                        <datalist id={`hubungan-list-${idx}`}>
+                          <option value="Istri" />
+                          <option value="Suami" />
+                          <option value="Anak" />
+                          <option value="Orang Tua" />
+                          <option value="Ayah" />
+                          <option value="Ibu" />
+                          <option value="Saudara Kandung" />
+                          <option value="Kakak" />
+                          <option value="Adik" />
+                          <option value="Mertua" />
+                          <option value="Menantu" />
+                          <option value="Kerabat" />
+                          <option value="Teman" />
+                        </datalist>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Information Note */}
+              <div className="p-2.5 bg-purple-100/60 dark:bg-purple-950/60 border border-purple-200 dark:border-purple-800 rounded-lg text-xs space-y-1">
+                <div className="flex items-center justify-between font-bold text-purple-950 dark:text-purple-200">
+                  <span>Estimasi Biaya Paket ({tambahPaxCount} Pax):</span>
+                  <span>
+                    Rp {(tambahPaxCount * (currentPackage?.hargaPaket || (groupInfo?.totalTagihan && groupInfo?.jumlahAnggota ? Math.round(groupInfo.totalTagihan / groupInfo.jumlahAnggota) : 0))).toLocaleString("id-ID")}
+                  </span>
+                </div>
+                <p className="text-[10.5px] text-muted-foreground">
+                  ℹ️ Tanggal jatuh tempo otomatis mengikuti grup pendaftaran ({jatuhTempo ? formatDateShort(jatuhTempo) : "Standar H-40"}). Invoice penambahan jamaah akan masuk ke antrean untuk ditinjau ulang sebelum diterbitkan.
+                </p>
               </div>
             </div>
           )}
 
-          {/* 3. NOMINAL TRANSACTION (Disederhanakan / Dihilangkan untuk PINDAH_PAKET) */}
-          {kategori !== "PINDAH_PAKET" && (
+          {/* 3. NOMINAL TRANSACTION (Disederhanakan / Dihilangkan untuk PINDAH_PAKET & TAMBAH_JAMAAH) */}
+          {kategori !== "PINDAH_PAKET" && kategori !== "TAMBAH_JAMAAH" && (
             <>
               <div>
                 <label className="text-xs font-bold uppercase tracking-wider text-foreground">
@@ -944,7 +1130,7 @@ export default function CreateInvoiceModal({
                 />
               </div>
 
-              {/* 4. JATUH TEMPO (Disembunyikan saat PINDAH_PAKET sesuai instruksi) */}
+              {/* 4. JATUH TEMPO (Disembunyikan saat PINDAH_PAKET & TAMBAH_JAMAAH) */}
               <div>
                 <div className="flex items-center justify-between">
                   <label className="text-xs font-bold uppercase tracking-wider text-foreground">
@@ -970,7 +1156,7 @@ export default function CreateInvoiceModal({
                 />
               </div>
 
-              {/* 5. CATATAN (Disembunyikan saat PINDAH_PAKET sesuai instruksi) */}
+              {/* 5. CATATAN (Disembunyikan saat PINDAH_PAKET & TAMBAH_JAMAAH) */}
               <div>
                 <label className="text-xs font-bold uppercase tracking-wider text-foreground">
                   4. Catatan / Rincian Tagihan Invoice
@@ -998,7 +1184,9 @@ export default function CreateInvoiceModal({
               !groupInfo ||
               (kategori === "PINDAH_PAKET"
                 ? !targetPaketId || targetPaketId === currentPackage?.id
-                : nominal <= 0)
+                : kategori === "TAMBAH_JAMAAH"
+                  ? tambahJamaahList.some((j) => !j.nama.trim())
+                  : nominal <= 0)
             }
             className={cn(
               "font-bold text-white",
@@ -1019,11 +1207,13 @@ export default function CreateInvoiceModal({
                 ? (pricingOption === "HARGA_BARU" && totalDiff > 0
                     ? "Pindahkan Paket & Terbitkan Invoice Selisih"
                     : "Pindahkan Paket")
-                : kategori === "PEMBATALAN"
-                  ? "Terbitkan Credit Note Pembatalan"
-                  : kategori === "REFUND_MURNI"
-                    ? "Terbitkan Bukti Refund"
-                    : "Terbitkan Invoice"}
+                : kategori === "TAMBAH_JAMAAH"
+                  ? `Tambah ${tambahPaxCount} Jamaah ke Grup`
+                  : kategori === "PEMBATALAN"
+                    ? "Terbitkan Credit Note Pembatalan"
+                    : kategori === "REFUND_MURNI"
+                      ? "Terbitkan Bukti Refund"
+                      : "Terbitkan Invoice"}
           </Button>
         </div>
       </div>
