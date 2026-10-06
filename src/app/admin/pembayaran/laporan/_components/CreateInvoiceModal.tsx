@@ -10,6 +10,7 @@ import {
   ArrowDownLeft,
   AlertTriangle,
   Package,
+  Layers,
 } from "lucide-react";
 import { cn, formatDateShort } from "@/shared/lib/utils";
 import { Button } from "@/shared/components/ui/Button";
@@ -58,6 +59,7 @@ export default function CreateInvoiceModal({
   // Pindah Paket specific states
   const [keberangkatanList, setKeberangkatanList] = useState<any[]>([]);
   const [targetPaketId, setTargetPaketId] = useState<string>("");
+  const [selectedClusterIndex, setSelectedClusterIndex] = useState<number>(0);
   const [pricingOption, setPricingOption] = useState<"HARGA_LAMA" | "HARGA_BARU">("HARGA_BARU");
 
   const [nominal, setNominal] = useState<number>(0);
@@ -176,10 +178,52 @@ export default function CreateInvoiceModal({
     return keberangkatanList.find((k) => k.id === targetPaketId) || null;
   }, [targetPaketId, keberangkatanList]);
 
+  // Extract clusters / variants from target package (e.g. SILVER/GOLD or Reguler/Varian 2)
+  const targetClusters = useMemo(() => {
+    if (!targetPackage) return [];
+    const opts = (targetPackage as any).hotelOptions;
+    if (!opts) return [];
+    let parsed = opts;
+    if (typeof opts === "string") {
+      try {
+        parsed = JSON.parse(opts);
+      } catch {
+        return [];
+      }
+    }
+    if (!Array.isArray(parsed)) return [];
+    return parsed.map((item: any, idx: number) => ({
+      id: idx,
+      clusterName: item.clusterName || item.variantName || item.namaCluster || `Klaster ${idx + 1}`,
+      hargaBase: Number(item.hargaBase || item.harga || targetPackage.hargaPaket || 0),
+      hotelMekkah: item.hotelMekkah || "",
+      hotelMadinah: item.hotelMadinah || "",
+      isVarian2: Boolean(item.isVarian2),
+      isPromo: Boolean(item.isPromo),
+    }));
+  }, [targetPackage]);
+
+  const activeTargetCluster = useMemo(() => {
+    if (!targetClusters || targetClusters.length === 0) return null;
+    return targetClusters[selectedClusterIndex] || targetClusters[0] || null;
+  }, [targetClusters, selectedClusterIndex]);
+
   // Pindah Paket calculations
   const paxCount = groupInfo?.jumlahAnggota || groupInfo?.anggotaIds?.length || 1;
   const oldPrice = currentPackage?.hargaPaket || (groupInfo?.totalTagihan ? Math.round(groupInfo.totalTagihan / paxCount) : 0);
-  const newPrice = targetPackage?.hargaPaket || 0;
+  
+  // Dynamic price based on selected cluster / variant specification
+  const newPrice = useMemo(() => {
+    if (!targetPackage) return 0;
+    if (pricingOption === "HARGA_BARU") {
+      if (activeTargetCluster && typeof activeTargetCluster.hargaBase === "number" && activeTargetCluster.hargaBase > 0) {
+        return activeTargetCluster.hargaBase;
+      }
+      return targetPackage.hargaPaket || 0;
+    }
+    return oldPrice;
+  }, [targetPackage, pricingOption, activeTargetCluster, oldPrice]);
+
   const diffPerPax = newPrice - oldPrice;
   const totalDiff = diffPerPax * paxCount;
 
@@ -202,6 +246,7 @@ export default function CreateInvoiceModal({
     setGroupInfo(null);
     setH40Warning(null);
     setTargetPaketId("");
+    setSelectedClusterIndex(0);
     setPricingOption("HARGA_BARU");
     setKategori("PEMBAYARAN");
   }
@@ -220,6 +265,8 @@ export default function CreateInvoiceModal({
       }
       setLoading(true);
       try {
+        const selectedClusterName = activeTargetCluster?.clusterName || "";
+
         // 1. Move group via API
         const resMove = await fetch(`/api/groups/${groupInfo.id}`, {
           method: "PUT",
@@ -228,6 +275,7 @@ export default function CreateInvoiceModal({
             paketKeberangkatanId: targetPaketId,
             pricingOption,
             totalDiff: pricingOption === "HARGA_BARU" ? totalDiff : 0,
+            hotelUpgrade: selectedClusterName || undefined,
           }),
         });
         const moveJson = await resMove.json();
@@ -244,7 +292,7 @@ export default function CreateInvoiceModal({
             kategori: "PINDAH_PAKET",
             subKategori: "pindah_paket",
             nominal: totalDiff,
-            catatan: `Invoice selisih pindah paket ke ${targetPackage?.namaPaket || targetPaketId} (${paxCount} pax @ selisih Rp ${diffPerPax.toLocaleString("id-ID")})`,
+            catatan: `Invoice selisih pindah paket ke ${targetPackage?.namaPaket || targetPaketId}${selectedClusterName ? ` [${selectedClusterName}]` : ""} (${paxCount} pax @ selisih Rp ${diffPerPax.toLocaleString("id-ID")})`,
           });
           resultInvNumber = inv.nomorInvoice || inv.id;
           finalAmount = totalDiff;
@@ -550,15 +598,13 @@ export default function CreateInvoiceModal({
                       <RefreshCw className="h-3.5 w-3.5 text-blue-600" />
                       Ganti Ke Paket Apa (Pilih Paket Tujuan)
                     </span>
-                    {targetPackage && (
-                      <span className="text-[10px] font-mono bg-blue-200 text-blue-900 px-1.5 py-0.5 rounded">
-                        {targetPackage.kode}
-                      </span>
-                    )}
                   </label>
                   <select
                     value={targetPaketId}
-                    onChange={(e) => setTargetPaketId(e.target.value)}
+                    onChange={(e) => {
+                      setTargetPaketId(e.target.value);
+                      setSelectedClusterIndex(0);
+                    }}
                     className="w-full px-3 py-2 bg-background border border-blue-300 dark:border-blue-700 font-bold rounded-lg text-xs focus:ring-2 focus:ring-blue-500"
                   >
                     <option value="">-- Pilih Paket Keberangkatan Tujuan --</option>
@@ -566,7 +612,7 @@ export default function CreateInvoiceModal({
                       .filter((k) => k.id !== currentPackage?.id)
                       .map((k) => (
                         <option key={k.id} value={k.id}>
-                          {k.kode} — {k.namaPaket} (Tgl: {k.tanggalBerangkat ? formatDateShort(k.tanggalBerangkat) : "-"}) - Rp {(k.hargaPaket || 0).toLocaleString("id-ID")}
+                          {k.namaPaket}
                         </option>
                       ))}
                   </select>
@@ -578,8 +624,10 @@ export default function CreateInvoiceModal({
                         <strong>{targetPackage.tanggalBerangkat ? formatDateShort(targetPackage.tanggalBerangkat) : "-"}</strong>
                       </div>
                       <div>
-                        <span className="block opacity-75">Tarif Resmi Paket Baru:</span>
-                        <strong>Rp {(targetPackage.hargaPaket || 0).toLocaleString("id-ID")} / pax</strong>
+                        <span className="block opacity-75">Tarif Resmi Paket:</span>
+                        <strong>
+                          Rp {((pricingOption === "HARGA_BARU" && activeTargetCluster?.hargaBase) ? activeTargetCluster.hargaBase : (targetPackage.hargaPaket || 0)).toLocaleString("id-ID")} / pax
+                        </strong>
                       </div>
                       <div>
                         <span className="block opacity-75">Sisa Seat Paket:</span>
@@ -660,10 +708,85 @@ export default function CreateInvoiceModal({
                         </span>
                       </div>
                       <p className="text-[10.5px] text-muted-foreground pl-5">
-                        Menyesuaikan dengan tarif resmi paket baru (Rp {(newPrice || 0).toLocaleString("id-ID")}/pax).
+                        Menyesuaikan dengan tarif resmi paket baru {activeTargetCluster ? `(${activeTargetCluster.clusterName} - Rp ${(newPrice || 0).toLocaleString("id-ID")}/pax)` : `(Rp ${(newPrice || 0).toLocaleString("id-ID")}/pax)`}.
                       </p>
                     </div>
                   </div>
+
+                  {/* Dynamic Cluster / Variant Spec Selection when target package has clusters */}
+                  {pricingOption === "HARGA_BARU" && targetClusters.length > 0 && (
+                    <div className="p-3 bg-gradient-to-r from-blue-50/90 to-sky-50/70 dark:from-blue-950/40 dark:to-sky-950/30 border border-blue-200 dark:border-blue-800 rounded-xl space-y-2 mt-2">
+                      <div className="flex items-center justify-between">
+                        <label className="text-[11px] font-bold text-blue-950 dark:text-blue-200 uppercase flex items-center gap-1.5">
+                          <Layers className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
+                          Pilih Klaster & Varian Spek Paket Baru
+                        </label>
+                        <span className="text-[10px] bg-blue-100 dark:bg-blue-900/80 text-blue-800 dark:text-blue-300 font-semibold px-2 py-0.5 rounded-full">
+                          {targetClusters.length} Pilihan Spek
+                        </span>
+                      </div>
+                      <p className="text-[10.5px] text-muted-foreground">
+                        Paket ini memiliki variasi klaster/spek. Pilih klaster yang sesuai untuk menentukan tarif resmi terbaru:
+                      </p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                        {targetClusters.map((cluster: any, idx: number) => {
+                          const isSelected = selectedClusterIndex === idx;
+                          return (
+                            <div
+                              key={idx}
+                              onClick={() => setSelectedClusterIndex(idx)}
+                              className={cn(
+                                "p-2.5 rounded-lg border cursor-pointer transition-all text-left flex flex-col justify-between space-y-1.5 relative",
+                                isSelected
+                                  ? "bg-white dark:bg-slate-900 border-blue-600 dark:border-blue-500 shadow-sm ring-2 ring-blue-500/20"
+                                  : "bg-white/70 dark:bg-slate-900/40 border-slate-200 dark:border-slate-800 hover:bg-white dark:hover:bg-slate-900"
+                              )}
+                            >
+                              <div className="flex items-start justify-between gap-1.5">
+                                <div className="font-bold text-xs text-foreground flex items-center gap-1.5">
+                                  <input
+                                    type="radio"
+                                    name="selectedCluster"
+                                    checked={isSelected}
+                                    onChange={() => setSelectedClusterIndex(idx)}
+                                    className="h-3.5 w-3.5 text-blue-600"
+                                  />
+                                  <span>{cluster.clusterName}</span>
+                                </div>
+                                {cluster.isVarian2 ? (
+                                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 whitespace-nowrap">
+                                    Varian Spek
+                                  </span>
+                                ) : cluster.isPromo ? (
+                                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 whitespace-nowrap">
+                                    Promo
+                                  </span>
+                                ) : null}
+                              </div>
+
+                              {(cluster.hotelMekkah || cluster.hotelMadinah) && (
+                                <div className="text-[10.5px] text-muted-foreground pl-5 space-y-0.5">
+                                  {cluster.hotelMekkah && (
+                                    <div>Mekkah: <span className="text-foreground font-medium">{cluster.hotelMekkah}</span></div>
+                                  )}
+                                  {cluster.hotelMadinah && (
+                                    <div>Madinah: <span className="text-foreground font-medium">{cluster.hotelMadinah}</span></div>
+                                  )}
+                                </div>
+                              )}
+
+                              <div className="pt-1.5 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-[11px] pl-5">
+                                <span className="text-muted-foreground text-[10px]">Tarif Resmi:</span>
+                                <strong className="text-blue-700 dark:text-blue-400 font-bold">
+                                  Rp {cluster.hargaBase.toLocaleString("id-ID")} / pax
+                                </strong>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
 
                   {/* Summary Calculation Box */}
                   <div className="p-2.5 bg-background border rounded-lg text-xs space-y-1 mt-1">

@@ -200,6 +200,17 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
           },
         });
       } catch { /* non-blocking */ }
+
+      // Update cluster/variant specification on registration request
+      if (body.hotelUpgrade) {
+        await prisma.registrationRequest.updateMany({
+          where: { groupId: existingGroup.id },
+          data: {
+            hotelUpgrade: body.hotelUpgrade,
+            paketId: targetPaket.id,
+          },
+        }).catch(() => {});
+      }
     }
 
     // Sanitize body fields before sending to groupRepo.update
@@ -207,6 +218,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
     delete cleanUpdateData.pricingOption;
     delete cleanUpdateData.newPrice;
     delete cleanUpdateData.oldPrice;
+    delete cleanUpdateData.hotelUpgrade;
 
     if (body.pricingOption === "HARGA_BARU" && typeof body.totalDiff === "number") {
       const newTotalTagihan = Math.max(0, existingGroup.totalTagihan + body.totalDiff);
