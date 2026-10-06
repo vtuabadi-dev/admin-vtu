@@ -334,6 +334,7 @@ export default function CreateInvoiceModal({
         broadcastMutation("registration_groups", "UPDATE", { id: groupInfo.id });
         broadcastMutation("keberangkatan", "UPDATE");
         broadcastMutation("invoices", "INSERT");
+        broadcastMutation("pembayaran", "INSERT", { groupId: groupInfo.id });
         handleReset();
       } catch (e: any) {
         console.error("Failed to move package:", e);
@@ -370,6 +371,7 @@ export default function CreateInvoiceModal({
         broadcastMutation("jamaah", "INSERT", { groupId: groupInfo.id });
         broadcastMutation("keberangkatan", "UPDATE");
         broadcastMutation("invoices", "INSERT");
+        broadcastMutation("pembayaran", "INSERT", { groupId: groupInfo.id });
         handleReset();
       } catch (e: any) {
         console.error("Failed to add jamaah:", e);
@@ -1105,7 +1107,7 @@ export default function CreateInvoiceModal({
                 <div className="flex items-center justify-between font-bold text-purple-950 dark:text-purple-200">
                   <span>Estimasi Biaya Paket ({tambahPaxCount} Pax):</span>
                   <span>
-                    Rp {(tambahPaxCount * (currentPackage?.hargaPaket || (groupInfo?.totalTagihan && groupInfo?.jumlahAnggota ? Math.round(groupInfo.totalTagihan / groupInfo.jumlahAnggota) : 0))).toLocaleString("id-ID")}
+                    Rp {(tambahPaxCount * (currentPackage?.hargaPaket || groupInfo?.keberangkatan?.hargaPaket || groupInfo?.paketKeberangkatan?.hargaPaket || (groupInfo?.totalTagihan ? Math.round(groupInfo.totalTagihan / Math.max(1, groupInfo.jumlahAnggota || 1)) : 0))).toLocaleString("id-ID")}
                   </span>
                 </div>
                 <p className="text-[10.5px] text-muted-foreground">

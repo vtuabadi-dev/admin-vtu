@@ -109,16 +109,53 @@ export async function updateTelegramConfig(partialConfig: Partial<TelegramConfig
 
 export function resolveTargetGroupId(
   startingPointCodeOrName: string | undefined,
-  config: TelegramConfig
+  config: TelegramConfig,
+  fallbackContextText?: string
 ): { groupId: string; targetName: string } {
-  const input = (startingPointCodeOrName || "").toLowerCase();
+  const primaryInput = (startingPointCodeOrName || "").toLowerCase().trim();
+  const contextInput = (fallbackContextText || "").toLowerCase().trim();
+  const combined = `${primaryInput} ${contextInput}`.trim();
 
-  if (input.includes("sub") || input.includes("surabaya")) {
-    return { groupId: config.groupIdSurabaya, targetName: "Surabaya" };
+  // 1. Deteksi Surabaya: SBY, SUB, Surabaya, Juanda (baik di starting point code/name maupun di kode/nama paket)
+  const isSurabaya =
+    primaryInput === "sby" ||
+    primaryInput === "sub" ||
+    primaryInput.includes("surabaya") ||
+    primaryInput.includes("juanda") ||
+    /\b(sby|sub)\b|surabaya|juanda/i.test(combined) ||
+    combined.includes("_sby_") ||
+    combined.includes("-sby-") ||
+    combined.includes(" sby ") ||
+    combined.includes("_sub_") ||
+    combined.includes("-sub-") ||
+    combined.includes(" sub ") ||
+    combined.includes("surabaya");
+
+  if (isSurabaya) {
+    if (config.groupIdSurabaya) {
+      return { groupId: config.groupIdSurabaya, targetName: "Surabaya" };
+    }
   }
 
-  if (input.includes("jkt") || input.includes("jakarta")) {
-    return { groupId: config.groupIdJakarta, targetName: "Jakarta" };
+  // 2. Deteksi Jakarta: JKT, CGK, Jakarta, Soekarno-Hatta, Cengkareng
+  const isJakarta =
+    primaryInput === "jkt" ||
+    primaryInput === "cgk" ||
+    primaryInput.includes("jakarta") ||
+    primaryInput.includes("cengkareng") ||
+    /\b(jkt|cgk)\b|jakarta|cengkareng/i.test(combined) ||
+    combined.includes("_jkt_") ||
+    combined.includes("-jkt-") ||
+    combined.includes(" jkt ") ||
+    combined.includes("_cgk_") ||
+    combined.includes("-cgk-") ||
+    combined.includes(" cgk ") ||
+    combined.includes("jakarta");
+
+  if (isJakarta) {
+    if (config.groupIdJakarta) {
+      return { groupId: config.groupIdJakarta, targetName: "Jakarta" };
+    }
   }
 
   // Fallback to Jakarta if available, else Surabaya
@@ -182,20 +219,36 @@ export async function sendPackageBroadcast(
     return { success: false, message: "Bot token belum dikonfigurasi." };
   }
 
-  const startingKey = params.startingPointCode || params.startingPointName || "JKT";
-  const { groupId, targetName } = resolveTargetGroupId(startingKey, config);
+  const pkgList = Array.isArray(params.packages) ? params.packages : [params.packages];
+  const samplePkg = pkgList[0] || {};
+
+  // Build context string from all package attributes to ensure accurate target routing
+  const contextForDetection = [
+    params.startingPointCode,
+    params.startingPointName,
+    params.kodeGrup,
+    samplePkg.kode,
+    samplePkg.kodeIndividu,
+    samplePkg.namaPaket,
+    samplePkg.startingPoint?.code,
+    samplePkg.startingPoint?.name,
+  ].filter(Boolean).join(" ");
+
+  const { groupId, targetName } = resolveTargetGroupId(
+    params.startingPointCode || params.startingPointName,
+    config,
+    contextForDetection
+  );
 
   if (!groupId) {
     console.warn(`[Telegram Broadcast] ID Grup Telegram untuk Starting ${targetName} belum dikonfigurasi.`);
     return { success: false, message: `ID Grup Telegram ${targetName} belum dikonfigurasi.` };
   }
 
-  const pkgList = Array.isArray(params.packages) ? params.packages : [params.packages];
   if (pkgList.length === 0) {
     return { success: false, message: "Data paket kosong." };
   }
 
-  const samplePkg = pkgList[0];
   const namaPaket = samplePkg.namaPaket || "Paket Umroh";
   const maskapai = samplePkg.maskapai || "Saudia";
   const hotelMekkah = samplePkg.hotelMekkah || "TBA";
@@ -204,17 +257,17 @@ export async function sendPackageBroadcast(
   const kuota = samplePkg.kuota || 45;
   const starting = params.startingPointName || params.startingPointCode || targetName;
 
-  // Build Caption: Use User's uploaded/entered custom caption as primary
+  // Build Caption: Gunakan input caption dari user APA ADANYA (verbatim) jika tersedia
   let caption = "";
-  let useHtmlParseMode = true;
+  let useHtmlParseMode = false;
 
-  if (params.customCaption && params.customCaption.trim()) {
-    caption = params.customCaption.trim();
-    // Only enable HTML parse mode if user's caption contains basic HTML tags, otherwise send as plain text
-    const hasHtmlTags = /<\/?(b|i|u|s|code|pre|a|strong|em)(\s+[^>]*)?>/i.test(caption);
-    useHtmlParseMode = hasHtmlTags;
+  if (params.customCaption && params.customCaption.trim().length > 0) {
+    // SALIN APA ADANYA dari kolom caption tanpa template tambahan
+    caption = params.customCaption;
+    // Cek apakah caption mengandung tag HTML valid
+    useHtmlParseMode = /<\/?(b|i|u|s|code|pre|a|strong|em)(\s+[^>]*)?>/i.test(caption);
   } else {
-    // Default fallback template ONLY if user didn't enter any custom caption
+    // Default fallback template HANYA jika kolom caption benar-benar kosong
     const captionLines = [
       `<b>🎉 PAKET UMROH BARU DIBUAT</b>`,
       ``,
@@ -233,113 +286,255 @@ export async function sendPackageBroadcast(
     useHtmlParseMode = true;
   }
 
-  let flyerMessageId: number | undefined;
+  // Helper untuk mengirim pesan teks Telegram dengan auto-fallback jika HTML error atau karakter panjang
+  async function sendTextMessageSafe(chatId: string, text: string, replyToId?: number): Promise<number | undefined> {
+    if (!text || text.trim().length === 0) return undefined;
 
-  try {
-    const flyers = Array.isArray(params.flyerBase64List) ? params.flyerBase64List.filter(Boolean) : [];
-
-    if (flyers.length > 0) {
-      if (flyers.length === 1) {
-        // Single Photo -> sendPhoto
-        const { buffer, mimeType } = base64ToBlob(flyers[0] || "");
-        const formData = new FormData();
-        formData.append("chat_id", groupId);
-        formData.append("caption", caption);
-        if (useHtmlParseMode) {
-          formData.append("parse_mode", "HTML");
-        }
-        const blob = new Blob([buffer as any], { type: mimeType });
-        formData.append("photo", blob, "flyer.jpg");
-
-        const res = await fetch(`https://api.telegram.org/bot${config.botToken}/sendPhoto`, {
-          method: "POST",
-          body: formData,
-        });
-
-        const resJson = await res.json();
-        if (resJson.ok) {
-          flyerMessageId = resJson.result?.message_id;
-        } else {
-          console.error("[Telegram Broadcast Error sendPhoto]", resJson);
-        }
-      } else {
-        // Multiple Photos -> sendMediaGroup
-        const formData = new FormData();
-        formData.append("chat_id", groupId);
-
-        const mediaArray = flyers.map((flyer, idx) => {
-          const attachName = `file${idx}`;
-          const { buffer, mimeType } = base64ToBlob(flyer);
-          const blob = new Blob([buffer as any], { type: mimeType });
-          formData.append(attachName, blob, `flyer_${idx + 1}.jpg`);
-
-          const item: any = {
-            type: "photo",
-            media: `attach://${attachName}`,
-          };
-          // Attach caption only to the first photo in media group
-          if (idx === 0) {
-            item.caption = caption;
-            if (useHtmlParseMode) {
-              item.parse_mode = "HTML";
-            }
-          }
-          return item;
-        });
-
-        formData.append("media", JSON.stringify(mediaArray));
-
-        const res = await fetch(`https://api.telegram.org/bot${config.botToken}/sendMediaGroup`, {
-          method: "POST",
-          body: formData,
-        });
-
-        const resJson = await res.json();
-        if (resJson.ok && Array.isArray(resJson.result) && resJson.result.length > 0) {
-          flyerMessageId = resJson.result[0]?.message_id;
-        } else {
-          console.error("[Telegram Broadcast Error sendMediaGroup]", resJson);
-        }
-      }
+    // Split jika teks melebihi limit 4096 karakter
+    const chunks: string[] = [];
+    if (text.length <= 4000) {
+      chunks.push(text);
     } else {
-      // No flyer uploaded -> Send text message as main message
-      const textPayload: any = {
-        chat_id: groupId,
-        text: caption,
-      };
-      if (useHtmlParseMode) {
-        textPayload.parse_mode = "HTML";
-      }
-
-      const res = await fetch(`https://api.telegram.org/bot${config.botToken}/sendMessage`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(textPayload),
-      });
-      const resJson = await res.json();
-      if (resJson.ok) {
-        flyerMessageId = resJson.result?.message_id;
+      let cur = text;
+      while (cur.length > 0) {
+        if (cur.length <= 4000) {
+          chunks.push(cur);
+          break;
+        }
+        let splitIdx = cur.lastIndexOf("\n", 4000);
+        if (splitIdx === -1) splitIdx = 4000;
+        chunks.push(cur.slice(0, splitIdx));
+        cur = cur.slice(splitIdx).trimStart();
       }
     }
 
-    // Step 2: Send Reply Message containing Package Code(s)
+    let lastSentMessageId: number | undefined;
+
+    for (const chunk of chunks) {
+      // Percobaan 1: coba dengan parse_mode HTML jika enabled
+      let payload: any = {
+        chat_id: chatId,
+        text: chunk,
+      };
+      if (replyToId && !lastSentMessageId) {
+        payload.reply_to_message_id = replyToId;
+      }
+      if (useHtmlParseMode) {
+        payload.parse_mode = "HTML";
+      }
+
+      let res = await fetch(`https://api.telegram.org/bot${config.botToken}/sendMessage`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      let resJson = await res.json();
+
+      // Jika gagal parse HTML (misal unescaped entity '&' atau '<'), fallback kirim teks polos
+      if (!resJson.ok && useHtmlParseMode) {
+        console.warn("[Telegram Broadcast] sendMessage HTML parse failed, retrying plain text:", resJson.description);
+        delete payload.parse_mode;
+        res = await fetch(`https://api.telegram.org/bot${config.botToken}/sendMessage`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        resJson = await res.json();
+      }
+
+      if (resJson.ok) {
+        lastSentMessageId = resJson.result?.message_id;
+      } else {
+        console.error("[Telegram Broadcast Error sendMessage]", resJson);
+      }
+    }
+
+    return lastSentMessageId;
+  }
+
+  let flyerMessageId: number | undefined;
+  let captionMessageId: number | undefined;
+
+  try {
+    const flyers = Array.isArray(params.flyerBase64List) ? params.flyerBase64List.filter(Boolean) : [];
+    // Batas caption Telegram untuk foto adalah 1024 karakter.
+    // Jika caption > 1000 karakter, kirim foto terpisah lalu kirim caption utuh sebagai teks.
+    const isCaptionTooLongForPhoto = caption.length > 1000;
+
+    if (flyers.length > 0) {
+      if (flyers.length === 1) {
+        // --- Single Photo ---
+        const { buffer, mimeType } = base64ToBlob(flyers[0] || "");
+
+        const buildFormData = (withCaption: boolean, htmlMode: boolean) => {
+          const fd = new FormData();
+          fd.append("chat_id", groupId);
+          if (withCaption && caption) {
+            fd.append("caption", caption);
+            if (htmlMode) fd.append("parse_mode", "HTML");
+          }
+          const blob = new Blob([buffer as any], { type: mimeType });
+          fd.append("photo", blob, "flyer.jpg");
+          return fd;
+        };
+
+        if (!isCaptionTooLongForPhoto) {
+          // Coba kirim foto beserta caption
+          let res = await fetch(`https://api.telegram.org/bot${config.botToken}/sendPhoto`, {
+            method: "POST",
+            body: buildFormData(true, useHtmlParseMode),
+          });
+          let resJson = await res.json();
+
+          // Jika gagal karena HTML entities parse error, retry kirim foto dengan caption teks polos
+          if (!resJson.ok && useHtmlParseMode) {
+            console.warn("[Telegram Broadcast] sendPhoto HTML parse failed, retrying plain text:", resJson.description);
+            res = await fetch(`https://api.telegram.org/bot${config.botToken}/sendPhoto`, {
+              method: "POST",
+              body: buildFormData(true, false),
+            });
+            resJson = await res.json();
+          }
+
+          // Jika tetap gagal karena panjang caption atau hal lain, fallback kirim foto tanpa caption
+          if (!resJson.ok) {
+            console.warn("[Telegram Broadcast] sendPhoto with caption failed, fallback to photo only:", resJson.description);
+            res = await fetch(`https://api.telegram.org/bot${config.botToken}/sendPhoto`, {
+              method: "POST",
+              body: buildFormData(false, false),
+            });
+            resJson = await res.json();
+          }
+
+          if (resJson.ok) {
+            flyerMessageId = resJson.result?.message_id;
+          } else {
+            console.error("[Telegram Broadcast Error sendPhoto]", resJson);
+          }
+        } else {
+          // Caption > 1000 karakter: kirim foto murni dulu
+          const res = await fetch(`https://api.telegram.org/bot${config.botToken}/sendPhoto`, {
+            method: "POST",
+            body: buildFormData(false, false),
+          });
+          const resJson = await res.json();
+          if (resJson.ok) {
+            flyerMessageId = resJson.result?.message_id;
+          } else {
+            console.error("[Telegram Broadcast Error sendPhoto]", resJson);
+          }
+        }
+      } else {
+        // --- Multiple Photos (Media Group) ---
+        const buildMediaGroupFormData = (withCaption: boolean, htmlMode: boolean) => {
+          const fd = new FormData();
+          fd.append("chat_id", groupId);
+
+          const mediaArray = flyers.map((flyer, idx) => {
+            const attachName = `file${idx}`;
+            const { buffer, mimeType } = base64ToBlob(flyer);
+            const blob = new Blob([buffer as any], { type: mimeType });
+            fd.append(attachName, blob, `flyer_${idx + 1}.jpg`);
+
+            const item: any = {
+              type: "photo",
+              media: `attach://${attachName}`,
+            };
+            if (idx === 0 && withCaption && caption) {
+              item.caption = caption;
+              if (htmlMode) item.parse_mode = "HTML";
+            }
+            return item;
+          });
+
+          fd.append("media", JSON.stringify(mediaArray));
+          return fd;
+        };
+
+        if (!isCaptionTooLongForPhoto) {
+          let res = await fetch(`https://api.telegram.org/bot${config.botToken}/sendMediaGroup`, {
+            method: "POST",
+            body: buildMediaGroupFormData(true, useHtmlParseMode),
+          });
+          let resJson = await res.json();
+
+          if (!resJson.ok && useHtmlParseMode) {
+            console.warn("[Telegram Broadcast] sendMediaGroup HTML parse failed, retrying plain text:", resJson.description);
+            res = await fetch(`https://api.telegram.org/bot${config.botToken}/sendMediaGroup`, {
+              method: "POST",
+              body: buildMediaGroupFormData(true, false),
+            });
+            resJson = await res.json();
+          }
+
+          if (!resJson.ok) {
+            console.warn("[Telegram Broadcast] sendMediaGroup with caption failed, fallback to media only:", resJson.description);
+            res = await fetch(`https://api.telegram.org/bot${config.botToken}/sendMediaGroup`, {
+              method: "POST",
+              body: buildMediaGroupFormData(false, false),
+            });
+            resJson = await res.json();
+          }
+
+          if (resJson.ok && Array.isArray(resJson.result) && resJson.result.length > 0) {
+            flyerMessageId = resJson.result[0]?.message_id;
+          } else {
+            console.error("[Telegram Broadcast Error sendMediaGroup]", resJson);
+          }
+        } else {
+          // Caption > 1000 karakter: kirim media group tanpa caption
+          const res = await fetch(`https://api.telegram.org/bot${config.botToken}/sendMediaGroup`, {
+            method: "POST",
+            body: buildMediaGroupFormData(false, false),
+          });
+          const resJson = await res.json();
+          if (resJson.ok && Array.isArray(resJson.result) && resJson.result.length > 0) {
+            flyerMessageId = resJson.result[0]?.message_id;
+          } else {
+            console.error("[Telegram Broadcast Error sendMediaGroup]", resJson);
+          }
+        }
+      }
+
+      // Jika caption belum terkirim bersama foto (karena > 1000 karakter atau fallback),
+      // kirim caption secara utuh APA ADANYA via sendMessage
+      if (isCaptionTooLongForPhoto || !flyerMessageId) {
+        captionMessageId = await sendTextMessageSafe(groupId, caption, flyerMessageId);
+      }
+    } else {
+      // Tidak ada flyer: Kirim caption teks murni apa adanya
+      captionMessageId = await sendTextMessageSafe(groupId, caption);
+    }
+
+    // Step 2: Send Reply Message containing Package Code(s) / Hashtag
     let replyMessageId: number | undefined;
 
     let replyText = "";
     if (pkgList.length === 1) {
-      replyText = pkgList[0].kodeIndividu || pkgList[0].kode || "KODE_PAKET_N/A";
+      const code = pkgList[0].kodeIndividu || pkgList[0].kode || "KODE_PAKET_N/A";
+      replyText = code.startsWith("#") ? code : `#${code}`;
     } else {
-      const kodeGrup = params.kodeGrup || pkgList[0].kodeGrup || "KODE_GRUP_N/A";
-      const individualCodes = pkgList.map((p) => p.kodeIndividu || p.kode).filter(Boolean);
+      const rawGrup = params.kodeGrup || pkgList[0].kodeGrup || "KODE_GRUP_N/A";
+      const kodeGrup = rawGrup.startsWith("#") ? rawGrup : `#${rawGrup}`;
+      const individualCodes = pkgList
+        .map((p) => {
+          const c = p.kodeIndividu || p.kode;
+          return c ? (c.startsWith("#") ? c : `#${c}`) : null;
+        })
+        .filter(Boolean);
       replyText = [kodeGrup, ...individualCodes].join("\n");
     }
+
+    // Balas (reply) ke pesan konten terakhir yang berhasil terkirim (caption atau flyer)
+    const targetReplyMessageId = captionMessageId || flyerMessageId;
 
     const replyPayload: any = {
       chat_id: groupId,
       text: replyText,
     };
-    if (flyerMessageId) {
-      replyPayload.reply_to_message_id = flyerMessageId;
+    if (targetReplyMessageId) {
+      replyPayload.reply_to_message_id = targetReplyMessageId;
     }
 
     const replyRes = await fetch(`https://api.telegram.org/bot${config.botToken}/sendMessage`, {
@@ -358,7 +553,7 @@ export async function sendPackageBroadcast(
     return {
       success: true,
       targetGroup: targetName,
-      flyerMessageId,
+      flyerMessageId: flyerMessageId || captionMessageId,
       replyMessageId,
     };
   } catch (err) {

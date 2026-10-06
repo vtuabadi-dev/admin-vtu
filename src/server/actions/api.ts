@@ -173,6 +173,36 @@ export async function createInvoice(data: {
     },
   });
 
+  // Create pending payment in review queue so it appears in Payment Review / Penerbitan Invoice
+  try {
+    const catatanPembayaran =
+      data.catatan ||
+      (data.kategori === "PINDAH_PAKET"
+        ? `Pindah Paket: Selisih biaya paket`
+        : data.kategori === "TAMBAH_JAMAAH"
+          ? `Tambah Jamaah: Tagihan penambahan jamaah`
+          : data.kategori === "PEMBATALAN"
+            ? `Pembatalan: Biaya pembatalan`
+            : data.kategori === "REFUND_MURNI"
+              ? `Refund: Pengembalian dana`
+              : `Tagihan Invoice: ${tipe}`);
+
+    await prisma.pembayaran.create({
+      data: {
+        groupId: data.groupId,
+        invoiceId: created.id,
+        jumlah: data.nominal,
+        metode: "transfer",
+        tanggal: new Date(),
+        status: "pending",
+        sumber: "admin",
+        catatan: catatanPembayaran,
+      },
+    });
+  } catch (err) {
+    console.warn("Failed creating pending pembayaran in review queue:", err);
+  }
+
   // Auto-Approve Registration Request if pending
   try {
     const group = await prisma.registrationGroup.findUnique({ where: { id: data.groupId } });
@@ -640,9 +670,30 @@ export async function addJamaahToGroup(data: {
       },
     }).catch(() => {});
 
+    // Create pending payment in review queue so it appears in Payment Review / Penerbitan Invoice
+    let createdPaymentId = "";
+    try {
+      const createdPayment = await prisma.pembayaran.create({
+        data: {
+          groupId: group.id,
+          invoiceId: createdInvoice.id,
+          jumlah: nominalTambahan,
+          metode: "transfer",
+          tanggal: new Date(),
+          status: "pending",
+          sumber: "admin",
+          catatan: `Tambah Jamaah: ${data.jamaahList.length} Pax (${data.jamaahList.map((j) => `${j.namaLengkap} - ${j.jenisKelamin === "L" ? "L" : "P"}${j.hubungan ? ` (${j.hubungan})` : ""}`).join(", ")})`,
+        },
+      });
+      createdPaymentId = createdPayment.id;
+    } catch (err) {
+      console.warn("Failed creating pending pembayaran for additional jamaah:", err);
+    }
+
     return {
       success: true,
       invoiceNumber: nomorInvoice,
+      paymentId: createdPaymentId,
       amount: nominalTambahan,
       addedCount: data.jamaahList.length,
       group: {

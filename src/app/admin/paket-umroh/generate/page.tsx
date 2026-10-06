@@ -13,6 +13,7 @@ import {
 import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X, Split, Layers, Tag, Edit3, RefreshCw, Info } from "lucide-react";
 import { generateVtuGroupCode } from "@/shared/lib/group-code.helper";
 import { PairingCanvas } from "./components/PairingCanvas";
+import { SplitStartingQuotaSlider } from "./components/SplitStartingQuotaSlider";
 import { useOperationalStore } from "@/stores/operational-store";
 
   interface MasterDataOptions {
@@ -1906,185 +1907,341 @@ export default function GeneratePaketPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
-              {!(generateMode === "split" && splitType !== "starting_point") && (
-                <>
+            {/* Jika mode Split Starting Point: Gunakan Batang Kuota Keseluruhan & Pil Draggable */}
+            {generateMode === "split" && splitType === "starting_point" ? (
+              <div className="space-y-4">
+                <SplitStartingQuotaSlider
+                  totalCapacity={selectedParentGroup?.totalCapacity || 45}
+                  parentCity={selectedParentGroup?.startingCity || "Paket Utama"}
+                  childCity={options?.cities.find(c => c.id === formData.startingPointId)?.name || "Cabang Baru"}
+                  childSeat={parseInt(formData.kapasitas, 10) || 15}
+                  targetMaterialisasi={parseInt(formData.targetMaterialisasi, 10) || 10}
+                  onChangeChildSeat={(val) => {
+                    setFormData(prev => ({
+                      ...prev,
+                      kapasitas: String(val),
+                      targetMaterialisasi: String(Math.max(1, Math.min(val, parseInt(prev.targetMaterialisasi, 10) || Math.round(val * 0.75)))),
+                    }));
+                  }}
+                  onChangeTargetMaterialisasi={(val) => {
+                    setFormData(prev => ({ ...prev, targetMaterialisasi: String(val) }));
+                  }}
+                />
+
+                {/* Baris Saklar Operasional */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-end pt-1">
+                  {/* Saklar Termasuk Perlengkapan */}
                   <div className="flex flex-col justify-end h-full">
-                    <label className="block text-sm font-medium mb-1 min-h-[2.5rem] flex items-end">Kapasitas Seat (Maksimal Jamaah)</label>
-                    <Input 
-                      id="field-kapasitas" 
-                      type="number" 
-                      name="kapasitas" 
-                      value={formData.kapasitas} 
-                      onChange={handleChange} 
-                      onKeyDown={(e) => handleKeyDownNext(e, "field-targetMaterialisasi")}
-                      placeholder="Misal: 45" 
-                    />
+                    <label className="block text-xs font-bold text-slate-800 mb-1 min-h-[2rem] flex items-end">Termasuk Perlengkapan?</label>
+                    <div className="flex items-center gap-2 h-10">
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked={formData.isAdaPerlengkapan === "ya"}
+                        onClick={() => setFormData(prev => ({ ...prev, isAdaPerlengkapan: prev.isAdaPerlengkapan === "ya" ? "tidak" : "ya" }))}
+                        className={cn(
+                          "relative inline-flex h-7 w-14 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-2",
+                          formData.isAdaPerlengkapan === "ya" ? "bg-emerald-600" : "bg-stone-300"
+                        )}
+                      >
+                        <span
+                          className={cn(
+                            "pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out",
+                            formData.isAdaPerlengkapan === "ya" ? "translate-x-7" : "translate-x-0"
+                          )}
+                        />
+                      </button>
+                      <span className={cn(
+                        "text-xs font-bold px-2.5 py-1 rounded-md border min-w-[55px] text-center transition-colors select-none",
+                        formData.isAdaPerlengkapan === "ya" 
+                          ? "bg-emerald-50 text-emerald-950 border-emerald-300" 
+                          : "bg-white text-stone-700 border-stone-300"
+                      )}>
+                        {formData.isAdaPerlengkapan === "ya" ? "Ya" : "Tidak"}
+                      </span>
+                    </div>
                   </div>
+
+                  {/* Saklar Termasuk Kereta Cepat */}
                   <div className="flex flex-col justify-end h-full">
-                    <label className="block text-sm font-medium mb-1 min-h-[2.5rem] flex items-end">Minimal Seat Materialisasi (Kuota Aman)</label>
-                    <Input 
-                      id="field-targetMaterialisasi" 
-                      type="number" 
-                      name="targetMaterialisasi" 
-                      value={formData.targetMaterialisasi} 
-                      onChange={handleChange} 
-                      onKeyDown={(e) => handleKeyDownNext(e, formData.isAdaKlaster === "tidak" ? "field-hargaBase" : "field-submitBtn")}
-                      placeholder="Misal: 30" 
-                    />
+                    <label className="block text-xs font-bold text-slate-800 mb-1 min-h-[2rem] flex items-end">Termasuk Kereta Cepat?</label>
+                    <div className="flex items-center gap-2 h-10">
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked={formData.isAdaKeretaCepat === "ya"}
+                        onClick={() => setFormData(prev => ({ ...prev, isAdaKeretaCepat: prev.isAdaKeretaCepat === "ya" ? "tidak" : "ya" }))}
+                        className={cn(
+                          "relative inline-flex h-7 w-14 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-2",
+                          formData.isAdaKeretaCepat === "ya" ? "bg-emerald-600" : "bg-stone-300"
+                        )}
+                      >
+                        <span
+                          className={cn(
+                            "pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out",
+                            formData.isAdaKeretaCepat === "ya" ? "translate-x-7" : "translate-x-0"
+                          )}
+                        />
+                      </button>
+                      <span className={cn(
+                        "text-xs font-bold px-2.5 py-1 rounded-md border min-w-[55px] text-center transition-colors select-none",
+                        formData.isAdaKeretaCepat === "ya" 
+                          ? "bg-emerald-50 text-emerald-950 border-emerald-300" 
+                          : "bg-white text-stone-700 border-stone-300"
+                      )}>
+                        {formData.isAdaKeretaCepat === "ya" ? "Ya" : "Tidak"}
+                      </span>
+                    </div>
                   </div>
-                </>
-              )}
-              <div className="flex flex-col justify-end h-full">
-                <label className="block text-xs font-bold text-slate-800 mb-1 min-h-[2.5rem] flex items-end">Termasuk Perlengkapan?</label>
-                <div className="flex items-center gap-2 h-10">
-                  <button
-                    type="button"
-                    role="switch"
-                    aria-checked={formData.isAdaPerlengkapan === "ya"}
-                    onClick={() => setFormData(prev => ({ ...prev, isAdaPerlengkapan: prev.isAdaPerlengkapan === "ya" ? "tidak" : "ya" }))}
-                    className={cn(
-                      "relative inline-flex h-7 w-14 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-2",
-                      formData.isAdaPerlengkapan === "ya" ? "bg-emerald-600" : "bg-stone-300"
-                    )}
-                  >
-                    <span
-                      className={cn(
-                        "pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out",
-                        formData.isAdaPerlengkapan === "ya" ? "translate-x-7" : "translate-x-0"
-                      )}
-                    />
-                  </button>
-                  <span className={cn(
-                    "text-xs font-bold px-2.5 py-1 rounded-md border min-w-[55px] text-center transition-colors select-none",
-                    formData.isAdaPerlengkapan === "ya" 
-                      ? "bg-emerald-50 text-emerald-950 border-emerald-300" 
-                      : "bg-white text-stone-700 border-stone-300"
-                  )}>
-                    {formData.isAdaPerlengkapan === "ya" ? "Ya" : "Tidak"}
-                  </span>
-                </div>
-              </div>
 
-              {/* Saklar Termasuk Kereta Cepat */}
-              <div className="flex flex-col justify-end h-full">
-                <label className="block text-xs font-bold text-slate-800 mb-1 min-h-[2.5rem] flex items-end">Termasuk Kereta Cepat?</label>
-                <div className="flex items-center gap-2 h-10">
-                  <button
-                    type="button"
-                    role="switch"
-                    aria-checked={formData.isAdaKeretaCepat === "ya"}
-                    onClick={() => setFormData(prev => ({ ...prev, isAdaKeretaCepat: prev.isAdaKeretaCepat === "ya" ? "tidak" : "ya" }))}
-                    className={cn(
-                      "relative inline-flex h-7 w-14 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-2",
-                      formData.isAdaKeretaCepat === "ya" ? "bg-emerald-600" : "bg-stone-300"
-                    )}
-                  >
-                    <span
-                      className={cn(
-                        "pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out",
-                        formData.isAdaKeretaCepat === "ya" ? "translate-x-7" : "translate-x-0"
-                      )}
-                    />
-                  </button>
-                  <span className={cn(
-                    "text-xs font-bold px-2.5 py-1 rounded-md border min-w-[55px] text-center transition-colors select-none",
-                    formData.isAdaKeretaCepat === "ya" 
-                      ? "bg-emerald-50 text-emerald-950 border-emerald-300" 
-                      : "bg-white text-stone-700 border-stone-300"
-                  )}>
-                    {formData.isAdaKeretaCepat === "ya" ? "Ya" : "Tidak"}
-                  </span>
-                </div>
-              </div>
+                  {/* Saklar Termasuk City Tour Thoif / Thaif */}
+                  <div className="flex flex-col justify-end h-full">
+                    <label className="block text-xs font-bold text-slate-800 mb-1 min-h-[2rem] flex items-end">Termasuk City Tour Thoif / Thaif?</label>
+                    <div className="flex items-center gap-2 h-10">
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked={formData.isAdaThoif === "ya"}
+                        onClick={() => setFormData(prev => ({ ...prev, isAdaThoif: prev.isAdaThoif === "ya" ? "tidak" : "ya" }))}
+                        className={cn(
+                          "relative inline-flex h-7 w-14 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-2",
+                          formData.isAdaThoif === "ya" ? "bg-emerald-600" : "bg-stone-300"
+                        )}
+                      >
+                        <span
+                          className={cn(
+                            "pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out",
+                            formData.isAdaThoif === "ya" ? "translate-x-7" : "translate-x-0"
+                          )}
+                        />
+                      </button>
+                      <span className={cn(
+                        "text-xs font-bold px-2.5 py-1 rounded-md border min-w-[55px] text-center transition-colors select-none",
+                        formData.isAdaThoif === "ya" 
+                          ? "bg-emerald-50 text-emerald-950 border-emerald-300" 
+                          : "bg-white text-stone-700 border-stone-300"
+                      )}>
+                        {formData.isAdaThoif === "ya" ? "Ya" : "Tidak"}
+                      </span>
+                    </div>
+                  </div>
 
-              {/* Saklar Termasuk City Tour Thoif / Thaif */}
-              <div className="flex flex-col justify-end h-full">
-                <label className="block text-xs font-bold text-slate-800 mb-1 min-h-[2.5rem] flex items-end">Termasuk City Tour Thoif / Thaif?</label>
-                <div className="flex items-center gap-2 h-10">
-                  <button
-                    type="button"
-                    role="switch"
-                    aria-checked={formData.isAdaThoif === "ya"}
-                    onClick={() => setFormData(prev => ({ ...prev, isAdaThoif: prev.isAdaThoif === "ya" ? "tidak" : "ya" }))}
-                    className={cn(
-                      "relative inline-flex h-7 w-14 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-2",
-                      formData.isAdaThoif === "ya" ? "bg-emerald-600" : "bg-stone-300"
-                    )}
-                  >
-                    <span
-                      className={cn(
-                        "pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out",
-                        formData.isAdaThoif === "ya" ? "translate-x-7" : "translate-x-0"
-                      )}
-                    />
-                  </button>
-                  <span className={cn(
-                    "text-xs font-bold px-2.5 py-1 rounded-md border min-w-[55px] text-center transition-colors select-none",
-                    formData.isAdaThoif === "ya" 
-                      ? "bg-emerald-50 text-emerald-950 border-emerald-300" 
-                      : "bg-white text-stone-700 border-stone-300"
-                  )}>
-                    {formData.isAdaThoif === "ya" ? "Ya" : "Tidak"}
-                  </span>
+                  {/* Saklar Tipe Konsumsi / Makan (FB vs BF) */}
+                  <div className="flex flex-col justify-end h-full">
+                    <label className="block text-xs font-bold text-slate-800 mb-1 min-h-[2rem] flex items-end">Tipe Konsumsi / Makan</label>
+                    <div className="flex items-center gap-2 h-10">
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked={formData.tipeMakan === "FB"}
+                        onClick={() => setFormData(prev => ({ ...prev, tipeMakan: prev.tipeMakan === "FB" ? "BF" : "FB" }))}
+                        className={cn(
+                          "relative inline-flex h-7 w-14 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-2",
+                          formData.tipeMakan === "FB" ? "bg-emerald-600" : "bg-amber-500"
+                        )}
+                        title={formData.tipeMakan === "FB" ? "Full Board (Makan 3x Sehari)" : "Breakfast Only (Sarapan Saja)"}
+                      >
+                        <span
+                          className={cn(
+                            "pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out",
+                            formData.tipeMakan === "FB" ? "translate-x-7" : "translate-x-0"
+                          )}
+                        />
+                      </button>
+                      <span className={cn(
+                        "text-xs font-bold px-2.5 py-1 rounded-md border min-w-[70px] text-center transition-colors select-none",
+                        formData.tipeMakan === "FB" 
+                          ? "bg-emerald-50 text-emerald-950 border-emerald-300" 
+                          : "bg-amber-50 text-amber-950 border-amber-300"
+                      )}>
+                        {formData.tipeMakan === "FB" ? "Full Board (FB)" : "Breakfast Only (BF)"}
+                      </span>
+                    </div>
+                  </div>
                 </div>
               </div>
-
-              {/* Saklar Tipe Konsumsi / Makan (FB vs BF) */}
-              <div className="flex flex-col justify-end h-full">
-                <label className="block text-xs font-bold text-slate-800 mb-1 min-h-[2.5rem] flex items-end">Tipe Konsumsi / Makan</label>
-                <div className="flex items-center gap-2 h-10">
-                  <button
-                    type="button"
-                    role="switch"
-                    aria-checked={formData.tipeMakan === "FB"}
-                    onClick={() => setFormData(prev => ({ ...prev, tipeMakan: prev.tipeMakan === "FB" ? "BF" : "FB" }))}
-                    className={cn(
-                      "relative inline-flex h-7 w-14 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-2",
-                      formData.tipeMakan === "FB" ? "bg-emerald-600" : "bg-amber-500"
-                    )}
-                    title={formData.tipeMakan === "FB" ? "Full Board (Makan 3x Sehari)" : "Breakfast Only (Sarapan Saja)"}
-                  >
-                    <span
-                      className={cn(
-                        "pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out",
-                        formData.tipeMakan === "FB" ? "translate-x-7" : "translate-x-0"
-                      )}
-                    />
-                  </button>
-                  <span className={cn(
-                    "text-xs font-bold px-2.5 py-1 rounded-md border min-w-[70px] text-center transition-colors select-none",
-                    formData.tipeMakan === "FB" 
-                      ? "bg-emerald-50 text-emerald-950 border-emerald-300" 
-                      : "bg-amber-50 text-amber-950 border-amber-300"
-                  )}>
-                    {formData.tipeMakan === "FB" ? "Full Board (FB)" : "Breakfast Only (BF)"}
-                  </span>
-                </div>
-              </div>
-              <div>
-                {formData.isAdaKlaster === "tidak" ? (
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                {!(generateMode === "split" && splitType !== "starting_point") && (
                   <>
-                    <label className="block text-xs font-bold text-slate-800 mb-1.5">Harga Base (Rp)</label>
-                    <Input 
-                      id="field-hargaBase" 
-                      type="text" 
-                      inputMode="numeric"
-                      name="hargaBase" 
-                      value={formatNumberWithDots(formData.hargaBase)} 
-                      onChange={(e) => handleCurrencyChange("hargaBase", e.target.value)} 
-                      onKeyDown={(e) => handleKeyDownNext(e, "field-submitBtn")} 
-                      placeholder="Rp -" 
-                      className="h-10 bg-white border-stone-300 text-slate-950 font-bold shadow-xs focus:ring-emerald-600 focus:border-emerald-600"
-                    />
+                    <div className="flex flex-col justify-end h-full">
+                      <label className="block text-sm font-medium mb-1 min-h-[2.5rem] flex items-end">Kapasitas Seat (Maksimal Jamaah)</label>
+                      <Input 
+                        id="field-kapasitas" 
+                        type="number" 
+                        name="kapasitas" 
+                        value={formData.kapasitas} 
+                        onChange={handleChange} 
+                        onKeyDown={(e) => handleKeyDownNext(e, "field-targetMaterialisasi")}
+                        placeholder="Misal: 45" 
+                      />
+                    </div>
+                    <div className="flex flex-col justify-end h-full">
+                      <label className="block text-sm font-medium mb-1 min-h-[2.5rem] flex items-end">Minimal Seat Materialisasi (Kuota Aman)</label>
+                      <Input 
+                        id="field-targetMaterialisasi" 
+                        type="number" 
+                        name="targetMaterialisasi" 
+                        value={formData.targetMaterialisasi} 
+                        onChange={handleChange} 
+                        onKeyDown={(e) => handleKeyDownNext(e, formData.isAdaKlaster === "tidak" ? "field-hargaBase" : "field-submitBtn")}
+                        placeholder="Misal: 30" 
+                      />
+                    </div>
                   </>
-                ) : (
-                  <div className="bg-stone-50 p-3 rounded-lg border border-stone-200 text-xs text-stone-600 font-medium h-full flex items-center">
-                    ℹ️ Harga Base diatur per masing-masing Klaster Seat di Langkah 3.
-                  </div>
                 )}
+                <div className="flex flex-col justify-end h-full">
+                  <label className="block text-xs font-bold text-slate-800 mb-1 min-h-[2.5rem] flex items-end">Termasuk Perlengkapan?</label>
+                  <div className="flex items-center gap-2 h-10">
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={formData.isAdaPerlengkapan === "ya"}
+                      onClick={() => setFormData(prev => ({ ...prev, isAdaPerlengkapan: prev.isAdaPerlengkapan === "ya" ? "tidak" : "ya" }))}
+                      className={cn(
+                        "relative inline-flex h-7 w-14 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-2",
+                        formData.isAdaPerlengkapan === "ya" ? "bg-emerald-600" : "bg-stone-300"
+                      )}
+                    >
+                      <span
+                        className={cn(
+                          "pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out",
+                          formData.isAdaPerlengkapan === "ya" ? "translate-x-7" : "translate-x-0"
+                        )}
+                      />
+                    </button>
+                    <span className={cn(
+                      "text-xs font-bold px-2.5 py-1 rounded-md border min-w-[55px] text-center transition-colors select-none",
+                      formData.isAdaPerlengkapan === "ya" 
+                        ? "bg-emerald-50 text-emerald-950 border-emerald-300" 
+                        : "bg-white text-stone-700 border-stone-300"
+                    )}>
+                      {formData.isAdaPerlengkapan === "ya" ? "Ya" : "Tidak"}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Saklar Termasuk Kereta Cepat */}
+                <div className="flex flex-col justify-end h-full">
+                  <label className="block text-xs font-bold text-slate-800 mb-1 min-h-[2.5rem] flex items-end">Termasuk Kereta Cepat?</label>
+                  <div className="flex items-center gap-2 h-10">
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={formData.isAdaKeretaCepat === "ya"}
+                      onClick={() => setFormData(prev => ({ ...prev, isAdaKeretaCepat: prev.isAdaKeretaCepat === "ya" ? "tidak" : "ya" }))}
+                      className={cn(
+                        "relative inline-flex h-7 w-14 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-2",
+                        formData.isAdaKeretaCepat === "ya" ? "bg-emerald-600" : "bg-stone-300"
+                      )}
+                    >
+                      <span
+                        className={cn(
+                          "pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out",
+                          formData.isAdaKeretaCepat === "ya" ? "translate-x-7" : "translate-x-0"
+                        )}
+                      />
+                    </button>
+                    <span className={cn(
+                      "text-xs font-bold px-2.5 py-1 rounded-md border min-w-[55px] text-center transition-colors select-none",
+                      formData.isAdaKeretaCepat === "ya" 
+                        ? "bg-emerald-50 text-emerald-950 border-emerald-300" 
+                        : "bg-white text-stone-700 border-stone-300"
+                    )}>
+                      {formData.isAdaKeretaCepat === "ya" ? "Ya" : "Tidak"}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Saklar Termasuk City Tour Thoif / Thaif */}
+                <div className="flex flex-col justify-end h-full">
+                  <label className="block text-xs font-bold text-slate-800 mb-1 min-h-[2.5rem] flex items-end">Termasuk City Tour Thoif / Thaif?</label>
+                  <div className="flex items-center gap-2 h-10">
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={formData.isAdaThoif === "ya"}
+                      onClick={() => setFormData(prev => ({ ...prev, isAdaThoif: prev.isAdaThoif === "ya" ? "tidak" : "ya" }))}
+                      className={cn(
+                        "relative inline-flex h-7 w-14 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-2",
+                        formData.isAdaThoif === "ya" ? "bg-emerald-600" : "bg-stone-300"
+                      )}
+                    >
+                      <span
+                        className={cn(
+                          "pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out",
+                          formData.isAdaThoif === "ya" ? "translate-x-7" : "translate-x-0"
+                        )}
+                      />
+                    </button>
+                    <span className={cn(
+                      "text-xs font-bold px-2.5 py-1 rounded-md border min-w-[55px] text-center transition-colors select-none",
+                      formData.isAdaThoif === "ya" 
+                        ? "bg-emerald-50 text-emerald-950 border-emerald-300" 
+                        : "bg-white text-stone-700 border-stone-300"
+                    )}>
+                      {formData.isAdaThoif === "ya" ? "Ya" : "Tidak"}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Saklar Tipe Konsumsi / Makan (FB vs BF) */}
+                <div className="flex flex-col justify-end h-full">
+                  <label className="block text-xs font-bold text-slate-800 mb-1 min-h-[2.5rem] flex items-end">Tipe Konsumsi / Makan</label>
+                  <div className="flex items-center gap-2 h-10">
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={formData.tipeMakan === "FB"}
+                      onClick={() => setFormData(prev => ({ ...prev, tipeMakan: prev.tipeMakan === "FB" ? "BF" : "FB" }))}
+                      className={cn(
+                        "relative inline-flex h-7 w-14 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-2",
+                        formData.tipeMakan === "FB" ? "bg-emerald-600" : "bg-amber-500"
+                      )}
+                      title={formData.tipeMakan === "FB" ? "Full Board (Makan 3x Sehari)" : "Breakfast Only (Sarapan Saja)"}
+                    >
+                      <span
+                        className={cn(
+                          "pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out",
+                          formData.tipeMakan === "FB" ? "translate-x-7" : "translate-x-0"
+                        )}
+                      />
+                    </button>
+                    <span className={cn(
+                      "text-xs font-bold px-2.5 py-1 rounded-md border min-w-[70px] text-center transition-colors select-none",
+                      formData.tipeMakan === "FB" 
+                        ? "bg-emerald-50 text-emerald-950 border-emerald-300" 
+                        : "bg-amber-50 text-amber-950 border-amber-300"
+                    )}>
+                      {formData.tipeMakan === "FB" ? "Full Board (FB)" : "Breakfast Only (BF)"}
+                    </span>
+                  </div>
+                </div>
+
+                <div>
+                  {formData.isAdaKlaster === "tidak" ? (
+                    <>
+                      <label className="block text-xs font-bold text-slate-800 mb-1.5">Harga Base (Rp)</label>
+                      <Input 
+                        id="field-hargaBase" 
+                        type="text" 
+                        inputMode="numeric"
+                        name="hargaBase" 
+                        value={formatNumberWithDots(formData.hargaBase)} 
+                        onChange={(e) => handleCurrencyChange("hargaBase", e.target.value)} 
+                        onKeyDown={(e) => handleKeyDownNext(e, "field-submitBtn")} 
+                        placeholder="Rp -" 
+                        className="h-10 bg-white border-stone-300 text-slate-950 font-bold shadow-xs focus:ring-emerald-600 focus:border-emerald-600"
+                      />
+                    </>
+                  ) : (
+                    <div className="bg-stone-50 p-3 rounded-lg border border-stone-200 text-xs text-stone-600 font-medium h-full flex items-center">
+                      ℹ️ Harga Base diatur per masing-masing Klaster Seat di Langkah 3.
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Custom Caption for Telegram Broadcast */}
             <div className="pt-3 border-t border-stone-200">
@@ -2489,185 +2646,368 @@ export default function GeneratePaketPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end pt-1">
-            {!(generateMode === "split" && splitType !== "starting_point") && (
-              <>
+          {/* Jika mode Split Starting Point: Gunakan Batang Kuota Keseluruhan & Pil Draggable (OCR Mode) */}
+          {generateMode === "split" && splitType === "starting_point" ? (
+            <div className="space-y-4">
+              <SplitStartingQuotaSlider
+                totalCapacity={selectedParentGroup?.totalCapacity || 45}
+                parentCity={selectedParentGroup?.startingCity || "Paket Utama"}
+                childCity={options?.cities.find(c => c.id === formData.startingPointId)?.name || "Cabang Baru"}
+                childSeat={parseInt(formData.kapasitas, 10) || 15}
+                targetMaterialisasi={parseInt(formData.targetMaterialisasi, 10) || 10}
+                onChangeChildSeat={(val) => {
+                  setFormData(prev => ({
+                    ...prev,
+                    kapasitas: String(val),
+                    targetMaterialisasi: String(Math.max(1, Math.min(val, parseInt(prev.targetMaterialisasi, 10) || Math.round(val * 0.75)))),
+                  }));
+                }}
+                onChangeTargetMaterialisasi={(val) => {
+                  setFormData(prev => ({ ...prev, targetMaterialisasi: String(val) }));
+                }}
+              />
+
+              {/* Baris Saklar Operasional (OCR Mode) */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 items-end pt-1">
+                {/* Saklar Termasuk Perlengkapan */}
                 <div className="flex flex-col justify-end h-full">
-                  <label className="block text-xs font-semibold mb-1 min-h-[2.25rem] flex items-end">Kapasitas Seat (Maksimal Jamaah)</label>
+                  <label className="block text-xs font-semibold mb-1 min-h-[2.25rem] flex items-end">Termasuk Perlengkapan?</label>
+                  <div className="flex items-center gap-2 h-10">
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={formData.isAdaPerlengkapan === "ya"}
+                      onClick={() => setFormData(prev => ({ ...prev, isAdaPerlengkapan: prev.isAdaPerlengkapan === "ya" ? "tidak" : "ya" }))}
+                      className={cn(
+                        "relative inline-flex h-7 w-14 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-2",
+                        formData.isAdaPerlengkapan === "ya" ? "bg-emerald-600" : "bg-stone-300"
+                      )}
+                    >
+                      <span
+                        className={cn(
+                          "pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out",
+                          formData.isAdaPerlengkapan === "ya" ? "translate-x-7" : "translate-x-0"
+                        )}
+                      />
+                    </button>
+                    <span className={cn(
+                      "text-xs font-semibold px-2.5 py-1 rounded-md border min-w-[55px] text-center transition-colors select-none",
+                      formData.isAdaPerlengkapan === "ya" 
+                        ? "bg-emerald-50 text-emerald-950 border-emerald-300" 
+                        : "bg-white text-stone-700 border-stone-300"
+                    )}>
+                      {formData.isAdaPerlengkapan === "ya" ? "Ya" : "Tidak"}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Saklar Termasuk Kereta Cepat (OCR Mode) */}
+                <div className="flex flex-col justify-end h-full">
+                  <label className="block text-xs font-semibold mb-1 min-h-[2.25rem] flex items-end">Termasuk Kereta Cepat?</label>
+                  <div className="flex items-center gap-2 h-10">
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={formData.isAdaKeretaCepat === "ya"}
+                      onClick={() => setFormData(prev => ({ ...prev, isAdaKeretaCepat: prev.isAdaKeretaCepat === "ya" ? "tidak" : "ya" }))}
+                      className={cn(
+                        "relative inline-flex h-7 w-14 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-2",
+                        formData.isAdaKeretaCepat === "ya" ? "bg-emerald-600" : "bg-stone-300"
+                      )}
+                    >
+                      <span
+                        className={cn(
+                          "pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out",
+                          formData.isAdaKeretaCepat === "ya" ? "translate-x-7" : "translate-x-0"
+                        )}
+                      />
+                    </button>
+                    <span className={cn(
+                      "text-xs font-semibold px-2.5 py-1 rounded-md border min-w-[55px] text-center transition-colors select-none",
+                      formData.isAdaKeretaCepat === "ya" 
+                        ? "bg-emerald-50 text-emerald-950 border-emerald-300" 
+                        : "bg-white text-stone-700 border-stone-300"
+                    )}>
+                      {formData.isAdaKeretaCepat === "ya" ? "Ya" : "Tidak"}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Saklar Termasuk City Tour Thoif / Thaif (OCR Mode) */}
+                <div className="flex flex-col justify-end h-full">
+                  <label className="block text-xs font-semibold mb-1 min-h-[2.25rem] flex items-end">Termasuk City Tour Thoif / Thaif?</label>
+                  <div className="flex items-center gap-2 h-10">
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={formData.isAdaThoif === "ya"}
+                      onClick={() => setFormData(prev => ({ ...prev, isAdaThoif: prev.isAdaThoif === "ya" ? "tidak" : "ya" }))}
+                      className={cn(
+                        "relative inline-flex h-7 w-14 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-2",
+                        formData.isAdaThoif === "ya" ? "bg-emerald-600" : "bg-stone-300"
+                      )}
+                    >
+                      <span
+                        className={cn(
+                          "pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out",
+                          formData.isAdaThoif === "ya" ? "translate-x-7" : "translate-x-0"
+                        )}
+                      />
+                    </button>
+                    <span className={cn(
+                      "text-xs font-semibold px-2.5 py-1 rounded-md border min-w-[55px] text-center transition-colors select-none",
+                      formData.isAdaThoif === "ya" 
+                        ? "bg-emerald-50 text-emerald-950 border-emerald-300" 
+                        : "bg-white text-stone-700 border-stone-300"
+                    )}>
+                      {formData.isAdaThoif === "ya" ? "Ya" : "Tidak"}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Saklar Tipe Konsumsi / Makan (FB vs BF) */}
+                <div className="flex flex-col justify-end h-full">
+                  <label className="block text-xs font-semibold mb-1 min-h-[2.25rem] flex items-end">Tipe Konsumsi / Makan</label>
+                  <div className="flex items-center gap-2 h-10">
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={formData.tipeMakan === "FB"}
+                      onClick={() => setFormData(prev => ({ ...prev, tipeMakan: prev.tipeMakan === "FB" ? "BF" : "FB" }))}
+                      className={cn(
+                        "relative inline-flex h-7 w-14 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-2",
+                        formData.tipeMakan === "FB" ? "bg-emerald-600" : "bg-amber-500"
+                      )}
+                      title={formData.tipeMakan === "FB" ? "Full Board (Makan 3x Sehari)" : "Breakfast Only (Sarapan Saja)"}
+                    >
+                      <span
+                        className={cn(
+                          "pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out",
+                          formData.tipeMakan === "FB" ? "translate-x-7" : "translate-x-0"
+                        )}
+                      />
+                    </button>
+                    <span className={cn(
+                      "text-xs font-semibold px-2.5 py-1 rounded-md border min-w-[70px] text-center transition-colors select-none",
+                      formData.tipeMakan === "FB" 
+                        ? "bg-emerald-50 text-emerald-950 border-emerald-300" 
+                        : "bg-amber-50 text-amber-950 border-amber-300"
+                    )}>
+                      {formData.tipeMakan === "FB" ? "Full Board (FB)" : "Breakfast Only (BF)"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {formData.isAdaKlaster === "tidak" && (
+                <div>
+                  <label className="block text-xs font-semibold mb-1">Harga Base (Rp)</label>
                   <Input 
-                    type="number" 
-                    name="kapasitas" 
-                    value={formData.kapasitas} 
-                    onChange={handleChange} 
-                    placeholder="45" 
+                    type="text" 
+                    inputMode="numeric"
+                    name="hargaBase" 
+                    value={formatNumberWithDots(formData.hargaBase)} 
+                    onChange={(e) => handleCurrencyChange("hargaBase", e.target.value)} 
+                    placeholder="35.000.000" 
                   />
                 </div>
-                <div className="flex flex-col justify-end h-full">
-                  <label className="block text-xs font-semibold mb-1 min-h-[2.25rem] flex items-end">Minimal Seat Materialisasi (Kuota Aman)</label>
-                  <Input 
-                    type="number" 
-                    name="targetMaterialisasi" 
-                    value={formData.targetMaterialisasi} 
-                    onChange={handleChange} 
-                    placeholder="30" 
-                  />
-                </div>
-              </>
-            )}
-            <div className="flex flex-col justify-end h-full">
-              <label className="block text-xs font-semibold mb-1 min-h-[2.25rem] flex items-end">Termasuk Perlengkapan?</label>
-              <div className="flex items-center gap-2 h-10">
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={formData.isAdaPerlengkapan === "ya"}
-                  onClick={() => setFormData(prev => ({ ...prev, isAdaPerlengkapan: prev.isAdaPerlengkapan === "ya" ? "tidak" : "ya" }))}
-                  className={cn(
-                    "relative inline-flex h-7 w-14 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-2",
-                    formData.isAdaPerlengkapan === "ya" ? "bg-emerald-600" : "bg-stone-300"
-                  )}
-                >
-                  <span
-                    className={cn(
-                      "pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out",
-                      formData.isAdaPerlengkapan === "ya" ? "translate-x-7" : "translate-x-0"
-                    )}
-                  />
-                </button>
-                <span className={cn(
-                  "text-xs font-semibold px-2.5 py-1 rounded-md border min-w-[55px] text-center transition-colors select-none",
-                  formData.isAdaPerlengkapan === "ya" 
-                    ? "bg-emerald-50 text-emerald-950 border-emerald-300" 
-                    : "bg-white text-stone-700 border-stone-300"
-                )}>
-                  {formData.isAdaPerlengkapan === "ya" ? "Ya" : "Tidak"}
-                </span>
-              </div>
-            </div>
+              )}
 
-            {/* Saklar Termasuk Kereta Cepat (OCR Mode) */}
-            <div className="flex flex-col justify-end h-full">
-              <label className="block text-xs font-semibold mb-1 min-h-[2.25rem] flex items-end">Termasuk Kereta Cepat?</label>
-              <div className="flex items-center gap-2 h-10">
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={formData.isAdaKeretaCepat === "ya"}
-                  onClick={() => setFormData(prev => ({ ...prev, isAdaKeretaCepat: prev.isAdaKeretaCepat === "ya" ? "tidak" : "ya" }))}
-                  className={cn(
-                    "relative inline-flex h-7 w-14 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-2",
-                    formData.isAdaKeretaCepat === "ya" ? "bg-emerald-600" : "bg-stone-300"
-                  )}
-                >
-                  <span
-                    className={cn(
-                      "pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out",
-                      formData.isAdaKeretaCepat === "ya" ? "translate-x-7" : "translate-x-0"
-                    )}
-                  />
-                </button>
-                <span className={cn(
-                  "text-xs font-semibold px-2.5 py-1 rounded-md border min-w-[55px] text-center transition-colors select-none",
-                  formData.isAdaKeretaCepat === "ya" 
-                    ? "bg-emerald-50 text-emerald-950 border-emerald-300" 
-                    : "bg-white text-stone-700 border-stone-300"
-                )}>
-                  {formData.isAdaKeretaCepat === "ya" ? "Ya" : "Tidak"}
-                </span>
-              </div>
-            </div>
-
-            {/* Saklar Termasuk City Tour Thoif / Thaif (Manual Mode) */}
-            <div className="flex flex-col justify-end h-full">
-              <label className="block text-xs font-semibold mb-1 min-h-[2.25rem] flex items-end">Termasuk City Tour Thoif / Thaif?</label>
-              <div className="flex items-center gap-2 h-10">
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={formData.isAdaThoif === "ya"}
-                  onClick={() => setFormData(prev => ({ ...prev, isAdaThoif: prev.isAdaThoif === "ya" ? "tidak" : "ya" }))}
-                  className={cn(
-                    "relative inline-flex h-7 w-14 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-2",
-                    formData.isAdaThoif === "ya" ? "bg-emerald-600" : "bg-stone-300"
-                  )}
-                >
-                  <span
-                    className={cn(
-                      "pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out",
-                      formData.isAdaThoif === "ya" ? "translate-x-7" : "translate-x-0"
-                    )}
-                  />
-                </button>
-                <span className={cn(
-                  "text-xs font-semibold px-2.5 py-1 rounded-md border min-w-[55px] text-center transition-colors select-none",
-                  formData.isAdaThoif === "ya" 
-                    ? "bg-emerald-50 text-emerald-950 border-emerald-300" 
-                    : "bg-white text-stone-700 border-stone-300"
-                )}>
-                  {formData.isAdaThoif === "ya" ? "Ya" : "Tidak"}
-                </span>
-              </div>
-            </div>
-
-            {/* Saklar Tipe Konsumsi / Makan (FB vs BF) */}
-            <div className="flex flex-col justify-end h-full">
-              <label className="block text-xs font-semibold mb-1 min-h-[2.25rem] flex items-end">Tipe Konsumsi / Makan</label>
-              <div className="flex items-center gap-2 h-10">
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={formData.tipeMakan === "FB"}
-                  onClick={() => setFormData(prev => ({ ...prev, tipeMakan: prev.tipeMakan === "FB" ? "BF" : "FB" }))}
-                  className={cn(
-                    "relative inline-flex h-7 w-14 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-2",
-                    formData.tipeMakan === "FB" ? "bg-emerald-600" : "bg-amber-500"
-                  )}
-                  title={formData.tipeMakan === "FB" ? "Full Board (Makan 3x Sehari)" : "Breakfast Only (Sarapan Saja)"}
-                >
-                  <span
-                    className={cn(
-                      "pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out",
-                      formData.tipeMakan === "FB" ? "translate-x-7" : "translate-x-0"
-                    )}
-                  />
-                </button>
-                <span className={cn(
-                  "text-xs font-semibold px-2.5 py-1 rounded-md border min-w-[70px] text-center transition-colors select-none",
-                  formData.tipeMakan === "FB" 
-                    ? "bg-emerald-50 text-emerald-950 border-emerald-300" 
-                    : "bg-amber-50 text-amber-950 border-amber-300"
-                )}>
-                  {formData.tipeMakan === "FB" ? "Full Board (FB)" : "Breakfast Only (BF)"}
-                </span>
-              </div>
-            </div>
-            {formData.isAdaKlaster === "tidak" && (
-              <div className="md:col-span-2">
-                <label className="block text-xs font-semibold mb-1">Harga Base (Rp)</label>
-                <Input 
-                  type="text" 
-                  inputMode="numeric"
-                  name="hargaBase" 
-                  value={formatNumberWithDots(formData.hargaBase)} 
-                  onChange={(e) => handleCurrencyChange("hargaBase", e.target.value)} 
-                  placeholder="35.000.000" 
+              {/* Custom Caption for Telegram Broadcast */}
+              <div className="pt-2 border-t">
+                <label className="block text-xs font-semibold mb-1 text-emerald-900 dark:text-emerald-300">
+                  Caption / Teks Pemasaran Broadcast Telegram
+                </label>
+                <textarea
+                  value={caption}
+                  onChange={(e) => setCaption(e.target.value)}
+                  placeholder="Tuliskan atau tempel caption pemasaran di sini..."
+                  className="w-full h-20 p-2.5 text-xs rounded-md border border-input bg-card focus:outline-none focus:ring-1 focus:ring-primary min-h-[56px]"
                 />
               </div>
-            )}
-
-            {/* Custom Caption for Telegram Broadcast */}
-            <div className="md:col-span-3 pt-2 border-t">
-              <label className="block text-xs font-semibold mb-1 text-emerald-900 dark:text-emerald-300">
-                Caption / Teks Pemasaran Broadcast Telegram
-              </label>
-              <textarea
-                value={caption}
-                onChange={(e) => setCaption(e.target.value)}
-                placeholder="Tuliskan atau tempel caption pemasaran di sini..."
-                className="w-full h-20 p-2.5 text-xs rounded-md border border-input bg-card focus:outline-none focus:ring-1 focus:ring-primary min-h-[56px]"
-              />
             </div>
-          </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end pt-1">
+              {!(generateMode === "split" && splitType !== "starting_point") && (
+                <>
+                  <div className="flex flex-col justify-end h-full">
+                    <label className="block text-xs font-semibold mb-1 min-h-[2.25rem] flex items-end">Kapasitas Seat (Maksimal Jamaah)</label>
+                    <Input 
+                      type="number" 
+                      name="kapasitas" 
+                      value={formData.kapasitas} 
+                      onChange={handleChange} 
+                      placeholder="45" 
+                    />
+                  </div>
+                  <div className="flex flex-col justify-end h-full">
+                    <label className="block text-xs font-semibold mb-1 min-h-[2.25rem] flex items-end">Minimal Seat Materialisasi (Kuota Aman)</label>
+                    <Input 
+                      type="number" 
+                      name="targetMaterialisasi" 
+                      value={formData.targetMaterialisasi} 
+                      onChange={handleChange} 
+                      placeholder="30" 
+                    />
+                  </div>
+                </>
+              )}
+              <div className="flex flex-col justify-end h-full">
+                <label className="block text-xs font-semibold mb-1 min-h-[2.25rem] flex items-end">Termasuk Perlengkapan?</label>
+                <div className="flex items-center gap-2 h-10">
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={formData.isAdaPerlengkapan === "ya"}
+                    onClick={() => setFormData(prev => ({ ...prev, isAdaPerlengkapan: prev.isAdaPerlengkapan === "ya" ? "tidak" : "ya" }))}
+                    className={cn(
+                      "relative inline-flex h-7 w-14 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-2",
+                      formData.isAdaPerlengkapan === "ya" ? "bg-emerald-600" : "bg-stone-300"
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        "pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out",
+                        formData.isAdaPerlengkapan === "ya" ? "translate-x-7" : "translate-x-0"
+                      )}
+                    />
+                  </button>
+                  <span className={cn(
+                    "text-xs font-semibold px-2.5 py-1 rounded-md border min-w-[55px] text-center transition-colors select-none",
+                    formData.isAdaPerlengkapan === "ya" 
+                      ? "bg-emerald-50 text-emerald-950 border-emerald-300" 
+                      : "bg-white text-stone-700 border-stone-300"
+                  )}>
+                    {formData.isAdaPerlengkapan === "ya" ? "Ya" : "Tidak"}
+                  </span>
+                </div>
+              </div>
+
+              {/* Saklar Termasuk Kereta Cepat (OCR Mode) */}
+              <div className="flex flex-col justify-end h-full">
+                <label className="block text-xs font-semibold mb-1 min-h-[2.25rem] flex items-end">Termasuk Kereta Cepat?</label>
+                <div className="flex items-center gap-2 h-10">
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={formData.isAdaKeretaCepat === "ya"}
+                    onClick={() => setFormData(prev => ({ ...prev, isAdaKeretaCepat: prev.isAdaKeretaCepat === "ya" ? "tidak" : "ya" }))}
+                    className={cn(
+                      "relative inline-flex h-7 w-14 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-2",
+                      formData.isAdaKeretaCepat === "ya" ? "bg-emerald-600" : "bg-stone-300"
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        "pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out",
+                        formData.isAdaKeretaCepat === "ya" ? "translate-x-7" : "translate-x-0"
+                      )}
+                    />
+                  </button>
+                  <span className={cn(
+                    "text-xs font-semibold px-2.5 py-1 rounded-md border min-w-[55px] text-center transition-colors select-none",
+                    formData.isAdaKeretaCepat === "ya" 
+                      ? "bg-emerald-50 text-emerald-950 border-emerald-300" 
+                      : "bg-white text-stone-700 border-stone-300"
+                  )}>
+                    {formData.isAdaKeretaCepat === "ya" ? "Ya" : "Tidak"}
+                  </span>
+                </div>
+              </div>
+
+              {/* Saklar Termasuk City Tour Thoif / Thaif (Manual Mode) */}
+              <div className="flex flex-col justify-end h-full">
+                <label className="block text-xs font-semibold mb-1 min-h-[2.25rem] flex items-end">Termasuk City Tour Thoif / Thaif?</label>
+                <div className="flex items-center gap-2 h-10">
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={formData.isAdaThoif === "ya"}
+                    onClick={() => setFormData(prev => ({ ...prev, isAdaThoif: prev.isAdaThoif === "ya" ? "tidak" : "ya" }))}
+                    className={cn(
+                      "relative inline-flex h-7 w-14 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-2",
+                      formData.isAdaThoif === "ya" ? "bg-emerald-600" : "bg-stone-300"
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        "pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out",
+                        formData.isAdaThoif === "ya" ? "translate-x-7" : "translate-x-0"
+                      )}
+                    />
+                  </button>
+                  <span className={cn(
+                    "text-xs font-semibold px-2.5 py-1 rounded-md border min-w-[55px] text-center transition-colors select-none",
+                    formData.isAdaThoif === "ya" 
+                      ? "bg-emerald-50 text-emerald-950 border-emerald-300" 
+                      : "bg-white text-stone-700 border-stone-300"
+                  )}>
+                    {formData.isAdaThoif === "ya" ? "Ya" : "Tidak"}
+                  </span>
+                </div>
+              </div>
+
+              {/* Saklar Tipe Konsumsi / Makan (FB vs BF) */}
+              <div className="flex flex-col justify-end h-full">
+                <label className="block text-xs font-semibold mb-1 min-h-[2.25rem] flex items-end">Tipe Konsumsi / Makan</label>
+                <div className="flex items-center gap-2 h-10">
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={formData.tipeMakan === "FB"}
+                    onClick={() => setFormData(prev => ({ ...prev, tipeMakan: prev.tipeMakan === "FB" ? "BF" : "FB" }))}
+                    className={cn(
+                      "relative inline-flex h-7 w-14 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-2",
+                      formData.tipeMakan === "FB" ? "bg-emerald-600" : "bg-amber-500"
+                    )}
+                    title={formData.tipeMakan === "FB" ? "Full Board (Makan 3x Sehari)" : "Breakfast Only (Sarapan Saja)"}
+                  >
+                    <span
+                      className={cn(
+                        "pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out",
+                        formData.tipeMakan === "FB" ? "translate-x-7" : "translate-x-0"
+                      )}
+                    />
+                  </button>
+                  <span className={cn(
+                    "text-xs font-semibold px-2.5 py-1 rounded-md border min-w-[70px] text-center transition-colors select-none",
+                    formData.tipeMakan === "FB" 
+                      ? "bg-emerald-50 text-emerald-950 border-emerald-300" 
+                      : "bg-amber-50 text-amber-950 border-amber-300"
+                  )}>
+                    {formData.tipeMakan === "FB" ? "Full Board (FB)" : "Breakfast Only (BF)"}
+                  </span>
+                  </div>
+                </div>
+
+                {formData.isAdaKlaster === "tidak" && (
+                  <div className="md:col-span-2">
+                    <label className="block text-xs font-semibold mb-1">Harga Base (Rp)</label>
+                    <Input 
+                      type="text" 
+                      inputMode="numeric"
+                      name="hargaBase" 
+                      value={formatNumberWithDots(formData.hargaBase)} 
+                      onChange={(e) => handleCurrencyChange("hargaBase", e.target.value)} 
+                      placeholder="35.000.000" 
+                    />
+                  </div>
+                )}
+
+                {/* Custom Caption for Telegram Broadcast */}
+                <div className="md:col-span-3 pt-2 border-t">
+                  <label className="block text-xs font-semibold mb-1 text-emerald-900 dark:text-emerald-300">
+                    Caption / Teks Pemasaran Broadcast Telegram
+                  </label>
+                  <textarea
+                    value={caption}
+                    onChange={(e) => setCaption(e.target.value)}
+                    placeholder="Tuliskan atau tempel caption pemasaran di sini..."
+                    className="w-full h-20 p-2.5 text-xs rounded-md border border-input bg-card focus:outline-none focus:ring-1 focus:ring-primary min-h-[56px]"
+                  />
+                </div>
+              </div>
+            )}
         </div>
 
         <div className="flex justify-end pt-3 border-t">
@@ -2892,6 +3232,15 @@ export default function GeneratePaketPage() {
                     checked={splitType === "starting_point"}
                     onChange={() => {
                       setSplitType("starting_point");
+                      if (selectedParentGroup) {
+                        const totalCap = selectedParentGroup.totalCapacity || 45;
+                        const initialChild = Math.max(1, Math.floor(totalCap / 3));
+                        setFormData(prev => ({
+                          ...prev,
+                          kapasitas: String(initialChild),
+                          targetMaterialisasi: String(Math.max(1, Math.round(initialChild * 0.75))),
+                        }));
+                      }
                     }}
                     className="text-amber-600 focus:ring-amber-500 h-4 w-4"
                   />
@@ -3042,6 +3391,14 @@ export default function GeneratePaketPage() {
                     if (found.startingPointId) {
                       setFormData(prev => ({ ...prev, startingPointId: found.startingPointId }));
                     }
+                  } else if (splitType === "starting_point") {
+                    const totalCap = found.totalCapacity || 45;
+                    const initialChild = Math.max(1, Math.floor(totalCap / 3));
+                    setFormData(prev => ({
+                      ...prev,
+                      kapasitas: String(initialChild),
+                      targetMaterialisasi: String(Math.max(1, Math.round(initialChild * 0.75))),
+                    }));
                   }
                 }
               }}
@@ -3152,6 +3509,7 @@ export default function GeneratePaketPage() {
                 date: d,
               }))}
               totalGroupCapacity={selectedParentGroup.totalCapacity || 45}
+              initialChildSeat={parseInt(formData.kapasitas, 10) || 15}
               onCancel={() => setShowPairingCanvas(false)}
               onConfirm={async (pairs) => {
                 setLoading(true);

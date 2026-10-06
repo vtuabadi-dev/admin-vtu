@@ -33,6 +33,7 @@ interface PairingCanvasProps {
   parentItems: { id: string; name: string; date: string; seat: number }[];
   initialChildItems: { tempId: string; name: string; date: string }[];
   totalGroupCapacity: number;
+  initialChildSeat?: number;
   onConfirm: (pairs: DepartureItemPair[]) => void;
   onCancel: () => void;
 }
@@ -43,14 +44,17 @@ export function PairingCanvas({
   parentItems,
   initialChildItems,
   totalGroupCapacity,
+  initialChildSeat,
   onConfirm,
   onCancel,
 }: PairingCanvasProps) {
   const [childList, setChildList] = useState(initialChildItems);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
 
-  // Default parent seat allocations (half or split)
-  const defaultParentSeat = Math.ceil(totalGroupCapacity / 2);
+  // Default parent seat allocations (based on initial allocation from wizard if available, or half)
+  const defaultParentSeat = initialChildSeat 
+    ? Math.max(1, totalGroupCapacity - initialChildSeat)
+    : Math.ceil(totalGroupCapacity / 2);
   const [parentSeats, setParentSeats] = useState<number[]>(
     parentItems.map(p => p.seat || defaultParentSeat)
   );

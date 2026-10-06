@@ -62,6 +62,7 @@ import {
   cachedReviewQueue,
   type InvoiceOrderItem,
 } from "./shared-constants";
+import { subscribeRealtimeEvents } from "@/shared/lib/realtime-bus";
 
 // Lazy-load invoice-pdf (34KB) — only fetched when user actually clicks print/download
 async function downloadInvoicePdf(payload: any, filename?: string) {
@@ -342,6 +343,26 @@ function PaymentReviewTabContent() {
     loadData(initialQueue.length > 0);
   }, [loadData, initialQueue.length]);
 
+  // Subscribe to realtime mutations (invoices, pembayaran, groups)
+  useEffect(() => {
+    const unsubscribe = subscribeRealtimeEvents((event) => {
+      if (
+        event.entity === "pembayaran" ||
+        event.entity === "invoices" ||
+        event.entity === "registration_groups" ||
+        event.entity === "all"
+      ) {
+        if (typeof window !== "undefined") {
+          try {
+            sessionStorage.removeItem("vtu_review_queue_cache");
+          } catch {}
+        }
+        loadData(true);
+      }
+    });
+    return () => unsubscribe();
+  }, [loadData]);
+
   const handleDeleteSinglePayment = async () => {
     if (!deletePaymentTarget) return;
     setIsDeletingPayment(true);
@@ -477,7 +498,12 @@ function PaymentReviewTabContent() {
     }
 
     const cat = (payment.catatan || "").toLowerCase();
-    if (cat.includes("dp") || cat.includes("daftar") || cat.includes("pendaftaran") || payment.sumber === "jamaah_dp") {
+    const invId = (payment.invoiceId || "").toLowerCase();
+    if (cat.includes("tambah jamaah") || cat.includes("penambahan jamaah") || payment.sumber === "tambah_jamaah" || invId.startsWith("inv-pax")) {
+      setFormJenis("Tambah Jamaah");
+    } else if (cat.includes("pindah paket") || invId.startsWith("inv-paket") || invId.startsWith("pindah-")) {
+      setFormJenis("Pindah Paket");
+    } else if (cat.includes("dp") || cat.includes("daftar") || cat.includes("pendaftaran") || payment.sumber === "jamaah_dp") {
       setFormJenis("DP (Pendaftaran)");
     } else if (cat.includes("lunas") || cat.includes("pelunasan") || (payment.group?.totalTagihan && payment.jumlah >= payment.group.totalTagihan)) {
       setFormJenis("Pelunasan");
@@ -1012,6 +1038,21 @@ function PaymentReviewTabContent() {
 
   const getPaymentTypeBadge = (p: any) => {
     const cat = (p.catatan || "").toLowerCase();
+    const invId = (p.invoiceId || "").toLowerCase();
+    if (cat.includes("tambah jamaah") || cat.includes("penambahan jamaah") || p.sumber === "tambah_jamaah" || invId.startsWith("inv-pax")) {
+      return (
+        <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-purple-500/10 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
+          Tambah Jamaah
+        </span>
+      );
+    }
+    if (cat.includes("pindah paket") || invId.startsWith("inv-paket") || invId.startsWith("pindah-")) {
+      return (
+        <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-blue-500/10 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+          Pindah Paket
+        </span>
+      );
+    }
     if (cat.includes("dp") || cat.includes("daftar") || cat.includes("pendaftaran") || p.sumber === "jamaah_dp") {
       return (
         <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-cyan-500/10 text-cyan-700 dark:text-cyan-300 border border-cyan-200 dark:border-cyan-800">
@@ -1068,11 +1109,16 @@ function PaymentReviewTabContent() {
 
     if (jenisFilter !== "all") {
       const cat = (p.catatan || "").toLowerCase();
-      const isDP = cat.includes("dp") || cat.includes("daftar") || cat.includes("pendaftaran") || p.sumber === "jamaah_dp";
-      const isLunas = cat.includes("lunas") || cat.includes("pelunasan") || (p.group?.totalTagihan && p.jumlah >= p.group.totalTagihan);
+      const invId = (p.invoiceId || "").toLowerCase();
+      const isTambahJamaah = cat.includes("tambah jamaah") || cat.includes("penambahan jamaah") || p.sumber === "tambah_jamaah" || invId.startsWith("inv-pax");
+      const isPindahPaket = cat.includes("pindah paket") || invId.startsWith("inv-paket") || invId.startsWith("pindah-");
+      const isDP = !isTambahJamaah && !isPindahPaket && (cat.includes("dp") || cat.includes("daftar") || cat.includes("pendaftaran") || p.sumber === "jamaah_dp");
+      const isLunas = !isTambahJamaah && !isPindahPaket && (cat.includes("lunas") || cat.includes("pelunasan") || (p.group?.totalTagihan && p.jumlah >= p.group.totalTagihan));
+      if (jenisFilter === "tambah_jamaah" && !isTambahJamaah) return false;
+      if (jenisFilter === "pindah_paket" && !isPindahPaket) return false;
       if (jenisFilter === "dp" && !isDP) return false;
       if (jenisFilter === "pelunasan" && !isLunas) return false;
-      if (jenisFilter === "tagihan" && (isDP || isLunas)) return false;
+      if (jenisFilter === "tagihan" && (isTambahJamaah || isPindahPaket || isDP || isLunas)) return false;
     }
 
     // Filter Tanggal
@@ -1256,7 +1302,9 @@ function PaymentReviewTabContent() {
             className="px-2.5 py-1.5 bg-background border rounded-lg text-xs font-medium focus:outline-none focus:ring-1 focus:ring-primary"
           >
             <option value="all">Semua Jenis</option>
+            <option value="tambah_jamaah">Tambah Jamaah</option>
             <option value="dp">DP (Pendaftaran)</option>
+            <option value="pindah_paket">Pindah Paket</option>
             <option value="tagihan">Cicilan / Tagihan</option>
             <option value="pelunasan">Pelunasan</option>
           </select>
@@ -1554,7 +1602,9 @@ function PaymentReviewTabContent() {
                         onChange={(e) => setFormJenis(e.target.value)}
                         className="mt-1 w-full h-8 px-2 rounded-md border bg-background text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-primary"
                       >
+                        <option value="Tambah Jamaah">Tambah Jamaah</option>
                         <option value="DP (Pendaftaran)">DP (Pendaftaran)</option>
+                        <option value="Pindah Paket">Pindah Paket</option>
                         <option value="Cicilan / Tagihan">Cicilan / Tagihan</option>
                         <option value="Pelunasan">Pelunasan</option>
                       </select>
