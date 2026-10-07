@@ -421,6 +421,8 @@ export interface Keberangkatan {
   childKeberangkatanList?: Keberangkatan[];
   driveFolderIds?: any;
   hotelOptions?: any;
+  include?: string[];
+  exclude?: string[];
   flightDetails?: FlightDetails;
 }
 

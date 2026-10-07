@@ -69,6 +69,8 @@ function mapKeberangkatan(row: any): Keberangkatan {
     promoLabel: row.promoLabel ?? undefined,
     driveFolderIds: row.driveFolderIds ?? undefined,
     hotelOptions: parsedHotelOptions,
+    include: Array.isArray(row.include) ? row.include : [],
+    exclude: Array.isArray(row.exclude) ? row.exclude : [],
     notes: (row as any).notes ?? undefined,
     parentKeberangkatan: (row as any).parentKeberangkatan ? {
       id: (row as any).parentKeberangkatan.id,

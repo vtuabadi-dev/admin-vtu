@@ -24,6 +24,8 @@ import {
   AlertTriangle,
   AlertCircle,
   CheckCircle2,
+  XCircle,
+  Info,
   CreditCard,
   Building2,
   Copy,
@@ -151,6 +153,8 @@ export default function RegisterPage() {
   const [isCustomRoomAssignment, setIsCustomRoomAssignment] = useState(false);
   const [hotelUpgrade, setHotelUpgrade] = useState("");
   const [loadingPaket, setLoadingPaket] = useState(false);
+  const [showDetailPaketModal, setShowDetailPaketModal] = useState(false);
+  const [detailModalClusterIndex, setDetailModalClusterIndex] = useState(0);
 
   const packageOptions = useMemo(() => {
     return paketList
@@ -1624,16 +1628,31 @@ export default function RegisterPage() {
                       {/* Multi-Cluster Selector (If Multi Cluster) */}
                       {isMultiCluster && clusters && (
                         <div className="space-y-3">
-                          <label className="block text-xs font-bold text-amber-200 uppercase tracking-wider">
-                            🏢 Pilih Klaster Hotel &amp; Varian Paket
-                          </label>
+                          <div className="flex items-center justify-between gap-2 flex-wrap pb-0.5">
+                            <label className="block text-xs font-bold text-amber-200 uppercase tracking-wider">
+                              🏢 Pilih Klaster Hotel &amp; Varian Paket
+                            </label>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setDetailModalClusterIndex(selectedClusterIndex);
+                                setShowDetailPaketModal(true);
+                              }}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-400/40 text-xs font-black transition-all cursor-pointer shadow-sm hover:scale-[1.02] active:scale-95"
+                              title="Klik untuk melihat rincian fasilitas include & exclude untuk paket dan varian ini"
+                            >
+                              <FileText className="w-3.5 h-3.5 text-amber-400" />
+                              <span>📋 Detail &amp; Fasilitas Paket</span>
+                            </button>
+                          </div>
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                             {clusters.map((cl: any, idx: number) => {
                               const isSelected = selectedClusterIndex === idx;
                               const clPrice = Number(cl.hargaBase || 0);
                               const isPromo = cl.isPromo || cl.clusterName?.toUpperCase().includes("PROMO") || (cl as any).promo;
-                              const isTanpaPerlengkapan = cl.perlengkapan === "EXCLUDE" || cl.tanpaPerlengkapan || (cl as any).isTanpaPerlengkapan;
+                              const isTanpaPerlengkapan = cl.perlengkapan === "EXCLUDE" || cl.tanpaPerlengkapan || (cl as any).isTanpaPerlengkapan || cl.clusterName?.toLowerCase().includes("tanpa perlengkapan");
                               const isVarian2 = cl.isVarian2 || cl.clusterName?.toUpperCase().includes("VARIAN 2") || (cl as any).variantName;
+                              const packageHasPerlengkapan = selectedPaket.include?.some((i: string) => i.toLowerCase().includes("perlengkapan")) ?? false;
 
                               return (
                                 <button
@@ -1673,15 +1692,19 @@ export default function RegisterPage() {
                                         )}
                                       </div>
                                       
-                                      {/* Perlengkapan Indicator */}
+                                      {/* Perlengkapan Indicator — Sesuai Data Riil */}
                                       <div>
                                         {isTanpaPerlengkapan ? (
                                           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-rose-950 text-rose-200 border border-rose-500/40">
                                             ⚠️ Tanpa Perlengkapan (LA Only)
                                           </span>
-                                        ) : (
+                                        ) : packageHasPerlengkapan ? (
                                           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-950 text-emerald-200 border border-emerald-500/40">
                                             🎁 Termasuk Perlengkapan Lengkap
+                                          </span>
+                                        ) : (
+                                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-stone-900/90 text-stone-300 border border-stone-600/50">
+                                            ❌ Perlengkapan Belum Termasuk
                                           </span>
                                         )}
                                       </div>
@@ -1695,10 +1718,33 @@ export default function RegisterPage() {
                                   </div>
 
                                   <div className={cn(
-                                    "text-xs font-extrabold pt-1.5 border-t",
-                                    isSelected ? "text-slate-950 border-amber-600/40" : "text-amber-400 border-amber-500/20"
+                                    "flex items-center justify-between gap-2 pt-1.5 border-t",
+                                    isSelected ? "border-amber-600/40" : "border-amber-500/20"
                                   )}>
-                                    Harga Base: <span className="text-sm font-black">Rp {clPrice.toLocaleString("id-ID")}</span> / pax
+                                    <div className={cn(
+                                      "text-xs font-extrabold",
+                                      isSelected ? (isVarian2 ? "text-purple-200" : "text-slate-950") : "text-amber-400"
+                                    )}>
+                                      Harga Base: <span className="text-sm font-black">Rp {clPrice.toLocaleString("id-ID")}</span> / pax
+                                    </div>
+                                    <span
+                                      role="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setDetailModalClusterIndex(idx);
+                                        setShowDetailPaketModal(true);
+                                      }}
+                                      className={cn(
+                                        "inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-black transition-all cursor-pointer shadow-xs",
+                                        isSelected
+                                          ? (isVarian2 ? "bg-purple-800 text-purple-100 hover:bg-purple-700" : "bg-slate-950 text-amber-300 hover:bg-black")
+                                          : "bg-amber-950/90 text-amber-300 border border-amber-500/30 hover:bg-amber-900"
+                                      )}
+                                      title="Klik untuk melihat detail fasilitas include & exclude untuk varian ini"
+                                    >
+                                      <Info className="w-3 h-3" />
+                                      Detail Paket
+                                    </span>
                                   </div>
                                 </button>
                               );
@@ -1710,14 +1756,27 @@ export default function RegisterPage() {
                       {/* Single Cluster Hotel Info (If Single Cluster) — Dark Brown Box */}
                       {!isMultiCluster && (
                         <div className="bg-[#160D07]/90 border border-amber-500/30 rounded-2xl p-4 flex flex-col sm:flex-row gap-4 sm:items-center justify-between text-xs shadow-inner">
-                          <div className="flex items-center gap-2">
-                            <span className="font-bold text-amber-200/80">🕋 Hotel Mekkah:</span>
-                            <span className="text-white font-extrabold bg-amber-950/80 border border-amber-500/40 px-3 py-1.5 rounded-xl">{hotelMekkah}</span>
+                          <div className="flex items-center gap-4 flex-wrap">
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-amber-200/80">🕋 Hotel Mekkah:</span>
+                              <span className="text-white font-extrabold bg-amber-950/80 border border-amber-500/40 px-3 py-1.5 rounded-xl">{hotelMekkah}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-amber-200/80">🕌 Hotel Madinah:</span>
+                              <span className="text-white font-extrabold bg-amber-950/80 border border-amber-500/40 px-3 py-1.5 rounded-xl">{hotelMadinah}</span>
+                            </div>
                           </div>
-                          <div className="flex items-center gap-2">
-                            <span className="font-bold text-amber-200/80">🕌 Hotel Madinah:</span>
-                            <span className="text-white font-extrabold bg-amber-950/80 border border-amber-500/40 px-3 py-1.5 rounded-xl">{hotelMadinah}</span>
-                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setDetailModalClusterIndex(0);
+                              setShowDetailPaketModal(true);
+                            }}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-400/40 text-xs font-black transition-all cursor-pointer self-start sm:self-auto shrink-0 shadow-sm"
+                          >
+                            <FileText className="w-3.5 h-3.5 text-amber-400" />
+                            <span>📋 Detail Fasilitas Paket</span>
+                          </button>
                         </div>
                       )}
 
@@ -3188,6 +3247,264 @@ export default function RegisterPage() {
           </a>
         </p>
       </div>
+
+      {/* ── DETAIL PAKET & FASILITAS MODAL (INCLUDE & EXCLUDE CHECKLIST) ── */}
+      {showDetailPaketModal && selectedPaket && (() => {
+        const modalClusters = (Array.isArray(selectedPaket.hotelOptions) && selectedPaket.hotelOptions.length > 0)
+          ? selectedPaket.hotelOptions
+          : [{
+              clusterName: "Reguler (Varian Utama)",
+              hotelMekkah: selectedPaket.hotelMekkah || "TBA",
+              hotelMadinah: selectedPaket.hotelMadinah || "TBA",
+              hargaBase: selectedPaket.hargaPaket || selectedPaket.paketUmroh?.hargaBase || 0,
+            }];
+
+        const currentCluster = modalClusters[detailModalClusterIndex] || modalClusters[0] || {};
+        const currentPrice = Number(currentCluster.hargaBase || selectedPaket.hargaPaket || 0);
+
+        const rawIncludeList: string[] = selectedPaket.include || [];
+        const rawExcludeList: string[] = selectedPaket.exclude || [];
+
+        const baseHasPerlengkapan = rawIncludeList.some((i: string) => i.toLowerCase().includes("perlengkapan"));
+        const isClusterTanpaPerlengkapan = currentCluster.perlengkapan === "EXCLUDE" || currentCluster.isTanpaPerlengkapan || (currentCluster as any).tanpaPerlengkapan || currentCluster.clusterName?.toLowerCase().includes("tanpa perlengkapan");
+        const includesPerlengkapan = baseHasPerlengkapan && !isClusterTanpaPerlengkapan;
+
+        const hasThoif = rawIncludeList.some((i: string) => /th[ao]'?if|ta'?if/i.test(i));
+        const hasKeretaCepat = rawIncludeList.some((i: string) => i.toLowerCase().includes("kereta cepat"));
+
+        const isBF = (selectedPaket as any).tipeMakan === "BF" || rawIncludeList.some((i: string) => i.toLowerCase().includes("breakfast"));
+        const hasMakan = !rawExcludeList.some((e: string) => e.toLowerCase().includes("makan"));
+
+        const operationalFeatures = [
+          {
+            id: "perlengkapan",
+            icon: "🎁",
+            title: "Perlengkapan Umroh",
+            isIncluded: includesPerlengkapan,
+            statusBadge: includesPerlengkapan 
+              ? "✅ Termasuk Lengkap" 
+              : (isClusterTanpaPerlengkapan ? "❌ Tidak Termasuk (LA Only)" : "❌ Belum Termasuk"),
+            badgeStyle: includesPerlengkapan
+              ? "bg-emerald-950 text-emerald-400 border-emerald-600/40"
+              : "bg-rose-950 text-rose-300 border-rose-600/40",
+            cardBg: includesPerlengkapan
+              ? "bg-emerald-950/30 border-emerald-500/30 ring-1 ring-emerald-500/20"
+              : "bg-rose-950/30 border-rose-500/30 ring-1 ring-rose-500/20",
+            description: includesPerlengkapan
+              ? "Koper Hardcase, Tas Selempang, Kain Ihram / Mukena, Batik Seragam, Buku Doa & ID Card."
+              : (isClusterTanpaPerlengkapan
+                  ? "Varian Land Arrangement (LA Only). Jamaah/Agen bertanggung jawab menyiapkan perlengkapan koper & seragam secara mandiri."
+                  : "Spesifikasi paket keberangkatan ini belum/tidak mencakup paket perlengkapan fisik dari travel."),
+          },
+          {
+            id: "thoif",
+            icon: "🏔️",
+            title: "City Tour & Ziarah Thaif",
+            isIncluded: hasThoif,
+            statusBadge: hasThoif ? "✅ Termasuk" : "❌ Tidak Termasuk",
+            badgeStyle: hasThoif
+              ? "bg-emerald-950 text-emerald-400 border-emerald-600/40"
+              : "bg-rose-950 text-rose-300 border-rose-600/40",
+            cardBg: hasThoif
+              ? "bg-emerald-950/20 border-emerald-500/30"
+              : "bg-[#1c0f08] border-amber-500/20",
+            description: hasThoif
+              ? "Termasuk agenda perjalanan wisata religi, napak tilas sejarah & ziarah ke Kota Thaif."
+              : "Tidak termasuk agenda perjalanan/ziarah ke Kota Thaif dalam program paket ini.",
+          },
+          {
+            id: "kereta",
+            icon: "🚄",
+            title: "Kereta Cepat Haramain (HHR)",
+            isIncluded: hasKeretaCepat,
+            statusBadge: hasKeretaCepat ? "✅ Termasuk" : "❌ Tidak Termasuk",
+            badgeStyle: hasKeretaCepat
+              ? "bg-emerald-950 text-emerald-400 border-emerald-600/40"
+              : "bg-rose-950 text-rose-300 border-rose-600/40",
+            cardBg: hasKeretaCepat
+              ? "bg-emerald-950/20 border-emerald-500/30"
+              : "bg-[#1c0f08] border-amber-500/20",
+            description: hasKeretaCepat
+              ? "Termasuk tiket perjalanan Kereta Cepat Haramain High Speed Railway (rute Mekkah - Madinah)."
+              : "Tidak termasuk tiket Kereta Cepat (perjalanan darat antar kota dilayani dengan Bus AC).",
+          },
+          {
+            id: "makan",
+            icon: "🍽️",
+            title: "Tipe Konsumsi / Makan",
+            isIncluded: hasMakan,
+            statusBadge: !hasMakan
+              ? "❌ Tidak Termasuk"
+              : isBF
+                ? "✅ Breakfast Only (BF)"
+                : "✅ Full Board (3x Sehari)",
+            badgeStyle: !hasMakan
+              ? "bg-rose-950 text-rose-300 border-rose-600/40"
+              : isBF
+                ? "bg-amber-950 text-amber-300 border-amber-600/40"
+                : "bg-emerald-950 text-emerald-400 border-emerald-600/40",
+            cardBg: !hasMakan
+              ? "bg-[#1c0f08] border-amber-500/20"
+              : "bg-emerald-950/20 border-emerald-500/30",
+            description: !hasMakan
+              ? "Konsumsi / makan selama di Arab Saudi tidak ditanggung oleh paket ini."
+              : isBF
+                ? "Mendapatkan sarapan pagi di hotel (Breakfast Only). Makan siang dan makan malam mandiri oleh jamaah."
+                : "Makan 3x sehari menu Indonesia (Full Board / FB) selama menginap di hotel Mekkah dan Madinah.",
+          },
+        ];
+
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
+            <div className="bg-[#1b0f07] border-2 border-amber-500/60 rounded-3xl max-w-xl w-full max-h-[92vh] flex flex-col shadow-2xl text-white overflow-hidden">
+              {/* Header Modal */}
+              <div className="p-4 sm:p-5 border-b border-amber-500/30 flex items-start justify-between gap-3 bg-[#24150B]/90">
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-[10px] font-black uppercase tracking-wider text-amber-300 bg-amber-500/20 border border-amber-400/40 px-2.5 py-0.5 rounded-md">
+                      📋 Rincian Fasilitas Paket
+                    </span>
+                    <span className="text-xs font-bold text-amber-200/80">
+                      ✈️ {selectedPaket.maskapai || "Saudia"} • {new Date(selectedPaket.tanggalBerangkat).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}
+                    </span>
+                  </div>
+                  <h3 className="text-base sm:text-lg font-black text-white mt-1.5">
+                    {selectedPaket.namaPaket || selectedPaket.paketUmroh?.namaPaket}
+                  </h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowDetailPaketModal(false)}
+                  className="p-1.5 rounded-xl bg-amber-950/80 hover:bg-amber-900 border border-amber-500/30 text-amber-300 hover:text-white transition-colors cursor-pointer"
+                  title="Tutup Modal"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Tab Varian Selector jika ada lebih dari 1 varian */}
+              {modalClusters.length > 1 && (
+                <div className="px-4 py-2.5 border-b border-amber-500/20 bg-[#140b05] flex items-center gap-2 overflow-x-auto">
+                  <span className="text-[11px] font-bold text-amber-200/70 shrink-0">Pilih Varian:</span>
+                  {modalClusters.map((c: any, i: number) => {
+                    const isTabActive = detailModalClusterIndex === i;
+                    return (
+                      <button
+                        key={i}
+                        type="button"
+                        onClick={() => setDetailModalClusterIndex(i)}
+                        className={cn(
+                          "px-3 py-1 rounded-xl text-xs font-extrabold whitespace-nowrap transition-all cursor-pointer border",
+                          isTabActive
+                            ? "bg-amber-500 text-slate-950 border-amber-400 shadow-md ring-2 ring-amber-300/50"
+                            : "bg-[#201209] text-amber-200 border-amber-500/30 hover:bg-[#2b180d]"
+                        )}
+                      >
+                        {c.clusterName || `Varian ${i + 1}`}
+                        <span className="ml-1.5 text-[10px] opacity-80">
+                          (Rp {Number(c.hargaBase || 0).toLocaleString("id-ID")})
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Body Scrollable */}
+              <div className="p-4 sm:p-5 overflow-y-auto space-y-4 text-xs">
+                {/* Card Ringkasan Varian Aktif & Hotel */}
+                <div className="p-3.5 rounded-2xl bg-[#26160c] border border-amber-500/30 flex flex-col sm:flex-row justify-between sm:items-center gap-3">
+                  <div>
+                    <span className="text-[10px] font-bold text-amber-300/80 block uppercase">Varian yang Ditinjau</span>
+                    <strong className="text-sm font-black text-amber-400">{currentCluster.clusterName || "Varian Utama"}</strong>
+                    <div className="text-[11px] text-amber-100/90 mt-1 space-y-0.5">
+                      <p>🕋 Hotel Mekkah: <strong>{currentCluster.hotelMekkah || "TBA"}</strong></p>
+                      <p>🕌 Hotel Madinah: <strong>{currentCluster.hotelMadinah || "TBA"}</strong></p>
+                    </div>
+                  </div>
+                  <div className="text-left sm:text-right bg-[#180d06] p-2.5 rounded-xl border border-amber-500/20 shrink-0">
+                    <span className="text-[10px] text-amber-200/70 block">Harga Base Varian</span>
+                    <span className="text-base font-black text-amber-400">Rp {currentPrice.toLocaleString("id-ID")}</span>
+                    <span className="text-[10px] text-amber-200/70"> / pax</span>
+                  </div>
+                </div>
+
+                {/* Section Title */}
+                <div className="border-b border-amber-500/30 pb-1.5 flex items-center justify-between">
+                  <span className="text-xs font-black text-amber-300 uppercase tracking-wider flex items-center gap-1.5">
+                    ⚙️ Status Fasilitas Operasional Paket
+                  </span>
+                  <span className="text-[10px] text-amber-200/70">
+                    Berdasarkan Data Paket Keberangkatan
+                  </span>
+                </div>
+
+                {/* 4 FITUR UTAMA (PERLENGKAPAN, THAIF, KERETA CEPAT, KONSUMSI) */}
+                <div className="space-y-2.5">
+                  {operationalFeatures.map((feat) => (
+                    <div
+                      key={feat.id}
+                      className={cn(
+                        "p-3 rounded-2xl border transition-all flex items-start gap-3",
+                        feat.cardBg
+                      )}
+                    >
+                      <div className="mt-0.5 shrink-0">
+                        {feat.isIncluded ? (
+                          <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+                        ) : (
+                          <XCircle className="w-5 h-5 text-rose-400" />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between gap-2 flex-wrap">
+                          <span className="font-black text-sm text-white flex items-center gap-1.5">
+                            <span>{feat.icon}</span>
+                            <span>{feat.title}</span>
+                          </span>
+                          <span className={cn(
+                            "px-2.5 py-0.5 rounded-full text-[11px] font-black border",
+                            feat.badgeStyle
+                          )}>
+                            {feat.statusBadge}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-amber-100/80 mt-1 leading-relaxed">
+                          {feat.description}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Footer Modal */}
+              <div className="p-3.5 sm:p-4 border-t border-amber-500/30 bg-[#24150B]/90 flex items-center justify-between gap-2">
+                {modalClusters.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedClusterIndex(detailModalClusterIndex);
+                      if (currentCluster.clusterName) setHotelUpgrade(currentCluster.clusterName);
+                      setShowDetailPaketModal(false);
+                    }}
+                    className="px-4 py-2 rounded-xl text-xs font-black bg-amber-500 hover:bg-amber-400 text-slate-950 transition-all cursor-pointer shadow-md"
+                  >
+                    Pilih Varian Ini ({currentCluster.clusterName || `Varian ${detailModalClusterIndex + 1}`})
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setShowDetailPaketModal(false)}
+                  className="ml-auto px-4 py-2 rounded-xl text-xs font-extrabold bg-stone-800 hover:bg-stone-700 text-stone-200 border border-stone-600 transition-colors cursor-pointer"
+                >
+                  Tutup
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   </div>
   );

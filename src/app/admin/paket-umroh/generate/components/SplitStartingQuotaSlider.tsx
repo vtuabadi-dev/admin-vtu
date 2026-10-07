@@ -142,17 +142,17 @@ export function SplitStartingQuotaSlider({
           onPointerUp={handlePointerUp}
           onPointerCancel={handlePointerUp}
           className={cn(
-            "relative h-14 sm:h-16 w-full rounded-2xl bg-stone-200 border-2 border-stone-300 p-1.5 shadow-inner select-none cursor-ew-resize flex items-center overflow-visible transition-all",
+            "relative h-9 sm:h-10 w-full rounded-xl bg-stone-200 border border-stone-300 p-0.5 shadow-inner select-none cursor-ew-resize flex items-center overflow-visible transition-all",
             isDragging && "ring-2 ring-amber-400 ring-offset-1 border-amber-500"
           )}
-          title="Klik atau geser pil di batang ini untuk mengatur alokasi kursi"
+          title="Geser tombol pil di batang ini untuk mengatur alokasi kursi"
         >
           {/* Sisi Kiri: Kuota Paket Utama */}
           <div
             style={{ width: `${parentPct}%` }}
-            className="h-full bg-gradient-to-r from-blue-700 via-indigo-600 to-indigo-500 rounded-l-xl transition-all duration-75 flex items-center justify-start pl-3 text-white text-xs font-bold overflow-hidden shadow-xs relative"
+            className="h-full bg-gradient-to-r from-blue-700 via-indigo-600 to-indigo-500 rounded-l-lg transition-all duration-75 flex items-center justify-start pl-2.5 text-white text-[11px] sm:text-xs font-bold overflow-hidden shadow-xs relative"
           >
-            <span className="truncate pr-4 flex items-center gap-1">
+            <span className="truncate pr-3 flex items-center gap-1 drop-shadow-xs">
               🏢 {parentCity} ({parentSeat} Seat)
             </span>
           </div>
@@ -160,33 +160,35 @@ export function SplitStartingQuotaSlider({
           {/* Sisi Kanan: Kuota Paket Split Baru */}
           <div
             style={{ width: `${childPct}%` }}
-            className="h-full bg-gradient-to-r from-amber-500 via-amber-600 to-orange-500 rounded-r-xl transition-all duration-75 flex items-center justify-end pr-3 text-white text-xs font-bold overflow-hidden shadow-xs relative"
+            className="h-full bg-gradient-to-r from-amber-500 via-amber-600 to-orange-500 rounded-r-lg transition-all duration-75 flex items-center justify-end pr-2.5 text-white text-[11px] sm:text-xs font-bold overflow-hidden shadow-xs relative"
           >
-            <span className="truncate pl-4 flex items-center gap-1">
+            <span className="truncate pl-3 flex items-center gap-1 drop-shadow-xs">
               ✈️ {childCity} ({currentChildSeat} Seat)
             </span>
           </div>
 
-          {/* PIL DI BATANG (Draggable Pill Handle) */}
+          {/* PIL DI BATANG (Compact Proportional Squircle Handle) */}
           <div
             style={{ left: `${parentPct}%` }}
             className={cn(
-              "absolute top-1/2 -translate-y-1/2 -translate-x-1/2 z-20 h-12 sm:h-14 px-3 sm:px-4 bg-white border-2 border-amber-600 rounded-full shadow-xl flex items-center gap-2 cursor-grab active:cursor-grabbing hover:scale-105 transition-transform duration-75",
-              isDragging && "scale-110 border-orange-600 shadow-2xl bg-amber-50"
+              "absolute top-1/2 -translate-y-1/2 -translate-x-1/2 z-20 w-8 sm:w-9 h-11 sm:h-12 bg-white border-2 border-amber-500 rounded-xl shadow-md flex items-center justify-center cursor-grab active:cursor-grabbing hover:scale-105 transition-all duration-75 select-none ring-2 ring-white/90",
+              isDragging && "scale-110 border-orange-600 shadow-xl bg-amber-50 ring-amber-300"
             )}
+            title={`Alokasi Split: ${currentChildSeat} Seat (${Math.round(childPct)}%) - Geser untuk mengubah`}
           >
-            {/* Grip lines / arrows */}
-            <div className="flex flex-col gap-0.5 items-center justify-center text-amber-600">
-              <span className="text-[10px] font-black leading-none">&#9664;</span>
-              <span className="text-[10px] font-black leading-none">&#9654;</span>
+            {/* Minimalist central grip indicator */}
+            <div className="flex gap-0.5 items-center justify-center">
+              <span className="w-1 h-3.5 bg-amber-400 rounded-full" />
+              <span className="w-1 h-3.5 bg-amber-500 rounded-full" />
             </div>
-            <div className="text-center leading-tight">
-              <span className="block text-[9px] font-extrabold uppercase text-stone-500 tracking-wider">
-                PIL ALOKASI
-              </span>
-              <span className="block text-xs sm:text-sm font-black text-amber-950 font-mono">
-                {currentChildSeat} Seat
-              </span>
+
+            {/* Floating Seat Tooltip Badge di atas pil */}
+            <div className="absolute -top-7.5 left-1/2 -translate-x-1/2 pointer-events-none whitespace-nowrap transition-transform duration-75">
+              <div className="bg-slate-900/95 text-white text-[10px] font-black px-2 py-0.5 rounded-full shadow-md flex items-center gap-1 border border-slate-700 backdrop-blur-xs">
+                <span>{currentChildSeat} Seat</span>
+                <span className="text-amber-400 font-medium">({Math.round(childPct)}%)</span>
+              </div>
+              <div className="w-1.5 h-1.5 bg-slate-900/95 rotate-45 mx-auto -mt-0.5 border-r border-b border-slate-700" />
             </div>
           </div>
         </div>
