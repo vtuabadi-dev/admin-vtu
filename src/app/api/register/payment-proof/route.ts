@@ -193,13 +193,19 @@ export async function POST(request: NextRequest) {
             isKeretaCepat:
               (reg as any).isKeretaCepat !== undefined
                 ? Boolean((reg as any).isKeretaCepat)
-                : ((Array.isArray(reg.keberangkatan?.include) && reg.keberangkatan.include.some((inc: string) => /kereta|fast train|haramain/i.test(inc))) ||
+                : (matchedVariant?.isAdaKeretaCepat === "ya" ||
+                   matchedVariant?.isAdaKeretaCepat === true ||
+                   matchedVariant?.keretaCepat === "INCLUDE" ||
+                   (Array.isArray(reg.keberangkatan?.include) && reg.keberangkatan.include.some((inc: string) => /kereta|fast train|haramain/i.test(inc))) ||
                    /kereta|fast train|haramain/i.test(reg.keberangkatan?.namaPaket || "") ||
                    (reg.keberangkatan as any)?.isAdaKeretaCepat === "ya"),
             isCityTourThoif:
               (reg as any).isCityTourThoif !== undefined
                 ? Boolean((reg as any).isCityTourThoif)
-                : ((Array.isArray(reg.keberangkatan?.include) && reg.keberangkatan.include.some((inc: string) => /th[ao]'?if|ta'?if|toif/i.test(inc))) ||
+                : (matchedVariant?.isAdaThoif === "ya" ||
+                   matchedVariant?.isAdaThoif === true ||
+                   matchedVariant?.thoif === "INCLUDE" ||
+                   (Array.isArray(reg.keberangkatan?.include) && reg.keberangkatan.include.some((inc: string) => /th[ao]'?if|ta'?if|toif/i.test(inc))) ||
                    /th[ao]'?if|ta'?if|toif/i.test(reg.keberangkatan?.namaPaket || "") ||
                    (reg.keberangkatan as any)?.isAdaThoif === "ya"),
           },
@@ -235,14 +241,20 @@ export async function POST(request: NextRequest) {
       const hasKC =
         (reg as any).isKeretaCepat !== undefined
           ? Boolean((reg as any).isKeretaCepat)
-          : (pkgInc.some((inc: string) => /kereta|fast train|haramain/i.test(inc)) ||
+          : (matchedVariant?.isAdaKeretaCepat === "ya" ||
+             matchedVariant?.isAdaKeretaCepat === true ||
+             matchedVariant?.keretaCepat === "INCLUDE" ||
+             pkgInc.some((inc: string) => /kereta|fast train|haramain/i.test(inc)) ||
              /kereta|fast train|haramain/i.test(reg.keberangkatan?.namaPaket || "") ||
              (reg.keberangkatan as any)?.isAdaKeretaCepat === "ya");
 
       const hasThoif =
         (reg as any).isCityTourThoif !== undefined
           ? Boolean((reg as any).isCityTourThoif)
-          : (pkgInc.some((inc: string) => /th[ao]'?if|ta'?if|toif/i.test(inc)) ||
+          : (matchedVariant?.isAdaThoif === "ya" ||
+             matchedVariant?.isAdaThoif === true ||
+             matchedVariant?.thoif === "INCLUDE" ||
+             pkgInc.some((inc: string) => /th[ao]'?if|ta'?if|toif/i.test(inc)) ||
              /th[ao]'?if|ta'?if|toif/i.test(reg.keberangkatan?.namaPaket || "") ||
              (reg.keberangkatan as any)?.isAdaThoif === "ya");
 

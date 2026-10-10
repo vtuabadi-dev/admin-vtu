@@ -248,6 +248,10 @@ export const packageService = {
             };
           }
 
+          const isKeretaCepatIncluded = data.isAdaKeretaCepat === "ya";
+          const isThoifIncluded = data.isAdaThoif === "ya";
+          const tipeMakanVariant = data.tipeMakan || "FB";
+
           const newVariant = {
             clusterName: `Varian 2 - ${variantLabel}`,
             variantName: variantLabel,
@@ -257,6 +261,11 @@ export const packageService = {
             hargaBase: Number(data.hargaBase || data.hargaPaket || targetParent.hargaPaket || 0),
             isTanpaPerlengkapan: data.isAdaPerlengkapan === "tidak",
             perlengkapan: data.isAdaPerlengkapan === "tidak" ? "EXCLUDE" : "INCLUDE",
+            isAdaKeretaCepat: data.isAdaKeretaCepat || (isKeretaCepatIncluded ? "ya" : "tidak"),
+            keretaCepat: isKeretaCepatIncluded ? "INCLUDE" : "EXCLUDE",
+            isAdaThoif: data.isAdaThoif || (isThoifIncluded ? "ya" : "tidak"),
+            thoif: isThoifIncluded ? "INCLUDE" : "EXCLUDE",
+            tipeMakan: tipeMakanVariant,
             isPromo: data.splitReason === "promo",
             promoText: data.splitReason === "promo" ? variantLabel : undefined,
             upgradeDouble: Number(data.upgradeDouble || 0),
@@ -588,6 +597,9 @@ export const packageService = {
     }
     if (data.hargaPaket !== undefined && before?.hargaPaket !== data.hargaPaket) {
       changes.push(`Harga Paket (Rp ${before?.hargaPaket} -> Rp ${data.hargaPaket})`);
+    }
+    if (data.hotelOptions !== undefined) {
+      changes.push(`Opsi Varian / Klaster Hotel diperbarui`);
     }
     if (changes.length === 0) changes.push("Memperbarui detail operasional paket");
 

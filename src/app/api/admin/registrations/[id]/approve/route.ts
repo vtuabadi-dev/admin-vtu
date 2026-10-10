@@ -122,14 +122,20 @@ export async function POST(
       const hasKC =
         (reg as any).isKeretaCepat !== undefined
           ? Boolean((reg as any).isKeretaCepat)
-          : (pkgInc.some((inc: string) => /kereta|fast train|haramain/i.test(inc)) ||
+          : (matchedVariant?.isAdaKeretaCepat === "ya" ||
+             matchedVariant?.isAdaKeretaCepat === true ||
+             matchedVariant?.keretaCepat === "INCLUDE" ||
+             pkgInc.some((inc: string) => /kereta|fast train|haramain/i.test(inc)) ||
              /kereta|fast train|haramain/i.test(paket.namaPaket || "") ||
              (paket as any).isAdaKeretaCepat === "ya");
 
       const hasThoif =
         (reg as any).isCityTourThoif !== undefined
           ? Boolean((reg as any).isCityTourThoif)
-          : (pkgInc.some((inc: string) => /th[ao]'?if|ta'?if|toif/i.test(inc)) ||
+          : (matchedVariant?.isAdaThoif === "ya" ||
+             matchedVariant?.isAdaThoif === true ||
+             matchedVariant?.thoif === "INCLUDE" ||
+             pkgInc.some((inc: string) => /th[ao]'?if|ta'?if|toif/i.test(inc)) ||
              /th[ao]'?if|ta'?if|toif/i.test(paket.namaPaket || "") ||
              (paket as any).isAdaThoif === "ya");
 

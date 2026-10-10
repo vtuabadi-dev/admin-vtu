@@ -13,6 +13,7 @@ interface Tab {
 interface TabsProps {
   tabs: Tab[];
   defaultTab?: string;
+  activeTab?: string;
   onTabChange?: (value: string) => void;
   className?: string;
   children: (activeTab: string) => React.ReactNode;
@@ -42,15 +43,17 @@ const tabCountVariants = cva("rounded-full px-1.5 py-0.5 text-xs", {
 export function Tabs({
   tabs,
   defaultTab,
+  activeTab: controlledActiveTab,
   onTabChange,
   className,
   children,
 }: TabsProps) {
-  const [active, setActive] = useState(defaultTab ?? tabs[0]?.value ?? "");
+  const [internalActive, setInternalActive] = useState(defaultTab ?? tabs[0]?.value ?? "");
+  const active = controlledActiveTab !== undefined ? controlledActiveTab : internalActive;
 
   const handleChange = useCallback(
     (value: string) => {
-      setActive(value);
+      setInternalActive(value);
       onTabChange?.(value);
     },
     [onTabChange]

@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState, useMemo, useCallback } from "react";
+import { useEffect, useState, useMemo, useCallback, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   FileText,
   Search,
@@ -250,7 +251,8 @@ import { useOperationalStore } from "@/stores/operational-store";
 // MAIN PAGE
 // ============================================================
 
-export default function DokumenPage() {
+function DokumenPageContent() {
+  const searchParams = useSearchParams();
   const storeKbrList = useOperationalStore((s) => s.keberangkatanList);
   const storeGroupList = useOperationalStore((s) => s.groupList);
   const storeIsLoaded = useOperationalStore((s) => s.isLoaded);
@@ -890,6 +892,27 @@ export default function DokumenPage() {
       setUploadSearching(false);
     }
   }
+
+  // Handle deep-link navigation (e.g. from /admin/jamaah/histori-paket)
+  useEffect(() => {
+    const tabParam = searchParams.get("tab");
+    const kodeParam = searchParams.get("kodeRegistrasi") || searchParams.get("search") || searchParams.get("grp");
+
+    if (tabParam === "upload" || kodeParam) {
+      setActiveTab("upload");
+    }
+
+    if (kodeParam) {
+      const cleanKode = kodeParam.trim();
+      setUploadSearchId(cleanKode);
+      if (cleanKode.toUpperCase().startsWith("GRP-")) {
+        const p = cleanKode.split("-");
+        if (p[1]) setSearchYear(p[1]);
+        if (p[2]) setSearchSeq(p[2].replace(/\D/g, ""));
+      }
+      handleSearchJamaah(cleanKode);
+    }
+  }, [searchParams]);
 
   function handleClearJamaah() {
     setSelectedJamaah(null);
@@ -1561,6 +1584,7 @@ export default function DokumenPage() {
           { value: "review", label: "Review Dokumen", count: reviewCounts.semua },
           { value: "upload", label: "Upload Dokumen" },
         ]}
+        activeTab={activeTab}
         onTabChange={setActiveTab}
       >
         {() => (
@@ -3729,5 +3753,22 @@ Tim Operasional`}
         </div>
       </Modal>
     </div>
+  );
+}
+
+export default function DokumenPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <div className="flex flex-col items-center gap-3">
+            <Loader2 className="h-8 w-8 text-primary animate-spin" />
+            <p className="text-xs text-muted-foreground">Memuat modul dokumen jamaah...</p>
+          </div>
+        </div>
+      }
+    >
+      <DokumenPageContent />
+    </Suspense>
   );
 }

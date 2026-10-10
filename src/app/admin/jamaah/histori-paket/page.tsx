@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
+import Link from "next/link";
 import {
   History,
   Search,
@@ -15,6 +16,7 @@ import {
   ChevronDown,
   ChevronUp,
   AlertCircle,
+  FileText,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/components/ui/Card";
 import { Button } from "@/shared/components/ui/Button";
@@ -421,7 +423,8 @@ export default function HistoriPaketPage() {
                             <th className="px-4 py-2.5">Jenis Aksi Pergerakan</th>
                             <th className="px-4 py-2.5">Nama Jamaah</th>
                             <th className="px-4 py-2.5">Catatan / Detail Operasional</th>
-                            <th className="px-4 py-2.5 text-right">Petugas Executed</th>
+                            <th className="px-4 py-2.5">Petugas Executed</th>
+                            <th className="px-4 py-2.5 text-right">Aksi</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y">
@@ -472,8 +475,21 @@ export default function HistoriPaketPage() {
                               <td className="px-4 py-3 text-muted-foreground leading-relaxed">
                                 {act.keterangan}
                               </td>
-                              <td className="px-4 py-3 text-right font-semibold text-foreground whitespace-nowrap">
+                              <td className="px-4 py-3 font-semibold text-foreground whitespace-nowrap">
                                 {act.actorName}
+                              </td>
+                              <td className="px-4 py-3 text-right whitespace-nowrap">
+                                {act.nomorPeserta ? (
+                                  <Link
+                                    href={`/admin/dokumen?tab=upload&kodeRegistrasi=${encodeURIComponent(act.nomorPeserta)}`}
+                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs transition-colors hover:shadow-sm"
+                                  >
+                                    <FileText className="w-3.5 h-3.5" />
+                                    <span>Lengkapi Data</span>
+                                  </Link>
+                                ) : (
+                                  <span className="text-muted-foreground text-xs">-</span>
+                                )}
                               </td>
                             </tr>
                           ))}

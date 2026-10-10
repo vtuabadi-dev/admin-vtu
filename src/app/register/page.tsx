@@ -3269,10 +3269,16 @@ export default function RegisterPage() {
         const isClusterTanpaPerlengkapan = currentCluster.perlengkapan === "EXCLUDE" || currentCluster.isTanpaPerlengkapan || (currentCluster as any).tanpaPerlengkapan || currentCluster.clusterName?.toLowerCase().includes("tanpa perlengkapan");
         const includesPerlengkapan = baseHasPerlengkapan && !isClusterTanpaPerlengkapan;
 
-        const hasThoif = rawIncludeList.some((i: string) => /th[ao]'?if|ta'?if/i.test(i));
-        const hasKeretaCepat = rawIncludeList.some((i: string) => i.toLowerCase().includes("kereta cepat"));
+        const hasThoif = (currentCluster.isAdaThoif !== undefined || currentCluster.thoif !== undefined)
+          ? (currentCluster.isAdaThoif === "ya" || currentCluster.isAdaThoif === true || currentCluster.thoif === "INCLUDE")
+          : rawIncludeList.some((i: string) => /th[ao]'?if|ta'?if/i.test(i));
 
-        const isBF = (selectedPaket as any).tipeMakan === "BF" || rawIncludeList.some((i: string) => i.toLowerCase().includes("breakfast"));
+        const hasKeretaCepat = (currentCluster.isAdaKeretaCepat !== undefined || currentCluster.keretaCepat !== undefined)
+          ? (currentCluster.isAdaKeretaCepat === "ya" || currentCluster.isAdaKeretaCepat === true || currentCluster.keretaCepat === "INCLUDE")
+          : rawIncludeList.some((i: string) => i.toLowerCase().includes("kereta cepat"));
+
+        const clusterTipeMakan = currentCluster.tipeMakan || (selectedPaket as any).tipeMakan;
+        const isBF = clusterTipeMakan === "BF" || rawIncludeList.some((i: string) => i.toLowerCase().includes("breakfast"));
         const hasMakan = !rawExcludeList.some((e: string) => e.toLowerCase().includes("makan"));
 
         const operationalFeatures = [

@@ -627,6 +627,21 @@ function resolveJamaahKeretaCepat(activePackage: any, groupObj: any, j: any): bo
     }
   }
 
+  // 3.5 Check variant in hotelOptions if group/jamaah selected a variant
+  const clusterName = getJamaahCluster(groupObj, j);
+  if (clusterName && Array.isArray(activePackage?.hotelOptions)) {
+    const matchedOpt = activePackage.hotelOptions.find((o: any) =>
+      o.clusterName === clusterName ||
+      o.variantName === clusterName ||
+      (o.variantName && clusterName.includes(o.variantName))
+    );
+    if (matchedOpt) {
+      if (matchedOpt.isAdaKeretaCepat !== undefined || matchedOpt.keretaCepat !== undefined) {
+        return Boolean(matchedOpt.isAdaKeretaCepat === "ya" || matchedOpt.isAdaKeretaCepat === true || matchedOpt.keretaCepat === "INCLUDE");
+      }
+    }
+  }
+
   // 4. Registration Request / Package Inclusions Snapshot Comparison
   const packageHasKC =
     (activePackage?.include && Array.isArray(activePackage.include) &&
@@ -666,6 +681,21 @@ function resolveJamaahCityTourThoif(activePackage: any, groupObj: any, j: any): 
           /th[ao]'?if|ta'?if|toif/i.test(`${item.deskripsi || ""} ${item.kategori || ""}`)
         );
         if (hasItem) return true;
+      }
+    }
+  }
+
+  // 3.5 Check variant in hotelOptions if group/jamaah selected a variant
+  const clusterNameThoif = getJamaahCluster(groupObj, j);
+  if (clusterNameThoif && Array.isArray(activePackage?.hotelOptions)) {
+    const matchedOpt = activePackage.hotelOptions.find((o: any) =>
+      o.clusterName === clusterNameThoif ||
+      o.variantName === clusterNameThoif ||
+      (o.variantName && clusterNameThoif.includes(o.variantName))
+    );
+    if (matchedOpt) {
+      if (matchedOpt.isAdaThoif !== undefined || matchedOpt.thoif !== undefined) {
+        return Boolean(matchedOpt.isAdaThoif === "ya" || matchedOpt.isAdaThoif === true || matchedOpt.thoif === "INCLUDE");
       }
     }
   }

@@ -9,6 +9,7 @@ import {
   UserCheck,
   UserPlus,
   Hotel,
+  Layers,
   Lock,
   Plus,
   Trash2,
@@ -28,6 +29,7 @@ import { SearchableSelect } from "@/shared/components/ui/SearchableSelect";
 import { getKeberangkatanById } from "@/server/actions/api";
 import type { Keberangkatan, FlightSegment } from "@/shared/types";
 import { detectFlightType } from "@/shared/lib/flight-utils";
+import { useOperationalStore } from "@/stores/operational-store";
 
 export default function EditKeberangkatanPage() {
   const params = useParams();
@@ -50,6 +52,7 @@ export default function EditKeberangkatanPage() {
   const [hargaPaket, setHargaPaket] = useState<number>(0);
   const [hotelMekkah, setHotelMekkah] = useState("");
   const [hotelMadinah, setHotelMadinah] = useState("");
+  const [hotelOptions, setHotelOptions] = useState<any[]>([]);
   const [pnrMain, setPnrMain] = useState("");
   
   // Staff State
@@ -137,6 +140,7 @@ export default function EditKeberangkatanPage() {
         setHargaPaket(data.hargaPaket || 0);
         setHotelMekkah(data.hotelMekkah || "");
         setHotelMadinah(data.hotelMadinah || "");
+        setHotelOptions(Array.isArray(data.hotelOptions) ? data.hotelOptions : []);
 
         const meta = (data as any).driveFolderIds || {};
         const flight = meta.flightDetails || {};
@@ -465,6 +469,7 @@ export default function EditKeberangkatanPage() {
           nomorPenerbangan: mainFlightNo,
           hotelMekkah,
           hotelMadinah,
+          hotelOptions,
           flightDetails: {
             pnr: pnrMain,
             nomorPenerbangan: mainFlightNo,
@@ -494,6 +499,45 @@ export default function EditKeberangkatanPage() {
       }
     } catch (err: any) {
       alert("Error: " + err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeleteVariant = async (indexToDelete: number) => {
+    const target = hotelOptions[indexToDelete];
+    if (!target) return;
+    const vName = target.clusterName || target.variantName || `Varian ${indexToDelete + 1}`;
+
+    if (!confirm(`Apakah Anda yakin ingin menghapus "${vName}" dari paket ini?\n\nPaket Utama (Reguler) akan tetap aktif dan kuota penerbangan tidak berubah.`)) {
+      return;
+    }
+
+    const newOptions = hotelOptions.filter((_, idx) => idx !== indexToDelete);
+    setHotelOptions(newOptions);
+
+    try {
+      setSaving(true);
+      const res = await fetch(`/api/keberangkatan/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          hotelOptions: newOptions,
+        }),
+      });
+
+      const resJson = await res.json();
+      if (resJson.success) {
+        setSuccessMessage(`"${vName}" berhasil dihapus dari paket keberangkatan ini.`);
+        useOperationalStore.getState().setIsLoaded(false);
+        useOperationalStore.getState().loadAllData();
+      } else {
+        alert(resJson.message || "Gagal menghapus varian.");
+        setHotelOptions(hotelOptions);
+      }
+    } catch (err: any) {
+      alert("Error: " + (err?.message || "Terjadi kesalahan sistem"));
+      setHotelOptions(hotelOptions);
     } finally {
       setSaving(false);
     }
@@ -1186,6 +1230,125 @@ export default function EditKeberangkatanPage() {
               />
             </div>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Section 5: Manajemen Varian & Klaster Hotel (Single Manifest - ADR-0021) */}
+      <Card className="border shadow-sm">
+        <CardHeader className="pb-3 border-b bg-muted/20 flex flex-row items-center justify-between">
+          <div>
+            <CardTitle className="text-base font-bold flex items-center gap-2 text-primary">
+              <Layers className="h-4 w-4" />
+              Manajemen Varian &amp; Klaster Hotel (Single Manifest)
+            </CardTitle>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Sesuai ADR-0021, seluruh varian paket (Promo / Spesifikasi Khusus) terintegrasi ke dalam 1 penerbangan yang sama.
+            </p>
+          </div>
+          <span className="text-xs font-semibold px-2.5 py-1 bg-primary/10 text-primary border border-primary/20 rounded-md">
+            {hotelOptions.length > 0 ? `${hotelOptions.length} Opsi Terdaftar` : "1 Opsi Reguler"}
+          </span>
+        </CardHeader>
+        <CardContent className="p-5 space-y-3">
+          {hotelOptions.length === 0 ? (
+            <div className="p-4 rounded-xl border bg-muted/10 text-xs text-muted-foreground flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <span className="font-bold text-foreground block">Varian Utama (Reguler)</span>
+                <span>Mekkah: {hotelMekkah || "TBA"} &mdash; Madinah: {hotelMadinah || "TBA"} (Rp {Number(hargaPaket).toLocaleString("id-ID")})</span>
+              </div>
+              <span className="text-[11px] font-medium text-muted-foreground italic">Paket Tunggal (Belum Ada Split Varian Tambahan)</span>
+            </div>
+          ) : (
+            hotelOptions.map((opt: any, idx: number) => {
+              const isVarian2 = opt.isVarian2 || (opt.clusterName && opt.clusterName.toUpperCase().includes("VARIAN 2")) || opt.variantName;
+              const isUtama = opt.isVarianUtama || (!isVarian2 && idx === 0);
+
+              return (
+                <div
+                  key={idx}
+                  className={`p-4 rounded-xl border transition-all flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 ${
+                    isVarian2
+                      ? "bg-purple-50/50 dark:bg-purple-950/20 border-purple-200 dark:border-purple-800/60 shadow-xs"
+                      : "bg-muted/10 border-border"
+                  }`}
+                >
+                  <div className="space-y-1.5 flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {isVarian2 ? (
+                        <span className="text-[11px] font-bold text-purple-700 bg-purple-100 dark:bg-purple-900/60 dark:text-purple-300 border border-purple-300 dark:border-purple-700 px-2 py-0.5 rounded uppercase flex items-center gap-1">
+                          💜 {opt.clusterName || `Varian 2 - ${opt.variantName || "Spek"}`}
+                        </span>
+                      ) : (
+                        <span className="text-[11px] font-bold text-primary bg-primary/10 border border-primary/20 px-2 py-0.5 rounded uppercase">
+                          {opt.clusterName || "Reguler (Varian Utama)"}
+                        </span>
+                      )}
+                      <span className="text-sm font-extrabold text-foreground">
+                        Rp {Number(opt.hargaBase || hargaPaket).toLocaleString("id-ID")}
+                        <span className="text-[11px] font-normal text-muted-foreground"> / pax</span>
+                      </span>
+                    </div>
+
+                    <div className="text-xs text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1">
+                      <span>🕋 Mekkah: <strong className="text-foreground">{opt.hotelMekkah || hotelMekkah || "TBA"}</strong></span>
+                      <span>•</span>
+                      <span>🕌 Madinah: <strong className="text-foreground">{opt.hotelMadinah || hotelMadinah || "TBA"}</strong></span>
+                    </div>
+
+                    {isVarian2 && (
+                      <div className="flex flex-wrap items-center gap-1.5 pt-1 text-[11px]">
+                        <span className={`px-2 py-0.5 rounded border font-semibold ${
+                          opt.isTanpaPerlengkapan || opt.perlengkapan === "EXCLUDE"
+                            ? "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800"
+                            : "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800"
+                        }`}>
+                          {opt.isTanpaPerlengkapan || opt.perlengkapan === "EXCLUDE" ? "Perlengkapan: Exclude (LA)" : "Perlengkapan: Include"}
+                        </span>
+                        <span className={`px-2 py-0.5 rounded border font-semibold ${
+                          opt.isAdaKeretaCepat === "ya" || opt.keretaCepat === "INCLUDE"
+                            ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800"
+                            : "bg-stone-100 text-stone-600 border-stone-200 dark:bg-stone-800 dark:text-stone-300"
+                        }`}>
+                          Kereta Cepat: {opt.isAdaKeretaCepat === "ya" || opt.keretaCepat === "INCLUDE" ? "Ya (Include)" : "Tidak"}
+                        </span>
+                        <span className={`px-2 py-0.5 rounded border font-semibold ${
+                          opt.isAdaThoif === "ya" || opt.thoif === "INCLUDE"
+                            ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800"
+                            : "bg-stone-100 text-stone-600 border-stone-200 dark:bg-stone-800 dark:text-stone-300"
+                        }`}>
+                          Thoif: {opt.isAdaThoif === "ya" || opt.thoif === "INCLUDE" ? "Ya (Include)" : "Tidak"}
+                        </span>
+                        <span className="px-2 py-0.5 rounded border font-semibold bg-stone-100 text-stone-600 border-stone-200 dark:bg-stone-800 dark:text-stone-300">
+                          Makan: {opt.tipeMakan === "BF" ? "Breakfast Only" : "Full Board"}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="shrink-0 self-end sm:self-center">
+                    {isUtama ? (
+                      <span className="text-[11px] text-muted-foreground italic font-medium px-2 py-1">
+                        (Basis Paket Utama)
+                      </span>
+                    ) : (
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => handleDeleteVariant(idx)}
+                        disabled={saving}
+                        className="gap-1.5 text-xs h-8 px-3"
+                        title="Hapus varian ini dari paket keberangkatan"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                        Hapus Varian
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              );
+            })
+          )}
         </CardContent>
       </Card>
 
