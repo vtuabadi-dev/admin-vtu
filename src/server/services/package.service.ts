@@ -188,6 +188,8 @@ export const packageService = {
         hotelMekkah: finalHotelMekkah,
         hotelMadinah: finalHotelMadinah,
         hargaBase: Number(data.hargaBase || data.hargaPaket || 0),
+        upgradeDouble: Number(data.upgradeDouble || 0),
+        upgradeTriple: Number(data.upgradeTriple || 0),
       }];
     }
 

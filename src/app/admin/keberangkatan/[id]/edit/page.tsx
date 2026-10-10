@@ -53,6 +53,8 @@ export default function EditKeberangkatanPage() {
   const [hotelMekkah, setHotelMekkah] = useState("");
   const [hotelMadinah, setHotelMadinah] = useState("");
   const [hotelOptions, setHotelOptions] = useState<any[]>([]);
+  const [upgradeDouble, setUpgradeDouble] = useState<number>(0);
+  const [upgradeTriple, setUpgradeTriple] = useState<number>(0);
   const [pnrMain, setPnrMain] = useState("");
   
   // Staff State
@@ -140,7 +142,10 @@ export default function EditKeberangkatanPage() {
         setHargaPaket(data.hargaPaket || 0);
         setHotelMekkah(data.hotelMekkah || "");
         setHotelMadinah(data.hotelMadinah || "");
-        setHotelOptions(Array.isArray(data.hotelOptions) ? data.hotelOptions : []);
+        const loadedOptions = Array.isArray(data.hotelOptions) ? data.hotelOptions : [];
+        setHotelOptions(loadedOptions);
+        setUpgradeDouble(Number((data as any).upgradeDouble || loadedOptions[0]?.upgradeDouble || 0));
+        setUpgradeTriple(Number((data as any).upgradeTriple || loadedOptions[0]?.upgradeTriple || 0));
 
         const meta = (data as any).driveFolderIds || {};
         const flight = meta.flightDetails || {};
@@ -455,6 +460,17 @@ export default function EditKeberangkatanPage() {
         ? `${flightSegments[0]?.asal || "SUB"} -> ${flightSegments[flightSegments.length - 1]?.tujuan || "JED"}`
         : "SUB -> JED";
 
+      const finalHotelOptions = hotelOptions.length > 0
+        ? hotelOptions.map((opt, i) => i === 0 ? { ...opt, upgradeDouble: Number(upgradeDouble || 0), upgradeTriple: Number(upgradeTriple || 0) } : opt)
+        : [{
+            clusterName: "Reguler",
+            hargaBase: Number(hargaPaket || 0),
+            hotelMekkah,
+            hotelMadinah,
+            upgradeDouble: Number(upgradeDouble || 0),
+            upgradeTriple: Number(upgradeTriple || 0),
+          }];
+
       const res = await fetch(`/api/keberangkatan/${id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -469,7 +485,7 @@ export default function EditKeberangkatanPage() {
           nomorPenerbangan: mainFlightNo,
           hotelMekkah,
           hotelMadinah,
-          hotelOptions,
+          hotelOptions: finalHotelOptions,
           flightDetails: {
             pnr: pnrMain,
             nomorPenerbangan: mainFlightNo,
@@ -709,6 +725,59 @@ export default function EditKeberangkatanPage() {
               />
               <p className="text-[11px] text-muted-foreground mt-1">
                 Harga per pax paket (di luar add-on).
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-bold text-foreground mb-1">
+                Harga Upgrade Kamar Double (Rp)
+              </label>
+              <Input
+                type="number"
+                min={0}
+                value={upgradeDouble}
+                onChange={(e) => {
+                  const val = parseInt(e.target.value, 10) || 0;
+                  setUpgradeDouble(val);
+                  setHotelOptions((prev) => {
+                    if (prev.length === 0) return prev;
+                    const next = [...prev];
+                    next[0] = { ...next[0], upgradeDouble: val };
+                    return next;
+                  });
+                }}
+                className="font-semibold bg-card"
+                placeholder="4500000"
+              />
+              <p className="text-[11px] text-muted-foreground mt-1">
+                Biaya tambahan kamar berdua (Double) per pax.
+              </p>
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-foreground mb-1">
+                Harga Upgrade Kamar Triple (Rp)
+              </label>
+              <Input
+                type="number"
+                min={0}
+                value={upgradeTriple}
+                onChange={(e) => {
+                  const val = parseInt(e.target.value, 10) || 0;
+                  setUpgradeTriple(val);
+                  setHotelOptions((prev) => {
+                    if (prev.length === 0) return prev;
+                    const next = [...prev];
+                    next[0] = { ...next[0], upgradeTriple: val };
+                    return next;
+                  });
+                }}
+                className="font-semibold bg-card"
+                placeholder="3000000"
+              />
+              <p className="text-[11px] text-muted-foreground mt-1">
+                Biaya tambahan kamar bertiga (Triple) per pax.
               </p>
             </div>
           </div>
@@ -1323,6 +1392,48 @@ export default function EditKeberangkatanPage() {
                         </span>
                       </div>
                     )}
+
+                    {/* Per-Variant Upgrade Prices */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 mt-2 border-t border-border/40">
+                      <div>
+                        <label className="block text-[11px] font-bold text-foreground mb-1">
+                          Upgrade Double (Rp):
+                        </label>
+                        <Input
+                          type="number"
+                          min={0}
+                          value={opt.upgradeDouble ?? 0}
+                          onChange={(e) => {
+                            const val = parseInt(e.target.value, 10) || 0;
+                            const updated = [...hotelOptions];
+                            updated[idx] = { ...updated[idx], upgradeDouble: val };
+                            setHotelOptions(updated);
+                            if (idx === 0) setUpgradeDouble(val);
+                          }}
+                          className="h-8 text-xs font-semibold bg-background"
+                          placeholder="4500000"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-bold text-foreground mb-1">
+                          Upgrade Triple (Rp):
+                        </label>
+                        <Input
+                          type="number"
+                          min={0}
+                          value={opt.upgradeTriple ?? 0}
+                          onChange={(e) => {
+                            const val = parseInt(e.target.value, 10) || 0;
+                            const updated = [...hotelOptions];
+                            updated[idx] = { ...updated[idx], upgradeTriple: val };
+                            setHotelOptions(updated);
+                            if (idx === 0) setUpgradeTriple(val);
+                          }}
+                          className="h-8 text-xs font-semibold bg-background"
+                          placeholder="3000000"
+                        />
+                      </div>
+                    </div>
                   </div>
 
                   <div className="shrink-0 self-end sm:self-center">

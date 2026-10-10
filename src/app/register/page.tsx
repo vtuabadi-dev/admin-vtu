@@ -1585,7 +1585,7 @@ export default function RegisterPage() {
                     : null;
                   const isMultiCluster = !!(clusters && clusters.length > 1);
 
-                  const activeCluster = isMultiCluster && clusters
+                  const activeCluster = clusters
                     ? clusters[selectedClusterIndex] || clusters[0]
                     : null;
 
@@ -1596,8 +1596,22 @@ export default function RegisterPage() {
                   const hotelMekkah = activeCluster?.hotelMekkah || selectedPaket.hotelMekkah || "TBA";
                   const hotelMadinah = activeCluster?.hotelMadinah || selectedPaket.hotelMadinah || "TBA";
 
-                  const upgradeTriple = Number(activeCluster?.upgradeTriple || 1500000);
-                  const upgradeDouble = Number(activeCluster?.upgradeDouble || 2500000);
+                  // Ambil nominal upgrade kamar dari active cluster, fallback ke klaster utama/paket jika varian belum meng-override
+                  const rawUpgradeTriple = Number(
+                    (activeCluster && Number(activeCluster.upgradeTriple) > 0 ? activeCluster.upgradeTriple : undefined) ??
+                    clusters?.find((c: any) => Number(c?.upgradeTriple) > 0)?.upgradeTriple ??
+                    (selectedPaket as any)?.upgradeTriple ??
+                    0
+                  );
+                  const rawUpgradeDouble = Number(
+                    (activeCluster && Number(activeCluster.upgradeDouble) > 0 ? activeCluster.upgradeDouble : undefined) ??
+                    clusters?.find((c: any) => Number(c?.upgradeDouble) > 0)?.upgradeDouble ??
+                    (selectedPaket as any)?.upgradeDouble ??
+                    0
+                  );
+
+                  const upgradeTriple = rawUpgradeTriple > 0 ? rawUpgradeTriple : 1500000;
+                  const upgradeDouble = rawUpgradeDouble > 0 ? rawUpgradeDouble : 2500000;
 
                   return (
                     <div className="bg-[#24150B]/95 border-2 border-amber-500/50 backdrop-blur-xl shadow-2xl rounded-3xl p-6 space-y-6 text-white">
