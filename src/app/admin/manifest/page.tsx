@@ -236,6 +236,37 @@ function deriveProvinsi(provinsi?: string, kota?: string): string {
   return "DKI JAKARTA";
 }
 
+function formatVariantLabel(
+  klasterName: string,
+  groupPkg: any,
+  isVarian2Row: boolean,
+  groupObj?: any,
+  jamaah?: any
+): { text: string; isVariant: boolean } {
+  const combined = `${klasterName || ""} ${(groupPkg as any)?.variantName || ""} ${(groupPkg as any)?.clusterName || ""} ${(groupPkg as any)?.splitLabel || ""} ${(groupObj as any)?.hotelUpgrade || ""} ${(jamaah as any)?.catatan || ""}`.toUpperCase();
+
+  if (combined.includes("VARIAN 2") || combined.includes("V2") || (groupPkg as any)?.isVarian2 || isVarian2Row) {
+    return { text: "Varian 2", isVariant: true };
+  }
+  if (combined.includes("VARIAN 3") || combined.includes("V3") || (groupPkg as any)?.isVarian3) {
+    return { text: "Varian 3", isVariant: true };
+  }
+  if (combined.includes("VARIAN 4") || combined.includes("V4")) {
+    return { text: "Varian 4", isVariant: true };
+  }
+  const matchNum = combined.match(/VARIAN\s*(\d+)/i);
+  if (matchNum && matchNum[1]) {
+    const num = parseInt(matchNum[1]);
+    if (num === 1) return { text: "VU (Utama)", isVariant: false };
+    return { text: `Varian ${num}`, isVariant: true };
+  }
+  if (combined.includes("PROMO")) {
+    const promoName = (groupPkg as any)?.promoLabel || "Varian Promo";
+    return { text: promoName.length > 15 ? "Varian Promo" : promoName, isVariant: true };
+  }
+  return { text: "VU (Utama)", isVariant: false };
+}
+
 function getAirlineCode(maskapaiStr?: string | null): string {
   if (!maskapaiStr) return "SV";
   const str = maskapaiStr.trim().toUpperCase();
@@ -2092,99 +2123,99 @@ function ManifestPageContent() {
 
               <div className="rounded-xl border border-stone-200 dark:border-stone-800 bg-card shadow-sm overflow-hidden">
                 <div className="overflow-x-auto">
-                  <table className="w-full border-collapse text-left text-xs font-medium">
+                  <table className="w-full border-collapse text-left text-xs font-medium whitespace-nowrap">
                     <thead className="bg-gradient-to-b from-stone-100 via-stone-200 to-stone-300 dark:from-stone-800 dark:via-stone-850 dark:to-stone-900 border-t border-t-white/90 dark:border-t-stone-700/60 border-b-2 border-b-stone-400/80 dark:border-b-stone-950 sticky top-0 z-10 shadow-md">
                       <tr>
                         {isSelectMode && (
-                          <th className="px-2 py-3 font-extrabold uppercase tracking-wider text-[10px] text-stone-800 dark:text-stone-100 border-r border-stone-300/80 dark:border-stone-700/80 w-10 text-center sticky left-0 bg-gradient-to-b from-stone-100 via-stone-200 to-stone-300 dark:from-stone-800 dark:via-stone-850 dark:to-stone-900 z-20 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
+                          <th className="px-2 py-1.5 font-extrabold uppercase tracking-wider text-[10px] text-stone-800 dark:text-stone-100 border-r border-stone-300/80 dark:border-stone-700/80 w-10 text-center sticky left-0 bg-gradient-to-b from-stone-100 via-stone-200 to-stone-300 dark:from-stone-800 dark:via-stone-850 dark:to-stone-900 z-20 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] whitespace-nowrap">
                             <input
                               type="checkbox"
-                              className="h-4 w-4 rounded border-stone-300 text-amber-600 focus:ring-amber-500 cursor-pointer"
+                              className="h-3.5 w-3.5 rounded border-stone-300 text-amber-600 focus:ring-amber-500 cursor-pointer"
                               checked={isAllSelected}
                               onChange={toggleSelectAll}
                               title={isAllSelected ? "Batal Pilih Semua" : "Pilih Semua Jamaah"}
                             />
                           </th>
                         )}
-                        <th className="px-3 py-3 font-extrabold uppercase tracking-wider text-[10px] text-stone-800 dark:text-stone-100 border-r border-stone-300/80 dark:border-stone-700/80 min-w-[200px] shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
+                        <th className="px-2.5 py-1.5 font-extrabold uppercase tracking-wider text-[10px] text-stone-800 dark:text-stone-100 border-r border-stone-300/80 dark:border-stone-700/80 min-w-[170px] shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] whitespace-nowrap">
                           KELUARGA / ROMBONGAN
                         </th>
-                        <th className="px-2 py-3 font-extrabold uppercase tracking-wider text-[10px] text-stone-800 dark:text-stone-100 border-r border-stone-300/80 dark:border-stone-700/80 w-16 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
+                        <th className="px-2 py-1.5 font-extrabold uppercase tracking-wider text-[10px] text-stone-800 dark:text-stone-100 border-r border-stone-300/80 dark:border-stone-700/80 w-14 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] whitespace-nowrap">
                           NO JAMAAH
                         </th>
-                        <th className="px-3 py-3 font-extrabold uppercase tracking-wider text-[10px] text-stone-800 dark:text-stone-100 border-r border-stone-300/80 dark:border-stone-700/80 min-w-[100px] shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
+                        <th className="px-2.5 py-1.5 font-extrabold uppercase tracking-wider text-[10px] text-stone-800 dark:text-stone-100 border-r border-stone-300/80 dark:border-stone-700/80 min-w-[90px] shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] whitespace-nowrap">
                           ID REGISTER
                         </th>
-                        <th className="px-3 py-3 font-extrabold uppercase tracking-wider text-[10px] text-stone-800 dark:text-stone-100 border-r border-stone-300/80 dark:border-stone-700/80 min-w-[170px] shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
+                        <th className="px-2.5 py-1.5 font-extrabold uppercase tracking-wider text-[10px] text-stone-800 dark:text-stone-100 border-r border-stone-300/80 dark:border-stone-700/80 min-w-[150px] shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] whitespace-nowrap">
                           NAMA
                         </th>
-                        <th className="px-3 py-3 font-extrabold uppercase tracking-wider text-[10px] text-stone-800 dark:text-stone-100 border-r border-stone-300/80 dark:border-stone-700/80 min-w-[140px] shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
+                        <th className="px-2.5 py-1.5 font-extrabold uppercase tracking-wider text-[10px] text-stone-800 dark:text-stone-100 border-r border-stone-300/80 dark:border-stone-700/80 min-w-[120px] shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] whitespace-nowrap">
                           NIK
                         </th>
-                        <th className="px-3 py-3 font-extrabold uppercase tracking-wider text-[10px] text-stone-800 dark:text-stone-100 border-r border-stone-300/80 dark:border-stone-700/80 min-w-[130px] shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
+                        <th className="px-2.5 py-1.5 font-extrabold uppercase tracking-wider text-[10px] text-stone-800 dark:text-stone-100 border-r border-stone-300/80 dark:border-stone-700/80 min-w-[110px] shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] whitespace-nowrap">
                           NO PASPOR
                         </th>
-                        <th className="px-3 py-3 font-extrabold uppercase tracking-wider text-[10px] text-stone-800 dark:text-stone-100 border-r border-stone-300/80 dark:border-stone-700/80 min-w-[130px] shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
+                        <th className="px-2.5 py-1.5 font-extrabold uppercase tracking-wider text-[10px] text-stone-800 dark:text-stone-100 border-r border-stone-300/80 dark:border-stone-700/80 min-w-[110px] shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] whitespace-nowrap">
                           TGL DIKELUARKAN
                         </th>
-                        <th className="px-3 py-3 font-extrabold uppercase tracking-wider text-[10px] text-stone-800 dark:text-stone-100 border-r border-stone-300/80 dark:border-stone-700/80 min-w-[130px] shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
+                        <th className="px-2.5 py-1.5 font-extrabold uppercase tracking-wider text-[10px] text-stone-800 dark:text-stone-100 border-r border-stone-300/80 dark:border-stone-700/80 min-w-[110px] shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] whitespace-nowrap">
                           TGL HABIS
                         </th>
-                        <th className="px-3 py-3 font-extrabold uppercase tracking-wider text-[10px] text-stone-800 dark:text-stone-100 border-r border-stone-300/80 dark:border-stone-700/80 min-w-[130px] shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
+                        <th className="px-2.5 py-1.5 font-extrabold uppercase tracking-wider text-[10px] text-stone-800 dark:text-stone-100 border-r border-stone-300/80 dark:border-stone-700/80 min-w-[110px] shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] whitespace-nowrap">
                           KOTA PASPOR
                         </th>
-                        <th className="px-3 py-3 font-extrabold uppercase tracking-wider text-[10px] text-stone-800 dark:text-stone-100 border-r border-stone-300/80 dark:border-stone-700/80 min-w-[110px] text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
-                          KLASTER
+                        <th className="px-2.5 py-1.5 font-extrabold uppercase tracking-wider text-[10px] text-stone-800 dark:text-stone-100 border-r border-stone-300/80 dark:border-stone-700/80 min-w-[125px] text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] whitespace-nowrap">
+                          KLASTER DAN VARIAN
                         </th>
-                        <th className="px-3 py-3 font-extrabold uppercase tracking-wider text-[10px] text-stone-800 dark:text-stone-100 border-r border-stone-300/80 dark:border-stone-700/80 min-w-[130px] text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
+                        <th className="px-2.5 py-1.5 font-extrabold uppercase tracking-wider text-[10px] text-stone-800 dark:text-stone-100 border-r border-stone-300/80 dark:border-stone-700/80 min-w-[110px] text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] whitespace-nowrap">
                           PERLENGKAPAN
                         </th>
-                        <th className="px-3 py-3 font-extrabold uppercase tracking-wider text-[10px] text-stone-800 dark:text-stone-100 border-r border-stone-300/80 dark:border-stone-700/80 w-28 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
+                        <th className="px-2 py-1.5 font-extrabold uppercase tracking-wider text-[10px] text-stone-800 dark:text-stone-100 border-r border-stone-300/80 dark:border-stone-700/80 w-24 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] whitespace-nowrap">
                           KERETA CEPAT
                         </th>
-                        <th className="px-3 py-3 font-extrabold uppercase tracking-wider text-[10px] text-stone-800 dark:text-stone-100 border-r border-stone-300/80 dark:border-stone-700/80 w-36 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
+                        <th className="px-2.5 py-1.5 font-extrabold uppercase tracking-wider text-[10px] text-stone-800 dark:text-stone-100 border-r border-stone-300/80 dark:border-stone-700/80 min-w-[130px] text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] whitespace-nowrap">
                           CITY TOUR THOIF / THAIF
                         </th>
-                        <th className="px-3 py-3 font-extrabold uppercase tracking-wider text-[10px] text-stone-800 dark:text-stone-100 border-r border-stone-300/80 dark:border-stone-700/80 w-28 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
+                        <th className="px-2 py-1.5 font-extrabold uppercase tracking-wider text-[10px] text-stone-800 dark:text-stone-100 border-r border-stone-300/80 dark:border-stone-700/80 w-24 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] whitespace-nowrap">
                           TIPE MAKAN
                         </th>
-                        <th className="px-3 py-3 font-extrabold uppercase tracking-wider text-[10px] text-stone-800 dark:text-stone-100 border-r border-stone-300/80 dark:border-stone-700/80 min-w-[130px] shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
+                        <th className="px-2.5 py-1.5 font-extrabold uppercase tracking-wider text-[10px] text-stone-800 dark:text-stone-100 border-r border-stone-300/80 dark:border-stone-700/80 min-w-[120px] shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] whitespace-nowrap">
                           HOTEL MAKKAH
                         </th>
-                        <th className="px-3 py-3 font-extrabold uppercase tracking-wider text-[10px] text-stone-800 dark:text-stone-100 border-r border-stone-300/80 dark:border-stone-700/80 min-w-[130px] shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
+                        <th className="px-2.5 py-1.5 font-extrabold uppercase tracking-wider text-[10px] text-stone-800 dark:text-stone-100 border-r border-stone-300/80 dark:border-stone-700/80 min-w-[120px] shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] whitespace-nowrap">
                           HOTEL MADINAH
                         </th>
-                        <th className="px-3 py-3 font-extrabold uppercase tracking-wider text-[10px] text-stone-800 dark:text-stone-100 border-r border-stone-300/80 dark:border-stone-700/80 min-w-[120px] shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
+                        <th className="px-2.5 py-1.5 font-extrabold uppercase tracking-wider text-[10px] text-stone-800 dark:text-stone-100 border-r border-stone-300/80 dark:border-stone-700/80 min-w-[100px] shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] whitespace-nowrap">
                           KAMAR
                         </th>
-                        <th className="px-2 py-3 font-extrabold uppercase tracking-wider text-[10px] text-stone-800 dark:text-stone-100 border-r border-stone-300/80 dark:border-stone-700/80 w-12 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
+                        <th className="px-2 py-1.5 font-extrabold uppercase tracking-wider text-[10px] text-stone-800 dark:text-stone-100 border-r border-stone-300/80 dark:border-stone-700/80 w-10 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] whitespace-nowrap">
                           JK (*)
                         </th>
-                        <th className="px-3 py-3 font-extrabold uppercase tracking-wider text-[10px] text-stone-800 dark:text-stone-100 border-r border-stone-300/80 dark:border-stone-700/80 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
+                        <th className="px-2.5 py-1.5 font-extrabold uppercase tracking-wider text-[10px] text-stone-800 dark:text-stone-100 border-r border-stone-300/80 dark:border-stone-700/80 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] whitespace-nowrap">
                           TEMPAT LAHIR (*)
                         </th>
-                        <th className="px-3 py-3 font-extrabold uppercase tracking-wider text-[10px] text-stone-800 dark:text-stone-100 border-r border-stone-300/80 dark:border-stone-700/80 w-24 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
+                        <th className="px-2.5 py-1.5 font-extrabold uppercase tracking-wider text-[10px] text-stone-800 dark:text-stone-100 border-r border-stone-300/80 dark:border-stone-700/80 w-24 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] whitespace-nowrap">
                           TGL LAHIR (*)
                         </th>
-                        <th className="px-2 py-3 font-extrabold uppercase tracking-wider text-[10px] text-stone-800 dark:text-stone-100 border-r border-stone-300/80 dark:border-stone-700/80 w-14 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
+                        <th className="px-2 py-1.5 font-extrabold uppercase tracking-wider text-[10px] text-stone-800 dark:text-stone-100 border-r border-stone-300/80 dark:border-stone-700/80 w-12 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] whitespace-nowrap">
                           UMUR
                         </th>
-                        <th className="px-3 py-3 font-extrabold uppercase tracking-wider text-[10px] text-stone-800 dark:text-stone-100 border-r border-stone-300/80 dark:border-stone-700/80 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
+                        <th className="px-2.5 py-1.5 font-extrabold uppercase tracking-wider text-[10px] text-stone-800 dark:text-stone-100 border-r border-stone-300/80 dark:border-stone-700/80 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] whitespace-nowrap">
                           STATUS MENIKAH
                         </th>
-                        <th className="px-3 py-3 font-extrabold uppercase tracking-wider text-[10px] text-stone-800 dark:text-stone-100 border-r border-stone-300/80 dark:border-stone-700/80 min-w-[110px] shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
+                        <th className="px-2.5 py-1.5 font-extrabold uppercase tracking-wider text-[10px] text-stone-800 dark:text-stone-100 border-r border-stone-300/80 dark:border-stone-700/80 min-w-[100px] shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] whitespace-nowrap">
                           NO TELP/HP
                         </th>
-                        <th className="px-3 py-3 font-extrabold uppercase tracking-wider text-[10px] text-stone-800 dark:text-stone-100 border-r border-stone-300/80 dark:border-stone-700/80 min-w-[140px] shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
+                        <th className="px-2.5 py-1.5 font-extrabold uppercase tracking-wider text-[10px] text-stone-800 dark:text-stone-100 border-r border-stone-300/80 dark:border-stone-700/80 min-w-[120px] shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] whitespace-nowrap">
                           KOTA/KAB (*)
                         </th>
-                        <th className="px-3 py-3 font-extrabold uppercase tracking-wider text-[10px] text-stone-800 dark:text-stone-100 border-r border-stone-300/80 dark:border-stone-700/80 w-28 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
+                        <th className="px-2.5 py-1.5 font-extrabold uppercase tracking-wider text-[10px] text-stone-800 dark:text-stone-100 border-r border-stone-300/80 dark:border-stone-700/80 w-24 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] whitespace-nowrap">
                           PROVINSI (*)
                         </th>
-                        <th className="px-3 py-3 font-extrabold uppercase tracking-wider text-[10px] text-stone-800 dark:text-stone-100 min-w-[200px] border-r border-stone-300/80 dark:border-stone-700/80 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
+                        <th className="px-2.5 py-1.5 font-extrabold uppercase tracking-wider text-[10px] text-stone-800 dark:text-stone-100 min-w-[180px] border-r border-stone-300/80 dark:border-stone-700/80 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] whitespace-nowrap">
                           ALAMAT
                         </th>
-                        <th className="px-3 py-3 font-extrabold uppercase tracking-wider text-[10px] text-stone-800 dark:text-stone-100 w-24 text-center sticky right-0 bg-gradient-to-b from-stone-100 via-stone-200 to-stone-300 dark:from-stone-800 dark:via-stone-850 dark:to-stone-900 shadow-[-4px_0_6px_-4px_rgba(0,0,0,0.2),inset_0_1px_0_rgba(255,255,255,0.7)] dark:shadow-[-4px_0_6px_-4px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,255,255,0.05)] z-20">
+                        <th className="px-2.5 py-1.5 font-extrabold uppercase tracking-wider text-[10px] text-stone-800 dark:text-stone-100 w-20 text-center sticky right-0 bg-gradient-to-b from-stone-100 via-stone-200 to-stone-300 dark:from-stone-800 dark:via-stone-850 dark:to-stone-900 shadow-[-4px_0_6px_-4px_rgba(0,0,0,0.2),inset_0_1px_0_rgba(255,255,255,0.7)] dark:shadow-[-4px_0_6px_-4px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,255,255,0.05)] z-20 whitespace-nowrap">
                           AKSI
                         </th>
                       </tr>
@@ -2305,10 +2336,10 @@ function ManifestPageContent() {
                               >
                                 {/* CHECKBOX COL */}
                                 {isSelectMode && (
-                                  <td className={`px-2 py-2.5 text-center sticky left-0 ${isVarian2Row ? "bg-purple-100/95 dark:bg-purple-950/80" : "bg-white dark:bg-stone-900"} z-10 ${cellBorder}`}>
+                                  <td className={`px-2 py-1 text-center sticky left-0 ${isVarian2Row ? "bg-purple-100/95 dark:bg-purple-950/80" : "bg-white dark:bg-stone-900"} z-10 whitespace-nowrap ${cellBorder}`}>
                                     <input
                                       type="checkbox"
-                                      className="h-4 w-4 rounded border-stone-300 text-amber-600 focus:ring-amber-500 cursor-pointer"
+                                      className="h-3.5 w-3.5 rounded border-stone-300 text-amber-600 focus:ring-amber-500 cursor-pointer"
                                       checked={selectedJamaahIds.includes(j.id)}
                                       onChange={() => toggleSelectRow(j.id)}
                                       title="Mencentang jamaah ini akan memilih seluruh anggota rombongan"
@@ -2321,7 +2352,7 @@ function ManifestPageContent() {
                                   <td
                                     rowSpan={totalInGroup}
                                     className={cn(
-                                      "p-3 text-center align-middle font-bold text-[11px] shadow-xs border-r-2 border-b-[2.5px]",
+                                      "px-2.5 py-1 text-center align-middle font-bold text-[10.5px] shadow-xs border-r-2 border-b-[2.5px] whitespace-nowrap",
                                       isVarian2Row
                                         ? "bg-purple-200/90 dark:bg-purple-900/70 text-purple-950 dark:text-purple-100 border-r-purple-500 dark:border-r-purple-600 border-b-purple-500 dark:border-b-purple-600"
                                         : "bg-amber-50/80 dark:bg-amber-950/30 text-amber-950 dark:text-amber-200 border-r-amber-400 dark:border-r-amber-700 border-b-amber-400 dark:border-b-amber-500"
@@ -2332,21 +2363,21 @@ function ManifestPageContent() {
                                 )}
 
                                 {/* NO JAMAAH */}
-                                <td className={`px-2 py-2.5 text-center font-bold font-mono ${cellBorder} ${isVarian2Row ? "text-purple-900 dark:text-purple-200 font-extrabold" : "text-stone-700 dark:text-stone-300"}`}>
+                                <td className={`px-2 py-1 text-center font-bold font-mono whitespace-nowrap ${cellBorder} ${isVarian2Row ? "text-purple-900 dark:text-purple-200 font-extrabold" : "text-stone-700 dark:text-stone-300"}`}>
                                   {currentNoJamaah}
                                 </td>
 
                                 {/* ID REGISTER */}
-                                <td className={`px-3 py-2.5 font-mono font-semibold ${cellBorder} ${isVarian2Row ? "text-purple-950 dark:text-purple-100 font-bold" : "text-stone-800 dark:text-stone-200"}`}>
+                                <td className={`px-2.5 py-1 font-mono font-semibold whitespace-nowrap ${cellBorder} ${isVarian2Row ? "text-purple-950 dark:text-purple-100 font-bold" : "text-stone-800 dark:text-stone-200"}`}>
                                   {idRegister}
                                 </td>
 
                                 {/* NAMA */}
-                                <td className={`px-3 py-2.5 font-bold ${cellBorder} ${isVarian2Row ? "text-purple-950 dark:text-purple-100" : "text-stone-900 dark:text-white"}`}>
-                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                <td className={`px-2.5 py-1 font-bold whitespace-nowrap ${cellBorder} ${isVarian2Row ? "text-purple-950 dark:text-purple-100" : "text-stone-900 dark:text-white"}`}>
+                                  <div className="flex items-center gap-1.5 whitespace-nowrap">
                                     <span>{namaSot}</span>
                                     {isVarian2Row && (
-                                      <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-black bg-purple-600 text-white shadow-2xs">
+                                      <span className="inline-flex items-center gap-0.5 px-1 py-0.2 rounded text-[9px] font-black bg-purple-600 text-white shadow-2xs whitespace-nowrap">
                                         💜 V2
                                       </span>
                                     )}
@@ -2354,7 +2385,7 @@ function ManifestPageContent() {
                                 </td>
 
                                 {/* NIK */}
-                                <td className={`px-3 py-2.5 font-mono text-stone-800 dark:text-stone-200 ${cellBorder}`}>
+                                <td className={`px-2.5 py-1 font-mono whitespace-nowrap text-stone-800 dark:text-stone-200 ${cellBorder}`}>
                                   {nikVal && nikVal !== "-" ? (
                                     <span className="font-semibold">{nikVal}</span>
                                   ) : (
@@ -2363,122 +2394,81 @@ function ManifestPageContent() {
                                 </td>
 
                                 {/* NO PASPOR */}
-                                <td className={`px-3 py-2.5 font-mono font-semibold text-stone-800 dark:text-stone-200 ${cellBorder}`}>
+                                <td className={`px-2.5 py-1 font-mono font-semibold whitespace-nowrap text-stone-800 dark:text-stone-200 ${cellBorder}`}>
                                   {pasporInfo.noPaspor && pasporInfo.noPaspor !== "-" ? pasporInfo.noPaspor : "-"}
                                 </td>
 
                                 {/* TGL DIKELUARKAN */}
-                                <td className={`px-3 py-2.5 font-mono text-stone-700 dark:text-stone-300 ${cellBorder}`}>
+                                <td className={`px-2.5 py-1 font-mono whitespace-nowrap text-stone-700 dark:text-stone-300 ${cellBorder}`}>
                                   {formatDisplayDate(pasporInfo.tglDikeluarkan)}
                                 </td>
 
                                 {/* TGL HABIS */}
-                                <td className={`px-3 py-2.5 font-mono text-stone-700 dark:text-stone-300 ${cellBorder}`}>
+                                <td className={`px-2.5 py-1 font-mono whitespace-nowrap text-stone-700 dark:text-stone-300 ${cellBorder}`}>
                                   {formatDisplayDate(pasporInfo.tglHabis)}
                                 </td>
 
                                 {/* KOTA PASPOR */}
-                                <td className={`px-3 py-2.5 font-semibold text-stone-800 dark:text-stone-200 ${cellBorder}`}>
+                                <td className={`px-2.5 py-1 font-semibold whitespace-nowrap text-stone-800 dark:text-stone-200 ${cellBorder}`}>
                                   {pasporInfo.kotaPaspor}
                                 </td>
 
-                                {/* KLASTER */}
-                                <td className={`px-3 py-2.5 text-center ${cellBorder}`}>
+                                {/* KLASTER DAN VARIAN */}
+                                <td className={`px-2 py-1 text-center whitespace-nowrap ${cellBorder}`}>
                                   {(() => {
-                                    if (isVarian2Row) {
+                                    const vInfo = formatVariantLabel(klasterName, groupPkg, isVarian2Row, group.groupObj, j);
+                                    if (vInfo.isVariant) {
                                       return (
-                                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-black bg-purple-600 text-white border border-purple-400 dark:bg-purple-700 dark:border-purple-500 shadow-xs">
-                                          💜 {klasterName}
+                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-black bg-purple-600 text-white shadow-2xs whitespace-nowrap select-none">
+                                          💜 {vInfo.text}
                                         </span>
                                       );
                                     }
-                                    const isPromoKlaster = klasterName.toUpperCase().includes("PROMO") || isPromoVariant(groupPkg);
-                                    return isPromoKlaster ? (
-                                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-extrabold bg-purple-500/20 text-purple-800 dark:text-purple-300 border border-purple-500/40 shadow-xs">
-                                        🏷️ {groupPkg?.promoLabel || groupPkg?.splitLabel || klasterName}
-                                      </span>
-                                    ) : (
-                                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-extrabold bg-amber-500/15 text-amber-900 dark:text-amber-300 border border-amber-500/30 shadow-xs">
-                                        🏢 {klasterName}
+                                    return (
+                                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-extrabold bg-amber-500/15 text-amber-900 dark:text-amber-300 border border-amber-500/30 shadow-2xs whitespace-nowrap select-none">
+                                        {vInfo.text}
                                       </span>
                                     );
                                   })()}
                                 </td>
 
                                 {/* PERLENGKAPAN */}
-                                <td className={`px-3 py-2.5 text-center ${cellBorder}`}>
+                                <td className={`px-2 py-1 text-center whitespace-nowrap ${cellBorder}`}>
                                   {(() => {
                                     const resolved = resolveSystemStatusPerlengkapan(groupPkg, group.groupObj, j);
-
+                                    if (resolved.status === "INCLUDE") {
+                                      return (
+                                        <span
+                                          className="inline-flex items-center px-2 py-0.5 rounded text-[9.5px] font-black bg-emerald-600 text-white shadow-2xs tracking-wider select-none whitespace-nowrap"
+                                          title={resolved.keterangan || (resolved.physicalStatus === "SUDAH_AMBIL" ? "Sudah Diambil" : "Belum Diambil")}
+                                        >
+                                          INCLUDE{resolved.physicalStatus === "SUDAH_AMBIL" ? " ✓" : ""}
+                                        </span>
+                                      );
+                                    }
+                                    if (resolved.status === "PAID") {
+                                      return (
+                                        <span
+                                          className="inline-flex items-center px-2 py-0.5 rounded text-[9.5px] font-black bg-blue-600 text-white shadow-2xs tracking-wider select-none whitespace-nowrap"
+                                          title={resolved.keterangan || "+ Tambahan"}
+                                        >
+                                          PAID
+                                        </span>
+                                      );
+                                    }
                                     return (
-                                      <div className="flex flex-col items-center justify-center">
-                                        {resolved.status === "INCLUDE" ? (
-                                          <div>
-                                            <span
-                                              className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-black bg-emerald-600 text-white shadow-sm tracking-wider select-none"
-                                              title={resolved.keterangan}
-                                            >
-                                              INCLUDE
-                                            </span>
-                                            {resolved.physicalStatus === "SUDAH_AMBIL" ? (
-                                              <span className="text-[9px] font-semibold text-emerald-600 dark:text-emerald-400 block mt-0.5">
-                                                ✓ Sudah Diambil
-                                              </span>
-                                            ) : resolved.physicalStatus === "SEBAGIAN" ? (
-                                              <span className="text-[9px] font-semibold text-amber-600 dark:text-amber-400 block mt-0.5">
-                                                ⚡ Ambil Sebagian
-                                              </span>
-                                            ) : (
-                                              <span className="text-[9px] font-medium text-stone-500 dark:text-stone-400 block mt-0.5">
-                                                Belum Diambil
-                                              </span>
-                                            )}
-                                          </div>
-                                        ) : resolved.status === "PAID" ? (
-                                          <div>
-                                            <span
-                                              className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-black bg-blue-600 text-white shadow-sm tracking-wider select-none"
-                                              title={resolved.keterangan}
-                                            >
-                                              PAID
-                                            </span>
-                                            <span className="text-[9px] font-bold text-blue-600 dark:text-blue-400 block mt-0.5">
-                                              + Tambahan
-                                            </span>
-                                            {resolved.physicalStatus === "SUDAH_AMBIL" ? (
-                                              <span className="text-[9px] font-semibold text-emerald-600 dark:text-emerald-400 block">
-                                                ✓ Sudah Diambil
-                                              </span>
-                                            ) : resolved.physicalStatus === "SEBAGIAN" ? (
-                                              <span className="text-[9px] font-semibold text-amber-600 dark:text-amber-400 block">
-                                                ⚡ Ambil Sebagian
-                                              </span>
-                                            ) : (
-                                              <span className="text-[9px] font-medium text-stone-500 dark:text-stone-400 block">
-                                                Belum Diambil
-                                              </span>
-                                            )}
-                                          </div>
-                                        ) : (
-                                          <div>
-                                            <span
-                                              className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-black bg-stone-800 text-stone-200 dark:bg-stone-900 dark:text-stone-300 border border-stone-700 shadow-sm tracking-wider select-none"
-                                              title={resolved.keterangan}
-                                            >
-                                              EXCLUDE
-                                            </span>
-                                            <span className="text-[9px] text-stone-400 block mt-0.5 italic">
-                                              Tanpa perlengkapan
-                                            </span>
-                                          </div>
-                                        )}
-                                      </div>
+                                      <span
+                                        className="inline-flex items-center px-2 py-0.5 rounded text-[9.5px] font-black bg-stone-800 text-stone-200 dark:bg-stone-900 dark:text-stone-300 border border-stone-700 shadow-2xs tracking-wider select-none whitespace-nowrap"
+                                        title={resolved.keterangan || "Tanpa perlengkapan"}
+                                      >
+                                        EXCLUDE
+                                      </span>
                                     );
                                   })()}
                                 </td>
 
                                 {/* KERETA CEPAT */}
-                                <td className={`px-3 py-2.5 text-center ${cellBorder}`}>
+                                <td className={`px-2 py-1 text-center whitespace-nowrap ${cellBorder}`}>
                                   {(() => {
                                     const isKC = resolveJamaahKeretaCepat(groupPkg, group.groupObj, j);
                                     const isToggling = togglingFacility === `${j.id}-isKeretaCepat`;
@@ -2492,12 +2482,12 @@ function ManifestPageContent() {
                                       >
                                         {isKC ? (
                                           <span
-                                            className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 font-extrabold text-xs shadow-2xs mx-auto border border-emerald-300 dark:border-emerald-700 select-none hover:bg-emerald-200"
+                                            className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 font-extrabold text-[11px] shadow-2xs mx-auto border border-emerald-300 dark:border-emerald-700 select-none hover:bg-emerald-200"
                                           >
                                             ✓
                                           </span>
                                         ) : (
-                                          <span className="inline-flex items-center justify-center h-6 px-2 rounded-md bg-stone-100 text-stone-500 dark:bg-stone-800 dark:text-stone-400 font-mono text-xs border border-stone-200 dark:border-stone-700 select-none hover:bg-stone-200">
+                                          <span className="inline-flex items-center justify-center h-5 px-1.5 rounded-md bg-stone-100 text-stone-500 dark:bg-stone-800 dark:text-stone-400 font-mono text-[11px] border border-stone-200 dark:border-stone-700 select-none hover:bg-stone-200">
                                             —
                                           </span>
                                         )}
@@ -2507,7 +2497,7 @@ function ManifestPageContent() {
                                 </td>
 
                                 {/* CITY TOUR THOIF */}
-                                <td className={`px-3 py-2.5 text-center ${cellBorder}`}>
+                                <td className={`px-2 py-1 text-center whitespace-nowrap ${cellBorder}`}>
                                   {(() => {
                                     const isThoif = resolveJamaahCityTourThoif(groupPkg, group.groupObj, j);
                                     const isToggling = togglingFacility === `${j.id}-isCityTourThoif`;
@@ -2521,12 +2511,12 @@ function ManifestPageContent() {
                                       >
                                         {isThoif ? (
                                           <span
-                                            className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 font-extrabold text-xs shadow-2xs mx-auto border border-emerald-300 dark:border-emerald-700 select-none hover:bg-emerald-200"
+                                            className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 font-extrabold text-[11px] shadow-2xs mx-auto border border-emerald-300 dark:border-emerald-700 select-none hover:bg-emerald-200"
                                           >
                                             ✓
                                           </span>
                                         ) : (
-                                          <span className="inline-flex items-center justify-center h-6 px-2 rounded-md bg-stone-100 text-stone-500 dark:bg-stone-800 dark:text-stone-400 font-mono text-xs border border-stone-200 dark:border-stone-700 select-none hover:bg-stone-200">
+                                          <span className="inline-flex items-center justify-center h-5 px-1.5 rounded-md bg-stone-100 text-stone-500 dark:bg-stone-800 dark:text-stone-400 font-mono text-[11px] border border-stone-200 dark:border-stone-700 select-none hover:bg-stone-200">
                                             —
                                           </span>
                                         )}
@@ -2536,17 +2526,17 @@ function ManifestPageContent() {
                                 </td>
 
                                 {/* TIPE MAKAN (FB / BF) */}
-                                <td className={`px-3 py-2.5 text-center ${cellBorder}`}>
+                                <td className={`px-2 py-1 text-center whitespace-nowrap ${cellBorder}`}>
                                   {resolvePackageBoardType(groupPkg, activePackage) === "FB" ? (
                                     <span
-                                      className="inline-flex items-center justify-center px-2 py-0.5 rounded text-[11px] font-extrabold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700 shadow-2xs select-none"
+                                      className="inline-flex items-center justify-center px-1.5 py-0.2 rounded text-[10px] font-extrabold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700 shadow-2xs select-none whitespace-nowrap"
                                       title="Paket Full Board (Makan 3x Sehari)"
                                     >
                                       FB
                                     </span>
                                   ) : (
                                     <span
-                                      className="inline-flex items-center justify-center px-2 py-0.5 rounded text-[11px] font-extrabold bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 border border-amber-300 dark:border-amber-700 shadow-2xs select-none"
+                                      className="inline-flex items-center justify-center px-1.5 py-0.2 rounded text-[10px] font-extrabold bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 border border-amber-300 dark:border-amber-700 shadow-2xs select-none whitespace-nowrap"
                                       title="Paket Breakfast Only (Sarapan Saja)"
                                     >
                                       BF
@@ -2555,7 +2545,7 @@ function ManifestPageContent() {
                                 </td>
 
                                 {/* HOTEL MAKKAH */}
-                                <td className={`px-3 py-2.5 ${cellBorder}`}>
+                                <td className={`px-2.5 py-1 whitespace-nowrap ${cellBorder}`}>
                                   {resolveHotelForKlaster(
                                     j.hotelMekkah || groupPkg.hotelMekkah || activePackage.hotelMekkah,
                                     getJamaahCluster(group.groupObj, j) || "SILVER"
@@ -2563,7 +2553,7 @@ function ManifestPageContent() {
                                 </td>
 
                                 {/* HOTEL MADINAH */}
-                                <td className={`px-3 py-2.5 ${cellBorder}`}>
+                                <td className={`px-2.5 py-1 whitespace-nowrap ${cellBorder}`}>
                                   {resolveHotelForKlaster(
                                     j.hotelMadinah || groupPkg.hotelMadinah || activePackage.hotelMadinah,
                                     getJamaahCluster(group.groupObj, j) || "SILVER"
@@ -2571,66 +2561,66 @@ function ManifestPageContent() {
                                 </td>
 
                                 {/* KAMAR */}
-                                <td className={`px-3 py-2.5 uppercase font-semibold text-stone-700 dark:text-stone-300 ${cellBorder}`}>
+                                <td className={`px-2.5 py-1 uppercase font-semibold text-stone-700 dark:text-stone-300 whitespace-nowrap ${cellBorder}`}>
                                   {tipeKamarDisplay}
                                 </td>
 
                                 {/* JENIS KELAMIN */}
-                                <td className={`px-2 py-2.5 text-center font-bold ${cellBorder}`}>
+                                <td className={`px-2 py-1 text-center font-bold whitespace-nowrap ${cellBorder}`}>
                                   {j.jenisKelamin || "L"}
                                 </td>
 
                                 {/* TEMPAT LAHIR */}
-                                <td className={`px-3 py-2.5 ${cellBorder}`}>
+                                <td className={`px-2.5 py-1 whitespace-nowrap ${cellBorder}`}>
                                   {j.tempatLahir || "-"}
                                 </td>
 
                                 {/* TGL LAHIR */}
-                                <td className={`px-3 py-2.5 font-mono ${cellBorder}`}>
+                                <td className={`px-2.5 py-1 font-mono whitespace-nowrap ${cellBorder}`}>
                                   {formatDisplayDate(j.tanggalLahir)}
                                 </td>
 
                                 {/* UMUR */}
-                                <td className={`px-2 py-2.5 text-center font-semibold ${cellBorder}`}>
+                                <td className={`px-2 py-1 text-center font-semibold whitespace-nowrap ${cellBorder}`}>
                                   {calculateAge(j.tanggalLahir)}
                                 </td>
 
                                 {/* STATUS MENIKAH */}
-                                <td className={`px-3 py-2.5 ${cellBorder}`}>
+                                <td className={`px-2.5 py-1 whitespace-nowrap ${cellBorder}`}>
                                   {statusMenikahDisplay}
                                 </td>
 
                                 {/* NO TELP/HP */}
-                                <td className={`px-3 py-2.5 font-mono ${cellBorder}`}>
+                                <td className={`px-2.5 py-1 font-mono whitespace-nowrap ${cellBorder}`}>
                                   {j.nomorTelepon || "-"}
                                 </td>
 
                                 {/* KOTA/KAB */}
-                                <td className={`px-3 py-2.5 font-semibold text-stone-800 dark:text-stone-200 ${cellBorder}`}>
+                                <td className={`px-2.5 py-1 font-semibold whitespace-nowrap text-stone-800 dark:text-stone-200 ${cellBorder}`}>
                                   {kotaDisplay}
                                 </td>
 
                                 {/* PROVINSI */}
-                                <td className={`px-3 py-2.5 font-bold uppercase text-[10px] text-amber-800 dark:text-amber-300 ${cellBorder}`}>
+                                <td className={`px-2.5 py-1 font-bold uppercase text-[10px] whitespace-nowrap text-amber-800 dark:text-amber-300 ${cellBorder}`}>
                                   {provinsiDisplay}
                                 </td>
 
                                 {/* ALAMAT LENGKAP */}
                                 <td
-                                  className={`px-3 py-2.5 text-stone-600 dark:text-stone-400 max-w-[240px] truncate ${cellBorder}`}
+                                  className={`px-2.5 py-1 text-stone-600 dark:text-stone-400 max-w-[200px] truncate whitespace-nowrap ${cellBorder}`}
                                   title={alamatLengkapVal}
                                 >
                                   {alamatLengkapVal}
                                 </td>
 
                                 {/* AKSI */}
-                                <td className={`px-3 py-2.5 text-center sticky right-0 ${isVarian2Row ? "bg-purple-100/95 dark:bg-purple-950/85" : "bg-white dark:bg-stone-900"} shadow-[-4px_0_6px_-4px_rgba(0,0,0,0.15)] border-l ${isVarian2Row ? "border-purple-300/60 dark:border-purple-800/60" : "border-stone-200/50 dark:border-stone-800/50"} z-10 ${rowBorderClass}`}>
-                                  <div className="flex items-center justify-center gap-2">
+                                <td className={`px-1.5 py-1 text-center sticky right-0 ${isVarian2Row ? "bg-purple-100/95 dark:bg-purple-950/85" : "bg-white dark:bg-stone-900"} shadow-[-4px_0_6px_-4px_rgba(0,0,0,0.15)] border-l ${isVarian2Row ? "border-purple-300/60 dark:border-purple-800/60" : "border-stone-200/50 dark:border-stone-800/50"} z-10 whitespace-nowrap ${rowBorderClass}`}>
+                                  <div className="flex items-center justify-center gap-1.5 whitespace-nowrap">
                                     {isFirstInGroup && (
                                       <Button
                                         variant="outline"
                                         size="sm"
-                                        className="h-7 px-2 text-[10px] border-stone-200/60 dark:border-stone-800/60 hover:bg-sky-50 hover:text-sky-600"
+                                        className="h-6 w-6 p-0 border-stone-200/60 dark:border-stone-800/60 hover:bg-sky-50 hover:text-sky-600"
                                         title="Pindah Paket"
                                         onClick={() => {
                                           setGroupToMove(group);
@@ -2644,7 +2634,7 @@ function ManifestPageContent() {
                                     <Button
                                       variant="outline"
                                       size="sm"
-                                      className="h-7 px-2 text-[10px] border-stone-200/60 dark:border-stone-800/60 hover:bg-red-50 hover:text-red-600"
+                                      className="h-6 w-6 p-0 border-stone-200/60 dark:border-stone-800/60 hover:bg-red-50 hover:text-red-600"
                                       title="Hapus Jamaah"
                                       onClick={() => {
                                         setJamaahToDelete(j);
