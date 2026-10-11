@@ -249,6 +249,25 @@ describe("Package OCR & Route Resolution — Hardened Suite", () => {
       const route = extractLandingRoute(caption);
       expect(route).toBe("JED.TH-J");
     });
+
+    it("resolves Landing Jeddah with Madinah hotel stay but departure from King Abdul Aziz Airport Jeddah as JED.C-J", () => {
+      const caption = `
+        9 HARI PERJALANAN | STARTING JAKARTA
+        HARI-1 | JAKARTA-DOHA-JEDDAH-MAKKAH
+        HARI-2 | MAKKAH
+        HARI-5 | MAKKAH-MADINAH
+        HARI-6 | MADINAH
+        HARI-7 | MADINAH
+        HARI-8 | MADINAH-JEDDAH
+        • Koper disiapkan didepan kamar masing-masing
+        • Berkumpul di lobby hotel dan checkout hotel
+        • menuju King Abdul Aziz International Airport, Jeddah
+        • Proses Check in dan imigrasi
+        HARI-9 | JAKARTA
+      `;
+      const route = extractLandingRoute(caption);
+      expect(route).toBe("JED.C-J");
+    });
   });
 });
 

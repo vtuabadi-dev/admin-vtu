@@ -98,7 +98,9 @@ export async function processPackageFlyer(
   const hasRoute = !!localParsed.landingRoute;
 
   // If local parser extracted dates, duration, airline, city, price AND route, skip Gemini API!
-  if (hasDates && hasDuration && hasAirline && hasCity && hasPrice && hasRoute) {
+  // PENTING: Jika ada additionalImagePaths (user mengunggah flyer itinerary), DILARANG skip Gemini API!
+  // AI Gemini WAJIB memeriksa flyer itinerary (terutama flyer terakhir & kedua dari akhir) untuk membaca rute out kepulangan secara akurat!
+  if (hasDates && hasDuration && hasAirline && hasCity && hasPrice && hasRoute && (!additionalImagePaths || additionalImagePaths.length === 0)) {
     console.log(`[processPackageFlyer] ⚡ 100% Parsed locally via Regex/Parser in ${Date.now() - startMs}ms! Skipping Gemini API call to conserve token quota.`);
     return {
       ...localParsed,

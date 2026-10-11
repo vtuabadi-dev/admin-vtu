@@ -770,9 +770,20 @@ export function extractLandingRoute(caption: string): string | undefined {
                          /\b(?:MADINAH|MEDINA|MEDINAH|MED)\s*(?:IN|LANDING)\b/i.test(upper);
 
   const outJeddah = /\b(?:OUT|PULANG|TAKE\s*OFF|KEPULANGAN)\s*(?:DARI\s*)?(?:VIA\s*)?(?:BANDARA\s*)?(?:AIRPORT\s*)?JED(?:DAH)?\b/i.test(upper) ||
-                    /\bJED(?:DAH)?\s*(?:OUT|TAKE\s*OFF|PULANG)\b/i.test(upper);
+                    /\bJED(?:DAH)?\s*(?:OUT|TAKE\s*OFF|PULANG)\b/i.test(upper) ||
+                    /\b(?:MADINAH|MEDINA|MED)\s*-\s*JED(?:DAH)?\b/i.test(upper) ||
+                    /\bKING\s*ABDUL\s*A[Z|S]I[Z|S]\b/i.test(upper) ||
+                    /\bBANDARA\s*(?:INTERNASIONAL\s*)?(?:KING\s*ABDUL\s*A[Z|S]I[Z|S]\s*)?JED(?:DAH)?\b/i.test(upper) ||
+                    /\bJED(?:DAH)?\s*(?:INTERNATIONAL\s*)?AIRPORT\b/i.test(upper) ||
+                    /\bCHECK\s*IN\b[\s\S]*?\bJED(?:DAH)?\b/i.test(upper) ||
+                    /\bJED(?:DAH)?\s*-(?:SUB|CGK|KNO|UPG|SOC|BPN|BDJ|KJT|AAP|DPS|LOP|PLM)\b/i.test(upper);
+
   const outMadinah = /\b(?:OUT|PULANG|TAKE\s*OFF|KEPULANGAN)\s*(?:DARI\s*)?(?:VIA\s*)?(?:BANDARA\s*)?(?:AIRPORT\s*)?(?:MADINAH|MEDINA|MEDINAH|MED)\b/i.test(upper) ||
-                     /\b(?:MADINAH|MEDINA|MEDINAH|MED)\s*(?:OUT|TAKE\s*OFF|PULANG)\b/i.test(upper);
+                     /\b(?:MADINAH|MEDINA|MEDINAH|MED)\s*(?:OUT|TAKE\s*OFF|PULANG)\b/i.test(upper) ||
+                     /\bPRINCE\s*MOHAMMA?D\b/i.test(upper) ||
+                     /\bBANDARA\s*(?:INTERNASIONAL\s*)?(?:PRINCE\s*MOHAMMA?D\s*)?(?:MADINAH|MEDINA)\b/i.test(upper) ||
+                     /\b(?:MADINAH|MEDINA)\s*(?:INTERNATIONAL\s*)?AIRPORT\b/i.test(upper) ||
+                     /\bM[AE]D(?:INAH|INA)?\s*-(?:SUB|CGK|KNO|UPG|SOC|BPN|BDJ|KJT|AAP|DPS|LOP|PLM)\b/i.test(upper);
 
   // 1. If landing in Madinah, standard out is Jeddah -> MED-J (tanpa panah pertama karena Madinah sudah tujuan utama)
   if (landingMadinah) {
@@ -803,7 +814,9 @@ export function extractLandingRoute(caption: string): string | undefined {
     if (outJeddah) {
       return "JED.C-J";
     }
-    return "JED.C-M";
+    // JANGAN blind default ke JED.C-M jika belum ada bukti out eksplisit di teks!
+    // Kembalikan undefined agar sistem OCR / Gemini AI menganalisis flyer itinerary secara akurat.
+    return undefined;
   }
 
   // If only out is mentioned

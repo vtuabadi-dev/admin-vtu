@@ -245,8 +245,26 @@ export function resolveRouteFromItineraryChronology(
   const firstDest = nonIndoCities.find(c => c !== landing) || landing;
   const lastCity = nonIndoCities[nonIndoCities.length - 1];
 
-  // Tentukan rute out: jika kota terakhir Madinah -> out Madinah, selain itu out Jeddah
-  const isOutMadinah = lastCity === 'Madinah';
+  // Tentukan rute out dari flyer kepulangan (2 hari terakhir):
+  // Prioritaskan bandara kepulangan yang tertera pada aktivitas hari terakhir/kedua dari akhir
+  const lastDays = itinerary.slice(-2);
+  const lastDaysContent = lastDays.flatMap(d => [d.city, ...d.activities]).join(' ').toUpperCase();
+
+  const mentionsJeddahAirport =
+    /\b(?:KING\s*ABDUL\s*A[Z|S]I[Z|S]|JEDDAH\s*(?:INT(?:ERNATIONAL)?\s*)?AIRPORT|BANDARA\s*(?:INTERNASIONAL\s*)?(?:KING\s*ABDUL\s*A[Z|S]I[Z|S]\s*)?JEDDAH|MADINAH\s*-\s*JEDDAH|KEPULANGAN.*JEDDAH|CHECK\s*IN.*JEDDAH)\b/i.test(lastDaysContent);
+
+  const mentionsMadinahAirport =
+    /\b(?:PRINCE\s*MOHAMMA?D|MADINAH\s*(?:INT(?:ERNATIONAL)?\s*)?AIRPORT|BANDARA\s*(?:INTERNASIONAL\s*)?(?:PRINCE\s*MOHAMMA?D\s*)?MADINAH|KEPULANGAN.*MADINAH|CHECK\s*IN.*MADINAH)\b/i.test(lastDaysContent);
+
+  let isOutMadinah = false;
+  if (mentionsJeddahAirport) {
+    isOutMadinah = false;
+  } else if (mentionsMadinahAirport) {
+    isOutMadinah = true;
+  } else {
+    // Fallback: jika tidak ada sebutan bandara kepulangan eksplisit, gunakan kota terakhir
+    isOutMadinah = lastCity === 'Madinah';
+  }
 
   let routeCode = 'JED.C-M';
   if (landing === 'Madinah') {

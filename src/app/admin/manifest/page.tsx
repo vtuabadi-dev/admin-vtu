@@ -2374,14 +2374,7 @@ function ManifestPageContent() {
 
                                 {/* NAMA */}
                                 <td className={`px-2.5 py-1 font-bold whitespace-nowrap ${cellBorder} ${isVarian2Row ? "text-purple-950 dark:text-purple-100" : "text-stone-900 dark:text-white"}`}>
-                                  <div className="flex items-center gap-1.5 whitespace-nowrap">
-                                    <span>{namaSot}</span>
-                                    {isVarian2Row && (
-                                      <span className="inline-flex items-center gap-0.5 px-1 py-0.2 rounded text-[9px] font-black bg-purple-600 text-white shadow-2xs whitespace-nowrap">
-                                        💜 V2
-                                      </span>
-                                    )}
-                                  </div>
+                                  <span>{namaSot}</span>
                                 </td>
 
                                 {/* NIK */}

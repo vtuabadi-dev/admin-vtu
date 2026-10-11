@@ -1005,10 +1005,12 @@ export default function GeneratePaketPage() {
         if (!mappedLandingRoute && caption) {
           const captionLower = caption.toLowerCase();
           const landingMatch = captionLower.match(/(?:landing|in|masuk)\s+(?:ke\s*)?(?:di\s*)?(jeddah|madinah|medina)/i);
-          const outMatch = captionLower.match(/(?:out|pulang|take\s*off)\s+(?:dari\s*)?(?:via\s*)?(jeddah|madinah|medina)/i);
+          const outMatch = captionLower.match(/(?:out|pulang|take\s*off)\s+(?:dari\s*)?(?:via\s*)?(jeddah|madinah|medina)/i) ||
+                           captionLower.match(/(?:madinah\s*-\s*jeddah|king\s*abdul\s*a[zs]i[zs]|airport\s*,?\s*jeddah|bandara\s*,?\s*jeddah)/i);
           if (landingMatch && outMatch) {
             const landing = landingMatch[1]!.toLowerCase().includes("jed") ? "JED" : "MED";
-            const out = outMatch[1]!.toLowerCase().includes("jed") ? "J" : "M";
+            const isOutM = (outMatch[1] && outMatch[1].toLowerCase().includes("med")) || (!outMatch[1] && outMatch[0].toLowerCase().includes("medina"));
+            const out = isOutM ? "M" : "J";
             const found = routesList.find(r => {
               const kode = (r.kode || "").toUpperCase();
               return kode.startsWith(landing) && kode.endsWith(`-${out}`);

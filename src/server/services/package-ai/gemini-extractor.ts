@@ -161,12 +161,15 @@ export async function extractWithGemini(
     `2. INISIAL 'M' = BANDARA MADINAH (Prince Mohammad bin Abdulaziz International Airport / MED)\n` +
     `• Inisial '-J' = Rute OUT Bandara Jeddah (Take off pulang ke Indonesia dari Bandara Jeddah).\n` +
     `• Inisial '-M' = Rute OUT Bandara Madinah (Take off pulang ke Indonesia dari Bandara Madinah).\n\n` +
-    `CARA MENANGKAP RUTE OUT DARI FLYER TERAKHIR / SEBELUM TERAKHIR:\n` +
-    `1. Periksa jadwal itinerary hari-hari terakhir kepulangan (misal Hari 8, 9, 10, 11, 12, atau bagian Kepulangan):\n` +
-    `   - Jika jadwal kepulangan tertulis: "Transfer ke Bandara Internasional King Abdulaziz Jeddah", "Bandara Jeddah", "Jeddah - Jakarta/Surabaya", "Take off Jeddah", atau posisi terakhir jamaah berada di Makkah lalu langsung menuju Bandara Jeddah:\n` +
-    `     => MAKA RUTE OUT ADALAH JEDDAH, KODE WAJIB BERAKHIRAN '-J'!\n` +
-    `   - Jika jadwal kepulangan tertulis: "Transfer ke Bandara Prince Mohammad Bin Abdulaziz Madinah", "Bandara Madinah", "Madinah - Jakarta/Surabaya", "Take off Madinah", atau posisi terakhir jamaah berada di Madinah lalu langsung menuju Bandara Madinah:\n` +
-    `     => MAKA RUTE OUT ADALAH MADINAH, KODE WAJIB BERAKHIRAN '-M'!\n\n` +
+    `CARA MENANGKAP RUTE OUT DARI FLYER TERAKHIR ATAU KEDUA DARI AKHIR (SANGAT KRUSIAL):\n` +
+    `1. Periksa jadwal itinerary hari-hari terakhir kepulangan (misal Hari 8, 9, 10, 11, 12, atau bagian Kepulangan) pada GAMBAR TERAKHIR atau GAMBAR KEDUA DARI AKHIR:\n` +
+    `   - BANYAK PAKET REGULER MENGINAP TERAKHIR DI MADINAH, NAMUN PENERBANGAN PULANG (OUT) ADALAH MELALUI BANDARA JEDDAH!\n` +
+    `   - Jika pada hari-hari terakhir tertulis: "MADINAH-JEDDAH", "menuju King Abdul Aziz International Airport, Jeddah", "Bandara Jeddah", "Jeddah - Jakarta/Surabaya", "Take off Jeddah", "Proses Check in dan imigrasi di Bandara Jeddah", atau rombongan bertolak menuju Bandara Jeddah:\n` +
+    `     => MAKA RUTE OUT MUTLAK ADALAH BANDARA JEDDAH! KODE RUTE WAJIB BERAKHIRAN '-J'!\n` +
+    `     => Untuk paket reguler yang landing Jeddah menuju Makkah (Hari-1/2 Makkah), KODE RUTE WAJIB ADALAH 'JED.C-J' (Jeddah -> Makkah → Jeddah)!\n` +
+    `     => SANGAT DILARANG MEMILIH 'JED.C-M' PADA KASUS INI KARENA KEPULANGAN KELUAR DARI SAUDI ADALAH BANDARA JEDDAH!\n` +
+    `   - HANYA DAN HANYA JIKA tertulis kepulangan langsung take off keluar dari Bandara Madinah ("menuju Bandara Prince Mohammad Bin Abdulaziz", "Bandara Madinah - CGK/SUB", "Take off Madinah", tanpa ada transfer bus ke Jeddah):\n` +
+    `     => BARU PILIH KODE BERAKHIRAN '-M' (misal 'JED.C-M')!\n\n` +
     `CARA MENENTUKAN KOTA TUJUAN PERTAMA DARI HEADER TABEL HARI PERTAMA / HARI KEDUA (MANDATORY & PRIORITAS TERTINGGI):\n` +
     `CUKUP MEMBACA HEADER TABEL HARI PERTAMA (HARI-1) ATAU HARI KEDUA (HARI-2) UNTUK MENENTUKAN KOTA TUJUAN SETELAH JEDDAH:\n` +
     `1. Periksa judul/header tabel pada Flyer Itinerary (HARI-1 atau HARI-2):\n` +
@@ -291,6 +294,7 @@ export async function extractWithGemini(
 
         // Assemble content parts (Prompt + Flyer Utama + Flyer Itinerary Terakhir / Sebelum Terakhir)
         const contentParts: any[] = [prompt];
+        contentParts.push("\n--- [GAMBAR #1: FLYER UTAMA (Paket, Maskapai, Harga Base, Tanggal Keberangkatan, Hotel Master)] ---\n");
         contentParts.push({
           inlineData: {
             data: base64Image,
@@ -298,22 +302,30 @@ export async function extractWithGemini(
           }
         });
 
-        if (Array.isArray(additionalImagePaths)) {
-          for (const addPath of additionalImagePaths) {
-            if (addPath && fs.existsSync(addPath)) {
-              try {
-                const addBuf = fs.readFileSync(addPath);
-                contentParts.push({
-                  inlineData: {
-                    data: addBuf.toString("base64"),
-                    mimeType: "image/jpeg"
-                  }
-                });
-              } catch (err) {
-                console.warn("[Gemini Extractor] Failed to attach additional itinerary flyer:", err);
+        if (Array.isArray(additionalImagePaths) && additionalImagePaths.length > 0) {
+          const validAddPaths = additionalImagePaths.filter(p => p && fs.existsSync(p));
+          const totalValid = validAddPaths.length;
+
+          validAddPaths.forEach((addPath, idx) => {
+            try {
+              const addBuf = fs.readFileSync(addPath);
+              let label = `\n--- [GAMBAR #${idx + 2}: FLYER ITINERARY] ---\n`;
+              if (idx === totalValid - 1) {
+                label = `\n--- [GAMBAR #${idx + 2} / GAMBAR TERAKHIR: FLYER ITINERARY KEPULANGAN (PERIKSA DENGAN SANGAT JELI BANDARA KEPULANGAN / OUT DARI SAUDI: JEDDAH ATAU MADINAH!)] ---\n`;
+              } else if (idx === totalValid - 2) {
+                label = `\n--- [GAMBAR #${idx + 2} / GAMBAR KEDUA DARI AKHIR: FLYER ITINERARY MENJELANG KEPULANGAN (PERIKSA AGENDA HARI-HARI AKHIR, TRANSFER BANDARA, 'MADINAH-JEDDAH', ATAU 'KING ABDUL AZIZ AIRPORT')] ---\n`;
               }
+              contentParts.push(label);
+              contentParts.push({
+                inlineData: {
+                  data: addBuf.toString("base64"),
+                  mimeType: "image/jpeg"
+                }
+              });
+            } catch (err) {
+              console.warn("[Gemini Extractor] Failed to attach additional itinerary flyer:", err);
             }
-          }
+          });
         }
 
         const result = await model.generateContent(contentParts);
