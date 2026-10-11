@@ -156,11 +156,12 @@ export async function extractWithGemini(
     `4. JED.D-J  : Jeddah -> Madinah → Jeddah (Landing Jeddah langsung menuju Madinah di Hari 1/2, out Bandara Jeddah)\n` +
     `5. JED.C-M  : Jeddah -> Makkah → Madinah (Landing Jeddah langsung ke Makkah di Hari 1/2, out Bandara Madinah)\n` +
     `6. JED.C-J  : Jeddah -> Makkah → Jeddah (Landing Jeddah langsung ke Makkah di Hari 1/2, out Bandara Jeddah)\n\n` +
-    `ATURAN MUTLAK RUTE OUT (SETELAH TANDA '-' PADA KODE):\n` +
-    `1. INISIAL 'J' = BANDARA JEDDAH (King Abdulaziz International Airport / JED)\n` +
-    `2. INISIAL 'M' = BANDARA MADINAH (Prince Mohammad bin Abdulaziz International Airport / MED)\n` +
-    `• Inisial '-J' = Rute OUT Bandara Jeddah (Take off pulang ke Indonesia dari Bandara Jeddah).\n` +
-    `• Inisial '-M' = Rute OUT Bandara Madinah (Take off pulang ke Indonesia dari Bandara Madinah).\n\n` +
+    `PRINSIP MUTLAK RUTE OUT SETELAH PANAH TERAKHIR ('→'):\n` +
+    `• Rute OUT HANYA DAN HANYA MENGAMBIL NAMA KOTA BANDARA SAAT KELUAR MENINGGALKAN ARAB SAUDI!\n` +
+    `• Setelah meninggalkan Saudi, apakah pesawat transit ke Doha, Dubai, Muscat, Kuala Lumpur, atau langsung ke Indonesia, SISTEM TIDAK ADA URUSAN DAN TIDAK MEMPERDULIKAN TRANSIT TERSEBUT!\n` +
+    `• Inti penentuan Rute OUT khusus paket reguler HANYALAH MEMILIH SALAH SATU DARI DUA BANDARA INI KETIKA MENINGGALKAN TANAH SAUDI:\n` +
+    `  1. INISIAL '-J' (→ Jeddah)  : Pesawat take-off keluar meninggalkan Arab Saudi dari BANDARA JEDDAH (King Abdulaziz International Airport / JED).\n` +
+    `  2. INISIAL '-M' (→ Madinah) : Pesawat take-off keluar meninggalkan Arab Saudi dari BANDARA MADINAH (Prince Mohammad bin Abdulaziz International Airport / MED).\n\n` +
     `CARA MENANGKAP RUTE OUT DARI FLYER TERAKHIR ATAU KEDUA DARI AKHIR (SANGAT KRUSIAL):\n` +
     `1. Periksa jadwal itinerary hari-hari terakhir kepulangan (misal Hari 8, 9, 10, 11, 12, atau bagian Kepulangan) pada GAMBAR TERAKHIR atau GAMBAR KEDUA DARI AKHIR:\n` +
     `   - BANYAK PAKET REGULER MENGINAP TERAKHIR DI MADINAH, NAMUN PENERBANGAN PULANG (OUT) ADALAH MELALUI BANDARA JEDDAH!\n` +
