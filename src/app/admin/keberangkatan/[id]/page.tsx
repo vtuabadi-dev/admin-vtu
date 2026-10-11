@@ -649,9 +649,15 @@ export default function KeberangkatanDetailPage() {
                             {listToRender.map((opt: any, idx: number) => (
                               <div key={idx} className="flex flex-wrap items-center gap-2 p-2.5 rounded-lg border bg-card text-xs shadow-xs">
                                 {opt.clusterName && opt.clusterName !== "Reguler" && (
-                                  <span className="font-bold text-primary bg-primary/10 border border-primary/20 px-2 py-0.5 rounded text-[11px] uppercase">
-                                    {opt.clusterName}
-                                  </span>
+                                  opt.isVarian2 || opt.clusterName.toUpperCase().includes("VARIAN 2") ? (
+                                    <span className="font-bold text-purple-700 bg-purple-100 dark:bg-purple-900/60 dark:text-purple-300 border border-purple-300 dark:border-purple-700 px-2 py-0.5 rounded text-[11px] uppercase flex items-center gap-1">
+                                      💜 VARIAN 2
+                                    </span>
+                                  ) : (
+                                    <span className="font-bold text-primary bg-primary/10 border border-primary/20 px-2 py-0.5 rounded text-[11px] uppercase">
+                                      {opt.clusterName}
+                                    </span>
+                                  )
                                 )}
                                 <span className="font-semibold text-foreground">
                                   {opt.hotelMekkah || kbr.hotelMekkah || "TBA"} <span className="text-muted-foreground font-normal text-[11px]">(Mekkah)</span>

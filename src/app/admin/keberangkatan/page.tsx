@@ -709,9 +709,9 @@ export default function KeberangkatanListPage() {
                             return listToRender.map((opt: any, idx: number) => (
                               <div key={idx} className="flex flex-wrap items-center gap-1.5 text-xs bg-card border p-1.5 rounded-md shadow-xs">
                                 {opt.clusterName && opt.clusterName !== "Reguler" && (
-                                  opt.isVarian2 ? (
+                                  opt.isVarian2 || opt.clusterName.toUpperCase().includes("VARIAN 2") ? (
                                     <span className="font-bold text-purple-700 bg-purple-100 border border-purple-300 dark:bg-purple-900/60 dark:text-purple-300 dark:border-purple-600 text-[10px] px-1.5 py-0.5 rounded uppercase flex items-center gap-1">
-                                      💜 {opt.clusterName}
+                                      💜 VARIAN 2
                                     </span>
                                   ) : (
                                     <span className="font-bold text-primary text-[10px] bg-primary/10 border border-primary/20 px-1.5 py-0.5 rounded uppercase">

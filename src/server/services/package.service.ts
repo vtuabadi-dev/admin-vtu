@@ -255,8 +255,8 @@ export const packageService = {
           const tipeMakanVariant = data.tipeMakan || "FB";
 
           const newVariant = {
-            clusterName: `Varian 2 - ${variantLabel}`,
-            variantName: variantLabel,
+            clusterName: "Varian 2",
+            variantName: "Varian 2",
             isVarian2: true,
             hotelMekkah: finalHotelMekkah,
             hotelMadinah: finalHotelMadinah,
