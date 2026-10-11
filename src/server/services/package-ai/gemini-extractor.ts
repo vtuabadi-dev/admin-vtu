@@ -245,14 +245,24 @@ export async function extractWithGemini(
                 airline: { type: SchemaType.STRING, description: "Maskapai penerbangan dari Flyer Utama" },
                 hotelMekkah: { type: SchemaType.STRING, description: "Hotel Mekkah dari Flyer Utama" },
                 hotelMadinah: { type: SchemaType.STRING, description: "Hotel Madinah dari Flyer Utama" },
+                lastDayAirportMention: {
+                  type: SchemaType.STRING,
+                  description: "Nama bandara tempat penerbangan pulang saat keluar dari Saudi Arabia (lihat flyer hari terakhir / kedua dari akhir, cth: 'King Abdul Aziz International Airport, Jeddah' atau 'Prince Mohammad bin Abdulaziz International Airport, Madinah')"
+                },
+                exitAirportCity: {
+                  type: SchemaType.STRING,
+                  format: "enum",
+                  description: "Nama kota bandara tempat pesawat take-off meninggalkan Arab Saudi: 'Jeddah' atau 'Madinah'",
+                  enum: ["Jeddah", "Madinah"]
+                },
                 landingRoute: {
                   type: SchemaType.STRING,
                   format: "enum",
-                  description: "Kode Rute In-Out pesawat persis dari Master Route. RUTE OUT HANYA ADA 2 YAITU: inisial 'J' (Bandara Jeddah) atau inisial 'M' (Bandara Madinah/Medinah). Semua inisial setelah '-' adalah rute out tersebut (-J atau -M). Ambil info rute out ini dari flyer itinerary terakhir atau sebelum terakhir.",
+                  description: "Kode Rute In-Out pesawat persis dari Master Route. RUTE OUT HANYA ADA 2 YAITU: inisial 'J' (Bandara Jeddah) atau inisial 'M' (Bandara Madinah/Medinah). Jika exitAirportCity adalah 'Jeddah', WAJIB pilih kode berakhiran '-J' seperti 'JED.C-J'. Jika exitAirportCity adalah 'Madinah', pilih '-M' seperti 'JED.C-M'.",
                   enum: [
-                    "JED.C-M", "JED.C-J", "JED.D-J", "MED-J",
-                    "JED.TH-M", "JED.TH-J", "TD.C-M", "TD.C-J",
-                    "TD.D-J", "UD.D-M", "UD.D-J"
+                    "JED.C-J", "JED.C-M", "JED.D-J", "MED-J",
+                    "JED.TH-J", "JED.TH-M", "TD.C-J", "TD.C-M",
+                    "TD.D-J", "UD.D-J", "UD.D-M"
                   ]
                 },
                 isAdaPerlengkapan: { type: SchemaType.STRING, description: "Dari Caption: 'ya' jika termasuk perlengkapan, 'tidak' jika belum/tidak" },
@@ -333,6 +343,26 @@ export async function extractWithGemini(
 
         const responseText = result.response.text();
         const parsed = JSON.parse(responseText);
+
+        // Deterministic Guardrail: Pastikan rute out selaras dengan bandara kepulangan yang terdeteksi
+        const exitCity = (parsed.exitAirportCity || "").toUpperCase();
+        const airportMention = (parsed.lastDayAirportMention || "").toUpperCase();
+        const isJeddahExit = exitCity === "JEDDAH" || 
+          airportMention.includes("KING ABDUL") || 
+          airportMention.includes("JEDDAH") || 
+          airportMention.includes("JED-");
+
+        if (isJeddahExit) {
+          if (parsed.landingRoute === "JED.C-M" || !parsed.landingRoute || parsed.landingRoute === "JED.C-J") {
+            parsed.landingRoute = "JED.C-J";
+          } else if (parsed.landingRoute === "JED.TH-M") {
+            parsed.landingRoute = "JED.TH-J";
+          } else if (parsed.landingRoute === "TD.C-M") {
+            parsed.landingRoute = "TD.C-J";
+          } else if (parsed.landingRoute === "UD.D-M") {
+            parsed.landingRoute = "UD.D-J";
+          }
+        }
 
         if (providerId) {
           try {
