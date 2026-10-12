@@ -46,6 +46,7 @@ export const ALASAN_REJECT = [
 export const ROOM_TYPE_OPTIONS = [
   { value: "Quad", label: "Quad (4 Pax)", badgeClass: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800" },
   { value: "Quad Family", label: "Quad Family (4 Pax)", badgeClass: "bg-teal-500/10 text-teal-700 dark:text-teal-300 border-teal-300 dark:border-teal-800" },
+  { value: "Quad Infant", label: "Quad Infant", badgeClass: "bg-teal-500/10 text-teal-700 dark:text-teal-300 border-teal-300 dark:border-teal-800" },
   { value: "Triple", label: "Triple (3 Pax)", badgeClass: "bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-800" },
   { value: "Double", label: "Double (2 Pax)", badgeClass: "bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border-indigo-300 dark:border-indigo-800" },
   { value: "Mix", label: "Mix (Diatur Travel)", badgeClass: "bg-slate-500/10 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-800" },
@@ -56,7 +57,6 @@ export const DEFAULT_TAMBAHAN_OPTIONS = [
   "Upgrade Kamar Double",
   "Upgrade Kamar Triple",
   "Upgrade Kamar Single",
-  "Upgrade Kamar Quad Family",
   "Tiket Kereta Cepat Haramain (Mekkah - Madinah)",
   "Upgrade Hotel Bintang 5",
   "Paspor Express & Penanganan Dokumen",
@@ -84,7 +84,7 @@ export function getRoomTypeBadgeStyle(roomType?: string): string {
   const norm = (roomType || "quad").toLowerCase().trim();
   if (norm.includes("double")) return "bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border-indigo-300 dark:border-indigo-800";
   if (norm.includes("triple")) return "bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-800";
-  if (norm.includes("family")) return "bg-teal-500/10 text-teal-700 dark:text-teal-300 border-teal-300 dark:border-teal-800";
+  if (norm.includes("family") || norm.includes("infant")) return "bg-teal-500/10 text-teal-700 dark:text-teal-300 border-teal-300 dark:border-teal-800";
   if (norm.includes("single")) return "bg-purple-500/10 text-purple-700 dark:text-purple-300 border-purple-300 dark:border-purple-800";
   if (norm.includes("mix")) return "bg-slate-500/10 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-800";
   return "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800";
@@ -102,15 +102,31 @@ export function isRoomUpgradeItem(name: string): boolean {
   );
 }
 
+/**
+ * Menentukan apakah tipe kamar merupakan kamar dasar (Base Room) paket umroh.
+ * Kamar dasar (Quad, Quad Family, Quad Infant, Quad Fix, Mix) tidak dikenakan tambahan biaya upgrade (Rp 0).
+ * Hanya Double, Triple, dan Single yang memiliki tambahan biaya upgrade.
+ */
+export function isBaseRoomType(roomType?: string): boolean {
+  if (!roomType) return true;
+  const lower = roomType.toLowerCase().trim();
+  if (lower.includes("double") || lower.includes("triple") || lower.includes("single")) {
+    return false;
+  }
+  return true;
+}
+
 export function detectRoomTypeFromName(name: string): string {
-  const lower = name.toLowerCase();
+  if (!name) return "Quad";
+  const lower = name.toLowerCase().trim();
   if (lower.includes("double")) return "Double";
   if (lower.includes("triple")) return "Triple";
   if (lower.includes("single")) return "Single";
+  if (lower.includes("infant") || lower.includes("quinf")) return "Quad Infant";
   if (lower.includes("family")) return "Quad Family";
   if (lower.includes("mix")) return "Mix";
   if (lower.includes("quad")) return "Quad";
-  return "Double";
+  return "Quad";
 }
 
 export function resolveKlasterName(p: any): string {
@@ -177,6 +193,12 @@ export function getPackageUpgradePrice(paymentOrGroup: any, itemNameOrRoomType: 
   if (!itemNameOrRoomType) return 0;
   const lower = itemNameOrRoomType.toLowerCase().trim();
 
+  // Seluruh konsumsi kamar Quad (Quad reguler, Quad Family, Quad Infant, Quad Fix, dll) serta Mix
+  // merupakan kamar dasar paket (Base Room) sehingga TIADA tambahan biaya upgrade (Rp 0).
+  if (isBaseRoomType(itemNameOrRoomType)) {
+    return 0;
+  }
+
   // Resolve keberangkatan / package info
   const kbr = paymentOrGroup?.keberangkatan || paymentOrGroup?.group?.keberangkatan || paymentOrGroup?.paketKeberangkatan;
   const targetKlaster = resolveKlasterName(paymentOrGroup);
@@ -231,9 +253,6 @@ export function getPackageUpgradePrice(paymentOrGroup: any, itemNameOrRoomType: 
   if (lower.includes("single") || lower === "single") {
     return Math.round(upgradeDouble * 1.5);
   }
-  if (lower.includes("family") || lower === "quad family") {
-    return Math.round(upgradeTriple * 0.8);
-  }
 
   return 0;
 }
@@ -248,7 +267,10 @@ export function getInitialTambahanOptions(): string[] {
       const stored = localStorage.getItem("vtu_master_tambahan_opts");
       if (stored) {
         const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          // Bersihkan item upgrade quad jika pernah tersimpan di cache browser
+          return parsed.filter((opt: string) => !opt.toLowerCase().includes("quad"));
+        }
       }
     } catch {}
   }

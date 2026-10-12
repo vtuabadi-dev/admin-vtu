@@ -52,6 +52,7 @@ import {
   DEFAULT_POTONGAN_OPTIONS,
   getRoomTypeBadgeStyle,
   isRoomUpgradeItem,
+  isBaseRoomType,
   detectRoomTypeFromName,
   getPackageUpgradePrice,
   resolveKlasterName,
@@ -79,11 +80,12 @@ function syncRoomOrderItems(
   // Pertahankan item non-kamar (diskon, perlengkapan, dsb)
   const nonRoomItems = existingOrderItems.filter((it) => !isRoomUpgradeItem(it.nama));
 
-  // Kelompokkan jamaah per tipe kamar upgrade (selain Quad dan Mix)
+  // Kelompokkan jamaah per tipe kamar upgrade (hanya tipe upgrade non-dasar: Double, Triple, Single)
+  // Kamar tipe Quad (Quad, Quad Family, Quad Infant, Quad Fix, dll) serta Mix adalah standar paket (Rp 0)
   const roomGroups: Record<string, string[]> = {};
   Object.entries(currentRoomMap).forEach(([nama, rType]) => {
     const norm = detectRoomTypeFromName(rType);
-    if (norm !== "Quad" && norm !== "Mix") {
+    if (!isBaseRoomType(norm) && norm !== "Quad" && norm !== "Mix") {
       if (!roomGroups[norm]) roomGroups[norm] = [];
       roomGroups[norm].push(nama);
     }
@@ -170,9 +172,10 @@ function PaymentReviewTabContent() {
   const [editingJenisText, setEditingJenisText] = useState("");
 
   const saveTambahanOptions = (opts: string[]) => {
-    setMasterTambahanOptions(opts);
+    const clean = opts.filter((o) => !o.toLowerCase().includes("quad"));
+    setMasterTambahanOptions(clean);
     if (typeof window !== "undefined") {
-      try { localStorage.setItem("vtu_master_tambahan_opts", JSON.stringify(opts)); } catch {}
+      try { localStorage.setItem("vtu_master_tambahan_opts", JSON.stringify(clean)); } catch {}
     }
   };
 
@@ -280,8 +283,9 @@ function PaymentReviewTabContent() {
       .then((json) => {
         if (json.success && json.data) {
           if (Array.isArray(json.data.tambahan) && json.data.tambahan.length > 0) {
-            setMasterTambahanOptions(json.data.tambahan);
-            try { localStorage.setItem("vtu_master_tambahan_opts", JSON.stringify(json.data.tambahan)); } catch {}
+            const cleanTambahan = json.data.tambahan.filter((opt: string) => !opt.toLowerCase().includes("quad"));
+            setMasterTambahanOptions(cleanTambahan);
+            try { localStorage.setItem("vtu_master_tambahan_opts", JSON.stringify(cleanTambahan)); } catch {}
           }
           if (Array.isArray(json.data.potongan) && json.data.potongan.length > 0) {
             setMasterPotonganOptions(json.data.potongan);

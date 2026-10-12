@@ -147,8 +147,9 @@ const SplitInvoiceModal = dynamic(
       .then((json) => {
         if (json.success && json.data) {
           if (Array.isArray(json.data.tambahan) && json.data.tambahan.length > 0) {
-            setMasterTambahanOptions(json.data.tambahan);
-            try { localStorage.setItem("vtu_master_tambahan_opts", JSON.stringify(json.data.tambahan)); } catch {}
+            const cleanTambahan = json.data.tambahan.filter((opt: string) => !opt.toLowerCase().includes("quad"));
+            setMasterTambahanOptions(cleanTambahan);
+            try { localStorage.setItem("vtu_master_tambahan_opts", JSON.stringify(cleanTambahan)); } catch {}
           }
           if (Array.isArray(json.data.potongan) && json.data.potongan.length > 0) {
             setMasterPotonganOptions(json.data.potongan);
@@ -160,9 +161,10 @@ const SplitInvoiceModal = dynamic(
   }, []);
 
   const saveTambahanOptions = (opts: string[]) => {
-    setMasterTambahanOptions(opts);
+    const clean = opts.filter((o) => !o.toLowerCase().includes("quad"));
+    setMasterTambahanOptions(clean);
     if (typeof window !== "undefined") {
-      try { localStorage.setItem("vtu_master_tambahan_opts", JSON.stringify(opts)); } catch {}
+      try { localStorage.setItem("vtu_master_tambahan_opts", JSON.stringify(clean)); } catch {}
     }
   };
 
