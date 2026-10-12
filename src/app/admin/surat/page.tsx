@@ -4197,22 +4197,9 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
                                   >
                                     <div className="flex items-center gap-2.5 min-w-0">
                                       <FileText className="h-4 w-4 text-slate-400 shrink-0" />
-                                      <div className="flex flex-col min-w-0">
-                                        <span className="text-xs sm:text-sm font-semibold text-slate-800 dark:text-slate-100 truncate">
-                                          {variant.name}
-                                        </span>
-                                        <span className="text-[11px] text-muted-foreground flex items-center gap-1.5 mt-0.5">
-                                          {variant.isTtd ? (
-                                            <Badge variant="info" size="sm" className="text-[10px] py-0 px-1.5 bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 font-semibold">
-                                              ✓ Ada TTD & Stempel
-                                            </Badge>
-                                          ) : (
-                                            <Badge variant="outline" size="sm" className="text-[10px] py-0 px-1.5 bg-stone-50 text-stone-600 border-stone-300 dark:bg-stone-800 dark:text-stone-400 font-medium">
-                                              ✍️ Tanpa TTD (Cap Basah)
-                                            </Badge>
-                                          )}
-                                        </span>
-                                      </div>
+                                      <span className="text-xs sm:text-sm font-semibold text-slate-800 dark:text-slate-100 truncate">
+                                        {variant.name}
+                                      </span>
                                     </div>
 
                                     {/* Action Buttons: Word (Template Asli), PDF, Cetak */}
