@@ -91,6 +91,9 @@ export default function CreateInvoiceModal({
   const [targetPaketId, setTargetPaketId] = useState<string>("");
   const [selectedClusterIndex, setSelectedClusterIndex] = useState<number>(0);
   const [pricingOption, setPricingOption] = useState<"HARGA_LAMA" | "HARGA_BARU">("HARGA_BARU");
+  const [hotelUpgradeEnabled, setHotelUpgradeEnabled] = useState(false);
+  const [hotelUpgradeName, setHotelUpgradeName] = useState("");
+  const [hotelUpgradeNominal, setHotelUpgradeNominal] = useState<number>(0);
 
   const [nominal, setNominal] = useState<number>(0);
   const [jatuhTempo, setJatuhTempo] = useState("");
@@ -278,6 +281,9 @@ export default function CreateInvoiceModal({
     setTargetPaketId("");
     setSelectedClusterIndex(0);
     setPricingOption("HARGA_BARU");
+    setHotelUpgradeEnabled(false);
+    setHotelUpgradeName("");
+    setHotelUpgradeNominal(0);
     setKategori("PEMBAYARAN");
     setTambahPaxCount(1);
     setTambahJamaahList([{ nama: "", gender: "L", hubungan: "" }]);
@@ -295,11 +301,13 @@ export default function CreateInvoiceModal({
         alert("Paket tujuan tidak boleh sama dengan paket saat ini");
         return;
       }
+      if (pricingOption === "HARGA_BARU" && totalDiff < 0) {
+        alert("Penyesuaian tagihan untuk perpindahan ke paket dengan harga lebih murah saat ini ditahan sementara menunggu ketetapan SOP akuntansi Product Owner.");
+        return;
+      }
       setLoading(true);
       try {
-        const selectedClusterName = activeTargetCluster?.clusterName || "";
-
-        // 1. Move group via API
+        // 1. Unified atomic transfer via API
         const resMove = await fetch(`/api/groups/${groupInfo.id}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
@@ -307,7 +315,8 @@ export default function CreateInvoiceModal({
             paketKeberangkatanId: targetPaketId,
             pricingOption,
             totalDiff: pricingOption === "HARGA_BARU" ? totalDiff : 0,
-            hotelUpgrade: selectedClusterName || undefined,
+            hotelUpgradeName: hotelUpgradeEnabled && hotelUpgradeName ? hotelUpgradeName : undefined,
+            hotelUpgradeNominal: hotelUpgradeEnabled && hotelUpgradeNominal > 0 ? hotelUpgradeNominal : undefined,
           }),
         });
         const moveJson = await resMove.json();
@@ -315,20 +324,10 @@ export default function CreateInvoiceModal({
           throw new Error(moveJson.message || "Gagal memproses pemindahan paket");
         }
 
-        // 2. If harga baru and positive difference, create invoice for difference
-        let resultInvNumber = `PINDAH-${groupInfo.kodeRegistrasi || groupInfo.id.slice(-6).toUpperCase()}`;
-        let finalAmount = 0;
-        if (pricingOption === "HARGA_BARU" && totalDiff > 0) {
-          const inv = await createInvoice({
-            groupId: groupInfo.id,
-            kategori: "PINDAH_PAKET",
-            subKategori: "pindah_paket",
-            nominal: totalDiff,
-            catatan: `Invoice selisih pindah paket ke ${targetPackage?.namaPaket || targetPaketId}${selectedClusterName ? ` [${selectedClusterName}]` : ""} (${paxCount} pax @ selisih Rp ${diffPerPax.toLocaleString("id-ID")})`,
-          });
-          resultInvNumber = inv.nomorInvoice || inv.id;
-          finalAmount = totalDiff;
-        }
+        const resultInvNumber =
+          moveJson.data?.invoice?.nomorInvoice ||
+          `PINDAH-${groupInfo.kodeRegistrasi || groupInfo.id.slice(-6).toUpperCase()}`;
+        const finalAmount = moveJson.data?.totalAdditionalBill || 0;
 
         onSuccess(resultInvNumber, finalAmount);
         broadcastMutation("registration_groups", "UPDATE", { id: groupInfo.id });
@@ -873,14 +872,98 @@ export default function CreateInvoiceModal({
                       </p>
                     )}
                     {pricingOption === "HARGA_BARU" && totalDiff < 0 && (
-                      <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">
-                        ℹ️ Tagihan rombongan akan disesuaikan berkurang sebesar <strong>Rp {Math.abs(totalDiff).toLocaleString("id-ID")}</strong>.
-                      </p>
+                      <div className="p-2 bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 rounded-lg text-amber-900 dark:text-amber-200 text-[11px] space-y-1">
+                        <div className="font-bold flex items-center gap-1 text-amber-700 dark:text-amber-300">
+                          <AlertTriangle className="h-3.5 w-3.5 text-amber-600" />
+                          <span>Skenario Paket Lebih Murah Ditahan Sementara</span>
+                        </div>
+                        <p className="text-[10.5px] leading-relaxed">
+                          Sesuai ketetapan Product Owner, penyesuaian kewajiban untuk paket tujuan lebih murah (-Rp {Math.abs(totalDiff).toLocaleString("id-ID")}) ditahan sementara menunggu penetapan SOP akuntansi. Silakan gunakan <strong>HARGA_LAMA</strong>.
+                        </p>
+                      </div>
                     )}
                     {pricingOption === "HARGA_LAMA" && (
                       <p className="text-[11px] text-blue-600 dark:text-blue-400 font-medium">
-                        ℹ️ Rombongan dipindahkan ke paket baru tanpa ada penambahan tagihan invoice.
+                        ℹ️ Rombongan dipindahkan ke paket baru tanpa ada penambahan tagihan invoice selisih paket.
                       </p>
+                    )}
+                    {hotelUpgradeEnabled && hotelUpgradeNominal > 0 && (
+                      <p className="text-[11px] text-purple-700 dark:text-purple-300 font-medium">
+                        🏨 Tambahan Upgrade Hotel: <strong>+Rp {hotelUpgradeNominal.toLocaleString("id-ID")}</strong> ({hotelUpgradeName || "Pilihan Admin"}).
+                      </p>
+                    )}
+                  </div>
+
+                  {/* D. UPGRADE HOTEL BERBAYAR (EKSPLISIT SESUAI DIRECTIVE 2.B) */}
+                  <div className="p-3 bg-slate-100/80 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-xl space-y-2 mt-2">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300 uppercase flex items-center gap-1.5 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={hotelUpgradeEnabled}
+                          onChange={(e) => {
+                            setHotelUpgradeEnabled(e.target.checked);
+                            if (!e.target.checked) {
+                              setHotelUpgradeName("");
+                              setHotelUpgradeNominal(0);
+                            } else if (!hotelUpgradeName) {
+                              setHotelUpgradeName(targetPackage.hotelMekkah ? `Makkah: ${targetPackage.hotelMekkah}` : "Pilihan Admin");
+                            }
+                          }}
+                          className="h-3.5 w-3.5 text-blue-600 rounded"
+                        />
+                        <span>Tambahkan Item Upgrade Hotel Berbayar</span>
+                      </label>
+                      <span className="text-[10px] bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-1.5 py-0.5 rounded font-mono">
+                        Manual Admin
+                      </span>
+                    </div>
+
+                    {hotelUpgradeEnabled && (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2 border-t border-slate-200 dark:border-slate-800">
+                        <div>
+                          <label className="text-[10.5px] font-medium text-muted-foreground block mb-1">
+                            Pilih Hotel Tujuan
+                          </label>
+                          <select
+                            value={hotelUpgradeName}
+                            onChange={(e) => setHotelUpgradeName(e.target.value)}
+                            className="w-full px-2.5 py-1.5 bg-background border rounded-lg text-xs font-semibold focus:ring-1 focus:ring-blue-500"
+                          >
+                            <option value="">-- Pilih Hotel Tujuan --</option>
+                            {targetPackage.hotelMekkah && (
+                              <option value={`Makkah: ${targetPackage.hotelMekkah}`}>
+                                Makkah: {targetPackage.hotelMekkah}
+                              </option>
+                            )}
+                            {targetPackage.hotelMadinah && (
+                              <option value={`Madinah: ${targetPackage.hotelMadinah}`}>
+                                Madinah: {targetPackage.hotelMadinah}
+                              </option>
+                            )}
+                            {targetClusters.map((c: any, i: number) => (
+                              <option key={i} value={`${c.clusterName} (${c.hotelMekkah || "Makkah"})`}>
+                                {c.clusterName} ({c.hotelMekkah || "Makkah"})
+                              </option>
+                            ))}
+                            <option value="Hotel Bintang 5 Eksklusif">Hotel Bintang 5 Eksklusif</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="text-[10.5px] font-medium text-muted-foreground block mb-1">
+                            Nominal Upgrade Total (Rp)
+                          </label>
+                          <input
+                            type="number"
+                            min="0"
+                            step="100000"
+                            placeholder="Contoh: 4000000"
+                            value={hotelUpgradeNominal || ""}
+                            onChange={(e) => setHotelUpgradeNominal(Math.max(0, parseInt(e.target.value, 10) || 0))}
+                            className="w-full px-2.5 py-1.5 bg-background border rounded-lg text-xs font-bold text-foreground focus:ring-1 focus:ring-blue-500"
+                          />
+                        </div>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -1185,7 +1268,9 @@ export default function CreateInvoiceModal({
               loading ||
               !groupInfo ||
               (kategori === "PINDAH_PAKET"
-                ? !targetPaketId || targetPaketId === currentPackage?.id
+                ? !targetPaketId ||
+                  targetPaketId === currentPackage?.id ||
+                  (pricingOption === "HARGA_BARU" && totalDiff < 0)
                 : kategori === "TAMBAH_JAMAAH"
                   ? tambahJamaahList.some((j) => !j.nama.trim())
                   : nominal <= 0)

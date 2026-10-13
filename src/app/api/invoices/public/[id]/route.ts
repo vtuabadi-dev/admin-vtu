@@ -189,7 +189,35 @@ export async function GET(
       namaPaket: group?.keberangkatan?.namaPaket || "PAKET UMROH 10 H SBY ( JED.C )",
       tipePaket: group?.keberangkatan?.packageType?.name || "SILVER",
       jumlahPax: membersList.length || 2,
-      hargaSatuanPaket: group?.keberangkatan?.hargaPaket || 37400000,
+      hargaSatuanPaket: (() => {
+        // 1. If invoice has explicit items, check for base package item
+        if (invoice?.items && invoice.items.length > 0) {
+          const baseItem = invoice.items.find(
+            (i: any) =>
+              i.kategori === "Paket Umroh" ||
+              i.kategori === "PAKET_UMROH" ||
+              (i.deskripsi && i.deskripsi.toLowerCase().includes("paket umroh"))
+          );
+          if (baseItem && baseItem.hargaSatuan > 0) {
+            return baseItem.hargaSatuan;
+          }
+        }
+        // 2. If additive/transfer invoice, do not divide total by pax count as base price
+        const isAdditive =
+          invoice?.tipe === "tambahan" ||
+          (invoice?.nomorInvoice &&
+            (invoice.nomorInvoice.startsWith("PINDAH") ||
+              invoice.nomorInvoice.startsWith("INV-PAKET") ||
+              invoice.nomorInvoice.startsWith("INV-UPGRADE")));
+        if (isAdditive) {
+          return group?.keberangkatan?.hargaPaket || 37400000;
+        }
+        // 3. For initial registration invoice with no items: protect agreed historical base price
+        if (invoice?.jumlah && membersList.length > 0) {
+          return Math.round(invoice.jumlah / membersList.length);
+        }
+        return group?.keberangkatan?.hargaPaket || 37400000;
+      })(),
       tanggalBerangkat: group?.keberangkatan?.tanggalBerangkat
         ? new Date(group.keberangkatan.tanggalBerangkat).toLocaleDateString("id-ID", {
             day: "numeric",

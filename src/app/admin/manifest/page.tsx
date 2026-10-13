@@ -816,6 +816,10 @@ function ManifestPageContent() {
   const [groupToMove, setGroupToMove] = useState<any | null>(null);
   const [targetPaketId, setTargetPaketId] = useState<string>("");
   const [isMoving, setIsMoving] = useState(false);
+  const [movePricingOption, setMovePricingOption] = useState<"HARGA_LAMA" | "HARGA_BARU">("HARGA_LAMA");
+  const [moveHotelUpgradeEnabled, setMoveHotelUpgradeEnabled] = useState(false);
+  const [moveHotelUpgradeName, setMoveHotelUpgradeName] = useState("");
+  const [moveHotelUpgradeNominal, setMoveHotelUpgradeNominal] = useState<number>(0);
 
   // Multi-Select & Bulk Delete State
   const [isSelectMode, setIsSelectMode] = useState<boolean>(false);
@@ -1612,16 +1616,39 @@ function ManifestPageContent() {
     setIsMoving(true);
     const movedGroupId = groupToMove.groupId;
     try {
+      const paxCount = groupToMove.members?.length || 1;
+      const oldPrice = activePackage?.hargaPaket || (groupToMove.groupObj?.totalTagihan ? Math.round(groupToMove.groupObj.totalTagihan / paxCount) : 0);
+      const targetPkg = keberangkatanList.find((k) => k.id === targetPaketId);
+      const newPrice = targetPkg?.hargaPaket || 0;
+      const diffPerPax = newPrice - oldPrice;
+      const totalDiff = diffPerPax * paxCount;
+
+      if (movePricingOption === "HARGA_BARU" && totalDiff < 0) {
+        alert("Penyesuaian tagihan untuk perpindahan ke paket dengan harga lebih murah saat ini ditahan sementara menunggu ketetapan SOP akuntansi Product Owner.");
+        setIsMoving(false);
+        return;
+      }
+
       const res = await fetch(`/api/groups/${movedGroupId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ paketKeberangkatanId: targetPaketId }),
+        body: JSON.stringify({
+          paketKeberangkatanId: targetPaketId,
+          pricingOption: movePricingOption,
+          totalDiff: movePricingOption === "HARGA_BARU" ? totalDiff : 0,
+          hotelUpgradeName: moveHotelUpgradeEnabled && moveHotelUpgradeName ? moveHotelUpgradeName : undefined,
+          hotelUpgradeNominal: moveHotelUpgradeEnabled && moveHotelUpgradeNominal > 0 ? moveHotelUpgradeNominal : undefined,
+        }),
       });
       const json = await res.json();
       if (res.ok && json.success) {
         setMoveModalOpen(false);
         setGroupToMove(null);
         setTargetPaketId("");
+        setMovePricingOption("HARGA_LAMA");
+        setMoveHotelUpgradeEnabled(false);
+        setMoveHotelUpgradeName("");
+        setMoveHotelUpgradeNominal(0);
 
         // 1. Optimistic UI update: instantly remove moved group members from current active manifest
         setAllJamaah((prev) => prev.filter((j) => j.groupId !== movedGroupId));
@@ -1631,14 +1658,22 @@ function ManifestPageContent() {
         broadcastMutation("registration_groups", "UPDATE", { id: movedGroupId });
         broadcastMutation("keberangkatan", "UPDATE");
         broadcastMutation("manifest", "UPDATE");
+        broadcastMutation("invoices", "INSERT");
+        broadcastMutation("pembayaran", "INSERT", { groupId: movedGroupId });
         await loadAllData();
         router.refresh();
+
+        if (json.data?.invoice) {
+          alert(`Rombongan berhasil dipindahkan ke paket tujuan! Terbit Invoice ${json.data.invoice.nomorInvoice} sebesar Rp ${json.data.invoice.jumlah.toLocaleString("id-ID")}.`);
+        } else {
+          alert("Rombongan berhasil dipindahkan ke paket tujuan dengan mode HARGA_LAMA (tanpa penambahan tagihan).");
+        }
       } else {
         alert(json.message || "Gagal memindahkan grup jamaah");
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      alert("Terjadi kesalahan sistem");
+      alert(err?.message || "Terjadi kesalahan sistem");
     } finally {
       setIsMoving(false);
     }
@@ -3581,27 +3616,164 @@ function ManifestPageContent() {
         description="Pindahkan seluruh anggota rombongan/keluarga ke paket keberangkatan lain."
       >
         <div className="space-y-4">
-          <div className="bg-sky-50 dark:bg-sky-950/30 text-sky-800 dark:text-sky-200 p-4 rounded-md text-sm border border-sky-200 dark:border-sky-800/30">
+          <div className="bg-sky-50 dark:bg-sky-950/30 text-sky-800 dark:text-sky-200 p-3 rounded-xl text-xs border border-sky-200 dark:border-sky-800/30 space-y-1">
             <p><strong>Rombongan:</strong> {groupToMove ? formatGroupMergeLabel(groupToMove.groupObj, groupToMove.members) : "-"}</p>
             <p><strong>Jumlah Anggota:</strong> {groupToMove?.members?.length || 0} Pax</p>
           </div>
+
           <Select
             label="Pilih Paket Tujuan"
             options={keberangkatanList
               .filter(k => k.id !== activePackage?.id && k.status === "scheduled")
               .map((k) => ({
                 value: k.id,
-                label: `${k.kode} — ${k.namaPaket || "-"} (${formatDateShort(k.tanggalBerangkat)})`,
+                label: `${k.kode} — ${k.namaPaket || "-"} (${formatDateShort(k.tanggalBerangkat)}) - Rp ${(k.hargaPaket || 0).toLocaleString("id-ID")}/pax`,
               }))}
             placeholder="-- Pilih Paket Tujuan --"
             value={targetPaketId}
             onChange={(e) => setTargetPaketId(e.target.value)}
           />
+
+          {targetPaketId && (() => {
+            const selectedTargetPkg = keberangkatanList.find(k => k.id === targetPaketId);
+            const paxCountMove = groupToMove?.members?.length || 1;
+            const oldPriceMove = activePackage?.hargaPaket || (groupToMove?.groupObj?.totalTagihan ? Math.round(groupToMove.groupObj.totalTagihan / paxCountMove) : 0);
+            const newPriceMove = selectedTargetPkg?.hargaPaket || 0;
+            const diffPerPaxMove = newPriceMove - oldPriceMove;
+            const totalDiffMove = diffPerPaxMove * paxCountMove;
+            const isCheaperMove = movePricingOption === "HARGA_BARU" && totalDiffMove < 0;
+
+            return (
+              <div className="space-y-3 pt-1">
+                {/* Mode Harga Toggle */}
+                <div className="p-3 bg-slate-50 dark:bg-slate-900/50 border rounded-xl space-y-2 text-xs">
+                  <label className="font-bold uppercase text-[11px] text-slate-700 dark:text-slate-300">
+                    Pilihan Penyesuaian Tarif Biaya
+                  </label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <label className={cn(
+                      "p-2.5 rounded-lg border cursor-pointer transition flex items-start gap-2",
+                      movePricingOption === "HARGA_LAMA" ? "border-blue-500 bg-blue-50/70 dark:bg-blue-950/40" : "bg-background"
+                    )}>
+                      <input
+                        type="radio"
+                        name="movePricingOption"
+                        checked={movePricingOption === "HARGA_LAMA"}
+                        onChange={() => setMovePricingOption("HARGA_LAMA")}
+                        className="mt-0.5"
+                      />
+                      <div>
+                        <span className="font-bold block">HARGA_LAMA</span>
+                        <span className="text-[10.5px] text-muted-foreground">Pertahankan tarif kesepakatan lama (Rp 0).</span>
+                      </div>
+                    </label>
+
+                    <label className={cn(
+                      "p-2.5 rounded-lg border cursor-pointer transition flex items-start gap-2",
+                      movePricingOption === "HARGA_BARU" ? "border-blue-500 bg-blue-50/70 dark:bg-blue-950/40" : "bg-background"
+                    )}>
+                      <input
+                        type="radio"
+                        name="movePricingOption"
+                        checked={movePricingOption === "HARGA_BARU"}
+                        onChange={() => setMovePricingOption("HARGA_BARU")}
+                        className="mt-0.5"
+                      />
+                      <div>
+                        <span className="font-bold block">HARGA_BARU</span>
+                        <span className="text-[10.5px] text-muted-foreground">
+                          {totalDiffMove > 0
+                            ? `+Rp ${totalDiffMove.toLocaleString("id-ID")}`
+                            : totalDiffMove < 0
+                            ? `-Rp ${Math.abs(totalDiffMove).toLocaleString("id-ID")}`
+                            : "Tarif sama (Rp 0)"}
+                        </span>
+                      </div>
+                    </label>
+                  </div>
+
+                  {isCheaperMove && (
+                    <div className="p-2.5 bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 rounded-lg text-amber-900 dark:text-amber-200 text-[11px] space-y-1 mt-1">
+                      <p className="font-bold">⚠️ Skenario Paket Lebih Murah Ditahan Sementara</p>
+                      <p className="text-[10.5px] leading-relaxed">
+                        Sesuai ketetapan Product Owner, penyesuaian kewajiban untuk paket tujuan lebih murah ditahan sementara menunggu penetapan SOP akuntansi. Silakan gunakan <strong>HARGA_LAMA</strong>.
+                      </p>
+                    </div>
+                  )}
+
+                  {movePricingOption === "HARGA_BARU" && totalDiffMove > 0 && (
+                    <p className="text-[11px] text-amber-600 dark:text-amber-400 font-medium pt-1">
+                      ℹ️ Invoice selisih pindah paket sebesar <strong>Rp {totalDiffMove.toLocaleString("id-ID")}</strong> akan otomatis diterbitkan.
+                    </p>
+                  )}
+                </div>
+
+                {/* Optional Hotel Upgrade */}
+                <div className="p-3 bg-slate-100/80 dark:bg-slate-900/60 border rounded-xl space-y-2 text-xs">
+                  <label className="flex items-center gap-2 font-bold cursor-pointer text-[11px]">
+                    <input
+                      type="checkbox"
+                      checked={moveHotelUpgradeEnabled}
+                      onChange={(e) => {
+                        setMoveHotelUpgradeEnabled(e.target.checked);
+                        if (!e.target.checked) {
+                          setMoveHotelUpgradeName("");
+                          setMoveHotelUpgradeNominal(0);
+                        } else if (!moveHotelUpgradeName && selectedTargetPkg?.hotelMekkah) {
+                          setMoveHotelUpgradeName(`Makkah: ${selectedTargetPkg.hotelMekkah}`);
+                        }
+                      }}
+                    />
+                    <span>Tambahkan Upgrade Hotel Berbayar</span>
+                  </label>
+
+                  {moveHotelUpgradeEnabled && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2 border-t">
+                      <div>
+                        <label className="text-[10px] text-muted-foreground block mb-0.5">Hotel Tujuan</label>
+                        <input
+                          type="text"
+                          placeholder="Nama Hotel Tujuan"
+                          value={moveHotelUpgradeName}
+                          onChange={(e) => setMoveHotelUpgradeName(e.target.value)}
+                          className="w-full px-2 py-1 text-xs border rounded bg-background"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] text-muted-foreground block mb-0.5">Nominal Upgrade Total (Rp)</label>
+                        <input
+                          type="number"
+                          placeholder="Contoh: 4000000"
+                          value={moveHotelUpgradeNominal || ""}
+                          onChange={(e) => setMoveHotelUpgradeNominal(Math.max(0, parseInt(e.target.value, 10) || 0))}
+                          className="w-full px-2 py-1 text-xs border rounded bg-background font-bold"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
+
           <div className="flex justify-end gap-2 pt-2">
             <Button variant="outline" disabled={isMoving} onClick={() => setMoveModalOpen(false)}>
               Batal
             </Button>
-            <Button disabled={!targetPaketId || isMoving} onClick={handleMoveGroup}>
+            <Button
+              disabled={
+                !targetPaketId ||
+                isMoving ||
+                (movePricingOption === "HARGA_BARU" && (() => {
+                  const selectedTargetPkg = keberangkatanList.find(k => k.id === targetPaketId);
+                  const paxCountMove = groupToMove?.members?.length || 1;
+                  const oldPriceMove = activePackage?.hargaPaket || (groupToMove?.groupObj?.totalTagihan ? Math.round(groupToMove.groupObj.totalTagihan / paxCountMove) : 0);
+                  const newPriceMove = selectedTargetPkg?.hargaPaket || 0;
+                  return (newPriceMove - oldPriceMove) * paxCountMove < 0;
+                })())
+              }
+              onClick={handleMoveGroup}
+            >
               {isMoving ? "Memindahkan..." : "Pindahkan Rombongan"}
             </Button>
           </div>
