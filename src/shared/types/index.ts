@@ -404,6 +404,8 @@ export interface Keberangkatan {
   hotelMekkah?: string;
   hotelMadinah?: string;
   kuota?: number;
+  durationDays?: number;
+  durasiHari?: number;
   kodeIndividu?: string;
   paketGrupId?: string;
   parentKeberangkatanId?: string;
@@ -420,6 +422,9 @@ export interface Keberangkatan {
   };
   childKeberangkatanList?: Keberangkatan[];
   driveFolderIds?: any;
+  flyerUrl?: string;
+  flyerDriveId?: string;
+  caption?: string;
   hotelOptions?: any;
   include?: string[];
   exclude?: string[];

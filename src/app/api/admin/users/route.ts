@@ -24,6 +24,7 @@ export async function GET(_request: NextRequest) {
         phone: true,
         role: true,
         secondaryRoles: true,
+        kantorCabang: true,
         mustChangePassword: true,
         isInvitePending: true,
         inviteToken: true,
@@ -48,7 +49,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { name, email, phone, role, secondaryRoles } = body;
+    const { name, email, phone, role, secondaryRoles, kantorCabang } = body;
 
     if (!name || !email || !role) {
       return NextResponse.json({ success: false, message: "Nama lengkap, email, dan role wajib diisi" }, { status: 400 });
@@ -85,6 +86,7 @@ export async function POST(request: NextRequest) {
         passwordHash,
         role: role as OperationalRole,
         secondaryRoles: validSecondaryRoles,
+        kantorCabang: kantorCabang || "Malang",
         mustChangePassword: true,
         inviteToken,
         inviteExpires,
@@ -97,6 +99,7 @@ export async function POST(request: NextRequest) {
         phone: true,
         role: true,
         secondaryRoles: true,
+        kantorCabang: true,
         mustChangePassword: true,
         isInvitePending: true,
         inviteToken: true,

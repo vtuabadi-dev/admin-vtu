@@ -282,6 +282,7 @@ model User {
   inviteExpires      DateTime?
   isInvitePending    Boolean         @default(false)
   tenantId           String?
+  kantorCabang       String?         @default("Malang")
   createdAt          DateTime        @default(now())
   updatedAt          DateTime        @updatedAt
 
@@ -327,6 +328,9 @@ model Keberangkatan {
   splitLabel            String?
   promoLabel            String?
   driveFolderIds      Json?
+  flyerUrl            String?
+  flyerDriveId        String?
+  caption             String?             @db.Text
   status              StatusKeberangkatan @default(scheduled)
   kuota               Int
   maxSeat             Int?
@@ -1488,6 +1492,45 @@ model SystemSetting {
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
   @@map("system_settings")
+}
+
+// ============================================================
+// BUKU TAMU — GUEST BOOK & VISIT LIFECYCLE
+// ============================================================
+
+enum HasilKunjunganTamu {
+  CLOSING
+  MINAT
+}
+
+enum StatusKunjunganTamu {
+  SEDANG_BERKUNJUNG
+  SELESAI
+}
+
+model BukuTamu {
+  id                 String               @id @default(cuid())
+  namaTamu           String
+  nomorWa            String
+  kotaAsal           String?
+  keperluan          String?              @db.Text
+  kantorCabang       String               @default("Malang") // "Malang" | "Surabaya" | "Jakarta"
+  adminId            String
+  adminName          String
+  waktuKunjungan     DateTime             @default(now())
+  statusKunjungan    StatusKunjunganTamu  @default(SEDANG_BERKUNJUNG)
+  hasilKunjungan     HasilKunjunganTamu?
+  minatBulan         String?              // contoh: "November 2026"
+  minatJenisPaket    String?              // contoh: "Reguler", "Plus Turki"
+  minatTanggal       DateTime?
+  catatanHasil       String?              @db.Text
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+
+  @@index([adminId])
+  @@index([kantorCabang])
+  @@index([statusKunjungan])
+  @@map("buku_tamu")
 }
 
 

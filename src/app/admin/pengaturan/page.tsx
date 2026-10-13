@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Save, Sparkles, Building2, CheckCircle2 } from "lucide-react";
+import { Save, Sparkles, Building2, CheckCircle2, User, MapPin, KeyRound, Lock, AlertCircle, Loader2, Phone, Mail, ShieldCheck, Eye, EyeOff } from "lucide-react";
 import { PermissionGuard } from "@/shared/components/PermissionGuard";
 import { Tabs } from "@/shared/components/ui/Tabs";
 import { Select } from "@/shared/components/ui/Select";
@@ -10,6 +10,7 @@ import { Button } from "@/shared/components/ui/Button";
 import { Badge } from "@/shared/components/ui/Badge";
 import { OcrSettingsTab } from "./components/OcrSettingsTab";
 import { TelegramBroadcastTab } from "./components/TelegramBroadcastTab";
+import { DAFTAR_KANTOR_CABANG, getKantorCabang } from "@/shared/lib/kantor-cabang";
 import {
   getCompanyProfile,
   saveCompanyProfile,
@@ -245,67 +246,369 @@ function ProfilPerusahaan() {
   );
 }
 
-// ── Profil & Akun ──
+// ── Profil & Akun Admin ──
 function ProfilAkun() {
-  const [saved, setSaved] = useState(false);
-  const handleSave = () => {
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [statusMessage, setStatusMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  const [formData, setFormData] = useState({
+    name: "",
+    email: "",
+    phone: "",
+    role: "super_admin",
+    secondaryRoles: [] as string[],
+    kantorCabang: "Malang",
+    currentPassword: "",
+    newPassword: "",
+    confirmPassword: "",
+  });
+
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+
+  useEffect(() => {
+    async function fetchProfile() {
+      try {
+        setLoading(true);
+        const res = await fetch("/api/admin/profile");
+        const json = await res.json();
+        if (json.success && json.data) {
+          setFormData((prev) => ({
+            ...prev,
+            name: json.data.name || "",
+            email: json.data.email || "",
+            phone: json.data.phone || "",
+            role: json.data.role || "super_admin",
+            secondaryRoles: json.data.secondaryRoles || [],
+            kantorCabang: json.data.kantorCabang || "Malang",
+          }));
+        }
+      } catch (err) {
+        console.error("Gagal memuat profil admin:", err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchProfile();
+  }, []);
+
+  const handleSave = async () => {
+    setStatusMessage(null);
+
+    if (!formData.name.trim()) {
+      setStatusMessage({ type: "error", text: "Nama pengelola wajib diisi." });
+      return;
+    }
+
+    if (!formData.email.trim()) {
+      setStatusMessage({ type: "error", text: "Email pengelola wajib diisi." });
+      return;
+    }
+
+    if (formData.newPassword) {
+      if (formData.newPassword.length < 6) {
+        setStatusMessage({ type: "error", text: "Password baru minimal 6 karakter." });
+        return;
+      }
+      if (formData.newPassword !== formData.confirmPassword) {
+        setStatusMessage({ type: "error", text: "Password baru dan konfirmasi password tidak cocok." });
+        return;
+      }
+      if (!formData.currentPassword) {
+        setStatusMessage({ type: "error", text: "Password saat ini wajib diisi untuk verifikasi pergantian password." });
+        return;
+      }
+    }
+
+    setSaving(true);
+    try {
+      const payload: any = {
+        name: formData.name.trim(),
+        email: formData.email.trim(),
+        phone: formData.phone.trim(),
+        kantorCabang: formData.kantorCabang,
+      };
+
+      if (formData.newPassword) {
+        payload.currentPassword = formData.currentPassword;
+        payload.newPassword = formData.newPassword;
+        payload.confirmPassword = formData.confirmPassword;
+      }
+
+      const res = await fetch("/api/admin/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      const resJson = await res.json();
+      if (resJson.success) {
+        setStatusMessage({
+          type: "success",
+          text: formData.newPassword
+            ? "Data profil dan password baru akun admin berhasil diperbarui!"
+            : "Data profil dan penempatan kantor berhasil disimpan!",
+        });
+        setFormData((prev) => ({
+          ...prev,
+          currentPassword: "",
+          newPassword: "",
+          confirmPassword: "",
+        }));
+        setTimeout(() => setStatusMessage(null), 4000);
+      } else {
+        setStatusMessage({
+          type: "error",
+          text: resJson.message || "Gagal menyimpan perubahan akun admin.",
+        });
+      }
+    } catch (err: any) {
+      setStatusMessage({
+        type: "error",
+        text: err?.message || "Terjadi kesalahan pada server.",
+      });
+    } finally {
+      setSaving(false);
+    }
   };
 
+  const selectedOffice = getKantorCabang(formData.kantorCabang);
+
+  if (loading) {
+    return (
+      <div className="py-12 flex flex-col items-center justify-center gap-3 text-muted-foreground">
+        <Loader2 className="w-6 h-6 animate-spin text-primary" />
+        <span className="text-sm">Memuat informasi akun admin...</span>
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-6">
-      {/* Company Profile Embedded */}
-      <ProfilPerusahaan />
-
-      <div className="pt-4 border-t border-slate-200 dark:border-stone-800">
-        <SettingSection title="Informasi Akun Admin" desc="Data akun administrator yang sedang login">
-          <SettingRow label="Nama Lengkap" desc="Nama yang ditampilkan di sistem">
-            <input
-              className="h-9 w-64 rounded-md border border-input bg-transparent px-3 py-1 text-sm"
-              defaultValue="Admin VTU"
-            />
-          </SettingRow>
-          <SettingRow label="Email" desc="Email untuk login dan notifikasi sistem">
-            <input
-              className="h-9 w-64 rounded-md border border-input bg-transparent px-3 py-1 text-sm"
-              defaultValue="admin@vtu.id"
-            />
-          </SettingRow>
-          <SettingRow label="Role" desc="Role menentukan hak akses di sistem">
-            <Select
-              options={[
-                { value: "super_admin", label: "Super Admin" },
-                { value: "admin_operasional", label: "Admin Operasional" },
-                { value: "admin_pembayaran", label: "Admin Pembayaran" },
-                { value: "admin_manifest", label: "Admin Manifest" },
-                { value: "admin_dokumen", label: "Admin Dokumen" },
-                { value: "admin_badal", label: "Admin Badal Umroh & Wakaf" },
-              ]}
-              defaultValue="super_admin"
-            />
-          </SettingRow>
-        </SettingSection>
-
-        <SettingSection title="Keamanan Akun" desc="Ubah password akun">
-          <SettingRow label="Password Saat Ini">
-            <input type="password" className="h-9 w-64 rounded-md border border-input bg-transparent px-3 py-1 text-sm" defaultValue="••••••••" />
-          </SettingRow>
-          <SettingRow label="Password Baru">
-            <input type="password" className="h-9 w-64 rounded-md border border-input bg-transparent px-3 py-1 text-sm" placeholder="Min. 8 karakter" />
-          </SettingRow>
-          <SettingRow label="Konfirmasi Password">
-            <input type="password" className="h-9 w-64 rounded-md border border-input bg-transparent px-3 py-1 text-sm" placeholder="Ketik ulang password" />
-          </SettingRow>
-        </SettingSection>
-
-        <div className="flex items-center gap-2 pt-2">
-          <Button onClick={handleSave} className="gap-1.5">
-            <Save className="h-3.5 w-3.5" />
-            Simpan Password & Akun
-          </Button>
-          {saved && <span className="text-xs text-success">Tersimpan!</span>}
+    <div className="space-y-6 max-w-4xl">
+      {/* Alert status notification */}
+      {statusMessage && (
+        <div
+          className={`p-4 rounded-xl flex items-center gap-3 text-sm font-medium ${
+            statusMessage.type === "success"
+              ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-200 border border-emerald-300 dark:border-emerald-800"
+              : "bg-red-50 dark:bg-red-950/40 text-red-800 dark:text-red-200 border border-red-300 dark:border-red-800"
+          }`}
+        >
+          {statusMessage.type === "success" ? (
+            <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+          ) : (
+            <AlertCircle className="w-5 h-5 text-red-600 shrink-0" />
+          )}
+          <span>{statusMessage.text}</span>
         </div>
+      )}
+
+      {/* 1. INFORMASI AKUN & IDENTITAS PENGELOLA */}
+      <SettingSection
+        title="Informasi Akun & Pengelola"
+        desc="Identitas akun administrator yang digunakan dalam operasional VTU Travel"
+      >
+        <SettingRow
+          label="Nama Lengkap"
+          desc="Nama lengkap resmi pengelola yang tercantum di sistem dan tanda tangan digital"
+        >
+          <div className="relative">
+            <User className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+            <input
+              className="h-9 w-80 rounded-md border border-input bg-background pl-9 pr-3 py-1 text-sm font-semibold"
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              placeholder="Nama Lengkap Admin"
+            />
+          </div>
+        </SettingRow>
+
+        <SettingRow
+          label="Email Akun Pengelola"
+          desc="Email resmi untuk login dan penerimaan notifikasi keamanan sistem"
+        >
+          <div className="relative">
+            <Mail className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+            <input
+              type="email"
+              className="h-9 w-80 rounded-md border border-input bg-background pl-9 pr-3 py-1 text-sm font-semibold"
+              value={formData.email}
+              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+              placeholder="email@vtu.id"
+            />
+          </div>
+        </SettingRow>
+
+        <SettingRow
+          label="Nomor WhatsApp / Telepon"
+          desc="Nomor WhatsApp aktif pengelola untuk komunikasi internal dan delegasi tugas"
+        >
+          <div className="relative">
+            <Phone className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+            <input
+              className="h-9 w-80 rounded-md border border-input bg-background pl-9 pr-3 py-1 text-sm"
+              value={formData.phone}
+              onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+              placeholder="Contoh: 081234567890"
+            />
+          </div>
+        </SettingRow>
+
+        <SettingRow
+          label="Hak Akses / Role Sistem"
+          desc="Tingkat otorisasi modul operasional yang diberikan oleh Super Admin"
+        >
+          <div className="flex items-center gap-2">
+            <Badge variant="outline" className="text-xs uppercase font-bold tracking-wider py-1 px-2.5 bg-primary/10 text-primary border-primary/30">
+              <ShieldCheck className="w-3.5 h-3.5 mr-1" />
+              {formData.role.replace(/_/g, " ")}
+            </Badge>
+            {formData.secondaryRoles.length > 0 && (
+              <span className="text-xs text-muted-foreground">
+                (+{formData.secondaryRoles.length} peran sekunder)
+              </span>
+            )}
+          </div>
+        </SettingRow>
+      </SettingSection>
+
+      {/* 2. PENEMPATAN KANTOR CABANG */}
+      <SettingSection
+        title="Penempatan Kantor Cabang"
+        desc="Atur kantor fisik tempat Anda bertugas melayani jamaah dan tamu travel"
+      >
+        <div className="p-4 rounded-xl bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/40 space-y-2">
+          <div className="flex items-center gap-2 text-xs font-bold text-amber-900 dark:text-amber-300">
+            <MapPin className="w-4 h-4 text-amber-600" />
+            Penting untuk Modul Buku Tamu & Registrasi Langsung
+          </div>
+          <p className="text-xs text-amber-800/90 dark:text-amber-200/90 leading-relaxed">
+            Kantor penempatan yang Anda pilih di bawah ini akan secara otomatis menjadi identitas kantor penerima saat Anda mencatat tamu di <strong>Buku Tamu</strong>, mengaitkan konsultasi calon jamaah, dan menyusun laporan kunjungan per kantor cabang.
+          </p>
+        </div>
+
+        <SettingRow
+          label="Kantor Penempatan Admin"
+          desc="Pilih kantor cabang tempat Anda aktif berdinas saat ini"
+        >
+          <div className="w-80">
+            <select
+              className="h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-primary"
+              value={formData.kantorCabang}
+              onChange={(e) => setFormData({ ...formData, kantorCabang: e.target.value })}
+            >
+              {DAFTAR_KANTOR_CABANG.map((k) => (
+                <option key={k.id} value={k.id}>
+                  {k.nama} ({k.kota})
+                </option>
+              ))}
+            </select>
+          </div>
+        </SettingRow>
+
+        {/* Live Preview Alamat Kantor Terpilih */}
+        <div className="p-3.5 rounded-lg border border-slate-200 dark:border-stone-800 bg-slate-50 dark:bg-stone-900/50 flex items-start gap-3">
+          <div className="p-2 rounded-md bg-white dark:bg-stone-800 border text-primary shrink-0">
+            <Building2 className="w-4 h-4" />
+          </div>
+          <div className="text-xs space-y-1">
+            <div className="font-bold text-slate-800 dark:text-slate-100 flex items-center gap-1.5">
+              <span>{selectedOffice.nama}</span>
+              {selectedOffice.isPusat && (
+                <Badge variant="success" className="text-[10px] py-0 px-1.5">Pusat</Badge>
+              )}
+            </div>
+            <p className="text-muted-foreground leading-relaxed">{selectedOffice.alamat}</p>
+            {selectedOffice.telepon && (
+              <p className="text-muted-foreground font-mono">Telp / Hotline: {selectedOffice.telepon}</p>
+            )}
+          </div>
+        </div>
+      </SettingSection>
+
+      {/* 3. KEAMANAN & GANTI PASSWORD */}
+      <SettingSection
+        title="Keamanan Akun & Ubah Password"
+        desc="Perbarui password login Anda secara berkala untuk menjaga keamanan data operasional travel"
+      >
+        <SettingRow
+          label="Password Saat Ini"
+          desc="Wajib diisi jika Anda ingin mengganti password login baru"
+        >
+          <div className="relative w-80">
+            <Lock className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+            <input
+              type={showCurrentPassword ? "text" : "password"}
+              className="h-9 w-full rounded-md border border-input bg-background pl-9 pr-10 py-1 text-sm"
+              value={formData.currentPassword}
+              onChange={(e) => setFormData({ ...formData, currentPassword: e.target.value })}
+              placeholder="Ketik password saat ini..."
+            />
+            <button
+              type="button"
+              className="absolute right-2.5 top-2.5 text-muted-foreground hover:text-foreground"
+              onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+            >
+              {showCurrentPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </button>
+          </div>
+        </SettingRow>
+
+        <SettingRow
+          label="Password Baru"
+          desc="Gunakan minimal 6 karakter kombinasi huruf dan angka"
+        >
+          <div className="relative w-80">
+            <KeyRound className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+            <input
+              type={showNewPassword ? "text" : "password"}
+              className="h-9 w-full rounded-md border border-input bg-background pl-9 pr-10 py-1 text-sm"
+              value={formData.newPassword}
+              onChange={(e) => setFormData({ ...formData, newPassword: e.target.value })}
+              placeholder="Password baru (min. 6 karakter)"
+            />
+            <button
+              type="button"
+              className="absolute right-2.5 top-2.5 text-muted-foreground hover:text-foreground"
+              onClick={() => setShowNewPassword(!showNewPassword)}
+            >
+              {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </button>
+          </div>
+        </SettingRow>
+
+        <SettingRow
+          label="Konfirmasi Password Baru"
+          desc="Ketik ulang password baru untuk memastikan kecocokan"
+        >
+          <div className="relative w-80">
+            <KeyRound className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+            <input
+              type={showNewPassword ? "text" : "password"}
+              className="h-9 w-full rounded-md border border-input bg-background pl-9 pr-3 py-1 text-sm"
+              value={formData.confirmPassword}
+              onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
+              placeholder="Ketik ulang password baru"
+            />
+          </div>
+        </SettingRow>
+      </SettingSection>
+
+      {/* TOMBOL SIMPAN */}
+      <div className="flex items-center gap-3 pt-3">
+        <Button
+          onClick={handleSave}
+          disabled={saving}
+          className="gap-2 bg-primary text-primary-foreground font-bold shadow-md hover:opacity-90"
+        >
+          {saving ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Save className="h-4 w-4" />
+          )}
+          {saving ? "Menyimpan Perubahan..." : "Simpan Perubahan Akun & Penempatan"}
+        </Button>
       </div>
     </div>
   );

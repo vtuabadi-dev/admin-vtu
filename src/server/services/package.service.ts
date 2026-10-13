@@ -470,6 +470,48 @@ export const packageService = {
         }
       }
 
+      // Upload flyer and caption to Google Drive vault
+      let uploadedFlyerDriveId: string | undefined = undefined;
+      let uploadedFlyerUrl: string | undefined = undefined;
+      const packageCaption = data.caption || data.customCaption || undefined;
+
+      const flyerBase64 = Array.isArray(data.flyerBase64List) && data.flyerBase64List.length > 0
+        ? data.flyerBase64List[0]
+        : (data.flyerBase64 || null);
+
+      if (flyerBase64 && driveFolderIds?.rootPackageFolderId) {
+        try {
+          const { getStorageAdapter } = await import("../storage");
+          const storage = getStorageAdapter();
+          const cleanBase64 = flyerBase64.replace(/^data:image\/[a-zA-Z]+;base64,/, "");
+          const imgBuffer = Buffer.from(cleanBase64, "base64");
+          if (imgBuffer.length > 0) {
+            const extMatch = flyerBase64.match(/^data:image\/([a-zA-Z]+);base64,/);
+            const ext = extMatch ? extMatch[1] : "jpg";
+            const mimeType = ext === "png" ? "image/png" : "image/jpeg";
+            const flyerFileName = `Flyer-${kodeIndividu}.${ext}`;
+            const fId = await storage.upload(flyerFileName, imgBuffer, mimeType, driveFolderIds.rootPackageFolderId);
+            if (fId) {
+              uploadedFlyerDriveId = fId;
+              uploadedFlyerUrl = `https://drive.google.com/uc?export=view&id=${fId}`;
+            }
+          }
+        } catch (flyerErr) {
+          console.warn("[PackageService] Gagal mengunggah flyer ke Google Drive:", flyerErr);
+        }
+      }
+
+      if (packageCaption && driveFolderIds?.rootPackageFolderId) {
+        try {
+          const { getStorageAdapter } = await import("../storage");
+          const storage = getStorageAdapter();
+          const captionBuffer = Buffer.from(packageCaption, "utf-8");
+          await storage.upload(`Caption-${kodeIndividu}.txt`, captionBuffer, "text/plain", driveFolderIds.rootPackageFolderId);
+        } catch (capErr) {
+          console.warn("[PackageService] Gagal mengunggah caption ke Google Drive:", capErr);
+        }
+      }
+
       const created = await keberangkatanRepo.create({
         kode: kodeIndividu,
         kodeIndividu,
@@ -481,6 +523,9 @@ export const packageService = {
         spekLabel: data.spekLabel || (data.splitReason === "spek" ? data.splitLabel : undefined),
         notes: lineageNotes || undefined,
         driveFolderIds,
+        flyerUrl: uploadedFlyerUrl,
+        flyerDriveId: uploadedFlyerDriveId,
+        caption: packageCaption,
         include: includeList,
         namaPaket: formattedPackageName,
         hargaPaket: parseInt(data.hargaBase || data.hargaPaket || "0", 10),

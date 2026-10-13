@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Users, Shield, UserPlus, Loader2, RefreshCw, Copy, Check, Mail, Send, ShieldPlus, Edit3, ExternalLink, Clock, Info } from "lucide-react";
+import { Users, Shield, UserPlus, Loader2, RefreshCw, Copy, Check, Mail, Send, ShieldPlus, Edit3, ExternalLink, Clock, Info, MapPin } from "lucide-react";
 import { Button } from "@/shared/components/ui/Button";
 import { Input } from "@/shared/components/ui/Input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/components/ui/Card";
 import { Badge } from "@/shared/components/ui/Badge";
 import { formatDate, getWhatsAppUrl } from "@/shared/lib/utils";
 import type { OperationalRole } from "@/shared/types";
+import { DAFTAR_KANTOR_CABANG } from "@/shared/lib/kantor-cabang";
 import { RolePermissionMatrix } from "./components/RolePermissionMatrix";
 import { ModulePermissionEditor } from "./components/ModulePermissionEditor";
 import type { ModulePermission } from "@/app/api/admin/roles/route";
@@ -30,6 +31,7 @@ interface UserItem {
   phone?: string | null;
   role: OperationalRole;
   secondaryRoles?: string[];
+  kantorCabang?: string | null;
   mustChangePassword: boolean;
   isInvitePending?: boolean;
   inviteToken?: string;
@@ -94,6 +96,7 @@ export default function UserManagementPage() {
     phone: "",
     role: "admin_operasional" as OperationalRole,
     secondaryRoles: [] as string[],
+    kantorCabang: "Malang",
   });
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
@@ -105,6 +108,7 @@ export default function UserManagementPage() {
     phone: "",
     role: "admin_operasional" as OperationalRole,
     secondaryRoles: [] as string[],
+    kantorCabang: "Malang",
   });
   const [editSubmitting, setEditSubmitting] = useState(false);
   const [editFormError, setEditFormError] = useState<string | null>(null);
@@ -189,6 +193,7 @@ export default function UserManagementPage() {
         phone: "",
         role: "admin_operasional",
         secondaryRoles: [],
+        kantorCabang: "Malang",
       });
       setIsModalOpen(false);
 
@@ -216,6 +221,7 @@ export default function UserManagementPage() {
       phone: user.phone || "",
       role: user.role,
       secondaryRoles: user.secondaryRoles || [],
+      kantorCabang: user.kantorCabang || "Malang",
     });
     setEditFormError(null);
   };
@@ -596,7 +602,13 @@ export default function UserManagementPage() {
 
                         return (
                           <tr key={user.id} className="hover:bg-muted/30 transition-colors">
-                            <td className="px-4 py-3 font-semibold text-foreground">{user.name}</td>
+                            <td className="px-4 py-3">
+                              <div className="font-semibold text-foreground">{user.name}</div>
+                              <span className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-700 dark:text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded mt-1">
+                                <MapPin className="w-3 h-3 text-amber-600 shrink-0" />
+                                Kantor {user.kantorCabang || "Malang"}
+                              </span>
+                            </td>
                             <td className="px-4 py-3">
                               <p className="text-muted-foreground font-mono">{user.email}</p>
                               {user.phone ? (
@@ -820,6 +832,24 @@ export default function UserManagementPage() {
               </div>
 
               <div className="space-y-1.5">
+                <label className="font-bold text-foreground">Kantor Penempatan Admin *</label>
+                <select
+                  value={formData.kantorCabang}
+                  onChange={(e) => setFormData({ ...formData, kantorCabang: e.target.value })}
+                  className="w-full h-9 px-2.5 rounded-md border bg-background text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-primary"
+                >
+                  {DAFTAR_KANTOR_CABANG.map((k) => (
+                    <option key={k.id} value={k.id}>
+                      {k.nama} ({k.kota})
+                    </option>
+                  ))}
+                </select>
+                <p className="text-[10.5px] text-muted-foreground">
+                  Lokasi kantor fisik tempat admin bertugas melayani jamaah dan buku tamu.
+                </p>
+              </div>
+
+              <div className="space-y-1.5">
                 <label className="font-bold text-foreground">Role Utama (Primary Role) *</label>
                 <select
                   value={formData.role}
@@ -938,6 +968,21 @@ export default function UserManagementPage() {
                   placeholder="Contoh: 081234567890"
                   className="h-9 text-xs font-mono"
                 />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="font-bold text-foreground">Kantor Penempatan Admin *</label>
+                <select
+                  value={editFormData.kantorCabang}
+                  onChange={(e) => setEditFormData({ ...editFormData, kantorCabang: e.target.value })}
+                  className="w-full h-9 px-2.5 rounded-md border bg-background text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-primary"
+                >
+                  {DAFTAR_KANTOR_CABANG.map((k) => (
+                    <option key={k.id} value={k.id}>
+                      {k.nama} ({k.kota})
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div className="space-y-1.5">

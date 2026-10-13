@@ -95,6 +95,7 @@ const adminNav: NavSection[] = [
         icon: Plane,
         children: [
           { label: "Generate Paket", href: "/admin/paket-umroh/generate" },
+          { label: "Katalog Paket", href: "/admin/paket-umroh/katalog" },
           { label: "Info Hotel", href: "/admin/paket-umroh/info-hotel" },
           { label: "Paket Aktif", href: "/admin/keberangkatan" },
         ],
@@ -122,6 +123,7 @@ const adminNav: NavSection[] = [
         label: "Jamaah",
         icon: Users,
         children: [
+          { label: "Buku Tamu", href: "/admin/jamaah/buku-tamu" },
           { label: "Semua Jamaah", href: "/admin/jamaah" },
           { label: "Pencarian Jamaah", href: "/admin/jamaah?search" },
           { label: "Histori Paket", href: "/admin/jamaah/histori-paket" },
