@@ -116,8 +116,8 @@ export default function KeberangkatanListPage() {
   const handleToggleKatalog = async (pkgId: string, newState: boolean) => {
     setTogglingKatalogId(pkgId);
     // Optimistic update
-    setKeberangkatan((prev) =>
-      prev.map((item) =>
+    setKeberangkatan((prev) => {
+      const updated = prev.map((item) =>
         item.id === pkgId
           ? {
               ...item,
@@ -128,8 +128,15 @@ export default function KeberangkatanListPage() {
               },
             }
           : item
-      )
-    );
+      );
+      useOperationalStore.getState().setKeberangkatanList(updated);
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem("vtu_katalog_packages_cache_v1", JSON.stringify(updated));
+        } catch {}
+      }
+      return updated;
+    });
     try {
       const res = await fetch(`/api/keberangkatan/${pkgId}`, {
         method: "PUT",

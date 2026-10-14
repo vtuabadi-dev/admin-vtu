@@ -24,8 +24,58 @@ import { Input } from "@/shared/components/ui/Input";
 import { Card, CardContent } from "@/shared/components/ui/Card";
 import { Badge } from "@/shared/components/ui/Badge";
 import { useSession } from "@/shared/hooks/use-session";
-import { formatNumberWithDots, getWhatsAppUrl } from "@/shared/lib/utils";
+import { formatNumberWithDots, getWhatsAppUrl, cn } from "@/shared/lib/utils";
 import type { Keberangkatan } from "@/shared/types";
+import { useOperationalStore } from "@/stores/operational-store";
+
+// Cache Keys & Singletons untuk mencegah render ulang dan loading flicker
+const KATALOG_PACKAGES_CACHE_KEY = "vtu_katalog_packages_cache_v1";
+const KATALOG_GUESTS_CACHE_KEY = "vtu_katalog_guests_cache_v1";
+let memoryCachedPackages: Keberangkatan[] | null = null;
+let memoryCachedGuests: BukuTamuSimple[] | null = null;
+
+const getInitialCachedPackages = (): Keberangkatan[] => {
+  if (memoryCachedPackages && memoryCachedPackages.length > 0) {
+    return memoryCachedPackages;
+  }
+  if (typeof window !== "undefined") {
+    try {
+      const raw = localStorage.getItem(KATALOG_PACKAGES_CACHE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          memoryCachedPackages = parsed;
+          return parsed;
+        }
+      }
+    } catch {}
+  }
+  const storeList = useOperationalStore.getState().keberangkatanList;
+  if (storeList && storeList.length > 0) {
+    memoryCachedPackages = storeList;
+    return storeList;
+  }
+  return [];
+};
+
+const getInitialCachedGuests = (): BukuTamuSimple[] => {
+  if (memoryCachedGuests && memoryCachedGuests.length > 0) {
+    return memoryCachedGuests;
+  }
+  if (typeof window !== "undefined") {
+    try {
+      const raw = localStorage.getItem(KATALOG_GUESTS_CACHE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          memoryCachedGuests = parsed;
+          return parsed;
+        }
+      }
+    } catch {}
+  }
+  return [];
+};
 
 interface BukuTamuSimple {
   id: string;
@@ -81,8 +131,13 @@ const getFlyerList = (pkg: Keberangkatan): string[] => {
 export default function KatalogPaketPage() {
   const { user } = useSession();
 
-  const [packages, setPackages] = useState<Keberangkatan[]>([]);
-  const [loading, setLoading] = useState(true);
+  // Instant render dari cache memory / localStorage jika sudah pernah dimuat sebelumnya
+  const [packages, setPackages] = useState<Keberangkatan[]>(getInitialCachedPackages);
+  const [loading, setLoading] = useState<boolean>(() => {
+    const cached = getInitialCachedPackages();
+    return cached.length === 0;
+  });
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedStartingPoint, setSelectedStartingPoint] = useState<string>("ALL");
   const [selectedMonth, setSelectedMonth] = useState<string>("ALL");
   const [searchQuery, setSearchQuery] = useState<string>("");
@@ -90,8 +145,8 @@ export default function KatalogPaketPage() {
   // Slide index per paket ID: Record<packageId, currentSlideIndex>
   const [activeSlideMap, setActiveSlideMap] = useState<Record<string, number>>({});
 
-  // Tamu milik admin yang sedang login
-  const [myGuests, setMyGuests] = useState<BukuTamuSimple[]>([]);
+  // Tamu milik admin yang sedang login (dengan caching instan)
+  const [myGuests, setMyGuests] = useState<BukuTamuSimple[]>(getInitialCachedGuests);
   const [loadingGuests, setLoadingGuests] = useState(false);
 
   // Modal Kirim WA ke Tamu
@@ -105,30 +160,50 @@ export default function KatalogPaketPage() {
   // Copy Caption State
   const [copiedCaptionId, setCopiedCaptionId] = useState<string | null>(null);
 
-  // Fetch Packages
-  const fetchPackages = async () => {
+  // Fetch Packages dengan Stale-While-Revalidate
+  const fetchPackages = async (isManual = false) => {
     try {
-      setLoading(true);
+      if (isManual) {
+        setIsRefreshing(true);
+      } else if (packages.length === 0) {
+        setLoading(true);
+      }
       const res = await fetch("/api/keberangkatan");
       const json = await res.json();
       if (json.success && json.data) {
         setPackages(json.data);
+        memoryCachedPackages = json.data;
+        useOperationalStore.getState().setKeberangkatanList(json.data);
+        if (typeof window !== "undefined") {
+          try {
+            localStorage.setItem(KATALOG_PACKAGES_CACHE_KEY, JSON.stringify(json.data));
+          } catch {}
+        }
       }
     } catch (err) {
       console.error("Gagal memuat katalog paket:", err);
     } finally {
       setLoading(false);
+      setIsRefreshing(false);
     }
   };
 
-  // Fetch Tamu Milik Admin Sendiri
+  // Fetch Tamu Milik Admin Sendiri dengan Caching
   const fetchMyGuests = async () => {
     try {
-      setLoadingGuests(true);
+      if (myGuests.length === 0) {
+        setLoadingGuests(true);
+      }
       const res = await fetch("/api/buku-tamu?filter=mine");
       const json = await res.json();
       if (json.success && json.data) {
         setMyGuests(json.data);
+        memoryCachedGuests = json.data;
+        if (typeof window !== "undefined") {
+          try {
+            localStorage.setItem(KATALOG_GUESTS_CACHE_KEY, JSON.stringify(json.data));
+          } catch {}
+        }
       }
     } catch (err) {
       console.warn("Gagal memuat tamu admin:", err);
@@ -138,7 +213,8 @@ export default function KatalogPaketPage() {
   };
 
   useEffect(() => {
-    fetchPackages();
+    // Background silent revalidation: perbarui data tanpa menghambat render UI
+    fetchPackages(false);
     fetchMyGuests();
   }, []);
 
@@ -644,11 +720,12 @@ Salam hangat dari kami,
         <Button
           variant="outline"
           size="sm"
-          onClick={fetchPackages}
+          onClick={() => fetchPackages(true)}
+          disabled={isRefreshing}
           className="gap-2 shrink-0 font-medium"
         >
-          <RefreshCw className="w-3.5 h-3.5" />
-          Refresh Katalog
+          <RefreshCw className={cn("w-3.5 h-3.5", isRefreshing && "animate-spin text-emerald-500")} />
+          {isRefreshing ? "Memperbarui..." : "Refresh Katalog"}
         </Button>
       </div>
 
