@@ -429,6 +429,7 @@ export interface Keberangkatan {
   include?: string[];
   exclude?: string[];
   flightDetails?: FlightDetails;
+  isPublishedKatalog?: boolean;
 }
 
 export interface FlightSegment {

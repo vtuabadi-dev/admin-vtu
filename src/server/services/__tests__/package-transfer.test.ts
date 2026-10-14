@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { transferPackageGroup } from "../package-transfer.service";
 import { prisma } from "@/server/db/client";
+import { formatStandardDocumentFileName } from "@/shared/lib/file-standardization";
+import { moveAndRenameDriveFile } from "@/server/storage/google-drive";
 
 // Mock dependencies
 vi.mock("@/server/db/client", () => {
@@ -330,8 +332,8 @@ describe("WP-TRF-2026-001: Package Transfer Integrity & Invariants Suite", () =>
         tanggalBerangkat: new Date("2026-11-20"),
       });
 
-      // Conditional update returns 0 affected rows
-      mockTx.$executeRaw.mockResolvedValue(0);
+      // Group lock succeeds (1), but capacity conditional update returns 0 affected rows (full)
+      mockTx.$executeRaw.mockResolvedValueOnce(1).mockResolvedValueOnce(0);
       mockTx.keberangkatan.findUnique.mockResolvedValue({ kuota: 45, terisi: 44 });
 
       await expect(
@@ -455,6 +457,160 @@ describe("WP-TRF-2026-001: Package Transfer Integrity & Invariants Suite", () =>
           }),
         })
       );
+    });
+  });
+
+  describe("Google Drive Relocation Alignment (D-001)", () => {
+    it("uses actual assigned manifest row numbers for Google Drive file renaming when target has prior members", async () => {
+      (prisma.registrationGroup.findUnique as any).mockResolvedValue({
+        id: "grp-1",
+        kodeRegistrasi: "GRP-2026-0001",
+        paketKeberangkatanId: "keb-old",
+        keberangkatan: {
+          id: "keb-old",
+          hargaPaket: 30000000,
+          driveFolderIds: { paspor: "f-old-paspor", foto: "f-old-foto" },
+        },
+        anggota: [
+          {
+            id: "jam-1",
+            namaLengkap: "Ahmad",
+            status: "registered",
+            dokumen: [
+              { id: "dok-1", jenis: "paspor", fileUrl: "https://drive.google.com/old1.jpg" },
+            ],
+          },
+          {
+            id: "jam-2",
+            namaLengkap: "Fatimah",
+            status: "registered",
+            dokumen: [
+              { id: "dok-2", jenis: "pas_foto", fileUrl: "https://drive.google.com/old2.jpg" },
+            ],
+          },
+        ],
+      });
+
+      (prisma.keberangkatan.findUnique as any).mockResolvedValue({
+        id: "keb-new",
+        hargaPaket: 30000000,
+        kuota: 45,
+        terisi: 20,
+        driveFolderIds: {
+          rootPackageFolderId: "root-123",
+          paspor: "f-new-paspor",
+          foto: "f-new-foto",
+        },
+        tanggalBerangkat: new Date("2026-11-20"),
+      });
+
+      mockTx.$executeRaw.mockResolvedValue(1);
+      mockTx.manifest.findFirst.mockResolvedValue({ id: "man-target" });
+      // Target manifest already has 20 members (max nomorUrut is 20)
+      mockTx.manifestRow.findFirst.mockImplementation(({ where }: any) => {
+        if (where?.manifestId === "man-target") {
+          return Promise.resolve({ nomorUrut: 20 });
+        }
+        return Promise.resolve(null);
+      });
+
+      await transferPackageGroup({
+        groupId: "grp-1",
+        targetPaketId: "keb-new",
+        pricingOption: "HARGA_LAMA",
+      });
+
+      // Verify that formatStandardDocumentFileName was called with 21 and 22, NOT 1 or 2
+      expect(formatStandardDocumentFileName).toHaveBeenCalledWith(
+        21,
+        expect.any(String),
+        "Ahmad",
+        expect.any(String)
+      );
+      expect(formatStandardDocumentFileName).toHaveBeenCalledWith(
+        22,
+        expect.any(String),
+        "Fatimah",
+        expect.any(String)
+      );
+    });
+  });
+
+  describe("Concurrency & Race Condition Isolation (D-003)", () => {
+    it("aborts transaction cleanly if a concurrent transaction has already moved the group", async () => {
+      (prisma.registrationGroup.findUnique as any).mockResolvedValue({
+        id: "grp-1",
+        paketKeberangkatanId: "keb-old",
+        keberangkatan: { id: "keb-old", hargaPaket: 30000000 },
+        anggota: [{ id: "jam-1", status: "registered", dokumen: [] }],
+      });
+
+      (prisma.keberangkatan.findUnique as any).mockResolvedValue({
+        id: "keb-new",
+        hargaPaket: 35000000,
+        kuota: 45,
+        terisi: 10,
+        tanggalBerangkat: new Date("2026-11-20"),
+      });
+
+      // Group atomic row-level lock returns 0 affected rows (competing transaction already committed move)
+      mockTx.$executeRaw.mockResolvedValueOnce(0);
+
+      await expect(
+        transferPackageGroup({
+          groupId: "grp-1",
+          targetPaketId: "keb-new",
+          pricingOption: "HARGA_BARU",
+        })
+      ).rejects.toThrow("Grup sudah terdaftar pada paket tujuan tersebut atau sedang dipindahkan");
+
+      // Verify no invoices, no payments, and no capacity increments occurred
+      expect(mockTx.invoice.create).not.toHaveBeenCalled();
+      expect(mockTx.pembayaran.create).not.toHaveBeenCalled();
+      expect(mockTx.penghuniKamar.deleteMany).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("Google Drive Error Isolation (Post-Commit)", () => {
+    it("succeeds database transfer even if Google Drive file move throws an error", async () => {
+      (prisma.registrationGroup.findUnique as any).mockResolvedValue({
+        id: "grp-1",
+        kodeRegistrasi: "GRP-2026-0001",
+        paketKeberangkatanId: "keb-old",
+        keberangkatan: { id: "keb-old", hargaPaket: 30000000 },
+        anggota: [
+          {
+            id: "jam-1",
+            status: "registered",
+            dokumen: [{ id: "dok-1", jenis: "paspor", fileUrl: "https://drive.google.com/err.jpg" }],
+          },
+        ],
+      });
+
+      (prisma.keberangkatan.findUnique as any).mockResolvedValue({
+        id: "keb-new",
+        hargaPaket: 30000000,
+        kuota: 45,
+        terisi: 10,
+        tanggalBerangkat: new Date("2026-11-20"),
+      });
+
+      mockTx.$executeRaw.mockResolvedValue(1);
+      mockTx.manifest.findFirst.mockResolvedValue({ id: "man-target" });
+      mockTx.manifestRow.findFirst.mockResolvedValue(null);
+
+      // Make Drive relocation reject
+      (moveAndRenameDriveFile as any).mockRejectedValueOnce(new Error("Google Drive API rate limit"));
+
+      const result = await transferPackageGroup({
+        groupId: "grp-1",
+        targetPaketId: "keb-new",
+        pricingOption: "HARGA_LAMA",
+      });
+
+      // Transfer itself must still return success = true because database committed
+      expect(result.success).toBe(true);
+      expect(mockTx.registrationGroup.update).toHaveBeenCalled();
     });
   });
 });

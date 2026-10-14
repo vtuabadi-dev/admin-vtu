@@ -113,6 +113,21 @@ export async function transferPackageGroup(
 
   // 3. Execute in interactive database transaction
   const txResult = await prisma.$transaction(async (tx) => {
+    // 0. Atomic Row Lock & Idempotency Guard on Registration Group (D-003)
+    // Enforces concurrency isolation by acquiring row-level lock on the group
+    // and verifying it has not already been moved to the target package.
+    const updatedGroupRows = await tx.$executeRaw`
+      UPDATE "registration_groups"
+      SET "updatedAt" = NOW()
+      WHERE "id" = ${existingGroup.id} AND "paketKeberangkatanId" != ${targetPaket.id}
+    `;
+
+    if (updatedGroupRows === 0) {
+      throw new Error(
+        "Grup sudah terdaftar pada paket tujuan tersebut atau sedang dipindahkan (idempoten)"
+      );
+    }
+
     // A. Atomic PostgreSQL Conditional Capacity Check & Increment
     const updatedTargetRows = await tx.$executeRaw`
       UPDATE "keberangkatan"
@@ -148,7 +163,7 @@ export async function transferPackageGroup(
       where: { jamaahId: { in: movingMemberIds } },
     });
 
-    // C. Re-link Manifest Rows to destination manifest sequentially
+    // C. Re-link Manifest Rows to destination manifest sequentially (D-001)
     let targetManifest = await tx.manifest.findFirst({
       where: { keberangkatanId: targetPaket.id },
       orderBy: { createdAt: "desc" },
@@ -175,8 +190,12 @@ export async function transferPackageGroup(
       select: { nomorUrut: true },
     });
     let nextNomorUrut = (maxRow?.nomorUrut ?? 0) + 1;
+    const memberManifestNumberMap: Record<string, number> = {};
 
     for (const member of activeMembers) {
+      const assignedNomorUrut = nextNomorUrut++;
+      memberManifestNumberMap[member.id] = assignedNomorUrut;
+
       const existingRow = await tx.manifestRow.findFirst({
         where: { jamaahId: member.id },
       });
@@ -185,7 +204,7 @@ export async function transferPackageGroup(
           where: { id: existingRow.id },
           data: {
             manifestId: targetManifest.id,
-            nomorUrut: nextNomorUrut++,
+            nomorUrut: assignedNomorUrut,
           },
         });
       } else {
@@ -193,7 +212,7 @@ export async function transferPackageGroup(
           data: {
             manifestId: targetManifest.id,
             jamaahId: member.id,
-            nomorUrut: nextNomorUrut++,
+            nomorUrut: assignedNomorUrut,
             namaLengkap: member.namaLengkap,
             nomorPaspor: member.nomorPaspor || "-",
             tempatLahir: member.tempatLahir || "-",
@@ -323,6 +342,7 @@ export async function transferPackageGroup(
     return {
       createdInvoice,
       totalAdditionalBill,
+      memberManifestNumberMap,
     };
   });
 
@@ -350,11 +370,13 @@ export async function transferPackageGroup(
     const offset = hasTL ? 2 : 1;
     const oldFolders = (existingGroup.keberangkatan?.driveFolderIds as any) || {};
 
-    let currentManifestNo = offset;
+    let fallbackManifestNo = offset;
     let movedCount = 0;
 
     for (const member of activeMembers) {
-      const noUrutBaru = currentManifestNo++;
+      // D-001: Use actual assigned manifest row number from DB transaction
+      const noUrutBaru =
+        txResult.memberManifestNumberMap?.[member.id] ?? fallbackManifestNo++;
       const regCode =
         member.registrationId || existingGroup.kodeRegistrasi || member.id;
 

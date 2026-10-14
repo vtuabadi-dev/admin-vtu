@@ -33,6 +33,18 @@ export async function GET(
           packageType: { select: { name: true } },
         },
       },
+      registrationRequests: {
+        select: {
+          keberangkatan: {
+            select: {
+              namaPaket: true,
+              packageType: { select: { name: true } },
+            },
+          },
+        },
+        orderBy: { createdAt: "asc" as const },
+        take: 1,
+      },
       ketuaGroup: {
         select: {
           id: true,
@@ -186,8 +198,48 @@ export async function GET(
       alamat: getManifestAlamat(group),
       telepon: group?.ketuaGroup?.nomorTelepon,
       kodeRegistrasi: group?.kodeRegistrasi || kode || "-",
-      namaPaket: group?.keberangkatan?.namaPaket || "PAKET UMROH 10 H SBY ( JED.C )",
-      tipePaket: group?.keberangkatan?.packageType?.name || "SILVER",
+      namaPaket: (() => {
+        // 1. If invoice has explicit items, check for base package item description
+        if (invoice?.items && invoice.items.length > 0) {
+          const baseItem = invoice.items.find(
+            (i: any) =>
+              i.kategori === "Paket Umroh" ||
+              i.kategori === "PAKET_UMROH" ||
+              (i.deskripsi && i.deskripsi.toLowerCase().includes("paket umroh"))
+          );
+          if (baseItem && baseItem.deskripsi) {
+            return baseItem.deskripsi;
+          }
+        }
+        // 2. If additive/transfer invoice, use current target package name
+        const isAdditive =
+          invoice?.tipe === "tambahan" ||
+          (invoice?.nomorInvoice &&
+            (invoice.nomorInvoice.startsWith("PINDAH") ||
+              invoice.nomorInvoice.startsWith("INV-PAKET") ||
+              invoice.nomorInvoice.startsWith("INV-UPGRADE")));
+        if (isAdditive) {
+          return group?.keberangkatan?.namaPaket || "PAKET UMROH 10 H SBY ( JED.C )";
+        }
+        // 3. For initial registration invoice with no items: protect agreed historical package name from initial registration request
+        const initialRequestPackage = (group as any)?.registrationRequests?.[0]?.keberangkatan?.namaPaket;
+        if (initialRequestPackage) {
+          return initialRequestPackage;
+        }
+        return group?.keberangkatan?.namaPaket || "PAKET UMROH 10 H SBY ( JED.C )";
+      })(),
+      tipePaket: (() => {
+        const isAdditive =
+          invoice?.tipe === "tambahan" ||
+          (invoice?.nomorInvoice &&
+            (invoice.nomorInvoice.startsWith("PINDAH") ||
+              invoice.nomorInvoice.startsWith("INV-PAKET") ||
+              invoice.nomorInvoice.startsWith("INV-UPGRADE")));
+        if (!isAdditive && (group as any)?.registrationRequests?.[0]?.keberangkatan?.packageType?.name) {
+          return (group as any).registrationRequests[0].keberangkatan.packageType.name;
+        }
+        return group?.keberangkatan?.packageType?.name || "SILVER";
+      })(),
       jumlahPax: membersList.length || 2,
       hargaSatuanPaket: (() => {
         // 1. If invoice has explicit items, check for base package item

@@ -38,6 +38,15 @@ export default function KeberangkatanListPage() {
   const [openInfoId, setOpenInfoId] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [provisioningId, setProvisioningId] = useState<string | null>(null);
+  const [togglingKatalogId, setTogglingKatalogId] = useState<string | null>(null);
+
+  // Variant Modal State untuk Publikasi Katalog & Pendaftaran
+  const [variantModalGroup, setVariantModalGroup] = useState<{
+    groupKey: string;
+    title: string;
+    departureDate?: string;
+    packages: Keberangkatan[];
+  } | null>(null);
 
   // Excel Import States
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
@@ -101,6 +110,45 @@ export default function KeberangkatanListPage() {
       alert("Terjadi kesalahan: " + (err?.message || "Gagal menghubungi server"));
     } finally {
       setProvisioningId(null);
+    }
+  };
+
+  const handleToggleKatalog = async (pkgId: string, newState: boolean) => {
+    setTogglingKatalogId(pkgId);
+    // Optimistic update
+    setKeberangkatan((prev) =>
+      prev.map((item) =>
+        item.id === pkgId
+          ? {
+              ...item,
+              isPublishedKatalog: newState,
+              driveFolderIds: {
+                ...(typeof item.driveFolderIds === "object" ? item.driveFolderIds : {}),
+                isPublishedKatalog: newState,
+              },
+            }
+          : item
+      )
+    );
+    try {
+      const res = await fetch(`/api/keberangkatan/${pkgId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          isPublishedKatalog: newState,
+          driveFolderIds: { isPublishedKatalog: newState },
+        }),
+      });
+      const json = await res.json();
+      if (!json.success) {
+        alert(json.message || "Gagal memperbarui status katalog paket");
+        load(false);
+      }
+    } catch (err: any) {
+      alert("Gagal menghubungi server: " + (err?.message || "Kesalahan jaringan"));
+      load(false);
+    } finally {
+      setTogglingKatalogId(null);
     }
   };
 
@@ -225,6 +273,40 @@ export default function KeberangkatanListPage() {
     return result;
   }, [keberangkatan, selectedMonth, searchQuery]);
 
+  // Helper untuk menentukan group key rombongan/varian secara konsisten antara induk dan anak
+  const getPackageGroupKey = (k: Keberangkatan, allList: Keberangkatan[]): string => {
+    if (k.parentKeberangkatanId) {
+      return `group_${k.parentKeberangkatanId}`;
+    }
+    const hasChildren = allList.some((other) => other.parentKeberangkatanId === k.id);
+    if (hasChildren) {
+      return `group_${k.id}`;
+    }
+    const baseCode = (k.kode || "").replace(/_V\d+$/i, "").trim().toLowerCase();
+    const getDateStr = (d: any) => {
+      if (!d) return "";
+      try { return new Date(d).toISOString().split("T")[0] || ""; } catch { return ""; }
+    };
+    const depDateStr = getDateStr(k.tanggalBerangkat);
+    if (baseCode && depDateStr) {
+      return `rom_${baseCode}_${depDateStr}`;
+    }
+    return `pkg_${k.id}`;
+  };
+
+  // Helper cek apakah paket merupakan varian kedua/tambahan (V2)
+  const isV2Variant = (pkg: Keberangkatan): boolean => {
+    return (
+      pkg.kode.includes("_V2") ||
+      pkg.kode.toLowerCase().includes("v2") ||
+      !!pkg.parentKeberangkatanId ||
+      (pkg as any).splitReason === "promo" ||
+      (pkg as any).splitReason === "spek" ||
+      (pkg as any).splitLabel?.toLowerCase().includes("v2") ||
+      (pkg as any).promoLabel?.toLowerCase().includes("v2")
+    );
+  };
+
   // Group related packages (Parents and their children / variants) to compute joint accumulation quota
   const groupStatsMap = useMemo(() => {
     const map = new Map<string, {
@@ -235,18 +317,8 @@ export default function KeberangkatanListPage() {
       childPackages: Keberangkatan[];
     }>();
 
-    const getDateStr = (d: any) => {
-      if (!d) return "";
-      try { return new Date(d).toISOString().split("T")[0] || ""; } catch { return ""; }
-    };
-
     keberangkatan.forEach((k) => {
-      const baseCode = (k.kode || "").replace(/_V\d+$/i, "").trim().toLowerCase();
-      const depDateStr = getDateStr(k.tanggalBerangkat);
-      // Scoped strictly by parent ID or (base code + departure date)
-      const groupKey = k.parentKeberangkatanId
-        ? `parent_${k.parentKeberangkatanId}`
-        : (baseCode && depDateStr ? `rom_${baseCode}_${depDateStr}` : `pkg_${k.id}`);
+      const groupKey = getPackageGroupKey(k, keberangkatan);
 
       if (!map.has(groupKey)) {
         map.set(groupKey, {
@@ -262,7 +334,7 @@ export default function KeberangkatanListPage() {
       entry.totalGroupQuota += (k.maxSeat || k.kuota || 0);
       entry.totalGroupFilled += (k.terisi || 0);
 
-      const isChild = !!k.parentKeberangkatanId || (k as any).splitReason === "promo" || k.kode.includes("_V");
+      const isChild = isV2Variant(k);
       if (isChild) {
         entry.childPackages.push(k);
       } else {
@@ -272,6 +344,25 @@ export default function KeberangkatanListPage() {
 
     return map;
   }, [keberangkatan]);
+
+  const handleKatalogSwitchClick = (pkg: Keberangkatan, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const groupKey = getPackageGroupKey(pkg, keberangkatan);
+    const groupStats = groupStatsMap.get(groupKey);
+    const groupPackages = groupStats?.allPackages || [pkg];
+
+    if (groupPackages.length > 1) {
+      setVariantModalGroup({
+        groupKey,
+        title: pkg.namaPaket || pkg.kode,
+        departureDate: pkg.tanggalBerangkat,
+        packages: groupPackages,
+      });
+    } else {
+      const isPub = pkg.isPublishedKatalog ?? ((pkg.driveFolderIds as any)?.isPublishedKatalog === true);
+      handleToggleKatalog(pkg.id, !isPub);
+    }
+  };
 
   if (loading && keberangkatan.length === 0) {
     return (
@@ -630,6 +721,72 @@ export default function KeberangkatanListPage() {
                         </button>
                       );
                     })()}
+
+                    {/* SAKLAR TOGGLE TAMPILKAN DI KATALOG & FORM PENDAFTARAN */}
+                    {(() => {
+                      const isPublished = k.isPublishedKatalog ?? ((k.driveFolderIds as any)?.isPublishedKatalog === true);
+                      const hasMultipleVariants = isPartOfSplit;
+                      const variantCount = groupStats?.allPackages.length || 1;
+                      const activeVariantCount = groupStats?.allPackages.filter(
+                        (p) => p.isPublishedKatalog ?? ((p.driveFolderIds as any)?.isPublishedKatalog === true)
+                      ).length || 0;
+
+                      return (
+                        <div className="flex items-center gap-1.5 pl-1.5 border-l border-border/60">
+                          <button
+                            type="button"
+                            onClick={(e) => handleKatalogSwitchClick(k, e)}
+                            disabled={togglingKatalogId === k.id}
+                            className="inline-flex items-center gap-1.5 cursor-pointer select-none bg-transparent border-none p-0 group"
+                            title={
+                              hasMultipleVariants
+                                ? `Paket ini memiliki ${variantCount} varian (${activeVariantCount}/${variantCount} aktif di katalog). Klik untuk mengatur publikasi varian.`
+                                : isPublished
+                                  ? "Paket aktif di Katalog & Pendaftaran. Klik untuk menonaktifkan."
+                                  : "Paket belum tampil di Katalog & Pendaftaran. Klik untuk mengaktifkan."
+                            }
+                          >
+                            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-tight group-hover:text-foreground transition-colors hidden sm:inline">
+                              Katalog:
+                            </span>
+
+                            {/* Saklar Switch */}
+                            <div
+                              role="switch"
+                              aria-checked={isPublished}
+                              className={cn(
+                                "relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden",
+                                isPublished ? "bg-emerald-600 shadow-[0_0_8px_rgba(16,185,129,0.4)]" : "bg-slate-300 dark:bg-slate-700",
+                                togglingKatalogId === k.id && "opacity-50 cursor-wait"
+                              )}
+                            >
+                              <span
+                                aria-hidden="true"
+                                className={cn(
+                                  "pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out",
+                                  isPublished ? "translate-x-4" : "translate-x-0"
+                                )}
+                              />
+                            </div>
+
+                            {/* Indikator Rasio Varian Aktif (misal: 1/2) tepat di sebelah saklar jika varian > 1 */}
+                            {hasMultipleVariants && (
+                              <span
+                                className={cn(
+                                  "px-1.5 py-0.5 rounded text-[10.5px] font-extrabold font-mono border leading-none tracking-tight shadow-xs transition-all",
+                                  activeVariantCount > 0
+                                    ? "bg-purple-500/15 text-purple-700 dark:text-purple-300 border-purple-500/35"
+                                    : "bg-slate-100 dark:bg-slate-800 text-slate-500 border-slate-300 dark:border-slate-700"
+                                )}
+                                title={`${activeVariantCount} dari ${variantCount} varian ditampilkan di katalog`}
+                              >
+                                {activeVariantCount}/{variantCount}
+                              </span>
+                            )}
+                          </button>
+                        </div>
+                      );
+                    })()}
                   </div>
                 </div>
               </CardHeader>
@@ -861,6 +1018,153 @@ export default function KeberangkatanListPage() {
         })}
         </div>
       )}
+      {/* Modal Pengaturan Varian Paket untuk Publikasi Katalog & Form Pendaftaran */}
+      <Modal
+        open={!!variantModalGroup}
+        onClose={() => setVariantModalGroup(null)}
+        title="Publikasi Katalog & Formulir Pendaftaran"
+        description="Paket ini memiliki lebih dari satu varian. Tentukan varian mana saja yang aktif untuk ditampilkan di Katalog Brosur & Formulir Pendaftaran Jamaah."
+        size="lg"
+      >
+        {variantModalGroup && (() => {
+          const currentGroupKey = variantModalGroup.groupKey;
+          const currentStats = groupStatsMap.get(currentGroupKey);
+          const currentPackages = (currentStats?.allPackages && currentStats.allPackages.length > 0)
+            ? currentStats.allPackages
+            : variantModalGroup.packages;
+
+          const sortedPackages = [...currentPackages].sort((a, b) => {
+            const aIsV2 = isV2Variant(a);
+            const bIsV2 = isV2Variant(b);
+            if (!aIsV2 && bIsV2) return -1;
+            if (aIsV2 && !bIsV2) return 1;
+            return (a.kode || "").localeCompare(b.kode || "");
+          });
+
+          const totalGroupQuota = currentStats?.totalGroupQuota || sortedPackages.reduce((s, p) => s + (p.maxSeat || p.kuota || 0), 0);
+          const totalGroupFilled = currentStats?.totalGroupFilled || sortedPackages.reduce((s, p) => s + (p.terisi || 0), 0);
+          const remainingGroup = Math.max(0, totalGroupQuota - totalGroupFilled);
+
+          return (
+            <div className="space-y-4 pt-1">
+              {/* Info Kuota Bersama */}
+              <div className="p-3.5 rounded-xl bg-gradient-to-r from-emerald-500/10 via-teal-500/10 to-slate-500/10 border border-emerald-500/25 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                <div>
+                  <div className="text-xs font-semibold text-muted-foreground">Rombongan Paket:</div>
+                  <div className="text-sm font-bold text-foreground">{variantModalGroup.title}</div>
+                </div>
+                <div className="flex items-center gap-2 text-xs">
+                  <div className="px-2.5 py-1 rounded-md bg-background border font-semibold">
+                    Total Kuota: <span className="font-bold text-emerald-600 dark:text-emerald-400">{totalGroupQuota}</span>
+                  </div>
+                  <div className="px-2.5 py-1 rounded-md bg-background border font-semibold">
+                    Sisa Gabungan: <span className="font-bold text-emerald-600 dark:text-emerald-400">{remainingGroup}</span> Seat
+                  </div>
+                </div>
+              </div>
+
+              {/* Daftar Varian dengan Switch Masing-Masing */}
+              <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
+                {sortedPackages.map((pkgItem) => {
+                  const isV2 = isV2Variant(pkgItem);
+                  const isPub = pkgItem.isPublishedKatalog ?? ((pkgItem.driveFolderIds as any)?.isPublishedKatalog === true);
+                  const isToggling = togglingKatalogId === pkgItem.id;
+                  const variantLabel = (pkgItem as any).splitLabel || (pkgItem as any).promoLabel || (pkgItem as any).spekLabel;
+
+                  return (
+                    <div
+                      key={pkgItem.id}
+                      className={cn(
+                        "flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-xl border transition-all",
+                        isPub
+                          ? "border-emerald-500/40 bg-emerald-500/5 shadow-xs"
+                          : "border-border/80 bg-muted/20 opacity-80 hover:opacity-100"
+                      )}
+                    >
+                      <div className="space-y-1.5 flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          {isV2 ? (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-extrabold bg-gradient-to-r from-purple-500/20 to-pink-500/20 text-purple-700 dark:text-purple-300 border border-purple-500/40 shadow-xs">
+                              ⚡ Varian V2 {variantLabel ? `• ${variantLabel}` : "• Second Variant"}
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-extrabold bg-emerald-500/20 text-emerald-800 dark:text-emerald-200 border border-emerald-500/40 shadow-xs">
+                              ⭐ Varian Utama (V1)
+                            </span>
+                          )}
+                          <span className="text-xs font-mono text-muted-foreground bg-muted px-2 py-0.5 rounded">
+                            {pkgItem.kode}
+                          </span>
+                        </div>
+
+                        <div className="font-bold text-sm text-foreground line-clamp-1">
+                          {pkgItem.namaPaket || pkgItem.kode}
+                        </div>
+
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
+                          <span>✈️ {pkgItem.maskapai || "Saudia"}</span>
+                          <span>•</span>
+                          <span>🏨 {pkgItem.hotelMekkah || "Mekkah"} / {pkgItem.hotelMadinah || "Madinah"}</span>
+                          <span>•</span>
+                          <span>Terisi: <strong>{pkgItem.terisi}</strong> Pax</span>
+                        </div>
+                      </div>
+
+                      {/* Saklar Switch Varian */}
+                      <div className="flex items-center justify-between sm:justify-end gap-3 pt-2 sm:pt-0 border-t sm:border-t-0 border-border/50 shrink-0">
+                        <div className="text-right">
+                          <div className={cn(
+                            "text-xs font-bold leading-tight",
+                            isPub ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"
+                          )}>
+                            {isPub ? "Tampil di Katalog & Form" : "Nonaktif (Disembunyikan)"}
+                          </div>
+                          <div className="text-[10px] text-muted-foreground">
+                            {isPub ? "Jamaah dapat melihat & mendaftar" : "Tidak muncul di publik"}
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          role="switch"
+                          aria-checked={isPub}
+                          disabled={isToggling}
+                          onClick={() => handleToggleKatalog(pkgItem.id, !isPub)}
+                          className={cn(
+                            "relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden",
+                            isPub ? "bg-emerald-600 shadow-[0_0_10px_rgba(16,185,129,0.35)]" : "bg-slate-300 dark:bg-slate-700",
+                            isToggling && "opacity-50 cursor-wait"
+                          )}
+                        >
+                          <span
+                            aria-hidden="true"
+                            className={cn(
+                              "pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out",
+                              isPub ? "translate-x-5" : "translate-x-0"
+                            )}
+                          />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Footer Modal */}
+              <div className="flex items-center justify-end pt-3 border-t border-border">
+                <Button
+                  variant="default"
+                  onClick={() => setVariantModalGroup(null)}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs"
+                >
+                  Selesai
+                </Button>
+              </div>
+            </div>
+          );
+        })()}
+      </Modal>
+
       {/* Modal Import Excel */}
       <Modal
         open={isImportModalOpen}

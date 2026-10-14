@@ -156,31 +156,53 @@ export default function RegisterPage() {
   const [showDetailPaketModal, setShowDetailPaketModal] = useState(false);
   const [detailModalClusterIndex, setDetailModalClusterIndex] = useState(0);
 
+  // Helper cek apakah paket diaktifkan untuk publikasi katalog & pendaftaran
+  const isPackagePublished = (pkg: Keberangkatan): boolean => {
+    if (pkg.isPublishedKatalog !== undefined) return pkg.isPublishedKatalog;
+    const meta = typeof pkg.driveFolderIds === "object" ? pkg.driveFolderIds : null;
+    return (meta as any)?.isPublishedKatalog === true;
+  };
+
   const packageOptions = useMemo(() => {
-    return paketList
-      .filter((p) => p.status !== "cancelled")
-      .map((p) => {
-        const name = p.namaPaket || p.paketUmroh?.namaPaket || p.kode;
-        const tgl = p.tanggalBerangkat
-          ? new Date(p.tanggalBerangkat).toLocaleDateString("id-ID", {
-              day: "numeric",
-              month: "short",
-              year: "numeric",
-            })
-          : "";
-        const maskapai = p.maskapai || "";
-        const sub = [
-          tgl ? `Tgl: ${tgl}` : "",
-          maskapai ? `Flight: ${maskapai}` : "",
-        ]
-          .filter(Boolean)
-          .join(" • ");
-        return {
-          value: p.id,
-          label: name,
-          sublabel: sub || undefined,
-        };
-      });
+    const hasAnyPublished = paketList.some(isPackagePublished);
+    const eligiblePackages = hasAnyPublished
+      ? paketList.filter((p) => p.status !== "cancelled" && isPackagePublished(p))
+      : paketList.filter((p) => p.status !== "cancelled");
+
+    return eligiblePackages.map((p) => {
+      const isV2 = p.kode.includes("_V2") || 
+                   p.kode.toLowerCase().includes("v2") ||
+                   !!p.parentKeberangkatanId ||
+                   (p as any).splitReason === "promo" ||
+                   (p as any).splitReason === "spek" ||
+                   (p as any).splitLabel?.toLowerCase().includes("v2") ||
+                   (p as any).promoLabel?.toLowerCase().includes("v2");
+
+      const variantLabel = (p as any).splitLabel || (p as any).promoLabel || (p as any).spekLabel || "";
+      const variantTag = isV2 ? ` [Varian V2${variantLabel ? ` • ${variantLabel}` : ""}]` : "";
+      const name = `${p.namaPaket || p.paketUmroh?.namaPaket || p.kode}${variantTag}`;
+
+      const tgl = p.tanggalBerangkat
+        ? new Date(p.tanggalBerangkat).toLocaleDateString("id-ID", {
+            day: "numeric",
+            month: "short",
+            year: "numeric",
+          })
+        : "";
+      const maskapai = p.maskapai || "";
+      const sub = [
+        isV2 ? "⚡ Varian V2" : "",
+        tgl ? `Tgl: ${tgl}` : "",
+        maskapai ? `Flight: ${maskapai}` : "",
+      ]
+        .filter(Boolean)
+        .join(" • ");
+      return {
+        value: p.id,
+        label: name,
+        sublabel: sub || undefined,
+      };
+    });
   }, [paketList]);
 
   // Step 6: Signature
@@ -1618,9 +1640,27 @@ export default function RegisterPage() {
                       {/* Header Info */}
                       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-amber-500/30 pb-5">
                         <div>
-                          <span className="text-[11px] font-black uppercase tracking-wider text-amber-300 bg-amber-500/20 border border-amber-400/40 px-3 py-1 rounded-lg shadow-sm">
-                            Detail Paket Keberangkatan
-                          </span>
+                          <div className="flex items-center gap-2 flex-wrap mb-1">
+                            <span className="text-[11px] font-black uppercase tracking-wider text-amber-300 bg-amber-500/20 border border-amber-400/40 px-3 py-1 rounded-lg shadow-sm">
+                              Detail Paket Keberangkatan
+                            </span>
+                            {(() => {
+                              const isV2 = selectedPaket.kode.includes("_V2") || 
+                                           selectedPaket.kode.toLowerCase().includes("v2") ||
+                                           !!selectedPaket.parentKeberangkatanId ||
+                                           (selectedPaket as any).splitReason === "promo" ||
+                                           (selectedPaket as any).splitReason === "spek" ||
+                                           (selectedPaket as any).splitLabel?.toLowerCase().includes("v2") ||
+                                           (selectedPaket as any).promoLabel?.toLowerCase().includes("v2");
+                              const variantLabel = (selectedPaket as any).splitLabel || (selectedPaket as any).promoLabel || (selectedPaket as any).spekLabel;
+                              if (!isV2) return null;
+                              return (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-extrabold bg-gradient-to-r from-purple-500/30 to-pink-500/30 text-purple-200 border border-purple-400/50 shadow-sm">
+                                  ⚡ Varian V2 {variantLabel ? `• ${variantLabel}` : "• Second Variant"}
+                                </span>
+                              );
+                            })()}
+                          </div>
                           <h3 className="text-lg font-extrabold text-white mt-2 drop-shadow-[0_1.5px_3px_rgba(0,0,0,0.9)]">
                             {selectedPaket.namaPaket || selectedPaket.paketUmroh?.namaPaket}
                           </h3>

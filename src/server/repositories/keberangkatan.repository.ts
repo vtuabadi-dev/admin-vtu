@@ -97,6 +97,7 @@ function mapKeberangkatan(row: any): Keberangkatan {
       name: row.startingPoint.name,
       code: row.startingPoint.code,
     } : undefined,
+    isPublishedKatalog: (row.driveFolderIds as any)?.isPublishedKatalog === true,
   };
 }
 
@@ -228,7 +229,7 @@ export const keberangkatanRepo = {
     if (data.include !== undefined) updateData.include = data.include;
     if (data.exclude !== undefined) updateData.exclude = data.exclude;
 
-    if (data.driveFolderIds !== undefined || data.tourLeader !== undefined || data.muthowif !== undefined || data.flightDetails !== undefined) {
+    if (data.driveFolderIds !== undefined || data.tourLeader !== undefined || data.muthowif !== undefined || data.flightDetails !== undefined || data.isPublishedKatalog !== undefined) {
       const existing = await prisma.keberangkatan.findUnique({ where: { id }, select: { driveFolderIds: true } });
       const currentMeta = (existing?.driveFolderIds as any) || {};
       const newMeta = {
@@ -238,6 +239,7 @@ export const keberangkatanRepo = {
       if (data.tourLeader !== undefined) newMeta.tourLeader = data.tourLeader;
       if (data.muthowif !== undefined) newMeta.muthowif = data.muthowif;
       if (data.flightDetails !== undefined) newMeta.flightDetails = data.flightDetails;
+      if (data.isPublishedKatalog !== undefined) newMeta.isPublishedKatalog = data.isPublishedKatalog;
       updateData.driveFolderIds = newMeta;
     }
 
