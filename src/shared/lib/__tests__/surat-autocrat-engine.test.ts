@@ -533,18 +533,19 @@ Bulan: {{Bulan Awal}}`,
   });
 
   describe("WhatsApp Template Generation & Parsing (Simplified Format)", () => {
-    it("should generate the exact simplified WA template for Surat Permohonan Cuti Pekerja without PT header", () => {
+    it("should dynamically follow template.nama for Surat Permohonan Cuti without the word Pekerja", () => {
       const cutiTemplate = DEFAULT_SURAT_TEMPLATES.find((t) => t.slug === "cuti-pekerja")!;
       expect(cutiTemplate).toBeDefined();
+      expect(cutiTemplate.nama).toBe("Surat Permohonan Cuti");
 
       const waText = generateWaTemplateText(cutiTemplate, cutiTemplate.placeholders);
 
       const expectedText = [
-        "FORMULIR DATA: SURAT PERMOHONAN CUTI PEKERJA",
+        "FORMULIR DATA: SURAT PERMOHONAN CUTI",
         "",
         "Assalamu'alaikum Warahmatullahi Wabarakatuh,",
         "Bapak/Ibu Calon Jamaah yang dirahmati Allah,",
-        "Mohon melengkapi data berikut untuk penerbitan dokumen Surat Permohonan Cuti Pekerja.",
+        "Mohon melengkapi data berikut untuk penerbitan dokumen Surat Permohonan Cuti.",
         "Silakan isi jawaban di sebelah kanan tanda titik dua (:), lalu kirimkan kembali seluruh pesan ini:",
         "",
         "1. Ditujukan Kepada : ",
@@ -559,6 +560,8 @@ Bulan: {{Bulan Awal}}`,
 
       expect(waText).toBe(expectedText);
       expect(waText).not.toContain("PT. Vauza Tamma Abadi (VTU ABADI)");
+      expect(waText).not.toContain("CUTI PEKERJA");
+      expect(waText).not.toContain("Cuti Pekerja");
       expect(waText).toContain("Assalamu'alaikum");
       expect(waText).toContain("Bapak/Ibu Calon Jamaah");
       expect(waText).not.toContain("*FORMULIR DATA");

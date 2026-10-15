@@ -578,15 +578,15 @@ Wassalamu'alaikum Warahmatullahi Wabarakatuh.`,
   {
     id: "tpl-cuti-pekerja",
     slug: "cuti-pekerja",
-    nama: "Surat Permohonan Cuti Pekerja",
+    nama: "Surat Permohonan Cuti",
     kategori: "instansi",
     deskripsi: "Permohonan dispensasi izin dan cuti kerja karyawan untuk menunaikan ibadah umroh",
-    kodeNomorDefault: "SC-KERJA",
-    formatNomor: "[NOMOR]/SC-KERJA/VTU/[BULAN]/[TAHUN]",
+    kodeNomorDefault: "SURAT-CUTI",
+    formatNomor: "[NOMOR]/SURAT-CUTI/VTU/[BULAN]/[TAHUN]",
     jumlahTemplateTerlampir: 1,
     kebutuhanNomorPerSurat: 1,
-    formatNamaFile: "Surat_Cuti_Kerja_{{nama_lengkap}}",
-    fileNameUploaded: "Template_Surat_Cuti_Pekerja.docx",
+    formatNamaFile: "Surat_Cuti_{{nama_lengkap}}",
+    fileNameUploaded: "Template_Surat_Cuti.docx",
     perihalDefault: "Permohonan Izin / Cuti Ibadah Umroh",
     kopSuratType: "ppiu_vtu",
     lampiranDefault: "1 (Satu) Lembar Itinerary",
@@ -602,35 +602,23 @@ Wassalamu'alaikum Warahmatullahi Wabarakatuh.`,
 
 Sehubungan dengan rencana keberangkatan Ibadah Umroh jamaah PT. Vauza Tamma Abadi, dengan ini kami sampaikan bahwa karyawan/karyawati Bapak/Ibu di bawah ini:
 
-Nama Karyawan     : {nama_lengkap}
-Nomor NIK / KTP   : {nik}
-Nomor Paspor      : {nomor_paspor}
-Jabatan / Posisi  : {jabatan_karyawan}
-Departemen / Div  : {departemen}
-Nama Perusahaan   : {nama_perusahaan}
+Ditujukan Kepada  : {ditujukan_kepada}
+Nama Yang Cuti    : {nama_yang_cuti}
+No Identitas NIP/NIK: {no_identitas}
+Pekerjaan         : {pekerjaan}
+Tanggal Cuti      : {tanggal_cuti}
 
-Telah terdaftar resmi sebagai jamaah umroh PT. Vauza Tamma Abadi dan dijadwalkan menunaikan ibadah Umroh ke Tanah Suci pada:
-
-Paket Umroh       : {nama_paket}
-Tanggal Berangkat : {tanggal_berangkat}
-Tanggal Kepulangan: {tanggal_pulang}
-Lama Pelaksanaan : {lama_cuti_hari} Hari
+Telah terdaftar resmi sebagai jamaah umroh PT. Vauza Tamma Abadi dan dijadwalkan menunaikan ibadah Umroh ke Tanah Suci.
 
 Mengingat pentingnya rangkaian ibadah tersebut, kami memohon kesediaan Bapak/Ibu Pimpinan kiranya dapat memberikan izin cuti / dispensasi kerja kepada yang bersangkutan selama periode keberangkatan tersebut di atas.
 
 Demikian surat permohonan ini kami sampaikan. Atas perhatian, kebijaksanaan, dan kerjasama Bapak/Ibu, kami ucapkan terima kasih.`,
     placeholders: [
-      { key: "nama_lengkap", label: "Nama Lengkap", sourceType: "manifest", manifestField: "jamaah.namaLengkap", inputType: "text", required: true },
-      { key: "nik", label: "NIK Karyawan", sourceType: "manifest", manifestField: "jamaah.nik", inputType: "text", required: true },
-      { key: "nomor_paspor", label: "Nomor Paspor", sourceType: "manifest", manifestField: "jamaah.nomorPaspor", inputType: "text" },
-      { key: "nama_perusahaan", label: "Nama Perusahaan / Instansi", sourceType: "manual", inputType: "text", defaultValue: "PT. Maju Bersama", placeholderHint: "Nama kantor/perusahaan" },
-      { key: "kota_kantor", label: "Kota Kantor / Instansi", sourceType: "manual", inputType: "city", defaultValue: "Jakarta", placeholderHint: "Kota tempat bekerja" },
-      { key: "jabatan_karyawan", label: "Jabatan Karyawan", sourceType: "manual", inputType: "text", defaultValue: "Staff Operasional", placeholderHint: "Jabatan/posisi" },
-      { key: "departemen", label: "Departemen / Divisi", sourceType: "manual", inputType: "text", defaultValue: "Divisi Operasional" },
-      { key: "nama_paket", label: "Nama Paket", sourceType: "manifest", manifestField: "keberangkatan.namaPaket", inputType: "text" },
-      { key: "tanggal_berangkat", label: "Tanggal Berangkat", sourceType: "manifest", manifestField: "keberangkatan.tanggalBerangkat", inputType: "date" },
-      { key: "tanggal_pulang", label: "Tanggal Pulang", sourceType: "manifest", manifestField: "keberangkatan.tanggalPulang", inputType: "date" },
-      { key: "lama_cuti_hari", label: "Lama Cuti (Hari)", sourceType: "manual", inputType: "number", defaultValue: "10", placeholderHint: "Jumlah hari cuti" },
+      { key: "ditujukan_kepada", label: "Ditujukan Kepada", sourceType: "manual", inputType: "text", defaultValue: "Yth. Pimpinan / HRD PT. Maju Bersama", placeholderHint: "Instansi / Kantor yang dituju", required: true },
+      { key: "nama_yang_cuti", label: "Nama Yang Cuti", sourceType: "manifest", manifestField: "jamaah.namaLengkap", inputType: "text", required: true },
+      { key: "no_identitas", label: "No Identitas NIP/NIK", sourceType: "manifest", manifestField: "jamaah.nik", inputType: "text", required: true },
+      { key: "pekerjaan", label: "Pekerjaan", sourceType: "manifest", manifestField: "jamaah.pekerjaan", inputType: "text", defaultValue: "Karyawan Swasta", required: true },
+      { key: "tanggal_cuti", label: "Tanggal Cuti", sourceType: "manifest", manifestField: "keberangkatan.tanggalBerangkat", inputType: "text", defaultValue: "", required: true },
     ],
     isDefault: true,
     createdAt: new Date().toISOString(),
@@ -2150,59 +2138,6 @@ export function generateWaTemplateText(
   placeholders: SuratPlaceholderMapping[],
   currentFormData: Record<string, string> = {}
 ): string {
-  const isCutiPekerja =
-    template?.slug === "cuti-pekerja" ||
-    template?.id === "tpl-cuti-pekerja" ||
-    (template?.nama && template.nama.toLowerCase().includes("cuti pekerja"));
-
-  if (isCutiPekerja) {
-    const ditujukanKepadaVal =
-      currentFormData["ditujukan_kepada"] ||
-      currentFormData["nama_perusahaan"] ||
-      currentFormData["tujuan"] ||
-      "";
-    const namaYangCutiVal =
-      currentFormData["nama_yang_cuti"] ||
-      currentFormData["nama_lengkap"] ||
-      currentFormData["nama"] ||
-      "";
-    const noIdentitasVal =
-      currentFormData["no_identitas"] ||
-      currentFormData["nip_nik"] ||
-      currentFormData["nik"] ||
-      "";
-    const pekerjaanVal =
-      currentFormData["pekerjaan"] ||
-      currentFormData["jabatan_karyawan"] ||
-      currentFormData["jabatan"] ||
-      "";
-    const tanggalCutiVal =
-      currentFormData["tanggal_cuti"] ||
-      (currentFormData["tanggal_berangkat"] && currentFormData["tanggal_pulang"]
-        ? `${currentFormData["tanggal_berangkat"]} s/d ${currentFormData["tanggal_pulang"]}`
-        : currentFormData["tanggal_berangkat"] || "");
-
-    const lines = [
-      `FORMULIR DATA: SURAT PERMOHONAN CUTI PEKERJA`,
-      ``,
-      `Assalamu'alaikum Warahmatullahi Wabarakatuh,`,
-      `Bapak/Ibu Calon Jamaah yang dirahmati Allah,`,
-      `Mohon melengkapi data berikut untuk penerbitan dokumen Surat Permohonan Cuti Pekerja.`,
-      `Silakan isi jawaban di sebelah kanan tanda titik dua (:), lalu kirimkan kembali seluruh pesan ini:`,
-      ``,
-      `1. Ditujukan Kepada : ${ditujukanKepadaVal}`.trimEnd() + (ditujukanKepadaVal ? "" : " "),
-      `2. Nama Yang Cuti : ${namaYangCutiVal}`.trimEnd() + (namaYangCutiVal ? "" : " "),
-      `3. No Identitas NIP/NIK : ${noIdentitasVal}`.trimEnd() + (noIdentitasVal ? "" : " "),
-      `4. Pekerjaan : ${pekerjaanVal}`.trimEnd() + (pekerjaanVal ? "" : " "),
-      `5. Tanggal Cuti : ${tanggalCutiVal}`.trimEnd() + (tanggalCutiVal ? "" : " "),
-      ``,
-      `(Catatan: Mohon pastikan ejaan nama, nomor NIK/identitas, dan tanggal telah sesuai)`,
-      `Terima kasih atas kerja samanya. 🙏`,
-    ];
-
-    return lines.join("\n");
-  }
-
   const cleanPlaceholders = placeholders.filter((p) => !isSystemAutoPlaceholder(p.key));
   const tplName = (template?.nama || "Surat Resmi").trim();
 
@@ -2220,8 +2155,51 @@ export function generateWaTemplateText(
     const cleanLabel = (p.label || p.key)
       .replace(/_/g, " ")
       .replace(/\b\w/g, (c) => c.toUpperCase());
-    const existingVal = currentFormData[p.key] || "";
-    lines.push(`${idx + 1}. ${cleanLabel} : ${existingVal}`);
+
+    // Check direct key or common aliases
+    const pKey = p.key;
+    let existingVal = currentFormData[pKey] || "";
+    if (!existingVal) {
+      const normK = pKey.toLowerCase().replace(/[\s_\-\.]/g, "");
+      if (normK.includes("perusahaan") || normK.includes("ditujukan") || normK.includes("tujuan")) {
+        existingVal =
+          currentFormData["ditujukan_kepada"] ||
+          currentFormData["nama_perusahaan"] ||
+          currentFormData["tujuan"] ||
+          "";
+      } else if (
+        normK.includes("namayangcuti") ||
+        normK === "namakaryawan" ||
+        normK.includes("namalengkap") ||
+        normK === "nama"
+      ) {
+        existingVal =
+          currentFormData["nama_yang_cuti"] ||
+          currentFormData["nama_lengkap"] ||
+          currentFormData["nama"] ||
+          "";
+      } else if (normK.includes("nik") || normK.includes("nip") || normK.includes("noidentitas")) {
+        existingVal =
+          currentFormData["no_identitas"] ||
+          currentFormData["nip_nik"] ||
+          currentFormData["nik"] ||
+          "";
+      } else if (normK.includes("pekerjaan") || normK.includes("jabatan")) {
+        existingVal =
+          currentFormData["pekerjaan"] ||
+          currentFormData["jabatan_karyawan"] ||
+          currentFormData["jabatan"] ||
+          "";
+      } else if (normK.includes("tanggalcuti") || normK.includes("tglcuti")) {
+        existingVal =
+          currentFormData["tanggal_cuti"] ||
+          (currentFormData["tanggal_berangkat"] && currentFormData["tanggal_pulang"]
+            ? `${currentFormData["tanggal_berangkat"]} s/d ${currentFormData["tanggal_pulang"]}`
+            : currentFormData["tanggal_berangkat"] || "");
+      }
+    }
+
+    lines.push(`${idx + 1}. ${cleanLabel} : ${existingVal}`.trimEnd() + (existingVal ? "" : " "));
   });
 
   lines.push(``);
