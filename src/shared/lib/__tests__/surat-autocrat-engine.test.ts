@@ -18,6 +18,8 @@ import {
   parseMonthYearToIsoString,
   formatIsoToIndonesianMonthYear,
   formatJamaahNameWithEndorsement,
+  generateWaTemplateText,
+  parseWaFormText,
 } from "@/shared/lib/surat-autocrat-engine";
 import { searchKantorImigrasi, getKotaFromKanimName } from "@/shared/lib/kantor-imigrasi";
 
@@ -529,6 +531,105 @@ Bulan: {{Bulan Awal}}`,
       expect(resolved.nama_lengkap).toBe("Shofani Zainul, St");
     });
   });
+
+  describe("WhatsApp Template Generation & Parsing (Simplified Format)", () => {
+    it("should generate the exact simplified WA template for Surat Permohonan Cuti Pekerja without PT header", () => {
+      const cutiTemplate = DEFAULT_SURAT_TEMPLATES.find((t) => t.slug === "cuti-pekerja")!;
+      expect(cutiTemplate).toBeDefined();
+
+      const waText = generateWaTemplateText(cutiTemplate, cutiTemplate.placeholders);
+
+      const expectedText = [
+        "FORMULIR DATA: SURAT PERMOHONAN CUTI PEKERJA",
+        "",
+        "Assalamu'alaikum Warahmatullahi Wabarakatuh,",
+        "Bapak/Ibu Calon Jamaah yang dirahmati Allah,",
+        "Mohon melengkapi data berikut untuk penerbitan dokumen Surat Permohonan Cuti Pekerja.",
+        "Silakan isi jawaban di sebelah kanan tanda titik dua (:), lalu kirimkan kembali seluruh pesan ini:",
+        "",
+        "1. Ditujukan Kepada : ",
+        "2. Nama Yang Cuti : ",
+        "3. No Identitas NIP/NIK : ",
+        "4. Pekerjaan : ",
+        "5. Tanggal Cuti : ",
+        "",
+        "(Catatan: Mohon pastikan ejaan nama, nomor NIK/identitas, dan tanggal telah sesuai)",
+        "Terima kasih atas kerja samanya. 🙏",
+      ].join("\n");
+
+      expect(waText).toBe(expectedText);
+      expect(waText).not.toContain("PT. Vauza Tamma Abadi (VTU ABADI)");
+      expect(waText).toContain("Assalamu'alaikum");
+      expect(waText).toContain("Bapak/Ibu Calon Jamaah");
+      expect(waText).not.toContain("*FORMULIR DATA");
+    });
+
+    it("should generate populated values when currentFormData is provided for Surat Cuti Pekerja", () => {
+      const cutiTemplate = DEFAULT_SURAT_TEMPLATES.find((t) => t.slug === "cuti-pekerja")!;
+      const formData = {
+        nama_lengkap: "Ahmad Dahlan",
+        nik: "3515081234560001",
+        nama_perusahaan: "PT Pertamina",
+        pekerjaan: "Staff Logistik",
+        tanggal_berangkat: "10 November 2026",
+        tanggal_pulang: "20 November 2026",
+      };
+
+      const waText = generateWaTemplateText(cutiTemplate, cutiTemplate.placeholders, formData);
+      expect(waText).toContain("1. Ditujukan Kepada : PT Pertamina");
+      expect(waText).toContain("2. Nama Yang Cuti : Ahmad Dahlan");
+      expect(waText).toContain("3. No Identitas NIP/NIK : 3515081234560001");
+      expect(waText).toContain("4. Pekerjaan : Staff Logistik");
+      expect(waText).toContain("5. Tanggal Cuti : 10 November 2026 s/d 20 November 2026");
+    });
+
+    it("should not include PT header in general templates either", () => {
+      const rekomTemplate = DEFAULT_SURAT_TEMPLATES[0]!;
+      const waText = generateWaTemplateText(rekomTemplate, rekomTemplate.placeholders);
+      expect(waText).not.toContain("PT. Vauza Tamma Abadi (VTU ABADI)");
+      expect(waText).toContain("Assalamu'alaikum");
+      expect(waText).toContain("FORMULIR DATA: SURAT REKOMENDASI PASPOR");
+    });
+
+    it("should parse the simplified Surat Permohonan Cuti Pekerja reply accurately into mapped fields", () => {
+      const cutiTemplate = DEFAULT_SURAT_TEMPLATES.find((t) => t.slug === "cuti-pekerja")!;
+      const rawWaReply = `
+FORMULIR DATA: SURAT PERMOHONAN CUTI PEKERJA
+
+Assalamu'alaikum Warahmatullahi Wabarakatuh,
+Bapak/Ibu Calon Jamaah yang dirahmati Allah,
+Mohon melengkapi data berikut untuk penerbitan dokumen Surat Permohonan Cuti Pekerja.
+Silakan isi jawaban di sebelah kanan tanda titik dua (:), lalu kirimkan kembali seluruh pesan ini:
+
+1. Ditujukan Kepada : PT Telkom Indonesia (Persero) Tbk
+2. Nama Yang Cuti : Ir. H. Joko Santoso
+3. No Identitas NIP/NIK : 198503152010011002
+4. Pekerjaan : Senior Systems Engineer
+5. Tanggal Cuti : 15 s/d 25 November 2026
+
+(Catatan: Mohon pastikan ejaan nama, nomor NIK/identitas, dan tanggal telah sesuai)
+Terima kasih atas kerja samanya. 🙏
+      `.trim();
+
+      const parseRes = parseWaFormText(rawWaReply, cutiTemplate.placeholders);
+      expect(parseRes.detectedCount).toBeGreaterThanOrEqual(4);
+
+      // Verify all field aliases
+      expect(parseRes.parsedMap.ditujukan_kepada).toBe("PT Telkom Indonesia (Persero) Tbk");
+      expect(parseRes.parsedMap.nama_perusahaan).toBe("PT Telkom Indonesia (Persero) Tbk");
+      expect(parseRes.parsedMap.nama_lengkap).toBe("Ir. H. Joko Santoso");
+      expect(parseRes.parsedMap.nama_yang_cuti).toBe("Ir. H. Joko Santoso");
+      expect(parseRes.parsedMap.nik).toBe("198503152010011002");
+      expect(parseRes.parsedMap.nip_nik).toBe("198503152010011002");
+      expect(parseRes.parsedMap.pekerjaan).toBe("Senior Systems Engineer");
+      expect(parseRes.parsedMap.jabatan_karyawan).toBe("Senior Systems Engineer");
+      expect(parseRes.parsedMap.tanggal_cuti).toBe("15 s/d 25 November 2026");
+      expect(parseRes.parsedMap.tanggal_berangkat).toBe("15 November 2026");
+      expect(parseRes.parsedMap.tanggal_pulang).toBe("25 November 2026");
+      expect(parseRes.parsedMap.lama_cuti_hari).toBe("11");
+    });
+  });
 });
+
 
 
