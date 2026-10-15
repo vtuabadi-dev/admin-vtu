@@ -594,6 +594,45 @@ Bulan: {{Bulan Awal}}`,
       expect(waText).toContain("FORMULIR DATA: SURAT REKOMENDASI PASPOR");
     });
 
+    it("should dynamically generate form items strictly from whatever placeholders are configured in the template", () => {
+      const customTemplate = {
+        id: "tpl-custom-bebas",
+        slug: "surat-kustom",
+        nama: "Surat Keterangan Bebas",
+        kategori: "internal" as const,
+        deskripsi: "Template surat kustom",
+        kodeNomorDefault: "SKB",
+        templateContent: "Test {nama_pemohon} {instansi_tujuan} {alasan_izin}",
+        perihalDefault: "Permohonan",
+        kopSuratType: "ppiu_vtu" as const,
+        penandatangan: {
+          nama: "Faisal",
+          jabatan: "Direktur",
+          showStempel: true,
+          showBarcode: true,
+        },
+        placeholders: [
+          { key: "nama_pemohon", label: "Nama Pemohon", inputType: "text" as const },
+          { key: "instansi_tujuan", label: "Instansi Tujuan", inputType: "text" as const },
+          { key: "alasan_izin", label: "Alasan Permohonan Izin", inputType: "text" as const },
+        ],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      const waText = generateWaTemplateText(customTemplate, customTemplate.placeholders);
+
+      expect(waText).toContain("FORMULIR DATA: SURAT KETERANGAN BEBAS");
+      expect(waText).toContain("Mohon melengkapi data berikut untuk penerbitan dokumen Surat Keterangan Bebas.");
+      expect(waText).toContain("1. Nama Pemohon : ");
+      expect(waText).toContain("2. Instansi Tujuan : ");
+      expect(waText).toContain("3. Alasan Permohonan Izin : ");
+      // Must not contain any Cuti Pekerja fields
+      expect(waText).not.toContain("Ditujukan Kepada");
+      expect(waText).not.toContain("Nama Yang Cuti");
+      expect(waText).not.toContain("Tanggal Cuti");
+    });
+
     it("should parse the simplified Surat Permohonan Cuti Pekerja reply accurately into mapped fields", () => {
       const cutiTemplate = DEFAULT_SURAT_TEMPLATES.find((t) => t.slug === "cuti-pekerja")!;
       const rawWaReply = `
