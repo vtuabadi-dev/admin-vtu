@@ -9,8 +9,6 @@ import {
   User,
   Sparkles,
   FileSignature,
-  Share2,
-  QrCode,
   Download,
   Search,
   Sliders,
@@ -274,7 +272,6 @@ function GenerateSuratPageContent() {
   const [manualFormData, setManualFormData] = useState<Record<string, string>>({});
   const [nomorUrutSurat, setNomorUrutSurat] = useState<string>("001");
   const [customPerihal, setCustomPerihal] = useState<string>("");
-  const [customShowBarcode, setCustomShowBarcode] = useState<boolean | null>(null);
 
   // History state
   const [historyLogs, setHistoryLogs] = useState<GeneratedSuratLog[]>([]);
@@ -477,7 +474,6 @@ function GenerateSuratPageContent() {
   useEffect(() => {
     if (activeTemplate) {
       setCustomPerihal(activeTemplate.perihalDefault || "");
-      setCustomShowBarcode(null);
 
       // Populate default manual values
       const initialManual: Record<string, string> = {};
@@ -518,12 +514,6 @@ function GenerateSuratPageContent() {
     const prefix = activeTemplate?.kodeNomorDefault || "SR-PASPOR";
     return `${prefix}/${nextNum}/VTU/${todayInfo.romanMonth}/${todayInfo.year}`;
   }, [activeTemplate, nomorUrutSurat, todayInfo]);
-
-  // Effective QR Code visibility
-  const effectiveShowBarcode =
-    customShowBarcode !== null
-      ? customShowBarcode
-      : (activeTemplate?.penandatangan?.showBarcode ?? true);
 
   // Active attached document file (if uploaded template exists)
   const activeAttachedFile = useMemo(() => {
@@ -651,21 +641,6 @@ function GenerateSuratPageContent() {
     }
     return activeTemplate.templateContent || "";
   }, [activeTemplate, activeAttachedFile]);
-
-  // Detect if the template contains its own document headers (Nomor, Kepada/Yth, etc.)
-  const isFullDocumentTemplate = useMemo(() => {
-    const lower = rawTemplateText.toLowerCase();
-    const hasNomor =
-      lower.includes("no:") ||
-      lower.includes("no :") ||
-      lower.includes("nomor:") ||
-      lower.includes("nomor :");
-    const hasTujuan =
-      lower.includes("kepada") ||
-      lower.includes("yth.") ||
-      lower.includes("yth ");
-    return hasNomor && hasTujuan;
-  }, [rawTemplateText]);
 
   // Effective Placeholders list strictly following the template document file
   const effectivePlaceholders = useMemo(() => {
@@ -1759,36 +1734,6 @@ function GenerateSuratPageContent() {
     effectivePlaceholders,
     dataSourceMode,
   ]);
-
-  // Action: Share WhatsApp
-  const handleShareWhatsApp = () => {
-    if (!activeTemplate) return;
-    handleSaveToHistory();
-    const phone = activeJamaah?.nomorTelepon || "";
-    const cleanPhone = phone.replace(/[^0-9]/g, "").replace(/^0/, "62");
-    const effectiveNama =
-      extractNamaFromAutocratFields(resolvedFieldValues, manualFormData, effectivePlaceholders) ||
-      activeJamaah?.namaLengkap ||
-      "Jamaah";
-
-    const msg = `*PT. VAUZA TAMMA ABADI (VTU ABADI)*
-_Penyelenggara Ibadah Umroh Kemenag RI No. U.400/2021 / No. 805/2019_
-
-Yth. Bapak/Ibu *${toTitleCase(effectiveNama)}*,
-
-Berikut adalah informasi penerbitan *${activeTemplate.nama}*:
-📄 *Nomor Surat*: ${computedNomorSurat}
-📌 *Perihal*: ${renderedPerihal}
-✈️ *Paket*: ${activeKeberangkatan?.namaPaket || "-"}
-
-🔗 *Verifikasi Keabsahan Surat Digital*:
-${verificationUrl}
-
-Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Terima kasih.`.trim();
-
-    const waUrl = getWhatsAppUrl(cleanPhone, msg);
-    window.open(waUrl, "_blank");
-  };
 
   // State & Handler: Generate Surat and Navigate to Riwayat
   const [isGenerating, setIsGenerating] = useState(false);
@@ -3313,79 +3258,6 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
 
             {/* ── RIGHT COLUMN (6 COLS): FORM ISIAN DATA SURAT & AKSI BUAT SURAT ── */}
             <div className="lg:col-span-6 space-y-4">
-              {/* Document Switcher, Status & Inline Controls Bar */}
-              <div className="flex flex-wrap items-center justify-between gap-3 px-1 py-1.5 bg-slate-50/80 dark:bg-slate-900/40 rounded-xl border border-slate-200/80 dark:border-slate-800/80">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5 pl-2">
-                    <FileText className="h-3.5 w-3.5 text-primary" />
-                    Template:
-                  </span>
-                  <Badge variant="outline" className="text-xs bg-white dark:bg-slate-800 border-primary/20 text-foreground font-mono">
-                    {activeAttachedFile?.fileName || activeTemplate.fileNameUploaded || activeTemplate.nama}
-                  </Badge>
-                  {isFullDocumentTemplate && (
-                    <Badge variant="success" size="sm" className="text-[10px]">
-                      Full Document DOCX
-                    </Badge>
-                  )}
-
-                  {/* If multiple documents attached, allow switching preview */}
-                  {activeTemplate.attachedFiles && activeTemplate.attachedFiles.length > 1 && (
-                    <div className="inline-flex rounded-lg border border-stone-200 dark:border-stone-800 bg-muted/40 p-0.5">
-                      {activeTemplate.attachedFiles.map((doc, idx) => (
-                        <button
-                          key={doc.index || idx}
-                          type="button"
-                          onClick={() => setSelectedDocIndex(idx)}
-                          className={cn(
-                            "px-2.5 py-1 text-xs font-medium rounded-md transition-all cursor-pointer",
-                            selectedDocIndex === idx
-                              ? "bg-primary text-primary-foreground shadow-xs font-semibold"
-                              : "text-muted-foreground hover:text-foreground"
-                          )}
-                        >
-                          Dokumen {idx + 1}
-                          {doc.fileName ? `: ${doc.fileName.replace(/\.docx$/i, "")}` : ""}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                <div className="flex items-center gap-2 pr-1">
-                  {/* Live QR Code Toggle Button */}
-                  <button
-                    type="button"
-                    onClick={() => setCustomShowBarcode(!effectiveShowBarcode)}
-                    className={cn(
-                      "inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold border transition-all cursor-pointer",
-                      effectiveShowBarcode
-                        ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20"
-                        : "bg-stone-100 dark:bg-stone-800 text-stone-500 border-stone-300 dark:border-stone-700 hover:bg-stone-200"
-                    )}
-                    title={
-                      effectiveShowBarcode
-                        ? "QR Code Verifikasi Aktif pada surat ini. Klik untuk mematikan."
-                        : "QR Code Verifikasi Dimatikan. Klik untuk mengaktifkan."
-                    }
-                  >
-                    <QrCode className="h-3.5 w-3.5" />
-                    <span>QR Code: {effectiveShowBarcode ? "Aktif [✓]" : "Nonaktif [✕]"}</span>
-                  </button>
-
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="text-xs text-emerald-600 dark:text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/10 h-8"
-                    onClick={handleShareWhatsApp}
-                    title="Kirim notifikasi surat ke WhatsApp jamaah"
-                  >
-                    <Share2 className="mr-1.5 h-3.5 w-3.5" />
-                    Kirim WA
-                  </Button>
-                </div>
-              </div>
-
               {/* Card 2: Dynamic Autocrat Placeholders Form */}
               <Card className="border-stone-200 dark:border-stone-800 shadow-xs">
                 <CardHeader className="pb-3 border-b border-stone-200 dark:border-stone-800">
