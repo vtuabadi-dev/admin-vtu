@@ -2138,7 +2138,15 @@ export function generateWaTemplateText(
   placeholders: SuratPlaceholderMapping[],
   currentFormData: Record<string, string> = {}
 ): string {
-  const cleanPlaceholders = placeholders.filter((p) => !isSystemAutoPlaceholder(p.key));
+  const seenKeys = new Set<string>();
+  const cleanPlaceholders = placeholders
+    .filter((p) => !isSystemAutoPlaceholder(p.key))
+    .filter((p) => {
+      const norm = p.key.toLowerCase().trim().replace(/[\u2018\u2019\u201A\u201B']/g, "'").replace(/[\s_\-\.]/g, "");
+      if (seenKeys.has(norm)) return false;
+      seenKeys.add(norm);
+      return true;
+    });
   const tplName = (template?.nama || "Surat Resmi").trim();
 
   const lines: string[] = [

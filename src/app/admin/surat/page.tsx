@@ -647,6 +647,14 @@ function GenerateSuratPageContent() {
     const normalize = (s: string) =>
       s.toLowerCase().trim().replace(/[\u2018\u2019\u201A\u201B']/g, "'").replace(/[\s_\-\.]/g, "");
 
+    const cleanNorm = (s: string) =>
+      s
+        .toLowerCase()
+        .trim()
+        .replace(/[\u2018\u2019\u201A\u201B']/g, "'")
+        .replace(/(?:_|\-|\.|\s)?(?:doc|dokumen)?(?:_|\-|\.|\s)?[12345]$/i, "")
+        .replace(/[\s_\-\.]/g, "");
+
     const extractedTags = rawTemplateText
       ? extractPlaceholdersFromText(rawTemplateText).filter((k) => !isSystemAutoPlaceholder(k))
       : [];
@@ -658,28 +666,41 @@ function GenerateSuratPageContent() {
       (activeTemplate?.placeholders || []).forEach((p) => {
         if (!isSystemAutoPlaceholder(p.key)) {
           existingMap.set(normalize(p.key), p);
+          existingMap.set(cleanNorm(p.key), p);
+          if (p.label) existingMap.set(cleanNorm(p.label), p);
         }
       });
 
       const result: any[] = [];
-      const seen = new Set<string>();
+      const seenKeys = new Set<string>();
+      const seenLabels = new Set<string>();
 
       extractedTags.forEach((tag) => {
-        const norm = normalize(tag);
-        if (seen.has(norm)) return;
-        seen.add(norm);
+        const normKey = normalize(tag);
+        const baseKey = cleanNorm(tag);
+        if (seenKeys.has(normKey) || seenKeys.has(baseKey)) return;
 
-        const existing = existingMap.get(norm);
+        const existing = existingMap.get(normKey) || existingMap.get(baseKey);
+        const label = existing?.label || tag.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+        const normLabel = cleanNorm(label);
+
+        if (seenLabels.has(normLabel)) return;
+
+        seenKeys.add(normKey);
+        seenKeys.add(baseKey);
+        seenLabels.add(normLabel);
+
         if (existing) {
           result.push({
             ...existing,
             key: tag,
+            label,
           });
         } else {
           const matchRes = matchTagToManifestField(tag);
           result.push({
             key: tag,
-            label: tag.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
+            label,
             sourceType: matchRes.sourceType,
             manifestField: matchRes.matchedManifest?.key,
             inputType: matchRes.defaultType,
@@ -692,8 +713,32 @@ function GenerateSuratPageContent() {
       return result;
     }
 
-    // Fallback: If no document text is extracted yet, use template's configured placeholders (excluding system auto tags)
-    return (activeTemplate?.placeholders || []).filter((p) => !isSystemAutoPlaceholder(p.key));
+    // Fallback: If no document text is extracted yet, use template's configured placeholders (strictly deduplicated by key & label)
+    const rawList = (activeTemplate?.placeholders || []).filter((p) => !isSystemAutoPlaceholder(p.key));
+    const seenFallbackKeys = new Set<string>();
+    const seenFallbackLabels = new Set<string>();
+    const deduplicatedFallback: typeof rawList = [];
+
+    rawList.forEach((p) => {
+      const normKey = normalize(p.key);
+      const baseKey = cleanNorm(p.key);
+      const label = p.label || p.key;
+      const normLabel = cleanNorm(label);
+
+      if (seenFallbackKeys.has(normKey) || seenFallbackKeys.has(baseKey) || seenFallbackLabels.has(normLabel)) {
+        return;
+      }
+
+      seenFallbackKeys.add(normKey);
+      seenFallbackKeys.add(baseKey);
+      seenFallbackLabels.add(normLabel);
+      deduplicatedFallback.push({
+        ...p,
+        label,
+      });
+    });
+
+    return deduplicatedFallback;
   }, [activeTemplate, rawTemplateText]);
 
   // OCR Document Configuration (KTP, Akta, KK)
