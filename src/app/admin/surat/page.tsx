@@ -90,7 +90,6 @@ import type {
   GeneratedSuratLog,
   SuratPlaceholderMapping,
 } from "@/shared/types/surat";
-import OfficialLetterPreview from "./_components/OfficialLetterPreview";
 
 /**
  * Checks whether a template has an uploaded .docx template binary attached
@@ -275,9 +274,6 @@ function GenerateSuratPageContent() {
   const [manualFormData, setManualFormData] = useState<Record<string, string>>({});
   const [nomorUrutSurat, setNomorUrutSurat] = useState<string>("001");
   const [customPerihal, setCustomPerihal] = useState<string>("");
-  const [customTujuan, setCustomTujuan] = useState<string>("");
-  const [customKotaTujuan, setCustomKotaTujuan] = useState<string>("");
-  const [customLampiran, setCustomLampiran] = useState<string>("");
   const [customShowBarcode, setCustomShowBarcode] = useState<boolean | null>(null);
 
   // History state
@@ -481,9 +477,6 @@ function GenerateSuratPageContent() {
   useEffect(() => {
     if (activeTemplate) {
       setCustomPerihal(activeTemplate.perihalDefault || "");
-      setCustomTujuan(activeTemplate.tujuanDefault || "");
-      setCustomKotaTujuan(activeTemplate.kotaTujuanDefault || "");
-      setCustomLampiran(activeTemplate.lampiranDefault || "");
       setCustomShowBarcode(null);
 
       // Populate default manual values
@@ -1682,34 +1675,6 @@ function GenerateSuratPageContent() {
     return renderAutocratMergedText(customPerihal || activeTemplate?.perihalDefault || "", resolvedFieldValues);
   }, [customPerihal, activeTemplate, resolvedFieldValues]);
 
-  const renderedTujuan = useMemo(() => {
-    if (customTujuan && customTujuan.trim()) {
-      return renderAutocratMergedText(customTujuan, resolvedFieldValues);
-    }
-    const kanim =
-      resolvedFieldValues["Kanim"] ||
-      resolvedFieldValues["kanim"] ||
-      resolvedFieldValues["kantor_imigrasi"];
-    if (kanim && kanim.trim() && (!activeTemplate?.tujuanDefault || activeTemplate.tujuanDefault.toLowerCase().includes("imigrasi"))) {
-      return `Yth. Kepala ${kanim}`;
-    }
-    return renderAutocratMergedText(activeTemplate?.tujuanDefault || "", resolvedFieldValues);
-  }, [customTujuan, activeTemplate, resolvedFieldValues]);
-
-  const renderedKotaTujuan = useMemo(() => {
-    if (customKotaTujuan && customKotaTujuan.trim()) {
-      return renderAutocratMergedText(customKotaTujuan, resolvedFieldValues);
-    }
-    const kota =
-      resolvedFieldValues["Kota Kanim"] ||
-      resolvedFieldValues["kota_kanim"] ||
-      resolvedFieldValues["kota"];
-    if (kota && kota.trim() && (!activeTemplate?.kotaTujuanDefault || activeTemplate.kotaTujuanDefault.toLowerCase().includes("tempat"))) {
-      return kota;
-    }
-    return renderAutocratMergedText(activeTemplate?.kotaTujuanDefault || "", resolvedFieldValues);
-  }, [customKotaTujuan, activeTemplate, resolvedFieldValues]);
-
   // Verification URL for QR Code
   const verificationUrl = useMemo(() => {
     const baseUrl = typeof window !== "undefined" ? window.location.origin : "https://vtuabadi.com";
@@ -2447,10 +2412,10 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
             </div>
           </div>
 
-          {/* TWO COLUMN WORKSPACE: CONFIG & MANIFEST AUTO-FILL (LEFT) + A4 PREVIEW (RIGHT) */}
+          {/* TWO COLUMN WORKSPACE: SUMBER DATA (LEFT) + FORM ISIAN AUTOCRAT (RIGHT) */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-            {/* ── LEFT COLUMN (5 COLS): CONTROLS & DYNAMIC AUTOCRAT FORM ── */}
-            <div className="lg:col-span-5 space-y-4">
+            {/* ── LEFT COLUMN (6 COLS): SUMBER DATA & EKSTRAKSI (MANIFEST / OCR / WA / MANUAL) ── */}
+            <div className="lg:col-span-6 space-y-4">
               {/* Mode Selector: Referensi Manifest vs Ekstraksi OCR vs Format Teks WA vs Input Manual */}
               <div className="p-3 bg-stone-50 dark:bg-stone-900/60 rounded-xl border border-stone-200 dark:border-stone-800 shadow-2xs space-y-2">
                 <div className="flex items-center justify-between">
@@ -3344,24 +3309,98 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
                   )}
                 </CardContent>
               </Card>
+            </div>
 
-              {/* Card 3: Dynamic Autocrat Placeholders Form */}
-              <Card className="border-stone-200 dark:border-stone-800">
+            {/* ── RIGHT COLUMN (6 COLS): FORM ISIAN DATA SURAT & AKSI BUAT SURAT ── */}
+            <div className="lg:col-span-6 space-y-4">
+              {/* Document Switcher, Status & Inline Controls Bar */}
+              <div className="flex flex-wrap items-center justify-between gap-3 px-1 py-1.5 bg-slate-50/80 dark:bg-slate-900/40 rounded-xl border border-slate-200/80 dark:border-slate-800/80">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5 pl-2">
+                    <FileText className="h-3.5 w-3.5 text-primary" />
+                    Template:
+                  </span>
+                  <Badge variant="outline" className="text-xs bg-white dark:bg-slate-800 border-primary/20 text-foreground font-mono">
+                    {activeAttachedFile?.fileName || activeTemplate.fileNameUploaded || activeTemplate.nama}
+                  </Badge>
+                  {isFullDocumentTemplate && (
+                    <Badge variant="success" size="sm" className="text-[10px]">
+                      Full Document DOCX
+                    </Badge>
+                  )}
+
+                  {/* If multiple documents attached, allow switching preview */}
+                  {activeTemplate.attachedFiles && activeTemplate.attachedFiles.length > 1 && (
+                    <div className="inline-flex rounded-lg border border-stone-200 dark:border-stone-800 bg-muted/40 p-0.5">
+                      {activeTemplate.attachedFiles.map((doc, idx) => (
+                        <button
+                          key={doc.index || idx}
+                          type="button"
+                          onClick={() => setSelectedDocIndex(idx)}
+                          className={cn(
+                            "px-2.5 py-1 text-xs font-medium rounded-md transition-all cursor-pointer",
+                            selectedDocIndex === idx
+                              ? "bg-primary text-primary-foreground shadow-xs font-semibold"
+                              : "text-muted-foreground hover:text-foreground"
+                          )}
+                        >
+                          Dokumen {idx + 1}
+                          {doc.fileName ? `: ${doc.fileName.replace(/\.docx$/i, "")}` : ""}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2 pr-1">
+                  {/* Live QR Code Toggle Button */}
+                  <button
+                    type="button"
+                    onClick={() => setCustomShowBarcode(!effectiveShowBarcode)}
+                    className={cn(
+                      "inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold border transition-all cursor-pointer",
+                      effectiveShowBarcode
+                        ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20"
+                        : "bg-stone-100 dark:bg-stone-800 text-stone-500 border-stone-300 dark:border-stone-700 hover:bg-stone-200"
+                    )}
+                    title={
+                      effectiveShowBarcode
+                        ? "QR Code Verifikasi Aktif pada surat ini. Klik untuk mematikan."
+                        : "QR Code Verifikasi Dimatikan. Klik untuk mengaktifkan."
+                    }
+                  >
+                    <QrCode className="h-3.5 w-3.5" />
+                    <span>QR Code: {effectiveShowBarcode ? "Aktif [✓]" : "Nonaktif [✕]"}</span>
+                  </button>
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-xs text-emerald-600 dark:text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/10 h-8"
+                    onClick={handleShareWhatsApp}
+                    title="Kirim notifikasi surat ke WhatsApp jamaah"
+                  >
+                    <Share2 className="mr-1.5 h-3.5 w-3.5" />
+                    Kirim WA
+                  </Button>
+                </div>
+              </div>
+
+              {/* Card 2: Dynamic Autocrat Placeholders Form */}
+              <Card className="border-stone-200 dark:border-stone-800 shadow-xs">
                 <CardHeader className="pb-3 border-b border-stone-200 dark:border-stone-800">
                   <CardTitle className="text-xs font-bold flex items-center justify-between">
                     <span className="flex items-center gap-1.5">
                       <Sparkles className="h-4 w-4 text-primary" />
-                      {dataSourceMode === "manual"
-                        ? "2. Kolom Isian Data Surat (Autocrat Tags)"
-                        : "3. Kolom Isian Data Surat (Autocrat Tags)"}
+                      2. Kolom Isian Data Surat (Autocrat Tags)
                     </span>
-                    <span className="text-[10px] text-muted-foreground">
+                    <Badge variant="outline" size="sm" className="text-[10px] text-muted-foreground font-mono">
                       {effectivePlaceholders.length} Tag Terkonfigurasi
-                    </span>
+                    </Badge>
                   </CardTitle>
                 </CardHeader>
 
-                <CardContent className="p-3.5 space-y-2.5 max-h-[58vh] overflow-y-auto pr-2">
+                <CardContent className="p-3.5 space-y-2.5 max-h-[62vh] overflow-y-auto pr-2">
                   {effectivePlaceholders.length === 0 ? (
                     <div className="text-center py-6 text-xs text-muted-foreground">
                       Semua data surat telah otomatis terisi dari manifest.
@@ -3589,7 +3628,6 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
                                       nextData[pl.key] = effectiveKota;
                                     }
                                   });
-                                  setCustomKotaTujuan(effectiveKota);
                                 }
                                 setManualFormData(nextData);
                               }}
@@ -3950,100 +3988,6 @@ Surat fisik resmi dapat diambil di kantor atau diunduh melalui portal jamaah. Te
                     : "Template Word (.docx) diperlukan sebelum surat dapat dibuat & dikonversi ke PDF."}
                 </p>
               </div>
-            </div>
-
-            {/* ── RIGHT COLUMN (7 COLS): LIVE A4 WYSIWYG PREVIEW ── */}
-            <div className="lg:col-span-7 space-y-4">
-              {/* Document Switcher, Status & Inline Controls Bar */}
-              <div className="flex flex-wrap items-center justify-between gap-3 px-1 py-1.5 bg-slate-50/80 dark:bg-slate-900/40 rounded-xl border border-slate-200/80 dark:border-slate-800/80">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5 pl-2">
-                    <FileText className="h-3.5 w-3.5 text-primary" />
-                    Template:
-                  </span>
-                  <Badge variant="outline" className="text-xs bg-white dark:bg-slate-800 border-primary/20 text-foreground font-mono">
-                    {activeAttachedFile?.fileName || activeTemplate.fileNameUploaded || activeTemplate.nama}
-                  </Badge>
-                  {isFullDocumentTemplate && (
-                    <Badge variant="success" size="sm" className="text-[10px]">
-                      Full Document DOCX
-                    </Badge>
-                  )}
-
-                  {/* If multiple documents attached, allow switching preview */}
-                  {activeTemplate.attachedFiles && activeTemplate.attachedFiles.length > 1 && (
-                    <div className="inline-flex rounded-lg border border-stone-200 dark:border-stone-800 bg-muted/40 p-0.5">
-                      {activeTemplate.attachedFiles.map((doc, idx) => (
-                        <button
-                          key={doc.index || idx}
-                          type="button"
-                          onClick={() => setSelectedDocIndex(idx)}
-                          className={cn(
-                            "px-2.5 py-1 text-xs font-medium rounded-md transition-all cursor-pointer",
-                            selectedDocIndex === idx
-                              ? "bg-primary text-primary-foreground shadow-xs font-semibold"
-                              : "text-muted-foreground hover:text-foreground"
-                          )}
-                        >
-                          Dokumen {idx + 1}
-                          {doc.fileName ? `: ${doc.fileName.replace(/\.docx$/i, "")}` : ""}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                <div className="flex items-center gap-2 pr-1">
-                  {/* Live QR Code Toggle Button */}
-                  <button
-                    type="button"
-                    onClick={() => setCustomShowBarcode(!effectiveShowBarcode)}
-                    className={cn(
-                      "inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold border transition-all cursor-pointer",
-                      effectiveShowBarcode
-                        ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20"
-                        : "bg-stone-100 dark:bg-stone-800 text-stone-500 border-stone-300 dark:border-stone-700 hover:bg-stone-200"
-                    )}
-                    title={
-                      effectiveShowBarcode
-                        ? "QR Code Verifikasi Aktif pada surat ini. Klik untuk mematikan."
-                        : "QR Code Verifikasi Dimatikan. Klik untuk mengaktifkan."
-                    }
-                  >
-                    <QrCode className="h-3.5 w-3.5" />
-                    <span>QR Code: {effectiveShowBarcode ? "Aktif [✓]" : "Nonaktif [✕]"}</span>
-                  </button>
-
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="text-xs text-emerald-600 dark:text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/10 h-8"
-                    onClick={handleShareWhatsApp}
-                    title="Kirim notifikasi surat ke WhatsApp jamaah"
-                  >
-                    <Share2 className="mr-1.5 h-3.5 w-3.5" />
-                    Kirim WA
-                  </Button>
-                </div>
-              </div>
-
-              {/* ── REALISTIC A4 LETTER SHEET PREVIEW WITH KOP SURAT & STRUCTURED LAYOUT ── */}
-              <OfficialLetterPreview
-                template={activeTemplate}
-                rawText={renderedLetterBody}
-                computedNomorSurat={computedNomorSurat}
-                computedNomorSurat2={computedNomorSurat2}
-                renderedPerihal={renderedPerihal}
-                renderedTujuan={renderedTujuan}
-                renderedKotaTujuan={renderedKotaTujuan}
-                customLampiran={customLampiran}
-                todayInfo={todayInfo}
-                effectiveShowBarcode={effectiveShowBarcode}
-                verificationUrl={verificationUrl}
-                selectedDocIndex={selectedDocIndex}
-                activeJamaah={activeJamaah}
-                activeKeberangkatan={activeKeberangkatan}
-              />
             </div>
           </div>
         </div>
