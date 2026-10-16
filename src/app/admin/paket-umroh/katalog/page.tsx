@@ -22,7 +22,6 @@ import {
 import { Button } from "@/shared/components/ui/Button";
 import { Input } from "@/shared/components/ui/Input";
 import { Card, CardContent } from "@/shared/components/ui/Card";
-import { Badge } from "@/shared/components/ui/Badge";
 import { useSession } from "@/shared/hooks/use-session";
 import { formatNumberWithDots, getWhatsAppUrl, cn } from "@/shared/lib/utils";
 import type { Keberangkatan } from "@/shared/types";
@@ -154,8 +153,12 @@ export default function KatalogPaketPage() {
   const [selectedGuest, setSelectedGuest] = useState<BukuTamuSimple | null>(null);
   const [guestSearch, setGuestSearch] = useState("");
 
-  // Modal Zoom Flyer
-  const [previewFlyerUrl, setPreviewFlyerUrl] = useState<string | null>(null);
+  // Modal Zoom Flyer (dengan dukungan navigasi / slide antar halaman brosur)
+  const [previewFlyerData, setPreviewFlyerData] = useState<{
+    pkg: Keberangkatan;
+    flyers: string[];
+    currentIndex: number;
+  } | null>(null);
 
   // Copy Caption State
   const [copiedCaptionId, setCopiedCaptionId] = useState<string | null>(null);
@@ -257,6 +260,31 @@ export default function KatalogPaketPage() {
     });
   }, [publishedPackages]);
 
+  // Count paket per starting point
+  const packageCountByStarting = useMemo(() => {
+    const counts: Record<string, number> = {};
+    publishedPackages.forEach((pkg) => {
+      const sp = getStartingPointName(pkg);
+      if (sp) {
+        counts[sp] = (counts[sp] || 0) + 1;
+      }
+    });
+    return counts;
+  }, [publishedPackages]);
+
+  // Count paket per bulan
+  const packageCountByMonth = useMemo(() => {
+    const counts: Record<string, number> = {};
+    publishedPackages.forEach((pkg) => {
+      if (pkg.tanggalBerangkat) {
+        const d = new Date(pkg.tanggalBerangkat);
+        const mKey = d.toLocaleDateString("id-ID", { month: "long", year: "numeric" });
+        counts[mKey] = (counts[mKey] || 0) + 1;
+      }
+    });
+    return counts;
+  }, [publishedPackages]);
+
   // Filtered packages by starting point, month, and search query
   const filteredPackages = useMemo(() => {
     return publishedPackages.filter((pkg) => {
@@ -319,7 +347,7 @@ export default function KatalogPaketPage() {
     return sortedEntries;
   }, [filteredPackages]);
 
-  // Navigasi Slide Flyer
+  // Navigasi Slide Flyer pada Kartu
   const nextFlyerSlide = (pkgId: string, total: number) => {
     if (total <= 1) return;
     setActiveSlideMap((prev) => {
@@ -335,6 +363,53 @@ export default function KatalogPaketPage() {
       return { ...prev, [pkgId]: (current - 1 + total) % total };
     });
   };
+
+  // Navigasi Flyer pada Modal Zoom
+  const openFlyerZoom = (pkg: Keberangkatan, index: number = 0) => {
+    const flyers = getFlyerList(pkg);
+    if (flyers.length === 0) return;
+    setPreviewFlyerData({
+      pkg,
+      flyers,
+      currentIndex: index,
+    });
+  };
+
+  const nextZoomFlyer = () => {
+    if (!previewFlyerData || previewFlyerData.flyers.length <= 1) return;
+    const nextIdx = (previewFlyerData.currentIndex + 1) % previewFlyerData.flyers.length;
+    setPreviewFlyerData({
+      ...previewFlyerData,
+      currentIndex: nextIdx,
+    });
+    setActiveSlideMap((prev) => ({ ...prev, [previewFlyerData.pkg.id]: nextIdx }));
+  };
+
+  const prevZoomFlyer = () => {
+    if (!previewFlyerData || previewFlyerData.flyers.length <= 1) return;
+    const prevIdx = (previewFlyerData.currentIndex - 1 + previewFlyerData.flyers.length) % previewFlyerData.flyers.length;
+    setPreviewFlyerData({
+      ...previewFlyerData,
+      currentIndex: prevIdx,
+    });
+    setActiveSlideMap((prev) => ({ ...prev, [previewFlyerData.pkg.id]: prevIdx }));
+  };
+
+  // Shortcut Keyboard Panah Kiri / Kanan & Esc pada Modal Zoom
+  useEffect(() => {
+    if (!previewFlyerData) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setPreviewFlyerData(null);
+      } else if (e.key === "ArrowRight") {
+        nextZoomFlyer();
+      } else if (e.key === "ArrowLeft") {
+        prevZoomFlyer();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [previewFlyerData]);
 
   // Open modal send to guest
   const openSendModal = (pkg: Keberangkatan) => {
@@ -450,7 +525,7 @@ Salam hangat dari kami,
     return map;
   }, [packages]);
 
-  // Render individual 2-grid card
+  // Render individual 2-grid card (Tatanan Asli Tetap, Warna Cerah Estetik)
   const renderPackageCard = (pkg: Keberangkatan) => {
     const depDate = pkg.tanggalBerangkat ? new Date(pkg.tanggalBerangkat) : null;
 
@@ -490,13 +565,20 @@ Salam hangat dari kami,
     return (
       <Card
         key={pkg.id}
-        className="relative overflow-hidden rounded-2xl border border-emerald-500/20 bg-gradient-to-b from-slate-900/95 via-slate-950/95 to-[#060a12]/95 shadow-xl backdrop-blur-md flex flex-col justify-between transition-all hover:border-emerald-500/40 hover:shadow-[0_12px_32px_rgba(16,185,129,0.08)]"
+        className="relative overflow-hidden rounded-3xl border-2 border-emerald-500/35 bg-gradient-to-br from-white via-[#f4fbf7] to-[#e6f7f0] shadow-[inset_0_2px_4px_rgba(255,255,255,0.95),0_10px_28px_-6px_rgba(4,120,87,0.18)] hover:border-emerald-400 hover:shadow-[0_16px_36px_-6px_rgba(4,120,87,0.28)] transition-all flex flex-col justify-between"
       >
         <CardContent className="p-5 flex-1 flex flex-col justify-between space-y-4">
           {/* TOP SECTION: SPLIT PORTRAIT FLYER & SCROLLABLE CAPTION */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-stretch">
             {/* Sisi Kiri: Portrait Flyer Slider */}
-            <div className="relative aspect-[3/4] sm:aspect-auto sm:h-[350px] rounded-xl overflow-hidden bg-slate-950 border border-white/10 group flex flex-col justify-between">
+            <div
+              onClick={() => {
+                if (currentFlyer) {
+                  openFlyerZoom(pkg, currentSlideIndex);
+                }
+              }}
+              className="relative aspect-[3/4] sm:aspect-auto sm:h-[350px] rounded-2xl overflow-hidden bg-gradient-to-br from-teal-50/80 via-emerald-50/60 to-slate-100 border-2 border-emerald-500/35 group flex flex-col justify-between cursor-pointer shadow-[inset_0_2px_4px_rgba(0,0,0,0.06)]"
+            >
               {currentFlyer ? (
                 <>
                   <img
@@ -506,14 +588,12 @@ Salam hangat dari kami,
                   />
 
                   {/* Hover Overlay Zoom */}
-                  <button
-                    type="button"
-                    onClick={() => setPreviewFlyerUrl(currentFlyer)}
-                    className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-xs font-semibold gap-1.5 backdrop-blur-[2px]"
+                  <div
+                    className="absolute inset-0 bg-gradient-to-t from-emerald-950/85 via-emerald-950/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-xs font-black gap-2 backdrop-blur-[2px]"
                   >
-                    <Eye className="w-4 h-4 text-emerald-400" />
-                    Perbesar Brosur
-                  </button>
+                    <Eye className="w-4 h-4 text-amber-300 drop-shadow-[0_1px_3px_rgba(0,0,0,0.6)]" />
+                    <span className="drop-shadow-[0_1px_3px_rgba(0,0,0,0.6)]">Klik untuk Memperbesar</span>
+                  </div>
 
                   {/* Slider Navigation Controls (< dan >) */}
                   <div className="absolute inset-x-2 top-1/2 -translate-y-1/2 flex items-center justify-between pointer-events-none">
@@ -524,8 +604,8 @@ Salam hangat dari kami,
                         prevFlyerSlide(pkg.id, flyers.length);
                       }}
                       disabled={flyers.length <= 1}
-                      className={`pointer-events-auto w-8 h-8 rounded-full bg-black/70 hover:bg-black/90 text-white backdrop-blur-md flex items-center justify-center transition-all border border-white/20 shadow-lg ${
-                        flyers.length <= 1 ? "opacity-30 cursor-not-allowed" : "hover:scale-110 active:scale-95"
+                      className={`pointer-events-auto w-9 h-9 rounded-full bg-gradient-to-b from-white via-white/95 to-emerald-50 text-emerald-950 backdrop-blur-md flex items-center justify-center transition-all border border-emerald-300 shadow-[0_4px_12px_rgba(0,0,0,0.15)] ${
+                        flyers.length <= 1 ? "opacity-30 cursor-not-allowed" : "hover:scale-110 active:scale-95 hover:text-emerald-700 hover:shadow-emerald-500/30"
                       }`}
                       title="Halaman Sebelumnya"
                     >
@@ -539,8 +619,8 @@ Salam hangat dari kami,
                         nextFlyerSlide(pkg.id, flyers.length);
                       }}
                       disabled={flyers.length <= 1}
-                      className={`pointer-events-auto w-8 h-8 rounded-full bg-black/70 hover:bg-black/90 text-white backdrop-blur-md flex items-center justify-center transition-all border border-white/20 shadow-lg ${
-                        flyers.length <= 1 ? "opacity-30 cursor-not-allowed" : "hover:scale-110 active:scale-95"
+                      className={`pointer-events-auto w-9 h-9 rounded-full bg-gradient-to-b from-white via-white/95 to-emerald-50 text-emerald-950 backdrop-blur-md flex items-center justify-center transition-all border border-emerald-300 shadow-[0_4px_12px_rgba(0,0,0,0.15)] ${
+                        flyers.length <= 1 ? "opacity-30 cursor-not-allowed" : "hover:scale-110 active:scale-95 hover:text-emerald-700 hover:shadow-emerald-500/30"
                       }`}
                       title="Halaman Berikutnya"
                     >
@@ -549,41 +629,43 @@ Salam hangat dari kami,
                   </div>
 
                   {/* Page Indicator Badge */}
-                  <div className="absolute top-2.5 right-2.5 px-2.5 py-1 rounded-full bg-black/75 border border-amber-400/40 text-[10.5px] font-bold text-amber-300 backdrop-blur-md shadow-md flex items-center gap-1">
+                  <div className="absolute top-2.5 right-2.5 px-3 py-1 rounded-full bg-gradient-to-r from-emerald-950/90 via-teal-900/90 to-emerald-950/90 border border-amber-400/60 text-[11px] font-black text-amber-300 backdrop-blur-md shadow-md flex items-center gap-1">
                     <span>
                       Hal {currentSlideIndex + 1}/{flyers.length}
                     </span>
                   </div>
                 </>
               ) : (
-                <div className="w-full h-full flex flex-col items-center justify-center p-4 bg-gradient-to-b from-slate-900 to-emerald-950/40 text-center text-slate-400 space-y-2">
-                  <Plane className="w-8 h-8 text-emerald-400/50" />
-                  <p className="text-xs font-semibold text-slate-300">Belum Ada Brosur Flyer</p>
-                  <p className="text-[10px] text-slate-500">Materi flyer belum diunggah</p>
+                <div className="w-full h-full flex flex-col items-center justify-center p-4 bg-gradient-to-br from-teal-50 via-emerald-100/60 to-amber-50/50 text-center text-slate-500 space-y-2">
+                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#064e3b] via-[#047857] to-[#0f766e] text-white flex items-center justify-center shadow-md border-2 border-amber-300">
+                    <Plane className="w-6 h-6 text-amber-300 rotate-45 drop-shadow-sm" />
+                  </div>
+                  <p className="text-xs font-black text-emerald-950">Belum Ada Brosur Flyer</p>
+                  <p className="text-[10.5px] text-emerald-900/70 font-semibold">Materi flyer belum diunggah</p>
                 </div>
               )}
             </div>
 
-            {/* Sisi Kanan: Scrollable Caption Promosi */}
-            <div className="h-[350px] flex flex-col rounded-xl bg-slate-950/60 dark:bg-black/50 border border-white/10 p-3.5 space-y-2">
-              <div className="flex items-center justify-between pb-2 border-b border-white/10 text-xs">
-                <span className="font-bold text-slate-200 flex items-center gap-1.5">
-                  <FileText className="w-3.5 h-3.5 text-emerald-400" />
+            {/* Sisi Kanan: Scrollable Caption Promosi (Warna Cerah Gradasi Estetik Mint/Teal/Gold) */}
+            <div className="h-[350px] flex flex-col rounded-2xl bg-gradient-to-br from-white via-[#f0fdfa]/90 to-[#e6fbf1]/80 border-2 border-teal-500/35 p-4 space-y-2.5 shadow-[inset_0_2px_4px_rgba(255,255,255,0.95),0_2px_8px_rgba(13,148,136,0.06)]">
+              <div className="flex items-center justify-between pb-2.5 border-b border-emerald-200/80 text-xs">
+                <span className="font-black bg-gradient-to-r from-emerald-950 via-teal-900 to-emerald-900 bg-clip-text text-transparent flex items-center gap-1.5 text-sm">
+                  <FileText className="w-4 h-4 text-emerald-700" />
                   Caption Promosi
                 </span>
                 <button
                   type="button"
                   onClick={() => handleCopyCaption(pkg)}
-                  className="px-2.5 py-1 rounded-md border border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 text-[11px] font-semibold flex items-center gap-1 transition-all"
+                  className="px-3 py-1.5 rounded-xl border border-amber-300 bg-gradient-to-r from-amber-400 via-amber-500 to-yellow-500 hover:from-amber-300 hover:to-yellow-400 text-slate-950 text-[11px] font-black flex items-center gap-1.5 shadow-[0_3px_10px_rgba(245,158,11,0.35),inset_0_1px_1px_rgba(255,255,255,0.6)] transition-all active:scale-95 cursor-pointer"
                 >
                   {copiedCaptionId === pkg.id ? (
                     <>
-                      <Check className="w-3 h-3 text-emerald-400" />
-                      <span className="text-emerald-400">Disalin!</span>
+                      <Check className="w-3.5 h-3.5 text-slate-950" />
+                      <span>Disalin!</span>
                     </>
                   ) : (
                     <>
-                      <Copy className="w-3 h-3" />
+                      <Copy className="w-3.5 h-3.5 text-slate-950" />
                       <span>Salin Caption</span>
                     </>
                   )}
@@ -591,9 +673,9 @@ Salam hangat dari kami,
               </div>
 
               {/* Scrollable Container dengan Custom Aesthetic Scrollbar */}
-              <div className="flex-1 overflow-y-auto pr-1 text-[11.5px] text-slate-300 font-sans leading-relaxed whitespace-pre-line scrollbar-thin scrollbar-thumb-emerald-500/30 scrollbar-track-transparent">
+              <div className="flex-1 overflow-y-auto pr-1 text-[11.5px] text-emerald-950 font-sans leading-relaxed whitespace-pre-line scrollbar-thin scrollbar-thumb-teal-500/30 scrollbar-track-transparent">
                 {pkg.caption || (
-                  <span className="text-slate-500 italic text-xs">
+                  <span className="text-emerald-900/50 italic text-xs">
                     Belum ada teks caption promosi khusus untuk paket keberangkatan ini.
                   </span>
                 )}
@@ -602,26 +684,26 @@ Salam hangat dari kami,
           </div>
 
           {/* MIDDLE SECTION: DETAIL PAKET & STACKED BADGES */}
-          <div className="pt-3 border-t border-white/10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <div className="pt-3 border-t border-emerald-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
             {/* Kolom Kiri: Judul Paket, Tanda V2, & Tanggal Berangkat (Tanpa Harga & Tanpa Hotel) */}
             <div className="space-y-1.5 flex-1 min-w-0">
               {/* TANDA SECOND VARIANT (V2) */}
               {isV2 && (
                 <div className="flex items-center gap-1.5 flex-wrap">
-                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10.5px] font-extrabold bg-gradient-to-r from-purple-500/25 to-pink-500/25 text-purple-300 border border-purple-500/40 shadow-[0_0_10px_rgba(168,85,247,0.25)]">
+                  <span className="inline-flex items-center gap-1 px-3 py-0.5 rounded-full text-[10.5px] font-black bg-gradient-to-r from-purple-500 via-fuchsia-500 to-pink-500 text-white shadow-xs border border-purple-300">
                     <span>⚡ Varian V2</span>
                     {variantLabel && variantLabel !== "Varian 2" && <span>• {variantLabel}</span>}
                   </span>
-                  <span className="text-[10px] text-slate-400 bg-white/5 px-2 py-0.5 rounded-full border border-white/10 font-mono">
+                  <span className="text-[10px] text-slate-700 bg-white/80 px-2.5 py-0.5 rounded-full border border-slate-200 font-mono font-bold shadow-2xs">
                     Second Variant
                   </span>
                 </div>
               )}
-              <h3 className="font-bold text-base text-white tracking-tight line-clamp-2 leading-snug">
+              <h3 className="font-black text-base bg-gradient-to-r from-emerald-950 via-teal-950 to-slate-900 bg-clip-text text-transparent tracking-tight line-clamp-2 leading-snug">
                 {pkg.namaPaket}
               </h3>
-              <div className="flex items-center gap-2 text-xs text-slate-400 font-medium">
-                <Calendar className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+              <div className="flex items-center gap-2 text-xs font-bold text-emerald-900/80">
+                <Calendar className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
                 <span>
                   {depDate
                     ? depDate.toLocaleDateString("id-ID", {
@@ -631,8 +713,8 @@ Salam hangat dari kami,
                       })
                     : "-"}
                 </span>
-                <span className="text-slate-600">•</span>
-                <span className="text-emerald-400 font-semibold">
+                <span className="text-emerald-300">•</span>
+                <span className="px-2 py-0.5 rounded-full bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 text-white font-black text-[10.5px] shadow-xs">
                   {pkg.durationDays || pkg.durasiHari || 9} Hari
                 </span>
               </div>
@@ -642,13 +724,13 @@ Salam hangat dari kami,
             <div className="flex flex-col items-end gap-2 shrink-0 w-full sm:w-auto">
               {/* Box Atas: Sisa Kuota (Gabungan untuk rombongan varian) */}
               {isFull ? (
-                <div className="w-full sm:w-auto px-3.5 py-1.5 rounded-lg bg-rose-500/15 border border-rose-500/40 text-rose-300 font-bold text-xs flex items-center justify-center sm:justify-start gap-1.5 shadow-sm">
-                  <span className="w-2 h-2 rounded-full bg-rose-500" />
+                <div className="w-full sm:w-auto px-4 py-2 rounded-xl bg-gradient-to-r from-rose-50 via-rose-100 to-rose-50 border-2 border-rose-400 text-rose-900 font-black text-xs flex items-center justify-center sm:justify-start gap-2 shadow-xs">
+                  <span className="w-2.5 h-2.5 rounded-full bg-rose-600 shadow-[0_0_6px_rgba(225,29,72,0.8)]" />
                   <span>KUOTA PENUH (0 Seat)</span>
                 </div>
               ) : (
-                <div className="w-full sm:w-auto px-3.5 py-1.5 rounded-lg bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 font-bold text-xs flex items-center justify-center sm:justify-start gap-1.5 shadow-[0_0_12px_rgba(16,185,129,0.15)]">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                <div className="w-full sm:w-auto px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-100 via-teal-100 to-emerald-100 border-2 border-emerald-500/50 text-emerald-950 font-black text-xs flex items-center justify-center sm:justify-start gap-2 shadow-[inset_0_1.5px_2px_rgba(255,255,255,0.9),0_3px_8px_rgba(13,148,136,0.2)]">
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-600 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
                   <span>
                     Sisa Kuota: {sisaSeat} Seat{isPartOfGroup ? " (Gabungan)" : ""}
                   </span>
@@ -656,15 +738,15 @@ Salam hangat dari kami,
               )}
 
               {/* Box Bawah: Badge Maskapai dengan Logo & Nomor Penerbangan */}
-              <div className="w-full sm:w-auto px-3.5 py-1.5 rounded-lg bg-slate-900/90 border border-white/10 text-slate-200 text-xs flex items-center justify-between sm:justify-start gap-3 shadow-sm">
-                <div className="w-6 h-6 rounded-md bg-amber-500/15 border border-amber-500/30 flex items-center justify-center shrink-0">
-                  <Plane className="w-3.5 h-3.5 text-amber-400 rotate-45" />
+              <div className="w-full sm:w-auto px-4 py-2 rounded-xl bg-gradient-to-r from-white via-white/95 to-emerald-50/50 border-2 border-emerald-500/35 text-emerald-950 text-xs flex items-center justify-between sm:justify-start gap-3 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
+                <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-amber-400 via-amber-500 to-yellow-600 text-slate-950 flex items-center justify-center shrink-0 shadow-sm border border-amber-300">
+                  <Plane className="w-4 h-4 text-slate-950 rotate-45" />
                 </div>
                 <div className="text-right sm:text-left leading-tight">
-                  <div className="font-bold text-xs text-white line-clamp-1">
+                  <div className="font-black text-xs text-emerald-950 line-clamp-1">
                     {pkg.maskapai || "Saudi Airlines"}
                   </div>
-                  <div className="text-[10.5px] text-slate-400 font-mono">
+                  <div className="text-[10.5px] text-emerald-800 font-mono font-black">
                     {pkg.nomorPenerbangan || "SV-819"}
                   </div>
                 </div>
@@ -672,12 +754,12 @@ Salam hangat dari kami,
             </div>
           </div>
 
-          {/* BOTTOM SECTION: ACTION BUTTON */}
+          {/* BOTTOM SECTION: ACTION BUTTON DENGAN GRADASI MEWAH */}
           <div className="pt-2">
             {isFull ? (
               <Button
                 disabled
-                className="w-full h-11 rounded-xl bg-slate-800 text-slate-500 border border-slate-700/50 cursor-not-allowed font-semibold text-xs flex items-center justify-center gap-2 opacity-60"
+                className="w-full h-12 rounded-2xl bg-slate-100 text-slate-400 border-2 border-slate-200 cursor-not-allowed font-black text-xs flex items-center justify-center gap-2"
               >
                 <Send className="w-4 h-4" />
                 Kuota Penuh (Tidak Dapat Kirim WA)
@@ -685,9 +767,9 @@ Salam hangat dari kami,
             ) : (
               <Button
                 onClick={() => openSendModal(pkg)}
-                className="w-full h-11 rounded-xl bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs shadow-lg shadow-emerald-950/40 hover:shadow-emerald-800/50 transition-all flex items-center justify-center gap-2"
+                className="w-full h-12 rounded-2xl bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-500 hover:via-teal-500 hover:to-emerald-600 text-white font-black text-sm shadow-[inset_0_1.5px_1px_rgba(255,255,255,0.6),0_6px_20px_rgba(4,120,87,0.35)] border border-emerald-400/60 transition-all flex items-center justify-center gap-2 active:scale-[0.99] cursor-pointer"
               >
-                <Send className="w-4 h-4" />
+                <Send className="w-4 h-4 text-amber-300 drop-shadow-[0_1px_2px_rgba(0,0,0,0.4)]" />
                 Kirim ke WA (Pilih Tamu)
               </Button>
             )}
@@ -699,143 +781,219 @@ Salam hangat dari kami,
 
   return (
     <div className="space-y-6">
-      {/* HEADER SECTION */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2 text-foreground">
-              <Plane className="w-6 h-6 text-primary" />
-              Katalog Paket Umroh
-            </h1>
-            <Badge variant="outline" className="bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-300">
-              <Sparkles className="w-3 h-3 mr-1" />
-              Google Drive Cloud Vault
-            </Badge>
+      {/* HEADER SECTION - THEMED EXACTLY LIKE DAFTAR PAKET KEBERANGKATAN & MANIFEST DENGAN GRADASI AESTETIK */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 md:p-5 rounded-3xl border-2 border-emerald-600/70 dark:border-emerald-500/50 bg-gradient-to-r from-[#bbf7d0]/90 via-[#ccfbf1] to-[#fef08a]/60 dark:from-slate-900 dark:via-emerald-950/40 dark:to-slate-900 shadow-[inset_0_2.5px_4px_rgba(255,255,255,0.95),inset_0_-2.5px_4px_rgba(4,120,87,0.3),0_10px_30px_-5px_rgba(4,120,87,0.25)]">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#064e3b] via-[#047857] to-[#0f766e] text-white flex items-center justify-center font-bold text-lg shadow-[inset_0_2px_3px_rgba(255,255,255,0.5),0_6px_16px_rgba(4,120,87,0.4)] border-2 border-amber-300 shrink-0">
+            <Plane className="w-7 h-7 text-amber-300 drop-shadow-[0_2px_3px_rgba(0,0,0,0.4)]" />
           </div>
-          <p className="text-sm text-muted-foreground mt-1">
-            Daftar brosur resmi, materi flyer Google Drive, dan caption promosi bulanan siap kirim ke WhatsApp tamu binaan Anda
-          </p>
+          <div>
+            <h1 className="text-lg font-black text-emerald-950 dark:text-white flex items-center gap-2.5 tracking-tight drop-shadow-[0_1px_0_rgba(255,255,255,0.8)] dark:drop-shadow-none">
+              Daftar Katalog Brosur & Paket Umroh
+              <span className="text-[10px] bg-gradient-to-r from-amber-400 via-amber-500 to-yellow-500 text-slate-950 font-black px-3 py-0.5 rounded-full shadow-[inset_0_1px_2px_rgba(255,255,255,0.6),0_2px_6px_rgba(180,83,9,0.35)] border border-amber-300">
+                AKTIF
+              </span>
+            </h1>
+            <p className="text-xs text-emerald-900 dark:text-emerald-300 font-extrabold mt-0.5 flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-emerald-600 animate-pulse shadow-[0_0_6px_rgba(16,185,129,0.9)]" />
+              Total {publishedPackages.length} Paket Keberangkatan Terdaftar • Siap Kirim ke WhatsApp Tamu Binaan
+            </p>
+          </div>
         </div>
 
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => fetchPackages(true)}
-          disabled={isRefreshing}
-          className="gap-2 shrink-0 font-medium"
-        >
-          <RefreshCw className={cn("w-3.5 h-3.5", isRefreshing && "animate-spin text-emerald-500")} />
-          {isRefreshing ? "Memperbarui..." : "Refresh Katalog"}
-        </Button>
+        {/* Action Buttons on Right (Manifest Operasional Style dengan Gradasi) */}
+        <div className="flex items-center gap-1.5 p-1.5 bg-gradient-to-b from-white to-emerald-50 dark:bg-slate-950 rounded-2xl border-2 border-emerald-500/40 dark:border-emerald-700/60 shadow-[inset_0_2px_4px_rgba(0,0,0,0.06),0_2px_6px_rgba(0,0,0,0.04)] shrink-0">
+          <button
+            type="button"
+            onClick={() => fetchPackages(true)}
+            disabled={isRefreshing}
+            className="px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 bg-gradient-to-b from-[#0f766e] via-[#047857] to-[#064e3b] text-white shadow-[inset_0_1.5px_1px_rgba(255,255,255,0.6),0_4px_10px_rgba(4,120,87,0.45)] border border-emerald-400/50 hover:from-emerald-600 hover:to-teal-800 cursor-pointer active:scale-95 disabled:opacity-50"
+          >
+            <RefreshCw className={cn("w-3.5 h-3.5", isRefreshing ? "animate-spin text-amber-300" : "text-amber-300 drop-shadow-[0_1px_2px_rgba(0,0,0,0.3)]")} />
+            <span>{isRefreshing ? "Memperbarui..." : "Refresh Katalog"}</span>
+          </button>
+
+          <a
+            href="/admin/keberangkatan"
+            className="px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 text-emerald-950 dark:text-emerald-300 hover:bg-emerald-100/70 dark:hover:bg-emerald-950/40 cursor-pointer"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-emerald-700 dark:text-emerald-400" />
+            <span>Kelola Paket Aktif</span>
+          </a>
+        </div>
       </div>
 
-      {/* FILTER BERTINGKAT (STARTING POINT & BULAN) & PENCARIAN */}
-      <Card className="border border-emerald-500/20 bg-slate-900/60 dark:bg-[#0c121e]/80 backdrop-blur-md shadow-lg">
-        <CardContent className="p-4 space-y-4">
-          {/* BARIS 1: FILTER STARTING POINT (ASAL KEBERANGKATAN) */}
-          <div className="space-y-1.5">
-            <div className="flex items-center gap-1.5 text-xs font-bold text-slate-300">
-              <MapPin className="w-3.5 h-3.5 text-amber-400" />
-              <span>Filter Starting Point (Asal Keberangkatan):</span>
-            </div>
-            <div className="flex items-center gap-2 overflow-x-auto pb-1 max-w-full text-xs font-semibold scrollbar-thin scrollbar-thumb-amber-500/30">
+      {/* FILTER STARTING POINT & BULAN TABS DENGAN GRADASI MEWAH */}
+      <div className="space-y-3">
+        {/* BARIS 1: FILTER STARTING POINT (ASAL KEBERANGKATAN) */}
+        <div className="space-y-1">
+          <div className="flex items-center gap-1.5 text-xs font-black text-emerald-950 px-1">
+            <MapPin className="w-3.5 h-3.5 text-amber-600" />
+            <span>Filter Starting Point (Asal Keberangkatan):</span>
+          </div>
+
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 pt-1 no-scrollbar scroll-smooth">
+            <div className="flex items-center gap-2 p-2 bg-gradient-to-r from-[#ccfbf1]/90 via-white to-[#d1fae5]/80 dark:from-slate-900 dark:via-slate-850 dark:to-slate-900 rounded-2xl border-2 border-teal-500/50 dark:border-teal-600/50 shadow-[inset_0_2.5px_4px_rgba(255,255,255,0.95),inset_0_-2.5px_4px_rgba(13,148,136,0.3),0_6px_20px_-3px_rgba(13,148,136,0.25)]">
               <button
                 type="button"
                 onClick={() => setSelectedStartingPoint("ALL")}
-                className={`px-3.5 py-1.5 rounded-full whitespace-nowrap transition-all border ${
+                className={cn(
+                  "px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-2 cursor-pointer whitespace-nowrap shrink-0 active:scale-95",
                   selectedStartingPoint === "ALL"
-                    ? "bg-amber-500/20 border-amber-400 text-amber-300 shadow-[0_0_12px_rgba(245,158,11,0.2)] font-bold"
-                    : "bg-black/30 border-white/10 text-slate-400 hover:text-slate-200 hover:border-white/20"
-                }`}
+                    ? "bg-gradient-to-b from-[#0f766e] via-[#047857] to-[#064e3b] text-white shadow-[inset_0_1.5px_1px_rgba(255,255,255,0.5),0_4px_12px_rgba(13,148,136,0.4)] border border-teal-300/60"
+                    : "text-teal-950 dark:text-teal-200 hover:text-teal-900 bg-gradient-to-b from-white via-white/95 to-teal-50/50 hover:bg-white dark:from-slate-800 dark:to-slate-850 dark:hover:bg-slate-800 border border-teal-200/90 dark:border-teal-800/60 shadow-[inset_0_1px_1px_rgba(255,255,255,0.9),0_2px_4px_rgba(0,0,0,0.04)] hover:border-teal-400"
+                )}
               >
-                Semua Starting ({packages.length})
-              </button>
-              {startingPointsList.map((sp) => (
-                <button
-                  key={sp}
-                  type="button"
-                  onClick={() => setSelectedStartingPoint(sp)}
-                  className={`px-3.5 py-1.5 rounded-full whitespace-nowrap transition-all border ${
-                    selectedStartingPoint === sp
-                      ? "bg-amber-500/20 border-amber-400 text-amber-300 shadow-[0_0_12px_rgba(245,158,11,0.2)] font-bold"
-                      : "bg-black/30 border-white/10 text-slate-400 hover:text-slate-200 hover:border-white/20"
-                  }`}
+                <MapPin className={cn("w-3.5 h-3.5", selectedStartingPoint === "ALL" ? "text-amber-300" : "text-teal-600")} />
+                <span>Semua Starting</span>
+                <span
+                  className={cn(
+                    "text-[10px] px-2.5 py-0.5 rounded-full font-mono font-black",
+                    selectedStartingPoint === "ALL"
+                      ? "bg-gradient-to-r from-amber-400 to-yellow-400 text-teal-950 shadow-xs"
+                      : "bg-teal-50 text-teal-800 border border-teal-200"
+                  )}
                 >
-                  {sp}
-                </button>
-              ))}
+                  {publishedPackages.length} Paket
+                </span>
+              </button>
+
+              {startingPointsList.map((sp) => {
+                const isActive = selectedStartingPoint === sp;
+                const count = packageCountByStarting[sp] || 0;
+                return (
+                  <button
+                    key={sp}
+                    type="button"
+                    onClick={() => setSelectedStartingPoint(sp)}
+                    className={cn(
+                      "px-3.5 py-2 rounded-xl text-xs font-extrabold transition-all flex items-center gap-2 cursor-pointer whitespace-nowrap shrink-0 active:scale-95",
+                      isActive
+                        ? "bg-gradient-to-b from-[#0f766e] via-[#047857] to-[#064e3b] text-white shadow-[inset_0_1.5px_1px_rgba(255,255,255,0.5),0_4px_12px_rgba(13,148,136,0.4)] border border-teal-300/60"
+                        : "text-teal-950 dark:text-teal-200 hover:text-teal-900 bg-gradient-to-b from-white via-white/95 to-teal-50/50 hover:bg-white dark:from-slate-800 dark:to-slate-850 dark:hover:bg-slate-800 border border-teal-200/90 dark:border-teal-800/60 shadow-[inset_0_1px_1px_rgba(255,255,255,0.9),0_2px_4px_rgba(0,0,0,0.04)] hover:border-teal-400"
+                    )}
+                  >
+                    <MapPin className={cn("w-3.5 h-3.5", isActive ? "text-amber-300" : "text-teal-600")} />
+                    <span>{sp}</span>
+                    <span
+                      className={cn(
+                        "text-[10px] px-2.5 py-0.5 rounded-full font-mono font-bold",
+                        isActive
+                          ? "bg-gradient-to-r from-amber-400 to-yellow-400 text-teal-950 font-black shadow-xs"
+                          : "bg-teal-50 text-teal-800 border border-teal-200"
+                      )}
+                    >
+                      {count} Paket
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        {/* BARIS 2: FILTER BULAN TABS DENGAN SEARCH INPUT */}
+        <div className="space-y-1">
+          <div className="flex items-center justify-between px-1">
+            <div className="flex items-center gap-1.5 text-xs font-black text-emerald-950">
+              <Calendar className="w-3.5 h-3.5 text-emerald-700" />
+              <span>Filter Bulan Keberangkatan:</span>
             </div>
           </div>
 
-          {/* BARIS 2: FILTER BULAN & INPUT SEARCH */}
-          <div className="pt-2 border-t border-white/10 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
-            {/* Scrollable Month Pills */}
-            <div className="space-y-1.5 flex-1 min-w-0">
-              <div className="flex items-center gap-1.5 text-xs font-bold text-slate-300">
-                <Calendar className="w-3.5 h-3.5 text-emerald-400" />
-                <span>Filter Bulan Keberangkatan:</span>
-              </div>
-              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 max-w-full text-xs font-semibold scrollbar-thin scrollbar-thumb-emerald-500/30">
+          <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
+            {/* Scrollable Month Tabs */}
+            <div className="flex items-center gap-2 overflow-x-auto pb-1 pt-1 no-scrollbar scroll-smooth flex-1 min-w-0">
+              <div className="flex items-center gap-2 p-2 bg-gradient-to-r from-[#ccfbf1]/90 via-white to-[#d1fae5]/80 dark:from-slate-900 dark:via-slate-850 dark:to-slate-900 rounded-2xl border-2 border-teal-500/50 dark:border-teal-600/50 shadow-[inset_0_2.5px_4px_rgba(255,255,255,0.95),inset_0_-2.5px_4px_rgba(13,148,136,0.3),0_6px_20px_-3px_rgba(13,148,136,0.25)]">
                 <button
                   type="button"
                   onClick={() => setSelectedMonth("ALL")}
-                  className={`px-3 py-1.5 rounded-lg whitespace-nowrap transition-all border ${
+                  className={cn(
+                    "px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-2 cursor-pointer whitespace-nowrap shrink-0 active:scale-95",
                     selectedMonth === "ALL"
-                      ? "bg-emerald-500/25 border-emerald-400 text-emerald-300 shadow-[0_0_12px_rgba(16,185,129,0.2)] font-bold"
-                      : "bg-black/30 border-white/10 text-slate-400 hover:text-slate-200 hover:border-white/20"
-                  }`}
+                      ? "bg-gradient-to-b from-[#0f766e] via-[#047857] to-[#064e3b] text-white shadow-[inset_0_1.5px_1px_rgba(255,255,255,0.5),0_4px_12px_rgba(13,148,136,0.4)] border border-teal-300/60"
+                      : "text-teal-950 dark:text-teal-200 hover:text-teal-900 bg-gradient-to-b from-white via-white/95 to-teal-50/50 hover:bg-white dark:from-slate-800 dark:to-slate-850 dark:hover:bg-slate-800 border border-teal-200/90 dark:border-teal-800/60 shadow-[inset_0_1px_1px_rgba(255,255,255,0.9),0_2px_4px_rgba(0,0,0,0.04)] hover:border-teal-400"
+                  )}
                 >
-                  Semua Bulan
-                </button>
-                {monthsList.map((m) => (
-                  <button
-                    key={m}
-                    type="button"
-                    onClick={() => setSelectedMonth(m)}
-                    className={`px-3 py-1.5 rounded-lg whitespace-nowrap transition-all border ${
-                      selectedMonth === m
-                        ? "bg-emerald-500/25 border-emerald-400 text-emerald-300 shadow-[0_0_12px_rgba(16,185,129,0.2)] font-bold"
-                        : "bg-black/30 border-white/10 text-slate-400 hover:text-slate-200 hover:border-white/20"
-                    }`}
+                  <Calendar className={cn("w-3.5 h-3.5", selectedMonth === "ALL" ? "text-amber-300" : "text-teal-600")} />
+                  <span>Semua Bulan</span>
+                  <span
+                    className={cn(
+                      "text-[10px] px-2.5 py-0.5 rounded-full font-mono font-black",
+                      selectedMonth === "ALL"
+                        ? "bg-gradient-to-r from-amber-400 to-yellow-400 text-teal-950 shadow-xs"
+                        : "bg-teal-50 text-teal-800 border border-teal-200"
+                    )}
                   >
-                    {m}
-                  </button>
-                ))}
+                    {publishedPackages.length} Paket
+                  </span>
+                </button>
+
+                {monthsList.map((m) => {
+                  const isActive = selectedMonth === m;
+                  const count = packageCountByMonth[m] || 0;
+                  return (
+                    <button
+                      key={m}
+                      type="button"
+                      onClick={() => setSelectedMonth(m)}
+                      className={cn(
+                        "px-3.5 py-2 rounded-xl text-xs font-extrabold transition-all flex items-center gap-2 cursor-pointer whitespace-nowrap shrink-0 active:scale-95",
+                        isActive
+                          ? "bg-gradient-to-b from-[#0f766e] via-[#047857] to-[#064e3b] text-white shadow-[inset_0_1.5px_1px_rgba(255,255,255,0.5),0_4px_12px_rgba(13,148,136,0.4)] border border-teal-300/60"
+                          : "text-teal-950 dark:text-teal-200 hover:text-teal-900 bg-gradient-to-b from-white via-white/95 to-teal-50/50 hover:bg-white dark:from-slate-800 dark:to-slate-850 dark:hover:bg-slate-800 border border-teal-200/90 dark:border-teal-800/60 shadow-[inset_0_1px_1px_rgba(255,255,255,0.9),0_2px_4px_rgba(0,0,0,0.04)] hover:border-teal-400"
+                      )}
+                    >
+                      <Calendar className={cn("w-3.5 h-3.5", isActive ? "text-amber-300" : "text-teal-600")} />
+                      <span className="uppercase">{m}</span>
+                      <span
+                        className={cn(
+                          "text-[10px] px-2.5 py-0.5 rounded-full font-mono font-bold",
+                          isActive
+                            ? "bg-gradient-to-r from-amber-400 to-yellow-400 text-teal-950 font-black shadow-xs"
+                            : "bg-teal-50 text-teal-800 border border-teal-200"
+                        )}
+                      >
+                        {count} Paket
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
-            {/* Search Input */}
-            <div className="relative w-full md:w-64 shrink-0 pt-2 md:pt-4">
-              <Search className="absolute left-2.5 top-[23px] md:top-[25px] h-4 w-4 text-slate-400" />
+            {/* Search Input Box */}
+            <div className="relative w-full lg:w-72 shrink-0">
+              <Search className="absolute left-3.5 top-3 h-4 w-4 text-emerald-800/60" />
               <Input
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Cari paket, maskapai..."
-                className="pl-8 h-9 text-xs bg-black/40 border-white/10 text-white placeholder:text-slate-500 rounded-lg focus:border-emerald-500"
+                placeholder="Cari nama paket, maskapai..."
+                className="pl-10 h-11 text-xs bg-white/95 border-2 border-teal-500/40 text-emerald-950 placeholder:text-emerald-900/40 rounded-2xl focus:border-teal-600 focus:bg-white shadow-[inset_0_1px_2px_rgba(0,0,0,0.04)] font-semibold"
               />
             </div>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       {/* DAFTAR PAKET (2 GRID CARD DENGAN PEMBATAS BULAN MEWAH) */}
       {loading ? (
         <div className="py-20 flex flex-col items-center justify-center gap-3 text-muted-foreground">
-          <Loader2 className="w-8 h-8 animate-spin text-primary" />
-          <span className="text-sm font-medium">Memuat katalog paket umroh...</span>
+          <Loader2 className="w-8 h-8 animate-spin text-emerald-700" />
+          <span className="text-sm font-black text-emerald-950">Memuat katalog paket umroh...</span>
         </div>
       ) : publishedPackages.length === 0 ? (
-        <Card className="py-16 text-center space-y-4 border border-white/10 bg-slate-900/40">
+        <Card className="py-16 text-center space-y-4 border-2 border-emerald-600/30 bg-gradient-to-br from-white via-white to-emerald-50/30 shadow-lg rounded-3xl">
           <CardContent className="space-y-3">
-            <Plane className="w-12 h-12 text-muted-foreground/30 mx-auto" />
-            <h3 className="text-base font-bold text-foreground">Belum Ada Paket yang Ditampilkan di Katalog</h3>
-            <p className="text-xs text-muted-foreground max-w-md mx-auto">
+            <Plane className="w-12 h-12 text-emerald-600/30 mx-auto" />
+            <h3 className="text-base font-black text-emerald-950">Belum Ada Paket yang Ditampilkan di Katalog</h3>
+            <p className="text-xs text-emerald-900/70 max-w-md mx-auto font-medium">
               Paket keberangkatan belum diaktifkan saklarnya untuk katalog. Silakan aktifkan saklar <strong>“Katalog”</strong> pada kartu paket keberangkatan yang diinginkan di menu <strong>Paket Aktif</strong>.
             </p>
             <div className="pt-2">
               <a
                 href="/admin/keberangkatan"
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-md transition-all"
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-b from-[#0f766e] via-[#047857] to-[#064e3b] text-white text-xs font-black shadow-md border border-emerald-400/50 hover:from-emerald-600 hover:to-teal-800 transition-all"
               >
                 Buka Menu Paket Aktif
               </a>
@@ -843,32 +1001,32 @@ Salam hangat dari kami,
           </CardContent>
         </Card>
       ) : filteredPackages.length === 0 ? (
-        <Card className="py-16 text-center space-y-2 border border-white/10 bg-slate-900/40">
+        <Card className="py-16 text-center space-y-2 border-2 border-emerald-600/30 bg-gradient-to-br from-white via-white to-emerald-50/30 shadow-lg rounded-3xl">
           <CardContent>
-            <Plane className="w-12 h-12 text-muted-foreground/30 mx-auto mb-2" />
-            <h3 className="text-base font-bold text-foreground">Tidak Ada Paket Ditemukan</h3>
-            <p className="text-xs text-muted-foreground max-w-md mx-auto">
+            <Plane className="w-12 h-12 text-emerald-600/30 mx-auto mb-2" />
+            <h3 className="text-base font-black text-emerald-950">Tidak Ada Paket Ditemukan</h3>
+            <p className="text-xs text-emerald-900/70 max-w-md mx-auto font-medium">
               Tidak ada paket umroh yang sesuai dengan filter starting point, filter bulan, atau pencarian ini.
             </p>
           </CardContent>
         </Card>
       ) : selectedMonth === "ALL" ? (
-        // MODE SEMUA BULAN: TAMPILKAN PEMBATAS ESTETIK PER BULAN
+        // MODE SEMUA BULAN: TAMPILKAN PEMBATAS ESTETIK PER BULAN DENGAN GRADASI MEWAH
         <div className="space-y-10">
           {packagesGroupedByMonth.map(([monthName, pkgs]) => (
             <div key={monthName} className="space-y-6">
-              {/* PEMBATAS BULAN MEWAH DENGAN JUDUL BULAN DI TENGAH */}
-              <div className="relative py-4 flex items-center justify-center">
+              {/* PEMBATAS BULAN MEWAH (THEMED MINT / TEAL / AMBER GRADIENT) */}
+              <div className="relative py-5 flex items-center justify-center">
                 <div className="absolute inset-0 flex items-center">
-                  <div className="w-full h-px bg-gradient-to-r from-transparent via-amber-500/40 via-emerald-500/40 to-transparent" />
+                  <div className="w-full h-1 bg-gradient-to-r from-transparent via-teal-400 via-amber-400 to-transparent rounded-full opacity-80" />
                 </div>
-                <div className="relative px-6 py-2 rounded-full bg-slate-950/95 border border-amber-500/40 shadow-[0_0_20px_rgba(245,158,11,0.15)] backdrop-blur-md flex items-center gap-2 text-amber-300 font-bold text-sm tracking-wide">
-                  <span className="text-amber-400">✦</span>
-                  <span>{monthName}</span>
-                  <span className="text-xs text-emerald-400 font-semibold font-mono">
-                    ({pkgs.length} Paket)
+                <div className="relative px-7 py-2.5 rounded-2xl bg-gradient-to-r from-[#ccfbf1]/95 via-white to-[#d1fae5]/95 border-2 border-teal-500/60 shadow-[inset_0_2px_3px_rgba(255,255,255,0.95),0_6px_20px_rgba(13,148,136,0.3)] flex items-center gap-3 text-emerald-950 font-black text-sm tracking-wide">
+                  <span className="text-amber-500 text-base drop-shadow-[0_1px_2px_rgba(245,158,11,0.5)]">✦</span>
+                  <span className="uppercase tracking-wider">{monthName}</span>
+                  <span className="text-xs px-3 py-1 rounded-full bg-gradient-to-r from-amber-400 via-amber-500 to-yellow-500 text-slate-950 font-black shadow-sm border border-amber-300">
+                    {pkgs.length} Paket
                   </span>
-                  <span className="text-amber-400">✦</span>
+                  <span className="text-amber-500 text-base drop-shadow-[0_1px_2px_rgba(245,158,11,0.5)]">✦</span>
                 </div>
               </div>
 
@@ -882,17 +1040,17 @@ Salam hangat dari kami,
       ) : (
         // MODE SATU BULAN TERTENTU
         <div className="space-y-6">
-          <div className="relative py-4 flex items-center justify-center">
+          <div className="relative py-5 flex items-center justify-center">
             <div className="absolute inset-0 flex items-center">
-              <div className="w-full h-px bg-gradient-to-r from-transparent via-amber-500/40 via-emerald-500/40 to-transparent" />
+              <div className="w-full h-1 bg-gradient-to-r from-transparent via-teal-400 via-amber-400 to-transparent rounded-full opacity-80" />
             </div>
-            <div className="relative px-6 py-2 rounded-full bg-slate-950/95 border border-amber-500/40 shadow-[0_0_20px_rgba(245,158,11,0.15)] backdrop-blur-md flex items-center gap-2 text-amber-300 font-bold text-sm tracking-wide">
-              <span className="text-amber-400">✦</span>
-              <span>{selectedMonth}</span>
-              <span className="text-xs text-emerald-400 font-semibold font-mono">
-                ({filteredPackages.length} Paket)
+            <div className="relative px-7 py-2.5 rounded-2xl bg-gradient-to-r from-[#ccfbf1]/95 via-white to-[#d1fae5]/95 border-2 border-teal-500/60 shadow-[inset_0_2px_3px_rgba(255,255,255,0.95),0_6px_20px_rgba(13,148,136,0.3)] flex items-center gap-3 text-emerald-950 font-black text-sm tracking-wide">
+              <span className="text-amber-500 text-base drop-shadow-[0_1px_2px_rgba(245,158,11,0.5)]">✦</span>
+              <span className="uppercase tracking-wider">{selectedMonth}</span>
+              <span className="text-xs px-3 py-1 rounded-full bg-gradient-to-r from-amber-400 via-amber-500 to-yellow-500 text-slate-950 font-black shadow-sm border border-amber-300">
+                {filteredPackages.length} Paket
               </span>
-              <span className="text-amber-400">✦</span>
+              <span className="text-amber-500 text-base drop-shadow-[0_1px_2px_rgba(245,158,11,0.5)]">✦</span>
             </div>
           </div>
 
@@ -1050,25 +1208,81 @@ Salam hangat dari kami,
         </div>
       )}
 
-      {/* MODAL ZOOM PREVIEW FLYER */}
-      {previewFlyerUrl && (
+      {/* MODAL ZOOM PREVIEW FLYER (DENGAN SLIDER NAVIGASI HALAMAN & KEYBOARD SHORTCUT) */}
+      {previewFlyerData && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-md animate-in fade-in-0"
-          onClick={() => setPreviewFlyerUrl(null)}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-md animate-in fade-in-0"
+          onClick={() => setPreviewFlyerData(null)}
         >
-          <div className="relative max-w-2xl max-h-[90vh] bg-card rounded-xl overflow-hidden shadow-2xl p-2">
-            <button
-              type="button"
-              onClick={() => setPreviewFlyerUrl(null)}
-              className="absolute top-4 right-4 bg-black/60 text-white rounded-full p-1.5 hover:bg-black transition-all"
-            >
-              ✕
-            </button>
-            <img
-              src={previewFlyerUrl}
-              alt="Brosur Flyer Paket"
-              className="w-full h-auto max-h-[85vh] object-contain rounded-lg"
-            />
+          <div
+            className="relative max-w-2xl max-h-[92vh] bg-white rounded-2xl overflow-hidden shadow-2xl p-4 border border-slate-200 animate-in zoom-in-95 flex flex-col items-center"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header Modal Zoom */}
+            <div className="w-full flex items-center justify-between pb-3 border-b border-slate-100 mb-3">
+              <div className="flex items-center gap-2 min-w-0 pr-4">
+                <span className="font-bold text-sm text-slate-900 truncate">
+                  {previewFlyerData.pkg.namaPaket}
+                </span>
+                {previewFlyerData.flyers.length > 1 && (
+                  <span className="shrink-0 px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-800 text-xs font-bold border border-emerald-200">
+                    Hal {previewFlyerData.currentIndex + 1} dari {previewFlyerData.flyers.length}
+                  </span>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => setPreviewFlyerData(null)}
+                className="w-7 h-7 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold flex items-center justify-center transition-all text-xs"
+                title="Tutup (Esc)"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Flyer Image Container with Navigation Arrows */}
+            <div className="relative flex items-center justify-center max-h-[78vh] overflow-hidden rounded-xl bg-slate-50 border border-slate-100 w-full">
+              <img
+                src={previewFlyerData.flyers[previewFlyerData.currentIndex]}
+                alt={`Brosur ${previewFlyerData.pkg.namaPaket}`}
+                className="w-full h-auto max-h-[75vh] object-contain rounded-lg select-none"
+              />
+
+              {/* Tombol Geser Flyer Kiri & Kanan di Dalam Modal */}
+              {previewFlyerData.flyers.length > 1 && (
+                <>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      prevZoomFlyer();
+                    }}
+                    className="absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/95 hover:bg-white text-slate-800 shadow-xl flex items-center justify-center border border-slate-200 transition-all hover:scale-110 active:scale-95"
+                    title="Halaman Sebelumnya (Panah Kiri)"
+                  >
+                    <ChevronLeft className="w-5 h-5 text-slate-700" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      nextZoomFlyer();
+                    }}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/95 hover:bg-white text-slate-800 shadow-xl flex items-center justify-center border border-slate-200 transition-all hover:scale-110 active:scale-95"
+                    title="Halaman Berikutnya (Panah Kanan)"
+                  >
+                    <ChevronRight className="w-5 h-5 text-slate-700" />
+                  </button>
+                </>
+              )}
+            </div>
+
+            {/* Hint di bawah jika ada lebih dari 1 halaman */}
+            {previewFlyerData.flyers.length > 1 && (
+              <div className="pt-3 text-xs text-slate-500 font-medium flex items-center gap-2">
+                <span>Gunakan tombol panah atau tombol di samping untuk menggeser halaman brosur</span>
+              </div>
+            )}
           </div>
         </div>
       )}
