@@ -119,16 +119,57 @@ const getStartingPointName = (pkg: Keberangkatan): string => {
   return "Jakarta (CGK)";
 };
 
-// Helper untuk memecah daftar flyer brosur (bisa comma-separated, newline, atau single URL)
+// Helper untuk memecah daftar flyer brosur (bisa comma-separated, newline, single URL, atau drive ID)
 const getFlyerList = (pkg: Keberangkatan): string[] => {
-  if (!pkg.flyerUrl) return [];
-  if (pkg.flyerUrl.includes(",")) {
-    return pkg.flyerUrl.split(",").map((s) => s.trim()).filter(Boolean);
-  }
-  if (pkg.flyerUrl.includes("\n")) {
-    return pkg.flyerUrl.split("\n").map((s) => s.trim()).filter(Boolean);
-  }
-  return [pkg.flyerUrl];
+  const source = pkg.flyerUrl || pkg.flyerDriveId;
+  if (!source) return [];
+  const rawList = source.includes(",")
+    ? source.split(",").map((s) => s.trim()).filter(Boolean)
+    : source.includes("\n")
+    ? source.split("\n").map((s) => s.trim()).filter(Boolean)
+    : [source];
+
+  return rawList
+    .map((item) => {
+      if (!item) return "";
+      const trimmed = item.trim();
+      if (trimmed.startsWith("data:") || trimmed.startsWith("blob:")) return trimmed;
+      if (trimmed.startsWith("/api/storage/download")) return trimmed;
+      if (trimmed.includes("drive.google.com")) {
+        const match = trimmed.match(/id=([a-zA-Z0-9_-]+)/);
+        if (match && match[1]) {
+          return `/api/storage/download?id=${match[1]}`;
+        }
+      }
+      // Bare Google Drive ID (panjang 20+ karakter alfanumerik)
+      if (/^[a-zA-Z0-9_-]{20,}$/.test(trimmed) && !trimmed.startsWith("http") && !trimmed.startsWith("/")) {
+        return `/api/storage/download?id=${trimmed}`;
+      }
+      return trimmed;
+    })
+    .filter(Boolean);
+};
+
+// Helper teks caption promosi: gunakan caption yang tersimpan atau buatkan template otomatis lengkap jika belum diisi
+const getPackageCaption = (pkg: Keberangkatan): string => {
+  if (pkg.caption && pkg.caption.trim() !== "") return pkg.caption;
+  const depStr = pkg.tanggalBerangkat
+    ? new Date(pkg.tanggalBerangkat).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })
+    : "-";
+  return (
+    `✨ *${pkg.namaPaket}* ✨\n\n` +
+    `🗓️ *Keberangkatan:* ${depStr}\n` +
+    `⏳ *Durasi:* ${pkg.durationDays || 9} Hari\n` +
+    `✈️ *Maskapai:* ${pkg.maskapai || "Penerbangan Terbaik"}\n` +
+    `🏨 *Hotel Makkah:* ${pkg.hotelMekkah || "-"}\n` +
+    `🏨 *Hotel Madinah:* ${pkg.hotelMadinah || "-"}\n` +
+    `💰 *Harga:* Rp ${formatNumberWithDots(pkg.hargaPaket || 35000000)}\n\n` +
+    `✅ *Fasilitas Termasuk:*\n` +
+    (pkg.include && pkg.include.length > 0
+      ? pkg.include.map((i) => `• ${i}`).join("\n")
+      : `• Tiket Pesawat PP & Visa Umroh\n• Hotel & Makan Sesuai Program\n• Transportasi Bus AC & Muthowif Berpengalaman`) +
+    `\n\n📲 *Informasi & Pendaftaran:* Segera hubungi customer care kami sebelum kuota habis!`
+  );
 };
 
 export default function KatalogPaketPage() {
@@ -573,9 +614,7 @@ export default function KatalogPaketPage() {
       ? `\n🖼️ *Flyer Brosur Resmi:*\n${targetPackage.flyerUrl}\n`
       : "";
 
-    const captionSection = targetPackage.caption
-      ? `\n📝 *Deskripsi & Fasilitas:* \n${targetPackage.caption}\n`
-      : "";
+    const captionSection = `\n📝 *Deskripsi & Fasilitas:* \n${getPackageCaption(targetPackage)}\n`;
 
     const pesan = `*Bismillah, Assalamu'alaikum Warahmatullahi Wabarakatuh.*
 
@@ -602,7 +641,7 @@ Salam hangat dari kami,
   };
 
   const handleCopyCaption = (pkg: Keberangkatan) => {
-    const textToCopy = pkg.caption || `${pkg.namaPaket}\nKeberangkatan: ${pkg.tanggalBerangkat ? new Date(pkg.tanggalBerangkat).toLocaleDateString("id-ID") : ""}`;
+    const textToCopy = getPackageCaption(pkg);
     navigator.clipboard.writeText(textToCopy);
     setCopiedCaptionId(pkg.id);
     setTimeout(() => setCopiedCaptionId(null), 2500);
@@ -828,23 +867,7 @@ Salam hangat dari kami,
 
               {/* Scrollable Container dengan Custom Aesthetic Scrollbar */}
               <div className="flex-1 overflow-y-auto pr-1 text-[11.5px] text-emerald-950 font-sans leading-relaxed whitespace-pre-line scrollbar-thin scrollbar-thumb-teal-500/30 scrollbar-track-transparent">
-                {pkg.caption ? (
-                  pkg.caption
-                ) : (
-                  <div className="flex flex-col items-center justify-center h-full py-8 text-center space-y-2">
-                    <span className="text-emerald-900/50 italic text-xs">
-                      Belum ada teks caption promosi khusus untuk paket keberangkatan ini.
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => openManageMediaModal(pkg)}
-                      className="px-3 py-1.5 rounded-xl border border-teal-500/50 bg-teal-50 hover:bg-teal-100 text-teal-900 text-[11px] font-bold shadow-2xs flex items-center gap-1.5 cursor-pointer transition-all active:scale-95"
-                    >
-                      <Edit3 className="w-3.5 h-3.5 text-teal-700" />
-                      <span>Buat / Isi Caption</span>
-                    </button>
-                  </div>
-                )}
+                {getPackageCaption(pkg)}
               </div>
             </div>
           </div>

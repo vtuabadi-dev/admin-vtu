@@ -484,7 +484,25 @@ export const packageService = {
       // Upload flyer and caption to Google Drive vault
       let uploadedFlyerDriveId: string | undefined = undefined;
       const uploadedFlyerUrls: string[] = [];
-      const packageCaption = data.caption || data.customCaption || undefined;
+
+      // Auto-generate rich formatted caption if user didn't provide one
+      const depDateFormatted = depDate.toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });
+      const priceFormatted = (parseInt(data.hargaBase || data.hargaPaket || "0", 10)).toLocaleString("id-ID");
+      const defaultPromoCaption =
+        `✨ *${formattedPackageName}* ✨\n\n` +
+        `🗓️ *Keberangkatan:* ${depDateFormatted}\n` +
+        `⏳ *Durasi:* ${durasiHari} Hari\n` +
+        `✈️ *Maskapai:* ${airline?.name || data.maskapai || "Penerbangan Terbaik"}\n` +
+        `🏨 *Hotel Makkah:* ${finalHotelMekkah || "-"}\n` +
+        `🏨 *Hotel Madinah:* ${finalHotelMadinah || "-"}\n` +
+        `💰 *Harga Mulai:* Rp ${priceFormatted}\n\n` +
+        `✅ *Fasilitas Termasuk:*\n` +
+        (includeList && includeList.length > 0
+          ? includeList.map((i: string) => `• ${i}`).join("\n")
+          : `• Tiket Pesawat PP & Visa Umroh\n• Hotel & Makan Sesuai Program\n• Transportasi Bus AC & Muthowif Berpengalaman`) +
+        `\n\n📲 *Informasi & Pendaftaran:* Segera hubungi customer care kami sebelum kuota habis!`;
+
+      const packageCaption = data.caption || data.customCaption || defaultPromoCaption;
 
       const flyerBase64List = Array.isArray(data.flyerBase64List) && data.flyerBase64List.length > 0
         ? data.flyerBase64List.filter(Boolean)
@@ -518,7 +536,7 @@ export const packageService = {
                 if (!uploadedFlyerDriveId) uploadedFlyerDriveId = fId;
                 const url = fId.startsWith("http")
                   ? fId
-                  : `https://drive.google.com/uc?export=view&id=${fId}`;
+                  : `/api/storage/download?id=${fId}`;
                 uploadedFlyerUrls.push(url);
               }
             }
@@ -695,7 +713,7 @@ export const packageService = {
               if (!firstDriveId) firstDriveId = fId;
               const url = fId.startsWith("http")
                 ? fId
-                : `https://drive.google.com/uc?export=view&id=${fId}`;
+                : `/api/storage/download?id=${fId}`;
               uploadedUrls.push(url);
             }
           }

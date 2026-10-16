@@ -1241,6 +1241,28 @@ export default function GeneratePaketPage() {
       if (warningMessages.length > 0) {
         setOcrWarning(warningMessages.join(" | "));
       }
+
+      // Otomatis buatkan caption promosi dari data hasil ekstraksi jika admin belum mengetik caption
+      if (!caption || caption.trim() === "") {
+        const depStr = departureDates[0]
+          ? new Date(departureDates[0]).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })
+          : "Mendatang";
+        const airlineObj = options?.airlines?.find((a) => a.id === finalFormData.maskapaiId);
+        const mkkHotel = options?.hotels?.find((h) => h.id === finalFormData.hotelMekkahId);
+        const medHotel = options?.hotels?.find((h) => h.id === finalFormData.hotelMadinahId);
+        const autoCap =
+          `✨ *${finalFormData.namaPaket || "PAKET UMROH SPESIAL"}* ✨\n\n` +
+          `🗓️ *Keberangkatan:* ${depStr}\n` +
+          `⏳ *Durasi:* ${finalFormData.durasiHari || 9} Hari\n` +
+          `✈️ *Maskapai:* ${airlineObj?.name || "Penerbangan Terbaik"}\n` +
+          `🏨 *Hotel Makkah:* ${mkkHotel?.name || "-"}\n` +
+          `🏨 *Hotel Madinah:* ${medHotel?.name || "-"}\n` +
+          `💰 *Harga Mulai:* Rp ${formatNumberWithDots(finalFormData.hargaBase || "35000000")}\n\n` +
+          `✅ *Fasilitas Termasuk:*\n` +
+          `• Tiket Pesawat PP & Visa Umroh\n• Hotel & Makan Sesuai Program\n• Transportasi Bus AC & Muthowif Berpengalaman\n• Asuransi Perjalanan\n\n` +
+          `📲 *Informasi & Pendaftaran:* Segera hubungi customer care kami sebelum kuota habis!`;
+        setCaption(autoCap);
+      }
     } catch (err) {
       console.error(err);
       setOcrWarning("Gagal menghubungi server ekstraksi AI.");
