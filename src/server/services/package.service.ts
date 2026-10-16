@@ -359,15 +359,44 @@ export const packageService = {
         maskapaiCode: mCode,
       });
 
-      const monthFolder = getMonthFolderName(depDate);
+      const pairedItemForThisDate = Array.isArray(data.pairedItems)
+        ? data.pairedItems.find((p: any) => p.childDate === depDateStr || p.parentDate === depDateStr) || data.pairedItems[i]
+        : null;
 
-      // Create & validate Google Drive folder hierarchy for this package BEFORE DB creation
-      const driveFolderIds = await createPackageFolderHierarchy(depYear, monthFolder, folderName);
+      const specificParentId = pairedItemForThisDate?.parentId || initialParentId || data.parentKeberangkatanId || undefined;
 
-      if (!validateFolderRegistry(driveFolderIds)) {
-        throw new Error(
-          `[PackageService Error] Gagal mem-provisioning folder Google Drive untuk paket "${formattedNamaPaket}". Kategori folder tidak lengkap.`
-        );
+      let parentRecord: any = null;
+      if (specificParentId) {
+        if (initialParentKeb && initialParentKeb.id === specificParentId) {
+          parentRecord = initialParentKeb;
+        } else {
+          parentRecord = await prisma.keberangkatan.findUnique({
+            where: { id: specificParentId },
+            include: { startingPoint: true, paketGrup: true },
+          });
+        }
+      }
+
+      // ADR-0025: Deteksi apakah ini Paket Split Varian (Promo, Spek, Varian Fasilitas, dll)
+      const isSplitVariant = !!parentRecord && !!data.splitReason && data.splitReason !== "starting_point";
+      const variantName = isSplitVariant
+        ? (data.splitLabel || data.promoLabel || data.spekLabel || (data.splitReason === "promo" ? "Varian Promo" : data.splitReason === "spek" ? "Varian Spek" : "Varian Khusus"))
+        : "Varian Utama";
+
+      let driveFolderIds: any = null;
+      if (isSplitVariant && parentRecord.driveFolderIds) {
+        // Paket split varian MENGADOPSI folder paket utama (Document Pooling: seluruh berkas jamaah tersimpan di folder paket utama)
+        driveFolderIds = parentRecord.driveFolderIds;
+      } else {
+        // Paket Utama atau Split Starting Point: Buat hierarki folder Google Drive lengkap (termasuk folder FLYER)
+        const monthFolder = getMonthFolderName(depDate);
+        driveFolderIds = await createPackageFolderHierarchy(depYear, monthFolder, folderName);
+
+        if (!validateFolderRegistry(driveFolderIds)) {
+          throw new Error(
+            `[PackageService Error] Gagal mem-provisioning folder Google Drive untuk paket "${formattedNamaPaket}". Kategori folder tidak lengkap.`
+          );
+        }
       }
 
       let formattedPackageName = departureDates.length > 1 ? formattedNamaPaket : (data.namaPaket || formattedNamaPaket);
@@ -380,24 +409,6 @@ export const packageService = {
         const sLabel = data.spekLabel || data.splitLabel;
         if (!formattedPackageName.toLowerCase().includes(sLabel.toLowerCase())) {
           formattedPackageName = `${formattedPackageName} [${sLabel}]`;
-        }
-      }
-
-      const pairedItemForThisDate = Array.isArray(data.pairedItems)
-        ? data.pairedItems.find((p: any) => p.childDate === depDateStr || p.parentDate === depDateStr) || data.pairedItems[i]
-        : null;
-
-      const specificParentId = pairedItemForThisDate?.parentId || initialParentId || undefined;
-
-      let parentRecord: any = null;
-      if (specificParentId) {
-        if (initialParentKeb && initialParentKeb.id === specificParentId) {
-          parentRecord = initialParentKeb;
-        } else {
-          parentRecord = await prisma.keberangkatan.findUnique({
-            where: { id: specificParentId },
-            include: { startingPoint: true, paketGrup: true },
-          });
         }
       }
 
@@ -483,6 +494,15 @@ export const packageService = {
         try {
           const { getStorageAdapter } = await import("../storage");
           const storage = getStorageAdapter();
+
+          // ADR-0025: Dapatkan / buat subfolder varian di dalam folder FLYER paket
+          const { getOrCreateVariantFlyerFolder } = await import("../storage/google-drive");
+          const { variantFolderId } = await getOrCreateVariantFlyerFolder(
+            driveFolderIds.rootPackageFolderId,
+            variantName,
+            driveFolderIds.flyer
+          );
+
           for (let fIdx = 0; fIdx < flyerBase64List.length; fIdx++) {
             const flyerBase64 = flyerBase64List[fIdx];
             const cleanBase64 = flyerBase64.replace(/^data:image\/[a-zA-Z0-9+.-]+;base64,/, "");
@@ -493,7 +513,7 @@ export const packageService = {
               const mimeType = ext === "png" ? "image/png" : "image/jpeg";
               const flyerSuffix = flyerBase64List.length > 1 ? `_${fIdx + 1}` : "";
               const flyerFileName = `Flyer-${kodeIndividu}${flyerSuffix}.${ext}`;
-              const fId = await storage.upload(flyerFileName, imgBuffer, mimeType, driveFolderIds.rootPackageFolderId);
+              const fId = await storage.upload(flyerFileName, imgBuffer, mimeType, variantFolderId);
               if (fId) {
                 if (!uploadedFlyerDriveId) uploadedFlyerDriveId = fId;
                 const url = fId.startsWith("http")
@@ -518,7 +538,13 @@ export const packageService = {
           const { getStorageAdapter } = await import("../storage");
           const storage = getStorageAdapter();
           const captionBuffer = Buffer.from(packageCaption, "utf-8");
-          await storage.upload(`Caption-${kodeIndividu}.txt`, captionBuffer, "text/plain", driveFolderIds.rootPackageFolderId);
+          const { getOrCreateVariantFlyerFolder } = await import("../storage/google-drive");
+          const { variantFolderId } = await getOrCreateVariantFlyerFolder(
+            driveFolderIds.rootPackageFolderId,
+            variantName,
+            driveFolderIds.flyer
+          );
+          await storage.upload(`Caption-${kodeIndividu}.txt`, captionBuffer, "text/plain", variantFolderId);
         } catch (capErr) {
           console.warn("[PackageService] Gagal mengunggah caption ke Google Drive:", capErr);
         }
@@ -641,6 +667,19 @@ export const packageService = {
         let firstDriveId: string | undefined = undefined;
         const kodeIndividu = before?.kode || id;
 
+        // ADR-0025: Tentukan nama subfolder varian
+        const isSplitVariant = !!before?.parentKeberangkatanId && !!before?.splitReason && before?.splitReason !== "starting_point";
+        const variantName = isSplitVariant
+          ? (before?.splitLabel || before?.promoLabel || (before as any)?.spekLabel || "Varian Khusus")
+          : "Varian Utama";
+
+        const { getOrCreateVariantFlyerFolder } = await import("../storage/google-drive");
+        const { variantFolderId } = await getOrCreateVariantFlyerFolder(
+          rootFolderId,
+          variantName,
+          driveFolderIds.flyer
+        );
+
         for (let fIdx = 0; fIdx < flyerBase64List.length; fIdx++) {
           const flyerBase64 = flyerBase64List[fIdx];
           const cleanBase64 = flyerBase64.replace(/^data:image\/[a-zA-Z0-9+.-]+;base64,/, "");
@@ -651,7 +690,7 @@ export const packageService = {
             const mimeType = ext === "png" ? "image/png" : "image/jpeg";
             const flyerSuffix = flyerBase64List.length > 1 ? `_${fIdx + 1}` : "";
             const flyerFileName = `Flyer-${kodeIndividu}${flyerSuffix}.${ext}`;
-            const fId = await storage.upload(flyerFileName, imgBuffer, mimeType, rootFolderId);
+            const fId = await storage.upload(flyerFileName, imgBuffer, mimeType, variantFolderId);
             if (fId) {
               if (!firstDriveId) firstDriveId = fId;
               const url = fId.startsWith("http")
@@ -676,7 +715,20 @@ export const packageService = {
         const storage = getStorageAdapter();
         const kodeIndividu = before?.kode || id;
         const captionBuffer = Buffer.from(data.caption, "utf-8");
-        await storage.upload(`Caption-${kodeIndividu}.txt`, captionBuffer, "text/plain", rootFolderId);
+
+        const isSplitVariant = !!before?.parentKeberangkatanId && !!before?.splitReason && before?.splitReason !== "starting_point";
+        const variantName = isSplitVariant
+          ? (before?.splitLabel || before?.promoLabel || (before as any)?.spekLabel || "Varian Khusus")
+          : "Varian Utama";
+
+        const { getOrCreateVariantFlyerFolder } = await import("../storage/google-drive");
+        const { variantFolderId } = await getOrCreateVariantFlyerFolder(
+          rootFolderId,
+          variantName,
+          driveFolderIds.flyer
+        );
+
+        await storage.upload(`Caption-${kodeIndividu}.txt`, captionBuffer, "text/plain", variantFolderId);
       } catch (capErr) {
         console.warn("[PackageService] Gagal mengunggah caption di updateWithAudit:", capErr);
       }

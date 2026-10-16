@@ -122,6 +122,7 @@ export async function getOrCreateFolder(folderName: string, parentId?: string): 
 
 export interface DriveFolderRegistry {
   rootPackageFolderId: string;
+  flyer?: string;
   paspor: string;
   ktp: string;
   foto: string;
@@ -215,6 +216,7 @@ export async function createPackageFolderHierarchy(
     manifest,
     exportFolder,
     formulirPendaftaran,
+    flyerFolder,
   ] = await Promise.all([
     getOrCreateFolder("PASPOR", packageFolderId),
     getOrCreateFolder("KTP", packageFolderId),
@@ -225,10 +227,12 @@ export async function createPackageFolderHierarchy(
     getOrCreateFolder("MANIFEST", packageFolderId),
     getOrCreateFolder("EXPORT", packageFolderId),
     getOrCreateFolder("FORMULIR PENDAFTARAN", packageFolderId),
+    getOrCreateFolder("FLYER", packageFolderId),
   ]);
 
   const registry: DriveFolderRegistry = {
     rootPackageFolderId: packageFolderId,
+    flyer: flyerFolder,
     paspor,
     ktp,
     foto,
@@ -247,6 +251,21 @@ export async function createPackageFolderHierarchy(
   }
 
   return registry;
+}
+
+/**
+ * Dapatkan atau buat folder FLYER dan subfolder varian di dalam packageFolderId
+ * Contoh: packageFolderId -> FLYER -> "Varian Utama" / "Varian Promo" / "Varian Spek"
+ */
+export async function getOrCreateVariantFlyerFolder(
+  packageFolderId: string,
+  variantName: string = "Varian Utama",
+  knownFlyerFolderId?: string
+): Promise<{ flyerFolderId: string; variantFolderId: string }> {
+  const flyerFolderId = knownFlyerFolderId || (await getOrCreateFolder("FLYER", packageFolderId));
+  const safeVariantName = variantName && variantName.trim() !== "" ? variantName.trim() : "Varian Utama";
+  const variantFolderId = await getOrCreateFolder(safeVariantName, flyerFolderId);
+  return { flyerFolderId, variantFolderId };
 }
 
 export async function provisionPackageStorage(packageId: string): Promise<DriveFolderRegistry | undefined> {
