@@ -18,6 +18,10 @@ import {
   ChevronLeft,
   ChevronRight,
   MapPin,
+  UploadCloud,
+  Trash2,
+  Edit3,
+  ImagePlus,
 } from "lucide-react";
 import { Button } from "@/shared/components/ui/Button";
 import { Input } from "@/shared/components/ui/Input";
@@ -162,6 +166,121 @@ export default function KatalogPaketPage() {
 
   // Copy Caption State
   const [copiedCaptionId, setCopiedCaptionId] = useState<string | null>(null);
+
+  // Modal Kelola Flyer & Caption
+  const [manageMediaPkg, setManageMediaPkg] = useState<Keberangkatan | null>(null);
+  const [mediaFlyerUrls, setMediaFlyerUrls] = useState<string[]>([]);
+  const [newFlyerFiles, setNewFlyerFiles] = useState<File[]>([]);
+  const [newFlyerPreviews, setNewFlyerPreviews] = useState<string[]>([]);
+  const [mediaCaption, setMediaCaption] = useState<string>("");
+  const [savingMedia, setSavingMedia] = useState<boolean>(false);
+
+  const openManageMediaModal = (pkg: Keberangkatan) => {
+    setManageMediaPkg(pkg);
+    setMediaFlyerUrls(getFlyerList(pkg));
+    setNewFlyerFiles([]);
+    setNewFlyerPreviews([]);
+    setMediaCaption(pkg.caption || "");
+  };
+
+  const handleAddNewFlyers = (incoming: FileList | File[]) => {
+    const arr = Array.from(incoming).filter((f) => f.type.startsWith("image/"));
+    if (arr.length === 0) return;
+    const newPreviews = arr.map((f) => URL.createObjectURL(f));
+    setNewFlyerFiles((prev) => [...prev, ...arr]);
+    setNewFlyerPreviews((prev) => [...prev, ...newPreviews]);
+  };
+
+  const handleRemoveExistingFlyer = (index: number) => {
+    setMediaFlyerUrls((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleRemoveNewFlyer = (index: number) => {
+    const url = newFlyerPreviews[index];
+    if (url) URL.revokeObjectURL(url);
+    setNewFlyerFiles((prev) => prev.filter((_, i) => i !== index));
+    setNewFlyerPreviews((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleGenerateAutoCaption = () => {
+    if (!manageMediaPkg) return;
+    const depStr = manageMediaPkg.tanggalBerangkat
+      ? new Date(manageMediaPkg.tanggalBerangkat).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })
+      : "-";
+    const autoCap = `✨ *${manageMediaPkg.namaPaket}* ✨\n\n` +
+      `🗓️ *Keberangkatan:* ${depStr}\n` +
+      `⏳ *Durasi:* ${manageMediaPkg.durationDays || 9} Hari\n` +
+      `✈️ *Maskapai:* ${manageMediaPkg.maskapai || "Penerbangan Terbaik"}\n` +
+      `🏨 *Hotel Makkah:* ${manageMediaPkg.hotelMekkah || "-"}\n` +
+      `🏨 *Hotel Madinah:* ${manageMediaPkg.hotelMadinah || "-"}\n` +
+      `💰 *Harga:* Rp ${formatNumberWithDots(manageMediaPkg.hargaPaket || 35000000)}\n\n` +
+      `✅ *Fasilitas Termasuk:*\n` +
+      (manageMediaPkg.include && manageMediaPkg.include.length > 0
+        ? manageMediaPkg.include.map((i) => `• ${i}`).join("\n")
+        : `• Tiket Pesawat PP & Visa Umroh\n• Hotel & Makan Sesuai Program\n• Transportasi Bus AC & Muthowif Berpengalaman`) +
+      `\n\n📲 *Informasi & Pendaftaran:* Segera hubungi customer care kami sebelum kuota habis!`;
+    setMediaCaption(autoCap);
+  };
+
+  const handleSaveMedia = async () => {
+    if (!manageMediaPkg) return;
+    setSavingMedia(true);
+    try {
+      const base64List = await Promise.all(
+        newFlyerFiles.map((file) => {
+          return new Promise<string>((resolve) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result as string);
+            reader.onerror = () => resolve("");
+            reader.readAsDataURL(file);
+          });
+        })
+      );
+      const validBase64 = base64List.filter(Boolean);
+
+      const payload: any = {
+        caption: mediaCaption || null,
+      };
+
+      if (validBase64.length > 0) {
+        payload.flyerBase64List = validBase64;
+        if (mediaFlyerUrls.length > 0) {
+          payload.flyerUrl = mediaFlyerUrls.join(",");
+        }
+      } else {
+        payload.flyerUrl = mediaFlyerUrls.join(",") || null;
+      }
+
+      const res = await fetch(`/api/keberangkatan/${manageMediaPkg.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const json = await res.json();
+      if (json.success && json.data) {
+        const updatedPkg = json.data;
+        setPackages((prev) =>
+          prev.map((p) => (p.id === manageMediaPkg.id ? { ...p, ...updatedPkg } : p))
+        );
+        if (typeof window !== "undefined") {
+          const nextList = packages.map((p) =>
+            p.id === manageMediaPkg.id ? { ...p, ...updatedPkg } : p
+          );
+          memoryCachedPackages = nextList;
+          try {
+            localStorage.setItem(KATALOG_PACKAGES_CACHE_KEY, JSON.stringify(nextList));
+          } catch {}
+        }
+        setManageMediaPkg(null);
+      } else {
+        alert(json.message || "Gagal menyimpan perubahan flyer & caption");
+      }
+    } catch (err: any) {
+      alert("Terjadi kesalahan: " + (err?.message || err));
+    } finally {
+      setSavingMedia(false);
+    }
+  };
 
   // Fetch Packages dengan Stale-While-Revalidate
   const fetchPackages = async (isManual = false) => {
@@ -628,6 +747,19 @@ Salam hangat dari kami,
                     </button>
                   </div>
 
+                  {/* Floating Edit Flyer Button in top-left */}
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openManageMediaModal(pkg);
+                    }}
+                    className="absolute top-2.5 left-2.5 p-1.5 rounded-full bg-emerald-950/80 hover:bg-emerald-900 text-white border border-emerald-400/50 shadow-md backdrop-blur-md opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer z-10"
+                    title="Ganti / Kelola Flyer"
+                  >
+                    <ImagePlus className="w-3.5 h-3.5 text-amber-300" />
+                  </button>
+
                   {/* Page Indicator Badge */}
                   <div className="absolute top-2.5 right-2.5 px-3 py-1 rounded-full bg-gradient-to-r from-emerald-950/90 via-teal-900/90 to-emerald-950/90 border border-amber-400/60 text-[11px] font-black text-amber-300 backdrop-blur-md shadow-md flex items-center gap-1">
                     <span>
@@ -642,6 +774,17 @@ Salam hangat dari kami,
                   </div>
                   <p className="text-xs font-black text-emerald-950">Belum Ada Brosur Flyer</p>
                   <p className="text-[10.5px] text-emerald-900/70 font-semibold">Materi flyer belum diunggah</p>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openManageMediaModal(pkg);
+                    }}
+                    className="mt-1 px-3 py-1.5 rounded-xl border border-emerald-500 bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-500 hover:to-teal-600 text-white text-[11px] font-bold shadow-md flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer"
+                  >
+                    <UploadCloud className="w-3.5 h-3.5 text-amber-300" />
+                    <span>Unggah Flyer</span>
+                  </button>
                 </div>
               )}
             </div>
@@ -653,31 +796,54 @@ Salam hangat dari kami,
                   <FileText className="w-4 h-4 text-emerald-700" />
                   Caption Promosi
                 </span>
-                <button
-                  type="button"
-                  onClick={() => handleCopyCaption(pkg)}
-                  className="px-3 py-1.5 rounded-xl border border-amber-300 bg-gradient-to-r from-amber-400 via-amber-500 to-yellow-500 hover:from-amber-300 hover:to-yellow-400 text-slate-950 text-[11px] font-black flex items-center gap-1.5 shadow-[0_3px_10px_rgba(245,158,11,0.35),inset_0_1px_1px_rgba(255,255,255,0.6)] transition-all active:scale-95 cursor-pointer"
-                >
-                  {copiedCaptionId === pkg.id ? (
-                    <>
-                      <Check className="w-3.5 h-3.5 text-slate-950" />
-                      <span>Disalin!</span>
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="w-3.5 h-3.5 text-slate-950" />
-                      <span>Salin Caption</span>
-                    </>
-                  )}
-                </button>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => openManageMediaModal(pkg)}
+                    title="Edit Caption / Kelola Flyer"
+                    className="p-1.5 px-2 rounded-xl border border-teal-400/50 bg-white hover:bg-teal-50 text-teal-800 shadow-xs transition-all active:scale-95 cursor-pointer flex items-center gap-1 text-[11px] font-bold"
+                  >
+                    <Edit3 className="w-3.5 h-3.5 text-teal-700" />
+                    <span className="hidden sm:inline">Kelola</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleCopyCaption(pkg)}
+                    className="px-3 py-1.5 rounded-xl border border-amber-300 bg-gradient-to-r from-amber-400 via-amber-500 to-yellow-500 hover:from-amber-300 hover:to-yellow-400 text-slate-950 text-[11px] font-black flex items-center gap-1.5 shadow-[0_3px_10px_rgba(245,158,11,0.35),inset_0_1px_1px_rgba(255,255,255,0.6)] transition-all active:scale-95 cursor-pointer"
+                  >
+                    {copiedCaptionId === pkg.id ? (
+                      <>
+                        <Check className="w-3.5 h-3.5 text-slate-950" />
+                        <span>Disalin!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-3.5 h-3.5 text-slate-950" />
+                        <span>Salin Caption</span>
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
 
               {/* Scrollable Container dengan Custom Aesthetic Scrollbar */}
               <div className="flex-1 overflow-y-auto pr-1 text-[11.5px] text-emerald-950 font-sans leading-relaxed whitespace-pre-line scrollbar-thin scrollbar-thumb-teal-500/30 scrollbar-track-transparent">
-                {pkg.caption || (
-                  <span className="text-emerald-900/50 italic text-xs">
-                    Belum ada teks caption promosi khusus untuk paket keberangkatan ini.
-                  </span>
+                {pkg.caption ? (
+                  pkg.caption
+                ) : (
+                  <div className="flex flex-col items-center justify-center h-full py-8 text-center space-y-2">
+                    <span className="text-emerald-900/50 italic text-xs">
+                      Belum ada teks caption promosi khusus untuk paket keberangkatan ini.
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => openManageMediaModal(pkg)}
+                      className="px-3 py-1.5 rounded-xl border border-teal-500/50 bg-teal-50 hover:bg-teal-100 text-teal-900 text-[11px] font-bold shadow-2xs flex items-center gap-1.5 cursor-pointer transition-all active:scale-95"
+                    >
+                      <Edit3 className="w-3.5 h-3.5 text-teal-700" />
+                      <span>Buat / Isi Caption</span>
+                    </button>
+                  </div>
                 )}
               </div>
             </div>
@@ -1283,6 +1449,180 @@ Salam hangat dari kami,
                 <span>Gunakan tombol panah atau tombol di samping untuk menggeser halaman brosur</span>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL KELOLA FLYER & CAPTION PROMOSI ── */}
+      {manageMediaPkg && (
+        <div className="fixed inset-0 z-50 bg-slate-950/75 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl border-2 border-emerald-500/40 shadow-2xl max-w-2xl w-full p-6 space-y-5 my-8">
+            {/* Header Modal */}
+            <div className="flex items-center justify-between pb-3 border-b border-emerald-100">
+              <div className="space-y-1 min-w-0 pr-4">
+                <div className="flex items-center gap-2">
+                  <span className="p-1.5 rounded-xl bg-emerald-100 text-emerald-800 font-bold text-xs">
+                    🎨 Media Manager
+                  </span>
+                  <h3 className="text-base font-black text-slate-900 truncate">
+                    Kelola Flyer & Caption
+                  </h3>
+                </div>
+                <p className="text-xs text-slate-600 font-medium truncate">
+                  {manageMediaPkg.namaPaket}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setManageMediaPkg(null)}
+                disabled={savingMedia}
+                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center font-bold transition-all text-xs cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Section 1: Flyer Brosur */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-black text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+                  <ImagePlus className="w-4 h-4 text-emerald-700" />
+                  Brosur Flyer Paket
+                </label>
+                <span className="text-[11px] font-semibold text-slate-500">
+                  {mediaFlyerUrls.length + newFlyerFiles.length} flyer aktif
+                </span>
+              </div>
+
+              {/* Flyer List Grid (Existing + New) */}
+              <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
+                {/* Existing Flyers */}
+                {mediaFlyerUrls.map((url, idx) => (
+                  <div key={`existing-${idx}`} className="relative group rounded-xl overflow-hidden border-2 border-emerald-300 aspect-[3/4] bg-slate-100 shadow-xs">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={url} alt={`Flyer ${idx + 1}`} className="w-full h-full object-cover" />
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveExistingFlyer(idx)}
+                      disabled={savingMedia}
+                      className="absolute top-1 right-1 p-1 rounded-full bg-red-600 hover:bg-red-700 text-white shadow-md opacity-90 hover:opacity-100 transition-all cursor-pointer"
+                      title="Hapus flyer ini"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                    <div className="absolute bottom-0 inset-x-0 bg-emerald-950/80 text-amber-300 text-[10px] font-bold text-center py-0.5">
+                      Hal {idx + 1}
+                    </div>
+                  </div>
+                ))}
+
+                {/* Newly Added Flyers */}
+                {newFlyerPreviews.map((url, idx) => (
+                  <div key={`new-${idx}`} className="relative group rounded-xl overflow-hidden border-2 border-amber-400 aspect-[3/4] bg-slate-100 shadow-xs ring-2 ring-amber-400/30">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={url} alt={`Flyer Baru ${idx + 1}`} className="w-full h-full object-cover" />
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveNewFlyer(idx)}
+                      disabled={savingMedia}
+                      className="absolute top-1 right-1 p-1 rounded-full bg-red-600 hover:bg-red-700 text-white shadow-md opacity-90 hover:opacity-100 transition-all cursor-pointer"
+                      title="Hapus flyer baru ini"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                    <div className="absolute bottom-0 inset-x-0 bg-amber-950/85 text-amber-300 text-[10px] font-bold text-center py-0.5">
+                      Baru {idx + 1}
+                    </div>
+                  </div>
+                ))}
+
+                {/* Add Flyer Button */}
+                <div
+                  onClick={() => {
+                    const input = document.getElementById("katalog-flyer-file-input");
+                    if (input) (input as HTMLInputElement).click();
+                  }}
+                  className="rounded-xl border-2 border-dashed border-emerald-400/80 hover:border-emerald-500 bg-emerald-50/50 hover:bg-emerald-50 flex flex-col items-center justify-center p-3 aspect-[3/4] cursor-pointer transition-all text-center gap-1.5 active:scale-95 shadow-xs"
+                >
+                  <input
+                    id="katalog-flyer-file-input"
+                    type="file"
+                    multiple
+                    accept="image/jpeg,image/png,image/webp"
+                    className="hidden"
+                    onChange={(e) => {
+                      if (e.target.files) handleAddNewFlyers(e.target.files);
+                    }}
+                  />
+                  <div className="w-8 h-8 rounded-full bg-emerald-200/80 text-emerald-800 flex items-center justify-center font-bold">
+                    <UploadCloud className="w-4 h-4" />
+                  </div>
+                  <span className="text-[11px] font-black text-emerald-950 leading-tight">
+                    + Tambah Foto Flyer
+                  </span>
+                  <span className="text-[9.5px] text-emerald-800/70 font-semibold">
+                    JPG/PNG/WEBP
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Section 2: Caption Promosi */}
+            <div className="space-y-2 pt-2 border-t border-emerald-100">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-black text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+                  <FileText className="w-4 h-4 text-emerald-700" />
+                  Caption Promosi Pemasaran
+                </label>
+                <button
+                  type="button"
+                  onClick={handleGenerateAutoCaption}
+                  disabled={savingMedia}
+                  className="text-[11px] font-bold text-emerald-700 hover:text-emerald-800 hover:underline flex items-center gap-1 cursor-pointer"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                  <span>Generate Otomatis dari Data Paket</span>
+                </button>
+              </div>
+              <textarea
+                value={mediaCaption}
+                onChange={(e) => setMediaCaption(e.target.value)}
+                rows={6}
+                placeholder="Tuliskan atau tempel caption promosi di sini. Teks ini akan tampil di katalog dan dapat disalin langsung oleh admin saat mengirim paket ke jamaah..."
+                className="w-full p-3 text-xs font-medium rounded-2xl border-2 border-teal-200 bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 font-sans leading-relaxed shadow-xs placeholder:text-stone-400"
+              />
+            </div>
+
+            {/* Footer Buttons */}
+            <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-emerald-100">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setManageMediaPkg(null)}
+                disabled={savingMedia}
+                className="rounded-xl font-bold text-xs"
+              >
+                Batal
+              </Button>
+              <Button
+                type="button"
+                onClick={handleSaveMedia}
+                disabled={savingMedia}
+                className="rounded-xl bg-gradient-to-r from-emerald-600 via-teal-700 to-emerald-700 hover:from-emerald-500 hover:to-teal-600 text-white font-bold text-xs shadow-md flex items-center gap-1.5 px-5"
+              >
+                {savingMedia ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span>Menyimpan...</span>
+                  </>
+                ) : (
+                  <>
+                    <Check className="w-3.5 h-3.5" />
+                    <span>Simpan Perubahan</span>
+                  </>
+                )}
+              </Button>
+            </div>
           </div>
         </div>
       )}

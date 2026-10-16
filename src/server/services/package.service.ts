@@ -472,34 +472,46 @@ export const packageService = {
 
       // Upload flyer and caption to Google Drive vault
       let uploadedFlyerDriveId: string | undefined = undefined;
-      let uploadedFlyerUrl: string | undefined = undefined;
+      const uploadedFlyerUrls: string[] = [];
       const packageCaption = data.caption || data.customCaption || undefined;
 
-      const flyerBase64 = Array.isArray(data.flyerBase64List) && data.flyerBase64List.length > 0
-        ? data.flyerBase64List[0]
-        : (data.flyerBase64 || null);
+      const flyerBase64List = Array.isArray(data.flyerBase64List) && data.flyerBase64List.length > 0
+        ? data.flyerBase64List.filter(Boolean)
+        : (data.flyerBase64 ? [data.flyerBase64] : []);
 
-      if (flyerBase64 && driveFolderIds?.rootPackageFolderId) {
+      if (flyerBase64List.length > 0 && driveFolderIds?.rootPackageFolderId) {
         try {
           const { getStorageAdapter } = await import("../storage");
           const storage = getStorageAdapter();
-          const cleanBase64 = flyerBase64.replace(/^data:image\/[a-zA-Z]+;base64,/, "");
-          const imgBuffer = Buffer.from(cleanBase64, "base64");
-          if (imgBuffer.length > 0) {
-            const extMatch = flyerBase64.match(/^data:image\/([a-zA-Z]+);base64,/);
-            const ext = extMatch ? extMatch[1] : "jpg";
-            const mimeType = ext === "png" ? "image/png" : "image/jpeg";
-            const flyerFileName = `Flyer-${kodeIndividu}.${ext}`;
-            const fId = await storage.upload(flyerFileName, imgBuffer, mimeType, driveFolderIds.rootPackageFolderId);
-            if (fId) {
-              uploadedFlyerDriveId = fId;
-              uploadedFlyerUrl = `https://drive.google.com/uc?export=view&id=${fId}`;
+          for (let fIdx = 0; fIdx < flyerBase64List.length; fIdx++) {
+            const flyerBase64 = flyerBase64List[fIdx];
+            const cleanBase64 = flyerBase64.replace(/^data:image\/[a-zA-Z0-9+.-]+;base64,/, "");
+            const imgBuffer = Buffer.from(cleanBase64, "base64");
+            if (imgBuffer.length > 0) {
+              const extMatch = flyerBase64.match(/^data:image\/([a-zA-Z0-9+.-]+);base64,/);
+              const ext = extMatch ? (extMatch[1] === "png" ? "png" : "jpg") : "jpg";
+              const mimeType = ext === "png" ? "image/png" : "image/jpeg";
+              const flyerSuffix = flyerBase64List.length > 1 ? `_${fIdx + 1}` : "";
+              const flyerFileName = `Flyer-${kodeIndividu}${flyerSuffix}.${ext}`;
+              const fId = await storage.upload(flyerFileName, imgBuffer, mimeType, driveFolderIds.rootPackageFolderId);
+              if (fId) {
+                if (!uploadedFlyerDriveId) uploadedFlyerDriveId = fId;
+                const url = fId.startsWith("http")
+                  ? fId
+                  : `https://drive.google.com/uc?export=view&id=${fId}`;
+                uploadedFlyerUrls.push(url);
+              }
             }
           }
         } catch (flyerErr) {
           console.warn("[PackageService] Gagal mengunggah flyer ke Google Drive:", flyerErr);
         }
       }
+
+      // Final Flyer URL (gabungan multi-flyer atau fallback flyerUrl yang sudah ada)
+      const finalFlyerUrl = uploadedFlyerUrls.length > 0
+        ? uploadedFlyerUrls.join(",")
+        : (data.flyerUrl || undefined);
 
       if (packageCaption && driveFolderIds?.rootPackageFolderId) {
         try {
@@ -523,8 +535,8 @@ export const packageService = {
         spekLabel: data.spekLabel || (data.splitReason === "spek" ? data.splitLabel : undefined),
         notes: lineageNotes || undefined,
         driveFolderIds,
-        flyerUrl: uploadedFlyerUrl,
-        flyerDriveId: uploadedFlyerDriveId,
+        flyerUrl: finalFlyerUrl,
+        flyerDriveId: uploadedFlyerDriveId || data.flyerDriveId || undefined,
         caption: packageCaption,
         include: includeList,
         namaPaket: formattedPackageName,
@@ -612,9 +624,73 @@ export const packageService = {
 
   async updateWithAudit(id: string, data: any, user: { userId: string; userName: string; role: string }) {
     const before = await keberangkatanRepo.findById(id);
+
+    // Process flyer upload if provided in update payload
+    const flyerBase64List = Array.isArray(data.flyerBase64List) && data.flyerBase64List.length > 0
+      ? data.flyerBase64List.filter(Boolean)
+      : (data.flyerBase64 ? [data.flyerBase64] : []);
+
+    const driveFolderIds = (before?.driveFolderIds as any);
+    const rootFolderId = driveFolderIds?.rootPackageFolderId;
+
+    if (flyerBase64List.length > 0 && rootFolderId) {
+      try {
+        const { getStorageAdapter } = await import("../storage");
+        const storage = getStorageAdapter();
+        const uploadedUrls: string[] = [];
+        let firstDriveId: string | undefined = undefined;
+        const kodeIndividu = before?.kode || id;
+
+        for (let fIdx = 0; fIdx < flyerBase64List.length; fIdx++) {
+          const flyerBase64 = flyerBase64List[fIdx];
+          const cleanBase64 = flyerBase64.replace(/^data:image\/[a-zA-Z0-9+.-]+;base64,/, "");
+          const imgBuffer = Buffer.from(cleanBase64, "base64");
+          if (imgBuffer.length > 0) {
+            const extMatch = flyerBase64.match(/^data:image\/([a-zA-Z0-9+.-]+);base64,/);
+            const ext = extMatch ? (extMatch[1] === "png" ? "png" : "jpg") : "jpg";
+            const mimeType = ext === "png" ? "image/png" : "image/jpeg";
+            const flyerSuffix = flyerBase64List.length > 1 ? `_${fIdx + 1}` : "";
+            const flyerFileName = `Flyer-${kodeIndividu}${flyerSuffix}.${ext}`;
+            const fId = await storage.upload(flyerFileName, imgBuffer, mimeType, rootFolderId);
+            if (fId) {
+              if (!firstDriveId) firstDriveId = fId;
+              const url = fId.startsWith("http")
+                ? fId
+                : `https://drive.google.com/uc?export=view&id=${fId}`;
+              uploadedUrls.push(url);
+            }
+          }
+        }
+        if (uploadedUrls.length > 0) {
+          data.flyerUrl = uploadedUrls.join(",");
+          data.flyerDriveId = firstDriveId;
+        }
+      } catch (err) {
+        console.warn("[PackageService] Gagal mengunggah flyer di updateWithAudit:", err);
+      }
+    }
+
+    if (data.caption && rootFolderId) {
+      try {
+        const { getStorageAdapter } = await import("../storage");
+        const storage = getStorageAdapter();
+        const kodeIndividu = before?.kode || id;
+        const captionBuffer = Buffer.from(data.caption, "utf-8");
+        await storage.upload(`Caption-${kodeIndividu}.txt`, captionBuffer, "text/plain", rootFolderId);
+      } catch (capErr) {
+        console.warn("[PackageService] Gagal mengunggah caption di updateWithAudit:", capErr);
+      }
+    }
+
     const updated = await keberangkatanRepo.update(id, data);
 
     const changes: string[] = [];
+    if (data.flyerUrl !== undefined) {
+      changes.push("Brosur Flyer diperbarui");
+    }
+    if (data.caption !== undefined) {
+      changes.push("Caption Promosi diperbarui");
+    }
     if (data.tanggalBerangkat) {
       const newDep = new Date(data.tanggalBerangkat).toISOString().split("T")[0];
       const oldDep = before?.tanggalBerangkat ? new Date(before.tanggalBerangkat).toISOString().split("T")[0] : "";

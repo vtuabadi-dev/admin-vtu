@@ -228,6 +228,9 @@ export const keberangkatanRepo = {
     if (data.packageTypeId !== undefined) updateData.packageTypeId = data.packageTypeId;
     if (data.include !== undefined) updateData.include = data.include;
     if (data.exclude !== undefined) updateData.exclude = data.exclude;
+    if (data.flyerUrl !== undefined) updateData.flyerUrl = data.flyerUrl;
+    if (data.flyerDriveId !== undefined) updateData.flyerDriveId = data.flyerDriveId;
+    if (data.caption !== undefined) updateData.caption = data.caption;
 
     if (data.driveFolderIds !== undefined || data.tourLeader !== undefined || data.muthowif !== undefined || data.flightDetails !== undefined || data.isPublishedKatalog !== undefined) {
       const existing = await prisma.keberangkatan.findUnique({ where: { id }, select: { driveFolderIds: true } });

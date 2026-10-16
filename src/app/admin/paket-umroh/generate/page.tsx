@@ -2249,16 +2249,120 @@ export default function GeneratePaketPage() {
               </div>
             )}
 
-            {/* Custom Caption for Telegram Broadcast */}
+            {/* ── Unggah Brosur Flyer Paket (Jalur Manual) ── */}
             <div className="pt-3 border-t border-stone-200">
-              <label className="block text-xs font-bold mb-1.5 text-slate-800">
-                Caption / Teks Pemasaran Broadcast Telegram (Opsional)
-              </label>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-xs font-bold text-slate-800">
+                  🖼️ Brosur / Flyer Paket (Opsional - Tampil di Katalog & Broadcast)
+                </label>
+                <span className="text-[11px] font-semibold text-stone-500">
+                  {flyerFiles.length}/{MAX_FILES} file dipilih
+                </span>
+              </div>
+              <div
+                onDrop={handleDrop}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                className={cn(
+                  "border-2 border-dashed rounded-xl p-4 text-center cursor-pointer transition-colors bg-stone-50/60 hover:bg-stone-50",
+                  isDragging ? "border-emerald-500 bg-emerald-50/40" : "border-stone-300"
+                )}
+                onClick={() => {
+                  const input = document.getElementById("manual-flyer-upload-input");
+                  if (input) (input as HTMLInputElement).click();
+                }}
+              >
+                <input
+                  id="manual-flyer-upload-input"
+                  type="file"
+                  multiple
+                  accept="image/jpeg,image/png,image/webp"
+                  className="hidden"
+                  onChange={(e) => {
+                    if (e.target.files) addFiles(e.target.files);
+                  }}
+                />
+                <div className="flex flex-col items-center justify-center gap-1.5">
+                  <div className="w-10 h-10 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold">
+                    📸
+                  </div>
+                  <p className="text-xs font-bold text-slate-800">
+                    Klik untuk pilih foto flyer atau seret & lepas file ke sini
+                  </p>
+                  <p className="text-[10.5px] text-stone-500 font-medium">
+                    Mendukung JPG, PNG, WEBP (Bisa unggah multi-brosur / itinerary)
+                  </p>
+                </div>
+              </div>
+
+              {/* Flyer Previews in Manual Form */}
+              {flyerFiles.length > 0 && (
+                <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-2">
+                  {flyerFiles.map((file, idx) => (
+                    <div key={idx} className="relative group rounded-lg overflow-hidden border border-stone-200 bg-white aspect-[3/4] shadow-xs">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={flyerPreviews[idx] || ""}
+                        alt={file.name}
+                        className="w-full h-full object-cover"
+                      />
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          removeFile(idx);
+                        }}
+                        className="absolute top-1 right-1 p-1 rounded-full bg-red-600 text-white opacity-90 hover:opacity-100 shadow-sm"
+                        title="Hapus flyer ini"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                      <div className="absolute bottom-0 inset-x-0 bg-slate-900/80 text-white text-[9.5px] px-1 py-0.5 truncate text-center font-mono">
+                        Hal {idx + 1}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Custom Caption for Katalog & Telegram Broadcast */}
+            <div className="pt-3 border-t border-stone-200">
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-xs font-bold text-slate-800">
+                  📝 Caption Promosi (Tampil di Katalog Paket & Siaran Telegram)
+                </label>
+                {(!caption || caption.trim() === "") && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const depStr = departureDates[0] ? new Date(departureDates[0]).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" }) : "Mendatang";
+                      const autoCap = `✨ *${formData.namaPaket || "PAKET UMROH SPESIAL"}* ✨\n\n` +
+                        `🗓️ *Keberangkatan:* ${depStr}\n` +
+                        `⏳ *Durasi:* ${formData.durasiHari || 9} Hari\n` +
+                        `✈️ *Maskapai:* ${options?.airlines?.find(a => a.id === formData.maskapaiId)?.name || "Penerbangan Terbaik"}\n` +
+                        `🏨 *Hotel Makkah:* ${options?.hotels?.find(h => h.id === formData.hotelMekkahId)?.name || "-"}\n` +
+                        `🏨 *Hotel Madinah:* ${options?.hotels?.find(h => h.id === formData.hotelMadinahId)?.name || "-"}\n` +
+                        `💰 *Harga Mulai:* Rp ${formatNumberWithDots(formData.hargaBase || "35000000")}\n\n` +
+                        `✅ *Fasilitas Termasuk:*\n` +
+                        `• Tiket Pesawat PP & Visa Umroh\n` +
+                        `• Hotel & Makan Sesuai Program\n` +
+                        `• Transportasi Bus AC & Muthowif Berpengalaman\n` +
+                        `• Asuransi Perjalanan\n\n` +
+                        `📲 *Informasi & Pendaftaran:* Segera hubungi customer care kami sebelum kuota habis!`;
+                      setCaption(autoCap);
+                    }}
+                    className="text-[11px] font-bold text-emerald-700 hover:text-emerald-800 hover:underline cursor-pointer"
+                  >
+                    ✨ Buat Template Caption Otomatis
+                  </button>
+                )}
+              </div>
               <textarea
                 value={caption}
                 onChange={(e) => setCaption(e.target.value)}
-                placeholder="Tuliskan atau tempel caption pemasaran di sini. Jika diisi, bot Telegram akan menyiarkan caption ini langsung ke grup..."
-                className="w-full h-20 p-3 text-xs font-medium rounded-xl border border-stone-300 bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-emerald-600 min-h-[56px] shadow-xs placeholder:text-stone-400"
+                placeholder="Tuliskan atau tempel caption pemasaran di sini. Caption ini akan muncul di Katalog Paket serta disiarkan oleh bot Telegram..."
+                className="w-full h-24 p-3 text-xs font-medium rounded-xl border border-stone-300 bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-emerald-600 min-h-[64px] shadow-xs placeholder:text-stone-400 font-sans"
               />
             </div>
           </div>
