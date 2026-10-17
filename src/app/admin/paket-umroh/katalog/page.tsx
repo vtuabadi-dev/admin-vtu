@@ -646,6 +646,7 @@ export default function KatalogPaketPage() {
     setTargetPackage(pkg);
     setSelectedGuest(null);
     setGuestSearch("");
+    setSelectedFlyerIndex(0);
     fetchMyGuests();
   };
 
@@ -724,42 +725,67 @@ Salam hangat dari kami,
   // State & handler untuk salin gambar flyer ke clipboard
   const [copyingFlyer, setCopyingFlyer] = useState(false);
   const [copiedFlyerSuccess, setCopiedFlyerSuccess] = useState(false);
+  const [selectedFlyerIndex, setSelectedFlyerIndex] = useState(0);
 
   const handleCopyFlyerImageToClipboard = async (flyerUrl: string) => {
     try {
       setCopyingFlyer(true);
-      const fullUrl = flyerUrl.startsWith("http")
+
+      if (!flyerUrl) throw new Error("URL flyer tidak ditemukan");
+
+      // Periksa dukungan Clipboard API
+      if (typeof navigator === "undefined" || !navigator.clipboard || typeof navigator.clipboard.write !== "function") {
+        throw new Error("Peramban Anda tidak mengizinkan akses salin gambar otomatis ke papan klip");
+      }
+
+      // Gunakan relative path atau origin lokal agar tidak terkena blokir CORS lintas domain
+      const targetUrl = flyerUrl.startsWith("http")
         ? flyerUrl
-        : `https://www.vtu.my.id${flyerUrl.startsWith("/") ? "" : "/"}${flyerUrl}`;
-      const res = await fetch(fullUrl);
-      const blob = await res.blob();
-      const objectUrl = URL.createObjectURL(blob);
-      const img = new Image();
-      img.src = objectUrl;
-      await new Promise((resolve, reject) => {
-        img.onload = resolve;
-        img.onerror = reject;
-      });
+        : (flyerUrl.startsWith("/") ? flyerUrl : `/${flyerUrl}`);
 
-      const canvas = document.createElement("canvas");
-      canvas.width = img.naturalWidth;
-      canvas.height = img.naturalHeight;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) throw new Error("Canvas context unavailable");
-      ctx.drawImage(img, 0, 0);
-      URL.revokeObjectURL(objectUrl);
+      const res = await fetch(targetUrl, { credentials: "same-origin" });
+      if (!res.ok) throw new Error(`Gagal memuat gambar (HTTP ${res.status})`);
+      const rawBlob = await res.blob();
 
-      const pngBlob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
-      if (!pngBlob) throw new Error("Gagal mengonversi gambar ke PNG");
+      let pngBlob: Blob | null = null;
+      if (rawBlob.type === "image/png") {
+        pngBlob = rawBlob;
+      } else {
+        const objectUrl = URL.createObjectURL(rawBlob);
+        try {
+          const img = new Image();
+          img.crossOrigin = "anonymous";
+          img.src = objectUrl;
+          await new Promise<void>((resolve, reject) => {
+            img.onload = () => resolve();
+            img.onerror = () => reject(new Error("Gagal membaca gambar flyer"));
+          });
+
+          const canvas = document.createElement("canvas");
+          canvas.width = img.naturalWidth || img.width;
+          canvas.height = img.naturalHeight || img.height;
+          const ctx = canvas.getContext("2d");
+          if (!ctx) throw new Error("Canvas context tidak tersedia");
+          ctx.drawImage(img, 0, 0);
+
+          pngBlob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
+        } finally {
+          URL.revokeObjectURL(objectUrl);
+        }
+      }
+
+      if (!pngBlob) throw new Error("Gagal mengonversi gambar flyer ke format PNG");
 
       await navigator.clipboard.write([
         new ClipboardItem({ "image/png": pngBlob }),
       ]);
+
       setCopiedFlyerSuccess(true);
       setTimeout(() => setCopiedFlyerSuccess(false), 3000);
-    } catch (err) {
+    } catch (err: any) {
       console.error("Gagal menyalin gambar flyer:", err);
-      alert("Gagal menyalin gambar secara otomatis. Anda dapat klik tombol 'Unduh Foto' lalu seret gambar langsung ke WhatsApp.");
+      const detail = err?.message ? ` (${err.message})` : "";
+      alert(`Gagal menyalin gambar secara otomatis${detail}. Anda dapat klik tombol 'Unduh Foto' lalu seret/lampirkan gambar langsung ke WhatsApp.`);
     } finally {
       setCopyingFlyer(false);
     }
@@ -767,15 +793,18 @@ Salam hangat dari kami,
 
   const handleDownloadFlyer = async (flyerUrl: string, index: number) => {
     try {
-      const fullUrl = flyerUrl.startsWith("http")
+      const targetUrl = flyerUrl.startsWith("http")
         ? flyerUrl
-        : `https://www.vtu.my.id${flyerUrl.startsWith("/") ? "" : "/"}${flyerUrl}`;
-      const res = await fetch(fullUrl);
+        : (flyerUrl.startsWith("/") ? flyerUrl : `/${flyerUrl}`);
+      const res = await fetch(targetUrl, { credentials: "same-origin" });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `Flyer-${targetPackage?.namaPaket || "Brosur"}-Hal${index + 1}.png`;
+      const ext = blob.type.includes("jpeg") || blob.type.includes("jpg") ? "jpg" : "png";
+      const cleanPkgName = (targetPackage?.namaPaket || "Brosur").replace(/[^a-zA-Z0-9_-]/g, "_");
+      a.download = `Flyer-${cleanPkgName}-Hal${index + 1}.${ext}`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -1452,15 +1481,30 @@ Salam hangat dari kami,
 
                   {/* Thumbnail Row */}
                   <div className="flex items-center gap-2 overflow-x-auto pb-1">
-                    {packageFlyers.map((url, fIdx) => (
-                      <div key={fIdx} className="relative group shrink-0 w-16 h-20 rounded-lg overflow-hidden border border-slate-200 dark:border-stone-700 bg-black/5">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={url} alt={`Flyer ${fIdx + 1}`} className="w-full h-full object-cover" />
-                        <div className="absolute inset-x-0 bottom-0 bg-black/60 text-white text-[9px] font-bold text-center py-0.5">
-                          Hal {fIdx + 1}
-                        </div>
-                      </div>
-                    ))}
+                    {packageFlyers.map((url, fIdx) => {
+                      const isSelected = fIdx === selectedFlyerIndex;
+                      return (
+                        <button
+                          key={fIdx}
+                          type="button"
+                          onClick={() => setSelectedFlyerIndex(fIdx)}
+                          className={`relative group shrink-0 w-16 h-20 rounded-lg overflow-hidden border transition-all cursor-pointer ${
+                            isSelected
+                              ? "border-emerald-600 ring-2 ring-emerald-500 shadow-md scale-102"
+                              : "border-slate-200 dark:border-stone-700 opacity-75 hover:opacity-100"
+                          } bg-black/5`}
+                          title={`Klik untuk memilih Halaman ${fIdx + 1}`}
+                        >
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={url} alt={`Flyer ${fIdx + 1}`} className="w-full h-full object-cover" />
+                          <div className={`absolute inset-x-0 bottom-0 text-[9px] font-bold text-center py-0.5 ${
+                            isSelected ? "bg-emerald-700 text-white" : "bg-black/60 text-white"
+                          }`}>
+                            Hal {fIdx + 1}
+                          </div>
+                        </button>
+                      );
+                    })}
                   </div>
 
                   {/* Copy Image & Download Buttons */}
@@ -1470,7 +1514,7 @@ Salam hangat dari kami,
                       size="sm"
                       variant="outline"
                       disabled={copyingFlyer}
-                      onClick={() => handleCopyFlyerImageToClipboard(packageFlyers[0]!)}
+                      onClick={() => handleCopyFlyerImageToClipboard(packageFlyers[selectedFlyerIndex] || packageFlyers[0]!)}
                       className="h-8 text-xs font-bold gap-1.5 border-emerald-600/40 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-950/40"
                     >
                       {copyingFlyer ? (
@@ -1480,18 +1524,24 @@ Salam hangat dari kami,
                       ) : (
                         <Copy className="w-3.5 h-3.5" />
                       )}
-                      <span>{copiedFlyerSuccess ? "Flyer Siap Di-Paste!" : "Salin Foto Flyer"}</span>
+                      <span>
+                        {copiedFlyerSuccess
+                          ? "Flyer Siap Di-Paste!"
+                          : packageFlyers.length > 1
+                          ? `Salin Foto Flyer (Hal ${selectedFlyerIndex + 1})`
+                          : "Salin Foto Flyer"}
+                      </span>
                     </Button>
 
                     <Button
                       type="button"
                       size="sm"
                       variant="outline"
-                      onClick={() => handleDownloadFlyer(packageFlyers[0]!, 0)}
+                      onClick={() => handleDownloadFlyer(packageFlyers[selectedFlyerIndex] || packageFlyers[0]!, selectedFlyerIndex)}
                       className="h-8 text-xs font-semibold gap-1.5"
                     >
                       <Download className="w-3.5 h-3.5" />
-                      <span>Unduh Foto</span>
+                      <span>{packageFlyers.length > 1 ? `Unduh Foto (Hal ${selectedFlyerIndex + 1})` : "Unduh Foto"}</span>
                     </Button>
                   </div>
 
