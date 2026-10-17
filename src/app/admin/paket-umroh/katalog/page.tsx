@@ -22,6 +22,8 @@ import {
   Trash2,
   Edit3,
   ImagePlus,
+  Download,
+  ImageIcon,
 } from "lucide-react";
 import { Button } from "@/shared/components/ui/Button";
 import { Input } from "@/shared/components/ui/Input";
@@ -678,9 +680,20 @@ export default function KatalogPaketPage() {
 
     const hargaFormatted = `Rp ${formatNumberWithDots(targetPackage.hargaPaket || 0)}`;
 
-    const flyerSection = targetPackage.flyerUrl
-      ? `\n🖼️ *Flyer Brosur Resmi:*\n${targetPackage.flyerUrl}\n`
-      : "";
+    const flyers = getFlyerList(targetPackage);
+    let flyerSection = "";
+    if (flyers.length > 0) {
+      const domain = "https://www.vtu.my.id";
+      const formattedFlyers = flyers
+        .map((f, idx) => {
+          const fullUrl = f.startsWith("http") ? f : `${domain}${f.startsWith("/") ? "" : "/"}${f}`;
+          return flyers.length > 1
+            ? `👉 *Brosur Hal ${idx + 1}:* ${fullUrl}`
+            : `👉 *Brosur Resmi:* ${fullUrl}`;
+        })
+        .join("\n");
+      flyerSection = `\n🖼️ *Link Brosur Kualitas HD:*\n${formattedFlyers}\n`;
+    }
 
     const captionSection = `\n📝 *Deskripsi & Fasilitas:* \n${getPackageCaption(targetPackage)}\n`;
 
@@ -706,6 +719,70 @@ Salam hangat dari kami,
     const waUrl = getWhatsAppUrl(formattedPhone, pesan);
     window.open(waUrl, "_blank");
     setTargetPackage(null);
+  };
+
+  // State & handler untuk salin gambar flyer ke clipboard
+  const [copyingFlyer, setCopyingFlyer] = useState(false);
+  const [copiedFlyerSuccess, setCopiedFlyerSuccess] = useState(false);
+
+  const handleCopyFlyerImageToClipboard = async (flyerUrl: string) => {
+    try {
+      setCopyingFlyer(true);
+      const fullUrl = flyerUrl.startsWith("http")
+        ? flyerUrl
+        : `https://www.vtu.my.id${flyerUrl.startsWith("/") ? "" : "/"}${flyerUrl}`;
+      const res = await fetch(fullUrl);
+      const blob = await res.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      const img = new Image();
+      img.src = objectUrl;
+      await new Promise((resolve, reject) => {
+        img.onload = resolve;
+        img.onerror = reject;
+      });
+
+      const canvas = document.createElement("canvas");
+      canvas.width = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) throw new Error("Canvas context unavailable");
+      ctx.drawImage(img, 0, 0);
+      URL.revokeObjectURL(objectUrl);
+
+      const pngBlob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
+      if (!pngBlob) throw new Error("Gagal mengonversi gambar ke PNG");
+
+      await navigator.clipboard.write([
+        new ClipboardItem({ "image/png": pngBlob }),
+      ]);
+      setCopiedFlyerSuccess(true);
+      setTimeout(() => setCopiedFlyerSuccess(false), 3000);
+    } catch (err) {
+      console.error("Gagal menyalin gambar flyer:", err);
+      alert("Gagal menyalin gambar secara otomatis. Anda dapat klik tombol 'Unduh Foto' lalu seret gambar langsung ke WhatsApp.");
+    } finally {
+      setCopyingFlyer(false);
+    }
+  };
+
+  const handleDownloadFlyer = async (flyerUrl: string, index: number) => {
+    try {
+      const fullUrl = flyerUrl.startsWith("http")
+        ? flyerUrl
+        : `https://www.vtu.my.id${flyerUrl.startsWith("/") ? "" : "/"}${flyerUrl}`;
+      const res = await fetch(fullUrl);
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `Flyer-${targetPackage?.namaPaket || "Brosur"}-Hal${index + 1}.png`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch {
+      window.open(flyerUrl, "_blank");
+    }
   };
 
   const handleCopyCaption = (pkg: Keberangkatan) => {
@@ -1354,6 +1431,77 @@ Salam hangat dari kami,
                 • Rp {formatNumberWithDots(targetPackage.hargaPaket || 0)}
               </div>
             </div>
+
+            {/* Flyer Brosur Action Box */}
+            {(() => {
+              const packageFlyers = getFlyerList(targetPackage);
+              if (packageFlyers.length === 0) return null;
+              return (
+                <div className="p-3 rounded-xl bg-slate-50 dark:bg-stone-900 border border-slate-200 dark:border-stone-800 text-xs space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                      <ImageIcon className="w-4 h-4 text-emerald-600" />
+                      Flyer Brosur Paket ({packageFlyers.length} Halaman)
+                    </span>
+                    {copiedFlyerSuccess && (
+                      <span className="text-[11px] font-bold text-emerald-600 flex items-center gap-1 animate-in fade-in">
+                        <Check className="w-3.5 h-3.5" /> Gambar Flyer Tersalin!
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Thumbnail Row */}
+                  <div className="flex items-center gap-2 overflow-x-auto pb-1">
+                    {packageFlyers.map((url, fIdx) => (
+                      <div key={fIdx} className="relative group shrink-0 w-16 h-20 rounded-lg overflow-hidden border border-slate-200 dark:border-stone-700 bg-black/5">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={url} alt={`Flyer ${fIdx + 1}`} className="w-full h-full object-cover" />
+                        <div className="absolute inset-x-0 bottom-0 bg-black/60 text-white text-[9px] font-bold text-center py-0.5">
+                          Hal {fIdx + 1}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Copy Image & Download Buttons */}
+                  <div className="flex flex-wrap items-center gap-2 pt-1">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      disabled={copyingFlyer}
+                      onClick={() => handleCopyFlyerImageToClipboard(packageFlyers[0]!)}
+                      className="h-8 text-xs font-bold gap-1.5 border-emerald-600/40 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-950/40"
+                    >
+                      {copyingFlyer ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : copiedFlyerSuccess ? (
+                        <Check className="w-3.5 h-3.5 text-emerald-600" />
+                      ) : (
+                        <Copy className="w-3.5 h-3.5" />
+                      )}
+                      <span>{copiedFlyerSuccess ? "Flyer Siap Di-Paste!" : "Salin Foto Flyer"}</span>
+                    </Button>
+
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleDownloadFlyer(packageFlyers[0]!, 0)}
+                      className="h-8 text-xs font-semibold gap-1.5"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      <span>Unduh Foto</span>
+                    </Button>
+                  </div>
+
+                  {/* WhatsApp Guidance Note */}
+                  <div className="p-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-[11px] text-emerald-950 dark:text-emerald-200 leading-relaxed">
+                    💡 <strong>Cara kirim foto langsung di WhatsApp Web:</strong> Klik tombol <strong>&quot;Salin Foto Flyer&quot;</strong> di atas, lalu di kolom chat WhatsApp tinggal tekan <strong>Ctrl + V</strong> untuk langsung melampirkan foto flyer!
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Search Input Tamu */}
             <div className="space-y-1.5">
