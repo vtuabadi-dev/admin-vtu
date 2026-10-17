@@ -687,9 +687,9 @@ export const packageService = {
 
         // ADR-0025: Tentukan nama subfolder varian
         const isSplitVariant = !!before?.parentKeberangkatanId && !!before?.splitReason && before?.splitReason !== "starting_point";
-        const variantName = isSplitVariant
+        const variantName = data.variantName || (isSplitVariant
           ? (before?.splitLabel || before?.promoLabel || (before as any)?.spekLabel || "Varian Khusus")
-          : "Varian Utama";
+          : "Varian Utama");
 
         const { getOrCreateVariantFlyerFolder } = await import("../storage/google-drive");
         const { variantFolderId } = await getOrCreateVariantFlyerFolder(
@@ -739,9 +739,9 @@ export const packageService = {
         const captionBuffer = Buffer.from(data.caption, "utf-8");
 
         const isSplitVariant = !!before?.parentKeberangkatanId && !!before?.splitReason && before?.splitReason !== "starting_point";
-        const variantName = isSplitVariant
+        const variantName = data.variantName || (isSplitVariant
           ? (before?.splitLabel || before?.promoLabel || (before as any)?.spekLabel || "Varian Khusus")
-          : "Varian Utama";
+          : "Varian Utama");
 
         const { getOrCreateVariantFlyerFolder } = await import("../storage/google-drive");
         const { variantFolderId } = await getOrCreateVariantFlyerFolder(
@@ -753,6 +753,37 @@ export const packageService = {
         await storage.upload(`Caption-${kodeIndividu}.txt`, captionBuffer, "text/plain", variantFolderId);
       } catch (capErr) {
         console.warn("[PackageService] Gagal mengunggah caption di updateWithAudit:", capErr);
+      }
+    }
+
+    // Auto-provision flyer subfolder di Google Drive untuk varian hotelOptions jika ada
+    if (Array.isArray(data.hotelOptions) && rootFolderId) {
+      try {
+        const { getOrCreateVariantFlyerFolder } = await import("../storage/google-drive");
+        for (const opt of data.hotelOptions) {
+          const vName = opt.clusterName || opt.variantName;
+          if (vName && vName !== "Reguler") {
+            await getOrCreateVariantFlyerFolder(rootFolderId, vName, driveFolderIds?.flyer);
+          }
+        }
+      } catch (optFolderErr) {
+        console.warn("[PackageService] Gagal membuat subfolder varian di folder FLYER:", optFolderErr);
+      }
+    }
+
+    // Jika pembaruan flyer/caption ditujukan untuk sub-varian spesifik di hotelOptions
+    if (typeof data.subVariantIndex === "number" && (Array.isArray(data.hotelOptions) || Array.isArray(before?.hotelOptions))) {
+      const currentOpts = Array.isArray(data.hotelOptions) ? [...data.hotelOptions] : [...(before?.hotelOptions as any[])];
+      const targetOpt = currentOpts[data.subVariantIndex];
+      if (targetOpt) {
+        currentOpts[data.subVariantIndex] = {
+          ...targetOpt,
+          flyerUrl: data.flyerUrl !== undefined ? data.flyerUrl : targetOpt.flyerUrl,
+          caption: data.caption !== undefined ? data.caption : targetOpt.caption,
+        };
+        data.hotelOptions = currentOpts;
+        delete data.flyerUrl;
+        delete data.caption;
       }
     }
 

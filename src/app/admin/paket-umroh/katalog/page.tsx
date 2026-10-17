@@ -292,7 +292,25 @@ export default function KatalogPaketPage() {
         payload.flyerUrl = mediaFlyerUrls.join(",") || null;
       }
 
-      const res = await fetch(`/api/keberangkatan/${manageMediaPkg.id}`, {
+      // Cek apakah kartu ini merupakan kartu sub-varian hotelOptions
+      const parentId = (manageMediaPkg as any)._parentPackageId || (
+        manageMediaPkg.id.includes("_var_") ? manageMediaPkg.id.split("_var_")[0] : manageMediaPkg.id
+      );
+      if (typeof (manageMediaPkg as any)._subVariantIndex === "number") {
+        payload.subVariantIndex = (manageMediaPkg as any)._subVariantIndex;
+        payload.variantName = (manageMediaPkg as any)._variantName || "Varian 2";
+      } else if (manageMediaPkg.id.includes("_var_")) {
+        const rawIdx = manageMediaPkg.id.split("_var_")[1];
+        if (rawIdx) {
+          const idx = parseInt(rawIdx, 10);
+          if (!isNaN(idx)) {
+            payload.subVariantIndex = idx;
+            payload.variantName = (manageMediaPkg as any).splitLabel || `Varian ${idx + 1}`;
+          }
+        }
+      }
+
+      const res = await fetch(`/api/keberangkatan/${parentId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -301,11 +319,11 @@ export default function KatalogPaketPage() {
       if (json.success && json.data) {
         const updatedPkg = json.data;
         setPackages((prev) =>
-          prev.map((p) => (p.id === manageMediaPkg.id ? { ...p, ...updatedPkg } : p))
+          prev.map((p) => (p.id === parentId ? { ...p, ...updatedPkg } : p))
         );
         if (typeof window !== "undefined") {
           const nextList = packages.map((p) =>
-            p.id === manageMediaPkg.id ? { ...p, ...updatedPkg } : p
+            p.id === parentId ? { ...p, ...updatedPkg } : p
           );
           memoryCachedPackages = nextList;
           try {
@@ -388,9 +406,58 @@ export default function KatalogPaketPage() {
     return meta?.isPublishedKatalog === true;
   };
 
-  // Hanya ambil paket yang saklar katalog-nya diaktifkan dari Paket Aktif
+  // Ambil seluruh varian paket yang diaktifkan di Paket Aktif
+  // Mendukung:
+  // 1. Paket Tunggal / Split Row (Keberangkatan terpisah)
+  // 2. Paket dengan In-Package Split Varian (hotelOptions)
   const publishedPackages = useMemo(() => {
-    return packages.filter(isPackagePublishedInKatalog);
+    const list: Keberangkatan[] = [];
+
+    for (const pkg of packages) {
+      const isPkgPub = isPackagePublishedInKatalog(pkg);
+      let opts = pkg.hotelOptions;
+      if (typeof opts === "string") {
+        try { opts = JSON.parse(opts); } catch { opts = []; }
+      }
+      const validOpts = Array.isArray(opts)
+        ? opts.filter((o: any) => o && (o.hotelMekkah || o.hotelMadinah || o.hargaBase))
+        : [];
+
+      if (validOpts.length > 1) {
+        // Cek publikasi per varian
+        validOpts.forEach((opt: any, vIdx: number) => {
+          const isOptPub = vIdx === 0
+            ? (opt.isPublishedKatalog !== undefined ? opt.isPublishedKatalog === true : isPkgPub)
+            : (opt.isPublishedKatalog === true);
+
+          if (isOptPub) {
+            const isV2 = vIdx > 0;
+            const vName = opt.clusterName || opt.variantName || (isV2 ? `Varian ${vIdx + 1}` : "Varian Utama");
+
+            list.push({
+              ...pkg,
+              id: `${pkg.id}_var_${vIdx}`,
+              isPublishedKatalog: true,
+              hotelMekkah: opt.hotelMekkah || pkg.hotelMekkah,
+              hotelMadinah: opt.hotelMadinah || pkg.hotelMadinah,
+              hargaPaket: opt.hargaBase || pkg.hargaPaket,
+              flyerUrl: opt.flyerUrl || (vIdx === 0 ? pkg.flyerUrl : ""),
+              caption: opt.caption || (vIdx === 0 ? pkg.caption : ""),
+              splitReason: isV2 ? "promo" : (pkg.splitReason || undefined),
+              splitLabel: isV2 ? vName : (pkg.splitLabel || undefined),
+              promoLabel: isV2 ? vName : (pkg.promoLabel || undefined),
+              _parentPackageId: pkg.id,
+              _subVariantIndex: vIdx,
+              _variantName: vName,
+            } as any);
+          }
+        });
+      } else if (isPkgPub) {
+        list.push(pkg);
+      }
+    }
+
+    return list;
   }, [packages]);
 
   // Distinct Starting Points list (hanya dari paket yang aktif di katalog)
@@ -693,8 +760,9 @@ Salam hangat dari kami,
     };
     const baseCode = (pkg.kode || "").replace(/_V\d+$/i, "").trim().toLowerCase();
     const depDateStr = getDateStr(pkg.tanggalBerangkat);
-    const groupKey = pkg.parentKeberangkatanId
-      ? `parent_${pkg.parentKeberangkatanId}`
+    const parentId = (pkg as any)._parentPackageId || pkg.parentKeberangkatanId;
+    const groupKey = parentId
+      ? `parent_${parentId}`
       : (baseCode && depDateStr ? `rom_${baseCode}_${depDateStr}` : `pkg_${pkg.id}`);
 
     const groupStat = groupStatsMap.get(groupKey);

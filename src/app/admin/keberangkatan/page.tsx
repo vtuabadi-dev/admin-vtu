@@ -46,6 +46,8 @@ export default function KeberangkatanListPage() {
     title: string;
     departureDate?: string;
     packages: Keberangkatan[];
+    targetPackageId?: string;
+    isHotelOptionsMode?: boolean;
   } | null>(null);
 
   // Excel Import States
@@ -149,6 +151,85 @@ export default function KeberangkatanListPage() {
       const json = await res.json();
       if (!json.success) {
         alert(json.message || "Gagal memperbarui status katalog paket");
+        load(false);
+      }
+    } catch (err: any) {
+      alert("Gagal menghubungi server: " + (err?.message || "Kesalahan jaringan"));
+      load(false);
+    } finally {
+      setTogglingKatalogId(null);
+    }
+  };
+
+  const handleToggleHotelOptionKatalog = async (pkgId: string, optIndex: number, newState: boolean) => {
+    setTogglingKatalogId(`${pkgId}_opt_${optIndex}`);
+
+    const targetPkg = keberangkatan.find((k) => k.id === pkgId);
+    if (!targetPkg) {
+      setTogglingKatalogId(null);
+      return;
+    }
+
+    let opts = targetPkg.hotelOptions;
+    if (typeof opts === "string") {
+      try { opts = JSON.parse(opts); } catch { opts = []; }
+    }
+    const currentOpts: any[] = Array.isArray(opts) ? [...opts] : [];
+    if (!currentOpts[optIndex]) {
+      setTogglingKatalogId(null);
+      return;
+    }
+
+    currentOpts[optIndex] = {
+      ...currentOpts[optIndex],
+      isPublishedKatalog: newState,
+    };
+
+    const anyPublished = currentOpts.some((o: any, idx: number) => {
+      if (idx === 0) {
+        return o.isPublishedKatalog !== undefined
+          ? o.isPublishedKatalog === true
+          : (targetPkg.isPublishedKatalog ?? ((targetPkg.driveFolderIds as any)?.isPublishedKatalog === true));
+      }
+      return o.isPublishedKatalog === true;
+    });
+
+    setKeberangkatan((prev) => {
+      const updated = prev.map((item) =>
+        item.id === pkgId
+          ? {
+              ...item,
+              hotelOptions: currentOpts,
+              isPublishedKatalog: anyPublished,
+              driveFolderIds: {
+                ...(typeof item.driveFolderIds === "object" ? item.driveFolderIds : {}),
+                isPublishedKatalog: anyPublished,
+              },
+            }
+          : item
+      );
+      useOperationalStore.getState().setKeberangkatanList(updated);
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem("vtu_katalog_packages_cache_v1", JSON.stringify(updated));
+        } catch {}
+      }
+      return updated;
+    });
+
+    try {
+      const res = await fetch(`/api/keberangkatan/${pkgId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          hotelOptions: currentOpts,
+          isPublishedKatalog: anyPublished,
+          driveFolderIds: { isPublishedKatalog: anyPublished },
+        }),
+      });
+      const json = await res.json();
+      if (!json.success) {
+        alert(json.message || "Gagal memperbarui status publikasi varian");
         load(false);
       }
     } catch (err: any) {
@@ -358,12 +439,29 @@ export default function KeberangkatanListPage() {
     const groupStats = groupStatsMap.get(groupKey);
     const groupPackages = groupStats?.allPackages || [pkg];
 
+    let hotelOpts = pkg.hotelOptions;
+    if (typeof hotelOpts === "string") {
+      try { hotelOpts = JSON.parse(hotelOpts); } catch { hotelOpts = []; }
+    }
+    const validHotelOpts = Array.isArray(hotelOpts)
+      ? hotelOpts.filter((o: any) => o && (o.hotelMekkah || o.hotelMadinah || o.hargaBase))
+      : [];
+
     if (groupPackages.length > 1) {
       setVariantModalGroup({
         groupKey,
         title: pkg.namaPaket || pkg.kode,
         departureDate: pkg.tanggalBerangkat,
         packages: groupPackages,
+      });
+    } else if (validHotelOpts.length > 1) {
+      setVariantModalGroup({
+        groupKey: `pkg_${pkg.id}`,
+        title: pkg.namaPaket || pkg.kode,
+        departureDate: pkg.tanggalBerangkat,
+        packages: [pkg],
+        targetPackageId: pkg.id,
+        isHotelOptionsMode: true,
       });
     } else {
       const isPub = pkg.isPublishedKatalog ?? ((pkg.driveFolderIds as any)?.isPublishedKatalog === true);
@@ -731,19 +829,44 @@ export default function KeberangkatanListPage() {
 
                     {/* SAKLAR TOGGLE TAMPILKAN DI KATALOG & FORM PENDAFTARAN */}
                     {(() => {
+                      let hotelOptsList = k.hotelOptions;
+                      if (typeof hotelOptsList === "string") {
+                        try { hotelOptsList = JSON.parse(hotelOptsList); } catch { hotelOptsList = []; }
+                      }
+                      const validHotelOpts = Array.isArray(hotelOptsList)
+                        ? hotelOptsList.filter((o: any) => o && (o.hotelMekkah || o.hotelMadinah || o.hargaBase))
+                        : [];
+                      const hasHotelVariants = validHotelOpts.length > 1;
+
                       const isPublished = k.isPublishedKatalog ?? ((k.driveFolderIds as any)?.isPublishedKatalog === true);
-                      const hasMultipleVariants = isPartOfSplit;
-                      const variantCount = groupStats?.allPackages.length || 1;
-                      const activeVariantCount = groupStats?.allPackages.filter(
-                        (p) => p.isPublishedKatalog ?? ((p.driveFolderIds as any)?.isPublishedKatalog === true)
-                      ).length || 0;
+
+                      let hasMultipleVariants = isPartOfSplit || hasHotelVariants;
+                      let variantCount = 1;
+                      let activeVariantCount = 0;
+
+                      if (isPartOfSplit && groupStats && groupStats.allPackages.length > 1) {
+                        variantCount = groupStats.allPackages.length;
+                        activeVariantCount = groupStats.allPackages.filter(
+                          (p) => p.isPublishedKatalog ?? ((p.driveFolderIds as any)?.isPublishedKatalog === true)
+                        ).length;
+                      } else if (hasHotelVariants) {
+                        variantCount = validHotelOpts.length;
+                        activeVariantCount = validHotelOpts.filter((opt: any, idx: number) => {
+                          if (idx === 0) {
+                            return opt.isPublishedKatalog !== undefined ? opt.isPublishedKatalog === true : isPublished;
+                          }
+                          return opt.isPublishedKatalog === true;
+                        }).length;
+                      }
+
+                      const isSwitchChecked = hasMultipleVariants ? activeVariantCount > 0 : isPublished;
 
                       return (
                         <div className="flex items-center gap-1.5 pl-1.5 border-l border-border/60">
                           <button
                             type="button"
                             onClick={(e) => handleKatalogSwitchClick(k, e)}
-                            disabled={togglingKatalogId === k.id}
+                            disabled={togglingKatalogId === k.id || togglingKatalogId?.startsWith(`${k.id}_`)}
                             className="inline-flex items-center gap-1.5 cursor-pointer select-none bg-transparent border-none p-0 group"
                             title={
                               hasMultipleVariants
@@ -760,18 +883,18 @@ export default function KeberangkatanListPage() {
                             {/* Saklar Switch */}
                             <div
                               role="switch"
-                              aria-checked={isPublished}
+                              aria-checked={isSwitchChecked}
                               className={cn(
                                 "relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden",
-                                isPublished ? "bg-emerald-600 shadow-[0_0_8px_rgba(16,185,129,0.4)]" : "bg-slate-300 dark:bg-slate-700",
-                                togglingKatalogId === k.id && "opacity-50 cursor-wait"
+                                isSwitchChecked ? "bg-emerald-600 shadow-[0_0_8px_rgba(16,185,129,0.4)]" : "bg-slate-300 dark:bg-slate-700",
+                                (togglingKatalogId === k.id || togglingKatalogId?.startsWith(`${k.id}_`)) && "opacity-50 cursor-wait"
                               )}
                             >
                               <span
                                 aria-hidden="true"
                                 className={cn(
                                   "pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out",
-                                  isPublished ? "translate-x-4" : "translate-x-0"
+                                  isSwitchChecked ? "translate-x-4" : "translate-x-0"
                                 )}
                               />
                             </div>
@@ -1034,6 +1157,11 @@ export default function KeberangkatanListPage() {
         size="lg"
       >
         {variantModalGroup && (() => {
+          const isHotelMode = variantModalGroup.isHotelOptionsMode && !!variantModalGroup.targetPackageId;
+          const targetPkgForHotel = isHotelMode
+            ? keberangkatan.find((k) => k.id === variantModalGroup.targetPackageId) || variantModalGroup.packages[0]
+            : null;
+
           const currentGroupKey = variantModalGroup.groupKey;
           const currentStats = groupStatsMap.get(currentGroupKey);
           const currentPackages = (currentStats?.allPackages && currentStats.allPackages.length > 0)
@@ -1048,8 +1176,12 @@ export default function KeberangkatanListPage() {
             return (a.kode || "").localeCompare(b.kode || "");
           });
 
-          const totalGroupQuota = currentStats?.totalGroupQuota || sortedPackages.reduce((s, p) => s + (p.maxSeat || p.kuota || 0), 0);
-          const totalGroupFilled = currentStats?.totalGroupFilled || sortedPackages.reduce((s, p) => s + (p.terisi || 0), 0);
+          const totalGroupQuota = isHotelMode
+            ? (targetPkgForHotel?.maxSeat || targetPkgForHotel?.kuota || 45)
+            : (currentStats?.totalGroupQuota || sortedPackages.reduce((s, p) => s + (p.maxSeat || p.kuota || 0), 0));
+          const totalGroupFilled = isHotelMode
+            ? (targetPkgForHotel?.terisi || 0)
+            : (currentStats?.totalGroupFilled || sortedPackages.reduce((s, p) => s + (p.terisi || 0), 0));
           const remainingGroup = Math.max(0, totalGroupQuota - totalGroupFilled);
 
           return (
@@ -1072,7 +1204,107 @@ export default function KeberangkatanListPage() {
 
               {/* Daftar Varian dengan Switch Masing-Masing */}
               <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
-                {sortedPackages.map((pkgItem) => {
+                {isHotelMode && targetPkgForHotel ? (() => {
+                  let opts = targetPkgForHotel.hotelOptions;
+                  if (typeof opts === "string") {
+                    try { opts = JSON.parse(opts); } catch { opts = []; }
+                  }
+                  const validOpts = Array.isArray(opts) ? opts : [];
+
+                  return validOpts.map((opt: any, optIdx: number) => {
+                    const isV2 = optIdx > 0 || opt.isVarian2 || opt.clusterName === "Varian 2";
+                    const isPub = optIdx === 0
+                      ? (opt.isPublishedKatalog !== undefined
+                          ? opt.isPublishedKatalog === true
+                          : (targetPkgForHotel.isPublishedKatalog ?? ((targetPkgForHotel.driveFolderIds as any)?.isPublishedKatalog === true)))
+                      : (opt.isPublishedKatalog === true);
+                    const isToggling = togglingKatalogId === `${targetPkgForHotel.id}_opt_${optIdx}`;
+                    const variantTitle = opt.clusterName || opt.variantName || (isV2 ? `Varian ${optIdx + 1}` : "Varian Utama (Reguler)");
+
+                    return (
+                      <div
+                        key={`opt_${optIdx}`}
+                        className={cn(
+                          "flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-xl border transition-all",
+                          isPub
+                            ? "border-emerald-500/40 bg-emerald-500/5 shadow-xs"
+                            : "border-border/80 bg-muted/20 opacity-80 hover:opacity-100"
+                        )}
+                      >
+                        <div className="space-y-1.5 flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            {isV2 ? (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-extrabold bg-gradient-to-r from-purple-500/20 to-pink-500/20 text-purple-700 dark:text-purple-300 border border-purple-500/40 shadow-xs">
+                                ⚡ {variantTitle}
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-extrabold bg-emerald-500/20 text-emerald-800 dark:text-emerald-200 border border-emerald-500/40 shadow-xs">
+                                ⭐ Varian Utama (V1)
+                              </span>
+                            )}
+                            <span className="text-xs font-mono text-muted-foreground bg-muted px-2 py-0.5 rounded">
+                              {targetPkgForHotel.kode}
+                            </span>
+                          </div>
+
+                          <div className="font-bold text-sm text-foreground line-clamp-1">
+                            {targetPkgForHotel.namaPaket || targetPkgForHotel.kode} - {variantTitle}
+                          </div>
+
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
+                            <span>✈️ {targetPkgForHotel.maskapai || "Garuda Indonesia"}</span>
+                            <span>•</span>
+                            <span>🏨 {opt.hotelMekkah || "Mekkah"} / {opt.hotelMadinah || "Madinah"}</span>
+                            {opt.hargaBase ? (
+                              <>
+                                <span>•</span>
+                                <span className="font-bold text-emerald-600 dark:text-emerald-400">
+                                  Rp {Number(opt.hargaBase).toLocaleString("id-ID")}
+                                </span>
+                              </>
+                            ) : null}
+                          </div>
+                        </div>
+
+                        {/* Saklar Switch Varian */}
+                        <div className="flex items-center justify-between sm:justify-end gap-3 pt-2 sm:pt-0 border-t sm:border-t-0 border-border/50 shrink-0">
+                          <div className="text-right">
+                            <div className={cn(
+                              "text-xs font-bold leading-tight",
+                              isPub ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"
+                            )}>
+                              {isPub ? "Tampil di Katalog & Form" : "Nonaktif (Disembunyikan)"}
+                            </div>
+                            <div className="text-[10px] text-muted-foreground">
+                              {isPub ? "Jamaah dapat melihat & mendaftar" : "Tidak muncul di publik"}
+                            </div>
+                          </div>
+
+                          <button
+                            type="button"
+                            role="switch"
+                            aria-checked={isPub}
+                            disabled={isToggling}
+                            onClick={() => handleToggleHotelOptionKatalog(targetPkgForHotel.id, optIdx, !isPub)}
+                            className={cn(
+                              "relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden",
+                              isPub ? "bg-emerald-600 shadow-[0_0_10px_rgba(16,185,129,0.35)]" : "bg-slate-300 dark:bg-slate-700",
+                              isToggling && "opacity-50 cursor-wait"
+                            )}
+                          >
+                            <span
+                              aria-hidden="true"
+                              className={cn(
+                                "pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out",
+                                isPub ? "translate-x-5" : "translate-x-0"
+                              )}
+                            />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  });
+                })() : sortedPackages.map((pkgItem) => {
                   const isV2 = isV2Variant(pkgItem);
                   const isPub = pkgItem.isPublishedKatalog ?? ((pkgItem.driveFolderIds as any)?.isPublishedKatalog === true);
                   const isToggling = togglingKatalogId === pkgItem.id;
