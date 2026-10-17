@@ -181,20 +181,33 @@ export const pembayaranRepo = {
 
       if (!group) {
         const pax = reg.paxCount || memberList.length || 1;
-        const basePaket = (reg.keberangkatan?.hargaPaket || 0) * pax;
-        let roomSurcharge = 0;
-        const roomType = (reg.roomUpgrade || "").toLowerCase().trim();
+        let basePricePerPax = reg.keberangkatan?.hargaPaket || 0;
         let upDouble = 2500000;
         let upTriple = 1500000;
         try {
           const hOpts = typeof reg.keberangkatan?.hotelOptions === "string"
             ? JSON.parse(reg.keberangkatan.hotelOptions)
             : reg.keberangkatan?.hotelOptions;
-          if (Array.isArray(hOpts) && hOpts[0]) {
-            if (Number(hOpts[0].upgradeDouble) > 0) upDouble = Number(hOpts[0].upgradeDouble);
-            if (Number(hOpts[0].upgradeTriple) > 0) upTriple = Number(hOpts[0].upgradeTriple);
+          if (Array.isArray(hOpts) && hOpts.length > 0) {
+            const matchedCluster = reg.hotelUpgrade
+              ? hOpts.find((o: any) =>
+                  (o.clusterName && o.clusterName.toLowerCase() === reg.hotelUpgrade?.toLowerCase()) ||
+                  (o.variantName && o.variantName.toLowerCase() === reg.hotelUpgrade?.toLowerCase()) ||
+                  (o.clusterName && reg.hotelUpgrade?.toLowerCase().includes(o.clusterName.toLowerCase()))
+                )
+              : null;
+            const activeCluster = matchedCluster || hOpts[0];
+            if (activeCluster) {
+              if (Number(activeCluster.hargaBase) > 0) basePricePerPax = Number(activeCluster.hargaBase);
+              if (Number(activeCluster.upgradeDouble) > 0) upDouble = Number(activeCluster.upgradeDouble);
+              if (Number(activeCluster.upgradeTriple) > 0) upTriple = Number(activeCluster.upgradeTriple);
+            }
           }
         } catch {}
+
+        const basePaket = basePricePerPax * pax;
+        let roomSurcharge = 0;
+        const roomType = (reg.roomUpgrade || "").toLowerCase().trim();
 
         if (roomType.includes("double")) {
           roomSurcharge = upDouble * pax;

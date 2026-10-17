@@ -146,9 +146,10 @@ export async function POST(request: NextRequest) {
     const hOptsList = Array.isArray(rawHOpts) ? rawHOpts : [];
     const matchedVariant = reg.hotelUpgrade
       ? hOptsList.find((o: any) =>
-          o.clusterName === reg.hotelUpgrade ||
-          o.variantName === reg.hotelUpgrade ||
-          (o.variantName && reg.hotelUpgrade?.includes(o.variantName))
+          (o.clusterName && o.clusterName.toLowerCase() === reg.hotelUpgrade?.toLowerCase()) ||
+          (o.variantName && o.variantName.toLowerCase() === reg.hotelUpgrade?.toLowerCase()) ||
+          (o.variantName && reg.hotelUpgrade?.toLowerCase().includes(o.variantName.toLowerCase())) ||
+          (o.clusterName && reg.hotelUpgrade?.toLowerCase().includes(o.clusterName.toLowerCase()))
         )
       : null;
 

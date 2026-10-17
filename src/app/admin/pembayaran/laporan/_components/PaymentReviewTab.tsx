@@ -56,6 +56,7 @@ import {
   detectRoomTypeFromName,
   getPackageUpgradePrice,
   resolveKlasterName,
+  resolvePackageClusterDetails,
   getInitialTambahanOptions,
   getInitialPotonganOptions,
   getInitialReviewQueue,
@@ -522,10 +523,11 @@ function PaymentReviewTabContent() {
     setFormCatatan(payment.catatan || "");
 
     // Hotel Information from Package resolved specifically for Jamaah/Group Cluster Choice
-    const targetKlaster = resolveKlasterName(payment);
+    const clusterDetails = resolvePackageClusterDetails(payment);
+    const targetKlaster = clusterDetails.clusterName || resolveKlasterName(payment);
     const kbr = payment.group?.keberangkatan;
-    const resolvedMekkah = resolveHotelForKlaster(kbr?.hotelMekkah, targetKlaster) || kbr?.hotelMekkah || "GRAND AL MASSA";
-    const resolvedMadinah = resolveHotelForKlaster(kbr?.hotelMadinah, targetKlaster) || kbr?.hotelMadinah || "DURRAT AL EIMAN";
+    const resolvedMekkah = clusterDetails.hotelMekkah || resolveHotelForKlaster(kbr?.hotelMekkah, targetKlaster) || kbr?.hotelMekkah || "GRAND AL MASSA";
+    const resolvedMadinah = clusterDetails.hotelMadinah || resolveHotelForKlaster(kbr?.hotelMadinah, targetKlaster) || kbr?.hotelMadinah || "DURRAT AL EIMAN";
     setFormHotelMekkah(resolvedMekkah);
     setFormHotelMadinah(resolvedMadinah);
 
@@ -616,7 +618,11 @@ function PaymentReviewTabContent() {
   const generateInvoiceMessage = useCallback((p: any, invNum: string, nominal: number) => {
     const groupName = p.namaGroup || p.group?.namaGroup || "Bapak/Ibu";
     const kodeReg = p.kodeRegistrasi || p.group?.kodeRegistrasi || "-";
-    const paketName = p.group?.keberangkatan?.namaPaket || "Paket Umroh VTU";
+    const clusterDetailsWa = resolvePackageClusterDetails(p);
+    const clusterSuffix = clusterDetailsWa.isCustomCluster
+      ? ` [Klaster ${clusterDetailsWa.clusterName}${clusterDetailsWa.variantName ? ` - ${clusterDetailsWa.variantName}` : ""}]`
+      : "";
+    const paketName = (p.group?.keberangkatan?.namaPaket || "Paket Umroh VTU") + clusterSuffix;
     const tgl = p.tanggal
       ? new Date(p.tanggal).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })
       : new Date().toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });
@@ -649,7 +655,7 @@ function PaymentReviewTabContent() {
     const totalDiskon = adjustedOrderItemsWa
       .filter((it) => it.tipe === "pengurangan")
       .reduce((sum, it) => sum + (it.nominal || 0), 0);
-    const basePackageUnit = p.group?.keberangkatan?.hargaPaket || (p.group?.totalTagihan ? Math.round(p.group.totalTagihan / Math.max(1, totalAnggotaWa)) : 0);
+    const basePackageUnit = clusterDetailsWa.hargaBase || p.group?.keberangkatan?.hargaPaket || (p.group?.totalTagihan ? Math.round(p.group.totalTagihan / Math.max(1, totalAnggotaWa)) : 0);
     const baseMainBillingTotal = basePackageUnit * splitPaxWa;
     const tagihanDisesuaikan = Math.max(0, baseMainBillingTotal + totalBeban - totalDiskon);
 
@@ -764,7 +770,8 @@ function PaymentReviewTabContent() {
       .filter((it) => it.tipe === "pengurangan")
       .reduce((sum, it) => sum + (it.nominal || 0), 0);
 
-    const basePackageUnit = p.group?.keberangkatan?.hargaPaket || (p.group?.totalTagihan ? Math.round(p.group.totalTagihan / Math.max(1, totalAnggotaPdf)) : 0);
+    const clusterDetailsPdf = resolvePackageClusterDetails(p);
+    const basePackageUnit = clusterDetailsPdf.hargaBase || p.group?.keberangkatan?.hargaPaket || (p.group?.totalTagihan ? Math.round(p.group.totalTagihan / Math.max(1, totalAnggotaPdf)) : 0);
     const totalTagihanBase = basePackageUnit * splitPaxPdf;
     const totalTagihanDisesuaikan = Math.max(0, totalTagihanBase + totalBeban - totalDiskon);
     const totalBayarVal = p.group?.totalPembayaran || 0;
@@ -803,15 +810,16 @@ function PaymentReviewTabContent() {
       alamat: formAlamat || getManifestAlamat(p.group || p),
       telepon: targetPhone || p.group?.ketuaGroup?.nomorTelepon,
       kodeRegistrasi: p.kodeRegistrasi || p.group?.kodeRegistrasi || "-",
-      namaPaket: p.group?.keberangkatan?.namaPaket || formCatatan || "PAKET UMROH 10 H SBY ( JED.C )",
-      tipePaket: p.group?.keberangkatan?.packageType?.name || "SILVER",
+      namaPaket: (p.group?.keberangkatan?.namaPaket || formCatatan || "PAKET UMROH 10 H SBY ( JED.C )") +
+        (clusterDetailsPdf.isCustomCluster ? ` [Klaster ${clusterDetailsPdf.clusterName}]` : ""),
+      tipePaket: clusterDetailsPdf.clusterName || p.group?.keberangkatan?.packageType?.name || "SILVER",
       jumlahPax: splitPaxPdf,
-      hargaSatuanPaket: p.group?.keberangkatan?.hargaPaket || 37400000,
+      hargaSatuanPaket: basePackageUnit,
       tanggalBerangkat: p.group?.keberangkatan?.tanggalBerangkat
         ? new Date(p.group.keberangkatan.tanggalBerangkat).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })
         : undefined,
-      hotelMekkah: formHotelMekkah || p.group?.keberangkatan?.hotelMekkah || "GRAND AL MASSA",
-      hotelMadinah: formHotelMadinah || p.group?.keberangkatan?.hotelMadinah || "DURRAT AL EIMAN",
+      hotelMekkah: formHotelMekkah || clusterDetailsPdf.hotelMekkah || p.group?.keberangkatan?.hotelMekkah || "GRAND AL MASSA",
+      hotelMadinah: formHotelMadinah || clusterDetailsPdf.hotelMadinah || p.group?.keberangkatan?.hotelMadinah || "DURRAT AL EIMAN",
       anggota: membersToInclude,
       orderItems: adjustedOrderItemsPdf,
       paymentHistory: history,
@@ -1204,7 +1212,8 @@ function PaymentReviewTabContent() {
     .filter((it) => it.tipe === "pengurangan")
     .reduce((sum, it) => sum + (it.nominal || 0), 0);
 
-  const basePackageUnit = selectedPayment?.group?.keberangkatan?.hargaPaket || (selectedPayment?.group?.totalTagihan && displayTotalAnggota > 0 ? Math.round(selectedPayment.group.totalTagihan / displayTotalAnggota) : 0);
+  const clusterDetailsDisplay = resolvePackageClusterDetails(selectedPayment);
+  const basePackageUnit = clusterDetailsDisplay.hargaBase || selectedPayment?.group?.keberangkatan?.hargaPaket || (selectedPayment?.group?.totalTagihan && displayTotalAnggota > 0 ? Math.round(selectedPayment.group.totalTagihan / displayTotalAnggota) : 0);
   const baseMainBillingTotal = basePackageUnit * displaySplitPax;
   const groupTotalTagihanBase = baseMainBillingTotal;
   const groupTotalTagihanDisesuaikan = Math.max(0, baseMainBillingTotal + totalBebanTambahan - totalPengurangan);
@@ -1939,7 +1948,14 @@ function PaymentReviewTabContent() {
                         {/* Base Package Main Billing Item */}
                         <tr className="hover:bg-muted/30 transition-colors">
                           <td className="py-2 px-2.5 font-medium text-foreground">
-                            {selectedPayment.group?.keberangkatan?.namaPaket || selectedPayment.namaPaket || selectedPayment.group?.namaPaket || "Paket Umroh"}
+                            <div>
+                              <p>{selectedPayment.group?.keberangkatan?.namaPaket || selectedPayment.namaPaket || selectedPayment.group?.namaPaket || "Paket Umroh"}</p>
+                              {clusterDetailsDisplay.isCustomCluster && (
+                                <span className="inline-flex items-center gap-1 mt-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/15 text-amber-800 dark:text-amber-300 border border-amber-500/30">
+                                  Klaster {clusterDetailsDisplay.clusterName} {clusterDetailsDisplay.variantName ? `(${clusterDetailsDisplay.variantName})` : ""}
+                                </span>
+                              )}
+                            </div>
                           </td>
                           <td className="py-2 px-2.5">
                             <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">

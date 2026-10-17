@@ -131,18 +131,16 @@ export function detectRoomTypeFromName(name: string): string {
 
 export function resolveKlasterName(p: any): string {
   if (!p) return "Standard / Non-Cluster";
-  const kbr = p.group?.keberangkatan;
+  const kbr = p.group?.keberangkatan || p.keberangkatan || p.paketKeberangkatan;
   const hotelM = kbr?.hotelMekkah || p.hotelMekkah || "";
   const hotelN = kbr?.hotelMadinah || p.hotelMadinah || "";
 
-  // Detect if package has multiple cluster variants (multi-hotel with slashes or cluster configs)
-  const isMultiClusterPackage =
-    hotelM.includes("/") ||
-    hotelN.includes("/") ||
-    Boolean(kbr?.clusterConfigs && Object.keys(kbr.clusterConfigs).length > 0) ||
-    Boolean(kbr?.isAdaKlaster === "ya");
-
+  // Prioritas Utama: Input registrasi jamaah/grup (hotelUpgrade / room cluster)
+  const regReq = p.group?.registrationRequests?.[0] || p.registrationRequests?.[0] || p.registrationRequest;
   const candidates = [
+    regReq?.hotelUpgrade,
+    p.hotelUpgrade,
+    p.group?.hotelUpgrade,
     p.group?.packageTypeName,
     p.group?.klasterName,
     p.group?.klaster,
@@ -171,7 +169,34 @@ export function resolveKlasterName(p: any): string {
     }
   }
 
-  const pkgName = p.group?.keberangkatan?.namaPaket || p.namaPaket || "";
+  // Cek apakah ada clusterName di catatan atau nama group
+  let hotelOptions = kbr?.hotelOptions || p.hotelOptions || p.group?.hotelOptions;
+  if (typeof hotelOptions === "string") {
+    try { hotelOptions = JSON.parse(hotelOptions); } catch {}
+  }
+  if (Array.isArray(hotelOptions)) {
+    for (const opt of hotelOptions) {
+      if (opt?.clusterName) {
+        const cLow = opt.clusterName.toLowerCase();
+        if (
+          p.catatan?.toLowerCase()?.includes(cLow) ||
+          p.group?.namaGroup?.toLowerCase()?.includes(cLow) ||
+          regReq?.hotelUpgrade?.toLowerCase()?.includes(cLow)
+        ) {
+          return opt.clusterName;
+        }
+      }
+    }
+  }
+
+  // Detect if package has multiple cluster variants (multi-hotel with slashes or cluster configs)
+  const isMultiClusterPackage =
+    hotelM.includes("/") ||
+    hotelN.includes("/") ||
+    Boolean(kbr?.clusterConfigs && Object.keys(kbr.clusterConfigs).length > 0) ||
+    Boolean(kbr?.isAdaKlaster === "ya");
+
+  const pkgName = kbr?.namaPaket || p.namaPaket || "";
   const groupCode = p.group?.kodeRegistrasi || p.kodeRegistrasi || "";
   const combined = `${pkgName} ${groupCode}`.toUpperCase();
   if (combined.includes("PLATINUM")) return "PLATINUM";
@@ -189,6 +214,82 @@ export function resolveKlasterName(p: any): string {
   return "SILVER";
 }
 
+export function resolvePackageClusterDetails(paymentOrGroup: any): {
+  clusterName: string;
+  variantName?: string;
+  hargaBase: number;
+  upgradeDouble: number;
+  upgradeTriple: number;
+  hotelMekkah?: string;
+  hotelMadinah?: string;
+  isCustomCluster: boolean;
+} {
+  const kbr = paymentOrGroup?.group?.keberangkatan || paymentOrGroup?.keberangkatan || paymentOrGroup?.paketKeberangkatan;
+  const defaultBasePrice = kbr?.hargaPaket ? Number(kbr.hargaPaket) : 0;
+  const targetKlaster = resolveKlasterName(paymentOrGroup);
+
+  let hotelOptions = kbr?.hotelOptions || paymentOrGroup?.hotelOptions || paymentOrGroup?.group?.hotelOptions;
+  if (typeof hotelOptions === "string") {
+    try { hotelOptions = JSON.parse(hotelOptions); } catch {}
+  }
+
+  let matchedCluster: any = null;
+  if (Array.isArray(hotelOptions) && hotelOptions.length > 0) {
+    // 1. Cari exact match clusterName
+    matchedCluster = hotelOptions.find(
+      (c: any) => c && targetKlaster && c.clusterName && c.clusterName.toLowerCase().trim() === targetKlaster.toLowerCase().trim()
+    );
+    // 2. Cari contains / partial match
+    if (!matchedCluster && targetKlaster) {
+      matchedCluster = hotelOptions.find(
+        (c: any) => c && (
+          (c.clusterName && targetKlaster.toLowerCase().includes(c.clusterName.toLowerCase())) ||
+          (c.variantName && targetKlaster.toLowerCase().includes(c.variantName.toLowerCase())) ||
+          (c.clusterName && c.clusterName.toLowerCase().includes(targetKlaster.toLowerCase()))
+        )
+      );
+    }
+    // 3. Fallback ke cluster pertama jika belum ketemu
+    if (!matchedCluster) {
+      matchedCluster = hotelOptions[0];
+    }
+  }
+
+  const hargaBase = (matchedCluster && Number(matchedCluster.hargaBase) > 0)
+    ? Number(matchedCluster.hargaBase)
+    : defaultBasePrice;
+
+  let upgradeDouble = 2500000;
+  let upgradeTriple = 1500000;
+
+  if (matchedCluster) {
+    if (matchedCluster.upgradeDouble !== undefined && Number(matchedCluster.upgradeDouble) > 0) {
+      upgradeDouble = Number(matchedCluster.upgradeDouble);
+    } else if (kbr?.upgradeDouble && Number(kbr.upgradeDouble) > 0) {
+      upgradeDouble = Number(kbr.upgradeDouble);
+    }
+    if (matchedCluster.upgradeTriple !== undefined && Number(matchedCluster.upgradeTriple) > 0) {
+      upgradeTriple = Number(matchedCluster.upgradeTriple);
+    } else if (kbr?.upgradeTriple && Number(kbr.upgradeTriple) > 0) {
+      upgradeTriple = Number(kbr.upgradeTriple);
+    }
+  } else {
+    if (kbr?.upgradeDouble && Number(kbr.upgradeDouble) > 0) upgradeDouble = Number(kbr.upgradeDouble);
+    if (kbr?.upgradeTriple && Number(kbr.upgradeTriple) > 0) upgradeTriple = Number(kbr.upgradeTriple);
+  }
+
+  return {
+    clusterName: matchedCluster?.clusterName || targetKlaster || "Reguler",
+    variantName: matchedCluster?.variantName,
+    hargaBase,
+    upgradeDouble,
+    upgradeTriple,
+    hotelMekkah: matchedCluster?.hotelMekkah || kbr?.hotelMekkah,
+    hotelMadinah: matchedCluster?.hotelMadinah || kbr?.hotelMadinah,
+    isCustomCluster: Boolean(matchedCluster && matchedCluster.clusterName !== "Reguler"),
+  };
+}
+
 export function getPackageUpgradePrice(paymentOrGroup: any, itemNameOrRoomType: string): number {
   if (!itemNameOrRoomType) return 0;
   const lower = itemNameOrRoomType.toLowerCase().trim();
@@ -199,59 +300,16 @@ export function getPackageUpgradePrice(paymentOrGroup: any, itemNameOrRoomType: 
     return 0;
   }
 
-  // Resolve keberangkatan / package info
-  const kbr = paymentOrGroup?.keberangkatan || paymentOrGroup?.group?.keberangkatan || paymentOrGroup?.paketKeberangkatan;
-  const targetKlaster = resolveKlasterName(paymentOrGroup);
-
-  let upgradeDouble = 2500000;
-  let upgradeTriple = 1500000;
-  let foundInPackage = false;
-
-  // Cek hotelOptions (array of clusters)
-  let hotelOptions = kbr?.hotelOptions || paymentOrGroup?.hotelOptions || paymentOrGroup?.group?.hotelOptions;
-  if (typeof hotelOptions === "string") {
-    try {
-      hotelOptions = JSON.parse(hotelOptions);
-    } catch {}
-  }
-
-  if (Array.isArray(hotelOptions) && hotelOptions.length > 0) {
-    // Cari cluster yang sesuai dengan pilihan jamaah/grup
-    let activeCluster = hotelOptions.find(
-      (c: any) => c && targetKlaster && c.clusterName && c.clusterName.toLowerCase() === targetKlaster.toLowerCase()
-    );
-    if (!activeCluster) {
-      // Fallback ke cluster pertama yang punya upgradeDouble / upgradeTriple
-      activeCluster = hotelOptions.find((c: any) => c && (Number(c.upgradeDouble) > 0 || Number(c.upgradeTriple) > 0)) || hotelOptions[0];
-    }
-    if (activeCluster) {
-      if (activeCluster.upgradeDouble !== undefined && activeCluster.upgradeDouble !== null && Number(activeCluster.upgradeDouble) > 0) {
-        upgradeDouble = Number(activeCluster.upgradeDouble);
-        foundInPackage = true;
-      }
-      if (activeCluster.upgradeTriple !== undefined && activeCluster.upgradeTriple !== null && Number(activeCluster.upgradeTriple) > 0) {
-        upgradeTriple = Number(activeCluster.upgradeTriple);
-        foundInPackage = true;
-      }
-    }
-  }
-
-  // Cek direct properties jika ada (cth: kbr.upgradeDouble, group.upgradeDouble, dsb)
-  if (!foundInPackage) {
-    if (kbr?.upgradeDouble && Number(kbr.upgradeDouble) > 0) upgradeDouble = Number(kbr.upgradeDouble);
-    if (kbr?.upgradeTriple && Number(kbr.upgradeTriple) > 0) upgradeTriple = Number(kbr.upgradeTriple);
-    if (paymentOrGroup?.group?.upgradeDouble && Number(paymentOrGroup.group.upgradeDouble) > 0) upgradeDouble = Number(paymentOrGroup.group.upgradeDouble);
-    if (paymentOrGroup?.group?.upgradeTriple && Number(paymentOrGroup.group.upgradeTriple) > 0) upgradeTriple = Number(paymentOrGroup.group.upgradeTriple);
-  }
+  const details = resolvePackageClusterDetails(paymentOrGroup);
 
   if (lower.includes("double") || lower === "double") {
-    return upgradeDouble;
+    return details.upgradeDouble;
   }
   if (lower.includes("triple") || lower === "triple") {
-    return upgradeTriple;
+    return details.upgradeTriple;
   }
   if (lower.includes("single") || lower === "single") {
-    return Math.round(upgradeDouble * 1.5);
+    return Math.round(details.upgradeDouble * 1.5);
   }
 
   return 0;
