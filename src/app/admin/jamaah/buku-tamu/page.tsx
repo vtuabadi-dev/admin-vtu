@@ -22,6 +22,8 @@ import {
   Check,
   Share2,
   MessageCircle,
+  Link2,
+  ExternalLink,
 } from "lucide-react";
 import { Button } from "@/shared/components/ui/Button";
 import { Input } from "@/shared/components/ui/Input";
@@ -323,8 +325,9 @@ Wassalamu'alaikum Warahmatullahi Wabarakatuh.
 Kepada Yth. Calon Tamu / Jamaah Baitullah,
 Terima kasih atas silaturahmi Anda dengan *VTU ABADI Travel (Kantor ${adminProfile.kantorCabang})*.
 
-Untuk pencatatan buku tamu kunjungan dan kemudahan konsultasi rencana ibadah Umroh Anda, silakan mengisi formulir buku tamu singkat melalui tautan resmi kami berikut:
-👉 ${link}
+Untuk pencatatan buku tamu kunjungan dan konsultasi rencana ibadah Umroh Anda, silakan klik tautan:
+👉 *Isi Buku Tamu:*
+${link}
 
 *(Nomor WhatsApp Anda telah terisi secara otomatis pada formulir)*
 
@@ -335,9 +338,28 @@ Wassalamu'alaikum Warahmatullahi Wabarakatuh.
     return getWhatsAppUrl(formattedPhone, pesan);
   };
 
-  const handleCopyShareLink = (phone?: string) => {
+  const handleCopyShareLink = async (phone?: string) => {
     const link = getPublicGuestbookLink(phone);
-    navigator.clipboard.writeText(link);
+    const hyperHtml = `<a href="${link}">Isi Buku Tamu</a>`;
+    const hyperPlain = `Isi Buku Tamu: ${link}`;
+
+    try {
+      if (typeof window !== "undefined" && typeof ClipboardItem !== "undefined" && navigator.clipboard?.write) {
+        const blobHtml = new Blob([hyperHtml], { type: "text/html" });
+        const blobPlain = new Blob([hyperPlain], { type: "text/plain" });
+        await navigator.clipboard.write([
+          new ClipboardItem({
+            "text/html": blobHtml,
+            "text/plain": blobPlain,
+          }),
+        ]);
+      } else {
+        await navigator.clipboard.writeText(hyperPlain);
+      }
+    } catch {
+      await navigator.clipboard.writeText(hyperPlain);
+    }
+
     setCopiedShareLink(true);
     setTimeout(() => setCopiedShareLink(false), 2500);
   };
@@ -1049,26 +1071,43 @@ Wassalamu'alaikum Warahmatullahi Wabarakatuh.
             </div>
 
             {/* Preview Link Box */}
-            <div className="p-3.5 rounded-xl bg-muted/50 border space-y-2 text-xs">
+            <div className="p-3.5 rounded-xl bg-muted/50 border space-y-2.5 text-xs">
               <div className="flex items-center justify-between text-muted-foreground text-[11px] font-semibold">
-                <span>Tautan Formulir Buku Tamu:</span>
+                <span>Preview Hyperlink:</span>
                 <span className="text-emerald-600 font-bold">
-                  {sharePhone.trim() ? "✓ Link Personalisasi" : "Link Umum"}
+                  {sharePhone.trim() ? "✓ Terhubung No. WA" : "Link Umum"}
                 </span>
               </div>
-              <div className="p-2.5 rounded-lg bg-background border font-mono text-[11px] break-all select-all text-foreground/90">
-                {getPublicGuestbookLink(sharePhone)}
-              </div>
-              <div className="flex items-center justify-between pt-1">
-                <span className="text-[11px] text-muted-foreground">
-                  Kantor: <strong>{adminProfile.kantorCabang}</strong> • Admin: <strong>{adminProfile.name}</strong>
-                </span>
+
+              {/* Visual Hyperlink Card */}
+              <div className="p-3 rounded-xl bg-background border flex items-center justify-between gap-3 shadow-xs">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 shrink-0">
+                    <Link2 className="w-4 h-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <a
+                      href={getPublicGuestbookLink(sharePhone)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-bold text-sm text-primary hover:underline inline-flex items-center gap-1.5"
+                      title="Klik untuk membuka pratinjau"
+                    >
+                      <span>Isi Buku Tamu</span>
+                      <ExternalLink className="w-3.5 h-3.5 text-muted-foreground" />
+                    </a>
+                    <div className="text-[11px] text-muted-foreground truncate font-mono">
+                      {getPublicGuestbookLink(sharePhone)}
+                    </div>
+                  </div>
+                </div>
+
                 <Button
                   type="button"
                   variant="outline"
                   size="sm"
                   onClick={() => handleCopyShareLink(sharePhone)}
-                  className="h-7 text-xs gap-1.5 font-bold"
+                  className="h-8 text-xs gap-1.5 font-bold shrink-0 border-emerald-600/30 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-950/40"
                 >
                   {copiedShareLink ? (
                     <>
@@ -1078,10 +1117,15 @@ Wassalamu'alaikum Warahmatullahi Wabarakatuh.
                   ) : (
                     <>
                       <Copy className="w-3.5 h-3.5" />
-                      <span>Salin Link</span>
+                      <span>Salin Hyperlink</span>
                     </>
                   )}
                 </Button>
+              </div>
+
+              <div className="text-[11px] text-muted-foreground flex items-center justify-between px-1">
+                <span>Tersalin sebagai teks bertautan: <strong>&quot;Isi Buku Tamu&quot;</strong></span>
+                <span>Kantor: <strong>{adminProfile.kantorCabang}</strong></span>
               </div>
             </div>
 
@@ -1109,7 +1153,18 @@ Wassalamu'alaikum Warahmatullahi Wabarakatuh.
                 Tutup
               </Button>
 
-              {sharePhone.trim() ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => handleCopyShareLink(sharePhone)}
+                className="gap-1.5 font-bold border-emerald-600/40 text-emerald-700 dark:text-emerald-300"
+              >
+                <Copy className="w-3.5 h-3.5" />
+                {copiedShareLink ? "Hyperlink Tersalin!" : "Salin Hyperlink \"Isi Buku Tamu\""}
+              </Button>
+
+              {sharePhone.trim() && (
                 <a
                   href={getShareWaUrl(sharePhone)}
                   target="_blank"
@@ -1119,16 +1174,6 @@ Wassalamu'alaikum Warahmatullahi Wabarakatuh.
                   <MessageCircle className="w-4 h-4" />
                   Kirim via WhatsApp
                 </a>
-              ) : (
-                <Button
-                  type="button"
-                  size="sm"
-                  onClick={() => handleCopyShareLink("")}
-                  className="gap-1.5 font-bold bg-emerald-600 hover:bg-emerald-700 text-white"
-                >
-                  <Copy className="w-3.5 h-3.5" />
-                  {copiedShareLink ? "Link Tersalin!" : "Salin Link Umum"}
-                </Button>
               )}
             </div>
           </div>
