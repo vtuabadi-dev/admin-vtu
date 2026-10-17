@@ -314,44 +314,56 @@ export const packageService = {
             }
           }
 
-          const newVariant = {
-            clusterName: "Varian 2",
-            variantName: "Varian 2",
-            isVarian2: true,
-            hotelMekkah: finalHotelMekkah,
-            hotelMadinah: finalHotelMadinah,
-            hargaBase: Number(data.hargaBase || data.hargaPaket || targetParent.hargaPaket || 0),
-            isTanpaPerlengkapan: data.isAdaPerlengkapan === "tidak",
-            perlengkapan: data.isAdaPerlengkapan === "tidak" ? "EXCLUDE" : "INCLUDE",
-            isAdaKeretaCepat: data.isAdaKeretaCepat || (isKeretaCepatIncluded ? "ya" : "tidak"),
-            keretaCepat: isKeretaCepatIncluded ? "INCLUDE" : "EXCLUDE",
-            isAdaThoif: data.isAdaThoif || (isThoifIncluded ? "ya" : "tidak"),
-            thoif: isThoifIncluded ? "INCLUDE" : "EXCLUDE",
-            tipeMakan: tipeMakanVariant,
-            isPromo: data.splitReason === "promo",
-            promoText: data.splitReason === "promo" ? variantLabel : undefined,
-            upgradeDouble: Number(data.upgradeDouble || 0),
-            upgradeTriple: Number(data.upgradeTriple || 0),
-            flyerUrl: variantFlyerUrl || undefined,
-            flyerDriveId: variantFlyerDriveId || undefined,
-            caption: variantCaption || undefined,
-          };
+          const newVariantItems: any[] = (data.isAdaKlaster === "ya" && hotelOptionsArray.length > 0)
+            ? hotelOptionsArray.map((c: any) => ({
+                clusterName: c.clusterName || variantLabel || "Varian 2",
+                variantName: variantLabel || "Varian 2",
+                isVarian2: true,
+                hotelMekkah: c.hotelMekkah || finalHotelMekkah,
+                hotelMadinah: c.hotelMadinah || finalHotelMadinah,
+                hargaBase: Number(c.hargaBase || data.hargaBase || data.hargaPaket || targetParent.hargaPaket || 0),
+                isTanpaPerlengkapan: data.isAdaPerlengkapan === "tidak",
+                perlengkapan: data.isAdaPerlengkapan === "tidak" ? "EXCLUDE" : "INCLUDE",
+                isAdaKeretaCepat: data.isAdaKeretaCepat || (isKeretaCepatIncluded ? "ya" : "tidak"),
+                keretaCepat: isKeretaCepatIncluded ? "INCLUDE" : "EXCLUDE",
+                isAdaThoif: data.isAdaThoif || (isThoifIncluded ? "ya" : "tidak"),
+                thoif: isThoifIncluded ? "INCLUDE" : "EXCLUDE",
+                tipeMakan: tipeMakanVariant,
+                isPromo: data.splitReason === "promo",
+                promoText: data.splitReason === "promo" ? variantLabel : undefined,
+                upgradeDouble: Number(c.upgradeDouble || data.upgradeDouble || 0),
+                upgradeTriple: Number(c.upgradeTriple || data.upgradeTriple || 0),
+                flyerUrl: variantFlyerUrl || undefined,
+                flyerDriveId: variantFlyerDriveId || undefined,
+                caption: variantCaption || undefined,
+              }))
+            : [{
+                clusterName: variantLabel || "Varian 2",
+                variantName: variantLabel || "Varian 2",
+                isVarian2: true,
+                hotelMekkah: finalHotelMekkah,
+                hotelMadinah: finalHotelMadinah,
+                hargaBase: Number(data.hargaBase || data.hargaPaket || targetParent.hargaPaket || 0),
+                isTanpaPerlengkapan: data.isAdaPerlengkapan === "tidak",
+                perlengkapan: data.isAdaPerlengkapan === "tidak" ? "EXCLUDE" : "INCLUDE",
+                isAdaKeretaCepat: data.isAdaKeretaCepat || (isKeretaCepatIncluded ? "ya" : "tidak"),
+                keretaCepat: isKeretaCepatIncluded ? "INCLUDE" : "EXCLUDE",
+                isAdaThoif: data.isAdaThoif || (isThoifIncluded ? "ya" : "tidak"),
+                thoif: isThoifIncluded ? "INCLUDE" : "EXCLUDE",
+                tipeMakan: tipeMakanVariant,
+                isPromo: data.splitReason === "promo",
+                promoText: data.splitReason === "promo" ? variantLabel : undefined,
+                upgradeDouble: Number(data.upgradeDouble || 0),
+                upgradeTriple: Number(data.upgradeTriple || 0),
+                flyerUrl: variantFlyerUrl || undefined,
+                flyerDriveId: variantFlyerDriveId || undefined,
+                caption: variantCaption || undefined,
+              }];
 
-          const existIdx = existingOptions.findIndex((o: any) =>
-            o.isVarian2 || o.variantName === variantLabel || o.clusterName === newVariant.clusterName
+          const nonVariantOptions = existingOptions.filter((o: any) =>
+            !o.isVarian2 && o.variantName !== variantLabel && o.clusterName !== "Varian 2"
           );
-
-          if (existIdx >= 0) {
-            existingOptions[existIdx] = {
-              ...existingOptions[existIdx],
-              ...newVariant,
-              flyerUrl: variantFlyerUrl || existingOptions[existIdx].flyerUrl,
-              flyerDriveId: variantFlyerDriveId || existingOptions[existIdx].flyerDriveId,
-              caption: variantCaption || existingOptions[existIdx].caption,
-            };
-          } else {
-            existingOptions.push(newVariant);
-          }
+          existingOptions = [...nonVariantOptions, ...newVariantItems];
 
           const updated = await prisma.keberangkatan.update({
             where: { id: targetParent.id },
