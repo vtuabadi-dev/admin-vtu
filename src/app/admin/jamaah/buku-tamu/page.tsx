@@ -272,9 +272,19 @@ export default function BukuTamuPage() {
     }
   };
 
+  // Helper to ensure customer links always use the official production domain (not temporary Vercel preview hashes)
+  const getPublicBaseUrl = () => {
+    if (typeof window !== "undefined") {
+      if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
+        return window.location.origin;
+      }
+    }
+    return "https://www.vtu.my.id";
+  };
+
   // Helper WA message generation
   const generateRegistrationWaUrl = (tamu: BukuTamuItem) => {
-    const origin = typeof window !== "undefined" ? window.location.origin : "https://vtu.my.id";
+    const origin = getPublicBaseUrl();
     const regUrl = `${origin}/pendaftaran`;
     const cleanPhone = tamu.nomorWa.replace(/[^0-9]/g, "");
     let formattedPhone = cleanPhone;
@@ -302,7 +312,7 @@ Wassalamu'alaikum Warahmatullahi Wabarakatuh.
 
   // Helper Public Guestbook Link & WA
   const getPublicGuestbookLink = (phone?: string) => {
-    const origin = typeof window !== "undefined" ? window.location.origin : "https://vtu.my.id";
+    const origin = getPublicBaseUrl();
     const params = new URLSearchParams();
     if (phone && phone.trim()) {
       params.set("phone", phone.trim());
@@ -370,7 +380,7 @@ Wassalamu'alaikum Warahmatullahi Wabarakatuh.
   };
 
   const handleCopyRegLink = (tamu: BukuTamuItem) => {
-    const origin = typeof window !== "undefined" ? window.location.origin : "https://vtu.my.id";
+    const origin = getPublicBaseUrl();
     const regUrl = `${origin}/pendaftaran`;
     navigator.clipboard.writeText(regUrl);
     setCopiedId(tamu.id);
