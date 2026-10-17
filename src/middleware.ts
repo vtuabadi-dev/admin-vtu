@@ -5,6 +5,8 @@ import { checkRateLimit, rateLimitKey, getRateLimitConfig } from "@/server/lib/r
 const PUBLIC_PATHS = [
   "/login",
   "/register",
+  "/pendaftaran",
+  "/buku-tamu",
   "/track",
   "/reset-password",
   "/setup-password",
@@ -13,6 +15,7 @@ const PUBLIC_PATHS = [
   "/api/track",
   "/_next",
   "/api/register",
+  "/api/buku-tamu/public",
   "/api/badal-umroh",
   "/api/wakaf-quran",
   "/api/master/harga-layanan",

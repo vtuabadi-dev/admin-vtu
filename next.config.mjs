@@ -16,6 +16,15 @@ const nextConfig = {
   experimental: {
     serverComponentsExternalPackages: ["@prisma/client", "pdfmake", "pdfkit"],
   },
+
+  async rewrites() {
+    return [
+      {
+        source: "/pendaftaran",
+        destination: "/register",
+      },
+    ];
+  },
 };
 
 export default nextConfig;

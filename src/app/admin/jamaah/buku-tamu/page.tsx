@@ -287,7 +287,10 @@ Yth. Bapak/Ibu *${tamu.namaTamu}*,
 Terima kasih atas kunjungan silaturahmi Anda ke kantor *VTU ABADI Travel (Kantor ${tamu.kantorCabang})* bersama tim kami (*${tamu.adminName}*).
 
 Untuk memudahkan proses booking seat dan pendaftaran online keberangkatan Umroh, silakan klik tautan formulir pendaftaran resmi berikut:
-👉 ${regUrl}
+👉 *Formulir Pendaftaran:*
+${regUrl}
+
+_💡 Catatan: Jika link di atas belum berwarna biru atau belum bisa diklik, silakan kirim balasan chat ini atau tekan 'Tambah ke kontak' terlebih dahulu 🙏_
 
 Bila memerlukan bantuan pengisian berkas atau konsultasi jadwal paket, kami siap mendampingi Anda hingga keberangkatan ke Baitullah.
 
@@ -330,6 +333,8 @@ Untuk pencatatan buku tamu kunjungan dan konsultasi rencana ibadah Umroh Anda, s
 ${link}
 
 *(Nomor WhatsApp Anda telah terisi secara otomatis pada formulir)*
+
+_💡 Catatan: Jika link di atas belum berwarna biru atau belum bisa diklik, silakan kirim balasan chat ini atau tekan 'Tambah ke kontak' terlebih dahulu 🙏_
 
 Bila ada hal yang ingin ditanyakan, kami dengan senang hati melayani Anda.
 Wassalamu'alaikum Warahmatullahi Wabarakatuh.
