@@ -20,6 +20,8 @@ import {
   User,
   HeartHandshake,
   Check,
+  Share2,
+  MessageCircle,
 } from "lucide-react";
 import { Button } from "@/shared/components/ui/Button";
 import { Input } from "@/shared/components/ui/Input";
@@ -119,6 +121,11 @@ export default function BukuTamuPage() {
 
   // Copy link toast state
   const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  // Modal Bagikan Link Buku Tamu
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const [sharePhone, setSharePhone] = useState("");
+  const [copiedShareLink, setCopiedShareLink] = useState(false);
 
   // Fetch admin profile for accurate office placement
   useEffect(() => {
@@ -288,6 +295,53 @@ Wassalamu'alaikum Warahmatullahi Wabarakatuh.
     return getWhatsAppUrl(formattedPhone, pesan);
   };
 
+  // Helper Public Guestbook Link & WA
+  const getPublicGuestbookLink = (phone?: string) => {
+    const origin = typeof window !== "undefined" ? window.location.origin : "https://vtu.my.id";
+    const params = new URLSearchParams();
+    if (phone && phone.trim()) {
+      params.set("phone", phone.trim());
+    }
+    if (adminProfile.name) {
+      params.set("admin", adminProfile.name);
+    }
+    if (adminProfile.kantorCabang) {
+      params.set("kantor", adminProfile.kantorCabang);
+    }
+    return `${origin}/buku-tamu?${params.toString()}`;
+  };
+
+  const getShareWaUrl = (phone: string) => {
+    const cleanPhone = phone.replace(/[^0-9]/g, "");
+    let formattedPhone = cleanPhone;
+    if (formattedPhone.startsWith("0")) formattedPhone = "62" + formattedPhone.slice(1);
+    else if (formattedPhone.startsWith("8")) formattedPhone = "62" + formattedPhone;
+
+    const link = getPublicGuestbookLink(phone);
+    const pesan = `*Bismillah, Assalamu'alaikum Warahmatullahi Wabarakatuh.*
+
+Kepada Yth. Calon Tamu / Jamaah Baitullah,
+Terima kasih atas silaturahmi Anda dengan *VTU ABADI Travel (Kantor ${adminProfile.kantorCabang})*.
+
+Untuk pencatatan buku tamu kunjungan dan kemudahan konsultasi rencana ibadah Umroh Anda, silakan mengisi formulir buku tamu singkat melalui tautan resmi kami berikut:
+👉 ${link}
+
+*(Nomor WhatsApp Anda telah terisi secara otomatis pada formulir)*
+
+Bila ada hal yang ingin ditanyakan, kami dengan senang hati melayani Anda.
+Wassalamu'alaikum Warahmatullahi Wabarakatuh.
+*VTU ABADI Travel — Melayani Sepenuh Hati*`;
+
+    return getWhatsAppUrl(formattedPhone, pesan);
+  };
+
+  const handleCopyShareLink = (phone?: string) => {
+    const link = getPublicGuestbookLink(phone);
+    navigator.clipboard.writeText(link);
+    setCopiedShareLink(true);
+    setTimeout(() => setCopiedShareLink(false), 2500);
+  };
+
   const handleCopyRegLink = (tamu: BukuTamuItem) => {
     const origin = typeof window !== "undefined" ? window.location.origin : "https://vtu.my.id";
     const regUrl = `${origin}/pendaftaran`;
@@ -327,13 +381,27 @@ Wassalamu'alaikum Warahmatullahi Wabarakatuh.
           </p>
         </div>
 
-        <Button
-          onClick={() => setIsAddModalOpen(true)}
-          className="gap-2 bg-primary text-primary-foreground font-bold shadow-md hover:opacity-90 shrink-0"
-        >
-          <Plus className="w-4 h-4" />
-          Catat Tamu Baru
-        </Button>
+        <div className="flex items-center gap-2 shrink-0">
+          <Button
+            variant="outline"
+            onClick={() => {
+              setSharePhone("");
+              setIsShareModalOpen(true);
+            }}
+            className="gap-2 border-emerald-600/40 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 font-semibold shadow-sm"
+          >
+            <Share2 className="w-4 h-4 text-emerald-600" />
+            Bagikan Link Buku Tamu
+          </Button>
+
+          <Button
+            onClick={() => setIsAddModalOpen(true)}
+            className="gap-2 bg-primary text-primary-foreground font-bold shadow-md hover:opacity-90 shrink-0"
+          >
+            <Plus className="w-4 h-4" />
+            Catat Tamu Baru
+          </Button>
+        </div>
       </div>
 
       {/* STATS CARDS */}
@@ -933,6 +1001,140 @@ Wassalamu'alaikum Warahmatullahi Wabarakatuh.
           </div>
         </div>
       )}
+      {/* MODAL BAGIKAN LINK BUKU TAMU KE CUSTOMER */}
+      {isShareModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm animate-in fade-in-0">
+          <div className="w-full max-w-lg bg-card rounded-2xl border shadow-2xl p-6 space-y-5 animate-in zoom-in-95">
+            <div className="flex items-center justify-between border-b pb-3">
+              <div>
+                <h3 className="text-base font-bold flex items-center gap-2 text-foreground">
+                  <Share2 className="w-5 h-5 text-emerald-600" />
+                  Bagikan Link Buku Tamu ke Customer
+                </h3>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Kirim link via WA agar calon jamaah mengisi form dengan nomor WA terisi otomatis
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsShareModalOpen(false)}
+                className="text-muted-foreground hover:text-foreground cursor-pointer text-sm"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Input Nomor WA Customer */}
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-foreground flex items-center justify-between">
+                <span>Nomor WhatsApp Customer</span>
+                <span className="text-[11px] font-normal text-muted-foreground">
+                  (Opsional, untuk auto-fill nomor di HP customer)
+                </span>
+              </label>
+              <div className="relative">
+                <Phone className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  type="tel"
+                  value={sharePhone}
+                  onChange={(e) => setSharePhone(e.target.value)}
+                  placeholder="Contoh: 081234567890 atau 6281234567890"
+                  className="pl-9 h-9 text-xs font-mono"
+                  autoFocus
+                />
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                Jika diisi, ketika customer membuka link dari WhatsApp, nomor WA mereka akan <strong>langsung terisi otomatis</strong> di form.
+              </p>
+            </div>
+
+            {/* Preview Link Box */}
+            <div className="p-3.5 rounded-xl bg-muted/50 border space-y-2 text-xs">
+              <div className="flex items-center justify-between text-muted-foreground text-[11px] font-semibold">
+                <span>Tautan Formulir Buku Tamu:</span>
+                <span className="text-emerald-600 font-bold">
+                  {sharePhone.trim() ? "✓ Link Personalisasi" : "Link Umum"}
+                </span>
+              </div>
+              <div className="p-2.5 rounded-lg bg-background border font-mono text-[11px] break-all select-all text-foreground/90">
+                {getPublicGuestbookLink(sharePhone)}
+              </div>
+              <div className="flex items-center justify-between pt-1">
+                <span className="text-[11px] text-muted-foreground">
+                  Kantor: <strong>{adminProfile.kantorCabang}</strong> • Admin: <strong>{adminProfile.name}</strong>
+                </span>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleCopyShareLink(sharePhone)}
+                  className="h-7 text-xs gap-1.5 font-bold"
+                >
+                  {copiedShareLink ? (
+                    <>
+                      <Check className="w-3.5 h-3.5 text-emerald-600" />
+                      <span className="text-emerald-600">Tersalin!</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-3.5 h-3.5" />
+                      <span>Salin Link</span>
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+
+            {/* Info 3 Kolom */}
+            <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-xs space-y-1 text-emerald-950 dark:text-emerald-200">
+              <div className="font-bold flex items-center gap-1.5">
+                <Check className="w-4 h-4 text-emerald-600 shrink-0" />
+                Formulir Minimalis 3 Kolom untuk Customer:
+              </div>
+              <ul className="list-disc list-inside text-[11px] text-emerald-800 dark:text-emerald-300 space-y-0.5 ml-1">
+                <li><strong>1. Nama Lengkap Jamaah</strong> (wajib diisi customer)</li>
+                <li><strong>2. Nomor WhatsApp</strong> (terisi otomatis dari link)</li>
+                <li><strong>3. Keperluan / Rencana Ibadah</strong> (dengan tombol pilihan cepat)</li>
+              </ul>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex items-center justify-end gap-2 pt-2 border-t">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setIsShareModalOpen(false)}
+              >
+                Tutup
+              </Button>
+
+              {sharePhone.trim() ? (
+                <a
+                  href={getShareWaUrl(sharePhone)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-md transition-all"
+                >
+                  <MessageCircle className="w-4 h-4" />
+                  Kirim via WhatsApp
+                </a>
+              ) : (
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={() => handleCopyShareLink("")}
+                  className="gap-1.5 font-bold bg-emerald-600 hover:bg-emerald-700 text-white"
+                >
+                  <Copy className="w-3.5 h-3.5" />
+                  {copiedShareLink ? "Link Tersalin!" : "Salin Link Umum"}
+                </Button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+
