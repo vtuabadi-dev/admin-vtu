@@ -719,8 +719,12 @@ export const packageService = {
           }
         }
         if (uploadedUrls.length > 0) {
-          data.flyerUrl = uploadedUrls.join(",");
-          data.flyerDriveId = firstDriveId;
+          const existingUrls = typeof data.flyerUrl === "string" && data.flyerUrl.trim() !== ""
+            ? data.flyerUrl.split(",").map((s: string) => s.trim()).filter(Boolean)
+            : [];
+          const combined = Array.from(new Set([...existingUrls, ...uploadedUrls]));
+          data.flyerUrl = combined.join(",");
+          data.flyerDriveId = firstDriveId || before?.flyerDriveId;
         }
       } catch (err) {
         console.warn("[PackageService] Gagal mengunggah flyer di updateWithAudit:", err);
