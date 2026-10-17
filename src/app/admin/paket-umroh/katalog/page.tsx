@@ -725,6 +725,8 @@ Salam hangat dari kami,
   // State & handler untuk salin gambar flyer ke clipboard
   const [copyingFlyer, setCopyingFlyer] = useState(false);
   const [copiedFlyerSuccess, setCopiedFlyerSuccess] = useState(false);
+  const [copyingAllFlyers, setCopyingAllFlyers] = useState(false);
+  const [copiedAllFlyersSuccess, setCopiedAllFlyersSuccess] = useState(false);
   const [selectedFlyerIndex, setSelectedFlyerIndex] = useState(0);
 
   const handleCopyFlyerImageToClipboard = async (flyerUrl: string) => {
@@ -791,6 +793,108 @@ Salam hangat dari kami,
     }
   };
 
+  const handleCopyAllFlyersCombined = async (flyerUrls: string[]) => {
+    if (!flyerUrls || flyerUrls.length === 0) return;
+    if (flyerUrls.length === 1) {
+      return handleCopyFlyerImageToClipboard(flyerUrls[0]!);
+    }
+
+    try {
+      setCopyingAllFlyers(true);
+
+      if (typeof navigator === "undefined" || !navigator.clipboard || typeof navigator.clipboard.write !== "function") {
+        throw new Error("Peramban Anda tidak mengizinkan akses salin gambar otomatis ke papan klip");
+      }
+
+      // Fetch semua blob gambar flyer secara paralel
+      const blobs = await Promise.all(
+        flyerUrls.map(async (fUrl) => {
+          const targetUrl = fUrl.startsWith("http")
+            ? fUrl
+            : (fUrl.startsWith("/") ? fUrl : `/${fUrl}`);
+          const res = await fetch(targetUrl, { credentials: "same-origin" });
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          return res.blob();
+        })
+      );
+
+      // Load semua gambar
+      const objectUrls: string[] = [];
+      const images = await Promise.all(
+        blobs.map((blob) => {
+          return new Promise<HTMLImageElement>((resolve, reject) => {
+            const oUrl = URL.createObjectURL(blob);
+            objectUrls.push(oUrl);
+            const img = new Image();
+            img.crossOrigin = "anonymous";
+            img.onload = () => resolve(img);
+            img.onerror = () => reject(new Error("Gagal membaca gambar"));
+            img.src = oUrl;
+          });
+        })
+      );
+
+      // Tentukan layout grid gabungan (2 kolom jika 4 halaman)
+      const count = images.length;
+      let cols = 1;
+      let rows = count;
+      if (count === 4) {
+        cols = 2;
+        rows = 2;
+      } else if (count >= 2 && count <= 3) {
+        cols = count;
+        rows = 1;
+      } else if (count > 4) {
+        cols = 2;
+        rows = Math.ceil(count / 2);
+      }
+
+      const singleW = images[0]?.naturalWidth || 1080;
+      const singleH = images[0]?.naturalHeight || 1350;
+      const gap = 16;
+      const pad = 16;
+
+      const totalCanvasW = cols * singleW + (cols - 1) * gap + pad * 2;
+      const totalCanvasH = rows * singleH + (rows - 1) * gap + pad * 2;
+
+      const canvas = document.createElement("canvas");
+      canvas.width = totalCanvasW;
+      canvas.height = totalCanvasH;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) throw new Error("Canvas context tidak tersedia");
+
+      // Background putih bersih
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, totalCanvasW, totalCanvasH);
+
+      images.forEach((img, idx) => {
+        const colIdx = idx % cols;
+        const rowIdx = Math.floor(idx / cols);
+        const x = pad + colIdx * (singleW + gap);
+        const y = pad + rowIdx * (singleH + gap);
+        ctx.drawImage(img, x, y, singleW, singleH);
+      });
+
+      objectUrls.forEach((u) => URL.revokeObjectURL(u));
+
+      const pngBlob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
+      if (!pngBlob) throw new Error("Gagal mengonversi gambar gabungan ke format PNG");
+
+      await navigator.clipboard.write([
+        new ClipboardItem({ "image/png": pngBlob }),
+      ]);
+
+      setCopiedAllFlyersSuccess(true);
+      setTimeout(() => setCopiedAllFlyersSuccess(false), 3000);
+    } catch (err: any) {
+      console.error("Gagal menggabungkan flyer:", err);
+      const detail = err?.message ? ` (${err.message})` : "";
+      alert(`Gagal menyalin semua flyer${detail}. Anda dapat menyalin per halaman atau mengunduh semua foto.`);
+    } finally {
+      setCopyingAllFlyers(false);
+    }
+  };
+
   const handleDownloadFlyer = async (flyerUrl: string, index: number) => {
     try {
       const targetUrl = flyerUrl.startsWith("http")
@@ -811,6 +915,13 @@ Salam hangat dari kami,
       URL.revokeObjectURL(url);
     } catch {
       window.open(flyerUrl, "_blank");
+    }
+  };
+
+  const handleDownloadAllFlyers = async (flyerUrls: string[]) => {
+    for (let i = 0; i < flyerUrls.length; i++) {
+      await handleDownloadFlyer(flyerUrls[i]!, i);
+      await new Promise((r) => setTimeout(r, 250));
     }
   };
 
@@ -1472,9 +1583,9 @@ Salam hangat dari kami,
                       <ImageIcon className="w-4 h-4 text-emerald-600" />
                       Flyer Brosur Paket ({packageFlyers.length} Halaman)
                     </span>
-                    {copiedFlyerSuccess && (
+                    {(copiedFlyerSuccess || copiedAllFlyersSuccess) && (
                       <span className="text-[11px] font-bold text-emerald-600 flex items-center gap-1 animate-in fade-in">
-                        <Check className="w-3.5 h-3.5" /> Gambar Flyer Tersalin!
+                        <Check className="w-3.5 h-3.5" /> {copiedAllFlyersSuccess ? "Semua Halaman Tersalin!" : "Gambar Flyer Tersalin!"}
                       </span>
                     )}
                   </div>
@@ -1509,11 +1620,36 @@ Salam hangat dari kami,
 
                   {/* Copy Image & Download Buttons */}
                   <div className="flex flex-wrap items-center gap-2 pt-1">
+                    {/* Tombol Salin Seluruh Flyer (Gabungan Grid HD) jika ada lebih dari 1 halaman */}
+                    {packageFlyers.length > 1 && (
+                      <Button
+                        type="button"
+                        size="sm"
+                        disabled={copyingAllFlyers || copyingFlyer}
+                        onClick={() => handleCopyAllFlyersCombined(packageFlyers)}
+                        className="h-8 text-xs font-bold gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs"
+                      >
+                        {copyingAllFlyers ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : copiedAllFlyersSuccess ? (
+                          <Check className="w-3.5 h-3.5 text-white" />
+                        ) : (
+                          <Sparkles className="w-3.5 h-3.5" />
+                        )}
+                        <span>
+                          {copiedAllFlyersSuccess
+                            ? "Semua Flyer Siap Di-Paste!"
+                            : `Salin Semua Hal (Gabung 1 Foto)`}
+                        </span>
+                      </Button>
+                    )}
+
+                    {/* Tombol Salin Halaman Tertentu yang Dipilih */}
                     <Button
                       type="button"
                       size="sm"
                       variant="outline"
-                      disabled={copyingFlyer}
+                      disabled={copyingFlyer || copyingAllFlyers}
                       onClick={() => handleCopyFlyerImageToClipboard(packageFlyers[selectedFlyerIndex] || packageFlyers[0]!)}
                       className="h-8 text-xs font-bold gap-1.5 border-emerald-600/40 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-950/40"
                     >
@@ -1528,11 +1664,12 @@ Salam hangat dari kami,
                         {copiedFlyerSuccess
                           ? "Flyer Siap Di-Paste!"
                           : packageFlyers.length > 1
-                          ? `Salin Foto Flyer (Hal ${selectedFlyerIndex + 1})`
+                          ? `Salin Hal ${selectedFlyerIndex + 1}`
                           : "Salin Foto Flyer"}
                       </span>
                     </Button>
 
+                    {/* Tombol Unduh Halaman Tertentu */}
                     <Button
                       type="button"
                       size="sm"
@@ -1541,13 +1678,28 @@ Salam hangat dari kami,
                       className="h-8 text-xs font-semibold gap-1.5"
                     >
                       <Download className="w-3.5 h-3.5" />
-                      <span>{packageFlyers.length > 1 ? `Unduh Foto (Hal ${selectedFlyerIndex + 1})` : "Unduh Foto"}</span>
+                      <span>{packageFlyers.length > 1 ? `Unduh Hal ${selectedFlyerIndex + 1}` : "Unduh Foto"}</span>
                     </Button>
+
+                    {/* Tombol Unduh Semua Halaman Sekaligus jika > 1 */}
+                    {packageFlyers.length > 1 && (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleDownloadAllFlyers(packageFlyers)}
+                        className="h-8 text-xs font-semibold gap-1.5 border-slate-300 dark:border-stone-700"
+                        title="Unduh seluruh file halaman brosur sekaligus"
+                      >
+                        <Download className="w-3.5 h-3.5 text-slate-600" />
+                        <span>Unduh Semua ({packageFlyers.length} Foto)</span>
+                      </Button>
+                    )}
                   </div>
 
                   {/* WhatsApp Guidance Note */}
                   <div className="p-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-[11px] text-emerald-950 dark:text-emerald-200 leading-relaxed">
-                    💡 <strong>Cara kirim foto langsung di WhatsApp Web:</strong> Klik tombol <strong>&quot;Salin Foto Flyer&quot;</strong> di atas, lalu di kolom chat WhatsApp tinggal tekan <strong>Ctrl + V</strong> untuk langsung melampirkan foto flyer!
+                    💡 <strong>Cara kirim foto langsung di WhatsApp Web:</strong> Klik tombol <strong>&quot;Salin Semua Hal (Gabung 1 Foto)&quot;</strong> atau <strong>&quot;Salin Foto Flyer&quot;</strong> di atas, lalu di kolom chat WhatsApp tinggal tekan <strong>Ctrl + V</strong> untuk langsung melampirkan foto brosur secara instan!
                   </div>
                 </div>
               );
