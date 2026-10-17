@@ -254,6 +254,66 @@ export const packageService = {
           const isThoifIncluded = data.isAdaThoif === "ya";
           const tipeMakanVariant = data.tipeMakan || "FB";
 
+          // ADR-0025: Upload flyer & caption untuk split variant ke Google Drive folder FLYER/[variantName]
+          let variantFlyerUrl: string | undefined = undefined;
+          let variantFlyerDriveId: string | undefined = undefined;
+          let variantCaption: string | undefined = data.caption || undefined;
+
+          const driveMeta = (targetParent.driveFolderIds as any);
+          const rootFolderId = driveMeta?.rootPackageFolderId;
+
+          const flyerBase64List = Array.isArray(data.flyerBase64List) && data.flyerBase64List.length > 0
+            ? data.flyerBase64List.filter(Boolean)
+            : (data.flyerBase64 ? [data.flyerBase64] : []);
+
+          if (rootFolderId) {
+            try {
+              const { getStorageAdapter } = await import("../storage");
+              const storage = getStorageAdapter();
+              const { getOrCreateVariantFlyerFolder } = await import("../storage/google-drive");
+              const { variantFolderId } = await getOrCreateVariantFlyerFolder(
+                rootFolderId,
+                variantLabel || "Varian 2",
+                driveMeta?.flyer
+              );
+
+              // 1. Upload Flyers jika ada
+              if (flyerBase64List.length > 0) {
+                const uploadedUrls: string[] = [];
+                for (let fIdx = 0; fIdx < flyerBase64List.length; fIdx++) {
+                  const b64 = flyerBase64List[fIdx];
+                  const clean = b64.replace(/^data:image\/[a-zA-Z0-9+.-]+;base64,/, "");
+                  const buf = Buffer.from(clean, "base64");
+                  if (buf.length > 0) {
+                    const extMatch = b64.match(/^data:image\/([a-zA-Z0-9+.-]+);base64,/);
+                    const ext = extMatch ? (extMatch[1] === "png" ? "png" : "jpg") : "jpg";
+                    const mime = ext === "png" ? "image/png" : "image/jpeg";
+                    const suffix = flyerBase64List.length > 1 ? `_${fIdx + 1}` : "";
+                    const fn = `Flyer-${targetParent.kode || targetParent.id}_${variantLabel || "V2"}${suffix}.${ext}`;
+                    const fId = await storage.upload(fn, buf, mime, variantFolderId);
+                    if (fId) {
+                      if (!variantFlyerDriveId) variantFlyerDriveId = fId;
+                      const url = fId.startsWith("http") ? fId : `/api/storage/download?id=${fId}`;
+                      uploadedUrls.push(url);
+                    }
+                  }
+                }
+                if (uploadedUrls.length > 0) {
+                  variantFlyerUrl = uploadedUrls.join(",");
+                }
+              }
+
+              // 2. Upload Caption jika ada
+              if (data.caption && data.caption.trim() !== "") {
+                const capBuf = Buffer.from(data.caption, "utf-8");
+                const capName = `Caption-${targetParent.kode || targetParent.id}_${variantLabel || "V2"}.txt`;
+                await storage.upload(capName, capBuf, "text/plain", variantFolderId);
+              }
+            } catch (vUploadErr) {
+              console.warn("[PackageService] Gagal upload flyer/caption varian di isVariantSplit:", vUploadErr);
+            }
+          }
+
           const newVariant = {
             clusterName: "Varian 2",
             variantName: "Varian 2",
@@ -272,6 +332,9 @@ export const packageService = {
             promoText: data.splitReason === "promo" ? variantLabel : undefined,
             upgradeDouble: Number(data.upgradeDouble || 0),
             upgradeTriple: Number(data.upgradeTriple || 0),
+            flyerUrl: variantFlyerUrl || undefined,
+            flyerDriveId: variantFlyerDriveId || undefined,
+            caption: variantCaption || undefined,
           };
 
           const existIdx = existingOptions.findIndex((o: any) =>
@@ -279,7 +342,13 @@ export const packageService = {
           );
 
           if (existIdx >= 0) {
-            existingOptions[existIdx] = { ...existingOptions[existIdx], ...newVariant };
+            existingOptions[existIdx] = {
+              ...existingOptions[existIdx],
+              ...newVariant,
+              flyerUrl: variantFlyerUrl || existingOptions[existIdx].flyerUrl,
+              flyerDriveId: variantFlyerDriveId || existingOptions[existIdx].flyerDriveId,
+              caption: variantCaption || existingOptions[existIdx].caption,
+            };
           } else {
             existingOptions.push(newVariant);
           }

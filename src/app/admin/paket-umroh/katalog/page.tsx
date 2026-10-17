@@ -442,6 +442,7 @@ export default function KatalogPaketPage() {
               hotelMadinah: opt.hotelMadinah || pkg.hotelMadinah,
               hargaPaket: opt.hargaBase || pkg.hargaPaket,
               flyerUrl: opt.flyerUrl || (vIdx === 0 ? pkg.flyerUrl : ""),
+              flyerDriveId: opt.flyerDriveId || (vIdx === 0 ? pkg.flyerDriveId : undefined),
               caption: opt.caption || (vIdx === 0 ? pkg.caption : ""),
               splitReason: isV2 ? "promo" : (pkg.splitReason || undefined),
               splitLabel: isV2 ? vName : (pkg.splitLabel || undefined),
