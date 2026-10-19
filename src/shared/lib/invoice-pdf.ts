@@ -15,6 +15,7 @@ export interface InvoiceOrderItem {
   nominal: number;
   qty?: number;
   hargaSatuan?: number;
+  satuan?: string; // e.g. "Pax", "Kamar", "Pcs", "Set", etc.
   allocatedJamaah?: string[]; // Daftar nama jamaah yang menerima alokasi (misal upgrade kamar)
 }
 

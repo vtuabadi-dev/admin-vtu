@@ -48,6 +48,7 @@ import {
   metodeOptions,
   DEFAULT_TAMBAHAN_OPTIONS,
   DEFAULT_POTONGAN_OPTIONS,
+  DEFAULT_SATUAN_OPTIONS,
   isRoomUpgradeItem,
   detectRoomTypeFromName,
   getPackageUpgradePrice,
@@ -127,8 +128,20 @@ const SplitInvoiceModal = dynamic(
   const [newBillingKategori, setNewBillingKategori] = useState<"tambahan" | "potongan">("tambahan");
   const [newBillingNominal, setNewBillingNominal] = useState(0);
   const [newBillingQty, setNewBillingQty] = useState<number>(1);
+  const [newBillingSatuan, setNewBillingSatuan] = useState<string>("Pax");
   const [newBillingAllocatedMembers, setNewBillingAllocatedMembers] = useState<string[]>([]);
   const [isCustomJenisMode, setIsCustomJenisMode] = useState<boolean>(false);
+
+  // Edit Item Modal State
+  const [editingItem, setEditingItem] = useState<BillingItem | null>(null);
+  const [showEditItemModal, setShowEditItemModal] = useState(false);
+  const [editItemNama, setEditItemNama] = useState("");
+  const [editItemKategori, setEditItemKategori] = useState<"utama" | "tambahan" | "potongan">("tambahan");
+  const [editItemNominal, setEditItemNominal] = useState(0);
+  const [editItemQty, setEditItemQty] = useState(1);
+  const [editItemSatuan, setEditItemSatuan] = useState("Pax");
+  const [editItemCatatan, setEditItemCatatan] = useState("");
+  const [editItemAllocatedMembers, setEditItemAllocatedMembers] = useState<string[]>([]);
 
 
 
@@ -377,16 +390,52 @@ const SplitInvoiceModal = dynamic(
       nama: trimmedName,
       kategori: newBillingKategori,
       nominal: newBillingNominal,
-      qty: Math.min(Math.max(1, newBillingQty), maxQtyLimit),
+      qty: Math.max(1, newBillingQty),
+      satuan: newBillingSatuan || "Pax",
       allocatedJamaah: allocated,
     };
 
     setBillingItems((prev) => [...prev, newItem]);
     setNewBillingNominal(0);
     setNewBillingQty(1);
+    setNewBillingSatuan("Pax");
     setNewBillingAllocatedMembers([]);
     setIsCustomJenisMode(false);
     setShowAddItemModal(false);
+  }
+
+  function handleOpenEditItem(item: BillingItem) {
+    setEditingItem(item);
+    setEditItemNama(item.nama);
+    setEditItemKategori(item.kategori);
+    setEditItemNominal(item.nominal);
+    setEditItemQty(item.qty);
+    setEditItemSatuan(item.satuan || "Pax");
+    setEditItemCatatan(item.catatan || "");
+    setEditItemAllocatedMembers(item.allocatedJamaah || []);
+    setShowEditItemModal(true);
+  }
+
+  function handleSaveEditItem() {
+    if (!editingItem || !editItemNama.trim() || editItemNominal < 0) return;
+    setBillingItems((prev) =>
+      prev.map((i) =>
+        i.id === editingItem.id
+          ? {
+              ...i,
+              nama: editItemNama.trim(),
+              kategori: editItemKategori,
+              nominal: editItemNominal,
+              qty: Math.max(1, editItemQty),
+              satuan: editItemSatuan || "Pax",
+              catatan: editItemCatatan.trim() || undefined,
+              allocatedJamaah: editItemAllocatedMembers.length > 0 ? editItemAllocatedMembers : undefined,
+            }
+          : i
+      )
+    );
+    setShowEditItemModal(false);
+    setEditingItem(null);
   }
 
   function handleRemoveBillingItem(id: string) {
@@ -493,6 +542,7 @@ const SplitInvoiceModal = dynamic(
           kategori: "utama",
           nominal: basePaxPrice,
           qty: summary.jumlahAnggota,
+          satuan: "Pax",
           isDefault: true,
         },
       ];
@@ -505,6 +555,7 @@ const SplitInvoiceModal = dynamic(
           kategori: "tambahan",
           nominal: upgradePrice,
           qty: summary.jumlahAnggota,
+          satuan: "Pax",
           allocatedJamaah: memberNames.length > 0 ? memberNames : undefined,
           isDefault: false,
         });
@@ -815,10 +866,10 @@ const SplitInvoiceModal = dynamic(
                             <tr className="border-b text-left font-medium text-muted-foreground bg-stone-50 dark:bg-stone-900/50">
                               <th className="p-2">Deskripsi Item Tagihan / Potongan</th>
                               <th className="p-2">Kategori</th>
-                              <th className="p-2 text-center">Qty</th>
-                              <th className="p-2 text-right">Harga / Pax</th>
+                              <th className="p-2 text-center">Qty / Satuan</th>
+                              <th className="p-2 text-right">Harga Satuan</th>
                               <th className="p-2 text-right">Total Nominal</th>
-                              <th className="p-2 text-center w-10">Aksi</th>
+                              <th className="p-2 text-center w-14">Aksi</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y">
@@ -857,7 +908,7 @@ const SplitInvoiceModal = dynamic(
                                     )}
                                   </td>
                                   <td className="p-2 text-center font-mono font-bold text-slate-700 dark:text-slate-300">
-                                    {item.qty} Pax
+                                    {item.qty} {item.satuan || "Pax"}
                                   </td>
                                   <td className="p-2 text-right font-mono tabular-nums text-stone-600 dark:text-stone-400">
                                     {formatCurrency(item.nominal)}
@@ -868,18 +919,26 @@ const SplitInvoiceModal = dynamic(
                                     {item.kategori === "potongan" ? `- ${formatCurrency(itemTotal)}` : formatCurrency(itemTotal)}
                                   </td>
                                   <td className="p-2 text-center">
-                                    {!item.isDefault ? (
+                                    <div className="flex items-center justify-center gap-1">
                                       <button
                                         type="button"
-                                        onClick={() => handleRemoveBillingItem(item.id)}
-                                        className="text-stone-400 hover:text-destructive transition-colors p-1 cursor-pointer"
-                                        title="Hapus Item Ini"
+                                        onClick={() => handleOpenEditItem(item)}
+                                        className="text-stone-400 hover:text-amber-600 dark:hover:text-amber-400 transition-colors p-1 cursor-pointer rounded hover:bg-stone-100 dark:hover:bg-stone-800"
+                                        title="Ubah Rincian Item (Jumlah, Satuan & Harga)"
                                       >
-                                        <Trash2 className="h-3.5 w-3.5" />
+                                        <Edit3 className="h-3.5 w-3.5" />
                                       </button>
-                                    ) : (
-                                      <span className="text-[10px] text-muted-foreground font-mono">-</span>
-                                    )}
+                                      {!item.isDefault && (
+                                        <button
+                                          type="button"
+                                          onClick={() => handleRemoveBillingItem(item.id)}
+                                          className="text-stone-400 hover:text-destructive transition-colors p-1 cursor-pointer rounded hover:bg-stone-100 dark:hover:bg-stone-800"
+                                          title="Hapus Item Ini"
+                                        >
+                                          <Trash2 className="h-3.5 w-3.5" />
+                                        </button>
+                                      )}
+                                    </div>
                                   </td>
                                 </tr>
                               );
@@ -1375,32 +1434,64 @@ const SplitInvoiceModal = dynamic(
             </div>
           )}
 
-          {/* 5. Quantity Input with Max Limit */}
-          <div>
-            <div className="flex items-center justify-between mb-1">
-              <label className="text-xs font-bold text-foreground">
-                Quantity (Jumlah Pax)
+          {/* 5. Quantity & Satuan Input (Fleksibel sesuai pembelian) */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-bold text-foreground block mb-1">
+                Berapa Banyak (Quantity)
               </label>
-              <span className="text-[10px] font-bold text-amber-700 dark:text-amber-300 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/30">
-                Maksimal: {maxQtyLimit} Jamaah
-              </span>
+              <Input
+                type="number"
+                min={1}
+                placeholder="1"
+                value={newBillingQty}
+                onChange={(e) => {
+                  const val = parseInt(e.target.value, 10);
+                  if (isNaN(val) || val < 1) setNewBillingQty(1);
+                  else setNewBillingQty(val);
+                }}
+              />
+              <p className="mt-1 text-[10px] text-muted-foreground">
+                Jumlah pembelian item aktual.
+              </p>
             </div>
-            <Input
-              type="number"
-              min={1}
-              max={maxQtyLimit}
-              placeholder="1"
-              value={newBillingQty}
-              onChange={(e) => {
-                const val = parseInt(e.target.value, 10);
-                if (isNaN(val) || val < 1) setNewBillingQty(1);
-                else if (val > maxQtyLimit) setNewBillingQty(maxQtyLimit);
-                else setNewBillingQty(val);
-              }}
-            />
-            <p className="mt-1 text-[10px] text-muted-foreground">
-              Dibatasi sesuai jumlah {maxQtyLimit} jamaah terdaftar di grup ini.
-            </p>
+
+            <div>
+              <label className="text-xs font-bold text-foreground block mb-1">
+                Satuan Item
+              </label>
+              <div className="flex gap-1.5">
+                <Select
+                  value={DEFAULT_SATUAN_OPTIONS.includes(newBillingSatuan) ? newBillingSatuan : "custom"}
+                  onChange={(e) => {
+                    if (e.target.value !== "custom") {
+                      setNewBillingSatuan(e.target.value);
+                    } else {
+                      setNewBillingSatuan("");
+                    }
+                  }}
+                  className="w-full text-xs"
+                >
+                  {DEFAULT_SATUAN_OPTIONS.map((opt) => (
+                    <option key={opt} value={opt}>
+                      {opt}
+                    </option>
+                  ))}
+                  <option value="custom">Kustom (Lainnya)...</option>
+                </Select>
+                {!DEFAULT_SATUAN_OPTIONS.includes(newBillingSatuan) && (
+                  <Input
+                    placeholder="Satuan..."
+                    value={newBillingSatuan}
+                    onChange={(e) => setNewBillingSatuan(e.target.value)}
+                    className="text-xs w-28"
+                  />
+                )}
+              </div>
+              <p className="mt-1 text-[10px] text-muted-foreground">
+                Contoh: Pax, Kamar, Pcs, Box, Kg.
+              </p>
+            </div>
           </div>
 
           {/* Subtotal Preview */}
@@ -1542,6 +1633,148 @@ const SplitInvoiceModal = dynamic(
               onClick={() => setShowManageJenisModal(false)}
             >
               Selesai
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Modal Edit Item Tagihan (Ubah Jumlah, Satuan & Harga) */}
+      <Modal
+        open={showEditItemModal}
+        onClose={() => {
+          setShowEditItemModal(false);
+          setEditingItem(null);
+        }}
+        title={`Ubah Rincian Tagihan — ${editingItem?.nama || "Item"}`}
+        size="md"
+      >
+        <div className="space-y-4 pt-1">
+          <div>
+            <label className="text-xs font-bold text-foreground block mb-1">
+              Deskripsi / Nama Item
+            </label>
+            <Input
+              value={editItemNama}
+              onChange={(e) => setEditItemNama(e.target.value)}
+              placeholder="Contoh: Paket Umroh / Upgrade Kamar / Ekstra Bagasi"
+              disabled={editingItem?.isDefault}
+            />
+            {editingItem?.isDefault && (
+              <p className="mt-1 text-[10px] text-muted-foreground">
+                Nama paket utama dikunci otomatis dari sistem registrasi paket.
+              </p>
+            )}
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-bold text-foreground block mb-1">
+                Berapa Banyak (Quantity)
+              </label>
+              <Input
+                type="number"
+                min={1}
+                value={editItemQty}
+                onChange={(e) => {
+                  const val = parseInt(e.target.value, 10);
+                  setEditItemQty(isNaN(val) || val < 1 ? 1 : val);
+                }}
+              />
+              <p className="mt-1 text-[10px] text-muted-foreground">
+                Bebas diisi sesuai pembelian.
+              </p>
+            </div>
+
+            <div>
+              <label className="text-xs font-bold text-foreground block mb-1">
+                Satuan Item
+              </label>
+              <div className="flex gap-1.5">
+                <Select
+                  value={DEFAULT_SATUAN_OPTIONS.includes(editItemSatuan) ? editItemSatuan : "custom"}
+                  onChange={(e) => {
+                    if (e.target.value !== "custom") {
+                      setEditItemSatuan(e.target.value);
+                    } else {
+                      setEditItemSatuan("");
+                    }
+                  }}
+                  className="w-full text-xs"
+                >
+                  {DEFAULT_SATUAN_OPTIONS.map((opt) => (
+                    <option key={opt} value={opt}>
+                      {opt}
+                    </option>
+                  ))}
+                  <option value="custom">Kustom (Lainnya)...</option>
+                </Select>
+                {!DEFAULT_SATUAN_OPTIONS.includes(editItemSatuan) && (
+                  <Input
+                    placeholder="Satuan..."
+                    value={editItemSatuan}
+                    onChange={(e) => setEditItemSatuan(e.target.value)}
+                    className="text-xs w-28"
+                  />
+                )}
+              </div>
+              <p className="mt-1 text-[10px] text-muted-foreground">
+                Contoh: Pax, Kamar, Pcs, Box, Kg.
+              </p>
+            </div>
+          </div>
+
+          <div>
+            <label className="text-xs font-bold text-foreground block mb-1">
+              Harga Satuan (Rp)
+            </label>
+            <CurrencyInput
+              value={editItemNominal}
+              onChange={(val) => setEditItemNominal(val)}
+              placeholder="0"
+            />
+          </div>
+
+          <div>
+            <label className="text-xs font-bold text-foreground block mb-1">
+              Catatan / Keterangan Tambahan
+            </label>
+            <Input
+              value={editItemCatatan}
+              onChange={(e) => setEditItemCatatan(e.target.value)}
+              placeholder="Opsional, contoh: Tambahan pesanan dari ketua rombongan"
+            />
+          </div>
+
+          {/* Subtotal Preview */}
+          <div className="p-2.5 rounded-lg bg-stone-100 dark:bg-stone-900 border text-xs flex justify-between items-center">
+            <span className="text-muted-foreground font-medium">
+              Subtotal ({editItemQty} {editItemSatuan || "Pax"} × {formatCurrency(editItemNominal)}):
+            </span>
+            <span className="font-mono font-bold text-amber-600 dark:text-amber-400 text-sm">
+              {formatCurrency(editItemNominal * editItemQty)}
+            </span>
+          </div>
+
+          <div className="flex justify-end gap-2 pt-2 border-t">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setShowEditItemModal(false);
+                setEditingItem(null);
+              }}
+            >
+              Batal
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              className="font-bold bg-amber-500 hover:bg-amber-600 text-slate-950"
+              onClick={handleSaveEditItem}
+              disabled={!editItemNama.trim() || editItemNominal < 0}
+            >
+              Simpan Perubahan
             </Button>
           </div>
         </div>

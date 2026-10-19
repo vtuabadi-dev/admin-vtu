@@ -50,6 +50,7 @@ import {
   ROOM_TYPE_OPTIONS,
   DEFAULT_TAMBAHAN_OPTIONS,
   DEFAULT_POTONGAN_OPTIONS,
+  DEFAULT_SATUAN_OPTIONS,
   getRoomTypeBadgeStyle,
   isRoomUpgradeItem,
   isBaseRoomType,
@@ -156,6 +157,7 @@ function PaymentReviewTabContent() {
   const [newOrderType, setNewOrderType] = useState<"penambahan" | "pengurangan">("penambahan");
   const [newOrderNominal, setNewOrderNominal] = useState<number>(0);
   const [newOrderQty, setNewOrderQty] = useState<number>(1);
+  const [newOrderSatuan, setNewOrderSatuan] = useState<string>("Pax");
   const [newOrderAllocatedMembers, setNewOrderAllocatedMembers] = useState<string[]>([]);
   const [isOrderCustomJenisMode, setIsOrderCustomJenisMode] = useState<boolean>(false);
 
@@ -1938,8 +1940,8 @@ function PaymentReviewTabContent() {
                         <tr className="border-b bg-muted/60 text-muted-foreground font-bold uppercase tracking-wider text-[10px]">
                           <th className="py-2 px-2.5">Deskripsi Item Tagihan / Potongan</th>
                           <th className="py-2 px-2.5">Kategori</th>
-                          <th className="py-2 px-2.5 text-center">Qty</th>
-                          <th className="py-2 px-2.5 text-right">Harga / Pax</th>
+                          <th className="py-2 px-2.5 text-center">Qty / Satuan</th>
+                          <th className="py-2 px-2.5 text-right">Harga Satuan</th>
                           <th className="py-2 px-2.5 text-right">Total Nominal</th>
                           <th className="py-2 px-2.5 text-center w-10">Aksi</th>
                         </tr>
@@ -2028,7 +2030,7 @@ function PaymentReviewTabContent() {
                                 )}
                               </td>
                               <td className="py-2 px-2.5 text-center font-mono font-bold text-slate-700 dark:text-slate-300">
-                                {item.qty} Pax
+                                {item.qty || 1} {item.satuan || "Pax"}
                               </td>
                               <td className="py-2 px-2.5 text-right font-mono tabular-nums text-stone-600 dark:text-stone-400">
                                 {formatCurrency(item.hargaSatuan || (item.nominal / (item.qty || 1)))}
@@ -2946,32 +2948,64 @@ function PaymentReviewTabContent() {
             </div>
           )}
 
-          {/* 5. Quantity Input with Max Limit */}
-          <div>
-            <div className="flex items-center justify-between mb-1">
-              <label className="text-xs font-bold text-foreground">
-                Quantity (Jumlah Pax)
+          {/* 5. Quantity & Satuan Input (Fleksibel sesuai pembelian) */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-bold text-foreground block mb-1">
+                Berapa Banyak (Quantity)
               </label>
-              <span className="text-[10px] font-bold text-amber-700 dark:text-amber-300 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/30">
-                Maksimal: {maxOrderQtyLimit} Jamaah
-              </span>
+              <Input
+                type="number"
+                min={1}
+                placeholder="1"
+                value={newOrderQty}
+                onChange={(e) => {
+                  const val = parseInt(e.target.value, 10);
+                  if (isNaN(val) || val < 1) setNewOrderQty(1);
+                  else setNewOrderQty(val);
+                }}
+              />
+              <p className="mt-1 text-[10px] text-muted-foreground">
+                Jumlah pembelian item aktual.
+              </p>
             </div>
-            <Input
-              type="number"
-              min={1}
-              max={maxOrderQtyLimit}
-              placeholder="1"
-              value={newOrderQty}
-              onChange={(e) => {
-                const val = parseInt(e.target.value, 10);
-                if (isNaN(val) || val < 1) setNewOrderQty(1);
-                else if (val > maxOrderQtyLimit) setNewOrderQty(maxOrderQtyLimit);
-                else setNewOrderQty(val);
-              }}
-            />
-            <p className="mt-1 text-[10px] text-muted-foreground">
-              Dibatasi sesuai jumlah {maxOrderQtyLimit} jamaah terdaftar di grup ini.
-            </p>
+
+            <div>
+              <label className="text-xs font-bold text-foreground block mb-1">
+                Satuan Item
+              </label>
+              <div className="flex gap-1.5">
+                <Select
+                  value={DEFAULT_SATUAN_OPTIONS.includes(newOrderSatuan) ? newOrderSatuan : "custom"}
+                  onChange={(e) => {
+                    if (e.target.value !== "custom") {
+                      setNewOrderSatuan(e.target.value);
+                    } else {
+                      setNewOrderSatuan("");
+                    }
+                  }}
+                  className="w-full text-xs"
+                >
+                  {DEFAULT_SATUAN_OPTIONS.map((opt) => (
+                    <option key={opt} value={opt}>
+                      {opt}
+                    </option>
+                  ))}
+                  <option value="custom">Kustom (Lainnya)...</option>
+                </Select>
+                {!DEFAULT_SATUAN_OPTIONS.includes(newOrderSatuan) && (
+                  <Input
+                    placeholder="Satuan..."
+                    value={newOrderSatuan}
+                    onChange={(e) => setNewOrderSatuan(e.target.value)}
+                    className="text-xs w-28"
+                  />
+                )}
+              </div>
+              <p className="mt-1 text-[10px] text-muted-foreground">
+                Contoh: Pax, Kamar, Pcs, Box, Kg.
+              </p>
+            </div>
           </div>
 
           {/* Subtotal Preview */}
@@ -3013,7 +3047,7 @@ function PaymentReviewTabContent() {
                   }
                 }
 
-                const qty = Math.min(Math.max(1, newOrderQty), maxOrderQtyLimit);
+                const qty = Math.max(1, newOrderQty);
                 const totalNominal = newOrderNominal * qty;
                 const isRoomUpgrade = !isPotongan && isRoomUpgradeItem(trimmedName);
                 const allocated = isRoomUpgrade && newOrderAllocatedMembers.length > 0 ? newOrderAllocatedMembers : undefined;
@@ -3025,6 +3059,7 @@ function PaymentReviewTabContent() {
                     nama: trimmedName,
                     nominal: totalNominal,
                     qty: qty,
+                    satuan: newOrderSatuan || "Pax",
                     hargaSatuan: newOrderNominal,
                     tipe: newOrderType,
                     kategori: isPotongan ? "potongan" : "tambahan",
@@ -3046,6 +3081,7 @@ function PaymentReviewTabContent() {
 
                 setNewOrderNominal(0);
                 setNewOrderQty(1);
+                setNewOrderSatuan("Pax");
                 setNewOrderAllocatedMembers([]);
                 setIsOrderCustomJenisMode(false);
                 setShowAddOrderModal(false);

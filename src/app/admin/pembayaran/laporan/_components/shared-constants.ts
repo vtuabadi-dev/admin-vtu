@@ -19,10 +19,24 @@ export interface BillingItem {
   kategori: "utama" | "tambahan" | "potongan";
   nominal: number;
   qty: number;
+  satuan?: string;
   catatan?: string;
   isDefault?: boolean;
   allocatedJamaah?: string[];
 }
+
+export const DEFAULT_SATUAN_OPTIONS = [
+  "Pax",
+  "Kamar",
+  "Pcs",
+  "Set",
+  "Box",
+  "Kg",
+  "Unit",
+  "Hari",
+  "Org",
+  "Tiket",
+];
 
 // ============================================================
 // CONSTANTS
