@@ -445,14 +445,7 @@ function PaymentReviewTabContent() {
     };
   }, [selectedPayment]);
 
-  const maxOrderQtyLimit = useMemo(() => {
-    return (
-      availableAnggota.length ||
-      selectedPayment?.group?.jumlahAnggota ||
-      selectedPayment?.group?.anggota?.length ||
-      1
-    );
-  }, [availableAnggota.length, selectedPayment]);
+
 
   useEffect(() => {
     if (showAddOrderModal) {
@@ -2975,7 +2968,7 @@ function PaymentReviewTabContent() {
                 Satuan Item
               </label>
               <div className="flex gap-1.5">
-                <Select
+                <select
                   value={DEFAULT_SATUAN_OPTIONS.includes(newOrderSatuan) ? newOrderSatuan : "custom"}
                   onChange={(e) => {
                     if (e.target.value !== "custom") {
@@ -2984,7 +2977,7 @@ function PaymentReviewTabContent() {
                       setNewOrderSatuan("");
                     }
                   }}
-                  className="w-full text-xs"
+                  className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-xs shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                 >
                   {DEFAULT_SATUAN_OPTIONS.map((opt) => (
                     <option key={opt} value={opt}>
@@ -2992,7 +2985,7 @@ function PaymentReviewTabContent() {
                     </option>
                   ))}
                   <option value="custom">Kustom (Lainnya)...</option>
-                </Select>
+                </select>
                 {!DEFAULT_SATUAN_OPTIONS.includes(newOrderSatuan) && (
                   <Input
                     placeholder="Satuan..."

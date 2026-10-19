@@ -302,11 +302,6 @@ const SplitInvoiceModal = dynamic(
       ) ?? []
     : groupData?.pembayaran ?? [];
 
-  const maxQtyLimit = useMemo(() => {
-    // Saat split aktif, limit qty = jumlah anggota di split tersebut
-    if (activeSplit) return activeSplit.anggotaIds.length || 1;
-    return groupData?.jumlahAnggota || 1;
-  }, [groupData?.jumlahAnggota, activeSplit]);
 
   useEffect(() => {
     if (newBillingKategori === "tambahan") {
@@ -1461,7 +1456,7 @@ const SplitInvoiceModal = dynamic(
                 Satuan Item
               </label>
               <div className="flex gap-1.5">
-                <Select
+                <select
                   value={DEFAULT_SATUAN_OPTIONS.includes(newBillingSatuan) ? newBillingSatuan : "custom"}
                   onChange={(e) => {
                     if (e.target.value !== "custom") {
@@ -1470,7 +1465,7 @@ const SplitInvoiceModal = dynamic(
                       setNewBillingSatuan("");
                     }
                   }}
-                  className="w-full text-xs"
+                  className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-xs shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                 >
                   {DEFAULT_SATUAN_OPTIONS.map((opt) => (
                     <option key={opt} value={opt}>
@@ -1478,7 +1473,7 @@ const SplitInvoiceModal = dynamic(
                     </option>
                   ))}
                   <option value="custom">Kustom (Lainnya)...</option>
-                </Select>
+                </select>
                 {!DEFAULT_SATUAN_OPTIONS.includes(newBillingSatuan) && (
                   <Input
                     placeholder="Satuan..."
@@ -1646,7 +1641,7 @@ const SplitInvoiceModal = dynamic(
           setEditingItem(null);
         }}
         title={`Ubah Rincian Tagihan — ${editingItem?.nama || "Item"}`}
-        size="md"
+        size="default"
       >
         <div className="space-y-4 pt-1">
           <div>
@@ -1690,7 +1685,7 @@ const SplitInvoiceModal = dynamic(
                 Satuan Item
               </label>
               <div className="flex gap-1.5">
-                <Select
+                <select
                   value={DEFAULT_SATUAN_OPTIONS.includes(editItemSatuan) ? editItemSatuan : "custom"}
                   onChange={(e) => {
                     if (e.target.value !== "custom") {
@@ -1699,7 +1694,7 @@ const SplitInvoiceModal = dynamic(
                       setEditItemSatuan("");
                     }
                   }}
-                  className="w-full text-xs"
+                  className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-xs shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                 >
                   {DEFAULT_SATUAN_OPTIONS.map((opt) => (
                     <option key={opt} value={opt}>
@@ -1707,7 +1702,7 @@ const SplitInvoiceModal = dynamic(
                     </option>
                   ))}
                   <option value="custom">Kustom (Lainnya)...</option>
-                </Select>
+                </select>
                 {!DEFAULT_SATUAN_OPTIONS.includes(editItemSatuan) && (
                   <Input
                     placeholder="Satuan..."

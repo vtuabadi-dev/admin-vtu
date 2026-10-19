@@ -101,6 +101,7 @@ export interface RegistrationGroup {
     id: string;
     kode: string;
     namaPaket: string;
+    hargaPaket?: number;
     tanggalBerangkat?: string;
     tanggalPulang?: string;
     maskapai?: string;
