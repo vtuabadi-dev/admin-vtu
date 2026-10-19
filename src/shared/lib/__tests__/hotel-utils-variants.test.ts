@@ -58,6 +58,13 @@ describe("groupHotelOptionsIntoVariants", () => {
     expect(result[1]!.minPrice).toBe(36900000);
     expect(result[1]!.isPublished).toBe(true);
     expect(result[1]!.clusterSummary).toBe("Silver, Gold, Platinum");
+    expect(result[1]!.items).toHaveLength(3);
+    expect(result[1]!.items.map((it) => it.clusterName)).toEqual(["Silver", "Gold", "Platinum"]);
+
+    // Flat mapped clusters for register page should yield 4 cards (1 V1 + 3 V2)
+    const activeClusters = result.filter((vg) => vg.isPublished).flatMap((vg) => vg.items);
+    expect(activeClusters).toHaveLength(4);
+    expect(activeClusters.map((c) => c.clusterName)).toEqual(["Reguler", "Silver", "Gold", "Platinum"]);
   });
 
   it("should not create multiple variants if package has clusters without Varian 2", () => {

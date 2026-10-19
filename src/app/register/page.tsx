@@ -34,6 +34,7 @@ import {
   MessageCircle,
 } from "lucide-react";
 import { SearchableSelect } from "@/shared/components/ui/SearchableSelect";
+import { groupHotelOptionsIntoVariants } from "@/shared/lib/hotel-utils";
 import type { JenisKelamin, Keberangkatan } from "@/shared/types";
 
 type Step = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
@@ -1605,12 +1606,16 @@ export default function RegisterPage() {
                   const rawClusters = Array.isArray(selectedPaket.hotelOptions) && selectedPaket.hotelOptions.length > 0
                     ? selectedPaket.hotelOptions
                     : null;
-                  const clusters = rawClusters
-                    ? rawClusters.filter((c: any, idx: number) => {
-                        if (idx === 0) return true;
-                        return c.isPublishedKatalog !== false;
-                      })
-                    : null;
+                  const isPkgPub = isPackagePublished(selectedPaket);
+                  const variantGroups = groupHotelOptionsIntoVariants(selectedPaket.hotelOptions, isPkgPub);
+                  const clusters = variantGroups.length > 0
+                    ? variantGroups.filter((vg) => vg.isPublished).flatMap((vg) => vg.items)
+                    : (rawClusters
+                        ? rawClusters.filter((c: any, idx: number) => {
+                            if (idx === 0) return true;
+                            return c.isPublishedKatalog !== false;
+                          })
+                        : null);
                   const isMultiCluster = !!(clusters && clusters.length > 1);
 
                   const activeCluster = clusters
@@ -3310,14 +3315,18 @@ export default function RegisterPage() {
 
       {/* ── DETAIL PAKET & FASILITAS MODAL (INCLUDE & EXCLUDE CHECKLIST) ── */}
       {showDetailPaketModal && selectedPaket && (() => {
-        const modalClusters = (Array.isArray(selectedPaket.hotelOptions) && selectedPaket.hotelOptions.length > 0)
-          ? selectedPaket.hotelOptions
-          : [{
-              clusterName: "Reguler (Varian Utama)",
-              hotelMekkah: selectedPaket.hotelMekkah || "TBA",
-              hotelMadinah: selectedPaket.hotelMadinah || "TBA",
-              hargaBase: selectedPaket.hargaPaket || selectedPaket.paketUmroh?.hargaBase || 0,
-            }];
+        const isPkgPub = isPackagePublished(selectedPaket);
+        const variantGroups = groupHotelOptionsIntoVariants(selectedPaket.hotelOptions, isPkgPub);
+        const modalClusters = variantGroups.length > 0
+          ? variantGroups.filter((vg) => vg.isPublished).flatMap((vg) => vg.items)
+          : (Array.isArray(selectedPaket.hotelOptions) && selectedPaket.hotelOptions.length > 0
+            ? selectedPaket.hotelOptions
+            : [{
+                clusterName: "Reguler (Varian Utama)",
+                hotelMekkah: selectedPaket.hotelMekkah || "TBA",
+                hotelMadinah: selectedPaket.hotelMadinah || "TBA",
+                hargaBase: selectedPaket.hargaPaket || selectedPaket.paketUmroh?.hargaBase || 0,
+              }]);
 
         const currentCluster = modalClusters[detailModalClusterIndex] || modalClusters[0] || {};
         const currentPrice = Number(currentCluster.hargaBase || selectedPaket.hargaPaket || 0);
