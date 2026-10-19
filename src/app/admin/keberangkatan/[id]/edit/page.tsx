@@ -1345,7 +1345,7 @@ export default function EditKeberangkatanPage() {
                     <div className="flex items-center gap-2 flex-wrap">
                       {isVarian2 ? (
                         <span className="text-[11px] font-bold text-purple-700 bg-purple-100 dark:bg-purple-900/60 dark:text-purple-300 border border-purple-300 dark:border-purple-700 px-2 py-0.5 rounded uppercase flex items-center gap-1">
-                          💜 VARIAN 2
+                          💜 {opt.variantName || "VARIAN 2"}{opt.clusterName && opt.clusterName.toUpperCase() !== (opt.variantName || "VARIAN 2").toUpperCase() ? ` • ${opt.clusterName.toUpperCase()}` : ""}
                         </span>
                       ) : (
                         <span className="text-[11px] font-bold text-primary bg-primary/10 border border-primary/20 px-2 py-0.5 rounded uppercase">

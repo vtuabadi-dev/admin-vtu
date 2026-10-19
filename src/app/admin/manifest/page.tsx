@@ -243,27 +243,79 @@ function formatVariantLabel(
   groupObj?: any,
   jamaah?: any
 ): { text: string; isVariant: boolean } {
+  let hOpts: any[] = [];
+  if (groupPkg?.hotelOptions) {
+    try {
+      hOpts = typeof groupPkg.hotelOptions === "string" ? JSON.parse(groupPkg.hotelOptions) : (groupPkg.hotelOptions || []);
+    } catch {}
+  }
+  if (!Array.isArray(hOpts)) hOpts = [];
+
+  const rawSearch = (klasterName || (groupObj as any)?.hotelUpgrade || (jamaah as any)?.hotelUpgrade || "").trim().toLowerCase();
+
+  // 1. Match against hotelOptions by clusterName or variantName
+  let matchedOpt = hOpts.find((o: any) =>
+    (rawSearch && o.clusterName && o.clusterName.toLowerCase() === rawSearch) ||
+    (rawSearch && o.variantName && o.variantName.toLowerCase() === rawSearch)
+  );
+
+  // 2. If not matched, match against hotelOptions by hotels assigned to jamaah
+  if (!matchedOpt && (jamaah?.hotelMekkah || jamaah?.hotelMadinah)) {
+    matchedOpt = hOpts.find((o: any) =>
+      (jamaah?.hotelMekkah && o.hotelMekkah && o.hotelMekkah.trim().toLowerCase() === jamaah.hotelMekkah.trim().toLowerCase()) &&
+      (jamaah?.hotelMadinah && o.hotelMadinah && o.hotelMadinah.trim().toLowerCase() === jamaah.hotelMadinah.trim().toLowerCase())
+    );
+    if (!matchedOpt) {
+      matchedOpt = hOpts.find((o: any) =>
+        (jamaah?.hotelMekkah && o.hotelMekkah && o.hotelMekkah.trim().toLowerCase() === jamaah.hotelMekkah.trim().toLowerCase()) ||
+        (jamaah?.hotelMadinah && o.hotelMadinah && o.hotelMadinah.trim().toLowerCase() === jamaah.hotelMadinah.trim().toLowerCase())
+      );
+    }
+  }
+
+  const isOptV2 = Boolean(
+    matchedOpt?.isVarian2 ||
+    (matchedOpt?.variantName && matchedOpt.variantName.toUpperCase().includes("VARIAN 2")) ||
+    (matchedOpt?.clusterName && matchedOpt.clusterName.toUpperCase().includes("VARIAN 2"))
+  );
+
   const combined = `${klasterName || ""} ${(groupPkg as any)?.variantName || ""} ${(groupPkg as any)?.clusterName || ""} ${(groupPkg as any)?.splitLabel || ""} ${(groupObj as any)?.hotelUpgrade || ""} ${(jamaah as any)?.catatan || ""}`.toUpperCase();
 
-  if (combined.includes("VARIAN 2") || combined.includes("V2") || (groupPkg as any)?.isVarian2 || isVarian2Row) {
-    return { text: "Varian 2", isVariant: true };
+  // If Varian 2 detected
+  if (isOptV2 || combined.includes("VARIAN 2") || combined.includes("V2") || (groupPkg as any)?.isVarian2 || isVarian2Row) {
+    const clusterLabel = matchedOpt?.clusterName || (klasterName && !klasterName.toUpperCase().includes("VARIAN") ? klasterName : "");
+    const vName = matchedOpt?.variantName || "Varian 2";
+    if (clusterLabel && clusterLabel.toUpperCase() !== vName.toUpperCase()) {
+      return { text: `${vName} • ${clusterLabel}`, isVariant: true };
+    }
+    return { text: vName, isVariant: true };
   }
+
   if (combined.includes("VARIAN 3") || combined.includes("V3") || (groupPkg as any)?.isVarian3) {
-    return { text: "Varian 3", isVariant: true };
+    const clusterLabel = matchedOpt?.clusterName || (klasterName && !klasterName.toUpperCase().includes("VARIAN") ? klasterName : "");
+    return { text: clusterLabel ? `Varian 3 • ${clusterLabel}` : "Varian 3", isVariant: true };
   }
   if (combined.includes("VARIAN 4") || combined.includes("V4")) {
-    return { text: "Varian 4", isVariant: true };
+    const clusterLabel = matchedOpt?.clusterName || (klasterName && !klasterName.toUpperCase().includes("VARIAN") ? klasterName : "");
+    return { text: clusterLabel ? `Varian 4 • ${clusterLabel}` : "Varian 4", isVariant: true };
   }
   const matchNum = combined.match(/VARIAN\s*(\d+)/i);
   if (matchNum && matchNum[1]) {
     const num = parseInt(matchNum[1]);
     if (num === 1) return { text: "VU (Utama)", isVariant: false };
-    return { text: `Varian ${num}`, isVariant: true };
+    const clusterLabel = matchedOpt?.clusterName || (klasterName && !klasterName.toUpperCase().includes("VARIAN") ? klasterName : "");
+    return { text: clusterLabel ? `Varian ${num} • ${clusterLabel}` : `Varian ${num}`, isVariant: true };
   }
   if (combined.includes("PROMO")) {
     const promoName = (groupPkg as any)?.promoLabel || "Varian Promo";
-    return { text: promoName.length > 15 ? "Varian Promo" : promoName, isVariant: true };
+    return { text: promoName.length > 20 ? "Varian Promo" : promoName, isVariant: true };
   }
+
+  // If matched a non-V2 option (e.g. Klaster under Varian Utama)
+  if (matchedOpt && matchedOpt.clusterName && matchedOpt.clusterName.toUpperCase() !== "REGULER") {
+    return { text: `VU • ${matchedOpt.clusterName}`, isVariant: false };
+  }
+
   return { text: "VU (Utama)", isVariant: false };
 }
 
@@ -2289,8 +2341,30 @@ function ManifestPageContent() {
 
                             // ADR-0021: Detect Varian 2 / Split Variant universally
                             const rawKlaster = getJamaahCluster(group.groupObj, j);
-                            const klasterName = rawKlaster || "SILVER";
+                            let hOptsList: any[] = [];
+                            if (groupPkg?.hotelOptions) {
+                              try {
+                                hOptsList = typeof groupPkg.hotelOptions === "string" ? JSON.parse(groupPkg.hotelOptions) : (groupPkg.hotelOptions || []);
+                              } catch {}
+                            }
+                            if (!Array.isArray(hOptsList)) hOptsList = [];
+
+                            const searchCl = (rawKlaster || "").trim().toLowerCase();
+                            const matchedOpt = hOptsList.find((o: any) =>
+                              (searchCl && o.clusterName && o.clusterName.toLowerCase() === searchCl) ||
+                              (searchCl && o.variantName && o.variantName.toLowerCase() === searchCl) ||
+                              (j?.hotelMekkah && o.hotelMekkah && o.hotelMekkah.trim().toLowerCase() === j.hotelMekkah.trim().toLowerCase())
+                            );
+
+                            const isV2FromOpt = Boolean(
+                              matchedOpt?.isVarian2 ||
+                              (matchedOpt?.variantName && matchedOpt.variantName.toUpperCase().includes("VARIAN 2")) ||
+                              (matchedOpt?.clusterName && matchedOpt.clusterName.toUpperCase().includes("VARIAN 2"))
+                            );
+                            const klasterName = rawKlaster || matchedOpt?.clusterName || "";
+
                             const isVarian2Row = Boolean(
+                              isV2FromOpt ||
                               klasterName.toUpperCase().includes("VARIAN") ||
                               klasterName.toUpperCase().includes("PROMO") ||
                               klasterName.toUpperCase().includes("SPEK") ||
