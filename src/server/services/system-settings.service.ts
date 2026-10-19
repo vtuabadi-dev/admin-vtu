@@ -42,6 +42,7 @@ export interface GeneralSystemSettings {
   bankAccount: string;
   bankHolder: string;
   minDpPerPax: string;
+  maxTahapCicilan?: string;
   waHeader?: string;
   waBadalFormat?: string;
   waInvoiceTemplate?: string;
@@ -65,6 +66,7 @@ const DEFAULT_SETTINGS: GeneralSystemSettings = {
   bankAccount: "144-00-0018881-0",
   bankHolder: "PT VTU ABADI TRAVEL",
   minDpPerPax: "5000000",
+  maxTahapCicilan: "none",
   waInvoiceTemplate: DEFAULT_INVOICE_TEMPLATE,
   updatedAt: new Date().toISOString(),
   updatedBy: "system",

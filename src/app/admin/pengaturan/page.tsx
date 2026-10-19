@@ -711,6 +711,7 @@ function AturanOperasional() {
   const [bankAccount, setBankAccount] = useState("144-00-0018881-0");
   const [bankHolder, setBankHolder] = useState("PT VTU ABADI TRAVEL");
   const [minDpPerPax, setMinDpPerPax] = useState("5000000");
+  const [maxTahapCicilan, setMaxTahapCicilan] = useState<string>("none");
   const [waInvoiceTemplate, setWaInvoiceTemplate] = useState<string>(DEFAULT_WA_INVOICE_TPL);
 
   useEffect(() => {
@@ -723,6 +724,7 @@ function AturanOperasional() {
           if (json.data.bankAccount) setBankAccount(json.data.bankAccount);
           if (json.data.bankHolder) setBankHolder(json.data.bankHolder);
           if (json.data.minDpPerPax) setMinDpPerPax(json.data.minDpPerPax);
+          if (json.data.maxTahapCicilan) setMaxTahapCicilan(json.data.maxTahapCicilan);
           if (json.data.waInvoiceTemplate) setWaInvoiceTemplate(json.data.waInvoiceTemplate);
           return;
         }
@@ -739,6 +741,7 @@ function AturanOperasional() {
             if (parsed.bankAccount) setBankAccount(parsed.bankAccount);
             if (parsed.bankHolder) setBankHolder(parsed.bankHolder);
             if (parsed.minDpPerPax) setMinDpPerPax(parsed.minDpPerPax);
+            if (parsed.maxTahapCicilan) setMaxTahapCicilan(parsed.maxTahapCicilan);
             if (parsed.waInvoiceTemplate) setWaInvoiceTemplate(parsed.waInvoiceTemplate);
           } catch (e) {}
         }
@@ -748,7 +751,7 @@ function AturanOperasional() {
   }, []);
 
   const handleSave = async () => {
-    const payload = { bankName, bankAccount, bankHolder, minDpPerPax, waInvoiceTemplate };
+    const payload = { bankName, bankAccount, bankHolder, minDpPerPax, maxTahapCicilan, waInvoiceTemplate };
     if (typeof window !== "undefined") {
       localStorage.setItem("vtu_bank_config", JSON.stringify(payload));
     }
@@ -823,10 +826,18 @@ function AturanOperasional() {
           />
         </SettingRow>
         <SettingRow label="Maksimal Tahap Cicilan" desc="Jumlah tahap cicilan yang diizinkan setelah DP">
-          <Select options={[
-            { value: "2", label: "2x Cicilan" }, { value: "3", label: "3x Cicilan" },
-            { value: "4", label: "4x Cicilan" }, { value: "6", label: "6x Cicilan" },
-          ]} defaultValue="3" />
+          <Select
+            value={maxTahapCicilan}
+            onChange={(e) => setMaxTahapCicilan(e.target.value)}
+            options={[
+              { value: "none", label: "Tidak Ada (Bebas / Tanpa Batas)" },
+              { value: "2", label: "2x Cicilan" },
+              { value: "3", label: "3x Cicilan" },
+              { value: "4", label: "4x Cicilan" },
+              { value: "6", label: "6x Cicilan" },
+              { value: "12", label: "12x Cicilan" },
+            ]}
+          />
         </SettingRow>
         <SettingRow label="Masa Tenggang (Grace Period)" desc="Hari toleransi setelah jatuh tempo sebelum status Overdue">
           <Select options={[
