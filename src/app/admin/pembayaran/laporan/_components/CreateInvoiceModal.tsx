@@ -13,6 +13,9 @@ import {
   Layers,
   Receipt,
   Clock,
+  Plus,
+  Edit3,
+  Trash2,
 } from "lucide-react";
 import { cn, formatDateShort, formatCurrency } from "@/shared/lib/utils";
 import { Button } from "@/shared/components/ui/Button";
@@ -27,6 +30,11 @@ import {
   addJamaahToGroup,
 } from "@/server/actions/api";
 import {
+  BillingItem,
+  DEFAULT_SATUAN_OPTIONS,
+  isRoomUpgradeItem,
+  getInitialTambahanOptions,
+  getInitialPotonganOptions,
   resolvePackageClusterDetails,
   getPackageUpgradePrice,
   detectRoomTypeFromName,
@@ -108,6 +116,30 @@ export default function CreateInvoiceModal({
   const [catatan, setCatatan] = useState("");
   const [loading, setLoading] = useState(false);
   const [previewBuktiUrl, setPreviewBuktiUrl] = useState<string | null>(null);
+
+  // Dynamic Billing Items State for Invoice Modal
+  const [billingItems, setBillingItems] = useState<BillingItem[]>([]);
+  const [showAddItemModal, setShowAddItemModal] = useState(false);
+  const [newBillingNama, setNewBillingNama] = useState("");
+  const [newBillingKategori, setNewBillingKategori] = useState<"tambahan" | "potongan">("tambahan");
+  const [newBillingNominal, setNewBillingNominal] = useState(0);
+  const [newBillingQty, setNewBillingQty] = useState<number>(1);
+  const [newBillingSatuan, setNewBillingSatuan] = useState<string>("Pax");
+  const [newBillingAllocatedMembers, setNewBillingAllocatedMembers] = useState<string[]>([]);
+  const [isCustomJenisMode, setIsCustomJenisMode] = useState<boolean>(false);
+
+  // Edit item state
+  const [editingItem, setEditingItem] = useState<BillingItem | null>(null);
+  const [showEditItemModal, setShowEditItemModal] = useState(false);
+  const [editItemNama, setEditItemNama] = useState("");
+  const [editItemKategori, setEditItemKategori] = useState<"utama" | "tambahan" | "potongan">("tambahan");
+  const [editItemNominal, setEditItemNominal] = useState(0);
+  const [editItemQty, setEditItemQty] = useState(1);
+  const [editItemSatuan, setEditItemSatuan] = useState("Pax");
+  const [editItemCatatan, setEditItemCatatan] = useState("");
+
+  const [masterTambahanOptions, setMasterTambahanOptions] = useState<string[]>(getInitialTambahanOptions);
+  const [masterPotonganOptions, setMasterPotonganOptions] = useState<string[]>(getInitialPotonganOptions);
 
   // Load active groups and departure packages
   useEffect(() => {
@@ -313,6 +345,171 @@ export default function CreateInvoiceModal({
     }
   }, [kategori, pricingOption, totalDiff]);
 
+  // Initialize dynamic billing items when groupInfo is loaded
+  useEffect(() => {
+    if (!groupInfo) {
+      setBillingItems([]);
+      return;
+    }
+
+    const pax = groupInfo.jumlahAnggota || groupInfo.anggotaIds?.length || 1;
+    const clusterDetails = resolvePackageClusterDetails(groupInfo);
+    const pkgName =
+      groupInfo.keberangkatan?.namaPaket ||
+      groupInfo.paketKeberangkatan?.namaPaket ||
+      (groupInfo as any).namaPaket ||
+      "Paket Umroh";
+    const clusterSuffix =
+      clusterDetails.isCustomCluster && clusterDetails.clusterName && clusterDetails.clusterName !== "Reguler"
+        ? ` - Klaster ${clusterDetails.clusterName}`
+        : "";
+
+    const memberNames = (groupInfo.anggota || []).map((a: any) => a.namaLengkap).filter(Boolean);
+    const roomUpgradeType = groupInfo.roomUpgrade || groupInfo.registrationRequests?.[0]?.roomUpgrade;
+    const hasRoomUpgrade = Boolean(roomUpgradeType && !isBaseRoomType(roomUpgradeType));
+    const normRoom = hasRoomUpgrade ? detectRoomTypeFromName(roomUpgradeType) : "";
+    const upgradePrice = hasRoomUpgrade ? getPackageUpgradePrice(groupInfo, normRoom) : 0;
+
+    let basePaxPrice =
+      clusterDetails.hargaBase > 0
+        ? clusterDetails.hargaBase
+        : (groupInfo.keberangkatan?.hargaPaket ||
+          groupInfo.paketKeberangkatan?.hargaPaket ||
+          (typeof groupInfo.totalTagihan === "number" && groupInfo.totalTagihan > 0
+            ? Math.round(groupInfo.totalTagihan / pax)
+            : 0));
+
+    if (upgradePrice > 0 && clusterDetails.hargaBase <= 0 && groupInfo.totalTagihan > 0) {
+      const candidateBase = Math.round(groupInfo.totalTagihan / pax) - upgradePrice;
+      if (candidateBase > 0) {
+        basePaxPrice = candidateBase;
+      }
+    }
+
+    const items: BillingItem[] = [
+      {
+        id: "base-package",
+        nama: `${pkgName}${clusterSuffix} (${pax} Pax)`,
+        kategori: "utama",
+        nominal: basePaxPrice,
+        qty: pax,
+        satuan: "Pax",
+        isDefault: true,
+      },
+    ];
+
+    if (upgradePrice > 0) {
+      items.push({
+        id: `room-upgrade-${normRoom.toLowerCase()}`,
+        nama: `Upgrade Kamar ${normRoom} (${pax} Pax)`,
+        kategori: "tambahan",
+        nominal: upgradePrice,
+        qty: pax,
+        satuan: "Pax",
+        allocatedJamaah: memberNames.length > 0 ? memberNames : undefined,
+        isDefault: false,
+      });
+    }
+
+    setBillingItems(items);
+  }, [groupInfo]);
+
+  const totalTambahan = useMemo(() => {
+    return billingItems
+      .filter((i) => i.kategori === "tambahan")
+      .reduce((sum, i) => sum + i.nominal * i.qty, 0);
+  }, [billingItems]);
+
+  const totalPotongan = useMemo(() => {
+    return billingItems
+      .filter((i) => i.kategori === "potongan")
+      .reduce((sum, i) => sum + i.nominal * i.qty, 0);
+  }, [billingItems]);
+
+  const totalUtama = useMemo(() => {
+    return billingItems
+      .filter((i) => i.kategori === "utama")
+      .reduce((sum, i) => sum + i.nominal * i.qty, 0);
+  }, [billingItems]);
+
+  const calculatedTotalTagihan = useMemo(() => {
+    if (billingItems.length > 0) {
+      return totalUtama + totalTambahan - totalPotongan;
+    }
+    return groupInfo?.totalTagihan || 0;
+  }, [billingItems, totalUtama, totalTambahan, totalPotongan, groupInfo?.totalTagihan]);
+
+  function handleAddBillingItem() {
+    if (!newBillingNama.trim() || newBillingNominal <= 0) return;
+    const trimmed = newBillingNama.trim();
+    if (newBillingKategori === "tambahan") {
+      if (!masterTambahanOptions.includes(trimmed)) {
+        setMasterTambahanOptions((prev) => [...prev, trimmed]);
+      }
+    } else {
+      if (!masterPotonganOptions.includes(trimmed)) {
+        setMasterPotonganOptions((prev) => [...prev, trimmed]);
+      }
+    }
+    const isRoomUpgrade = newBillingKategori === "tambahan" && isRoomUpgradeItem(trimmed);
+    const allocated = isRoomUpgrade && newBillingAllocatedMembers.length > 0 ? newBillingAllocatedMembers : undefined;
+
+    const newItem: BillingItem = {
+      id: `bill-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+      nama: trimmed,
+      kategori: newBillingKategori,
+      nominal: newBillingNominal,
+      qty: Math.max(1, newBillingQty),
+      satuan: newBillingSatuan || "Pax",
+      allocatedJamaah: allocated,
+      isDefault: false,
+    };
+
+    setBillingItems((prev) => [...prev, newItem]);
+    setNewBillingNominal(0);
+    setNewBillingQty(1);
+    setNewBillingSatuan("Pax");
+    setNewBillingAllocatedMembers([]);
+    setIsCustomJenisMode(false);
+    setShowAddItemModal(false);
+  }
+
+  function handleOpenEditItem(item: BillingItem) {
+    setEditingItem(item);
+    setEditItemNama(item.nama);
+    setEditItemKategori(item.kategori);
+    setEditItemNominal(item.nominal);
+    setEditItemQty(item.qty);
+    setEditItemSatuan(item.satuan || "Pax");
+    setEditItemCatatan(item.catatan || "");
+    setShowEditItemModal(true);
+  }
+
+  function handleSaveEditItem() {
+    if (!editingItem || !editItemNama.trim() || editItemNominal < 0) return;
+    setBillingItems((prev) =>
+      prev.map((i) =>
+        i.id === editingItem.id
+          ? {
+              ...i,
+              nama: editItemNama.trim(),
+              kategori: editItemKategori,
+              nominal: editItemNominal,
+              qty: Math.max(1, editItemQty),
+              satuan: editItemSatuan || "Pax",
+              catatan: editItemCatatan.trim() || undefined,
+            }
+          : i
+      )
+    );
+    setShowEditItemModal(false);
+    setEditingItem(null);
+  }
+
+  function handleRemoveBillingItem(id: string) {
+    setBillingItems((prev) => prev.filter((i) => i.id !== id || i.isDefault));
+  }
+
   // Comprehensive financial summary for selected group
   const financialSummary = useMemo(() => {
     if (!groupInfo) return null;
@@ -340,9 +537,11 @@ export default function CreateInvoiceModal({
     }
 
     const computedTotalTagihan =
-      typeof groupInfo.totalTagihan === "number" && groupInfo.totalTagihan > 0
-        ? groupInfo.totalTagihan
-        : basePax * basePrice + (roomUpgradeNominal * basePax);
+      calculatedTotalTagihan > 0
+        ? calculatedTotalTagihan
+        : (typeof groupInfo.totalTagihan === "number" && groupInfo.totalTagihan > 0
+            ? groupInfo.totalTagihan
+            : basePax * basePrice + (roomUpgradeNominal * basePax));
 
     const verifiedPayments = (groupInfo.pembayaran || []).filter(
       (p: any) => p.status === "verified"
@@ -383,7 +582,7 @@ export default function CreateInvoiceModal({
       allPayments: (groupInfo.pembayaran || []) as any[],
       invoices: (groupInfo.invoices || []) as any[],
     };
-  }, [groupInfo, currentPackage]);
+  }, [groupInfo, currentPackage, calculatedTotalTagihan]);
 
   function handleReset() {
     setSeqInput("");
@@ -402,6 +601,7 @@ export default function CreateInvoiceModal({
     setTambahPaxCount(1);
     setTambahJamaahList([{ nama: "", gender: "L", hubungan: "" }]);
     setPreviewBuktiUrl(null);
+    setBillingItems([]);
   }
 
   async function handleSubmit() {
@@ -537,7 +737,8 @@ export default function CreateInvoiceModal({
   }
 
   return (
-    <Modal open={open} onClose={onClose} title="Penerbitan Invoice & Pengelolaan Transaksi Keuangan" size="3xl" className="max-w-6xl">
+    <>
+      <Modal open={open} onClose={onClose} title="Penerbitan Invoice & Pengelolaan Transaksi Keuangan" size="3xl" className="max-w-6xl">
       <div className="space-y-4 pt-1 text-xs">
 
         {/* CATEGORY SELECTOR */}
@@ -870,37 +1071,130 @@ export default function CreateInvoiceModal({
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
                       <Receipt className="h-4 w-4 text-emerald-600" />
-                      Rincian Tagihan & Invoice Terbit ({financialSummary.invoices.length})
+                      Rincian Tagihan & Potongan Group
                     </span>
-                    <span className="text-[10px] text-muted-foreground">
-                      Komponen & Daftar Invoice Resmi
-                    </span>
+                    <Button
+                      type="button"
+                      onClick={() => {
+                        setNewBillingNama(masterTambahanOptions[0] || "");
+                        setNewBillingNominal(0);
+                        setNewBillingQty(1);
+                        setNewBillingSatuan("Pax");
+                        setNewBillingAllocatedMembers([]);
+                        setShowAddItemModal(true);
+                      }}
+                      size="sm"
+                      variant="outline"
+                      className="h-7 text-xs font-bold border-amber-500/60 text-amber-700 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/40"
+                    >
+                      <Plus className="w-3.5 h-3.5 mr-1 text-amber-600" /> Tambah Item
+                    </Button>
                   </div>
 
-                  {/* Komponen Tarif */}
-                  <div className="p-2.5 bg-background border border-slate-200 dark:border-slate-800 rounded-lg text-xs space-y-1.5">
-                    <div className="flex justify-between items-center text-slate-700 dark:text-slate-300">
-                      <span>
-                        Tarif Dasar Paket{financialSummary.clusterName ? ` (Klaster ${financialSummary.clusterName})` : ""} ({financialSummary.basePax} Pax × {formatCurrency(financialSummary.basePrice)}):
-                      </span>
-                      <span className="font-bold text-foreground">{formatCurrency(financialSummary.basePax * financialSummary.basePrice)}</span>
-                    </div>
-                    {financialSummary.roomUpgradeNominal > 0 && (
-                      <div className="flex justify-between items-center text-slate-700 dark:text-slate-300 pt-1 border-t border-dashed">
-                        <span>
-                          {financialSummary.roomUpgradeName} ({financialSummary.basePax} Pax × {formatCurrency(financialSummary.roomUpgradeNominal)}):
-                        </span>
-                        <span className="font-bold text-emerald-600 dark:text-emerald-400">
-                          +{formatCurrency(financialSummary.basePax * financialSummary.roomUpgradeNominal)}
-                        </span>
-                      </div>
-                    )}
-                    {groupInfo.hotelUpgrade && !financialSummary.clusterName && (
-                      <div className="flex justify-between items-center text-slate-700 dark:text-slate-300 pt-1 border-t border-dashed">
-                        <span>Upgrade Hotel:</span>
-                        <span className="font-bold text-foreground">{groupInfo.hotelUpgrade}</span>
-                      </div>
-                    )}
+                  {/* Tabel Rincian Tagihan (Matching Image 3) */}
+                  <div className="overflow-x-auto border border-slate-200 dark:border-slate-800 rounded-lg bg-background">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-slate-50 dark:bg-slate-900 text-slate-600 dark:text-slate-400 font-semibold border-b">
+                        <tr>
+                          <th className="p-2">Deskripsi Item Tagihan / Potongan</th>
+                          <th className="p-2">Kategori</th>
+                          <th className="p-2 text-center">Qty / Satuan</th>
+                          <th className="p-2 text-right">Harga Satuan</th>
+                          <th className="p-2 text-right">Total Nominal</th>
+                          <th className="p-2 text-center">Aksi</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                        {billingItems.map((item) => (
+                          <tr key={item.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-900/40 transition-colors">
+                            <td className="p-2 font-medium">
+                              <div>
+                                <span className="font-semibold text-foreground">{item.nama}</span>
+                                {item.allocatedJamaah && item.allocatedJamaah.length > 0 && (
+                                  <div className="mt-0.5">
+                                    <span className="text-[10px] font-semibold bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 px-1.5 py-0.2 rounded border border-amber-300/40">
+                                      Peruntukan: {item.allocatedJamaah.join(", ")}
+                                    </span>
+                                  </div>
+                                )}
+                                {item.catatan && (
+                                  <p className="text-[10px] text-muted-foreground italic mt-0.5">{item.catatan}</p>
+                                )}
+                              </div>
+                            </td>
+                            <td className="p-2">
+                              <span
+                                className={cn(
+                                  "text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wide",
+                                  item.kategori === "utama"
+                                    ? "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300"
+                                    : item.kategori === "tambahan"
+                                    ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
+                                    : "bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300"
+                                )}
+                              >
+                                {item.kategori === "utama"
+                                  ? "Tagihan Utama"
+                                  : item.kategori === "tambahan"
+                                  ? "+ Tambahan"
+                                  : "- Potongan"}
+                              </span>
+                            </td>
+                            <td className="p-2 text-center font-bold text-foreground">
+                              {item.qty} {item.satuan || "Pax"}
+                            </td>
+                            <td className="p-2 text-right font-mono text-muted-foreground">
+                              {formatCurrency(item.nominal)}
+                            </td>
+                            <td className="p-2 text-right font-mono font-bold">
+                              <span
+                                className={
+                                  item.kategori === "potongan"
+                                    ? "text-rose-600 dark:text-rose-400"
+                                    : "text-emerald-600 dark:text-emerald-400"
+                                }
+                              >
+                                {item.kategori === "potongan" ? "-" : ""}
+                                {formatCurrency(item.nominal * item.qty)}
+                              </span>
+                            </td>
+                            <td className="p-2 text-center">
+                              <div className="flex items-center justify-center gap-1">
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenEditItem(item)}
+                                  className="p-1 text-slate-400 hover:text-amber-600 transition-colors rounded hover:bg-slate-100 dark:hover:bg-slate-800"
+                                  title="Ubah Rincian Item"
+                                >
+                                  <Edit3 className="w-3.5 h-3.5" />
+                                </button>
+                                {!item.isDefault && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRemoveBillingItem(item.id)}
+                                    className="p-1 text-slate-400 hover:text-rose-600 transition-colors rounded hover:bg-slate-100 dark:hover:bg-slate-800"
+                                    title="Hapus Item"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                      <tfoot>
+                        <tr className="bg-slate-50 dark:bg-slate-900/80 font-bold border-t">
+                          <td colSpan={4} className="p-2 text-right uppercase tracking-wider text-muted-foreground">
+                            TOTAL TAGIHAN AKHIR (NET)
+                          </td>
+                          <td className="p-2 text-right font-mono text-sm text-emerald-700 dark:text-emerald-300">
+                            {formatCurrency(calculatedTotalTagihan)}
+                          </td>
+                          <td></td>
+                        </tr>
+                      </tfoot>
+                    </table>
                   </div>
 
                   {/* Daftar Invoices Terbit */}
@@ -1881,6 +2175,399 @@ export default function CreateInvoiceModal({
           </div>
         </div>
       )}
-    </Modal>
+      </Modal>
+
+      {/* Modal Tambah Item Tagihan / Potongan */}
+      <Modal
+        open={showAddItemModal}
+        onClose={() => setShowAddItemModal(false)}
+        title="Tambah Item Tagihan / Potongan"
+        size="default"
+      >
+        <div className="space-y-4 pt-1">
+          {/* 1. Kategori Toggle */}
+          <div>
+            <label className="text-xs font-bold text-foreground block mb-1">
+              Kategori Item
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setNewBillingKategori("tambahan");
+                  setNewBillingNama(masterTambahanOptions[0] || "");
+                  setIsCustomJenisMode(false);
+                }}
+                className={`py-2 px-3 rounded-lg border text-xs font-bold transition-all ${
+                  newBillingKategori === "tambahan"
+                    ? "bg-emerald-500/15 border-emerald-500 text-emerald-800 dark:text-emerald-300"
+                    : "border-border text-muted-foreground hover:bg-muted"
+                }`}
+              >
+                + Tambahan (Menambah Tagihan)
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setNewBillingKategori("potongan");
+                  setNewBillingNama(masterPotonganOptions[0] || "");
+                  setIsCustomJenisMode(false);
+                }}
+                className={`py-2 px-3 rounded-lg border text-xs font-bold transition-all ${
+                  newBillingKategori === "potongan"
+                    ? "bg-rose-500/15 border-rose-500 text-rose-800 dark:text-rose-300"
+                    : "border-border text-muted-foreground hover:bg-muted"
+                }`}
+              >
+                - Potongan (Mengurangi Tagihan)
+              </button>
+            </div>
+          </div>
+
+          {/* 2. Jenis / Nama Item */}
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-xs font-bold text-foreground">
+                Jenis {newBillingKategori === "tambahan" ? "Tambahan" : "Potongan"}
+              </label>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsCustomJenisMode(!isCustomJenisMode);
+                  setNewBillingNama("");
+                }}
+                className="text-[11px] text-amber-600 dark:text-amber-400 hover:underline font-semibold"
+              >
+                {isCustomJenisMode ? "← Pilih dari Daftar" : "+ Input Kustom"}
+              </button>
+            </div>
+
+            {isCustomJenisMode ? (
+              <Input
+                placeholder={`Contoh: ${
+                  newBillingKategori === "tambahan"
+                    ? "Upgrade Hotel Bintang 5 / Ekstra Bagasi"
+                    : "Diskon Early Bird / Promo Tokoh"
+                }`}
+                value={newBillingNama}
+                onChange={(e) => setNewBillingNama(e.target.value)}
+                autoFocus
+              />
+            ) : (
+              <select
+                value={newBillingNama}
+                onChange={(e) => setNewBillingNama(e.target.value)}
+                className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-xs shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              >
+                {(newBillingKategori === "tambahan"
+                  ? masterTambahanOptions
+                  : masterPotonganOptions
+                ).map((opt) => (
+                  <option key={opt} value={opt}>
+                    {opt}
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
+
+          {/* 3. Nominal Input */}
+          <div>
+            <label className="text-xs font-bold text-foreground block mb-1">
+              Nominal Per Unit / Satuan (Rp)
+            </label>
+            <CurrencyInput
+              placeholder="Masukkan nominal"
+              value={newBillingNominal || 0}
+              onChange={(val) => setNewBillingNominal(val)}
+            />
+          </div>
+
+          {/* 4. Room Upgrade Allocation Section (Khusus Tambahan Upgrade Kamar) */}
+          {newBillingKategori === "tambahan" && isRoomUpgradeItem(newBillingNama) && (
+            <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-amber-900 dark:text-amber-200 flex items-center gap-1.5">
+                  Alokasikan Kamar ke Jamaah:
+                </label>
+                <span className="text-[10px] font-bold text-amber-700 dark:text-amber-300 bg-amber-500/20 px-2 py-0.5 rounded">
+                  {newBillingAllocatedMembers.length} Jamaah Terpilih
+                </span>
+              </div>
+              <p className="text-[10px] text-muted-foreground">
+                Centang jamaah yang mendapatkan kamar {detectRoomTypeFromName(newBillingNama)}. (Quantity otomatis tersinkron).
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-36 overflow-y-auto bg-background p-2 rounded-md border">
+                {(groupInfo?.anggota || []).map((a: any, idx: number) => {
+                  const nama = a.namaLengkap || `Anggota ${idx + 1}`;
+                  const isAllocated = newBillingAllocatedMembers.includes(nama);
+                  return (
+                    <label
+                      key={a.id || nama + idx}
+                      className={`flex items-center gap-2 p-1.5 rounded text-xs cursor-pointer transition-colors ${
+                        isAllocated
+                          ? "bg-amber-500/15 font-bold text-amber-900 dark:text-amber-200 border border-amber-500/30"
+                          : "text-muted-foreground hover:bg-muted"
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isAllocated}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            const updated = [...newBillingAllocatedMembers, nama];
+                            setNewBillingAllocatedMembers(updated);
+                            setNewBillingQty(Math.max(1, updated.length));
+                          } else {
+                            const updated = newBillingAllocatedMembers.filter((n) => n !== nama);
+                            setNewBillingAllocatedMembers(updated);
+                            setNewBillingQty(Math.max(1, updated.length));
+                          }
+                        }}
+                        className="rounded text-amber-600 focus:ring-amber-500 h-3.5 w-3.5 shrink-0"
+                      />
+                      <span className="truncate">{nama}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* 5. Quantity & Satuan Input (Fleksibel) */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-bold text-foreground block mb-1">
+                Berapa Banyak (Quantity)
+              </label>
+              <Input
+                type="number"
+                min={1}
+                placeholder="1"
+                value={newBillingQty}
+                onChange={(e) => {
+                  const val = parseInt(e.target.value, 10);
+                  if (isNaN(val) || val < 1) setNewBillingQty(1);
+                  else setNewBillingQty(val);
+                }}
+              />
+              <p className="mt-1 text-[10px] text-muted-foreground">
+                Jumlah pembelian item aktual.
+              </p>
+            </div>
+
+            <div>
+              <label className="text-xs font-bold text-foreground block mb-1">
+                Satuan Item
+              </label>
+              <div className="flex gap-1.5">
+                <select
+                  value={DEFAULT_SATUAN_OPTIONS.includes(newBillingSatuan) ? newBillingSatuan : "custom"}
+                  onChange={(e) => {
+                    if (e.target.value !== "custom") {
+                      setNewBillingSatuan(e.target.value);
+                    } else {
+                      setNewBillingSatuan("");
+                    }
+                  }}
+                  className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-xs shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                >
+                  {DEFAULT_SATUAN_OPTIONS.map((opt) => (
+                    <option key={opt} value={opt}>
+                      {opt}
+                    </option>
+                  ))}
+                  <option value="custom">Kustom (Lainnya)...</option>
+                </select>
+                {!DEFAULT_SATUAN_OPTIONS.includes(newBillingSatuan) && (
+                  <Input
+                    placeholder="Satuan..."
+                    value={newBillingSatuan}
+                    onChange={(e) => setNewBillingSatuan(e.target.value)}
+                    className="text-xs w-28"
+                  />
+                )}
+              </div>
+              <p className="mt-1 text-[10px] text-muted-foreground">
+                Contoh: Pax, Kamar, Pcs, Box, Kg.
+              </p>
+            </div>
+          </div>
+
+          {/* Subtotal Preview */}
+          {newBillingNominal > 0 && (
+            <div className="p-2.5 rounded-lg bg-stone-100 dark:bg-stone-900 border text-xs flex justify-between items-center">
+              <span className="text-muted-foreground font-medium">Subtotal Tambahan/Potongan:</span>
+              <span className="font-mono font-bold text-amber-600 dark:text-amber-400 text-sm">
+                {formatCurrency(newBillingNominal * newBillingQty)}
+              </span>
+            </div>
+          )}
+
+          {/* Actions */}
+          <div className="flex justify-end gap-2 pt-2 border-t">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setShowAddItemModal(false)}
+            >
+              Batal
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              className="bg-amber-600 hover:bg-amber-700 text-white font-bold"
+              onClick={handleAddBillingItem}
+              disabled={!newBillingNama.trim() || newBillingNominal <= 0}
+            >
+              Tambah ke Rincian Tagihan
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Modal Edit Item Tagihan (Ubah Jumlah, Satuan & Harga) */}
+      <Modal
+        open={showEditItemModal}
+        onClose={() => {
+          setShowEditItemModal(false);
+          setEditingItem(null);
+        }}
+        title={`Ubah Rincian Tagihan — ${editingItem?.nama || "Item"}`}
+        size="default"
+      >
+        <div className="space-y-4 pt-1">
+          <div>
+            <label className="text-xs font-bold text-foreground block mb-1">
+              Deskripsi / Nama Item
+            </label>
+            <Input
+              value={editItemNama}
+              onChange={(e) => setEditItemNama(e.target.value)}
+              placeholder="Contoh: Paket Umroh / Upgrade Kamar / Ekstra Bagasi"
+              disabled={editingItem?.isDefault}
+            />
+            {editingItem?.isDefault && (
+              <p className="mt-1 text-[10px] text-muted-foreground">
+                Nama paket utama dikunci otomatis dari sistem registrasi paket.
+              </p>
+            )}
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-bold text-foreground block mb-1">
+                Berapa Banyak (Quantity)
+              </label>
+              <Input
+                type="number"
+                min={1}
+                value={editItemQty}
+                onChange={(e) => {
+                  const val = parseInt(e.target.value, 10);
+                  setEditItemQty(isNaN(val) || val < 1 ? 1 : val);
+                }}
+              />
+              <p className="mt-1 text-[10px] text-muted-foreground">
+                Bebas diisi sesuai pembelian.
+              </p>
+            </div>
+
+            <div>
+              <label className="text-xs font-bold text-foreground block mb-1">
+                Satuan Item
+              </label>
+              <div className="flex gap-1.5">
+                <select
+                  value={DEFAULT_SATUAN_OPTIONS.includes(editItemSatuan) ? editItemSatuan : "custom"}
+                  onChange={(e) => {
+                    if (e.target.value !== "custom") {
+                      setEditItemSatuan(e.target.value);
+                    } else {
+                      setEditItemSatuan("");
+                    }
+                  }}
+                  className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-xs shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                >
+                  {DEFAULT_SATUAN_OPTIONS.map((opt) => (
+                    <option key={opt} value={opt}>
+                      {opt}
+                    </option>
+                  ))}
+                  <option value="custom">Kustom (Lainnya)...</option>
+                </select>
+                {!DEFAULT_SATUAN_OPTIONS.includes(editItemSatuan) && (
+                  <Input
+                    placeholder="Satuan..."
+                    value={editItemSatuan}
+                    onChange={(e) => setEditItemSatuan(e.target.value)}
+                    className="text-xs w-28"
+                  />
+                )}
+              </div>
+              <p className="mt-1 text-[10px] text-muted-foreground">
+                Contoh: Pax, Kamar, Pcs, Box, Kg.
+              </p>
+            </div>
+          </div>
+
+          <div>
+            <label className="text-xs font-bold text-foreground block mb-1">
+              Harga Satuan (Rp)
+            </label>
+            <CurrencyInput
+              value={editItemNominal}
+              onChange={(val) => setEditItemNominal(val)}
+              placeholder="0"
+            />
+          </div>
+
+          <div>
+            <label className="text-xs font-bold text-foreground block mb-1">
+              Catatan / Keterangan Tambahan
+            </label>
+            <Input
+              value={editItemCatatan}
+              onChange={(e) => setEditItemCatatan(e.target.value)}
+              placeholder="Opsional, contoh: Tambahan pesanan dari ketua rombongan"
+            />
+          </div>
+
+          {/* Subtotal Preview */}
+          <div className="p-2.5 rounded-lg bg-stone-100 dark:bg-stone-900 border text-xs flex justify-between items-center">
+            <span className="text-muted-foreground font-medium">
+              Subtotal ({editItemQty} {editItemSatuan || "Pax"} × {formatCurrency(editItemNominal)}):
+            </span>
+            <span className="font-mono font-bold text-amber-600 dark:text-amber-400 text-sm">
+              {formatCurrency(editItemNominal * editItemQty)}
+            </span>
+          </div>
+
+          <div className="flex justify-end gap-2 pt-2 border-t">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setShowEditItemModal(false);
+                setEditingItem(null);
+              }}
+            >
+              Batal
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              className="font-bold bg-amber-500 hover:bg-amber-600 text-slate-950"
+              onClick={handleSaveEditItem}
+              disabled={!editItemNama.trim() || editItemNominal < 0}
+            >
+              Simpan Perubahan
+            </Button>
+          </div>
+        </div>
+      </Modal>
+    </>
   );
 }
