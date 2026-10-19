@@ -1420,16 +1420,6 @@ export default function CreateInvoiceModal({
                     />
                   </div>
                 </div>
-
-                <div className="pt-2">
-                  <Button
-                    onClick={handleSubmit}
-                    disabled={loading || !groupInfo || nominal <= 0}
-                    className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 text-xs shadow-md"
-                  >
-                    {loading ? "Menerbitkan..." : `Terbitkan Invoice (${formatCurrency(nominal)})`}
-                  </Button>
-                </div>
               </div>
             </div>
           )}
