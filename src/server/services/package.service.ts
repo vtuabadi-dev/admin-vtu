@@ -853,15 +853,24 @@ export const packageService = {
     }
 
     // Jika pembaruan flyer/caption ditujukan untuk sub-varian spesifik di hotelOptions
-    if (typeof data.subVariantIndex === "number" && (Array.isArray(data.hotelOptions) || Array.isArray(before?.hotelOptions))) {
+    if ((typeof data.subVariantIndex === "number" || Array.isArray(data.subVariantIndices)) && (Array.isArray(data.hotelOptions) || Array.isArray(before?.hotelOptions))) {
       const currentOpts = Array.isArray(data.hotelOptions) ? [...data.hotelOptions] : [...(before?.hotelOptions as any[])];
-      const targetOpt = currentOpts[data.subVariantIndex];
-      if (targetOpt) {
-        currentOpts[data.subVariantIndex] = {
-          ...targetOpt,
-          flyerUrl: data.flyerUrl !== undefined ? data.flyerUrl : targetOpt.flyerUrl,
-          caption: data.caption !== undefined ? data.caption : targetOpt.caption,
-        };
+      const indicesToUpdate: number[] = Array.isArray(data.subVariantIndices)
+        ? data.subVariantIndices
+        : [data.subVariantIndex];
+      let updatedAny = false;
+      for (const idx of indicesToUpdate) {
+        const targetOpt = currentOpts[idx];
+        if (targetOpt) {
+          currentOpts[idx] = {
+            ...targetOpt,
+            flyerUrl: data.flyerUrl !== undefined ? data.flyerUrl : targetOpt.flyerUrl,
+            caption: data.caption !== undefined ? data.caption : targetOpt.caption,
+          };
+          updatedAny = true;
+        }
+      }
+      if (updatedAny) {
         data.hotelOptions = currentOpts;
         delete data.flyerUrl;
         delete data.caption;

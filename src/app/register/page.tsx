@@ -1602,8 +1602,14 @@ export default function RegisterPage() {
 
                 {/* Selected Package Details Card */}
                 {selectedPaket && (() => {
-                  const clusters = Array.isArray(selectedPaket.hotelOptions) && selectedPaket.hotelOptions.length > 0
+                  const rawClusters = Array.isArray(selectedPaket.hotelOptions) && selectedPaket.hotelOptions.length > 0
                     ? selectedPaket.hotelOptions
+                    : null;
+                  const clusters = rawClusters
+                    ? rawClusters.filter((c: any, idx: number) => {
+                        if (idx === 0) return true;
+                        return c.isPublishedKatalog !== false;
+                      })
                     : null;
                   const isMultiCluster = !!(clusters && clusters.length > 1);
 

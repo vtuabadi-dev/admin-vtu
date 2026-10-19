@@ -30,6 +30,7 @@ import { Input } from "@/shared/components/ui/Input";
 import { Card, CardContent } from "@/shared/components/ui/Card";
 import { useSession } from "@/shared/hooks/use-session";
 import { formatNumberWithDots, getWhatsAppUrl, cn } from "@/shared/lib/utils";
+import { groupHotelOptionsIntoVariants } from "@/shared/lib/hotel-utils";
 import type { Keberangkatan } from "@/shared/types";
 import { useOperationalStore } from "@/stores/operational-store";
 
@@ -298,7 +299,10 @@ export default function KatalogPaketPage() {
       const parentId = (manageMediaPkg as any)._parentPackageId || (
         manageMediaPkg.id.includes("_var_") ? manageMediaPkg.id.split("_var_")[0] : manageMediaPkg.id
       );
-      if (typeof (manageMediaPkg as any)._subVariantIndex === "number") {
+      if (Array.isArray((manageMediaPkg as any)._subVariantIndices)) {
+        payload.subVariantIndices = (manageMediaPkg as any)._subVariantIndices;
+        payload.variantName = (manageMediaPkg as any)._variantName || "Varian 2";
+      } else if (typeof (manageMediaPkg as any)._subVariantIndex === "number") {
         payload.subVariantIndex = (manageMediaPkg as any)._subVariantIndex;
         payload.variantName = (manageMediaPkg as any)._variantName || "Varian 2";
       } else if (manageMediaPkg.id.includes("_var_")) {
@@ -417,41 +421,36 @@ export default function KatalogPaketPage() {
 
     for (const pkg of packages) {
       const isPkgPub = isPackagePublishedInKatalog(pkg);
-      let opts = pkg.hotelOptions;
-      if (typeof opts === "string") {
-        try { opts = JSON.parse(opts); } catch { opts = []; }
-      }
-      const validOpts = Array.isArray(opts)
-        ? opts.filter((o: any) => o && (o.hotelMekkah || o.hotelMadinah || o.hargaBase))
-        : [];
+      const variantGroups = groupHotelOptionsIntoVariants(pkg.hotelOptions, isPkgPub);
 
-      if (validOpts.length > 1) {
-        // Cek publikasi per varian
-        validOpts.forEach((opt: any, vIdx: number) => {
-          const isOptPub = vIdx === 0
-            ? (opt.isPublishedKatalog !== undefined ? opt.isPublishedKatalog === true : isPkgPub)
-            : (opt.isPublishedKatalog === true);
-
-          if (isOptPub) {
-            const isV2 = vIdx > 0;
-            const vName = opt.clusterName || opt.variantName || (isV2 ? `Varian ${vIdx + 1}` : "Varian Utama");
+      if (variantGroups.length > 1) {
+        // Cek publikasi per varian (Varian Utama vs Varian 2 dsb)
+        // Varian 2 yang memiliki karakteristik klaster TIDAK dipecah katalognya, cukup 1 kartu katalog per varian
+        variantGroups.forEach((vg, vIdx: number) => {
+          if (vg.isPublished) {
+            const isV2 = vg.isV2;
+            const vName = vg.variantName;
 
             list.push({
               ...pkg,
-              id: `${pkg.id}_var_${vIdx}`,
+              id: `${pkg.id}_var_${vg.key}`,
               isPublishedKatalog: true,
-              hotelMekkah: opt.hotelMekkah || pkg.hotelMekkah,
-              hotelMadinah: opt.hotelMadinah || pkg.hotelMadinah,
-              hargaPaket: opt.hargaBase || pkg.hargaPaket,
-              flyerUrl: opt.flyerUrl || (vIdx === 0 ? pkg.flyerUrl : ""),
-              flyerDriveId: opt.flyerDriveId || (vIdx === 0 ? pkg.flyerDriveId : undefined),
-              caption: opt.caption || (vIdx === 0 ? pkg.caption : ""),
+              hotelMekkah: vg.hotelMekkah || pkg.hotelMekkah,
+              hotelMadinah: vg.hotelMadinah || pkg.hotelMadinah,
+              hargaPaket: vg.minPrice || pkg.hargaPaket,
+              flyerUrl: vg.flyerUrl || (vIdx === 0 ? pkg.flyerUrl : ""),
+              flyerDriveId: vg.flyerDriveId || (vIdx === 0 ? pkg.flyerDriveId : undefined),
+              caption: vg.caption || (vIdx === 0 ? pkg.caption : ""),
               splitReason: isV2 ? "promo" : (pkg.splitReason || undefined),
               splitLabel: isV2 ? vName : (pkg.splitLabel || undefined),
               promoLabel: isV2 ? vName : (pkg.promoLabel || undefined),
+              hotelOptions: vg.items,
               _parentPackageId: pkg.id,
-              _subVariantIndex: vIdx,
+              _subVariantIndex: vg.indices[0],
+              _subVariantIndices: vg.indices,
               _variantName: vName,
+              _isMultiCluster: vg.items.length > 1,
+              _clusterSummary: vg.clusterSummary,
             } as any);
           }
         });
