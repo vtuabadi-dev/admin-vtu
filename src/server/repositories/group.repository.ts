@@ -25,6 +25,15 @@ function mapGroup(row: any): RegistrationGroup {
     isKeretaCepat: row.isKeretaCepat ?? undefined,
     isCityTourThoif: row.isCityTourThoif ?? undefined,
     anggotaIds: row.anggota?.map((a: any) => a.id) ?? [],
+    anggota: row.anggota ?? [],
+    ketuaGroup: row.ketuaGroup ? {
+      id: row.ketuaGroup.id,
+      namaLengkap: row.ketuaGroup.namaLengkap,
+      nomorIdentitas: row.ketuaGroup.nomorIdentitas,
+      telepon: row.ketuaGroup.nomorTelepon || row.ketuaGroup.telepon,
+    } : undefined,
+    kontakNama: row.ketuaGroup?.namaLengkap || req?.namaPerwakilan || row.kontakNama,
+    kontakHp: row.ketuaGroup?.nomorTelepon || row.ketuaGroup?.telepon || req?.nomorTelepon || row.kontakHp,
     invoices: (row.invoices ?? []).map(mapInvoice),
     pembayaran: (row.pembayaran ?? []).map(mapPembayaran),
     createdAt: row.createdAt.toISOString(),
@@ -172,8 +181,10 @@ export const groupRepo = {
       include: {
         anggota: true,
         keberangkatan: { include: { paketUmroh: true } },
-        registrationRequests: { select: { hotelUpgrade: true, roomUpgrade: true, nomorTelepon: true, emailPerwakilan: true } },
+        registrationRequests: { select: { hotelUpgrade: true, roomUpgrade: true, nomorTelepon: true, emailPerwakilan: true, namaPerwakilan: true } },
         ketuaGroup: true,
+        invoices: { include: { items: true }, orderBy: { createdAt: "desc" } },
+        pembayaran: { include: { alokasi: true }, orderBy: { tanggal: "desc" } },
       },
     });
 
@@ -198,6 +209,8 @@ export const groupRepo = {
             anggota: true,
             keberangkatan: { include: { paketUmroh: true } },
             ketuaGroup: true,
+            invoices: { include: { items: true }, orderBy: { createdAt: "desc" } },
+            pembayaran: { include: { alokasi: true }, orderBy: { tanggal: "desc" } },
           },
         },
       },

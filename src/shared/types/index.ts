@@ -84,6 +84,15 @@ export interface RegistrationGroup {
   isCityTourThoif?: boolean;
   /** Anggota jamaah dalam grup ini */
   anggotaIds: string[];
+  anggota?: any[];
+  ketuaGroup?: {
+    id: string;
+    namaLengkap: string;
+    nomorIdentitas?: string;
+    telepon?: string;
+  };
+  kontakNama?: string;
+  kontakHp?: string;
   invoices?: Invoice[];
   pembayaran?: Pembayaran[];
   createdAt: string;

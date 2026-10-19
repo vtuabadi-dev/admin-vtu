@@ -11,8 +11,10 @@ import {
   AlertTriangle,
   Package,
   Layers,
+  Receipt,
+  Clock,
 } from "lucide-react";
-import { cn, formatDateShort } from "@/shared/lib/utils";
+import { cn, formatDateShort, formatCurrency } from "@/shared/lib/utils";
 import { Button } from "@/shared/components/ui/Button";
 import { Input } from "@/shared/components/ui/Input";
 import { CurrencyInput } from "@/shared/components/ui/CurrencyInput";
@@ -99,6 +101,7 @@ export default function CreateInvoiceModal({
   const [jatuhTempo, setJatuhTempo] = useState("");
   const [catatan, setCatatan] = useState("");
   const [loading, setLoading] = useState(false);
+  const [previewBuktiUrl, setPreviewBuktiUrl] = useState<string | null>(null);
 
   // Load active groups and departure packages
   useEffect(() => {
@@ -140,8 +143,7 @@ export default function CreateInvoiceModal({
     }
   }
 
-  function selectGroupData(group: any) {
-    setGroupInfo(group);
+  async function selectGroupData(group: any) {
     setLookupError("");
     setShowSuggestions(false);
     setTargetPaketId("");
@@ -153,12 +155,42 @@ export default function CreateInvoiceModal({
       if (parts[2]) setSeqInput(parts[2].slice(0, 4));
     }
 
-    if (group.sisaPembayaran && kategori === "PEMBAYARAN") {
-      setNominal(group.sisaPembayaran);
+    let activeGroup = group;
+    // Always fetch full details including invoices & payments if not present
+    if (!group.invoices || !group.pembayaran) {
+      try {
+        const full = await getGroupByKode(group.kodeRegistrasi);
+        if (full) {
+          activeGroup = full;
+        }
+      } catch (err) {
+        console.warn("Could not fetch full group details:", err);
+      }
+    }
+
+    setGroupInfo(activeGroup);
+
+    // Calculate financials
+    const basePax = activeGroup.jumlahAnggota || activeGroup.anggotaIds?.length || 1;
+    const basePrice =
+      activeGroup.keberangkatan?.hargaPaket ||
+      activeGroup.paketKeberangkatan?.hargaPaket ||
+      0;
+    const totalTagihan =
+      activeGroup.totalTagihan > 0 ? activeGroup.totalTagihan : basePax * basePrice;
+    const verifiedSum = (activeGroup.pembayaran || [])
+      .filter((p: any) => p.status === "verified")
+      .reduce((acc: number, p: any) => acc + (p.jumlah || 0), 0) || (activeGroup.totalPembayaran ?? 0);
+    const sisa = Math.max(0, totalTagihan - verifiedSum);
+
+    if (kategori === "PEMBAYARAN") {
+      setNominal(sisa > 0 ? sisa : activeGroup.sisaPembayaran || 0);
     }
 
     // Calculate H-40 for group's package departure
-    const tglBerangkatRaw = (group as any)?.paketKeberangkatan?.tanggalBerangkat || (group as any)?.keberangkatan?.tanggalBerangkat;
+    const tglBerangkatRaw =
+      (activeGroup as any)?.paketKeberangkatan?.tanggalBerangkat ||
+      (activeGroup as any)?.keberangkatan?.tanggalBerangkat;
     if (tglBerangkatRaw) {
       const tglBerangkat = new Date(tglBerangkatRaw);
       const h40 = new Date(tglBerangkat);
@@ -168,7 +200,11 @@ export default function CreateInvoiceModal({
       const diffMs = tglBerangkat.getTime() - now.getTime();
       const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
       const isLate = days <= 40 || now.getTime() >= h40.getTime();
-      const h40Formatted = h40.toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });
+      const h40Formatted = h40.toLocaleDateString("id-ID", {
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+      });
 
       setH40Warning({ isLate, days, h40Formatted });
 
@@ -271,6 +307,59 @@ export default function CreateInvoiceModal({
     }
   }, [kategori, pricingOption, totalDiff]);
 
+  // Comprehensive financial summary for selected group
+  const financialSummary = useMemo(() => {
+    if (!groupInfo) return null;
+
+    const basePax = groupInfo.jumlahAnggota || groupInfo.anggotaIds?.length || 1;
+    const basePrice =
+      groupInfo.keberangkatan?.hargaPaket ||
+      groupInfo.paketKeberangkatan?.hargaPaket ||
+      (currentPackage?.hargaPaket ?? 0);
+
+    const computedTotalTagihan =
+      typeof groupInfo.totalTagihan === "number" && groupInfo.totalTagihan > 0
+        ? groupInfo.totalTagihan
+        : basePax * basePrice;
+
+    const verifiedPayments = (groupInfo.pembayaran || []).filter(
+      (p: any) => p.status === "verified"
+    );
+    const pendingPayments = (groupInfo.pembayaran || []).filter(
+      (p: any) => p.status === "pending"
+    );
+
+    const totalTerbayar =
+      verifiedPayments.length > 0
+        ? verifiedPayments.reduce((sum: number, p: any) => sum + (p.jumlah || 0), 0)
+        : (groupInfo.totalPembayaran ?? 0);
+
+    const pendingTotal = pendingPayments.reduce(
+      (sum: number, p: any) => sum + (p.jumlah || 0),
+      0
+    );
+
+    const sisaTagihan = Math.max(0, computedTotalTagihan - totalTerbayar);
+    const percentPaid =
+      computedTotalTagihan > 0
+        ? Math.min(100, Math.round((totalTerbayar / computedTotalTagihan) * 100))
+        : 0;
+
+    return {
+      basePax,
+      basePrice,
+      totalTagihan: computedTotalTagihan,
+      totalTerbayar,
+      pendingTotal,
+      sisaTagihan,
+      percentPaid,
+      verifiedPayments,
+      pendingPayments,
+      allPayments: (groupInfo.pembayaran || []) as any[],
+      invoices: (groupInfo.invoices || []) as any[],
+    };
+  }, [groupInfo, currentPackage]);
+
   function handleReset() {
     setSeqInput("");
     setNominal(0);
@@ -287,6 +376,7 @@ export default function CreateInvoiceModal({
     setKategori("PEMBAYARAN");
     setTambahPaxCount(1);
     setTambahJamaahList([{ nama: "", gender: "L", hubungan: "" }]);
+    setPreviewBuktiUrl(null);
   }
 
   async function handleSubmit() {
@@ -422,7 +512,7 @@ export default function CreateInvoiceModal({
   }
 
   return (
-    <Modal open={open} onClose={onClose} title="Penerbitan Invoice & Pengelolaan Transaksi Keuangan" size="lg">
+    <Modal open={open} onClose={onClose} title="Penerbitan Invoice & Pengelolaan Transaksi Keuangan" size="3xl" className="max-w-6xl">
       <div className="space-y-4 pt-1 text-xs">
 
         {/* CATEGORY SELECTOR */}
@@ -606,7 +696,7 @@ export default function CreateInvoiceModal({
 
           {lookupError && <p className="text-xs text-destructive font-medium">{lookupError}</p>}
 
-          {groupInfo && (
+          {groupInfo && kategori !== "PEMBAYARAN" && (
             <div className="p-2.5 bg-background border border-amber-400/40 rounded-lg text-xs space-y-1">
               <p className="font-bold text-foreground">
                 Group: {groupInfo.namaGroup} <span className="font-mono text-amber-600">({groupInfo.kodeRegistrasi})</span>
@@ -620,6 +710,398 @@ export default function CreateInvoiceModal({
 
         {/* 2. DYNAMIC CATEGORY FORMS */}
         <div className="space-y-3 pt-1">
+
+          {/* DYNAMIC FORM FOR PEMBAYARAN */}
+          {kategori === "PEMBAYARAN" && !groupInfo && (
+            <div className="p-8 text-center border border-dashed rounded-xl border-slate-300 dark:border-slate-700 bg-slate-50/50 dark:bg-stone-900/30 space-y-2">
+              <div className="w-12 h-12 rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mx-auto">
+                <CreditCard className="h-6 w-6" />
+              </div>
+              <h3 className="font-bold text-sm text-foreground">Pilih Group Registrasi Jamaah</h3>
+              <p className="text-xs text-muted-foreground max-w-md mx-auto">
+                Gunakan kolom pencarian 4 digit di atas atau klik salah satu rekomendasi grup pendaftaran aktif untuk memuat data sisa tagihan, rincian biaya paket, riwayat pembayaran, serta formulir pembayaran baru.
+              </p>
+            </div>
+          )}
+
+          {kategori === "PEMBAYARAN" && groupInfo && financialSummary && (
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+              {/* KOLOM KIRI: STATUS SISA TAGIHAN, RINCIAN BIAYA & RIWAYAT PEMBAYARAN */}
+              <div className="lg:col-span-7 space-y-3.5">
+                {/* 1. KARTU IDENTITAS ROMBONGAN & RINGKASAN FINANSIAL */}
+                <div className="p-3.5 bg-background border border-emerald-500/30 rounded-xl space-y-3 shadow-2xs">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b pb-2">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-extrabold text-sm text-foreground">
+                          {groupInfo.namaGroup}
+                        </h3>
+                        <span className="font-mono text-xs font-bold px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+                          {groupInfo.kodeRegistrasi}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-muted-foreground mt-0.5">
+                        Ketua: <strong>{groupInfo.ketuaGroup?.namaLengkap || groupInfo.kontakNama || "Rombongan"}</strong> ({groupInfo.kontakHp || groupInfo.noTelp || "-"}) &middot; {financialSummary.basePax} Pax
+                      </p>
+                    </div>
+                    <div className="text-left sm:text-right">
+                      <span className="text-[11px] font-bold text-blue-700 dark:text-blue-300 block">
+                        {currentPackage?.namaPaket || groupInfo.keberangkatan?.namaPaket || "Paket Umroh"}
+                      </span>
+                      <span className="text-[10px] text-muted-foreground">
+                        {currentPackage?.tanggalBerangkat ? `Berangkat: ${formatDateShort(currentPackage.tanggalBerangkat)}` : ""}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* 3 KPI Financial Cards */}
+                  <div className="grid grid-cols-3 gap-2">
+                    {/* Total Tagihan */}
+                    <div className="p-2.5 rounded-lg border bg-slate-50 dark:bg-slate-900/40 border-slate-200 dark:border-slate-800">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground block">
+                        Total Tagihan
+                      </span>
+                      <span className="text-xs sm:text-sm font-extrabold text-foreground block mt-0.5">
+                        Rp {financialSummary.totalTagihan.toLocaleString("id-ID")}
+                      </span>
+                      <span className="text-[9.5px] text-muted-foreground block mt-0.5">
+                        {financialSummary.basePax} Pax × Rp {financialSummary.basePrice.toLocaleString("id-ID")}
+                      </span>
+                    </div>
+
+                    {/* Terbayar */}
+                    <div className="p-2.5 rounded-lg border bg-emerald-50/60 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800/60">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-800 dark:text-emerald-300 block">
+                          Terbayar
+                        </span>
+                        <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-emerald-200 text-emerald-900 dark:bg-emerald-900 dark:text-emerald-100">
+                          {financialSummary.percentPaid}%
+                        </span>
+                      </div>
+                      <span className="text-xs sm:text-sm font-extrabold text-emerald-700 dark:text-emerald-300 block mt-0.5">
+                        Rp {financialSummary.totalTerbayar.toLocaleString("id-ID")}
+                      </span>
+                      {financialSummary.pendingTotal > 0 ? (
+                        <span className="text-[9px] text-amber-600 dark:text-amber-400 font-semibold block mt-0.5">
+                          +{formatCurrency(financialSummary.pendingTotal)} pending
+                        </span>
+                      ) : (
+                        <span className="text-[9.5px] text-emerald-700/80 dark:text-emerald-400/80 block mt-0.5">
+                          {financialSummary.verifiedPayments.length} Pembayaran verified
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Sisa Tagihan (Mencolok!) */}
+                    <div className={cn(
+                      "p-2.5 rounded-lg border",
+                      financialSummary.sisaTagihan <= 0
+                        ? "bg-emerald-100/70 dark:bg-emerald-950/40 border-emerald-400"
+                        : "bg-rose-50 dark:bg-rose-950/30 border-rose-300 dark:border-rose-800"
+                    )}>
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-rose-900 dark:text-rose-200 block">
+                          Sisa Tagihan
+                        </span>
+                        <span className={cn(
+                          "text-[9px] font-extrabold px-1.5 py-0.2 rounded-full",
+                          financialSummary.sisaTagihan <= 0
+                            ? "bg-emerald-200 text-emerald-900"
+                            : "bg-rose-200 text-rose-900"
+                        )}>
+                          {financialSummary.sisaTagihan <= 0 ? "LUNAS" : "BELUM LUNAS"}
+                        </span>
+                      </div>
+                      <span className={cn(
+                        "text-xs sm:text-sm font-extrabold block mt-0.5",
+                        financialSummary.sisaTagihan <= 0 ? "text-emerald-800 dark:text-emerald-300" : "text-rose-700 dark:text-rose-300"
+                      )}>
+                        Rp {financialSummary.sisaTagihan.toLocaleString("id-ID")}
+                      </span>
+                      <span className="text-[9.5px] text-muted-foreground block mt-0.5">
+                        Outstanding Balance
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Progress Bar */}
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between text-[10px] text-muted-foreground font-semibold">
+                      <span>Progress Pelunasan Rombongan</span>
+                      <span>{financialSummary.percentPaid}% Selesai</span>
+                    </div>
+                    <div className="w-full h-2 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden">
+                      <div
+                        className="h-full bg-emerald-500 transition-all duration-500 rounded-full"
+                        style={{ width: `${Math.min(100, Math.max(0, financialSummary.percentPaid))}%` }}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* 2. RINCIAN TAGIHAN & INVOICES SEBELUMNYA */}
+                <div className="p-3 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-xl space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                      <Receipt className="h-4 w-4 text-emerald-600" />
+                      Rincian Tagihan & Invoice Terbit ({financialSummary.invoices.length})
+                    </span>
+                    <span className="text-[10px] text-muted-foreground">
+                      Komponen & Daftar Invoice Resmi
+                    </span>
+                  </div>
+
+                  {/* Komponen Tarif */}
+                  <div className="p-2.5 bg-background border border-slate-200 dark:border-slate-800 rounded-lg text-xs space-y-1.5">
+                    <div className="flex justify-between items-center text-slate-700 dark:text-slate-300">
+                      <span>Tarif Dasar Paket ({financialSummary.basePax} Pax × {formatCurrency(financialSummary.basePrice)}):</span>
+                      <span className="font-bold text-foreground">{formatCurrency(financialSummary.basePax * financialSummary.basePrice)}</span>
+                    </div>
+                    {(groupInfo.hotelUpgrade || groupInfo.roomUpgrade) && (
+                      <div className="flex justify-between items-center text-slate-700 dark:text-slate-300 pt-1 border-t border-dashed">
+                        <span>Upgrade Kamar / Hotel:</span>
+                        <span className="font-bold text-foreground">{groupInfo.hotelUpgrade || groupInfo.roomUpgrade}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Daftar Invoices Terbit */}
+                  {financialSummary.invoices.length > 0 ? (
+                    <div className="space-y-1.5 max-h-44 overflow-y-auto pr-1">
+                      {financialSummary.invoices.map((inv: any) => (
+                        <div
+                          key={inv.id}
+                          className="p-2.5 bg-background border border-slate-200 dark:border-slate-800 rounded-lg flex items-center justify-between gap-2 text-xs"
+                        >
+                          <div className="space-y-0.5">
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono font-bold text-slate-900 dark:text-slate-100">{inv.nomorInvoice}</span>
+                              <span className="text-[9.5px] uppercase font-bold px-1.5 py-0.2 rounded bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                                {inv.tipe || "INVOICE"}
+                              </span>
+                              <span className={cn(
+                                "text-[9px] font-bold px-1.5 py-0.2 rounded uppercase",
+                                inv.status === "paid" ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300" :
+                                inv.status === "partial" ? "bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300" :
+                                inv.status === "overdue" ? "bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300" :
+                                "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300"
+                              )}>
+                                {inv.status}
+                              </span>
+                            </div>
+                            <p className="text-[10px] text-muted-foreground">
+                              Jatuh Tempo: {formatDateShort(inv.jatuhTempo)}
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <p className="font-extrabold text-foreground">{formatCurrency(inv.jumlah)}</p>
+                            <p className="text-[10px] text-muted-foreground">
+                              Sisa: {formatCurrency(inv.sisaTagihan)}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-[11px] text-muted-foreground italic text-center py-2 bg-background rounded-lg border border-dashed">
+                      Belum ada invoice yang pernah diterbitkan untuk grup ini.
+                    </p>
+                  )}
+                </div>
+
+                {/* 3. RIWAYAT PEMBAYARAN JAMAAH */}
+                <div className="p-3 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-xl space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                      <Clock className="h-4 w-4 text-emerald-600" />
+                      Riwayat Pembayaran Jamaah ({financialSummary.allPayments.length})
+                    </span>
+                    <span className="text-[10px] text-muted-foreground">
+                      Log Transaksi Masuk
+                    </span>
+                  </div>
+
+                  {financialSummary.allPayments.length > 0 ? (
+                    <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+                      {financialSummary.allPayments.map((p: any) => (
+                        <div
+                          key={p.id}
+                          className="p-2.5 bg-background border border-slate-200 dark:border-slate-800 rounded-lg flex items-center justify-between gap-3 text-xs"
+                        >
+                          <div className="space-y-0.5">
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-slate-900 dark:text-slate-100">
+                                {p.tanggal ? formatDateShort(p.tanggal) : "-"}
+                              </span>
+                              <span className="text-[9.5px] uppercase font-bold px-1.5 py-0.2 rounded bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                                {p.metode || "TRANSFER"}
+                              </span>
+                              <span className={cn(
+                                "text-[9px] font-bold px-1.5 py-0.2 rounded",
+                                p.status === "verified" ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300" :
+                                p.status === "rejected" ? "bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300" :
+                                "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300"
+                              )}>
+                                {p.status === "verified" ? "Verified" : p.status === "rejected" ? "Ditolak" : "Pending Review"}
+                              </span>
+                            </div>
+                            <p className="text-[10.5px] text-muted-foreground">
+                              {p.catatan || (p.bankPengirim ? `${p.bankPengirim} (${p.nomorRekening || "-"})` : "Pembayaran")}
+                            </p>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <p className="font-extrabold text-foreground">{formatCurrency(p.jumlah)}</p>
+                            {p.buktiUrl && (
+                              <button
+                                type="button"
+                                onClick={() => setPreviewBuktiUrl(p.buktiUrl)}
+                                className="text-[10px] text-emerald-600 hover:text-emerald-700 underline font-semibold cursor-pointer block"
+                              >
+                                Lihat Bukti
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-[11px] text-muted-foreground italic text-center py-2.5 bg-background rounded-lg border border-dashed">
+                      Belum ada riwayat pembayaran yang tercatat untuk grup ini.
+                    </p>
+                  )}
+                </div>
+
+              </div>
+
+              {/* KOLOM KANAN: FORM PEMBAYARAN BARU YANG AKAN DIBAYARKAN */}
+              <div className="lg:col-span-5 p-4 bg-gradient-to-br from-emerald-500/5 via-background to-teal-500/5 border border-emerald-500/30 rounded-xl space-y-3.5 flex flex-col justify-between">
+                <div className="space-y-3">
+                  <div className="border-b border-emerald-500/20 pb-2">
+                    <h4 className="font-extrabold text-sm text-foreground flex items-center gap-1.5">
+                      <CreditCard className="h-4 w-4 text-emerald-600" />
+                      Kolom Pembayaran Baru
+                    </h4>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">
+                      Tentukan nominal tagihan atau pembayaran yang akan dibayarkan oleh rombongan ini.
+                    </p>
+                  </div>
+
+                  {/* 1. NOMINAL DENGAN QUICK SHORTCUTS */}
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] font-bold uppercase tracking-wider text-foreground block">
+                      Nominal Pembayaran Baru (Rp) <span className="text-red-500">*</span>
+                    </label>
+
+                    {/* Quick Shortcuts */}
+                    <div className="flex flex-wrap gap-1">
+                      {financialSummary.sisaTagihan > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setNominal(financialSummary.sisaTagihan)}
+                          className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-100 hover:bg-emerald-200 text-emerald-800 dark:bg-emerald-950 dark:hover:bg-emerald-900 dark:text-emerald-300 transition-colors cursor-pointer"
+                        >
+                          Bayar Sisa: {formatCurrency(financialSummary.sisaTagihan)}
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => setNominal(5000000 * financialSummary.basePax)}
+                        className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-800 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-300 transition-colors cursor-pointer"
+                      >
+                        DP: {formatCurrency(5000000 * financialSummary.basePax)}
+                      </button>
+                      {financialSummary.sisaTagihan > 10000000 && (
+                        <button
+                          type="button"
+                          onClick={() => setNominal(Math.round(financialSummary.sisaTagihan / 2))}
+                          className="text-[10px] font-bold px-2 py-0.5 rounded bg-blue-100 hover:bg-blue-200 text-blue-800 dark:bg-blue-950 dark:hover:bg-blue-900 dark:text-blue-300 transition-colors cursor-pointer"
+                        >
+                          50% Sisa: {formatCurrency(Math.round(financialSummary.sisaTagihan / 2))}
+                        </button>
+                      )}
+                    </div>
+
+                    <CurrencyInput
+                      placeholder="Masukkan nominal angka"
+                      value={nominal}
+                      onChange={(val) => setNominal(val)}
+                      className="font-mono font-extrabold text-base border-emerald-400 focus:ring-emerald-500"
+                    />
+
+                    {/* Simulation Sisa Tagihan */}
+                    <div className="p-2 rounded-lg bg-emerald-100/40 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-[11px] flex items-center justify-between">
+                      <span className="text-muted-foreground">Sisa setelah pembayaran ini:</span>
+                      <span className="font-bold text-foreground">
+                        {formatCurrency(Math.max(0, financialSummary.sisaTagihan - nominal))}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* 2. TANGGAL JATUH TEMPO */}
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[11px] font-bold uppercase tracking-wider text-foreground">
+                        Tanggal Jatuh Tempo
+                      </label>
+                      {h40Warning && (
+                        <span
+                          className={`text-[9.5px] font-bold px-1.5 py-0.5 rounded border ${
+                            h40Warning.isLate
+                              ? "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300 border-red-300 dark:border-red-800 animate-pulse"
+                              : "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800"
+                          }`}
+                        >
+                          {h40Warning.isLate ? "⚠️ ≤ H-40 Mepet" : "Standar H-40"}
+                        </span>
+                      )}
+                    </div>
+                    <Input
+                      type="date"
+                      value={jatuhTempo}
+                      onChange={(e) => setJatuhTempo(e.target.value)}
+                      className={`text-xs ${h40Warning?.isLate ? "border-red-500 font-bold bg-red-50/30" : ""}`}
+                    />
+                  </div>
+
+                  {/* 3. CATATAN / RINCIAN TAGIHAN */}
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] font-bold uppercase tracking-wider text-foreground">
+                      Catatan / Rincian Tagihan Invoice
+                    </label>
+                    <div className="flex flex-wrap gap-1">
+                      {["DP Pembayaran Pendaftaran", "Cicilan Tahap 1", "Cicilan Tahap 2", "Pelunasan Sisa Biaya"].map((tpl) => (
+                        <button
+                          key={tpl}
+                          type="button"
+                          onClick={() => setCatatan(tpl)}
+                          className="text-[9.5px] font-semibold px-1.5 py-0.5 rounded border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                        >
+                          {tpl}
+                        </button>
+                      ))}
+                    </div>
+                    <Input
+                      placeholder="Contoh: Cicilan tahap 1 atau pelunasan"
+                      value={catatan}
+                      onChange={(e) => setCatatan(e.target.value)}
+                      className="text-xs"
+                    />
+                  </div>
+                </div>
+
+                <div className="pt-2">
+                  <Button
+                    onClick={handleSubmit}
+                    disabled={loading || !groupInfo || nominal <= 0}
+                    className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 text-xs shadow-md"
+                  >
+                    {loading ? "Menerbitkan..." : `Terbitkan Invoice (${formatCurrency(nominal)})`}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* DYNAMIC FORM FOR PINDAH PAKET */}
           {kategori === "PINDAH_PAKET" && (
@@ -1200,8 +1682,8 @@ export default function CreateInvoiceModal({
             </div>
           )}
 
-          {/* 3. NOMINAL TRANSACTION (Disederhanakan / Dihilangkan untuk PINDAH_PAKET & TAMBAH_JAMAAH) */}
-          {kategori !== "PINDAH_PAKET" && kategori !== "TAMBAH_JAMAAH" && (
+          {/* 3. NOMINAL TRANSACTION (Hanya untuk PEMBATALAN & REFUND_MURNI) */}
+          {kategori !== "PEMBAYARAN" && kategori !== "PINDAH_PAKET" && kategori !== "TAMBAH_JAMAAH" && (
             <>
               <div>
                 <label className="text-xs font-bold uppercase tracking-wider text-foreground">
@@ -1258,52 +1740,110 @@ export default function CreateInvoiceModal({
         </div>
 
         {/* FOOTER ACTIONS */}
-        <div className="flex justify-end gap-2 pt-3 border-t sticky bottom-0 bg-background/95 backdrop-blur-xs z-20 mt-2 pb-1">
-          <Button variant="outline" onClick={onClose} disabled={loading}>
-            Batal
-          </Button>
-          <Button
-            onClick={handleSubmit}
-            disabled={
-              loading ||
-              !groupInfo ||
-              (kategori === "PINDAH_PAKET"
-                ? !targetPaketId ||
-                  targetPaketId === currentPackage?.id ||
-                  (pricingOption === "HARGA_BARU" && totalDiff < 0)
-                : kategori === "TAMBAH_JAMAAH"
-                  ? tambahJamaahList.some((j) => !j.nama.trim())
-                  : nominal <= 0)
-            }
-            className={cn(
-              "font-bold text-white",
-              kategori === "PEMBATALAN"
-                ? "bg-red-600 hover:bg-red-700"
-                : kategori === "REFUND_MURNI"
-                  ? "bg-amber-600 hover:bg-amber-700"
-                  : kategori === "PINDAH_PAKET"
-                    ? "bg-blue-600 hover:bg-blue-700"
-                    : kategori === "TAMBAH_JAMAAH"
-                      ? "bg-purple-600 hover:bg-purple-700"
-                      : "bg-emerald-600 hover:bg-emerald-700"
-            )}
-          >
-            {loading
-              ? "Memproses..."
-              : kategori === "PINDAH_PAKET"
-                ? (pricingOption === "HARGA_BARU" && totalDiff > 0
-                    ? "Pindahkan Paket & Terbitkan Invoice Selisih"
-                    : "Pindahkan Paket")
-                : kategori === "TAMBAH_JAMAAH"
-                  ? `Tambah ${tambahPaxCount} Jamaah ke Grup`
-                  : kategori === "PEMBATALAN"
-                    ? "Terbitkan Credit Note Pembatalan"
-                    : kategori === "REFUND_MURNI"
-                      ? "Terbitkan Bukti Refund"
-                      : "Terbitkan Invoice"}
-          </Button>
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-3 border-t sticky bottom-0 bg-background/95 backdrop-blur-xs z-20 mt-2 pb-1">
+          {kategori === "PEMBAYARAN" && groupInfo && financialSummary ? (
+            <div className="text-xs text-muted-foreground hidden sm:flex items-center gap-3">
+              <span>
+                Sisa Tagihan: <strong className="text-foreground">{formatCurrency(financialSummary.sisaTagihan)}</strong>
+              </span>
+              {nominal > 0 && (
+                <span className="flex items-center gap-1 font-semibold text-emerald-600 dark:text-emerald-400">
+                  &rarr; Sisa Baru: {formatCurrency(Math.max(0, financialSummary.sisaTagihan - nominal))}
+                </span>
+              )}
+            </div>
+          ) : (
+            <div />
+          )}
+
+          <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+            <Button variant="outline" onClick={onClose} disabled={loading}>
+              Batal
+            </Button>
+            <Button
+              onClick={handleSubmit}
+              disabled={
+                loading ||
+                !groupInfo ||
+                (kategori === "PINDAH_PAKET"
+                  ? !targetPaketId ||
+                    targetPaketId === currentPackage?.id ||
+                    (pricingOption === "HARGA_BARU" && totalDiff < 0)
+                  : kategori === "TAMBAH_JAMAAH"
+                    ? tambahJamaahList.some((j) => !j.nama.trim())
+                    : nominal <= 0)
+              }
+              className={cn(
+                "font-bold text-white",
+                kategori === "PEMBATALAN"
+                  ? "bg-red-600 hover:bg-red-700"
+                  : kategori === "REFUND_MURNI"
+                    ? "bg-amber-600 hover:bg-amber-700"
+                    : kategori === "PINDAH_PAKET"
+                      ? "bg-blue-600 hover:bg-blue-700"
+                      : kategori === "TAMBAH_JAMAAH"
+                        ? "bg-purple-600 hover:bg-purple-700"
+                        : "bg-emerald-600 hover:bg-emerald-700"
+              )}
+            >
+              {loading
+                ? "Memproses..."
+                : kategori === "PINDAH_PAKET"
+                  ? (pricingOption === "HARGA_BARU" && totalDiff > 0
+                      ? "Pindahkan Paket & Terbitkan Invoice Selisih"
+                      : "Pindahkan Paket")
+                  : kategori === "TAMBAH_JAMAAH"
+                    ? `Tambah ${tambahPaxCount} Jamaah ke Grup`
+                    : kategori === "PEMBATALAN"
+                      ? "Terbitkan Credit Note Pembatalan"
+                      : kategori === "REFUND_MURNI"
+                        ? "Terbitkan Bukti Refund"
+                        : `Terbitkan Invoice (${formatCurrency(nominal)})`}
+            </Button>
+          </div>
         </div>
       </div>
+
+      {/* LIGHTBOX PREVIEW BUKTI TRANSFER */}
+      {previewBuktiUrl && (
+        <div
+          className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4"
+          onClick={() => setPreviewBuktiUrl(null)}
+        >
+          <div
+            className="relative max-w-2xl w-full bg-background rounded-xl p-4 space-y-3"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between">
+              <h4 className="font-bold text-sm text-foreground">Bukti Transfer Pembayaran</h4>
+              <button
+                type="button"
+                onClick={() => setPreviewBuktiUrl(null)}
+                className="text-muted-foreground hover:text-foreground font-bold text-sm px-2 py-1 cursor-pointer"
+              >
+                ✕ Tutup
+              </button>
+            </div>
+            <div className="max-h-[70vh] overflow-auto flex items-center justify-center bg-black/5 rounded-lg">
+              <img
+                src={previewBuktiUrl}
+                alt="Bukti Transfer"
+                className="max-h-[65vh] object-contain rounded"
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <a
+                href={previewBuktiUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs font-bold text-emerald-600 hover:underline flex items-center gap-1"
+              >
+                Buka Tab Baru ↗
+              </a>
+            </div>
+          </div>
+        </div>
+      )}
     </Modal>
   );
 }
