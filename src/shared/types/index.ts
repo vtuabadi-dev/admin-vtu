@@ -101,10 +101,12 @@ export interface RegistrationGroup {
     id: string;
     kode: string;
     namaPaket: string;
-    hargaPaket: number;
     tanggalBerangkat?: string;
     tanggalPulang?: string;
     maskapai?: string;
+    hotelOptions?: any;
+    upgradeDouble?: number;
+    upgradeTriple?: number;
   };
   paketKeberangkatan?: {
     id: string;
@@ -114,7 +116,11 @@ export interface RegistrationGroup {
     tanggalBerangkat?: string;
     tanggalPulang?: string;
     maskapai?: string;
+    hotelOptions?: any;
+    upgradeDouble?: number;
+    upgradeTriple?: number;
   };
+  registrationRequests?: any[];
 }
 
 // ============================================================
@@ -350,11 +356,19 @@ export interface GroupPaymentSummary {
   anggota: Jamaah[];
   pembayaran: Pembayaran[];
   invoices: Invoice[];
+  hotelUpgrade?: string;
+  roomUpgrade?: string;
+  isKeretaCepat?: boolean;
+  isCityTourThoif?: boolean;
+  registrationRequests?: any[];
   keberangkatan?: {
     id: string;
     namaPaket: string;
     hargaPaket: number;
     tanggalBerangkat?: string;
+    hotelOptions?: any;
+    upgradeDouble?: number;
+    upgradeTriple?: number;
   };
 }
 

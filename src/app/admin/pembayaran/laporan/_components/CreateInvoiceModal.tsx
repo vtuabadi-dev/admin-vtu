@@ -26,6 +26,12 @@ import {
   createInvoice,
   addJamaahToGroup,
 } from "@/server/actions/api";
+import {
+  resolvePackageClusterDetails,
+  getPackageUpgradePrice,
+  detectRoomTypeFromName,
+  isBaseRoomType,
+} from "./shared-constants";
 import { broadcastMutation } from "@/shared/lib/realtime-bus";
 
 export default function CreateInvoiceModal({
@@ -312,15 +318,31 @@ export default function CreateInvoiceModal({
     if (!groupInfo) return null;
 
     const basePax = groupInfo.jumlahAnggota || groupInfo.anggotaIds?.length || 1;
+    const clusterDetails = resolvePackageClusterDetails(groupInfo);
     const basePrice =
-      groupInfo.keberangkatan?.hargaPaket ||
-      groupInfo.paketKeberangkatan?.hargaPaket ||
-      (currentPackage?.hargaPaket ?? 0);
+      clusterDetails.hargaBase > 0
+        ? clusterDetails.hargaBase
+        : (groupInfo.keberangkatan?.hargaPaket ||
+          groupInfo.paketKeberangkatan?.hargaPaket ||
+          (currentPackage?.hargaPaket ?? 0));
+
+    // Room upgrade calculation
+    const roomUpgradeType = groupInfo.roomUpgrade || groupInfo.registrationRequests?.[0]?.roomUpgrade;
+    let roomUpgradeNominal = 0;
+    let roomUpgradeName = "";
+    if (roomUpgradeType && !isBaseRoomType(roomUpgradeType)) {
+      const normRoom = detectRoomTypeFromName(roomUpgradeType);
+      const unitUpgrade = getPackageUpgradePrice(groupInfo, normRoom);
+      if (unitUpgrade > 0) {
+        roomUpgradeName = `Upgrade Kamar ${normRoom}`;
+        roomUpgradeNominal = unitUpgrade;
+      }
+    }
 
     const computedTotalTagihan =
       typeof groupInfo.totalTagihan === "number" && groupInfo.totalTagihan > 0
         ? groupInfo.totalTagihan
-        : basePax * basePrice;
+        : basePax * basePrice + (roomUpgradeNominal * basePax);
 
     const verifiedPayments = (groupInfo.pembayaran || []).filter(
       (p: any) => p.status === "verified"
@@ -348,6 +370,9 @@ export default function CreateInvoiceModal({
     return {
       basePax,
       basePrice,
+      clusterName: clusterDetails.isCustomCluster ? clusterDetails.clusterName : undefined,
+      roomUpgradeName,
+      roomUpgradeNominal,
       totalTagihan: computedTotalTagihan,
       totalTerbayar,
       pendingTotal,
@@ -855,13 +880,25 @@ export default function CreateInvoiceModal({
                   {/* Komponen Tarif */}
                   <div className="p-2.5 bg-background border border-slate-200 dark:border-slate-800 rounded-lg text-xs space-y-1.5">
                     <div className="flex justify-between items-center text-slate-700 dark:text-slate-300">
-                      <span>Tarif Dasar Paket ({financialSummary.basePax} Pax × {formatCurrency(financialSummary.basePrice)}):</span>
+                      <span>
+                        Tarif Dasar Paket{financialSummary.clusterName ? ` (Klaster ${financialSummary.clusterName})` : ""} ({financialSummary.basePax} Pax × {formatCurrency(financialSummary.basePrice)}):
+                      </span>
                       <span className="font-bold text-foreground">{formatCurrency(financialSummary.basePax * financialSummary.basePrice)}</span>
                     </div>
-                    {(groupInfo.hotelUpgrade || groupInfo.roomUpgrade) && (
+                    {financialSummary.roomUpgradeNominal > 0 && (
                       <div className="flex justify-between items-center text-slate-700 dark:text-slate-300 pt-1 border-t border-dashed">
-                        <span>Upgrade Kamar / Hotel:</span>
-                        <span className="font-bold text-foreground">{groupInfo.hotelUpgrade || groupInfo.roomUpgrade}</span>
+                        <span>
+                          {financialSummary.roomUpgradeName} ({financialSummary.basePax} Pax × {formatCurrency(financialSummary.roomUpgradeNominal)}):
+                        </span>
+                        <span className="font-bold text-emerald-600 dark:text-emerald-400">
+                          +{formatCurrency(financialSummary.basePax * financialSummary.roomUpgradeNominal)}
+                        </span>
+                      </div>
+                    )}
+                    {groupInfo.hotelUpgrade && !financialSummary.clusterName && (
+                      <div className="flex justify-between items-center text-slate-700 dark:text-slate-300 pt-1 border-t border-dashed">
+                        <span>Upgrade Hotel:</span>
+                        <span className="font-bold text-foreground">{groupInfo.hotelUpgrade}</span>
                       </div>
                     )}
                   </div>

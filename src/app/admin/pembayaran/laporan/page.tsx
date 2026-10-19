@@ -51,6 +51,8 @@ import {
   isRoomUpgradeItem,
   detectRoomTypeFromName,
   getPackageUpgradePrice,
+  resolvePackageClusterDetails,
+  isBaseRoomType,
   getInitialTambahanOptions,
   getInitialPotonganOptions,
 } from "./_components/shared-constants";
@@ -336,9 +338,15 @@ const SplitInvoiceModal = dynamic(
   }, [adjustedBillingItems]);
 
   const calculatedTotalTagihan = useMemo(() => {
+    const totalUtama = adjustedBillingItems
+      .filter((i) => i.kategori === "utama")
+      .reduce((sum, i) => sum + i.nominal * i.qty, 0);
+    if (totalUtama > 0) {
+      return totalUtama + totalTambahan - totalPotongan;
+    }
     const base = groupData?.totalTagihan || 0;
     return base + totalTambahan - totalPotongan;
-  }, [groupData?.totalTagihan, totalTambahan, totalPotongan]);
+  }, [adjustedBillingItems, groupData?.totalTagihan, totalTambahan, totalPotongan]);
 
   const calculatedSisaPembayaran = useMemo(() => {
     const dibayar = groupData?.totalPembayaran || 0;
@@ -450,22 +458,60 @@ const SplitInvoiceModal = dynamic(
         return;
       }
 
+      const clusterDetails = resolvePackageClusterDetails(summary);
       const pkgName = summary.keberangkatan?.namaPaket || (summary as any).namaPaket || (summary as any).paketUmroh?.namaPaket;
-      const billingItemName = pkgName
-        ? `${pkgName} (${summary.jumlahAnggota} Pax)`
-        : `Tagihan Paket (${summary.jumlahAnggota} Pax)`;
+      const clusterSuffix = clusterDetails.isCustomCluster && clusterDetails.clusterName && clusterDetails.clusterName !== "Reguler"
+        ? ` - Klaster ${clusterDetails.clusterName}`
+        : "";
 
-      setGroupData(summary);
-      setBillingItems([
+      const memberNames = (summary.anggota || []).map((a: any) => a.namaLengkap).filter(Boolean);
+      const roomUpgradeType = summary.roomUpgrade || summary.registrationRequests?.[0]?.roomUpgrade;
+      const hasRoomUpgrade = Boolean(roomUpgradeType && !isBaseRoomType(roomUpgradeType));
+      const normRoom = hasRoomUpgrade ? detectRoomTypeFromName(roomUpgradeType) : "";
+      const upgradePrice = hasRoomUpgrade ? getPackageUpgradePrice(summary, normRoom) : 0;
+
+      // Harga paket utama dasar klaster per pax
+      let basePaxPrice = clusterDetails.hargaBase > 0
+        ? clusterDetails.hargaBase
+        : (summary.keberangkatan?.hargaPaket || Math.round(summary.totalTagihan / Math.max(1, summary.jumlahAnggota)));
+
+      if (upgradePrice > 0 && clusterDetails.hargaBase <= 0 && summary.totalTagihan > 0) {
+        const candidateBase = Math.round(summary.totalTagihan / Math.max(1, summary.jumlahAnggota)) - upgradePrice;
+        if (candidateBase > 0) {
+          basePaxPrice = candidateBase;
+        }
+      }
+
+      const billingItemName = pkgName
+        ? `${pkgName}${clusterSuffix} (${summary.jumlahAnggota} Pax)`
+        : `Tagihan Paket${clusterSuffix} (${summary.jumlahAnggota} Pax)`;
+
+      const initialItems: BillingItem[] = [
         {
           id: "base-package",
           nama: billingItemName,
           kategori: "utama",
-          nominal: summary.totalTagihan / Math.max(1, summary.jumlahAnggota),
+          nominal: basePaxPrice,
           qty: summary.jumlahAnggota,
           isDefault: true,
         },
-      ]);
+      ];
+
+      // Item upgrade kamar independen (kategori: tambahan)
+      if (upgradePrice > 0) {
+        initialItems.push({
+          id: `room-upgrade-${normRoom.toLowerCase()}`,
+          nama: `Upgrade Kamar ${normRoom} (${summary.jumlahAnggota} Pax)`,
+          kategori: "tambahan",
+          nominal: upgradePrice,
+          qty: summary.jumlahAnggota,
+          allocatedJamaah: memberNames.length > 0 ? memberNames : undefined,
+          isDefault: false,
+        });
+      }
+
+      setGroupData(summary);
+      setBillingItems(initialItems);
       if (split) {
         setSplitConfig(split);
         setActiveSplitId(split.splits[0]?.id ?? null);

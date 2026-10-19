@@ -34,6 +34,7 @@ function mapGroup(row: any): RegistrationGroup {
     } : undefined,
     kontakNama: row.ketuaGroup?.namaLengkap || req?.namaPerwakilan || row.kontakNama,
     kontakHp: row.ketuaGroup?.nomorTelepon || row.ketuaGroup?.telepon || req?.nomorTelepon || row.kontakHp,
+    registrationRequests: row.registrationRequests || [],
     invoices: (row.invoices ?? []).map(mapInvoice),
     pembayaran: (row.pembayaran ?? []).map(mapPembayaran),
     createdAt: row.createdAt.toISOString(),
@@ -46,6 +47,9 @@ function mapGroup(row: any): RegistrationGroup {
       tanggalBerangkat: row.keberangkatan.tanggalBerangkat?.toISOString(),
       tanggalPulang: row.keberangkatan.tanggalPulang?.toISOString(),
       maskapai: row.keberangkatan.maskapai,
+      hotelOptions: row.keberangkatan.hotelOptions,
+      upgradeDouble: row.keberangkatan.upgradeDouble,
+      upgradeTriple: row.keberangkatan.upgradeTriple,
     } : undefined,
     paketKeberangkatan: row.keberangkatan ? {
       id: row.keberangkatan.id,
@@ -55,6 +59,9 @@ function mapGroup(row: any): RegistrationGroup {
       tanggalBerangkat: row.keberangkatan.tanggalBerangkat?.toISOString(),
       tanggalPulang: row.keberangkatan.tanggalPulang?.toISOString(),
       maskapai: row.keberangkatan.maskapai,
+      hotelOptions: row.keberangkatan.hotelOptions,
+      upgradeDouble: row.keberangkatan.upgradeDouble,
+      upgradeTriple: row.keberangkatan.upgradeTriple,
     } : undefined,
   };
 }
@@ -315,6 +322,15 @@ export const groupRepo = {
         pembayaran: { include: { alokasi: true } },
         invoices: { include: { items: true } },
         keberangkatan: true,
+        registrationRequests: {
+          select: {
+            id: true,
+            kodeRegistrasi: true,
+            hotelUpgrade: true,
+            roomUpgrade: true,
+            paxCount: true,
+          },
+        },
       },
     });
 
@@ -349,6 +365,16 @@ export const groupRepo = {
               },
               pembayaran: { include: { alokasi: true } },
               invoices: { include: { items: true } },
+              keberangkatan: true,
+              registrationRequests: {
+                select: {
+                  id: true,
+                  kodeRegistrasi: true,
+                  hotelUpgrade: true,
+                  roomUpgrade: true,
+                  paxCount: true,
+                },
+              },
             },
           },
           members: true,
@@ -369,6 +395,9 @@ export const groupRepo = {
           sisaPembayaran: totalHarga,
           status: "dp",
           jumlahAnggota: req.paxCount,
+          hotelUpgrade: req.hotelUpgrade || undefined,
+          roomUpgrade: req.roomUpgrade || undefined,
+          registrationRequests: [req],
           anggota: req.members.map((m: any) => ({
             id: m.id,
             registrationId: req.id,
@@ -399,11 +428,23 @@ export const groupRepo = {
           })),
           pembayaran: [],
           invoices: [],
+          keberangkatan: req.keberangkatan
+            ? {
+                id: req.keberangkatan.id,
+                namaPaket: req.keberangkatan.namaPaket,
+                hargaPaket: req.keberangkatan.hargaPaket,
+                hotelOptions: req.keberangkatan.hotelOptions,
+                upgradeDouble: req.keberangkatan.upgradeDouble,
+                upgradeTriple: req.keberangkatan.upgradeTriple,
+              }
+            : undefined,
         };
       }
     }
 
     if (!row) return null;
+
+    const reqData = row.registrationRequests?.[0];
 
     return {
       groupId: row.id,
@@ -414,6 +455,11 @@ export const groupRepo = {
       sisaPembayaran: row.sisaPembayaran,
       status: paymentStatus(row.totalPembayaran, row.totalTagihan),
       jumlahAnggota: row.jumlahAnggota,
+      hotelUpgrade: reqData?.hotelUpgrade || row.hotelUpgrade || undefined,
+      roomUpgrade: reqData?.roomUpgrade || row.roomUpgrade || undefined,
+      isKeretaCepat: row.isKeretaCepat ?? undefined,
+      isCityTourThoif: row.isCityTourThoif ?? undefined,
+      registrationRequests: row.registrationRequests || [],
       anggota: row.anggota.map((a: any) => ({
         id: a.id,
         registrationId: a.registrationId,
@@ -452,6 +498,9 @@ export const groupRepo = {
             tanggalBerangkat: row.keberangkatan.tanggalBerangkat
               ? row.keberangkatan.tanggalBerangkat.toISOString()
               : undefined,
+            hotelOptions: row.keberangkatan.hotelOptions,
+            upgradeDouble: row.keberangkatan.upgradeDouble,
+            upgradeTriple: row.keberangkatan.upgradeTriple,
           }
         : undefined,
     };
@@ -463,6 +512,14 @@ export const groupRepo = {
         anggota: { include: { dokumen: true } },
         pembayaran: { include: { alokasi: true } },
         invoices: { include: { items: true } },
+        keberangkatan: true,
+        registrationRequests: {
+          select: {
+            id: true,
+            hotelUpgrade: true,
+            roomUpgrade: true,
+          },
+        },
       },
       orderBy: { createdAt: "desc" },
     });
@@ -475,6 +532,22 @@ export const groupRepo = {
       sisaPembayaran: row.sisaPembayaran,
       status: paymentStatus(row.totalPembayaran, row.totalTagihan),
       jumlahAnggota: row.jumlahAnggota,
+      hotelUpgrade: row.registrationRequests?.[0]?.hotelUpgrade || row.hotelUpgrade || undefined,
+      roomUpgrade: row.registrationRequests?.[0]?.roomUpgrade || row.roomUpgrade || undefined,
+      registrationRequests: row.registrationRequests || [],
+      keberangkatan: row.keberangkatan
+        ? {
+            id: row.keberangkatan.id,
+            namaPaket: row.keberangkatan.namaPaket,
+            hargaPaket: row.keberangkatan.hargaPaket,
+            tanggalBerangkat: row.keberangkatan.tanggalBerangkat
+              ? row.keberangkatan.tanggalBerangkat.toISOString()
+              : undefined,
+            hotelOptions: row.keberangkatan.hotelOptions,
+            upgradeDouble: row.keberangkatan.upgradeDouble,
+            upgradeTriple: row.keberangkatan.upgradeTriple,
+          }
+        : undefined,
       anggota: row.anggota.map((a: any) => ({
         id: a.id,
         registrationId: a.registrationId,
