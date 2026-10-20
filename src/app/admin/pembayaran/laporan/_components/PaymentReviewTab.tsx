@@ -2743,7 +2743,7 @@ function PaymentReviewTabContent() {
         open={showAddOrderModal}
         onClose={() => setShowAddOrderModal(false)}
         title="Tambah Item Tagihan / Potongan"
-        size="sm"
+        size="default"
       >
         <div className="space-y-4 pt-1">
           {/* 1. Kategori Switcher */}

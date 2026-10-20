@@ -1213,6 +1213,10 @@ const SplitInvoiceModal = dynamic(
           setSuccessData({ invoiceNumber: invNumber, amount });
           setShowSuccess(true);
         }}
+        masterTambahanOptions={masterTambahanOptions}
+        masterPotonganOptions={masterPotonganOptions}
+        onUpdateTambahanOptions={saveTambahanOptions}
+        onUpdatePotonganOptions={savePotonganOptions}
       />
 
       {/* Split Invoice Modal */}
@@ -1230,7 +1234,7 @@ const SplitInvoiceModal = dynamic(
         open={showAddItemModal}
         onClose={() => setShowAddItemModal(false)}
         title="Tambah Item Tagihan / Potongan"
-        size="sm"
+        size="default"
       >
         <div className="space-y-4 pt-1">
           {/* 1. Kategori Switcher */}

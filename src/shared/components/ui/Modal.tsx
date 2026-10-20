@@ -9,6 +9,7 @@ const modalSizeVariants = cva("", {
   variants: {
     size: {
       sm: "max-w-sm",
+      md: "max-w-md",
       default: "max-w-lg",
       lg: "max-w-2xl",
       xl: "max-w-4xl",
@@ -30,7 +31,7 @@ export interface ModalProps extends VariantProps<typeof modalSizeVariants> {
   description?: string;
   children: React.ReactNode;
   className?: string;
-  size?: "sm" | "default" | "lg" | "xl" | "2xl" | "3xl" | "full";
+  size?: "sm" | "md" | "default" | "lg" | "xl" | "2xl" | "3xl" | "full";
 }
 
 export function Modal({
