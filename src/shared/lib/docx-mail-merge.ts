@@ -27,7 +27,7 @@ export function buildExpandedFieldMap(fieldValues: Record<string, string>): Reco
 
   for (const [key, val] of Object.entries(fieldValues)) {
     if (val === undefined || val === null) continue;
-    const strVal = String(val);
+    const strVal = String(val).trim() === "" ? "-" : String(val);
 
     // Quote variations
     const curlyKey = key.replace(/'/g, "’");

@@ -470,7 +470,7 @@ Bulan: {{Bulan Awal}}`,
       const template = DEFAULT_SURAT_TEMPLATES[0]!;
       const resolved = resolveAutocratFieldValues(template, null, null, {});
       expect(resolved).toBeDefined();
-      expect(resolved.nama_lengkap || "").toBe("");
+      expect(resolved.nama_lengkap).toBe("-");
     });
 
     it("should correctly convert between ISO dates and Indonesian letter date format", () => {
@@ -669,6 +669,60 @@ Terima kasih atas kerja samanya. 🙏
       expect(parseRes.parsedMap.tanggal_berangkat).toBe("15 November 2026");
       expect(parseRes.parsedMap.tanggal_pulang).toBe("25 November 2026");
       expect(parseRes.parsedMap.lama_cuti_hari).toBe("11");
+    });
+
+    it("should output '-' for any unfilled/empty form field as indicator of empty (pertanda kosong)", () => {
+      const cutiTemplate = DEFAULT_SURAT_TEMPLATES.find((t) => t.slug === "cuti-pekerja")!;
+      // Simulate form where Ditujukan Kepada, Nama, NIK, and Tanggal Cuti are filled, but Jabatan is left empty
+      const manualData = {
+        "Ditujukan Kepada": "Kepala Kantor",
+        "Nama yang cuti": "Rina Gustina",
+        "No Identitas NIP/NIK/NRP": "3172026905811001",
+        "Jabatan": "", // Empty input field
+        "Tanggal Cuti": "25 Januari s.d 5 Februari 2027",
+      };
+
+      const extraPlaceholders = [
+        { key: "Ditujukan Kepada", label: "Ditujukan Kepada", sourceType: "manual" as const, inputType: "text" as const },
+        { key: "Nama yang cuti", label: "Nama yang cuti", sourceType: "manual" as const, inputType: "text" as const },
+        { key: "No Identitas NIP/NIK/NRP", label: "No Identitas NIP/NIK/NRP", sourceType: "manual" as const, inputType: "text" as const },
+        { key: "Jabatan", label: "Jabatan", sourceType: "manual" as const, inputType: "text" as const },
+        { key: "Tanggal Cuti", label: "Tanggal Cuti", sourceType: "manual" as const, inputType: "text" as const },
+      ];
+
+      const resolved = resolveAutocratFieldValues(cutiTemplate, null, null, manualData, {}, extraPlaceholders);
+
+      expect(resolved["Ditujukan Kepada"]).toBe("Kepala Kantor");
+      expect(resolved["Nama yang cuti"]).toBe("Rina Gustina");
+      expect(resolved["No Identitas NIP/NIK/NRP"]).toBe("3172026905811001");
+      expect(resolved["Jabatan"]).toBe("-"); // Must be '-' pertanda kosong!
+      expect(resolved["Tanggal Cuti"]).toBe("25 Januari s.d 5 Februari 2027");
+
+      // Verify template rendering
+      const templateContent = `
+Ditujukan Kepada: <<Ditujukan Kepada>>
+Nama: <<Nama yang cuti>>
+Jabatan: <<Jabatan>>
+Tanggal Cuti: <<Tanggal Cuti>>
+      `.trim();
+
+      const merged = renderAutocratMergedText(templateContent, resolved);
+      expect(merged).toContain("Ditujukan Kepada: Kepala Kantor");
+      expect(merged).toContain("Nama: Rina Gustina");
+      expect(merged).toContain("Jabatan: -");
+      expect(merged).toContain("Tanggal Cuti: 25 Januari s.d 5 Februari 2027");
+    });
+
+    it("should replace any unpopulated Autocrat tags in text with '-' pertanda kosong", () => {
+      const templateContent = "Nama: {nama}\nJabatan: {jabatan}\nCatatan: <<catatan_tambahan>>";
+      const resolved = {
+        nama: "Muchamad Zamroni",
+        jabatan: "", // explicitly empty
+        // catatan_tambahan is not in resolved at all
+      };
+
+      const merged = renderAutocratMergedText(templateContent, resolved);
+      expect(merged).toBe("Nama: Muchamad Zamroni\nJabatan: -\nCatatan: -");
     });
   });
 });

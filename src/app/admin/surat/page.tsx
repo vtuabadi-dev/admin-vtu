@@ -1676,9 +1676,10 @@ function GenerateSuratPageContent() {
         nomorSurat2: computedNomorSurat2,
         tanggalSurat: todayInfo.masehi,
         tanggalHijriyah: todayInfo.hijriyah,
-      }
+      },
+      effectivePlaceholders
     );
-  }, [activeTemplate, activeJamaah, activeKeberangkatan, manualFormData, computedNomorSurat, computedNomorSurat2, todayInfo]);
+  }, [activeTemplate, activeJamaah, activeKeberangkatan, manualFormData, computedNomorSurat, computedNomorSurat2, todayInfo, effectivePlaceholders]);
 
   // Rendered Body Text with clean formatting and Word artifact removal
   const renderedLetterBody = useMemo(() => {

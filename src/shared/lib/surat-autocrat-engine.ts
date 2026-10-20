@@ -922,7 +922,8 @@ export function resolveAutocratFieldValues(
     nomorSurat2?: string;
     tanggalSurat?: string;
     tanggalHijriyah?: string;
-  } = {}
+  } = {},
+  extraPlaceholders?: SuratPlaceholderMapping[]
 ): Record<string, string> {
   const today = getTodayDateInfo();
   const values: Record<string, string> = {};
@@ -937,6 +938,8 @@ export function resolveAutocratFieldValues(
     ...(template.attachedFiles?.map((f) => f.formatNamaFile || "") || []),
     template.formatNamaFile || "",
     ...template.placeholders.map((p) => `{${p.key}}`),
+    ...(extraPlaceholders || []).map((p) => `{${p.key}}`),
+    ...Object.keys(manualFormData).map((k) => `{${k}}`),
   ].join("\n");
 
   const detectedKeys = extractPlaceholdersFromText(textSources);
@@ -977,6 +980,11 @@ export function resolveAutocratFieldValues(
     jamaah?.dokumen?.find?.((d: any) => d.jenis === "kk" || d.jenis === "buku_nikah")?.manualData?.namaAyah ||
     jamaah?.dokumen?.find?.((d: any) => d.jenis === "kk" || d.jenis === "buku_nikah")?.ocrData?.namaAyah ||
     "";
+
+  const allDefs = [
+    ...(template.placeholders || []),
+    ...(extraPlaceholders || []),
+  ];
 
   detectedKeys.forEach((key) => {
     const cleanK = normalizeKey(key);
@@ -1040,7 +1048,8 @@ export function resolveAutocratFieldValues(
       if (isEndorsement && isNamaJamaahKey && namaAyahCandidate) {
         values[key] = formatJamaahNameWithEndorsement(directManualVal, namaAyahCandidate, true);
       } else {
-        values[key] = directManualVal;
+        const trimmed = typeof directManualVal === "string" ? directManualVal.trim() : directManualVal;
+        values[key] = (trimmed === "" || trimmed === undefined || trimmed === null) ? "-" : String(directManualVal);
       }
       return;
     }
@@ -1063,8 +1072,8 @@ export function resolveAutocratFieldValues(
       return;
     }
 
-    // 2. Check if mapping exists in template.placeholders
-    const mapping = template.placeholders.find(
+    // 2. Check if mapping exists in allDefs
+    const mapping = allDefs.find(
       (p) => normalizeKey(p.key) === cleanK
     );
 
@@ -1107,13 +1116,14 @@ export function resolveAutocratFieldValues(
             effectiveField = "jamaah.alamat";
           }
 
-          values[key] = resolveManifestFieldValue(effectiveField, jamaah, keberangkatan, today, {
+          const manifestVal = resolveManifestFieldValue(effectiveField, jamaah, keberangkatan, today, {
             isEndorsement,
             namaAyah: namaAyahCandidate,
           });
+          values[key] = (!manifestVal || manifestVal.trim() === "") ? "-" : manifestVal;
         }
       } else {
-        // Manual form data priority -> auto-lookup kota if empty -> defaultValue -> empty string
+        // Manual form data priority -> auto-lookup kota if empty -> defaultValue -> dash '-'
         let val = getManualOverride(key);
         const cleanKey = key.toLowerCase().replace(/[\s_\-\.]/g, "");
         if (
@@ -1138,31 +1148,49 @@ export function resolveAutocratFieldValues(
           }
         }
 
-        values[key] = val !== undefined ? String(val) : (mapping.defaultValue ?? "");
+        const rawVal = val !== undefined ? String(val) : (mapping.defaultValue ?? "");
+        const trimmed = rawVal ? rawVal.trim() : "";
+        values[key] = trimmed === "" ? "-" : rawVal;
       }
     } else {
       // Smart Auto-detection based on key name if not explicitly configured in mapping
-      values[key] = autoDetectManifestValue(key, jamaah, keberangkatan, today, manualFormData, {
+      const detectedVal = autoDetectManifestValue(key, jamaah, keberangkatan, today, manualFormData, {
         isEndorsement,
         namaAyah: namaAyahCandidate,
       });
+      const trimmed = detectedVal ? detectedVal.trim() : "";
+      values[key] = trimmed === "" ? "-" : detectedVal;
     }
   });
 
-  // Cross-populate all aliases for template placeholders so keys like 'alamat', 'Alamat', 'Alamat Lengkap' match seamlessly
-  template.placeholders.forEach((p) => {
-    if (values[p.key] === undefined) {
+  // Cross-populate all aliases for template and extra placeholders so keys match seamlessly
+  allDefs.forEach((p) => {
+    if (values[p.key] === undefined || values[p.key] === "" || values[p.key] === "-") {
       const normPKey = normalizeKey(p.key);
       const normLabel = normalizeKey(p.label || "");
       for (const [vk, vv] of Object.entries(values)) {
         const normVk = normalizeKey(vk);
-        if (normVk === normPKey || normVk === normLabel) {
+        if ((normVk === normPKey || normVk === normLabel) && vv && vv.trim() !== "" && vv.trim() !== "-") {
           values[p.key] = vv;
           break;
         }
       }
     }
   });
+
+  // Ensure all configured placeholder keys exist in values, defaulting to "-" if not set or empty
+  allDefs.forEach((p) => {
+    if (values[p.key] === undefined || values[p.key] === null || String(values[p.key]).trim() === "") {
+      values[p.key] = "-";
+    }
+  });
+
+  // Final sweep: Any key in values that is empty string or only whitespace becomes "-" pertanda kosong
+  for (const k of Object.keys(values)) {
+    if (values[k] === undefined || values[k] === null || String(values[k]).trim() === "") {
+      values[k] = "-";
+    }
+  }
 
   return values;
 }
@@ -1316,7 +1344,7 @@ export function generateSuratFileName(
     if (!mergedData["Nama Lengkap"]) mergedData["Nama Lengkap"] = rawName;
     if (!mergedData["Nama Jamaah"]) mergedData["Nama Jamaah"] = rawName;
 
-    let mergedName = renderAutocratMergedText(targetFormat, mergedData);
+    let mergedName = renderAutocratMergedText(targetFormat, mergedData, { preserveUnmatched: true });
     // Strip any unresolved bracketed placeholders (e.g. {{tag}} or {tag})
     mergedName = mergedName.replace(/(?:\{+|<<|«|\[\[)[^}\]>»]+(?:\}+|>>|»|\]\])/g, "");
     let sanitized = mergedName.replace(/[/\\?%*:|"<>]/g, "").replace(/\s+/g, "_").replace(/^_+|_+$/g, "");
@@ -2014,17 +2042,33 @@ function escapeRegExp(string: string) {
   return string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-export function renderAutocratMergedText(templateText: string, resolvedValues: Record<string, string>): string {
+export function renderAutocratMergedText(
+  templateText: string,
+  resolvedValues: Record<string, string>,
+  options?: { preserveUnmatched?: boolean }
+): string {
   if (!templateText) return "";
 
   let result = templateText;
   Object.keys(resolvedValues).forEach((key) => {
-    const val = resolvedValues[key] !== undefined ? String(resolvedValues[key]) : "";
+    const rawVal = resolvedValues[key];
+    const val = (rawVal === undefined || rawVal === null || String(rawVal).trim() === "") ? "-" : String(rawVal);
     const escapedKey = escapeRegExp(key).replace(/['\u2019\u2018]/g, "['\\u2019\\u2018]");
     // Replace {key}, {{key}}, <<key>>, «key», [[key]] (case-insensitive with optional surrounding spaces)
     const pattern = new RegExp(`(?:\\{+|<<|«|\\[\\[)\\s*${escapedKey}\\s*(?:\\}+|>>|»|\\]\\])`, "gi");
     result = result.replace(pattern, val);
   });
+
+  if (!options?.preserveUnmatched) {
+    // Replace any remaining unpopulated Autocrat tags with "-" (pertanda kosong)
+    const remainingTags = extractPlaceholdersFromText(result);
+    for (const tag of remainingTags) {
+      if (isSystemAutoPlaceholder(tag)) continue;
+      const escapedTag = escapeRegExp(tag).replace(/['\u2019\u2018]/g, "['\\u2019\\u2018]");
+      const pattern = new RegExp(`(?:\\{+|<<|«|\\[\\[)\\s*${escapedTag}\\s*(?:\\}+|>>|»|\\]\\])`, "gi");
+      result = result.replace(pattern, "-");
+    }
+  }
 
   return result;
 }
