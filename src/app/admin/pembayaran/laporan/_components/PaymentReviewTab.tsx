@@ -124,7 +124,7 @@ function PaymentReviewTabContent() {
   const [selectedPayment, setSelectedPayment] = useState<any | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [jenisFilter, setJenisFilter] = useState<string>("all");
-  const [datePreset, setDatePreset] = useState<string>("all");
+  const [datePreset, setDatePreset] = useState<string>("today");
   const [startDate, setStartDate] = useState<string>("");
   const [endDate, setEndDate] = useState<string>("");
   const [searchQuery, setSearchQuery] = useState<string>("");
@@ -1134,20 +1134,26 @@ function PaymentReviewTabContent() {
       if (rawDate) {
         const itemDate = new Date(rawDate);
         if (!isNaN(itemDate.getTime())) {
-          const itemYMD = itemDate.toISOString().slice(0, 10);
+          const toLocalYMD = (d: Date) => {
+            const year = d.getFullYear();
+            const month = String(d.getMonth() + 1).padStart(2, "0");
+            const day = String(d.getDate()).padStart(2, "0");
+            return `${year}-${month}-${day}`;
+          };
+          const itemYMD = toLocalYMD(itemDate);
           const now = new Date();
-          const todayYMD = now.toISOString().slice(0, 10);
+          const todayYMD = toLocalYMD(now);
 
           if (datePreset === "today") {
             if (itemYMD !== todayYMD) return false;
           } else if (datePreset === "yesterday") {
             const yest = new Date(now);
             yest.setDate(yest.getDate() - 1);
-            if (itemYMD !== yest.toISOString().slice(0, 10)) return false;
+            if (itemYMD !== toLocalYMD(yest)) return false;
           } else if (datePreset === "this_week") {
             const sevenDaysAgo = new Date(now);
             sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-            const sevenDaysYMD = sevenDaysAgo.toISOString().slice(0, 10);
+            const sevenDaysYMD = toLocalYMD(sevenDaysAgo);
             if (itemYMD < sevenDaysYMD) return false;
           } else if (datePreset === "this_month") {
             const itemMonth = itemYMD.slice(0, 7);
@@ -1246,10 +1252,10 @@ function PaymentReviewTabContent() {
               <select
                 value={datePreset}
                 onChange={(e) => setDatePreset(e.target.value)}
-                className="pl-8 pr-2.5 py-1.5 bg-background border rounded-lg text-xs font-medium focus:outline-none focus:ring-1 focus:ring-primary"
+                className="pl-8 pr-2.5 py-1.5 bg-background border rounded-lg text-xs font-medium focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer"
               >
-                <option value="all">Semua Tanggal</option>
                 <option value="today">Hari Ini</option>
+                <option value="all">Semua Tanggal</option>
                 <option value="yesterday">Kemarin</option>
                 <option value="this_week">7 Hari Terakhir</option>
                 <option value="this_month">Bulan Ini</option>
@@ -1330,11 +1336,11 @@ function PaymentReviewTabContent() {
           </div>
 
           {/* Quick Reset All Filters Button */}
-          {(datePreset !== "all" || statusFilter !== "all" || jenisFilter !== "all" || searchQuery) && (
+          {(datePreset !== "today" || statusFilter !== "all" || jenisFilter !== "all" || searchQuery) && (
             <button
               type="button"
               onClick={() => {
-                setDatePreset("all");
+                setDatePreset("today");
                 setStartDate("");
                 setEndDate("");
                 setStatusFilter("all");
