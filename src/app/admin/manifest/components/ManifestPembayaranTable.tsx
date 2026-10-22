@@ -1162,7 +1162,7 @@ PT VAUZA TAMMA ABADI`;
 
                   // Bright, high-contrast separator line between different registration groups
                   const rowBorderClass = isLastInGroup
-                    ? "border-b-[2.5px] border-b-amber-500 dark:border-b-amber-400 shadow-[0_1px_0_rgba(245,158,11,0.25)]"
+                    ? "border-b-[2.5px] border-b-amber-500 dark:border-b-amber-400"
                     : "border-b border-b-stone-200 dark:border-b-stone-800";
 
                   return (
@@ -1173,7 +1173,7 @@ PT VAUZA TAMMA ABADI`;
                       </td>
 
                       {/* Sticky Left: Nama Jamaah / PIC (100% Solid Opaque, locked offset at left-[48px]) */}
-                      <td className={cn("px-3 py-2.5 sticky left-[48px] z-20 shadow-[inset_-2.5px_0_0_0_#292524,4px_0_8px_-2px_rgba(0,0,0,0.12)] dark:shadow-[inset_-2.5px_0_0_0_#78716c,4px_0_8px_-2px_rgba(0,0,0,0.25)] min-w-[220px] max-w-[280px]", stickyCellBg, rowBorderClass)}>
+                      <td className={cn("px-3 py-2.5 sticky left-[48px] z-20 min-w-[220px] max-w-[280px]", stickyCellBg, rowBorderClass, "shadow-[inset_-2.5px_0_0_0_#292524,4px_0_8px_-2px_rgba(0,0,0,0.12)] dark:shadow-[inset_-2.5px_0_0_0_#78716c,4px_0_8px_-2px_rgba(0,0,0,0.25)]")}>
                         {viewMode === "group" ? (
                           <div>
                             <div className="flex items-center gap-1.5 flex-wrap">
@@ -1400,7 +1400,7 @@ PT VAUZA TAMMA ABADI`;
                       </td>
 
                       {/* Sticky Right: Aksi (100% Solid Opaque, locked width, clean border) */}
-                      <td className={cn("px-2 py-2.5 text-center sticky right-0 z-20 shadow-[-4px_0_8px_-2px_rgba(0,0,0,0.08)] border-l-2 border-l-stone-400 dark:border-l-stone-600 w-[80px] min-w-[80px] max-w-[80px]", stickyCellBg, rowBorderClass)}>
+                      <td className={cn("px-2 py-2.5 text-center sticky right-0 z-20 border-l-2 border-l-stone-400 dark:border-l-stone-600 w-[80px] min-w-[80px] max-w-[80px]", stickyCellBg, rowBorderClass, "shadow-[-4px_0_8px_-2px_rgba(0,0,0,0.08)]")}>
                         <div className="flex items-center justify-center gap-1.5">
                           <button
                             type="button"
