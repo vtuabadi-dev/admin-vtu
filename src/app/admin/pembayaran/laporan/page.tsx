@@ -583,8 +583,12 @@ const SplitInvoiceModal = dynamic(
     setAlokasi(newAlokasi);
   }
 
+  // Split invoice detection (Alokasi per jamaah hanya diperlukan jika ada pecah kwitansi/invoice)
+  const hasSplitInvoice = Boolean(splitConfig && splitConfig.splits && splitConfig.splits.length > 0);
+  const isAlokasiRequired = hasSplitInvoice;
+
   const totalAlokasi = Object.values(alokasi).reduce((sum, v) => sum + v, 0);
-  const alokasiValid = nominal > 0 && totalAlokasi === nominal;
+  const alokasiValid = isAlokasiRequired ? (nominal > 0 && totalAlokasi === nominal) : nominal > 0;
 
   async function handleSubmit() {
     if (!groupData || nominal <= 0 || !alokasiValid) return;
@@ -600,11 +604,13 @@ const SplitInvoiceModal = dynamic(
         tanggal: new Date().toISOString().split("T")[0]!,
         buktiUrl: waTransferPreview || undefined,
         catatan: catatan || undefined,
-        alokasi: Object.entries(alokasi).map(([jamaahId, jumlah]) => ({
-          jamaahId,
-          namaJamaah: groupData.anggota.find((a) => a.id === jamaahId)?.namaLengkap ?? jamaahId,
-          jumlah,
-        })),
+        alokasi: isAlokasiRequired
+          ? Object.entries(alokasi).map(([jamaahId, jumlah]) => ({
+              jamaahId,
+              namaJamaah: groupData.anggota.find((a) => a.id === jamaahId)?.namaLengkap ?? jamaahId,
+              jumlah,
+            }))
+          : [],
       };
 
       await addPembayaran(newPayment);
@@ -1145,7 +1151,7 @@ const SplitInvoiceModal = dynamic(
                       />
                     </div>
 
-                    {activeAnggota.length > 0 && (
+                    {hasSplitInvoice && activeAnggota.length > 0 && (
                       <div>
                         <div className="flex items-center justify-between mb-2">
                           <label className="text-sm font-medium">Alokasi Pembayaran</label>

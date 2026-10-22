@@ -341,26 +341,32 @@ export function ManifestPembayaranTable({
         totalGroupVerifiedCash = Number(g.totalPembayaran);
       }
 
-      // Check explicit direct allocations if defined
+      // A group has split invoice if it has multiple active invoices or explicit split config
+      const isSplitInvoiceGroup = activeInvoices.length > 1 || Boolean((g as any)?.splitConfig || (g as any)?.isSplit);
+
+      // Check explicit direct allocations if defined (only relevant for split invoices)
       let unallocatedPool = totalGroupVerifiedCash;
       const directAllocMap = new Map<string, number>();
 
-      verifiedPayments.forEach((p) => {
-        (p.alokasi || []).forEach((a) => {
-          if (a.jamaahId && a.jumlah) {
-            const current = directAllocMap.get(a.jamaahId) || 0;
-            const amt = Number(a.jumlah);
-            directAllocMap.set(a.jamaahId, current + amt);
-            unallocatedPool -= amt;
-          }
+      if (isSplitInvoiceGroup) {
+        verifiedPayments.forEach((p) => {
+          (p.alokasi || []).forEach((a) => {
+            if (a.jamaahId && a.jumlah) {
+              const current = directAllocMap.get(a.jamaahId) || 0;
+              const amt = Number(a.jumlah);
+              directAllocMap.set(a.jamaahId, current + amt);
+              unallocatedPool -= amt;
+            }
+          });
         });
-      });
-      unallocatedPool = Math.max(0, unallocatedPool);
+        unallocatedPool = Math.max(0, unallocatedPool);
+      }
 
       // Allocate pool sequentially to members in order of sequence (-1, -2, -3)
+      // For unified invoices without split, funds fulfill member 1 first until lunas before shifting to the next
       const groupRows: JamaahFinancialRow[] = [];
       memberDrafts.forEach((draft) => {
-        const directAlloc = directAllocMap.get(draft.jamaah.id) || 0;
+        const directAlloc = isSplitInvoiceGroup ? (directAllocMap.get(draft.jamaah.id) || 0) : 0;
         const remainingNeeded = Math.max(0, draft.netTagihan - directAlloc);
         const allocatedFromPool = Math.min(unallocatedPool, remainingNeeded);
         unallocatedPool -= allocatedFromPool;
