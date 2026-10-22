@@ -20,6 +20,9 @@ import {
   UploadCloud,
   Sparkles,
   Loader2,
+  Send,
+  ImagePlus,
+  AlertTriangle,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/components/ui/Card";
 import { Button } from "@/shared/components/ui/Button";
@@ -62,6 +65,19 @@ export default function EditKeberangkatanPage() {
   const [tourLeaderKontak, setTourLeaderKontak] = useState("");
   const [muthowifNama, setMuthowifNama] = useState("");
   const [muthowifKontak, setMuthowifKontak] = useState("");
+
+  // Telegram Broadcast & Flyer State (ADR-0026)
+  const [caption, setCaption] = useState("");
+  const [existingFlyers, setExistingFlyers] = useState<string[]>([]);
+  const [flyerFiles, setFlyerFiles] = useState<File[]>([]);
+  const [flyerPreviews, setFlyerPreviews] = useState<string[]>([]);
+  const [broadcastInfo, setBroadcastInfo] = useState<{
+    isBroadcasted: boolean;
+    broadcastedAt?: string;
+    targetGroup?: string;
+    broadcastedBy?: string;
+  } | null>(null);
+  const [broadcasting, setBroadcasting] = useState(false);
 
   // Master Petugas State
   const [masterPetugas, setMasterPetugas] = useState<Array<{ id: string; nama: string; tipe: string; noHp?: string | null }>>([]);
@@ -157,6 +173,15 @@ export default function EditKeberangkatanPage() {
         setTourLeaderKontak(tl.kontak || "");
         setMuthowifNama(muth.nama || "");
         setMuthowifKontak(muth.kontak || "");
+
+        // ADR-0026: Telegram broadcast status & materials
+        setBroadcastInfo(meta.telegramBroadcast || null);
+        setCaption(data.caption || "");
+        const rawFlyers = data.flyerUrl || data.flyerDriveId;
+        if (rawFlyers) {
+          const fList = rawFlyers.split(/[\n,]/).map((s: string) => s.trim()).filter(Boolean);
+          setExistingFlyers(fList);
+        }
 
         // Periksa apakah ini merupakan paket pecahan Split Starting Point
         const isSplit =
@@ -501,6 +526,7 @@ export default function EditKeberangkatanPage() {
             nama: muthowifNama,
             kontak: muthowifKontak,
           },
+          caption: caption.trim() || undefined,
         }),
       });
 
@@ -556,6 +582,56 @@ export default function EditKeberangkatanPage() {
       setHotelOptions(hotelOptions);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleBroadcastTelegram = async () => {
+    if (!confirm("Kirim broadcast informasi paket ini ke grup Telegram operasional sekarang?")) {
+      return;
+    }
+    setBroadcasting(true);
+    try {
+      let newFlyersBase64: string[] = [];
+      if (flyerFiles.length > 0) {
+        newFlyersBase64 = await Promise.all(
+          flyerFiles.map(
+            (file) =>
+              new Promise<string>((resolve) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result as string);
+                reader.onerror = () => resolve("");
+                reader.readAsDataURL(file);
+              })
+          )
+        );
+      }
+
+      const res = await fetch(`/api/keberangkatan/${id}/broadcast-telegram`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          caption: caption.trim() || undefined,
+          flyerBase64List: newFlyersBase64.filter(Boolean),
+        }),
+      });
+
+      const resJson = await res.json();
+      if (resJson.success) {
+        setBroadcastInfo(resJson.data);
+        setSuccessMessage(
+          `Berhasil mengirim broadcast paket ke Telegram! (${
+            resJson.data?.targetGroup ? `Grup ${resJson.data.targetGroup.toUpperCase()}` : ""
+          })`
+        );
+        useOperationalStore.getState().setIsLoaded(false);
+        useOperationalStore.getState().loadAllData();
+      } else {
+        alert(`Gagal broadcast ke Telegram: ${resJson.message || "Terjadi kesalahan"}`);
+      }
+    } catch (err: any) {
+      alert("Error broadcast Telegram: " + (err?.message || "Koneksi gagal"));
+    } finally {
+      setBroadcasting(false);
     }
   };
 
@@ -647,6 +723,234 @@ export default function EditKeberangkatanPage() {
             <span className="w-full text-[11px] text-muted-foreground italic border-t pt-2 mt-1">
               🔒 ID Paket & Kode Keberangkatan bersifat permanen (Single Source of Truth) dan tidak dapat diubah demi keamanan audit transaksi.
             </span>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* ── CARD: BROADCAST TELEGRAM & MATERI PROMOSI (ADR-0026) ── */}
+      <Card className="border bg-card shadow-sm border-sky-500/30">
+        <CardHeader className="pb-3 border-b bg-sky-500/5">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <CardTitle className="text-base font-bold flex items-center gap-2 text-sky-950 dark:text-sky-300">
+              <Send className="h-5 w-5 text-sky-600" />
+              Brosur / Flyer &amp; Broadcast Telegram Paket
+            </CardTitle>
+
+            {/* Checklist Indicator */}
+            {broadcastInfo?.isBroadcasted ? (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 shadow-2xs">
+                <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                Sudah Pernah Terbroadcast ke Telegram
+                {broadcastInfo.targetGroup && (
+                  <span className="font-mono text-[10px] uppercase bg-emerald-600 text-white px-1.5 py-0.5 rounded ml-1">
+                    {broadcastInfo.targetGroup}
+                  </span>
+                )}
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30">
+                <AlertTriangle className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+                Belum Pernah Terbroadcast ke Telegram
+              </span>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent className="p-5 space-y-4">
+          {/* Status Info Notification */}
+          {broadcastInfo?.isBroadcasted ? (
+            <div className="p-3 bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800 rounded-lg text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <span className="text-emerald-900 dark:text-emerald-200">
+                ✓ Paket ini telah terkirim ke grup Telegram operasional pada:{" "}
+                <strong>
+                  {broadcastInfo.broadcastedAt
+                    ? new Date(broadcastInfo.broadcastedAt).toLocaleString("id-ID", {
+                        dateStyle: "long",
+                        timeStyle: "short",
+                      })
+                    : "-"}
+                </strong>
+                {broadcastInfo.broadcastedBy ? ` oleh ${broadcastInfo.broadcastedBy}` : ""}
+              </span>
+              <span className="text-[11px] text-emerald-700 dark:text-emerald-400 font-medium shrink-0">
+                (Dapat dibroadcast ulang jika terdapat pembaruan materi)
+              </span>
+            </div>
+          ) : (
+            <p className="text-xs text-muted-foreground">
+              Paket ini dibuat tanpa broadcast otomatis (jalur formulir manual). Anda dapat melengkapi flyer dan narasi caption di bawah ini, lalu menekan tombol <strong>Broadcast Paket ke Telegram</strong>.
+            </p>
+          )}
+
+          {/* Flyer Gallery & Upload */}
+          <div>
+            <label className="block text-xs font-bold text-foreground mb-1.5">
+              🖼️ Brosur / Flyer Paket
+            </label>
+            {existingFlyers.length > 0 && (
+              <div className="flex flex-wrap gap-3 mb-3">
+                {existingFlyers.map((flyer, fIdx) => {
+                  const flyerSrc =
+                    flyer.startsWith("http") || flyer.startsWith("/")
+                      ? flyer
+                      : `/api/storage/download?id=${flyer}`;
+                  return (
+                    <div
+                      key={fIdx}
+                      className="relative group border rounded-lg overflow-hidden bg-muted w-24 h-32 flex flex-col items-center justify-center shadow-2xs"
+                    >
+                      <img
+                        src={flyerSrc}
+                        alt={`Flyer ${fIdx + 1}`}
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          (e.target as HTMLElement).style.display = "none";
+                        }}
+                      />
+                      <span className="absolute bottom-1 right-1 text-[9px] bg-black/75 text-white px-1 rounded font-mono">
+                        Hal #{fIdx + 1}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Flyer Upload Controls */}
+            <div className="flex items-center gap-3">
+              <input
+                type="file"
+                id="edit-flyer-file-input"
+                multiple
+                accept="image/jpeg,image/png,image/webp"
+                className="hidden"
+                onChange={(e) => {
+                  if (e.target.files) {
+                    const files = Array.from(e.target.files);
+                    setFlyerFiles((prev) => [...prev, ...files]);
+                    const newPreviews = files.map((f) => URL.createObjectURL(f));
+                    setFlyerPreviews((prev) => [...prev, ...newPreviews]);
+                  }
+                }}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  const el = document.getElementById("edit-flyer-file-input");
+                  if (el) (el as HTMLInputElement).click();
+                }}
+                className="gap-1.5 text-xs font-semibold"
+              >
+                <ImagePlus className="h-3.5 w-3.5 text-sky-600" />
+                Unggah / Tambah Brosur Baru
+              </Button>
+              {flyerFiles.length > 0 && (
+                <span className="text-xs text-muted-foreground font-medium">
+                  {flyerFiles.length} file baru dipilih
+                </span>
+              )}
+            </div>
+
+            {/* Previews of newly selected files */}
+            {flyerPreviews.length > 0 && (
+              <div className="flex flex-wrap gap-2 pt-2">
+                {flyerPreviews.map((p, idx) => (
+                  <div key={idx} className="relative w-16 h-20 rounded border overflow-hidden">
+                    <img src={p} alt="Preview" className="w-full h-full object-cover" />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFlyerPreviews((prev) => prev.filter((_, i) => i !== idx));
+                        setFlyerFiles((prev) => prev.filter((_, i) => i !== idx));
+                      }}
+                      className="absolute top-0.5 right-0.5 bg-black/70 text-white rounded-full p-0.5"
+                    >
+                      <Trash2 className="h-2.5 w-2.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Caption Textarea */}
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="block text-xs font-bold text-foreground">
+                📝 Caption &amp; Narasi Promosi Telegram
+              </label>
+              <button
+                type="button"
+                onClick={() => {
+                  const depDateFormatted = tanggalBerangkat
+                    ? new Date(tanggalBerangkat).toLocaleDateString("id-ID", {
+                        day: "numeric",
+                        month: "long",
+                        year: "numeric",
+                      })
+                    : "-";
+                  const priceFormatted = Number(hargaPaket || 0).toLocaleString("id-ID");
+                  const defaultCaption =
+                    `✨ *${namaPaket || "PAKET UMROH"}* ✨\n\n` +
+                    `🗓️ *Keberangkatan:* ${depDateFormatted}\n` +
+                    `✈️ *Penerbangan:* ${pnrMain || "Maskapai Terbaik"}\n` +
+                    `🏨 *Hotel Makkah:* ${hotelMekkah || "-"}\n` +
+                    `🏨 *Hotel Madinah:* ${hotelMadinah || "-"}\n` +
+                    `💰 *Harga Base:* Rp ${priceFormatted}\n` +
+                    `👥 *Kuota Tersedia:* ${kuota} Pax\n\n` +
+                    `📲 *Informasi & Pendaftaran:* Segera hubungi customer care kami sebelum kuota habis!`;
+                  setCaption(defaultCaption);
+                }}
+                className="text-[11px] font-semibold text-sky-600 hover:text-sky-700 flex items-center gap-1 cursor-pointer"
+              >
+                <Sparkles className="h-3 w-3" />
+                Gunakan Template Default
+              </button>
+            </div>
+            <textarea
+              rows={4}
+              value={caption}
+              onChange={(e) => setCaption(e.target.value)}
+              placeholder="Tuliskan narasi brosur dan caption promosi untuk grup Telegram..."
+              className="w-full rounded-md border border-input bg-background px-3 py-2 text-xs focus:ring-1 focus:ring-sky-500 font-sans"
+            />
+          </div>
+
+          {/* Broadcast Trigger Button Area */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t">
+            <div className="flex items-center gap-3">
+              <Button
+                type="button"
+                onClick={handleBroadcastTelegram}
+                disabled={broadcasting || saving}
+                className="bg-sky-600 hover:bg-sky-700 text-white font-bold gap-2 px-5 shadow-sm"
+              >
+                {broadcasting ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Mengirim Broadcast...
+                  </>
+                ) : (
+                  <>
+                    <Send className="h-4 w-4" />
+                    Broadcast Paket ke Telegram
+                  </>
+                )}
+              </Button>
+
+              {/* Beside button checklist info */}
+              {broadcastInfo?.isBroadcasted && (
+                <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2.5 py-1.5 rounded-lg border border-emerald-500/30">
+                  <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
+                  <span>Terbroadcast</span>
+                </div>
+              )}
+            </div>
+
+            <p className="text-[11px] text-muted-foreground italic">
+              Pesan dan foto flyer akan otomatis dikirimkan ke grup Telegram sesuai kota starting point paket.
+            </p>
           </div>
         </CardContent>
       </Card>

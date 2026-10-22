@@ -3507,7 +3507,7 @@ function GenerateSuratPageContent() {
                                 title="Kota ini otomatis terisi saat memilih Kantor Imigrasi"
                               >
                                 <Sparkles className="h-3 w-3" />
-                                Auto VLOOKUP Kanim
+                                Auto VLOOKUP Kantor Imigrasi
                               </span>
                             ) : isSearchableSelect ? (
                               <span className="text-[10px] font-semibold text-indigo-600 dark:text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded flex items-center gap-1">

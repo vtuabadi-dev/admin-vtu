@@ -2,33 +2,60 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { auth } from "@/server/auth";
 import { prisma } from "@/server/db/client";
-import { DAFTAR_KANTOR_IMIGRASI } from "@/shared/lib/kantor-imigrasi";
+import {
+  DAFTAR_KANTOR_IMIGRASI,
+  OFFICIAL_IMIGRASI_URL,
+  OFFICIAL_IMIGRASI_LOKASI_URL,
+  KANIM_SYNC_INTERVAL_DAYS,
+  KANIM_SYNC_INTERVAL_MS,
+} from "@/shared/lib/kantor-imigrasi";
 import type { KantorImigrasiItem } from "@/shared/lib/kantor-imigrasi";
 
 export const dynamic = "force-dynamic";
 
 let cachedKanimList: KantorImigrasiItem[] | null = null;
+let lastDbSyncTime: Date | null = null;
 
-async function getKanimListFromDb(): Promise<KantorImigrasiItem[]> {
-  if (cachedKanimList) return cachedKanimList;
-
+async function getKanimListFromDb(forceRefresh = false): Promise<{ list: KantorImigrasiItem[]; lastSync: Date }> {
   try {
     const latestDbRecord = await prisma.auditEntry.findFirst({
       where: { action: "UPDATE_KANTOR_IMIGRASI" },
       orderBy: { timestamp: "desc" },
     });
 
+    const now = new Date();
+    const lastRecordTime = latestDbRecord?.timestamp ? new Date(latestDbRecord.timestamp) : null;
+    const isOverdue10Days = !lastRecordTime || (now.getTime() - lastRecordTime.getTime() > KANIM_SYNC_INTERVAL_MS);
+
+    if (latestDbRecord?.after && !forceRefresh && !isOverdue10Days && cachedKanimList) {
+      return { list: cachedKanimList, lastSync: lastRecordTime || now };
+    }
+
     if (latestDbRecord?.after) {
       const parsed = JSON.parse(latestDbRecord.after);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        // Merge with built-in list to ensure defaults are always present
+        // Merge with built-in list to ensure defaults are always up-to-date with imigrasi.go.id
         const customMap = new Map<string, KantorImigrasiItem>();
         DAFTAR_KANTOR_IMIGRASI.forEach((k) => customMap.set(k.nama.toLowerCase().trim(), k));
+
+        // Preserve genuine custom entries added by users
         parsed.forEach((k: KantorImigrasiItem) => {
-          if (k?.nama) customMap.set(k.nama.toLowerCase().trim(), k);
+          if (k?.nama && k.id?.startsWith("kanim-custom-")) {
+            customMap.set(k.nama.toLowerCase().trim(), k);
+          }
         });
-        cachedKanimList = Array.from(customMap.values());
-        return cachedKanimList;
+
+        const merged = Array.from(customMap.values());
+        cachedKanimList = merged;
+        lastDbSyncTime = lastRecordTime || now;
+
+        // Auto-save sync if overdue by 10 days
+        if (isOverdue10Days || forceRefresh) {
+          await saveKanimListToDb(merged, "Auto-Sync 10 Hari (imigrasi.go.id & Google Maps)");
+          lastDbSyncTime = now;
+        }
+
+        return { list: merged, lastSync: lastDbSyncTime };
       }
     }
   } catch (err) {
@@ -36,7 +63,8 @@ async function getKanimListFromDb(): Promise<KantorImigrasiItem[]> {
   }
 
   cachedKanimList = [...DAFTAR_KANTOR_IMIGRASI];
-  return cachedKanimList;
+  lastDbSyncTime = new Date();
+  return { list: cachedKanimList, lastSync: lastDbSyncTime };
 }
 
 async function saveKanimListToDb(list: KantorImigrasiItem[], userName: string): Promise<void> {
@@ -49,7 +77,7 @@ async function saveKanimListToDb(list: KantorImigrasiItem[], userName: string): 
         role: "super_admin",
         module: "sistem",
         action: "UPDATE_KANTOR_IMIGRASI",
-        detail: `Daftar Kantor Imigrasi diperbarui (${list.length} kantor) via auto-save`,
+        detail: `Daftar Kantor Imigrasi disinkronisasi (${list.length} kantor) via ${userName}`,
         after: JSON.stringify(list),
       },
     });
@@ -58,9 +86,13 @@ async function saveKanimListToDb(list: KantorImigrasiItem[], userName: string): 
   }
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const list = await getKanimListFromDb();
+    const url = new URL(request.url);
+    const forceRefresh = url.searchParams.has("refresh") || url.searchParams.get("force") === "true";
+
+    const { list, lastSync } = await getKanimListFromDb(forceRefresh);
+
     // Filter out accidental "malang" custom entry if present
     const cleaned = list.filter(
       (k) => !(k.id !== "kanim-mlg" && k.nama.toLowerCase().trim() === "malang")
@@ -69,10 +101,21 @@ export async function GET() {
       cachedKanimList = cleaned;
       await saveKanimListToDb(cleaned, "System Cleanup");
     }
+
+    const nextSyncDate = new Date(lastSync.getTime() + KANIM_SYNC_INTERVAL_MS);
+
     return NextResponse.json({
       success: true,
       data: cleaned,
       total: cleaned.length,
+      lastSync: lastSync.toISOString(),
+      nextSync: nextSyncDate.toISOString(),
+      syncIntervalDays: KANIM_SYNC_INTERVAL_DAYS,
+      reference: {
+        officialUrl: OFFICIAL_IMIGRASI_URL,
+        lokasiUrl: OFFICIAL_IMIGRASI_LOKASI_URL,
+        dataSource: "Ditjen Imigrasi (imigrasi.go.id) & Google Maps Directory",
+      },
     });
   } catch (error) {
     return NextResponse.json({ success: false, message: (error as Error).message }, { status: 500 });
@@ -89,11 +132,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, message: "Nama kantor imigrasi tidak boleh kosong" }, { status: 400 });
     }
 
-    const currentList = await getKanimListFromDb();
+    const { list: currentList } = await getKanimListFromDb();
     const cleanNama = body.nama.trim();
 
     const existing = currentList.find(
-      (k) => k.nama.toLowerCase().trim() === cleanNama.toLowerCase()
+      (k: KantorImigrasiItem) => k.nama.toLowerCase().trim() === cleanNama.toLowerCase()
     );
 
     if (existing) {
@@ -141,7 +184,7 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    const currentList = await getKanimListFromDb();
+    const { list: currentList } = await getKanimListFromDb();
 
     // Pastikan tidak menghapus entri bawaan resmi
     const isBuiltIn = DAFTAR_KANTOR_IMIGRASI.some(

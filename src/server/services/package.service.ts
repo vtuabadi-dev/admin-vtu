@@ -722,22 +722,31 @@ export const packageService = {
     }
 
     // 5. Trigger Telegram Broadcast (Async Background Notification)
-    try {
-      const { sendPackageBroadcast } = await import("./telegram-broadcast.service");
-      await sendPackageBroadcast({
-        packages: createdList,
-        kodeGrup,
-        flyerBase64List: Array.isArray(data.flyerBase64List)
-          ? data.flyerBase64List
-          : data.flyerBase64
-          ? [data.flyerBase64]
-          : [],
-        startingPointCode: sCode,
-        startingPointName: startingPoint?.name,
-        customCaption: data.caption || data.customCaption || "",
-      });
-    } catch (telegramErr) {
-      console.error("[PackageService] Gagal mengirim Telegram broadcast:", telegramErr);
+    // ADR-0026: Jika dibuat melalui Jalur Manual (atau flyer belum tersedia), lewati broadcast otomatis.
+    const flyerList = Array.isArray(data.flyerBase64List)
+      ? data.flyerBase64List.filter(Boolean)
+      : data.flyerBase64
+      ? [data.flyerBase64]
+      : [];
+    const isManualPath = data.isManual === true || data.pathMode === "manual" || data.generationMode === "manual";
+    const shouldAutoBroadcast = !isManualPath && flyerList.length > 0;
+
+    if (shouldAutoBroadcast) {
+      try {
+        const { sendPackageBroadcast } = await import("./telegram-broadcast.service");
+        await sendPackageBroadcast({
+          packages: createdList,
+          kodeGrup,
+          flyerBase64List: flyerList,
+          startingPointCode: sCode,
+          startingPointName: startingPoint?.name,
+          customCaption: data.caption || data.customCaption || "",
+        });
+      } catch (telegramErr) {
+        console.error("[PackageService] Gagal mengirim Telegram broadcast:", telegramErr);
+      }
+    } else {
+      console.log("[PackageService] Broadcast Telegram otomatis dilewati (Jalur Manual / flyer belum siap). Admin dapat memicu on-demand di Menu Edit.");
     }
 
     return departureDates.length === 1 ? createdList[0] : createdList;

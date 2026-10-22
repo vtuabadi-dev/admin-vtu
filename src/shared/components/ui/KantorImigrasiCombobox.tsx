@@ -9,6 +9,8 @@ import {
   getKotaFromKanimName,
   deleteCustomKantorImigrasi,
   isCustomKantorImigrasi,
+  shouldSyncKantorImigrasi,
+  recordKantorImigrasiSyncSuccess,
 } from "@/shared/lib/kantor-imigrasi";
 import type { KantorImigrasiItem } from "@/shared/lib/kantor-imigrasi";
 
@@ -34,7 +36,7 @@ export function KantorImigrasiCombobox({
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Load initial list from local cache + backend
+  // Load initial list from local cache + backend with 10-day sync interval
   useEffect(() => {
     const stored = getStoredKantorImigrasiList();
     // Filter out accidental "malang" custom entry if any
@@ -43,8 +45,10 @@ export function KantorImigrasiCombobox({
     );
     setList(cleaned);
 
-    // Fetch freshest list from API in background
-    fetch("/api/master/kantor-imigrasi")
+    const needSync = shouldSyncKantorImigrasi();
+
+    // Fetch freshest list from API in background (with periodic 10-day refresh param if needed)
+    fetch(needSync ? "/api/master/kantor-imigrasi?refresh=10d" : "/api/master/kantor-imigrasi")
       .then((res) => res.json())
       .then((data) => {
         if (data.success && Array.isArray(data.data) && data.data.length > 0) {
@@ -53,6 +57,7 @@ export function KantorImigrasiCombobox({
               !(k.id !== "kanim-mlg" && k.nama.toLowerCase().trim() === "malang")
           );
           setList(apiCleaned);
+          recordKantorImigrasiSyncSuccess();
         }
       })
       .catch(() => {});
@@ -64,9 +69,11 @@ export function KantorImigrasiCombobox({
     const q = value.toLowerCase().trim();
     const qWords = q.split(/\s+/).filter(Boolean);
 
-    // Filter candidate items first
+    // Filter candidate items first (including Google Maps names and addresses)
     const matched = list.filter((item) => {
-      const fullText = `${item.nama} ${item.shortLabel} ${item.kota} ${item.provinsi}`.toLowerCase();
+      const aliasText = item.aliases && item.aliases.length > 0 ? ` ${item.aliases.join(" ")}` : "";
+      const alamatText = item.alamat ? ` ${item.alamat}` : "";
+      const fullText = `${item.nama} ${item.shortLabel} ${item.kota} ${item.provinsi}${aliasText}${alamatText}`.toLowerCase();
       return qWords.every((word) => fullText.includes(word));
     });
 
@@ -91,7 +98,19 @@ export function KantorImigrasiCombobox({
         score += 100; // Substring match inside word (e.g. "Pemalang")
       }
 
-      // 3. Province match
+      // 3. Match on aliases (e.g. Google Maps legacy name / popular search)
+      if (item.aliases && item.aliases.some((a) => a.toLowerCase().trim() === q)) {
+        score += 850;
+      } else if (item.aliases && item.aliases.some((a) => a.toLowerCase().includes(q))) {
+        score += 250;
+      }
+
+      // 4. Match on street address / Google Maps location snippet
+      if (item.alamat && item.alamat.toLowerCase().includes(q)) {
+        score += 80;
+      }
+
+      // 5. Province match
       if (item.provinsi.toLowerCase().trim() === q) score += 50;
 
       return { item, score };
@@ -103,14 +122,15 @@ export function KantorImigrasiCombobox({
     return scored.map((s) => s.item).slice(0, 35);
   }, [list, value]);
 
-  // Check if current value matches an existing office name exactly
+  // Check if current value matches an existing office name or alias exactly
   const exactMatchExists = useMemo(() => {
     if (!value || !value.trim()) return true;
     const q = value.toLowerCase().trim();
     return list.some(
       (item) =>
         item.nama.toLowerCase().trim() === q ||
-        item.shortLabel.toLowerCase().trim() === q
+        item.shortLabel.toLowerCase().trim() === q ||
+        (item.aliases && item.aliases.some((a) => a.toLowerCase().trim() === q))
     );
   }, [list, value]);
 
@@ -297,9 +317,12 @@ export function KantorImigrasiCombobox({
           <div className="px-3 py-1.5 border-b border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-950/60 flex items-center justify-between text-[10px] text-muted-foreground">
             <span className="flex items-center gap-1">
               <Search className="h-3 w-3" />
-              Pilih dari daftar atau lanjut ketik manual
+              Pilih dari daftar atau ketik nama / kota / alamat Google Maps
             </span>
-            <span>{filteredList.length} kantor ditemukan</span>
+            <span className="flex items-center gap-1 font-mono text-[9px] text-emerald-600 dark:text-emerald-400">
+              <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              Sync 10h ({filteredList.length})
+            </span>
           </div>
 
           {/* List of Matched Offices */}
@@ -308,7 +331,8 @@ export function KantorImigrasiCombobox({
               const isSelected =
                 value &&
                 (value.toLowerCase().trim() === item.nama.toLowerCase().trim() ||
-                  value.toLowerCase().trim() === item.shortLabel.toLowerCase().trim());
+                  value.toLowerCase().trim() === item.shortLabel.toLowerCase().trim() ||
+                  (item.aliases && item.aliases.some((a) => a.toLowerCase().trim() === value.toLowerCase().trim())));
               const isHighlighted = idx === highlightedIndex;
               const isCustom = isCustomKantorImigrasi(item);
 
@@ -337,13 +361,21 @@ export function KantorImigrasiCombobox({
                         </span>
                       )}
                     </div>
-                    <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
-                      <span className="flex items-center gap-0.5 font-medium">
+                    <div className="flex items-center gap-2 text-[10px] text-muted-foreground truncate">
+                      <span className="flex items-center gap-0.5 font-medium shrink-0">
                         <MapPin className="h-2.5 w-2.5 text-primary shrink-0" />
                         {item.kota}
                       </span>
                       <span>&bull;</span>
-                      <span>{item.provinsi}</span>
+                      <span className="shrink-0">{item.provinsi}</span>
+                      {item.alamat && (
+                        <>
+                          <span>&bull;</span>
+                          <span className="truncate text-stone-400 dark:text-stone-500 max-w-[220px]" title={item.alamat}>
+                            {item.alamat}
+                          </span>
+                        </>
+                      )}
                     </div>
                   </div>
 
@@ -384,11 +416,17 @@ export function KantorImigrasiCombobox({
                     &quot;{(value || "").trim()}&quot;
                   </p>
                   <p className="text-[10px] font-normal text-emerald-700 dark:text-emerald-400">
-                    Otomatis terhubung dengan Kota Kanim di surat.
+                    Otomatis terhubung dengan Kota Kantor Imigrasi di surat.
                   </p>
                 </div>
               </button>
             )}
+          </div>
+
+          {/* Footer note: official reference */}
+          <div className="px-3 py-1 bg-stone-50 dark:bg-stone-950/80 border-t border-stone-200 dark:border-stone-800 flex items-center justify-between text-[9px] text-stone-500">
+            <span>Referensi: imigrasi.go.id &amp; Google Maps</span>
+            <span className="font-mono">Auto-sync 10 hari</span>
           </div>
         </div>
       )}

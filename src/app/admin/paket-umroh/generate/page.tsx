@@ -668,6 +668,8 @@ export default function GeneratePaketPage() {
         pairedItems: pairs,
         caption: caption || undefined,
         flyerBase64List: flyerBase64List,
+        isManual: pathMode === "manual",
+        pathMode: pathMode,
       };
 
       const res = await fetch("/api/keberangkatan", {
@@ -1354,6 +1356,8 @@ export default function GeneratePaketPage() {
       clusterConfigs: formData.isAdaKlaster === "ya" ? activeClusterConfigs : null,
       caption: caption || undefined,
       flyerBase64List,
+      isManual: pathMode === "manual",
+      pathMode: pathMode,
     };
 
     try {
@@ -3708,6 +3712,8 @@ export default function GeneratePaketPage() {
                     pairedItems: pairs,
                     caption: caption || undefined,
                     flyerBase64List: flyerBase64List,
+                    isManual: pathMode === "manual",
+                    pathMode: pathMode,
                   };
 
                   const res = await fetch("/api/keberangkatan", {

@@ -822,6 +822,32 @@ export default function KeberangkatanListPage() {
                       );
                     })()}
 
+                    {/* INDIKATOR STATUS BROADCAST TELEGRAM (ADR-0026) */}
+                    {(() => {
+                      const tgBroadcast = (k.driveFolderIds as any)?.telegramBroadcast;
+                      const isBroadcasted = tgBroadcast?.isBroadcasted === true;
+                      return (
+                        <div className="flex items-center pl-1.5 border-l border-border/60">
+                          {isBroadcasted ? (
+                            <span
+                              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-sky-500/15 text-sky-700 dark:text-sky-300 border border-sky-500/30"
+                              title={`Sudah terbroadcast ke Telegram (${tgBroadcast?.targetGroup ? `Grup ${tgBroadcast.targetGroup.toUpperCase()} • ` : ""}${tgBroadcast?.broadcastedAt ? new Date(tgBroadcast.broadcastedAt).toLocaleDateString("id-ID") : ""})`}
+                            >
+                              <span className="text-emerald-600 font-black">✓</span>
+                              <span>Telegram</span>
+                            </span>
+                          ) : (
+                            <span
+                              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-muted/60 text-muted-foreground border border-border/60 opacity-60"
+                              title="Belum dibroadcast ke Telegram. Anda dapat membroadcast melalui menu Edit paket."
+                            >
+                              <span>Telegram</span>
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })()}
+
                     {/* SAKLAR TOGGLE TAMPILKAN DI KATALOG & FORM PENDAFTARAN */}
                     {(() => {
                       const isPublished = k.isPublishedKatalog ?? ((k.driveFolderIds as any)?.isPublishedKatalog === true);
@@ -1108,11 +1134,14 @@ export default function KeberangkatanListPage() {
                       variant="outline"
                       size="sm"
                       className="shrink-0"
-                      title="Lengkapi & Edit Data Operasional Paket"
+                      title="Lengkapi & Edit Data Operasional Paket (Termasuk Broadcast Telegram)"
                       onClick={() => router.push(`/admin/keberangkatan/${k.id}/edit`)}
                     >
                       <Pencil className="mr-1 h-3.5 w-3.5 text-muted-foreground" />
                       Edit
+                      {(k.driveFolderIds as any)?.telegramBroadcast?.isBroadcasted && (
+                        <span className="ml-1 text-[11px] text-emerald-600 font-bold" title="Sudah pernah terbroadcast ke Telegram">✓</span>
+                      )}
                     </Button>
                     <Button
                       variant="destructive"

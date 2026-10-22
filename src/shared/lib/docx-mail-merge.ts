@@ -84,14 +84,29 @@ export function buildExpandedFieldMap(fieldValues: Record<string, string>): Reco
       result["Perihal"] = strVal;
     }
 
-    if (key.toLowerCase().includes("kanim") && !key.toLowerCase().includes("kota")) {
-      result["Kanim"] = strVal;
+    if (
+      (key.toLowerCase().includes("kanim") || key.toLowerCase().includes("kantor imigrasi") || key.toLowerCase().includes("kantor_imigrasi")) &&
+      !key.toLowerCase().includes("kota")
+    ) {
       result["Kantor Imigrasi"] = strVal;
+      result["kantor_imigrasi"] = strVal;
+      result["Kanim"] = strVal;
+      result["kanim"] = strVal;
     }
 
-    if (key.toLowerCase().includes("kota kanim") || key.toLowerCase().includes("kota_kanim")) {
+    if (
+      key.toLowerCase().includes("kota kanim") ||
+      key.toLowerCase().includes("kota_kanim") ||
+      key.toLowerCase().includes("kota kantor imigrasi") ||
+      key.toLowerCase().includes("kota_kantor_imigrasi") ||
+      key.toLowerCase().includes("kotakanim") ||
+      key.toLowerCase().includes("kotakantorimigrasi")
+    ) {
+      result["Kota Kantor Imigrasi"] = strVal;
       result["Kota Kanim"] = strVal;
       result["Kota Imigrasi"] = strVal;
+      result["kota_kantor_imigrasi"] = strVal;
+      result["kota_kanim"] = strVal;
     }
   }
 

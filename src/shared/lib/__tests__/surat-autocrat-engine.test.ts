@@ -190,12 +190,22 @@ describe("Surat Autocrat Merge Engine", () => {
     expect(mppResults.length).toBeGreaterThanOrEqual(1);
   });
 
-  it("should accurately lookup kota from kanim name via getKotaFromKanimName", () => {
+  it("should accurately lookup kota from kanim name via getKotaFromKanimName with backward compatibility", () => {
+    // Nomenklatur baru resmi (Kepmen Imipas 2026 & imigrasi.go.id)
+    expect(getKotaFromKanimName("Kantor Imigrasi Kelas I Khusus TPI Juanda")).toBe("Surabaya");
+    expect(getKotaFromKanimName("Kantor Imigrasi Kelas I Khusus TPI Kualanamu")).toBe("Deli Serdang");
+    expect(getKotaFromKanimName("Kantor Imigrasi Kelas I Non TPI Medan")).toBe("Medan");
+
+    // Backward compatibility untuk data lama di template
     expect(getKotaFromKanimName("Kantor Imigrasi Kelas I Khusus TPI Surabaya")).toBe("Surabaya");
     expect(getKotaFromKanimName("Kantor Imigrasi Kelas II Non TPI Sidoarjo")).toBe("Sidoarjo");
     expect(getKotaFromKanimName("Kantor Imigrasi Kelas I Khusus TPI Soekarno-Hatta")).toBe("Tangerang");
     expect(getKotaFromKanimName("Kanim Kelas I TPI Surakarta (Solo)")).toBe("Surakarta");
     expect(getKotaFromKanimName("Mal Pelayanan Publik (MPP) Siola Surabaya")).toBe("Surabaya");
+
+    // Google Maps Place names
+    expect(getKotaFromKanimName("Kanim Surabaya (TPI)")).toBe("Surabaya");
+    expect(getKotaFromKanimName("Kanim Malang (TPI)")).toBe("Malang");
   });
 
   it("should auto-fill kota_kanim via VLOOKUP when admin fills kantor_imigrasi in manual form", () => {

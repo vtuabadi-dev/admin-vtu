@@ -97,6 +97,47 @@ export async function POST(_request: NextRequest) {
       results.push({ type: "overdue", invoiceId: inv.id, nomorInvoice: inv.nomorInvoice, delivered, failed });
     }
 
+    // 4. Sinkronisasi berkala data Kantor Imigrasi (per 10 hari)
+    let kanimSyncStatus = "up-to-date";
+    try {
+      const { DAFTAR_KANTOR_IMIGRASI, KANIM_SYNC_INTERVAL_MS } = await import("@/shared/lib/kantor-imigrasi");
+      const latestKanimDb = await prisma.auditEntry.findFirst({
+        where: { action: "UPDATE_KANTOR_IMIGRASI" },
+        orderBy: { timestamp: "desc" },
+      });
+      const lastKanimTime = latestKanimDb?.timestamp ? new Date(latestKanimDb.timestamp).getTime() : 0;
+      if (now.getTime() - lastKanimTime > KANIM_SYNC_INTERVAL_MS) {
+        const customMap = new Map();
+        DAFTAR_KANTOR_IMIGRASI.forEach((k) => customMap.set(k.nama.toLowerCase().trim(), k));
+        if (latestKanimDb?.after) {
+          const parsed = JSON.parse(latestKanimDb.after);
+          if (Array.isArray(parsed)) {
+            parsed.forEach((k: any) => {
+              if (k?.nama && k.id?.startsWith("kanim-custom-")) {
+                customMap.set(k.nama.toLowerCase().trim(), k);
+              }
+            });
+          }
+        }
+        const syncedList = Array.from(customMap.values());
+        await prisma.auditEntry.create({
+          data: {
+            userId: "system-scheduler",
+            userName: "Cron Scheduler",
+            role: "super_admin",
+            module: "sistem",
+            action: "UPDATE_KANTOR_IMIGRASI",
+            detail: `Daftar Kantor Imigrasi disinkronisasi otomatis per 10 hari (${syncedList.length} kantor)`,
+            after: JSON.stringify(syncedList),
+          },
+        });
+        kanimSyncStatus = `synced (${syncedList.length} kantor)`;
+      }
+    } catch (kanimErr) {
+      console.warn("[Scheduler] Kanim 10-day sync check failed:", kanimErr);
+      kanimSyncStatus = "error";
+    }
+
     const totalDelivered = results.reduce((s, r) => s + r.delivered, 0);
     const totalFailed = results.reduce((s, r) => s + r.failed, 0);
 
@@ -106,6 +147,7 @@ export async function POST(_request: NextRequest) {
         invoicesProcessed: results.length,
         totalDelivered,
         totalFailed,
+        kanimPeriodicSync: kanimSyncStatus,
         breakdown: {
           h7: { count: results.filter((r) => r.type === "h7").length, delivered: results.filter((r) => r.type === "h7").reduce((s, r) => s + r.delivered, 0) },
           h3: { count: results.filter((r) => r.type === "h3").length, delivered: results.filter((r) => r.type === "h3").reduce((s, r) => s + r.delivered, 0) },

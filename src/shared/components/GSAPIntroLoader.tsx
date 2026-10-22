@@ -14,7 +14,18 @@ export default function GSAPIntroLoader({
   onComplete,
   forceShow = false,
 }: GSAPIntroLoaderProps) {
-  const [isVisible, setIsVisible] = useState(true);
+  const [isVisible, setIsVisible] = useState(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const played = localStorage.getItem("vtu_intro_played") || sessionStorage.getItem("vtu_intro_played");
+        if (played && !forceShow) {
+          document.documentElement.classList.remove("intro-pending");
+          return false;
+        }
+      } catch {}
+    }
+    return true;
+  });
 
   const overlayRef = useRef<HTMLDivElement | null>(null);
   const ambientGlowRef = useRef<HTMLDivElement | null>(null);
@@ -26,10 +37,10 @@ export default function GSAPIntroLoader({
   const progressBarRef = useRef<HTMLDivElement | null>(null);
   const skipBtnRef = useRef<HTMLButtonElement | null>(null);
 
-  // Check Session Storage for Intro state
+  // Check Storage for Intro state (ADR-0027: Persist across browser reopenings)
   useEffect(() => {
     if (typeof window !== "undefined") {
-      const played = sessionStorage.getItem("vtu_intro_played");
+      const played = localStorage.getItem("vtu_intro_played") || sessionStorage.getItem("vtu_intro_played");
       if (played && !forceShow) {
         document.documentElement.classList.remove("intro-pending");
         setIsVisible(false);
@@ -140,7 +151,10 @@ export default function GSAPIntroLoader({
   // Handle Finish & Smooth Curtain Dissolve
   const handleFinish = () => {
     if (typeof window !== "undefined") {
-      sessionStorage.setItem("vtu_intro_played", "true");
+      try {
+        localStorage.setItem("vtu_intro_played", "true");
+        sessionStorage.setItem("vtu_intro_played", "true");
+      } catch {}
       document.documentElement.classList.remove("intro-pending");
       window.dispatchEvent(new CustomEvent("vtu:intro-complete"));
     }

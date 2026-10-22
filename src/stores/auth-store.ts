@@ -27,51 +27,14 @@ interface AuthState {
   setRememberMe: (value: boolean) => void;
   checkSessionExpired: () => boolean;
 }
-
-const OUTSIDE_WORK_HOURS_TIMEOUT = 3 * 60 * 60 * 1000; // 3 jam (10.800.000 ms)
-
+// ADR-0027: Selama user tidak menekan tombol Logout (Keluar), sesi tidak boleh otomatis close/logout.
 export function evaluateSessionExpired(
-  lastActivity: number,
-  now: number = Date.now(),
-  userRole?: OperationalRole
+  _lastActivity: number,
+  _now: number = Date.now(),
+  _userRole?: OperationalRole
 ): boolean {
-  if (!lastActivity) return false;
-
-  // Aturan jam kerja 08:00-17:00 HANYA diperuntukkan bagi role ADMIN (bukan Jamaah)
-  const isAdmin = userRole !== undefined && userRole !== "jamaah";
-
-  if (!isAdmin) {
-    // Untuk role Jamaah: batas inaktivitas 24 jam
-    const JAMAAH_TIMEOUT = 24 * 60 * 60 * 1000;
-    return now - lastActivity >= JAMAAH_TIMEOUT;
-  }
-
-  const lastDate = new Date(lastActivity);
-  const nowDate = new Date(now);
-
-  const nowHour = nowDate.getHours();
-  const lastHour = lastDate.getHours();
-
-  const isSameDay =
-    nowDate.getFullYear() === lastDate.getFullYear() &&
-    nowDate.getMonth() === lastDate.getMonth() &&
-    nowDate.getDate() === lastDate.getDate();
-
-  // Aksi terakhir pada jam kerja Admin (08:00 - 16:59:59)
-  const lastWasInWorkHours = lastHour >= 8 && lastHour < 17;
-
-  if (isSameDay && lastWasInWorkHours) {
-    // Jika sudah mencapai/melewati jam 17:00 (5 sore) tanpa aktivitas setelah jam 17:00
-    if (nowHour >= 17) {
-      return true;
-    }
-    // Selama jam kerja (08:00 - 16:59:59), Admin tetap login terus
-    return false;
-  }
-
-  // Di luar jam kerja Admin (< 08:00 atau >= 17:00) atau beda hari: logout jika inaktif 3 jam
-  const inactiveDuration = now - lastActivity;
-  return inactiveDuration >= OUTSIDE_WORK_HOURS_TIMEOUT;
+  // Sesi persisten aktif terus menerus sampai pengguna melakukan logout eksplisit
+  return false;
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -135,6 +98,9 @@ export const useAuthStore = create<AuthState>()(
         if (typeof window !== "undefined") {
           try {
             localStorage.removeItem("vtu-auth-storage");
+            localStorage.removeItem("vtu_intro_completed");
+            localStorage.removeItem("vtu_intro_played");
+            sessionStorage.removeItem("vtu_intro_played");
           } catch {}
         }
         set({

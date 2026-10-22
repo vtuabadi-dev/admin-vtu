@@ -9,12 +9,21 @@ export function SplashScreen() {
   const loadAllData = useOperationalStore((s) => s.loadAllData);
 
   const [loadingText, setLoadingText] = useState("Menghubungkan ke server...");
-  const [shouldRender, setShouldRender] = useState(true);
+  const [shouldRender, setShouldRender] = useState(() => {
+    if (typeof window !== "undefined") {
+      try {
+        if (localStorage.getItem("vtu_intro_completed") === "true") {
+          return false;
+        }
+      } catch {}
+    }
+    return true;
+  });
   const [isFadingOut, setIsFadingOut] = useState(false);
 
   // Cycle through loading texts to feel alive
   useEffect(() => {
-    if (isLoaded) return;
+    if (isLoaded || !shouldRender) return;
     const texts = [
       "Menghubungkan ke server...",
       "Memuat data statistik...",
@@ -29,10 +38,18 @@ export function SplashScreen() {
     }, 600);
 
     return () => clearInterval(interval);
-  }, [isLoaded]);
+  }, [isLoaded, shouldRender]);
 
-  // Handle initialization and minimum display duration (2.5 seconds)
+  // Handle initialization and single-time intro display (ADR-0027)
   useEffect(() => {
+    const alreadyCompleted = typeof window !== "undefined" && localStorage.getItem("vtu_intro_completed") === "true";
+    if (alreadyCompleted) {
+      if (!isLoaded) {
+        loadAllData().catch((err) => console.error("Background pre-fetch error:", err));
+      }
+      return;
+    }
+
     const startTime = Date.now();
 
     async function init() {
@@ -47,6 +64,9 @@ export function SplashScreen() {
 
         setTimeout(() => {
           setIsFadingOut(true);
+          try {
+            localStorage.setItem("vtu_intro_completed", "true");
+          } catch {}
           setTimeout(() => {
             setShouldRender(false);
           }, 700); // match duration-700
@@ -57,6 +77,9 @@ export function SplashScreen() {
     if (!isLoaded) {
       init();
     } else {
+      try {
+        localStorage.setItem("vtu_intro_completed", "true");
+      } catch {}
       setShouldRender(false);
     }
   }, [isLoaded, loadAllData]);
