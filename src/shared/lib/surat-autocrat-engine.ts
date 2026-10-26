@@ -2171,17 +2171,132 @@ export interface ParsedWaResult {
     rawMatchedKey: string;
   }>;
   unmatchedLines: string[];
+  detectedLetterType?: "cuti" | "keterangan" | "other";
 }
 
 /**
- * Generates ready-to-share WhatsApp formatted message containing all required form placeholders.
+ * Checks whether a template is a standard Surat Cuti or Surat Keterangan template
+ * that shares the unified 6-point global request form.
+ */
+export function isUnifiedCutiKeteranganTemplate(template?: SuratTemplate | null): boolean {
+  if (!template) return false;
+  const s = (template.slug || "").toLowerCase();
+  const n = (template.nama || "").toLowerCase();
+  const id = (template.id || "").toLowerCase();
+  return (
+    id === "tpl-cuti-pekerja" ||
+    id === "tpl-surat-keterangan" ||
+    s === "cuti-pekerja" ||
+    s === "keterangan" ||
+    s === "surat-cuti" ||
+    s === "surat-keterangan" ||
+    n === "surat permohonan cuti" ||
+    n === "surat cuti pekerja" ||
+    n === "surat keterangan terdaftar jamaah" ||
+    n === "surat keterangan"
+  );
+}
+
+/**
+ * Generates the standardized 6-point WhatsApp form for Surat Cuti & Surat Keterangan.
+ */
+export function generateUnifiedWaTemplateText(
+  template?: SuratTemplate | null,
+  currentFormData: Record<string, string> = {}
+): string {
+  const isCuti = template
+    ? template.slug?.includes("cuti") || template.nama?.toLowerCase().includes("cuti")
+    : false;
+  const isKeterangan = template
+    ? template.slug?.includes("keterangan") || template.nama?.toLowerCase().includes("keterangan")
+    : false;
+
+  let defaultPilihan = "";
+  if (currentFormData["jenis_surat"] || currentFormData["pilihan_surat"] || currentFormData["tipe_surat"]) {
+    defaultPilihan = currentFormData["jenis_surat"] || currentFormData["pilihan_surat"] || currentFormData["tipe_surat"];
+  } else if (isCuti) {
+    defaultPilihan = "Surat Cuti";
+  } else if (isKeterangan) {
+    defaultPilihan = "Surat Keterangan";
+  }
+
+  const ditujukanKepada =
+    currentFormData["ditujukan_kepada"] ||
+    currentFormData["nama_perusahaan"] ||
+    currentFormData["tujuan"] ||
+    currentFormData["instansi_tujuan"] ||
+    "";
+
+  const namaYangBersangkutan =
+    currentFormData["nama_yang_bersangkutan"] ||
+    currentFormData["nama_lengkap"] ||
+    currentFormData["nama_yang_cuti"] ||
+    currentFormData["nama_jamaah"] ||
+    currentFormData["nama_karyawan"] ||
+    currentFormData["nama"] ||
+    "";
+
+  const noIdentitas =
+    currentFormData["no_identitas"] ||
+    currentFormData["nip_nik"] ||
+    currentFormData["nik"] ||
+    currentFormData["nip"] ||
+    currentFormData["nrp"] ||
+    currentFormData["no_identitas_nip_nik_nrp"] ||
+    "";
+
+  const jabatanPekerjaan =
+    currentFormData["jabatan"] ||
+    currentFormData["pekerjaan"] ||
+    currentFormData["jabatan_karyawan"] ||
+    currentFormData["jabatan_pekerjaan"] ||
+    "";
+
+  let requestTanggal =
+    currentFormData["request_tanggal"] ||
+    currentFormData["tanggal_cuti"] ||
+    "";
+  if (!requestTanggal) {
+    if (currentFormData["tanggal_berangkat"] && currentFormData["tanggal_pulang"]) {
+      requestTanggal = `${currentFormData["tanggal_berangkat"]} s/d ${currentFormData["tanggal_pulang"]}`;
+    } else if (currentFormData["tanggal_berangkat"]) {
+      requestTanggal = currentFormData["tanggal_berangkat"];
+    }
+  }
+
+  const lines: string[] = [
+    `Mohon melengkapi data berikut untuk penerbitan dokumen Surat Permohonan Izin.`,
+    `Silakan isi jawaban di sebelah kanan tanda titik dua (:)`,
+    ``,
+    `1. Surat Cuti / Surat Keterangan (pilih salah satu) : ${defaultPilihan}`.trimEnd() + (defaultPilihan ? "" : " "),
+    `2. Ditujukan Kepada : ${ditujukanKepada}`.trimEnd() + (ditujukanKepada ? "" : " "),
+    `3. Nama Yang Bersangkutan : ${namaYangBersangkutan}`.trimEnd() + (namaYangBersangkutan ? "" : " "),
+    `4. No Identitas NIP/NIK/NRP : ${noIdentitas}`.trimEnd() + (noIdentitas ? "" : " "),
+    `5. Jabatan/Pekerjaan : ${jabatanPekerjaan}`.trimEnd() + (jabatanPekerjaan ? "" : " "),
+    `6. Request Tanggal : ${requestTanggal}`.trimEnd() + (requestTanggal ? "" : " "),
+    ``,
+    `(Catatan: Mohon pastikan ejaan nama, nomor NIK/identitas, dan tanggal telah sesuai)`,
+    `Terima kasih atas kerja samanya. 🙏`,
+  ];
+
+  return lines.join("\n");
+}
+
+/**
+ * Generates ready-to-share WhatsApp formatted message containing form placeholders.
  * Admins copy this message and send it to jamaah on WhatsApp.
  */
 export function generateWaTemplateText(
   template: SuratTemplate,
   placeholders: SuratPlaceholderMapping[],
-  currentFormData: Record<string, string> = {}
+  currentFormData: Record<string, string> = {},
+  options?: { unifiedFormat?: boolean }
 ): string {
+  // If unifiedFormat is explicitly enabled OR template is standard Cuti / Keterangan (and not explicitly disabled)
+  if (options?.unifiedFormat || (options?.unifiedFormat !== false && isUnifiedCutiKeteranganTemplate(template))) {
+    return generateUnifiedWaTemplateText(template, currentFormData);
+  }
+
   const seenKeys = new Set<string>();
   const cleanPlaceholders = placeholders
     .filter((p) => !isSystemAutoPlaceholder(p.key))
@@ -2223,18 +2338,21 @@ export function generateWaTemplateText(
         normK.includes("namayangcuti") ||
         normK === "namakaryawan" ||
         normK.includes("namalengkap") ||
-        normK === "nama"
+        normK === "nama" ||
+        normK.includes("bersangkutan")
       ) {
         existingVal =
+          currentFormData["nama_yang_bersangkutan"] ||
           currentFormData["nama_yang_cuti"] ||
           currentFormData["nama_lengkap"] ||
           currentFormData["nama"] ||
           "";
-      } else if (normK.includes("nik") || normK.includes("nip") || normK.includes("noidentitas")) {
+      } else if (normK.includes("nik") || normK.includes("nip") || normK.includes("nrp") || normK.includes("noidentitas")) {
         existingVal =
           currentFormData["no_identitas"] ||
           currentFormData["nip_nik"] ||
           currentFormData["nik"] ||
+          currentFormData["nrp"] ||
           "";
       } else if (normK.includes("pekerjaan") || normK.includes("jabatan")) {
         existingVal =
@@ -2242,8 +2360,9 @@ export function generateWaTemplateText(
           currentFormData["jabatan_karyawan"] ||
           currentFormData["jabatan"] ||
           "";
-      } else if (normK.includes("tanggalcuti") || normK.includes("tglcuti")) {
+      } else if (normK.includes("tanggalcuti") || normK.includes("tglcuti") || normK.includes("requesttanggal")) {
         existingVal =
+          currentFormData["request_tanggal"] ||
           currentFormData["tanggal_cuti"] ||
           (currentFormData["tanggal_berangkat"] && currentFormData["tanggal_pulang"]
             ? `${currentFormData["tanggal_berangkat"]} s/d ${currentFormData["tanggal_pulang"]}`
@@ -2290,6 +2409,7 @@ export function parseWaFormText(
     rawMatchedKey: string;
   }> = [];
   const unmatchedLines: string[] = [];
+  let detectedLetterType: "cuti" | "keterangan" | "other" | undefined = undefined;
 
   const normalize = (str: string) =>
     str.toLowerCase().replace(/[^a-z0-9]/g, "");
@@ -2316,6 +2436,29 @@ export function parseWaFormText(
     // 4. Token & Rule-based scoring with disambiguation
     let bestMatch: SuratPlaceholderMapping | null = null;
     let highestScore = 0;
+
+    const isInputJenisSurat =
+      cleanKey.includes("suratcutisuratketerangan") ||
+      cleanKey.includes("pilihsalahsatu") ||
+      cleanKey.includes("jenissurat") ||
+      cleanKey.includes("tipesurat") ||
+      cleanKey.includes("pilihansurat") ||
+      (cleanKey.includes("suratcuti") && cleanKey.includes("keterangan"));
+
+    // If this is the letter type selection question (Line 1 of global form)
+    if (isInputJenisSurat) {
+      const explicitJenisPl = cleanPlaceholders.find((p) => {
+        const k = normalize(p.key);
+        const l = normalize(p.label || "");
+        return (
+          k.includes("jenissurat") ||
+          k.includes("tipesurat") ||
+          k.includes("pilihansurat") ||
+          l.includes("jenis surat")
+        );
+      });
+      return explicitJenisPl || null;
+    }
 
     for (const p of cleanPlaceholders) {
       const pNormKey = normalize(p.key);
@@ -2369,15 +2512,20 @@ export function parseWaFormText(
         cleanKey.includes("nik") ||
         cleanKey.includes("ktp") ||
         cleanKey.includes("noidentitas") ||
-        cleanKey.includes("nip");
+        cleanKey.includes("nip") ||
+        cleanKey.includes("nrp") ||
+        cleanKey.includes("identitas");
       const isPlaceNik =
         pNormKey.includes("nik") ||
         pNormKey.includes("ktp") ||
         pNormKey.includes("noidentitas") ||
         pNormKey.includes("nip") ||
+        pNormKey.includes("nrp") ||
         pNormLabel.includes("nik") ||
         pNormLabel.includes("ktp") ||
-        pNormLabel.includes("identitas");
+        pNormLabel.includes("identitas") ||
+        pNormLabel.includes("nrp") ||
+        pNormLabel.includes("nip");
 
       const isInputJabatan =
         cleanKey.includes("jabatan") ||
@@ -2393,28 +2541,54 @@ export function parseWaFormText(
       const isInputLama = cleanKey.includes("lama") || cleanKey.includes("durasi") || cleanKey.includes("jumlahhari");
       const isPlaceLama = pNormKey.includes("lama") || pNormKey.includes("durasi") || pNormLabel.includes("lama");
 
+      const isInputTanggalRequest =
+        cleanKey.includes("requesttanggal") ||
+        cleanKey.includes("tanggalrequest") ||
+        cleanKey.includes("tglrequest") ||
+        cleanKey.includes("requesttgl") ||
+        (cleanKey.includes("request") && cleanKey.includes("tanggal"));
+
       const isInputMulai = cleanKey.includes("mulai") || cleanKey.includes("berangkat") || cleanKey.includes("daritanggal") || cleanKey.includes("awal");
       const isPlaceMulai = pNormKey.includes("berangkat") || pNormKey.includes("mulai") || pNormKey.includes("awal") || pNormLabel.includes("berangkat") || pNormLabel.includes("mulai");
 
       const isInputSelesai = cleanKey.includes("pulang") || cleanKey.includes("selesai") || cleanKey.includes("sampaitanggal") || cleanKey.includes("akhir") || cleanKey.includes("kembali");
       const isPlaceSelesai = pNormKey.includes("pulang") || pNormKey.includes("selesai") || pNormKey.includes("kembali") || pNormLabel.includes("pulang") || pNormLabel.includes("selesai");
 
-      const isInputCuti = cleanKey.includes("cuti") || cleanKey.includes("izin") || cleanKey.includes("dispensasi");
-      const isPlaceCuti = pNormKey.includes("cuti") || pNormKey.includes("berangkat") || pNormLabel.includes("cuti");
-
-      const isInputNamaJamaah = cleanKey.includes("nama") && !isInputPerusahaan && !isInputAyah && !isInputPaket;
+      const isInputNamaJamaah =
+        (cleanKey.includes("nama") || cleanKey.includes("bersangkutan") || cleanKey.includes("namayangbersangkutan")) &&
+        !isInputPerusahaan &&
+        !isInputAyah &&
+        !isInputPaket &&
+        !isInputJenisSurat;
       const isPlaceNamaJamaah =
         (pNormKey === "nama" ||
           pNormKey === "namalengkap" ||
           pNormKey === "namajamaah" ||
           pNormKey === "namakaryawan" ||
           pNormKey === "namayangcuti" ||
+          pNormKey === "namayangbersangkutan" ||
+          pNormKey === "bersangkutan" ||
           pNormLabel.includes("nama lengkap") ||
           pNormLabel.includes("nama yang cuti") ||
+          pNormLabel.includes("nama yang bersangkutan") ||
           pNormLabel === "nama") &&
         !isPlacePerusahaan &&
         !isPlaceAyah &&
         !isPlacePaket;
+
+      const isInputCuti =
+        (cleanKey.includes("cuti") ||
+          cleanKey.includes("izin") ||
+          cleanKey.includes("dispensasi") ||
+          isInputTanggalRequest) &&
+        !isInputJenisSurat;
+      const isPlaceCuti =
+        (pNormKey.includes("cuti") ||
+          pNormKey.includes("berangkat") ||
+          pNormLabel.includes("cuti") ||
+          pNormKey.includes("request") ||
+          pNormLabel.includes("request")) &&
+        !isPlaceNamaJamaah;
 
       if (isInputPerusahaan && isPlacePerusahaan) score += 50;
       if (isInputAyah && isPlaceAyah) score += 50;
@@ -2427,10 +2601,18 @@ export function parseWaFormText(
       if (isInputMulai && isPlaceMulai) score += 50;
       if (isInputSelesai && isPlaceSelesai) score += 50;
       if (isInputCuti && isPlaceCuti) score += 50;
+      if (
+        isInputTanggalRequest &&
+        (pNormKey.includes("tanggal") || pNormKey.includes("cuti") || pNormKey.includes("berangkat")) &&
+        !isPlaceNamaJamaah
+      ) {
+        score += 60;
+      }
       if (isInputAlamat && isPlaceAlamat) score += 50;
       if (isInputNamaJamaah && isPlaceNamaJamaah) score += 60;
 
       // Penalize cross mismatches
+      if (isInputTanggalRequest && isPlaceNamaJamaah) score -= 100;
       if (isInputPerusahaan && isPlaceNamaJamaah) score -= 40;
       if (isInputAyah && isPlaceNamaJamaah) score -= 40;
       if (isInputPaket && isPlaceNamaJamaah) score -= 40;
@@ -2441,8 +2623,8 @@ export function parseWaFormText(
       if (isInputAlamat && !isPlaceAlamat) score -= 50;
       if (!isInputLama && isPlaceLama) score -= 50;
       if (isInputLama && !isPlaceLama) score -= 50;
-      if (!isInputMulai && isPlaceMulai) score -= 30;
-      if (!isInputSelesai && isPlaceSelesai) score -= 30;
+      if (!isInputMulai && isPlaceMulai && !isInputTanggalRequest) score -= 30;
+      if (!isInputSelesai && isPlaceSelesai && !isInputTanggalRequest) score -= 30;
 
       // Substring containment
       if (cleanKey.length >= 4 && pNormKey.includes(cleanKey)) score += 20;
@@ -2555,26 +2737,89 @@ export function parseWaFormText(
           rawMatchedKey: cleanLabel,
         });
 
-        // Smart Aliasing for Cuti Pekerja and commonly paired fields
+        // Comprehensive Smart Aliasing for global standardized fields
         const cleanK = normalize(cleanLabel);
-        if (cleanK.includes("ditujukan") || cleanK.includes("tujuan")) {
+
+        // 1. Jenis Surat (Cuti / Keterangan)
+        if (
+          cleanK.includes("suratcutisuratketerangan") ||
+          cleanK.includes("pilihsalahsatu") ||
+          cleanK.includes("jenissurat") ||
+          cleanK.includes("tipesurat") ||
+          cleanK.includes("pilihansurat") ||
+          (cleanK.includes("suratcuti") && cleanK.includes("keterangan"))
+        ) {
+          result["jenis_surat"] = finalVal;
+          result["tipe_surat"] = finalVal;
+          result["pilihan_surat"] = finalVal;
+          result["surat_cuti_surat_keterangan"] = finalVal;
+          const lVal = finalVal.toLowerCase();
+          if (lVal.includes("cuti") || lVal.includes("izin") || lVal.includes("dispensasi")) {
+            detectedLetterType = "cuti";
+          } else if (lVal.includes("keterangan") || lVal.includes("terdaftar")) {
+            detectedLetterType = "keterangan";
+          }
+        }
+
+        // 2. Ditujukan Kepada
+        if (cleanK.includes("ditujukan") || cleanK.includes("tujuan") || cleanK.includes("instansi")) {
           result["ditujukan_kepada"] = finalVal;
           result["nama_perusahaan"] = finalVal;
+          result["tujuan"] = finalVal;
+          result["instansi_tujuan"] = finalVal;
+          result["kepada_yth"] = finalVal;
         }
-        if (cleanK.includes("namayangcuti")) {
+
+        // 3. Nama Yang Bersangkutan
+        if (
+          cleanK.includes("namayangbersangkutan") ||
+          cleanK.includes("namayangcuti") ||
+          cleanK.includes("bersangkutan") ||
+          cleanK === "nama" ||
+          cleanK === "namalengkap"
+        ) {
+          result["nama_yang_bersangkutan"] = finalVal;
           result["nama_yang_cuti"] = finalVal;
           result["nama_lengkap"] = finalVal;
+          result["nama_jamaah"] = finalVal;
+          result["nama_karyawan"] = finalVal;
+          result["nama"] = finalVal;
         }
-        if (cleanK.includes("noidentitas") || cleanK.includes("nipnik") || cleanK.includes("nip")) {
+
+        // 4. No Identitas NIP/NIK/NRP
+        if (
+          cleanK.includes("noidentitas") ||
+          cleanK.includes("nipnik") ||
+          cleanK.includes("nip") ||
+          cleanK.includes("nrp") ||
+          cleanK.includes("nik") ||
+          cleanK.includes("ktp")
+        ) {
           result["nip_nik"] = finalVal;
           result["no_identitas"] = finalVal;
           result["nik"] = finalVal;
+          result["nip"] = finalVal;
+          result["nrp"] = finalVal;
+          result["no_identitas_nip_nik_nrp"] = finalVal;
         }
-        if (cleanK.includes("pekerjaan")) {
+
+        // 5. Jabatan/Pekerjaan
+        if (cleanK.includes("pekerjaan") || cleanK.includes("jabatan") || cleanK.includes("profesi")) {
           result["pekerjaan"] = finalVal;
           result["jabatan_karyawan"] = finalVal;
+          result["jabatan"] = finalVal;
+          result["jabatan_pekerjaan"] = finalVal;
         }
-        if (cleanK.includes("tanggalcuti") || cleanK.includes("tglcuti")) {
+
+        // 6. Request Tanggal
+        if (
+          cleanK.includes("requesttanggal") ||
+          cleanK.includes("tanggalrequest") ||
+          cleanK.includes("tanggalcuti") ||
+          cleanK.includes("tglcuti") ||
+          cleanK.includes("requesttgl")
+        ) {
+          result["request_tanggal"] = finalVal;
           result["tanggal_cuti"] = finalVal;
           const [startIso, endIso] = parseDateRangeToIsoStrings(rawRight);
           if (startIso) {
@@ -2591,6 +2836,13 @@ export function parseWaFormText(
             if (diffDays > 0) {
               result["lama_cuti_hari"] = String(diffDays);
             }
+          } else if (!startIso) {
+            const singleIso = parseDateToIsoString(rawRight);
+            if (singleIso) {
+              const formatted = formatIsoToIndonesianDate(singleIso);
+              result["tanggal_berangkat"] = formatted;
+              result["tanggal_cuti"] = formatted;
+            }
           }
         }
 
@@ -2599,32 +2851,102 @@ export function parseWaFormText(
       } else {
         // Direct alias fallback if placeholder tag was not in active cleanPlaceholders list
         const cleanK = normalize(cleanLabel);
-        if (cleanK.includes("ditujukan") || cleanK.includes("tujuan")) {
+
+        // 1. Surat Cuti / Surat Keterangan (pilih salah satu)
+        if (
+          cleanK.includes("suratcutisuratketerangan") ||
+          cleanK.includes("pilihsalahsatu") ||
+          cleanK.includes("jenissurat") ||
+          cleanK.includes("tipesurat") ||
+          cleanK.includes("pilihansurat") ||
+          (cleanK.includes("suratcuti") && cleanK.includes("keterangan"))
+        ) {
+          result["jenis_surat"] = rawRight;
+          result["tipe_surat"] = rawRight;
+          result["pilihan_surat"] = rawRight;
+          result["surat_cuti_surat_keterangan"] = rawRight;
+          const lVal = rawRight.toLowerCase();
+          if (lVal.includes("cuti") || lVal.includes("izin") || lVal.includes("dispensasi")) {
+            detectedLetterType = "cuti";
+          } else if (lVal.includes("keterangan") || lVal.includes("terdaftar")) {
+            detectedLetterType = "keterangan";
+          }
+          matchedFields.push({
+            key: "jenis_surat",
+            label: "Surat Cuti / Surat Keterangan (pilih salah satu)",
+            value: rawRight,
+            rawMatchedKey: cleanLabel,
+          });
+          continue;
+        }
+
+        // 2. Ditujukan Kepada
+        if (cleanK.includes("ditujukan") || cleanK.includes("tujuan") || cleanK.includes("instansi")) {
           result["ditujukan_kepada"] = rawRight;
           result["nama_perusahaan"] = rawRight;
-          matchedFields.push({ key: "nama_perusahaan", label: "Ditujukan Kepada", value: rawRight, rawMatchedKey: cleanLabel });
+          result["tujuan"] = rawRight;
+          result["instansi_tujuan"] = rawRight;
+          result["kepada_yth"] = rawRight;
+          matchedFields.push({ key: "ditujukan_kepada", label: "Ditujukan Kepada", value: rawRight, rawMatchedKey: cleanLabel });
           continue;
         }
-        if (cleanK.includes("namayangcuti")) {
+
+        // 3. Nama Yang Bersangkutan
+        if (
+          cleanK.includes("namayangbersangkutan") ||
+          cleanK.includes("namayangcuti") ||
+          cleanK.includes("bersangkutan") ||
+          cleanK === "nama" ||
+          cleanK === "namalengkap"
+        ) {
+          result["nama_yang_bersangkutan"] = rawRight;
           result["nama_yang_cuti"] = rawRight;
           result["nama_lengkap"] = rawRight;
-          matchedFields.push({ key: "nama_lengkap", label: "Nama Yang Cuti", value: rawRight, rawMatchedKey: cleanLabel });
+          result["nama_jamaah"] = rawRight;
+          result["nama_karyawan"] = rawRight;
+          result["nama"] = rawRight;
+          matchedFields.push({ key: "nama_yang_bersangkutan", label: "Nama Yang Bersangkutan", value: rawRight, rawMatchedKey: cleanLabel });
           continue;
         }
-        if (cleanK.includes("noidentitas") || cleanK.includes("nipnik") || cleanK.includes("nip")) {
+
+        // 4. No Identitas NIP/NIK/NRP
+        if (
+          cleanK.includes("noidentitas") ||
+          cleanK.includes("nipnik") ||
+          cleanK.includes("nip") ||
+          cleanK.includes("nrp") ||
+          cleanK.includes("nik") ||
+          cleanK.includes("ktp")
+        ) {
           result["nip_nik"] = rawRight;
           result["no_identitas"] = rawRight;
           result["nik"] = rawRight;
-          matchedFields.push({ key: "nik", label: "No Identitas NIP/NIK", value: rawRight, rawMatchedKey: cleanLabel });
+          result["nip"] = rawRight;
+          result["nrp"] = rawRight;
+          result["no_identitas_nip_nik_nrp"] = rawRight;
+          matchedFields.push({ key: "no_identitas", label: "No Identitas NIP/NIK/NRP", value: rawRight, rawMatchedKey: cleanLabel });
           continue;
         }
-        if (cleanK.includes("pekerjaan")) {
+
+        // 5. Jabatan/Pekerjaan
+        if (cleanK.includes("pekerjaan") || cleanK.includes("jabatan") || cleanK.includes("profesi")) {
           result["pekerjaan"] = rawRight;
           result["jabatan_karyawan"] = rawRight;
-          matchedFields.push({ key: "jabatan_karyawan", label: "Pekerjaan", value: rawRight, rawMatchedKey: cleanLabel });
+          result["jabatan"] = rawRight;
+          result["jabatan_pekerjaan"] = rawRight;
+          matchedFields.push({ key: "pekerjaan", label: "Jabatan/Pekerjaan", value: rawRight, rawMatchedKey: cleanLabel });
           continue;
         }
-        if (cleanK.includes("tanggalcuti") || cleanK.includes("tglcuti")) {
+
+        // 6. Request Tanggal
+        if (
+          cleanK.includes("requesttanggal") ||
+          cleanK.includes("tanggalrequest") ||
+          cleanK.includes("tanggalcuti") ||
+          cleanK.includes("tglcuti") ||
+          cleanK.includes("requesttgl")
+        ) {
+          result["request_tanggal"] = rawRight;
           result["tanggal_cuti"] = rawRight;
           const [startIso, endIso] = parseDateRangeToIsoStrings(rawRight);
           if (startIso) {
@@ -2641,8 +2963,15 @@ export function parseWaFormText(
             if (diffDays > 0) {
               result["lama_cuti_hari"] = String(diffDays);
             }
+          } else if (!startIso) {
+            const singleIso = parseDateToIsoString(rawRight);
+            if (singleIso) {
+              const formatted = formatIsoToIndonesianDate(singleIso);
+              result["tanggal_berangkat"] = formatted;
+              result["tanggal_cuti"] = formatted;
+            }
           }
-          matchedFields.push({ key: "tanggal_cuti", label: "Tanggal Cuti", value: rawRight, rawMatchedKey: cleanLabel });
+          matchedFields.push({ key: "tanggal_cuti", label: "Request Tanggal", value: rawRight, rawMatchedKey: cleanLabel });
           continue;
         }
       }
@@ -2676,8 +3005,10 @@ export function parseWaFormText(
   return {
     parsedMap: result,
     detectedCount: uniqueMatchedFields.length,
-    totalFields: cleanPlaceholders.length,
+    totalFields: Math.max(cleanPlaceholders.length, uniqueMatchedFields.length),
     matchedFields: uniqueMatchedFields,
     unmatchedLines,
+    detectedLetterType,
   };
 }
+

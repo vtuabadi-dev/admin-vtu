@@ -3178,7 +3178,7 @@ function GenerateSuratPageContent() {
                             setTimeout(() => handleParseWaText(pasted), 100);
                           }
                         }}
-                        placeholder={`Tempel (Paste) teks balasan WhatsApp dari jamaah di sini...\n\nContoh:\n*Nama Lengkap* : Muhammad Irfan Arsyad\n*NIK* : 3507123456780001\n*Instansi* : SMA Al Izzah Batu\n*Jabatan* : Guru Pengajar\n...`}
+                        placeholder={`Tempel (Paste) teks balasan WhatsApp dari jamaah di sini...\n\nContoh Format Global:\n1. Surat Cuti / Surat Keterangan (pilih salah satu) : Surat Cuti\n2. Ditujukan Kepada : HRD PT Maju Bersama\n3. Nama Yang Bersangkutan : Ir. H. Joko Santoso\n4. No Identitas NIP/NIK/NRP : 198503152010011002\n5. Jabatan/Pekerjaan : Senior Systems Engineer\n6. Request Tanggal : 15 s/d 25 November 2026`}
                         className="w-full p-2.5 text-xs font-mono rounded-lg border border-emerald-500/30 dark:border-emerald-500/30 bg-background text-foreground focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 focus:outline-none placeholder:text-muted-foreground/60 leading-relaxed"
                       />
 
@@ -3229,6 +3229,53 @@ function GenerateSuratPageContent() {
                               {Math.round((parsedWaSummary.detectedCount / Math.max(1, parsedWaSummary.totalFields)) * 100)}% Cocok
                             </span>
                           </div>
+
+                          {/* Suggested Template Banner if Letter Type mismatch */}
+                          {parsedWaSummary.detectedLetterType === "cuti" && !activeTemplate?.slug?.includes("cuti") && (
+                            <div className="p-2 rounded-lg bg-amber-500/10 border border-amber-500/30 flex items-center justify-between gap-2">
+                              <span className="text-[11px] text-amber-800 dark:text-amber-300 font-medium">
+                                💡 Jamaah memilih <strong>Surat Cuti</strong>. Template saat ini: <em>{activeTemplate?.nama}</em>.
+                              </span>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                onClick={() => {
+                                  const cutiTpl = templates.find((t) => t.slug === "cuti-pekerja" || t.slug.includes("cuti"));
+                                  if (cutiTpl) {
+                                    setSelectedTemplateSlug(cutiTpl.slug);
+                                    showToast(`Beralih ke template ${cutiTpl.nama}`);
+                                  }
+                                }}
+                                className="h-6 text-[10.5px] px-2 border-amber-500/50 text-amber-800 dark:text-amber-200 hover:bg-amber-500/20"
+                              >
+                                Beralih ke Surat Cuti
+                              </Button>
+                            </div>
+                          )}
+
+                          {parsedWaSummary.detectedLetterType === "keterangan" && !activeTemplate?.slug?.includes("keterangan") && (
+                            <div className="p-2 rounded-lg bg-amber-500/10 border border-amber-500/30 flex items-center justify-between gap-2">
+                              <span className="text-[11px] text-amber-800 dark:text-amber-300 font-medium">
+                                💡 Jamaah memilih <strong>Surat Keterangan</strong>. Template saat ini: <em>{activeTemplate?.nama}</em>.
+                              </span>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                onClick={() => {
+                                  const ketTpl = templates.find((t) => t.slug === "keterangan" || t.slug.includes("keterangan"));
+                                  if (ketTpl) {
+                                    setSelectedTemplateSlug(ketTpl.slug);
+                                    showToast(`Beralih ke template ${ketTpl.nama}`);
+                                  }
+                                }}
+                                className="h-6 text-[10.5px] px-2 border-amber-500/50 text-amber-800 dark:text-amber-200 hover:bg-amber-500/20"
+                              >
+                                Beralih ke Surat Keterangan
+                              </Button>
+                            </div>
+                          )}
 
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-36 overflow-y-auto pr-1">
                             {parsedWaSummary.matchedFields.map((f) => (

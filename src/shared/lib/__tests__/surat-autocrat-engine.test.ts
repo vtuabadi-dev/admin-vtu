@@ -542,42 +542,52 @@ Bulan: {{Bulan Awal}}`,
     });
   });
 
-  describe("WhatsApp Template Generation & Parsing (Simplified Format)", () => {
-    it("should dynamically follow template.nama for Surat Permohonan Cuti without the word Pekerja", () => {
+  describe("WhatsApp Template Generation & Parsing (Standardized Global Format for Cuti & Keterangan)", () => {
+    it("should generate the standardized 6-point global format for Surat Cuti (Surat Permohonan Izin)", () => {
       const cutiTemplate = DEFAULT_SURAT_TEMPLATES.find((t) => t.slug === "cuti-pekerja")!;
       expect(cutiTemplate).toBeDefined();
-      expect(cutiTemplate.nama).toBe("Surat Permohonan Cuti");
 
       const waText = generateWaTemplateText(cutiTemplate, cutiTemplate.placeholders);
 
       const expectedText = [
-        "FORMULIR DATA: SURAT PERMOHONAN CUTI",
+        "Mohon melengkapi data berikut untuk penerbitan dokumen Surat Permohonan Izin.",
+        "Silakan isi jawaban di sebelah kanan tanda titik dua (:)",
         "",
-        "Assalamu'alaikum Warahmatullahi Wabarakatuh,",
-        "Bapak/Ibu Calon Jamaah yang dirahmati Allah,",
-        "Mohon melengkapi data berikut untuk penerbitan dokumen Surat Permohonan Cuti.",
-        "Silakan isi jawaban di sebelah kanan tanda titik dua (:), lalu kirimkan kembali seluruh pesan ini:",
-        "",
-        "1. Ditujukan Kepada : ",
-        "2. Nama Yang Cuti : ",
-        "3. No Identitas NIP/NIK : ",
-        "4. Pekerjaan : ",
-        "5. Tanggal Cuti : ",
+        "1. Surat Cuti / Surat Keterangan (pilih salah satu) : Surat Cuti",
+        "2. Ditujukan Kepada : ",
+        "3. Nama Yang Bersangkutan : ",
+        "4. No Identitas NIP/NIK/NRP : ",
+        "5. Jabatan/Pekerjaan : ",
+        "6. Request Tanggal : ",
         "",
         "(Catatan: Mohon pastikan ejaan nama, nomor NIK/identitas, dan tanggal telah sesuai)",
         "Terima kasih atas kerja samanya. 🙏",
       ].join("\n");
 
       expect(waText).toBe(expectedText);
-      expect(waText).not.toContain("PT. Vauza Tamma Abadi (VTU ABADI)");
-      expect(waText).not.toContain("CUTI PEKERJA");
-      expect(waText).not.toContain("Cuti Pekerja");
-      expect(waText).toContain("Assalamu'alaikum");
-      expect(waText).toContain("Bapak/Ibu Calon Jamaah");
-      expect(waText).not.toContain("*FORMULIR DATA");
+      expect(waText).toContain("Surat Cuti / Surat Keterangan (pilih salah satu) : Surat Cuti");
+      expect(waText).toContain("Nama Yang Bersangkutan :");
+      expect(waText).toContain("No Identitas NIP/NIK/NRP :");
+      expect(waText).toContain("Jabatan/Pekerjaan :");
+      expect(waText).toContain("Request Tanggal :");
     });
 
-    it("should generate populated values when currentFormData is provided for Surat Cuti Pekerja", () => {
+    it("should generate the standardized 6-point global format for Surat Keterangan", () => {
+      const ketTemplate = DEFAULT_SURAT_TEMPLATES.find((t) => t.slug === "keterangan")!;
+      expect(ketTemplate).toBeDefined();
+
+      const waText = generateWaTemplateText(ketTemplate, ketTemplate.placeholders);
+
+      expect(waText).toContain("Mohon melengkapi data berikut untuk penerbitan dokumen Surat Permohonan Izin.");
+      expect(waText).toContain("1. Surat Cuti / Surat Keterangan (pilih salah satu) : Surat Keterangan");
+      expect(waText).toContain("2. Ditujukan Kepada :");
+      expect(waText).toContain("3. Nama Yang Bersangkutan :");
+      expect(waText).toContain("4. No Identitas NIP/NIK/NRP :");
+      expect(waText).toContain("5. Jabatan/Pekerjaan :");
+      expect(waText).toContain("6. Request Tanggal :");
+    });
+
+    it("should generate populated values when currentFormData is provided in global standardized format", () => {
       const cutiTemplate = DEFAULT_SURAT_TEMPLATES.find((t) => t.slug === "cuti-pekerja")!;
       const formData = {
         nama_lengkap: "Ahmad Dahlan",
@@ -589,11 +599,20 @@ Bulan: {{Bulan Awal}}`,
       };
 
       const waText = generateWaTemplateText(cutiTemplate, cutiTemplate.placeholders, formData);
-      expect(waText).toContain("1. Ditujukan Kepada : PT Pertamina");
-      expect(waText).toContain("2. Nama Yang Cuti : Ahmad Dahlan");
-      expect(waText).toContain("3. No Identitas NIP/NIK : 3515081234560001");
-      expect(waText).toContain("4. Pekerjaan : Staff Logistik");
-      expect(waText).toContain("5. Tanggal Cuti : 10 November 2026 s/d 20 November 2026");
+      expect(waText).toContain("1. Surat Cuti / Surat Keterangan (pilih salah satu) : Surat Cuti");
+      expect(waText).toContain("2. Ditujukan Kepada : PT Pertamina");
+      expect(waText).toContain("3. Nama Yang Bersangkutan : Ahmad Dahlan");
+      expect(waText).toContain("4. No Identitas NIP/NIK/NRP : 3515081234560001");
+      expect(waText).toContain("5. Jabatan/Pekerjaan : Staff Logistik");
+      expect(waText).toContain("6. Request Tanggal : 10 November 2026 s/d 20 November 2026");
+    });
+
+    it("should allow raw placeholder generation when unifiedFormat is explicitly disabled", () => {
+      const cutiTemplate = DEFAULT_SURAT_TEMPLATES.find((t) => t.slug === "cuti-pekerja")!;
+      const waText = generateWaTemplateText(cutiTemplate, cutiTemplate.placeholders, {}, { unifiedFormat: false });
+      expect(waText).toContain("FORMULIR DATA: SURAT PERMOHONAN CUTI");
+      expect(waText).toContain("1. Ditujukan Kepada : ");
+      expect(waText).toContain("2. Nama Yang Cuti : ");
     });
 
     it("should not include PT header in general templates either", () => {
@@ -604,7 +623,7 @@ Bulan: {{Bulan Awal}}`,
       expect(waText).toContain("FORMULIR DATA: SURAT REKOMENDASI PASPOR");
     });
 
-    it("should dynamically generate form items strictly from whatever placeholders are configured in the template", () => {
+    it("should dynamically generate form items strictly from whatever placeholders are configured in custom templates", () => {
       const customTemplate = {
         id: "tpl-custom-bebas",
         slug: "surat-kustom",
@@ -637,48 +656,77 @@ Bulan: {{Bulan Awal}}`,
       expect(waText).toContain("1. Nama Pemohon : ");
       expect(waText).toContain("2. Instansi Tujuan : ");
       expect(waText).toContain("3. Alasan Permohonan Izin : ");
-      // Must not contain any Cuti Pekerja fields
       expect(waText).not.toContain("Ditujukan Kepada");
-      expect(waText).not.toContain("Nama Yang Cuti");
-      expect(waText).not.toContain("Tanggal Cuti");
     });
 
-    it("should parse the simplified Surat Permohonan Cuti Pekerja reply accurately into mapped fields", () => {
+    it("should parse the unified 6-point global message accurately for Surat Cuti", () => {
       const cutiTemplate = DEFAULT_SURAT_TEMPLATES.find((t) => t.slug === "cuti-pekerja")!;
       const rawWaReply = `
-FORMULIR DATA: SURAT PERMOHONAN CUTI PEKERJA
+Mohon melengkapi data berikut untuk penerbitan dokumen Surat Permohonan Izin.
+Silakan isi jawaban di sebelah kanan tanda titik dua (:)
 
-Assalamu'alaikum Warahmatullahi Wabarakatuh,
-Bapak/Ibu Calon Jamaah yang dirahmati Allah,
-Mohon melengkapi data berikut untuk penerbitan dokumen Surat Permohonan Cuti Pekerja.
-Silakan isi jawaban di sebelah kanan tanda titik dua (:), lalu kirimkan kembali seluruh pesan ini:
-
-1. Ditujukan Kepada : PT Telkom Indonesia (Persero) Tbk
-2. Nama Yang Cuti : Ir. H. Joko Santoso
-3. No Identitas NIP/NIK : 198503152010011002
-4. Pekerjaan : Senior Systems Engineer
-5. Tanggal Cuti : 15 s/d 25 November 2026
+1. Surat Cuti / Surat Keterangan (pilih salah satu) : Surat Cuti
+2. Ditujukan Kepada : PT Telkom Indonesia (Persero) Tbk
+3. Nama Yang Bersangkutan : Ir. H. Joko Santoso
+4. No Identitas NIP/NIK/NRP : 198503152010011002
+5. Jabatan/Pekerjaan : Senior Systems Engineer
+6. Request Tanggal : 15 s/d 25 November 2026
 
 (Catatan: Mohon pastikan ejaan nama, nomor NIK/identitas, dan tanggal telah sesuai)
 Terima kasih atas kerja samanya. 🙏
       `.trim();
 
       const parseRes = parseWaFormText(rawWaReply, cutiTemplate.placeholders);
-      expect(parseRes.detectedCount).toBeGreaterThanOrEqual(4);
+      expect(parseRes.detectedCount).toBe(6);
+      expect(parseRes.detectedLetterType).toBe("cuti");
 
-      // Verify all field aliases
+      // Verify all field aliases mapped for Surat Cuti needs
+      expect(parseRes.parsedMap.jenis_surat).toBe("Surat Cuti");
       expect(parseRes.parsedMap.ditujukan_kepada).toBe("PT Telkom Indonesia (Persero) Tbk");
       expect(parseRes.parsedMap.nama_perusahaan).toBe("PT Telkom Indonesia (Persero) Tbk");
-      expect(parseRes.parsedMap.nama_lengkap).toBe("Ir. H. Joko Santoso");
+      expect(parseRes.parsedMap.nama_yang_bersangkutan).toBe("Ir. H. Joko Santoso");
       expect(parseRes.parsedMap.nama_yang_cuti).toBe("Ir. H. Joko Santoso");
+      expect(parseRes.parsedMap.nama_lengkap).toBe("Ir. H. Joko Santoso");
+      expect(parseRes.parsedMap.no_identitas).toBe("198503152010011002");
       expect(parseRes.parsedMap.nik).toBe("198503152010011002");
       expect(parseRes.parsedMap.nip_nik).toBe("198503152010011002");
       expect(parseRes.parsedMap.pekerjaan).toBe("Senior Systems Engineer");
       expect(parseRes.parsedMap.jabatan_karyawan).toBe("Senior Systems Engineer");
+      expect(parseRes.parsedMap.jabatan).toBe("Senior Systems Engineer");
+      expect(parseRes.parsedMap.request_tanggal).toBe("15 s/d 25 November 2026");
       expect(parseRes.parsedMap.tanggal_cuti).toBe("15 s/d 25 November 2026");
       expect(parseRes.parsedMap.tanggal_berangkat).toBe("15 November 2026");
       expect(parseRes.parsedMap.tanggal_pulang).toBe("25 November 2026");
       expect(parseRes.parsedMap.lama_cuti_hari).toBe("11");
+    });
+
+    it("should parse the unified 6-point global message accurately for Surat Keterangan and sort required fields", () => {
+      const ketTemplate = DEFAULT_SURAT_TEMPLATES.find((t) => t.slug === "keterangan")!;
+      const rawWaReply = `
+Mohon melengkapi data berikut untuk penerbitan dokumen Surat Permohonan Izin.
+Silakan isi jawaban di sebelah kanan tanda titik dua (:)
+
+1. Surat Cuti / Surat Keterangan (pilih salah satu) : Surat Keterangan
+2. Ditujukan Kepada : Dinas Perhubungan Kota Surabaya
+3. Nama Yang Bersangkutan : Hj. Siti Nur Azizah
+4. No Identitas NIP/NIK/NRP : 3578015509800003
+5. Jabatan/Pekerjaan : PNS / Staf Ahli
+6. Request Tanggal : 20 Desember 2026
+
+(Catatan: Mohon pastikan ejaan nama, nomor NIK/identitas, dan tanggal telah sesuai)
+Terima kasih atas kerja samanya. 🙏
+      `.trim();
+
+      const parseRes = parseWaFormText(rawWaReply, ketTemplate.placeholders);
+      expect(parseRes.detectedCount).toBe(6);
+      expect(parseRes.detectedLetterType).toBe("keterangan");
+
+      // Verify Surat Keterangan extracts its required fields seamlessly
+      expect(parseRes.parsedMap.nama_lengkap).toBe("Hj. Siti Nur Azizah");
+      expect(parseRes.parsedMap.nik).toBe("3578015509800003");
+      expect(parseRes.parsedMap.pekerjaan).toBe("PNS / Staf Ahli");
+      expect(parseRes.parsedMap.tanggal_berangkat).toBe("20 Desember 2026");
+      expect(parseRes.parsedMap.ditujukan_kepada).toBe("Dinas Perhubungan Kota Surabaya");
     });
 
     it("should output '-' for any unfilled/empty form field as indicator of empty (pertanda kosong)", () => {
