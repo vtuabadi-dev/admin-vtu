@@ -738,6 +738,7 @@ Demikian surat keterangan ini kami berikan untuk dapat dipergunakan sebagaimana 
       { key: "tanggal_berangkat", label: "Tanggal Berangkat", sourceType: "manifest", manifestField: "keberangkatan.tanggalBerangkat", inputType: "date" },
       { key: "status_registrasi", label: "Status Jamaah", sourceType: "manual", inputType: "text", defaultValue: "Terdaftar Resmi (Lengkap)" },
       { key: "keperluan_surat", label: "Keperluan Pembuatan Surat", sourceType: "manual", inputType: "text", defaultValue: "Kelengkapan Administrasi & Verifikasi Keberangkatan" },
+      { key: "instansi", label: "Instansi / Tujuan Surat", sourceType: "manual", inputType: "text", defaultValue: "Pihak yang Berkepentingan", placeholderHint: "Instansi / Lembaga / Perusahaan yang dituju (Ditujukan Kepada)" },
     ],
     isDefault: true,
     createdAt: new Date().toISOString(),
@@ -952,6 +953,27 @@ export function resolveAutocratFieldValues(
     const target = normalizeKey(k);
     for (const [mk, mv] of Object.entries(manualFormData)) {
       if (normalizeKey(mk) === target && mv !== undefined) return mv;
+    }
+    // Cross-alias fallback for instansi/kantor/perusahaan <-> ditujukan_kepada
+    if (
+      (target.includes("instansi") || target.includes("kantor") || target.includes("namaperusahaan") || target.includes("perusahaan")) &&
+      manualFormData["ditujukan_kepada"] !== undefined
+    ) {
+      return manualFormData["ditujukan_kepada"];
+    }
+    if (
+      target.includes("ditujukan") &&
+      (manualFormData["instansi"] !== undefined ||
+        manualFormData["nama_instansi"] !== undefined ||
+        manualFormData["instansi_tujuan"] !== undefined ||
+        manualFormData["nama_perusahaan"] !== undefined)
+    ) {
+      return (
+        manualFormData["instansi"] ??
+        manualFormData["nama_instansi"] ??
+        manualFormData["instansi_tujuan"] ??
+        manualFormData["nama_perusahaan"]
+      );
     }
     return undefined;
   };
@@ -1874,8 +1896,16 @@ function autoDetectManifestValue(
   if ((cleanK.includes("namaperusahaan") || cleanK.includes("kantor") || cleanK.includes("instansi")) && manualFormData["ditujukan_kepada"]) {
     return String(manualFormData["ditujukan_kepada"]);
   }
-  if (cleanK.includes("ditujukan") && manualFormData["nama_perusahaan"]) {
-    return String(manualFormData["nama_perusahaan"]);
+  if (
+    cleanK.includes("ditujukan") &&
+    (manualFormData["nama_perusahaan"] || manualFormData["instansi"] || manualFormData["nama_instansi"] || manualFormData["instansi_tujuan"])
+  ) {
+    return String(
+      manualFormData["nama_perusahaan"] ||
+      manualFormData["instansi"] ||
+      manualFormData["nama_instansi"] ||
+      manualFormData["instansi_tujuan"]
+    );
   }
   if ((cleanK.includes("jabatan") || cleanK.includes("pekerjaan")) && manualFormData["pekerjaan"]) {
     return String(manualFormData["pekerjaan"]);
@@ -2220,9 +2250,11 @@ export function generateUnifiedWaTemplateText(
 
   const ditujukanKepada =
     currentFormData["ditujukan_kepada"] ||
+    currentFormData["instansi"] ||
+    currentFormData["nama_instansi"] ||
+    currentFormData["instansi_tujuan"] ||
     currentFormData["nama_perusahaan"] ||
     currentFormData["tujuan"] ||
-    currentFormData["instansi_tujuan"] ||
     "";
 
   const namaYangBersangkutan =
@@ -2608,6 +2640,12 @@ export function parseWaFormText(
       }
       if (isInputAlamat && isPlaceAlamat) score += 50;
       if (isInputNamaJamaah && isPlaceNamaJamaah) score += 60;
+      if (
+        (cleanKey.includes("ditujukan") || cleanKey.includes("kepada")) &&
+        (pNormKey.includes("instansi") || pNormLabel.includes("instansi"))
+      ) {
+        score += 40;
+      }
 
       // Penalize cross mismatches
       if (isInputTanggalRequest && isPlaceNamaJamaah) score -= 100;
@@ -2759,13 +2797,22 @@ export function parseWaFormText(
           }
         }
 
-        // 2. Ditujukan Kepada
-        if (cleanK.includes("ditujukan") || cleanK.includes("tujuan") || cleanK.includes("instansi")) {
+        // 2. Ditujukan Kepada / Instansi
+        if (
+          cleanK.includes("ditujukan") ||
+          cleanK.includes("tujuan") ||
+          cleanK.includes("instansi") ||
+          cleanK.includes("namaperusahaan") ||
+          cleanK.includes("perusahaan")
+        ) {
           result["ditujukan_kepada"] = finalVal;
+          result["instansi"] = finalVal;
+          result["nama_instansi"] = finalVal;
+          result["instansi_tujuan"] = finalVal;
           result["nama_perusahaan"] = finalVal;
           result["tujuan"] = finalVal;
-          result["instansi_tujuan"] = finalVal;
           result["kepada_yth"] = finalVal;
+          result["kantor"] = finalVal;
         }
 
         // 3. Nama Yang Bersangkutan
@@ -2878,14 +2925,28 @@ export function parseWaFormText(
           continue;
         }
 
-        // 2. Ditujukan Kepada
-        if (cleanK.includes("ditujukan") || cleanK.includes("tujuan") || cleanK.includes("instansi")) {
+        // 2. Ditujukan Kepada / Instansi
+        if (
+          cleanK.includes("ditujukan") ||
+          cleanK.includes("tujuan") ||
+          cleanK.includes("instansi") ||
+          cleanK.includes("namaperusahaan") ||
+          cleanK.includes("perusahaan")
+        ) {
           result["ditujukan_kepada"] = rawRight;
+          result["instansi"] = rawRight;
+          result["nama_instansi"] = rawRight;
+          result["instansi_tujuan"] = rawRight;
           result["nama_perusahaan"] = rawRight;
           result["tujuan"] = rawRight;
-          result["instansi_tujuan"] = rawRight;
           result["kepada_yth"] = rawRight;
-          matchedFields.push({ key: "ditujukan_kepada", label: "Ditujukan Kepada", value: rawRight, rawMatchedKey: cleanLabel });
+          result["kantor"] = rawRight;
+          matchedFields.push({
+            key: detectedLetterType === "keterangan" ? "instansi" : "ditujukan_kepada",
+            label: detectedLetterType === "keterangan" ? "Instansi (Ditujukan Kepada)" : "Ditujukan Kepada",
+            value: rawRight,
+            rawMatchedKey: cleanLabel,
+          });
           continue;
         }
 

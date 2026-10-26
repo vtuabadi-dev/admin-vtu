@@ -727,6 +727,19 @@ Terima kasih atas kerja samanya. 🙏
       expect(parseRes.parsedMap.pekerjaan).toBe("PNS / Staf Ahli");
       expect(parseRes.parsedMap.tanggal_berangkat).toBe("20 Desember 2026");
       expect(parseRes.parsedMap.ditujukan_kepada).toBe("Dinas Perhubungan Kota Surabaya");
+      expect(parseRes.parsedMap.instansi).toBe("Dinas Perhubungan Kota Surabaya");
+      expect(parseRes.parsedMap.nama_instansi).toBe("Dinas Perhubungan Kota Surabaya");
+      expect(parseRes.parsedMap.instansi_tujuan).toBe("Dinas Perhubungan Kota Surabaya");
+
+      // Verify resolveAutocratFieldValues resolves {instansi} correctly
+      const resolved = resolveAutocratFieldValues(
+        ketTemplate,
+        null,
+        null,
+        parseRes.parsedMap,
+        { nomorSurat: "001/SK/2026", tanggalSurat: "26 Oktober 2026", tanggalHijriyah: "15 Rabiul Awwal 1448 H" }
+      );
+      expect(resolved.instansi).toBe("Dinas Perhubungan Kota Surabaya");
     });
 
     it("should output '-' for any unfilled/empty form field as indicator of empty (pertanda kosong)", () => {

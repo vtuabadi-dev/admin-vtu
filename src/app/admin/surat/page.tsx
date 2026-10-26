@@ -3466,6 +3466,28 @@ function GenerateSuratPageContent() {
                         }
                       }
 
+                      // Cross-fallback for instansi <-> ditujukan_kepada
+                      if (manualVal === undefined) {
+                        if (
+                          (normKey.includes("instansi") || normLabel.includes("instansi") || normKey.includes("kantor") || normKey.includes("perusahaan")) &&
+                          manualFormData["ditujukan_kepada"] !== undefined
+                        ) {
+                          manualVal = manualFormData["ditujukan_kepada"];
+                        } else if (
+                          normKey.includes("ditujukan") &&
+                          (manualFormData["instansi"] !== undefined ||
+                            manualFormData["nama_instansi"] !== undefined ||
+                            manualFormData["instansi_tujuan"] !== undefined ||
+                            manualFormData["nama_perusahaan"] !== undefined)
+                        ) {
+                          manualVal =
+                            manualFormData["instansi"] ??
+                            manualFormData["nama_instansi"] ??
+                            manualFormData["instansi_tujuan"] ??
+                            manualFormData["nama_perusahaan"];
+                        }
+                      }
+
                       let resolvedVal = (resolvedFieldValues as Record<string, string>)[p.key];
                       if (resolvedVal === undefined) {
                         for (const [rk, rv] of Object.entries(resolvedFieldValues as Record<string, string>)) {
