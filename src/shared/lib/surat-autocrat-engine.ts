@@ -2211,14 +2211,12 @@ export function generateUnifiedWaTemplateText(
     ? template.slug?.includes("keterangan") || template.nama?.toLowerCase().includes("keterangan")
     : false;
 
-  let defaultPilihan = "";
-  if (currentFormData["jenis_surat"] || currentFormData["pilihan_surat"] || currentFormData["tipe_surat"]) {
-    defaultPilihan = currentFormData["jenis_surat"] || currentFormData["pilihan_surat"] || currentFormData["tipe_surat"];
-  } else if (isCuti) {
-    defaultPilihan = "Surat Cuti";
-  } else if (isKeterangan) {
-    defaultPilihan = "Surat Keterangan";
-  }
+  let defaultPilihan =
+    currentFormData["jenis_surat"] ||
+    currentFormData["pilihan_surat"] ||
+    currentFormData["tipe_surat"] ||
+    (isCuti ? "Surat Cuti" : isKeterangan ? "Surat Keterangan" : "") ||
+    "";
 
   const ditujukanKepada =
     currentFormData["ditujukan_kepada"] ||
