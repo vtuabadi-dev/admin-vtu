@@ -97,6 +97,7 @@ export interface RegistrationGroup {
   pembayaran?: Pembayaran[];
   createdAt: string;
   updatedAt: string;
+  packageEntryTime?: string;
   keberangkatan?: {
     id: string;
     kode: string;

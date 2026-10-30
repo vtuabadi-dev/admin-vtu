@@ -124,6 +124,7 @@ describe("WP-TRF-2026-001: Package Transfer Integrity & Invariants Suite", () =>
         where: { id: "grp-1" },
         data: {
           paketKeberangkatanId: "keb-new",
+          packageEntryTime: expect.any(Date),
           updatedAt: expect.any(Date),
         },
       });

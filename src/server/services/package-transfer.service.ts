@@ -310,6 +310,7 @@ export async function transferPackageGroup(
           paketKeberangkatanId: targetPaket.id,
           totalTagihan: newTotalTagihan,
           sisaPembayaran: newSisa,
+          packageEntryTime: new Date(),
           updatedAt: new Date(),
         },
       });
@@ -319,6 +320,7 @@ export async function transferPackageGroup(
         where: { id: existingGroup.id },
         data: {
           paketKeberangkatanId: targetPaket.id,
+          packageEntryTime: new Date(),
           updatedAt: new Date(),
         },
       });

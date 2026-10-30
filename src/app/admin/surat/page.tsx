@@ -65,6 +65,7 @@ import {
   matchTagToManifestField,
   extractNamaFromAutocratFields,
   formatJamaahNameWithEndorsement,
+  countNameWords,
   generateSuratFileName,
   parseDateToIsoString,
   formatIsoToIndonesianDate,
@@ -270,6 +271,8 @@ function GenerateSuratPageContent() {
 
   // Dynamic Form Data (for placeholders)
   const [manualFormData, setManualFormData] = useState<Record<string, string>>({});
+  const userEditedFieldKeysRef = useRef<Set<string>>(new Set());
+  const lastAppliedOcrHashRef = useRef<string>("");
   const [nomorUrutSurat, setNomorUrutSurat] = useState<string>("001");
   const [customPerihal, setCustomPerihal] = useState<string>("");
 
@@ -825,7 +828,7 @@ function GenerateSuratPageContent() {
 
   // Map extracted OCR results to Autocrat Form Placeholders
   const applyAllOcrResultsToForm = useCallback(
-    (results: Record<OcrDocType, Record<string, any> | null>) => {
+    (results: Record<OcrDocType, Record<string, any> | null>, forceOverwrite = false) => {
       const ktp = results.ktp || {};
       const akta = results.akta || {};
       const kk = results.kk || {};
@@ -889,6 +892,13 @@ function GenerateSuratPageContent() {
           .replace(/[\u2018\u2019\u201A\u201B'"`{}[\]()_.\-:\/\\]/g, "")
           .replace(/\s+/g, "");
 
+      // Periksa apakah template saat ini adalah surat rekomendasi paspor
+      const isRekomPaspor =
+        activeTemplate?.slug?.includes("rekom") ||
+        activeTemplate?.id === "tpl-rekom-paspor" ||
+        activeTemplate?.kodeNomorDefault === "SR-PASPOR" ||
+        (activeTemplate?.nama || "").toLowerCase().includes("rekomendasi paspor");
+
       // Periksa apakah perihal / hal saat ini adalah endorsement nama
       const currentHalVal = (
         manualFormData["Hal"] ||
@@ -908,37 +918,41 @@ function GenerateSuratPageContent() {
         // Simpan nama ayah kandidat ke form
         if (namaAyahCandidate) {
           const ayahVal = toTitleCase(namaAyahCandidate);
-          next["namaAyah"] = ayahVal;
-          next["nama_ayah"] = ayahVal;
-          next["Nama Ayah"] = ayahVal;
-          next["ayah"] = ayahVal;
+          if (forceOverwrite || !userEditedFieldKeysRef.current.has("namaAyah")) next["namaAyah"] = ayahVal;
+          if (forceOverwrite || !userEditedFieldKeysRef.current.has("nama_ayah")) next["nama_ayah"] = ayahVal;
+          if (forceOverwrite || !userEditedFieldKeysRef.current.has("Nama Ayah")) next["Nama Ayah"] = ayahVal;
+          if (forceOverwrite || !userEditedFieldKeysRef.current.has("ayah")) next["ayah"] = ayahVal;
         }
 
         // Pre-populate standard global keys for direct text merges
         if (namaCandidate) {
           const rawBaseName = toTitleCase(namaCandidate);
-          next["_rawNamaJamaah"] = rawBaseName;
+          if (forceOverwrite || !userEditedFieldKeysRef.current.has("_rawNamaJamaah")) {
+            next["_rawNamaJamaah"] = rawBaseName;
+          }
 
-          // Jika perihal adalah endorsement nama, otomatis tambahkan nama ayah di belakang nama jamaah
-          const finalNama = (isCurrentlyEndorsement && namaAyahCandidate)
+          // Aturan 2 suku kata nama: Jika nama KTP hanya 1 suku kata, otomatis ambil nama ayah kandung dari KK/Akta
+          const isSingleWord = countNameWords(rawBaseName) < 2;
+          const shouldAppendAyah = (isCurrentlyEndorsement || (isRekomPaspor && isSingleWord)) && Boolean(namaAyahCandidate);
+
+          const finalNama = shouldAppendAyah
             ? formatJamaahNameWithEndorsement(rawBaseName, namaAyahCandidate, true)
             : rawBaseName;
 
-          next["nama"] = finalNama;
-          next["nama_lengkap"] = finalNama;
-          next["Nama"] = finalNama;
-          next["Nama Lengkap"] = finalNama;
-          next["Nama Jamaah"] = finalNama;
-          next["Nama Jama'ah"] = finalNama;
-          next["nama_jamaah"] = finalNama;
+          const namaKeys = ["nama", "nama_lengkap", "Nama", "Nama Lengkap", "Nama Jamaah", "Nama Jama'ah", "nama_jamaah"];
+          namaKeys.forEach((nk) => {
+            if (forceOverwrite || !userEditedFieldKeysRef.current.has(nk)) {
+              next[nk] = finalNama;
+            }
+          });
         }
         if (nikCandidate) {
           const val = String(nikCandidate).trim();
-          next["nik"] = val;
-          next["NIK"] = val;
-          next["no_identitas"] = val;
-          next["No Identitas"] = val;
-          next["nomor_identitas"] = val;
+          if (forceOverwrite || !userEditedFieldKeysRef.current.has("nik")) next["nik"] = val;
+          if (forceOverwrite || !userEditedFieldKeysRef.current.has("NIK")) next["NIK"] = val;
+          if (forceOverwrite || !userEditedFieldKeysRef.current.has("no_identitas")) next["no_identitas"] = val;
+          if (forceOverwrite || !userEditedFieldKeysRef.current.has("No Identitas")) next["No Identitas"] = val;
+          if (forceOverwrite || !userEditedFieldKeysRef.current.has("nomor_identitas")) next["nomor_identitas"] = val;
         }
         if (alamatCandidate) {
           const val = toTitleCase(alamatCandidate);
@@ -964,6 +978,9 @@ function GenerateSuratPageContent() {
         }
 
         effectivePlaceholders.forEach((p) => {
+          if (!forceOverwrite && userEditedFieldKeysRef.current.has(p.key)) {
+            return;
+          }
           const cleanK = cleanStr(p.key);
           const cleanL = cleanStr(p.label);
           const mf = (p.manifestField || "").toLowerCase();
@@ -1002,7 +1019,9 @@ function GenerateSuratPageContent() {
           if (isNama) {
             if (namaCandidate) {
               const rawBaseName = toTitleCase(namaCandidate);
-              const finalNama = (isCurrentlyEndorsement && namaAyahCandidate)
+              const isSingleWord = countNameWords(rawBaseName) < 2;
+              const shouldAppendAyah = (isCurrentlyEndorsement || (isRekomPaspor && isSingleWord)) && Boolean(namaAyahCandidate);
+              const finalNama = shouldAppendAyah
                 ? formatJamaahNameWithEndorsement(rawBaseName, namaAyahCandidate, true)
                 : rawBaseName;
               next[p.key] = finalNama;
@@ -1183,6 +1202,7 @@ function GenerateSuratPageContent() {
   // Handler perubahan nilai field input form dengan sinkronisasi otomatis nama endorsement saat Hal berubah
   const handleUpdateFieldValue = useCallback(
     (key: string, value: string) => {
+      userEditedFieldKeysRef.current.add(key);
       setManualFormData((prev) => {
         const next = { ...prev, [key]: value };
 
@@ -1244,15 +1264,55 @@ function GenerateSuratPageContent() {
             });
           }
         } else {
-          // Jika user mengedit nama secara manual saat TIDAK sedang mode endorsement, simpan juga sebagai _rawNamaJamaah
+          // Jika user mengedit nama secara manual, simpan dan sinkronkan ke semua alias nama
           const isNamaField =
             !cleanK.includes("ayah") &&
+            !cleanK.includes("perusahaan") &&
+            !cleanK.includes("paket") &&
             (cleanK === "nama" ||
               cleanK.includes("namajamaah") ||
-              cleanK.includes("namalengkap"));
-          const currentHal = (prev["Hal"] || prev["hal"] || prev["perihal"] || "").toLowerCase();
-          if (isNamaField && !currentHal.includes("endorse")) {
+              cleanK.includes("namalengkap") ||
+              cleanK === "namapemohon");
+
+          if (isNamaField) {
             next["_rawNamaJamaah"] = value;
+            userEditedFieldKeysRef.current.add("_rawNamaJamaah");
+
+            const namaKeys = ["nama", "nama_lengkap", "Nama", "Nama Lengkap", "Nama Jamaah", "Nama Jama'ah", "nama_jamaah", "namapemohon", "Nama Pemohon"];
+            namaKeys.forEach((nk) => {
+              next[nk] = value;
+              userEditedFieldKeysRef.current.add(nk);
+            });
+
+            effectivePlaceholders.forEach((pl) => {
+              const pk = pl.key.toLowerCase().replace(/[\s_\-\.]/g, "");
+              const plbl = (pl.label || "").toLowerCase().replace(/[\s_\-\.]/g, "");
+              if (
+                !pk.includes("ayah") &&
+                !plbl.includes("ayah") &&
+                !pk.includes("perusahaan") &&
+                !pk.includes("paket") &&
+                (pk === "nama" ||
+                  pk.includes("namajamaah") ||
+                  pk.includes("namalengkap") ||
+                  plbl.includes("nama jama") ||
+                  plbl.includes("nama lengkap") ||
+                  pk === "namapemohon" ||
+                  plbl === "nama pemohon")
+              ) {
+                next[pl.key] = value;
+                userEditedFieldKeysRef.current.add(pl.key);
+              }
+            });
+          } else if (cleanK.includes("ayah")) {
+            userEditedFieldKeysRef.current.add("namaAyah");
+            userEditedFieldKeysRef.current.add("nama_ayah");
+            userEditedFieldKeysRef.current.add("Nama Ayah");
+            userEditedFieldKeysRef.current.add("ayah");
+            next["namaAyah"] = value;
+            next["nama_ayah"] = value;
+            next["Nama Ayah"] = value;
+            next["ayah"] = value;
           }
         }
 
@@ -1262,12 +1322,23 @@ function GenerateSuratPageContent() {
     [ocrResultsData, activeJamaah, effectivePlaceholders]
   );
 
-  // Automatically apply OCR results to form when entering OCR mode or changing template
+  // Automatically apply OCR results to form only when entering OCR mode with new data or template changes
   useEffect(() => {
-    if (dataSourceMode === "ocr" && (["ktp", "akta", "kk"] as OcrDocType[]).some((j) => ocrResultsData[j])) {
+    if (dataSourceMode !== "ocr") return;
+    const hasAnyOcr = (["ktp", "akta", "kk"] as OcrDocType[]).some((j) => ocrResultsData[j]);
+    if (!hasAnyOcr) return;
+
+    const ocrHash = `${selectedTemplateSlug}_${JSON.stringify({
+      ktp: ocrResultsData.ktp?.nik || ocrResultsData.ktp?.namaLengkap,
+      akta: ocrResultsData.akta?.namaAyah || ocrResultsData.akta?.namaLengkap,
+      kk: ocrResultsData.kk?.nomorKk || ocrResultsData.kk?.namaAyah,
+    })}`;
+
+    if (ocrHash !== lastAppliedOcrHashRef.current) {
+      lastAppliedOcrHashRef.current = ocrHash;
       applyAllOcrResultsToForm(ocrResultsData);
     }
-  }, [dataSourceMode, selectedTemplateSlug, effectivePlaceholders, applyAllOcrResultsToForm, ocrResultsData]);
+  }, [dataSourceMode, selectedTemplateSlug, ocrResultsData, applyAllOcrResultsToForm]);
 
   // Helper to handle pasted file (from event or clipboard API)
   const handlePasteFile = useCallback(
@@ -3058,8 +3129,12 @@ function GenerateSuratPageContent() {
                         {(["ktp", "akta", "kk"] as OcrDocType[]).some((j) => ocrResultsData[j]) && (
                           <button
                             type="button"
-                            onClick={() => applyAllOcrResultsToForm(ocrResultsData)}
-                            className="text-[11px] font-semibold text-primary hover:underline flex items-center gap-1 shrink-0"
+                            onClick={() => {
+                              userEditedFieldKeysRef.current.clear();
+                              applyAllOcrResultsToForm(ocrResultsData, true);
+                              showToast("Hasil OCR berhasil diterapkan ulang ke formulir");
+                            }}
+                            className="text-[11px] font-semibold text-primary hover:underline flex items-center gap-1 shrink-0 cursor-pointer"
                           >
                             <RefreshCw className="h-3 w-3" />
                             Terapkan Ulang Hasil OCR

@@ -38,7 +38,8 @@ export async function resolveJamaahManifestSequence(jamaahId: string): Promise<n
       paketKeberangkatanId: jamaah.group.paketKeberangkatanId,
       status: { not: "batal" as any },
     },
-    orderBy: { updatedAt: "asc" },
+    // ADR-0030: Stable chronological ordering (never use mutable updatedAt)
+    orderBy: [{ packageEntryTime: "asc" }, { createdAt: "asc" }],
     include: {
       anggota: {
         where: { status: { not: "batal" as any } },
@@ -174,7 +175,8 @@ export async function syncPackageDocumentFileNamesToDrive(
         paketKeberangkatanId: keberangkatanId,
         status: { not: "batal" as any },
       },
-      orderBy: { updatedAt: "asc" },
+      // ADR-0030: Strict package-level isolation & stable chronological ordering
+      orderBy: [{ packageEntryTime: "asc" }, { createdAt: "asc" }],
       include: {
         anggota: {
           where: { status: { not: "batal" as any } },

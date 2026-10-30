@@ -358,10 +358,10 @@ export async function GET(request: Request) {
           orderBy: { createdAt: "asc" },
         });
 
-        // Chronological sort: match the exact entry order of the manifest table
+        // ADR-0030: Chronological sort: match the exact entry order of the manifest table (packageEntryTime ASC)
         const sortedGroups = [...groups].sort((a, b) => {
-          const timeA = new Date(a.updatedAt || a.createdAt).getTime();
-          const timeB = new Date(b.updatedAt || b.createdAt).getTime();
+          const timeA = new Date(a.packageEntryTime || a.createdAt).getTime();
+          const timeB = new Date(b.packageEntryTime || b.createdAt).getTime();
           return timeA - timeB;
         });
 

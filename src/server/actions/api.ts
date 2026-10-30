@@ -3,6 +3,7 @@
 import { prisma } from "@/server/db/client";
 import { packageService } from "@/server/services/package.service";
 import { groupRepo, pembayaranRepo } from "@/server/repositories";
+import { syncPackageDocumentFileNamesToDrive } from "@/server/services/manifest-drive-sync.service";
 
 
 // ==========================================
@@ -688,6 +689,21 @@ export async function addJamaahToGroup(data: {
       createdPaymentId = createdPayment.id;
     } catch (err) {
       console.warn("Failed creating pending pembayaran for additional jamaah:", err);
+    }
+
+    // ADR-0030: Trigger non-blocking background re-sync of Google Drive file names
+    // strictly isolated to this specific departure package (paketKeberangkatanId)
+    if (group.paketKeberangkatanId) {
+      const pkgId = group.paketKeberangkatanId;
+      syncPackageDocumentFileNamesToDrive(pkgId)
+        .then((res) => {
+          if (!res.success && res.errors.length > 0) {
+            console.warn(`[ADR-0030 Drive Re-Sync Warning for Paket ${pkgId}]:`, res.errors);
+          }
+        })
+        .catch((driveErr) => {
+          console.warn(`[ADR-0030 Drive Re-Sync Background Error for Paket ${pkgId}]:`, driveErr);
+        });
     }
 
     return {

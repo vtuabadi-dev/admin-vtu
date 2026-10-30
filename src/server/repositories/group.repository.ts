@@ -39,6 +39,7 @@ function mapGroup(row: any): RegistrationGroup {
     pembayaran: (row.pembayaran ?? []).map(mapPembayaran),
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
+    packageEntryTime: (row.packageEntryTime || row.createdAt).toISOString(),
     keberangkatan: row.keberangkatan ? {
       id: row.keberangkatan.id,
       kode: row.keberangkatan.kode,

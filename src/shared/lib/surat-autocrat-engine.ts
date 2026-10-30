@@ -975,10 +975,44 @@ export function resolveAutocratFieldValues(
         manualFormData["nama_perusahaan"]
       );
     }
+    // Cross-alias fallback for nama jamaah
+    const isTargetNamaJamaah =
+      target === "nama" ||
+      target === "namajamaah" ||
+      target === "namajama'ah" ||
+      target === "namalengkap" ||
+      target.includes("namajama") ||
+      target.includes("namalengkap");
+
+    if (isTargetNamaJamaah) {
+      for (const [mk, mv] of Object.entries(manualFormData)) {
+        const normMk = normalizeKey(mk);
+        if (
+          !normMk.includes("ayah") &&
+          !normMk.includes("perusahaan") &&
+          !normMk.includes("paket") &&
+          (normMk === "nama" ||
+            normMk === "namajamaah" ||
+            normMk === "namajama'ah" ||
+            normMk === "namalengkap" ||
+            normMk.includes("namajama") ||
+            normMk.includes("namalengkap")) &&
+          mv !== undefined &&
+          mv !== "" &&
+          mv !== "-"
+        ) {
+          return mv;
+        }
+      }
+      if (manualFormData["_rawNamaJamaah"] !== undefined) {
+        return manualFormData["_rawNamaJamaah"];
+      }
+    }
+
     return undefined;
   };
 
-  // Detect whether the current letter is for Endorsement
+  // Detect whether the current letter is for Endorsement or Rekomendasi Paspor
   const currentHal =
     getManualOverride("Hal") ||
     getManualOverride("hal") ||
@@ -991,6 +1025,12 @@ export function resolveAutocratFieldValues(
     template.perihalDefault ||
     "";
   const isEndorsement = currentHal.toLowerCase().includes("endorse");
+  const isRekomPaspor =
+    template.slug?.includes("rekom") ||
+    template.id === "tpl-rekom-paspor" ||
+    template.kodeNomorDefault === "SR-PASPOR" ||
+    (template.nama || "").toLowerCase().includes("rekomendasi paspor");
+
   const namaAyahCandidate =
     getManualOverride("namaAyah") ||
     getManualOverride("nama_ayah") ||
@@ -999,8 +1039,8 @@ export function resolveAutocratFieldValues(
     jamaah?.namaAyah ||
     jamaah?.ayahKandung ||
     jamaah?.fatherName ||
-    jamaah?.dokumen?.find?.((d: any) => d.jenis === "kk" || d.jenis === "buku_nikah")?.manualData?.namaAyah ||
-    jamaah?.dokumen?.find?.((d: any) => d.jenis === "kk" || d.jenis === "buku_nikah")?.ocrData?.namaAyah ||
+    jamaah?.dokumen?.find?.((d: any) => d.jenis === "akta" || d.jenis === "kk" || d.jenis === "buku_nikah")?.manualData?.namaAyah ||
+    jamaah?.dokumen?.find?.((d: any) => d.jenis === "akta" || d.jenis === "kk" || d.jenis === "buku_nikah")?.ocrData?.namaAyah ||
     "";
 
   const allDefs = [
@@ -1067,8 +1107,15 @@ export function resolveAutocratFieldValues(
         cleanK.includes("namajama") ||
         cleanK.includes("namalengkap");
 
-      if (isEndorsement && isNamaJamaahKey && namaAyahCandidate) {
-        values[key] = formatJamaahNameWithEndorsement(directManualVal, namaAyahCandidate, true);
+      if (isNamaJamaahKey) {
+        const isSingleWord = countNameWords(directManualVal) < 2;
+        const shouldAppendAyah = (isEndorsement || (isRekomPaspor && isSingleWord)) && Boolean(namaAyahCandidate);
+        if (shouldAppendAyah) {
+          values[key] = formatJamaahNameWithEndorsement(directManualVal, namaAyahCandidate, true);
+        } else {
+          const trimmed = typeof directManualVal === "string" ? directManualVal.trim() : directManualVal;
+          values[key] = (trimmed === "" || trimmed === undefined || trimmed === null) ? "-" : String(directManualVal);
+        }
       } else {
         const trimmed = typeof directManualVal === "string" ? directManualVal.trim() : directManualVal;
         values[key] = (trimmed === "" || trimmed === undefined || trimmed === null) ? "-" : String(directManualVal);
@@ -1141,6 +1188,7 @@ export function resolveAutocratFieldValues(
           const manifestVal = resolveManifestFieldValue(effectiveField, jamaah, keberangkatan, today, {
             isEndorsement,
             namaAyah: namaAyahCandidate,
+            isRekomPaspor,
           });
           values[key] = (!manifestVal || manifestVal.trim() === "") ? "-" : manifestVal;
         }
@@ -1179,6 +1227,7 @@ export function resolveAutocratFieldValues(
       const detectedVal = autoDetectManifestValue(key, jamaah, keberangkatan, today, manualFormData, {
         isEndorsement,
         namaAyah: namaAyahCandidate,
+        isRekomPaspor,
       });
       const trimmed = detectedVal ? detectedVal.trim() : "";
       values[key] = trimmed === "" ? "-" : detectedVal;
@@ -1615,6 +1664,25 @@ export function formatIsoToIndonesianMonthYear(isoMonth?: string | null): string
 export interface ManifestResolveOptions {
   isEndorsement?: boolean;
   namaAyah?: string | null;
+  isRekomPaspor?: boolean;
+}
+
+/**
+ * Counts the number of words (suku kata nama) in a person's name,
+ * filtering out titles/degrees (both prefix titles like H., Dr., and suffix titles after comma like , S.T., , S.Pd).
+ */
+export function countNameWords(name?: string | null): number {
+  if (!name || typeof name !== "string") return 0;
+  // Saring gelar belakang setelah koma
+  const nameWithoutSuffixTitle = name.split(",")[0] || "";
+  // Saring gelar kehormatan / akademis di awal nama
+  const cleanName = nameWithoutSuffixTitle
+    .trim()
+    .replace(/^(?:(?:H\.|Hj\.|Drs\.|Dr\.|K\.H\.|KH\.|Prof\.|Ustadz|Ust\.|Ir\.|Ir|Haji|Hajjah|Kyai)\s*)+/i, "")
+    .trim();
+  if (!cleanName) return 0;
+  const words = cleanName.split(/\s+/).filter(Boolean);
+  return words.length;
 }
 
 export function formatJamaahNameWithEndorsement(
@@ -1692,8 +1760,10 @@ export function resolveManifestFieldValue(
     switch (subKey) {
       case "namaLengkap": {
         const baseName = jamaah.namaLengkap || jamaah.name || "";
-        if (options?.isEndorsement) {
-          const ayah = options.namaAyah || jamaah.namaAyah || jamaah.ayahKandung || jamaah.fatherName || "";
+        const ayah = options?.namaAyah || jamaah.namaAyah || jamaah.ayahKandung || jamaah.fatherName || "";
+        const isSingleWord = countNameWords(baseName) < 2;
+        const shouldAppendAyah = (options?.isEndorsement || (options?.isRekomPaspor && isSingleWord)) && Boolean(ayah);
+        if (shouldAppendAyah) {
           return formatJamaahNameWithEndorsement(baseName, ayah, true);
         }
         return toTitleCase(baseName);

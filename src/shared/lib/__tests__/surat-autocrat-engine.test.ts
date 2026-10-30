@@ -18,6 +18,7 @@ import {
   parseMonthYearToIsoString,
   formatIsoToIndonesianMonthYear,
   formatJamaahNameWithEndorsement,
+  countNameWords,
   generateWaTemplateText,
   parseWaFormText,
 } from "@/shared/lib/surat-autocrat-engine";
@@ -530,15 +531,69 @@ Bulan: {{Bulan Awal}}`,
       expect(formatJamaahNameWithEndorsement("Shofani, ST", "H. Zainul")).toBe("Shofani Zainul, St");
     });
 
-    it("should automatically apply father's name in resolveAutocratFieldValues when Hal is Endorsements Nama", () => {
-      const template = DEFAULT_SURAT_TEMPLATES[0]!;
+    it("should accurately count name words excluding titles and degrees (countNameWords)", () => {
+      expect(countNameWords("Siti")).toBe(1);
+      expect(countNameWords("SITI, S.Pd")).toBe(1);
+      expect(countNameWords("H. Siti")).toBe(1);
+      expect(countNameWords("Dr. Supriyadi, M.Kom.")).toBe(1);
+      expect(countNameWords("Siti Aminah")).toBe(2);
+      expect(countNameWords("Siti Aminah, S.E.")).toBe(2);
+      expect(countNameWords("Muhammad Ridwan Nur")).toBe(3);
+      expect(countNameWords("")).toBe(0);
+      expect(countNameWords(null)).toBe(0);
+    });
+
+    it("should automatically append father's name from Akta/KK if KTP name has only 1 word for Surat Rekomendasi Paspor, regardless of perihal (ADR-0029)", () => {
+      const rekomTemplate = DEFAULT_SURAT_TEMPLATES[0]!; // tpl-rekom-paspor
       const manualData = {
-        Hal: "Endorsements Nama",
-        nama_lengkap: "Shofani, St",
-        namaAyah: "Zainul",
+        Hal: "Rekomendasi Pembuatan / Penggantian Paspor Umroh", // Regular non-endorsement perihal
+        nama_lengkap: "Siti",
+        namaAyah: "Ahmad Sofwan",
       };
-      const resolved = resolveAutocratFieldValues(template, null, null, manualData);
-      expect(resolved.nama_lengkap).toBe("Shofani Zainul, St");
+      const resolved = resolveAutocratFieldValues(rekomTemplate, null, null, manualData);
+      expect(resolved.nama_lengkap).toBe("Siti Ahmad Sofwan");
+    });
+
+    it("should NOT append father's name if KTP name already has 2 or more words for Surat Rekomendasi Paspor on regular perihal", () => {
+      const rekomTemplate = DEFAULT_SURAT_TEMPLATES[0]!;
+      const manualData = {
+        Hal: "Rekomendasi Pembuatan / Penggantian Paspor Umroh",
+        nama_lengkap: "Siti Aminah",
+        namaAyah: "Ahmad Sofwan",
+      };
+      const resolved = resolveAutocratFieldValues(rekomTemplate, null, null, manualData);
+      expect(resolved.nama_lengkap).toBe("Siti Aminah");
+    });
+
+    it("should resolve father's name from Akta Kelahiran document (d.jenis === 'akta')", () => {
+      const rekomTemplate = DEFAULT_SURAT_TEMPLATES[0]!;
+      const mockJamaahWithAkta: any = {
+        id: "jam-akta-1",
+        namaLengkap: "Supriyadi",
+        dokumen: [
+          {
+            jenis: "akta",
+            ocrData: { namaAyah: "Sulaiman" },
+          },
+        ],
+      };
+      const resolved = resolveAutocratFieldValues(rekomTemplate, mockJamaahWithAkta, null, {});
+      expect(resolved.nama_lengkap).toBe("Supriyadi Sulaiman");
+    });
+
+    it("should prioritize admin's manual typed revised name over OCR", () => {
+      const rekomTemplate = DEFAULT_SURAT_TEMPLATES[0]!;
+      const mockJamaah: any = {
+        id: "jam-rev-1",
+        namaLengkap: "Siti",
+        namaAyah: "Ahmad",
+      };
+      // Admin manually revisions/types "Siti Rahmawati" into manualFormData
+      const manualData = {
+        nama_lengkap: "Siti Rahmawati",
+      };
+      const resolved = resolveAutocratFieldValues(rekomTemplate, mockJamaah, null, manualData);
+      expect(resolved.nama_lengkap).toBe("Siti Rahmawati");
     });
   });
 

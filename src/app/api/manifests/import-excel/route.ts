@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/server/auth";
 import { prisma } from "@/server/db";
+import { syncPackageDocumentFileNamesToDrive } from "@/server/services/manifest-drive-sync.service";
 import type { JenisKelamin, StatusJamaah } from "@prisma/client";
 
 export interface ExcelImportRowInput {
@@ -432,6 +433,14 @@ export async function POST(req: Request) {
         },
       });
     }, { maxWait: 20000, timeout: 120000 });
+
+    // ADR-0030: Trigger non-blocking background re-sync of Google Drive file names
+    // strictly isolated to this specific departure package (keberangkatanId)
+    if (keberangkatanId) {
+      syncPackageDocumentFileNamesToDrive(keberangkatanId).catch((err) => {
+        console.warn(`[ADR-0030 Drive Re-Sync Background Error for Paket ${keberangkatanId}]:`, err);
+      });
+    }
 
     return NextResponse.json({
       success: true,

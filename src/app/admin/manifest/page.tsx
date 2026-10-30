@@ -1272,13 +1272,14 @@ function ManifestPageContent() {
         return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
       });
 
-      // Calculate the timestamp when this rombongan joined this package
-      // If group was transferred to this package later (updatedAt > createdAt), updatedAt reflects entry time
+      // ADR-0030: Calculate the immutable timestamp when this rombongan joined this package.
+      // Uses explicit packageEntryTime (or createdAt fallback). NEVER use mutable updatedAt,
+      // so adding a new jamaah or updating payments does NOT push this group to the bottom.
       let packageEntryTime = 0;
       if (groupObj) {
+        const entry = groupObj.packageEntryTime ? new Date(groupObj.packageEntryTime).getTime() : 0;
         const created = new Date(groupObj.createdAt).getTime();
-        const updated = new Date(groupObj.updatedAt).getTime();
-        packageEntryTime = updated || created;
+        packageEntryTime = entry || created;
       } else if (sortedMembers.length > 0) {
         packageEntryTime = Math.min(...sortedMembers.map((m) => new Date(m.createdAt).getTime()));
       }
