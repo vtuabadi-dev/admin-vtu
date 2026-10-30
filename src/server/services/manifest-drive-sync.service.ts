@@ -3,6 +3,26 @@ import { formatStandardDocumentFileName, hasPackageTourLeader } from "@/shared/l
 import { moveAndRenameDriveFile, isGoogleDriveConfigured } from "@/server/storage/google-drive";
 
 /**
+ * SSOT member sorting within a rombongan:
+ * 1. nomorPeserta ASC (numeric)
+ * 2. registrationId ASC (e.g. GRP-2026-00003-1 before GRP-2026-00003-2)
+ * 3. createdAt ASC
+ */
+export function sortGroupMembers<T extends { nomorPeserta?: string | null; registrationId?: string | null; createdAt: Date | string }>(
+  members: T[]
+): T[] {
+  return [...members].sort((a, b) => {
+    const numA = parseInt((a.nomorPeserta || "0").replace(/\D/g, ""), 10) || 0;
+    const numB = parseInt((b.nomorPeserta || "0").replace(/\D/g, ""), 10) || 0;
+    if (numA !== numB) return numA - numB;
+    const regA = a.registrationId || "";
+    const regB = b.registrationId || "";
+    if (regA !== regB) return regA.localeCompare(regB);
+    return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+  });
+}
+
+/**
  * Resolves the accurate sequential manifest number for a given Jamaah.
  * Adheres to ADR-0014: FIFO chronological ordering based on package entry time,
  * with Tour Leader offset (starts from 2 if package has TL, 1 if without).
@@ -36,22 +56,22 @@ export async function resolveJamaahManifestSequence(jamaahId: string): Promise<n
   const packageGroups = await prisma.registrationGroup.findMany({
     where: {
       paketKeberangkatanId: jamaah.group.paketKeberangkatanId,
-      status: { not: "batal" as any },
+      status: { not: "cancelled" },
     },
     // ADR-0030: Stable chronological ordering (never use mutable updatedAt)
     orderBy: [{ packageEntryTime: "asc" }, { createdAt: "asc" }],
     include: {
       anggota: {
-        where: { status: { not: "batal" as any } },
-        orderBy: { createdAt: "asc" },
-        select: { id: true },
+        where: { status: { not: "batal" } },
+        select: { id: true, registrationId: true, nomorPeserta: true, createdAt: true },
       },
     },
   });
 
   let currentCounter = offset;
   for (const g of packageGroups) {
-    for (const m of g.anggota) {
+    const sortedAnggota = sortGroupMembers(g.anggota);
+    for (const m of sortedAnggota) {
       if (m.id === jamaahId) {
         return currentCounter;
       }
@@ -173,14 +193,13 @@ export async function syncPackageDocumentFileNamesToDrive(
     const groups = await prisma.registrationGroup.findMany({
       where: {
         paketKeberangkatanId: keberangkatanId,
-        status: { not: "batal" as any },
+        status: { not: "cancelled" },
       },
       // ADR-0030: Strict package-level isolation & stable chronological ordering
       orderBy: [{ packageEntryTime: "asc" }, { createdAt: "asc" }],
       include: {
         anggota: {
-          where: { status: { not: "batal" as any } },
-          orderBy: { createdAt: "asc" },
+          where: { status: { not: "batal" } },
           include: { dokumen: true },
         },
       },
@@ -191,7 +210,8 @@ export async function syncPackageDocumentFileNamesToDrive(
     const allErrors: string[] = [];
 
     for (const g of groups) {
-      for (const m of g.anggota) {
+      const sortedAnggota = sortGroupMembers(g.anggota);
+      for (const m of sortedAnggota) {
         const noUrut = currentCounter++;
         const manifestName = resolveJamaahManifestName(m);
         const res = await syncJamaahDocumentFileNamesToDrive(m.id, {

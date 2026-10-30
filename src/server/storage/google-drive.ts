@@ -1,7 +1,7 @@
 import type { StorageAdapter } from "./adapter";
 
-const DRIVE_API = "https://www.googleapis.com/drive/v3";
-const DRIVE_UPLOAD = "https://www.googleapis.com/upload/drive/v3";
+export const DRIVE_API = "https://www.googleapis.com/drive/v3";
+export const DRIVE_UPLOAD = "https://www.googleapis.com/upload/drive/v3";
 
 const DEFAULT_FOLDER_ID = "1psSUE3ac8Glel1NYvnDomiTRTNQG6wm1";
 const CID_P1 = "667018553984-4qm3tl8sl4uvk18u0tm25s67rj4qnnr9";
@@ -55,7 +55,7 @@ async function getAccessToken(): Promise<string> {
   }
 }
 
-async function apiFetch(url: string, options: RequestInit = {}): Promise<Response> {
+export async function apiFetch(url: string, options: RequestInit = {}): Promise<Response> {
   const token = await getAccessToken();
   const res = await fetch(url, {
     ...options,
@@ -384,8 +384,23 @@ export async function moveAndRenameDriveFile(
     }
 
     const body: any = {};
+    let targetFileName = newFileName;
     if (newFileName) {
-      body.name = newFileName;
+      try {
+        const metaRes = await apiFetch(`${DRIVE_API}/files/${cleanId}?fields=name&supportsAllDrives=true`);
+        if (metaRes.ok) {
+          const meta = await metaRes.json();
+          const existingName = meta.name || "";
+          const extMatch = existingName.match(/\.([a-zA-Z0-9]{3,4})$/i);
+          if (extMatch && extMatch[1]) {
+            const ext = extMatch[1].toLowerCase();
+            targetFileName = newFileName.replace(/\.[a-zA-Z0-9]{3,4}$/i, `.${ext}`);
+          }
+        }
+      } catch {
+        // non-blocking fallback to original newFileName
+      }
+      body.name = targetFileName;
     }
 
     const url = `${DRIVE_API}/files/${cleanId}?${params.toString()}`;
@@ -395,7 +410,7 @@ export async function moveAndRenameDriveFile(
       body: JSON.stringify(body),
     });
 
-    console.log(`[Google Drive Relocation Success] File ${cleanId} renamed to "${newFileName}" and moved to "${newFolderId}"`);
+    console.log(`[Google Drive Relocation Success] File ${cleanId} renamed to "${targetFileName}" and moved to "${newFolderId}"`);
     return res.ok;
   } catch (err: any) {
     console.warn(`[Google Drive Relocation Warning] Could not move/rename file ${fileIdOrUrl}:`, err?.message || err);
