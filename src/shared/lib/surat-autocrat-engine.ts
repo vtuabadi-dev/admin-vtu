@@ -1572,14 +1572,69 @@ export function formatIsoToIndonesianDateRange(startDateIso?: string | null, end
 }
 
 /**
- * Parses an Indonesian date range string into [startDateIso, endDateIso]
+ * Parses an Indonesian date range string into [startDateIso, endDateIso].
+ * Supports formats such as:
+ * - "7-16 November 2026", "7 - 16 November 2026", "07-16 November 2026"
+ * - "10 s/d 25 Oktober 2026", "10 sd 25 Oktober 2026"
+ * - "28 Oktober - 5 November 2026", "28 Oktober-5 November 2026"
+ * - "28 Desember 2026 - 10 Januari 2027", "28 Desember 2026 s/d 10 Januari 2027"
+ * - "07/11/2026 - 16/11/2026", "2026-11-07 - 2026-11-16", "07-11-2026 - 16-11-2026"
  */
 export function parseDateRangeToIsoStrings(rangeStr?: string | null): [string, string] {
   if (!rangeStr || typeof rangeStr !== "string") return ["", ""];
   const trimmed = rangeStr.trim();
-  if (!trimmed) return ["", ""];
+  if (!trimmed || trimmed === "-") return ["", ""];
 
-  const parts = trimmed.split(/\s+(?:s\/d|-|sampai dengan|sd)\s+/i);
+  // 1. Pattern: Day-Day with dash/s-d/sampai and month/year: e.g. "7-16 November 2026", "7 - 16 November 2026", "07-16 November 2026"
+  const dayDayMatch = trimmed.match(
+    /^(\d{1,2})\s*(?:[-–—]|s\/d|s\.d\.|s\.d|sd|sampai dengan|sampai|hingga)\s*(\d{1,2})\s+([a-zA-Z]+)(?:\s+(\d{4}))?$/i
+  );
+  if (dayDayMatch && dayDayMatch[1] && dayDayMatch[2] && dayDayMatch[3]) {
+    const day1 = dayDayMatch[1].padStart(2, "0");
+    const day2 = dayDayMatch[2].padStart(2, "0");
+    const monthName = dayDayMatch[3];
+    const year = dayDayMatch[4] || String(new Date().getFullYear());
+    const endIso = parseDateToIsoString(`${day2} ${monthName} ${year}`);
+    if (endIso) {
+      const [y, m] = endIso.split("-");
+      return [`${y}-${m}-${day1}`, endIso];
+    }
+  }
+
+  // 2. Pattern: Date-Date across different months/years with dash/s-d: e.g. "28 Oktober - 5 November 2026", "28 Oktober-5 November 2026", "28 Desember 2026 - 10 Januari 2027"
+  const monthDayMatch = trimmed.match(
+    /^(\d{1,2}\s+[a-zA-Z]+(?:\s+\d{4})?)\s*(?:[-–—]|s\/d|s\.d\.|s\.d|sd|sampai dengan|sampai|hingga)\s*(\d{1,2}\s+[a-zA-Z]+(?:\s+\d{4})?)$/i
+  );
+  if (monthDayMatch && monthDayMatch[1] && monthDayMatch[2]) {
+    const rawStart = monthDayMatch[1].trim();
+    const rawEnd = monthDayMatch[2].trim();
+    const endIso = parseDateToIsoString(rawEnd);
+    if (endIso) {
+      if (!/\d{4}/.test(rawStart)) {
+        const [year] = endIso.split("-");
+        const startIso = parseDateToIsoString(`${rawStart} ${year}`);
+        if (startIso) return [startIso, endIso];
+      } else {
+        const startIso = parseDateToIsoString(rawStart);
+        if (startIso) return [startIso, endIso];
+      }
+    }
+  }
+
+  // 3. Pattern: Full date to full date with slash, hyphen, or ISO: e.g. "07/11/2026 - 16/11/2026", "2026-11-07 - 2026-11-16", "07-11-2026 - 16-11-2026"
+  const fullDateMatch = trimmed.match(
+    /^(\d{4}-\d{2}-\d{2}|\d{1,2}[/-]\d{1,2}[/-]\d{4})\s*(?:[-–—]|s\/d|s\.d\.|s\.d|sd|sampai dengan|sampai|hingga)\s*(\d{4}-\d{2}-\d{2}|\d{1,2}[/-]\d{1,2}[/-]\d{4})$/i
+  );
+  if (fullDateMatch && fullDateMatch[1] && fullDateMatch[2]) {
+    const startIso = parseDateToIsoString(fullDateMatch[1].trim());
+    const endIso = parseDateToIsoString(fullDateMatch[2].trim());
+    if (startIso && endIso) {
+      return [startIso, endIso];
+    }
+  }
+
+  // 4. General fallback with text separator or spaced hyphen
+  const parts = trimmed.split(/\s*(?:s\/d|s\.d\.|s\.d|sd|sampai dengan|sampai|hingga)\s*|\s+[-–—]\s+/i);
   if (parts.length >= 2 && parts[0] !== undefined && parts[1] !== undefined) {
     const rawStart = parts[0].trim();
     const rawEnd = parts[1].trim();
@@ -2793,6 +2848,35 @@ export function parseWaFormText(
       splitIndex = equalsIndex;
     }
 
+    if (splitIndex === -1) {
+      const strippedNumberLine = line.replace(/^[\s\-\*•\d\.\)\(\]]+/, "").trim();
+      const normLine = normalize(strippedNumberLine);
+      if (
+        normLine.startsWith("suratketerangan") ||
+        normLine.startsWith("suratcuti") ||
+        normLine.startsWith("suratizin")
+      ) {
+        let detectedVal = "Surat Cuti";
+        if (normLine.startsWith("suratketerangan")) {
+          detectedVal = "Surat Keterangan";
+          detectedLetterType = "keterangan";
+        } else {
+          detectedLetterType = "cuti";
+        }
+        result["jenis_surat"] = detectedVal;
+        result["tipe_surat"] = detectedVal;
+        result["pilihan_surat"] = detectedVal;
+        result["surat_cuti_surat_keterangan"] = detectedVal;
+        matchedFields.push({
+          key: "jenis_surat",
+          label: "Surat Cuti / Surat Keterangan (pilih salah satu)",
+          value: detectedVal,
+          rawMatchedKey: strippedNumberLine,
+        });
+        continue;
+      }
+    }
+
     if (splitIndex !== -1) {
       const rawLeft = line.substring(0, splitIndex).trim();
       let rawRight = line.substring(splitIndex + 1).trim();
@@ -2829,9 +2913,14 @@ export function parseWaFormText(
           normK.includes("tanggal") ||
           normK.includes("tgl")
         ) {
-          const parsedIso = parseDateToIsoString(rawRight);
-          if (parsedIso) {
-            finalVal = formatIsoToIndonesianDate(parsedIso);
+          const [startIso, endIso] = parseDateRangeToIsoStrings(rawRight);
+          if (startIso && endIso) {
+            finalVal = formatIsoToIndonesianDateRange(startIso, endIso);
+          } else {
+            const parsedIso = parseDateToIsoString(rawRight);
+            if (parsedIso) {
+              finalVal = formatIsoToIndonesianDate(parsedIso);
+            }
           }
         }
 
@@ -2951,12 +3040,45 @@ export function parseWaFormText(
             if (diffDays > 0) {
               result["lama_cuti_hari"] = String(diffDays);
             }
+            const formattedRange = formatIsoToIndonesianDateRange(startIso, endIso);
+            result["tanggal_cuti"] = formattedRange;
+            result["request_tanggal"] = formattedRange;
+            result[matchedPlaceholder.key] = formattedRange;
+            const tf = matchedFields.find(
+              (m) =>
+                m.key === matchedPlaceholder.key ||
+                m.key === "tanggal_cuti" ||
+                m.key === "request_tanggal"
+            );
+            if (tf) tf.value = formattedRange;
+          } else if (startIso && !endIso) {
+            const formatted = formatIsoToIndonesianDate(startIso);
+            result["tanggal_berangkat"] = formatted;
+            result["tanggal_cuti"] = formatted;
+            result["request_tanggal"] = formatted;
+            result[matchedPlaceholder.key] = formatted;
+            const tf = matchedFields.find(
+              (m) =>
+                m.key === matchedPlaceholder.key ||
+                m.key === "tanggal_cuti" ||
+                m.key === "request_tanggal"
+            );
+            if (tf) tf.value = formatted;
           } else if (!startIso) {
             const singleIso = parseDateToIsoString(rawRight);
             if (singleIso) {
               const formatted = formatIsoToIndonesianDate(singleIso);
               result["tanggal_berangkat"] = formatted;
               result["tanggal_cuti"] = formatted;
+              result["request_tanggal"] = formatted;
+              result[matchedPlaceholder.key] = formatted;
+              const tf = matchedFields.find(
+                (m) =>
+                  m.key === matchedPlaceholder.key ||
+                  m.key === "tanggal_cuti" ||
+                  m.key === "request_tanggal"
+              );
+              if (tf) tf.value = formatted;
             }
           }
         }
@@ -3077,6 +3199,7 @@ export function parseWaFormText(
         ) {
           result["request_tanggal"] = rawRight;
           result["tanggal_cuti"] = rawRight;
+          let dateValToMatch = rawRight;
           const [startIso, endIso] = parseDateRangeToIsoStrings(rawRight);
           if (startIso) {
             result["tanggal_berangkat"] = formatIsoToIndonesianDate(startIso);
@@ -3092,15 +3215,27 @@ export function parseWaFormText(
             if (diffDays > 0) {
               result["lama_cuti_hari"] = String(diffDays);
             }
+            const formattedRange = formatIsoToIndonesianDateRange(startIso, endIso);
+            result["tanggal_cuti"] = formattedRange;
+            result["request_tanggal"] = formattedRange;
+            dateValToMatch = formattedRange;
+          } else if (startIso && !endIso) {
+            const formatted = formatIsoToIndonesianDate(startIso);
+            result["tanggal_berangkat"] = formatted;
+            result["tanggal_cuti"] = formatted;
+            result["request_tanggal"] = formatted;
+            dateValToMatch = formatted;
           } else if (!startIso) {
             const singleIso = parseDateToIsoString(rawRight);
             if (singleIso) {
               const formatted = formatIsoToIndonesianDate(singleIso);
               result["tanggal_berangkat"] = formatted;
               result["tanggal_cuti"] = formatted;
+              result["request_tanggal"] = formatted;
+              dateValToMatch = formatted;
             }
           }
-          matchedFields.push({ key: "tanggal_cuti", label: "Request Tanggal", value: rawRight, rawMatchedKey: cleanLabel });
+          matchedFields.push({ key: "tanggal_cuti", label: "Request Tanggal", value: dateValToMatch, rawMatchedKey: cleanLabel });
           continue;
         }
       }

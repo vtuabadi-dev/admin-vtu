@@ -3732,6 +3732,15 @@ function GenerateSuratPageContent() {
                                   onChange={(e) =>
                                     setManualFormData((prev) => ({ ...prev, [p.key]: e.target.value }))
                                   }
+                                  onBlur={() => {
+                                    const [sIso, eIso] = parseDateRangeToIsoStrings(displayValue);
+                                    if (sIso && eIso) {
+                                      const norm = formatIsoToIndonesianDateRange(sIso, eIso);
+                                      if (norm && norm !== displayValue) {
+                                        setManualFormData((prev) => ({ ...prev, [p.key]: norm }));
+                                      }
+                                    }
+                                  }}
                                   placeholder={p.placeholderHint || "Contoh: 10 s/d 25 Oktober 2026"}
                                   className="text-xs h-9 bg-background text-foreground pr-8 font-medium shadow-xs"
                                 />

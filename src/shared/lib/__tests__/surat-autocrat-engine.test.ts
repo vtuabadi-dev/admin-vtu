@@ -511,6 +511,15 @@ Bulan: {{Bulan Awal}}`,
       expect(parseDateRangeToIsoStrings("10 s/d 25 Oktober 2026")).toEqual(["2026-10-10", "2026-10-25"]);
       expect(parseDateRangeToIsoStrings("28 Oktober s/d 10 November 2026")).toEqual(["2026-10-28", "2026-11-10"]);
       expect(parseDateRangeToIsoStrings("28 Desember 2026 s/d 10 Januari 2027")).toEqual(["2026-12-28", "2027-01-10"]);
+      // Hyphen '-' without spaces, with spaces, en-dash, and numerical dates
+      expect(parseDateRangeToIsoStrings("7-16 November 2026")).toEqual(["2026-11-07", "2026-11-16"]);
+      expect(parseDateRangeToIsoStrings("07-16 November 2026")).toEqual(["2026-11-07", "2026-11-16"]);
+      expect(parseDateRangeToIsoStrings("7 - 16 November 2026")).toEqual(["2026-11-07", "2026-11-16"]);
+      expect(parseDateRangeToIsoStrings("7–16 November 2026")).toEqual(["2026-11-07", "2026-11-16"]);
+      expect(parseDateRangeToIsoStrings("28 Oktober-5 November 2026")).toEqual(["2026-10-28", "2026-11-05"]);
+      expect(parseDateRangeToIsoStrings("28 Desember 2026-10 Januari 2027")).toEqual(["2026-12-28", "2027-01-10"]);
+      expect(parseDateRangeToIsoStrings("07/11/2026 - 16/11/2026")).toEqual(["2026-11-07", "2026-11-16"]);
+      expect(parseDateRangeToIsoStrings("07-11-2026")).toEqual(["2026-11-07", ""]);
     });
   });
 
@@ -753,6 +762,37 @@ Terima kasih atas kerja samanya. 🙏
       expect(parseRes.parsedMap.tanggal_berangkat).toBe("15 November 2026");
       expect(parseRes.parsedMap.tanggal_pulang).toBe("25 November 2026");
       expect(parseRes.parsedMap.lama_cuti_hari).toBe("11");
+    });
+
+    it("should intelligently parse hyphen date ranges and convert '-' to 's/d' for Surat Cuti/Permohonan Izin", () => {
+      const cutiTemplate = DEFAULT_SURAT_TEMPLATES.find((t) => t.slug === "cuti-pekerja")!;
+      const rawWaReply = `
+Mohon melengkapi data berikut untuk penerbitan dokumen Surat Permohonan Izin.
+Silakan isi jawaban di sebelah kanan tanda titik dua (:)
+
+1. Surat Keterangan (pilih salah l
+2. Ditujukan Kepada : kepala Kantor Pertanahan Kota Batam 
+3. Nama Yang Bersangkutan : Ir. Faradilla, S.T., M.H., QRMO. 
+4. No Identitas NIP:  198511182012122003
+5. Jabatan :  Kepala Seksi Survei dan Pemetaan 
+6. Request Tanggal : 7-16 November 2026
+
+(Catatan: Mohon pastikan ejaan nama, nomor NIK/identitas, dan tanggal telah sesuai)
+Terima kasih atas kerja samanya. 🙏
+      `.trim();
+
+      const parseRes = parseWaFormText(rawWaReply, cutiTemplate.placeholders);
+      expect(parseRes.detectedCount).toBeGreaterThanOrEqual(5);
+      expect(parseRes.parsedMap.ditujukan_kepada).toBe("kepala Kantor Pertanahan Kota Batam");
+      expect(parseRes.parsedMap.nama_yang_bersangkutan).toBe("Ir. Faradilla, S.T., M.H., QRMO.");
+      expect(parseRes.parsedMap.no_identitas).toBe("198511182012122003");
+      expect(parseRes.parsedMap.pekerjaan).toBe("Kepala Seksi Survei dan Pemetaan");
+      // Sret '-' converted to 's/d'
+      expect(parseRes.parsedMap.request_tanggal).toBe("7 s/d 16 November 2026");
+      expect(parseRes.parsedMap.tanggal_cuti).toBe("7 s/d 16 November 2026");
+      expect(parseRes.parsedMap.tanggal_berangkat).toBe("7 November 2026");
+      expect(parseRes.parsedMap.tanggal_pulang).toBe("16 November 2026");
+      expect(parseRes.parsedMap.lama_cuti_hari).toBe("10");
     });
 
     it("should parse the unified 6-point global message accurately for Surat Keterangan and sort required fields", () => {
