@@ -3162,87 +3162,68 @@ function GenerateSuratPageContent() {
                   </CardHeader>
 
                   <CardContent className="pt-4 space-y-4">
-                    {/* BAGIAN A: TEMPLATE TEKS SIAP SALIN KE WHATSAPP JAMAAH */}
-                    <div className="p-3 bg-stone-50 dark:bg-stone-900/60 rounded-xl border border-stone-200 dark:border-stone-800 space-y-2.5">
-                      <div className="flex items-center justify-between">
-                        <label className="text-xs font-bold text-foreground flex items-center gap-1.5">
-                          <Clipboard className="h-3.5 w-3.5 text-emerald-600" />
-                          Template Teks Form (Kirimkan ke WhatsApp Jamaah)
-                        </label>
-                        <span className="text-[10px] text-muted-foreground font-mono">
-                          Format Otomatis dari Tag Surat
-                        </span>
+                    {/* AREA FORMAT WA & TEMPEL BALASAN JAMAAH (SMART PARSER) */}
+                    <div className="p-3.5 bg-emerald-50/40 dark:bg-emerald-950/20 rounded-xl border border-emerald-500/30 dark:border-emerald-500/20 space-y-3">
+                      {/* Header Toolbar: Label Tempel Balasan & Tombol Salin Format WA */}
+                      <div className="flex flex-wrap items-center justify-between gap-2.5">
+                        <div className="space-y-0.5">
+                          <div className="flex items-center gap-2">
+                            <label className="text-xs font-bold text-emerald-900 dark:text-emerald-200 flex items-center gap-1.5">
+                              <Sparkles className="h-3.5 w-3.5 text-emerald-600" />
+                              Tempel (Paste) Teks Balasan dari Jamaah
+                            </label>
+                            {waInputText.trim() && (
+                              <span className="text-[10px] text-emerald-700 dark:text-emerald-400 font-mono bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
+                                {waInputText.split("\n").filter((l) => l.trim()).length} baris teks
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-[11px] text-muted-foreground leading-relaxed">
+                            Salin format template formulir, kirimkan ke chat WhatsApp jamaah, lalu tempelkan balasan mereka ke kolom di bawah ini.
+                          </p>
+                        </div>
+
+                        {/* Tombol Salin Format WA & Buka WA */}
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <Button
+                            type="button"
+                            size="sm"
+                            onClick={handleCopyWaTemplate}
+                            className={cn(
+                              "h-8 text-xs font-bold text-white transition-all flex items-center gap-1.5 shadow-xs",
+                              isCopiedWaTemplate
+                                ? "bg-emerald-700 hover:bg-emerald-800"
+                                : "bg-emerald-600 hover:bg-emerald-700"
+                            )}
+                          >
+                            {isCopiedWaTemplate ? (
+                              <>
+                                <ClipboardCheck className="h-3.5 w-3.5" />
+                                Tersalin ke Clipboard!
+                              </>
+                            ) : (
+                              <>
+                                <Clipboard className="h-3.5 w-3.5" />
+                                Salin Format Teks WA
+                              </>
+                            )}
+                          </Button>
+
+                          <a
+                            href={getWhatsAppUrl("", currentWaTemplateText)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1.5 h-8 px-2.5 rounded-lg border border-emerald-500/40 text-emerald-700 dark:text-emerald-300 bg-emerald-500/10 hover:bg-emerald-500/20 text-xs font-semibold transition-all"
+                            title="Buka WhatsApp Web / App dengan template ini"
+                          >
+                            <Send className="h-3.5 w-3.5" />
+                            Buka di WhatsApp
+                          </a>
+                        </div>
                       </div>
-
-                      <p className="text-[11px] text-muted-foreground leading-relaxed">
-                        Salin format template formulir di bawah ini, kirimkan ke chat WhatsApp calon jamaah agar mereka melengkapi isian data yang dibutuhkan.
-                      </p>
-
-                      {/* Box Preview Format WA */}
-                      <div className="relative">
-                        <pre className="p-2.5 rounded-lg bg-background border border-stone-200 dark:border-stone-800 text-[11px] font-mono text-foreground whitespace-pre-wrap max-h-36 overflow-y-auto leading-relaxed select-all">
-                          {currentWaTemplateText}
-                        </pre>
-                      </div>
-
-                      {/* Action Buttons */}
-                      <div className="flex flex-wrap items-center gap-2 pt-1">
-                        <Button
-                          type="button"
-                          size="sm"
-                          onClick={handleCopyWaTemplate}
-                          className={cn(
-                            "h-8 text-xs font-bold text-white transition-all flex items-center gap-1.5",
-                            isCopiedWaTemplate
-                              ? "bg-emerald-700 hover:bg-emerald-800"
-                              : "bg-emerald-600 hover:bg-emerald-700"
-                          )}
-                        >
-                          {isCopiedWaTemplate ? (
-                            <>
-                              <ClipboardCheck className="h-3.5 w-3.5" />
-                              Tersalin ke Clipboard!
-                            </>
-                          ) : (
-                            <>
-                              <Clipboard className="h-3.5 w-3.5" />
-                              Salin Format Teks WA
-                            </>
-                          )}
-                        </Button>
-
-                        <a
-                          href={getWhatsAppUrl("", currentWaTemplateText)}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg border border-emerald-500/40 text-emerald-700 dark:text-emerald-300 bg-emerald-500/10 hover:bg-emerald-500/20 text-xs font-semibold transition-all"
-                        >
-                          <Send className="h-3.5 w-3.5" />
-                          Buka di WhatsApp
-                        </a>
-                      </div>
-                    </div>
-
-                    {/* BAGIAN B: TEMPEL BALASAN JAMAAH & PARSING OTOMATIS */}
-                    <div className="p-3 bg-emerald-50/40 dark:bg-emerald-950/20 rounded-xl border border-emerald-500/30 dark:border-emerald-500/20 space-y-2.5">
-                      <div className="flex items-center justify-between">
-                        <label className="text-xs font-bold text-emerald-900 dark:text-emerald-200 flex items-center gap-1.5">
-                          <Sparkles className="h-3.5 w-3.5 text-emerald-600" />
-                          Tempel (Paste) Teks Balasan dari Jamaah
-                        </label>
-                        {waInputText.trim() && (
-                          <span className="text-[10px] text-emerald-700 dark:text-emerald-400 font-mono">
-                            {waInputText.split("\n").filter((l) => l.trim()).length} baris teks
-                          </span>
-                        )}
-                      </div>
-
-                      <p className="text-[11px] text-muted-foreground leading-relaxed">
-                        Setelah jamaah membalas pesan di WhatsApp, salin seluruh teks balasan tersebut dan tempelkan ke kolom berikut untuk di-parsing otomatis ke masing-masing variabel surat.
-                      </p>
 
                       <textarea
-                        rows={5}
+                        rows={8}
                         value={waInputText}
                         onChange={(e) => {
                           setWaInputText(e.target.value);
@@ -3253,8 +3234,12 @@ function GenerateSuratPageContent() {
                             setTimeout(() => handleParseWaText(pasted), 100);
                           }
                         }}
-                        placeholder={`Tempel (Paste) teks balasan WhatsApp dari jamaah di sini...\n\nContoh Format Global:\n1. Surat Cuti / Surat Keterangan (pilih salah satu) : Surat Cuti\n2. Ditujukan Kepada : HRD PT Maju Bersama\n3. Nama Yang Bersangkutan : Ir. H. Joko Santoso\n4. No Identitas NIP/NIK/NRP : 198503152010011002\n5. Jabatan/Pekerjaan : Senior Systems Engineer\n6. Request Tanggal : 15 s/d 25 November 2026`}
-                        className="w-full p-2.5 text-xs font-mono rounded-lg border border-emerald-500/30 dark:border-emerald-500/30 bg-background text-foreground focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 focus:outline-none placeholder:text-muted-foreground/60 leading-relaxed"
+                        placeholder={
+                          currentWaTemplateText
+                            ? `Tempel (Paste) teks balasan WhatsApp dari jamaah di sini...\n\nContoh Format:\n${currentWaTemplateText}`
+                            : `Tempel (Paste) teks balasan WhatsApp dari jamaah di sini...\n\nContoh Format Global:\n1. Surat Cuti / Surat Keterangan (pilih salah satu) : Surat Cuti\n2. Ditujukan Kepada : HRD PT Maju Bersama\n3. Nama Yang Bersangkutan : Ir. H. Joko Santoso\n4. No Identitas NIP/NIK/NRP : 198503152010011002\n5. Jabatan/Pekerjaan : Senior Systems Engineer\n6. Request Tanggal : 15 s/d 25 November 2026`
+                        }
+                        className="w-full p-3 text-xs font-mono rounded-lg border border-emerald-500/30 dark:border-emerald-500/30 bg-background text-foreground focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 focus:outline-none placeholder:text-muted-foreground/50 placeholder:font-mono leading-relaxed"
                       />
 
                       {/* Action Parse Row */}
