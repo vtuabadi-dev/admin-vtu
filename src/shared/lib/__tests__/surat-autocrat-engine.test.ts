@@ -23,6 +23,7 @@ import {
   parseWaFormText,
 } from "@/shared/lib/surat-autocrat-engine";
 import { searchKantorImigrasi, getKotaFromKanimName } from "@/shared/lib/kantor-imigrasi";
+import { buildExpandedFieldMap } from "@/shared/lib/docx-mail-merge";
 
 describe("Surat Autocrat Merge Engine", () => {
   it("should extract {placeholders} and {{placeholders}} from template text accurately", () => {
@@ -591,15 +592,15 @@ Bulan: {{Bulan Awal}}`,
       expect(resolved.nama_lengkap).toBe("Supriyadi");
     });
 
-    it("should resolve father's name when present in form inputs (manualFormData) as SSOT", () => {
+    it("should preserve exact verified name submitted in form inputs (manualFormData) as absolute SSOT", () => {
       const rekomTemplate = DEFAULT_SURAT_TEMPLATES[0]!;
       const mockJamaahWithAkta: any = {
         id: "jam-akta-1",
         namaLengkap: "Supriyadi",
       };
-      // Father's name was prefilled into form from OCR verification and accepted
+      // Verified full name present in form inputs as submitted by admin
       const manualData = {
-        nama_lengkap: "Supriyadi",
+        nama_lengkap: "Supriyadi Sulaiman",
         namaAyah: "Sulaiman",
       };
       const resolved = resolveAutocratFieldValues(rekomTemplate, mockJamaahWithAkta, null, manualData);
@@ -658,6 +659,42 @@ Bulan: {{Bulan Awal}}`,
       const resolved = resolveAutocratFieldValues(rekomTemplate, mockJamaah, null, manualData);
       expect(resolved.nik).toBe("3578010101010001");
       expect(resolved.tempat_lahir).toBe("Surabaya");
+    });
+
+    it("should guarantee that submitted form value in manualFormData overrides _rawNamaJamaah and raw OCR data as absolute SSOT", () => {
+      const rekomTemplate = DEFAULT_SURAT_TEMPLATES[0]!;
+      const mockJamaahWithOcr: any = {
+        id: "jam-ocr-over-1",
+        namaLengkap: "Raw OCR Name From Database",
+        dokumen: [
+          {
+            jenis: "ktp",
+            ocrData: { namaLengkap: "Raw OCR Name From Database", nik: "1234567890123456" },
+          },
+        ],
+      };
+      // Admin submitted revised verified data in the form column
+      const manualData = {
+        _rawNamaJamaah: "Raw OCR Name From Database", // Stored from initial OCR extraction
+        nama_lengkap: "Verified Admin Form Name",
+      };
+      const resolved = resolveAutocratFieldValues(rekomTemplate, mockJamaahWithOcr, null, manualData);
+      expect(resolved.nama_lengkap).toBe("Verified Admin Form Name");
+    });
+
+    it("should expand form name input to all Word placeholder variations in buildExpandedFieldMap", () => {
+      const formInputValues = {
+        nama_lengkap: "Siti Rahmawati",
+      };
+      const expanded = buildExpandedFieldMap(formInputValues);
+      expect(expanded["Nama Lengkap"]).toBe("Siti Rahmawati");
+      expect(expanded["nama_lengkap"]).toBe("Siti Rahmawati");
+      expect(expanded["Nama"]).toBe("Siti Rahmawati");
+      expect(expanded["nama"]).toBe("Siti Rahmawati");
+      expect(expanded["Nama Jamaah"]).toBe("Siti Rahmawati");
+      expect(expanded["Nama Jama'ah"]).toBe("Siti Rahmawati");
+      expect(expanded["Nama Pemohon"]).toBe("Siti Rahmawati");
+      expect(expanded["Nama Yang Cuti"]).toBe("Siti Rahmawati");
     });
   });
 

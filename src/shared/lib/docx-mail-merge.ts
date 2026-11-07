@@ -43,12 +43,62 @@ export function buildExpandedFieldMap(fieldValues: Record<string, string>): Reco
       result["tanggal_lahir"] = strVal;
     }
 
-    if (key.toLowerCase().includes("nama") && (key.toLowerCase().includes("jamaah") || key.toLowerCase().includes("jama'ah") || key.toLowerCase().includes("jama’ah") || key.toLowerCase().includes("lengkap"))) {
+    const lowerKey = key.toLowerCase();
+    const isPersonNameKey =
+      lowerKey === "nama" ||
+      lowerKey === "nama_lengkap" ||
+      lowerKey === "namalengkap" ||
+      lowerKey === "nama lengkap" ||
+      lowerKey === "nama_jamaah" ||
+      lowerKey === "namajamaah" ||
+      lowerKey === "nama jamaah" ||
+      lowerKey === "nama jama'ah" ||
+      lowerKey === "nama jama’ah" ||
+      lowerKey === "nama_pemohon" ||
+      lowerKey === "namapemohon" ||
+      lowerKey === "nama pemohon" ||
+      lowerKey === "nama_yang_cuti" ||
+      lowerKey === "namayangcuti" ||
+      lowerKey === "nama yang cuti" ||
+      lowerKey === "nama_peserta" ||
+      lowerKey === "namapeserta" ||
+      lowerKey === "nama peserta" ||
+      lowerKey === "nama_karyawan" ||
+      lowerKey === "namakaryawan" ||
+      lowerKey === "nama karyawan" ||
+      lowerKey === "nama_pegawai" ||
+      lowerKey === "namapegawai" ||
+      lowerKey === "nama pegawai" ||
+      lowerKey === "_rawnamajamaah" ||
+      (lowerKey.startsWith("nama") &&
+        !lowerKey.includes("ayah") &&
+        !lowerKey.includes("orangtua") &&
+        !lowerKey.includes("perusahaan") &&
+        !lowerKey.includes("kantor") &&
+        !lowerKey.includes("instansi") &&
+        !lowerKey.includes("paket") &&
+        !lowerKey.includes("hotel") &&
+        !lowerKey.includes("bank"));
+
+    if (isPersonNameKey) {
+      result["Nama"] = strVal;
+      result["nama"] = strVal;
+      result["Nama Lengkap"] = strVal;
+      result["nama_lengkap"] = strVal;
+      result["Nama Jamaah"] = strVal;
+      result["nama_jamaah"] = strVal;
       result["Nama Jama'ah"] = strVal;
       result["Nama Jama’ah"] = strVal;
-      result["Nama Jamaah"] = strVal;
-      result["nama_lengkap"] = strVal;
-      result["nama_jamaah"] = strVal;
+      result["Nama Pemohon"] = strVal;
+      result["nama_pemohon"] = strVal;
+      result["Nama Peserta"] = strVal;
+      result["nama_peserta"] = strVal;
+      result["Nama Karyawan"] = strVal;
+      result["nama_karyawan"] = strVal;
+      result["Nama Pegawai"] = strVal;
+      result["nama_pegawai"] = strVal;
+      result["Nama Yang Cuti"] = strVal;
+      result["nama_yang_cuti"] = strVal;
     }
 
     if (key.toLowerCase().includes("tempat lahir")) {

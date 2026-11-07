@@ -1520,7 +1520,30 @@ function GenerateSuratPageContent() {
             next["_rawNamaJamaah"] = value;
             userEditedFieldKeysRef.current.add("_rawNamaJamaah");
 
-            const namaKeys = ["nama", "nama_lengkap", "Nama", "Nama Lengkap", "Nama Jamaah", "Nama Jama'ah", "nama_jamaah", "namapemohon", "Nama Pemohon"];
+            const namaKeys = [
+              "nama",
+              "nama_lengkap",
+              "Nama",
+              "Nama Lengkap",
+              "Nama Jamaah",
+              "Nama Jama'ah",
+              "Nama Jama’ah",
+              "nama_jamaah",
+              "namapemohon",
+              "Nama Pemohon",
+              "nama_pemohon",
+              "nama_yang_cuti",
+              "Nama Yang Cuti",
+              "namapeserta",
+              "nama_peserta",
+              "Nama Peserta",
+              "namakaryawan",
+              "nama_karyawan",
+              "Nama Karyawan",
+              "namapegawai",
+              "nama_pegawai",
+              "Nama Pegawai"
+            ];
             namaKeys.forEach((nk) => {
               next[nk] = value;
               userEditedFieldKeysRef.current.add(nk);
@@ -1540,11 +1563,27 @@ function GenerateSuratPageContent() {
                   plbl.includes("nama jama") ||
                   plbl.includes("nama lengkap") ||
                   pk === "namapemohon" ||
-                  plbl === "nama pemohon")
+                  plbl === "nama pemohon" ||
+                  pk.includes("namayangcuti") ||
+                  plbl.includes("nama yang cuti") ||
+                  pk.includes("namapeserta") ||
+                  plbl.includes("nama peserta"))
               ) {
                 next[pl.key] = value;
                 userEditedFieldKeysRef.current.add(pl.key);
               }
+            });
+          } else if (cleanK === "nik" || cleanK.includes("identitas") || cleanK === "nipnik") {
+            const nikKeys = ["nik", "NIK", "no_identitas", "No Identitas", "nomor_identitas", "Nomor Identitas", "nip_nik", "NIP/NIK/NRP"];
+            nikKeys.forEach((nk) => {
+              next[nk] = value;
+              userEditedFieldKeysRef.current.add(nk);
+            });
+          } else if (cleanK.includes("paspor") || cleanK.includes("passport")) {
+            const pasporKeys = ["paspor", "Paspor", "nomor_paspor", "Nomor Paspor", "no_paspor", "No Paspor"];
+            pasporKeys.forEach((pk) => {
+              next[pk] = value;
+              userEditedFieldKeysRef.current.add(pk);
             });
           } else if (cleanK.includes("ayah")) {
             userEditedFieldKeysRef.current.add("namaAyah");
@@ -2013,12 +2052,28 @@ function GenerateSuratPageContent() {
   const verificationUrl = useMemo(() => {
     const baseUrl = typeof window !== "undefined" ? window.location.origin : "https://vtuabadi.com";
     const regId = activeJamaah?.registrationId || activeJamaah?.id || "";
-    const effectiveNama =
+    const formNama =
+      manualFormData["nama"] ||
+      manualFormData["nama_lengkap"] ||
+      manualFormData["Nama"] ||
+      manualFormData["Nama Lengkap"] ||
+      manualFormData["Nama Jamaah"] ||
+      manualFormData["Nama Jama'ah"] ||
+      manualFormData["Nama Pemohon"] ||
+      manualFormData["namapemohon"] ||
+      manualFormData["nama_yang_cuti"] ||
+      extractNamaFromAutocratFields(manualFormData, resolvedFieldValues, effectivePlaceholders) ||
       extractNamaFromAutocratFields(resolvedFieldValues, manualFormData, effectivePlaceholders) ||
       activeJamaah?.namaLengkap ||
       "Jamaah";
-    const jamNama = encodeURIComponent(effectiveNama);
-    const pkgNama = encodeURIComponent(activeKeberangkatan?.namaPaket || "");
+    const jamNama = encodeURIComponent(toTitleCase(formNama));
+    const pkgNama = encodeURIComponent(
+      manualFormData["nama_paket"] ||
+      manualFormData["Nama Paket"] ||
+      manualFormData["paket"] ||
+      activeKeberangkatan?.namaPaket ||
+      ""
+    );
     return `${baseUrl}/track/surat?no=${encodeURIComponent(computedNomorSurat)}&reg=${regId}&nama=${jamNama}&paket=${pkgNama}`;
   }, [computedNomorSurat, activeJamaah, activeKeberangkatan, resolvedFieldValues, manualFormData, effectivePlaceholders]);
 
@@ -2029,10 +2084,58 @@ function GenerateSuratPageContent() {
   const handleSaveToHistory = useCallback(() => {
     if (!activeTemplate) return;
 
-    const effectiveNama =
+    // SINKRONISASI MUTLAK: Seluruh data yang ada di kolom form isian adalah SSOT tunggal.
+    const submittedData: Record<string, string> = { ...manualFormData };
+    effectivePlaceholders.forEach((p) => {
+      let val = manualFormData[p.key];
+      if (val === undefined || val === null || val === "") {
+        const normKey = p.key.toLowerCase().replace(/[\u2018\u2019\u201A\u201B']/g, "'").replace(/[\s_\-\.]/g, "");
+        for (const [mk, mv] of Object.entries(manualFormData)) {
+          const cleanMk = mk.toLowerCase().replace(/[\u2018\u2019\u201A\u201B']/g, "'").replace(/[\s_\-\.]/g, "");
+          if (cleanMk === normKey && mv !== undefined && mv !== "") {
+            val = mv;
+            break;
+          }
+        }
+      }
+      if (val === undefined || val === null || val === "") {
+        val = (resolvedFieldValues as Record<string, string>)[p.key];
+      }
+      if (val !== undefined && val !== null && val !== "" && val !== "-") {
+        submittedData[p.key] = String(val);
+      }
+    });
+
+    // Nama jamaah / pemohon mutlak diambil dari isian form yang tersubmit
+    const formNama =
+      submittedData["nama"] ||
+      submittedData["nama_lengkap"] ||
+      submittedData["Nama"] ||
+      submittedData["Nama Lengkap"] ||
+      submittedData["Nama Jamaah"] ||
+      submittedData["Nama Jama'ah"] ||
+      submittedData["Nama Pemohon"] ||
+      submittedData["namapemohon"] ||
+      submittedData["nama_yang_cuti"] ||
+      extractNamaFromAutocratFields(submittedData, manualFormData, effectivePlaceholders) ||
       extractNamaFromAutocratFields(resolvedFieldValues, manualFormData, effectivePlaceholders) ||
       activeJamaah?.namaLengkap ||
       "Jamaah";
+
+    const finalFormNama = toTitleCase(formNama);
+
+    // Sinkronkan seluruh tag variasi nama agar mail merge Word (.docx) presisi 100%
+    const allNameKeys = [
+      "nama", "Nama", "nama_lengkap", "Nama Lengkap",
+      "Nama Jamaah", "nama_jamaah", "Nama Jama'ah", "Nama Jama’ah",
+      "Nama Pemohon", "namapemohon", "nama_pemohon",
+      "Nama Peserta", "nama_peserta", "Nama Yang Cuti", "nama_yang_cuti",
+      "Nama Karyawan", "nama_karyawan", "Nama Pegawai", "nama_pegawai",
+      "_rawNamaJamaah"
+    ];
+    allNameKeys.forEach((nk) => {
+      submittedData[nk] = finalFormNama;
+    });
 
     const logItem: GeneratedSuratLog = {
       id: `srt-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
@@ -2042,12 +2145,12 @@ function GenerateSuratPageContent() {
       templateName: activeTemplate.nama,
       kategori: activeTemplate.kategori,
       jamaahId: activeJamaah?.id,
-      jamaahNama: toTitleCase(effectiveNama),
+      jamaahNama: finalFormNama,
       jamaahPaspor:
-        manualFormData["nomor_paspor"] ||
-        manualFormData["Nomor Paspor"] ||
-        manualFormData["paspor"] ||
-        manualFormData["Paspor"] ||
+        submittedData["nomor_paspor"] ||
+        submittedData["Nomor Paspor"] ||
+        submittedData["paspor"] ||
+        submittedData["Paspor"] ||
         resolvedFieldValues["Nomor Paspor"] ||
         resolvedFieldValues["nomor_paspor"] ||
         resolvedFieldValues["Paspor"] ||
@@ -2055,10 +2158,10 @@ function GenerateSuratPageContent() {
         activeJamaah?.nomorPaspor ||
         "-",
       jamaahNik:
-        manualFormData["nik"] ||
-        manualFormData["NIK"] ||
-        manualFormData["no_identitas"] ||
-        manualFormData["No Identitas"] ||
+        submittedData["nik"] ||
+        submittedData["NIK"] ||
+        submittedData["no_identitas"] ||
+        submittedData["No Identitas"] ||
         resolvedFieldValues["NIK"] ||
         resolvedFieldValues["nik"] ||
         activeJamaah?.nik ||
@@ -2066,9 +2169,9 @@ function GenerateSuratPageContent() {
       packageId: activeKeberangkatan?.id,
       packageKode: activeKeberangkatan?.kode,
       packageName:
-        manualFormData["nama_paket"] ||
-        manualFormData["Nama Paket"] ||
-        manualFormData["paket"] ||
+        submittedData["nama_paket"] ||
+        submittedData["Nama Paket"] ||
+        submittedData["paket"] ||
         activeKeberangkatan?.namaPaket ||
         (dataSourceMode === "manual" ? "Manual / Non-Manifest" : "Paket Umroh"),
       departureDate: activeKeberangkatan?.tanggalBerangkat,
@@ -2076,7 +2179,7 @@ function GenerateSuratPageContent() {
       perihal: renderedPerihal,
       generatedDate: new Date().toISOString(),
       createdBy: "Admin Operasional",
-      fieldsData: { ...resolvedFieldValues, ...manualFormData },
+      fieldsData: { ...resolvedFieldValues, ...submittedData },
       renderedText: renderedLetterBody,
       templateFileBase64:
         activeAttachedFile?.templateFileBase64 ||

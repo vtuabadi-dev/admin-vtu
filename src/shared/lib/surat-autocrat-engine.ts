@@ -950,10 +950,26 @@ export function resolveAutocratFieldValues(
 
   // Alias groups dictionary for instant bidirectional resolution between template tags and form inputs
   const ALIAS_GROUPS: string[][] = [
-    // 1. Nama Jamaah
-    ["nama", "namajamaah", "namajama'ah", "namalengkap", "namapemohon", "namapeserta", "namakaryawan", "namatertanggung", "namapegawai", "_rawnamajamaah"],
+    // 1. Nama Jamaah / Pemohon / Karyawan (Form Input is absolute SSOT)
+    [
+      "nama",
+      "namajamaah",
+      "namajama'ah",
+      "namajama’ah",
+      "namajama`ah",
+      "namalengkap",
+      "namalengkapjamaah",
+      "namapemohon",
+      "namapeserta",
+      "namakaryawan",
+      "namatertanggung",
+      "namapegawai",
+      "namayangcuti",
+      "namapetugas",
+      "namapasien",
+    ],
     // 2. NIK / No Identitas
-    ["nik", "noktp", "nomorktp", "noidentitas", "nomoridentitas", "noid", "nomorid", "nipnik"],
+    ["nik", "noktp", "nomorktp", "noidentitas", "nomoridentitas", "noid", "nomorid", "nipnik", "nipniknrp"],
     // 3. Paspor
     ["paspor", "nomorpaspor", "nopaspor", "passport", "passportnumber"],
     // 4. Tempat Lahir
@@ -1016,8 +1032,8 @@ export function resolveAutocratFieldValues(
           mv !== "" &&
           mv !== "-"
         ) {
-          // If searching for jamaah name, exclude ayah / company / package keys
-          if (matchedGroup[0] === "nama" && (normMk.includes("ayah") || normMk.includes("perusahaan") || normMk.includes("paket"))) {
+          // If searching for jamaah name, exclude ayah / company / package / raw OCR internal keys
+          if (matchedGroup[0] === "nama" && (normMk.includes("ayah") || normMk.includes("perusahaan") || normMk.includes("paket") || normMk === "_rawnamajamaah")) {
             continue;
           }
           return mv;
@@ -1046,32 +1062,35 @@ export function resolveAutocratFieldValues(
         manualFormData["nama_perusahaan"]
       );
     }
-    // Cross-alias fallback for nama jamaah
+    // Cross-alias fallback for nama jamaah / pemohon
     const isTargetNamaJamaah =
       target === "nama" ||
-      target === "namajamaah" ||
-      target === "namajama'ah" ||
-      target === "namalengkap" ||
-      target.includes("namajama") ||
-      target.includes("namalengkap");
+      (target.startsWith("nama") &&
+        !target.includes("ayah") &&
+        !target.includes("orangtua") &&
+        !target.includes("perusahaan") &&
+        !target.includes("kantor") &&
+        !target.includes("instansi") &&
+        !target.includes("paket") &&
+        !target.includes("hotel") &&
+        !target.includes("bank"));
 
     if (isTargetNamaJamaah) {
       for (const [mk, mv] of Object.entries(manualFormData)) {
         const normMk = normalizeKey(mk);
-        if (
-          !normMk.includes("ayah") &&
-          !normMk.includes("perusahaan") &&
-          !normMk.includes("paket") &&
-          (normMk === "nama" ||
-            normMk === "namajamaah" ||
-            normMk === "namajama'ah" ||
-            normMk === "namalengkap" ||
-            normMk.includes("namajama") ||
-            normMk.includes("namalengkap")) &&
-          mv !== undefined &&
-          mv !== "" &&
-          mv !== "-"
-        ) {
+        const isMkNama =
+          normMk === "nama" ||
+          (normMk.startsWith("nama") &&
+            !normMk.includes("ayah") &&
+            !normMk.includes("orangtua") &&
+            !normMk.includes("perusahaan") &&
+            !normMk.includes("kantor") &&
+            !normMk.includes("instansi") &&
+            !normMk.includes("paket") &&
+            !normMk.includes("hotel") &&
+            !normMk.includes("bank"));
+
+        if (isMkNama && mv !== undefined && mv !== "" && mv !== "-") {
           return mv;
         }
       }
@@ -1173,29 +1192,30 @@ export function resolveAutocratFieldValues(
       return;
     }
 
-    // Check direct manual form override first (Form input is the absolute SSOT)
+    // Check direct manual form override first (Form input is the absolute SSOT - data di kolom form isian adalah SSOT)
     const directManualVal = getManualOverride(key);
-    if (directManualVal !== undefined) {
+    if (directManualVal !== undefined && directManualVal !== null) {
       const isNamaJamaahKey =
         cleanK === "nama" ||
         cleanK === "namajamaah" ||
         cleanK === "namalengkap" ||
         cleanK.includes("namajama") ||
-        cleanK.includes("namalengkap");
+        cleanK.includes("namalengkap") ||
+        cleanK === "namapemohon";
 
       if (isNamaJamaahKey) {
         const isSingleWord = countNameWords(directManualVal) < 2;
-        // Only append father name if father name exists in form inputs or verified manifest, NEVER from raw ocrData
-        const shouldAppendAyah = (isEndorsement || (isRekomPaspor && isSingleWord)) && Boolean(namaAyahCandidate);
+        // Hanya format nama ayah jika nama di form adalah single word DAN formAyah secara eksplisit diisi di form (manualFormData)
+        const shouldAppendAyah = (isEndorsement || (isRekomPaspor && isSingleWord)) && Boolean(formAyah);
         if (shouldAppendAyah) {
-          values[key] = formatJamaahNameWithEndorsement(directManualVal, namaAyahCandidate, true);
+          values[key] = formatJamaahNameWithEndorsement(directManualVal, formAyah, true);
         } else {
-          const trimmed = typeof directManualVal === "string" ? directManualVal.trim() : directManualVal;
-          values[key] = (trimmed === "" || trimmed === undefined || trimmed === null) ? "-" : String(directManualVal);
+          const trimmed = typeof directManualVal === "string" ? directManualVal.trim() : String(directManualVal);
+          values[key] = (trimmed === "" || trimmed === "-") ? "-" : trimmed;
         }
       } else {
-        const trimmed = typeof directManualVal === "string" ? directManualVal.trim() : directManualVal;
-        values[key] = (trimmed === "" || trimmed === undefined || trimmed === null) ? "-" : String(directManualVal);
+        const trimmed = typeof directManualVal === "string" ? directManualVal.trim() : String(directManualVal);
+        values[key] = (trimmed === "" || trimmed === "-") ? "-" : trimmed;
       }
       return;
     }
@@ -2129,6 +2149,19 @@ function autoDetectManifestValue(
   }
 
   // Common keywords matching
+  const formNameCandidate =
+    manualFormData["nama"] ||
+    manualFormData["nama_lengkap"] ||
+    manualFormData["Nama"] ||
+    manualFormData["Nama Lengkap"] ||
+    manualFormData["Nama Jamaah"] ||
+    manualFormData["Nama Jama'ah"] ||
+    manualFormData["Nama Pemohon"] ||
+    manualFormData["namapemohon"] ||
+    manualFormData["nama_yang_cuti"] ||
+    manualFormData["Nama Yang Cuti"] ||
+    manualFormData["_rawNamaJamaah"];
+
   if (
     cleanK.includes("namajamaah") ||
     cleanK.includes("namalengkap") ||
@@ -2136,8 +2169,13 @@ function autoDetectManifestValue(
     cleanK === "nama" ||
     cleanK === "namakaryawan" ||
     cleanK === "namatertanggung" ||
-    cleanK === "namapetugas"
+    cleanK === "namapetugas" ||
+    cleanK === "namapemohon" ||
+    cleanK === "namayangcuti"
   ) {
+    if (formNameCandidate && String(formNameCandidate).trim() && String(formNameCandidate).trim() !== "-") {
+      return String(formNameCandidate).trim();
+    }
     return resolveManifestFieldValue("jamaah.namaLengkap", jamaah, keberangkatan, today, options);
   }
   if (cleanK.includes("ayah") || cleanK.includes("orangtua")) {
