@@ -10,7 +10,7 @@ import {
   MOCK_LANDING_PATTERN, 
   MOCK_KLASTER
 } from "@/shared/lib/mock-data";
-import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X, Split, Layers, Tag, Edit3, RefreshCw, Info } from "lucide-react";
+import { Upload, Loader2, FileText, AlertTriangle, Sparkles, Plus, X, Split, Layers, Tag, Edit3, RefreshCw, Info, ClipboardPaste, ClipboardCheck } from "lucide-react";
 import { generateVtuGroupCode } from "@/shared/lib/group-code.helper";
 import { PairingCanvas } from "./components/PairingCanvas";
 import { SplitStartingQuotaSlider } from "./components/SplitStartingQuotaSlider";
@@ -86,13 +86,72 @@ export default function GeneratePaketPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const MAX_FILES = 10;
+  const [pasteFeedback, setPasteFeedback] = useState<string | null>(null);
+  const flyerFilesRef = useRef<File[]>(flyerFiles);
+  useEffect(() => {
+    flyerFilesRef.current = flyerFiles;
+  }, [flyerFiles]);
+
+  const extractImageFilesFromClipboard = (clipboardData: DataTransfer | null): File[] => {
+    if (!clipboardData) return [];
+    const imageFiles: File[] = [];
+
+    // 1. Periksa clipboardData.items (format standar WhatsApp Web/Desktop, Telegram, Snipping Tool)
+    if (clipboardData.items && clipboardData.items.length > 0) {
+      for (let i = 0; i < clipboardData.items.length; i++) {
+        const item = clipboardData.items[i];
+        if (item && item.kind === "file" && item.type.startsWith("image/")) {
+          const file = item.getAsFile();
+          if (file) {
+            const ext = file.type.includes("png")
+              ? ".png"
+              : file.type.includes("webp")
+              ? ".webp"
+              : file.type.includes("gif")
+              ? ".gif"
+              : ".jpg";
+            const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+            const cleanName =
+              file.name && file.name !== "image.png" && file.name !== "blob"
+                ? file.name
+                : `flyer_pasted_${timestamp}_${imageFiles.length + 1}${ext}`;
+            imageFiles.push(new File([file], cleanName, { type: file.type, lastModified: Date.now() }));
+          }
+        }
+      }
+    }
+
+    // 2. Fallback clipboardData.files (jika disalin sebagai File object di clipboard)
+    if (imageFiles.length === 0 && clipboardData.files && clipboardData.files.length > 0) {
+      for (let i = 0; i < clipboardData.files.length; i++) {
+        const file = clipboardData.files[i];
+        if (file && file.type.startsWith("image/")) {
+          const ext = file.type.includes("png")
+            ? ".png"
+            : file.type.includes("webp")
+            ? ".webp"
+            : file.type.includes("gif")
+            ? ".gif"
+            : ".jpg";
+          const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+          const cleanName =
+            file.name && file.name !== "image.png" && file.name !== "blob"
+              ? file.name
+              : `flyer_pasted_${timestamp}_${imageFiles.length + 1}${ext}`;
+          imageFiles.push(new File([file], cleanName, { type: file.type, lastModified: Date.now() }));
+        }
+      }
+    }
+
+    return imageFiles;
+  };
 
   const addFiles = useCallback((incoming: FileList | File[]) => {
     const arr = Array.from(incoming).filter(f =>
       f.type.startsWith("image/")
     );
     if (arr.length > 0) {
-      setActiveFlyerIndex(0);
+      setActiveFlyerIndex(prev => (prev !== null ? prev : 0));
       setFlyerZoom(100);
     }
     setFlyerFiles(prev => {
@@ -103,6 +162,78 @@ export default function GeneratePaketPage() {
       return combined;
     });
   }, []);
+
+  const handleDropzonePaste = useCallback((e: React.ClipboardEvent<HTMLDivElement>) => {
+    const clipboardData = e.clipboardData;
+    if (!clipboardData) return;
+
+    const pastedImages = extractImageFilesFromClipboard(clipboardData);
+    if (pastedImages.length > 0) {
+      e.preventDefault();
+      e.stopPropagation();
+
+      const currentCount = flyerFilesRef.current.length;
+      if (currentCount >= MAX_FILES) {
+        setPasteFeedback(`Maksimal ${MAX_FILES} foto flyer sudah tercapai.`);
+        setTimeout(() => setPasteFeedback(null), 4000);
+        return;
+      }
+
+      addFiles(pastedImages);
+      const remainingQuota = MAX_FILES - currentCount;
+      const acceptedCount = Math.min(pastedImages.length, remainingQuota);
+      setPasteFeedback(`${acceptedCount} foto flyer berhasil ditempel dari clipboard (WhatsApp / Telegram)`);
+      setTimeout(() => setPasteFeedback(null), 4000);
+    }
+  }, [addFiles]);
+
+  // Global window paste handler active when in OCR tab
+  useEffect(() => {
+    if (pathMode !== "ocr") return;
+
+    const handleWindowPaste = (e: ClipboardEvent) => {
+      const activeEl = document.activeElement;
+      const isTextInput =
+        activeEl instanceof HTMLInputElement ||
+        activeEl instanceof HTMLTextAreaElement ||
+        (activeEl as HTMLElement)?.isContentEditable;
+
+      const clipboardData = e.clipboardData;
+      if (!clipboardData) return;
+
+      const pastedImages = extractImageFilesFromClipboard(clipboardData);
+      if (pastedImages.length === 0) {
+        return; // Allow regular text paste into inputs/textareas
+      }
+
+      // If user is focused inside a text input and clipboard has plain text, let text paste proceed
+      if (isTextInput) {
+        const textData = clipboardData.getData("text/plain");
+        if (textData && textData.trim().length > 0) {
+          return;
+        }
+      }
+
+      e.preventDefault();
+      const currentCount = flyerFilesRef.current.length;
+      if (currentCount >= MAX_FILES) {
+        setPasteFeedback(`Maksimal ${MAX_FILES} foto flyer sudah tercapai.`);
+        setTimeout(() => setPasteFeedback(null), 4000);
+        return;
+      }
+
+      addFiles(pastedImages);
+      const remainingQuota = MAX_FILES - currentCount;
+      const acceptedCount = Math.min(pastedImages.length, remainingQuota);
+      setPasteFeedback(`${acceptedCount} foto flyer berhasil ditempel dari clipboard (WhatsApp / Telegram)`);
+      setTimeout(() => setPasteFeedback(null), 4000);
+    };
+
+    window.addEventListener("paste", handleWindowPaste);
+    return () => {
+      window.removeEventListener("paste", handleWindowPaste);
+    };
+  }, [pathMode, addFiles]);
 
   const removeFile = (index: number) => {
     setFlyerFiles(prev => prev.filter((_, i) => i !== index));
@@ -3904,9 +4035,19 @@ export default function GeneratePaketPage() {
                 </div>
               </div>
 
+              {/* ── Feedback Banner Paste Clipboard ── */}
+              {pasteFeedback && (
+                <div className="flex items-center gap-2 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800 text-emerald-800 dark:text-emerald-200 text-xs px-3 py-2.5 rounded-xl shadow-xs animate-in fade-in duration-200">
+                  <ClipboardCheck className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                  <span className="font-medium">{pasteFeedback}</span>
+                </div>
+              )}
+
               {/* ── Drag & Drop Zone ── */}
               <div
                 ref={dropRef}
+                tabIndex={0}
+                onPaste={handleDropzonePaste}
                 onDrop={handleDrop}
                 onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}
@@ -3943,7 +4084,11 @@ export default function GeneratePaketPage() {
                       <p className="text-xs text-muted-foreground mt-0.5">
                         atau <span className="text-primary font-semibold underline">klik untuk memilih</span> — mendukung hingga {MAX_FILES} foto sekaligus
                       </p>
-                      <p className="text-[11px] text-muted-foreground mt-1">Format: JPG, JPEG, PNG, WEBP</p>
+                      <div className="mt-2.5 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/25 text-emerald-700 dark:text-emerald-400 text-[11px] font-medium">
+                        <ClipboardPaste className="h-3.5 w-3.5 shrink-0" />
+                        <span>Bisa <strong>Ctrl+V (Paste)</strong> langsung dari WhatsApp & Telegram</span>
+                      </div>
+                      <p className="text-[11px] text-muted-foreground mt-2">Format: JPG, JPEG, PNG, WEBP (otomatis terbaca saat ditempel)</p>
                     </div>
                   </div>
                 ) : (
@@ -4017,16 +4162,22 @@ export default function GeneratePaketPage() {
                           className="aspect-square rounded-lg border-2 border-dashed border-border hover:border-primary/60 hover:bg-primary/5 transition-all flex flex-col items-center justify-center gap-1 text-muted-foreground hover:text-primary cursor-pointer"
                         >
                           <Plus className="h-5 w-5" />
-                          <span className="text-[10px] font-medium">Tambah</span>
+                          <span className="text-[10px] font-medium leading-tight">Tambah / Paste</span>
                         </div>
                       )}
                     </div>
 
-                    <div className="flex items-center justify-between pt-1 border-t border-border">
-                      <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+                    <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-border">
+                      <div className="space-y-0.5">
+                        <p className="text-xs text-muted-foreground flex items-center gap-1.5">
                         <span className="font-semibold text-foreground">{flyerFiles.length}</span> foto dipilih
                         <span className="text-[11px] text-emerald-700 dark:text-emerald-400 font-semibold">(Klik gambar untuk memperbesar)</span>
-                      </p>
+                        </p>
+                        <p className="text-[11px] text-muted-foreground flex items-center gap-1">
+                          <ClipboardPaste className="h-3 w-3 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                          <span>Tekan <kbd className="px-1 py-0.5 bg-muted rounded border text-[10px] font-mono">Ctrl+V</kbd> untuk tempel foto lagi dari WA / Telegram</span>
+                        </p>
+                      </div>
                       <button
                         type="button"
                         onClick={(e) => {
