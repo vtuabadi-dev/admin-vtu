@@ -73,6 +73,8 @@ import {
   parseDateRangeToIsoStrings,
   parseMonthYearToIsoString,
   formatIsoToIndonesianMonthYear,
+  formatMonthYear,
+  resolveManifestFieldValue,
   generateWaTemplateText,
   parseWaFormText,
   type ParsedWaResult,
@@ -273,6 +275,7 @@ function GenerateSuratPageContent() {
   const [manualFormData, setManualFormData] = useState<Record<string, string>>({});
   const userEditedFieldKeysRef = useRef<Set<string>>(new Set());
   const lastAppliedOcrHashRef = useRef<string>("");
+  const lastLoadedJamaahIdRef = useRef<string>("");
   const [nomorUrutSurat, setNomorUrutSurat] = useState<string>("001");
   const [customPerihal, setCustomPerihal] = useState<string>("");
 
@@ -743,6 +746,245 @@ function GenerateSuratPageContent() {
 
     return deduplicatedFallback;
   }, [activeTemplate, rawTemplateText]);
+
+  // Pre-fill manualFormData when activeJamaah or activeKeberangkatan is selected in Manifest mode
+  // The Form input is the absolute Single Source of Truth (SSOT). Extraction only populates initial fields for verification.
+  useEffect(() => {
+    if (dataSourceMode !== "manifest") return;
+    if (!selectedJamaahId) {
+      lastLoadedJamaahIdRef.current = "";
+      return;
+    }
+
+    // Only run when selected jamaah changes
+    if (lastLoadedJamaahIdRef.current === selectedJamaahId) return;
+    lastLoadedJamaahIdRef.current = selectedJamaahId;
+
+    if (!activeJamaah) return;
+
+    userEditedFieldKeysRef.current.clear();
+
+    const jm = activeJamaah as any;
+    const kb = activeKeberangkatan as any;
+
+    const newFormData: Record<string, string> = {};
+
+    const baseName = toTitleCase(jm.namaLengkap || jm.name || "");
+    const ayahName = toTitleCase(
+      jm.namaAyah ||
+      jm.ayahKandung ||
+      jm.fatherName ||
+      jm.dokumen?.find?.((d: any) => d.jenis === "akta" || d.jenis === "kk")?.manualData?.namaAyah ||
+      jm.dokumen?.find?.((d: any) => d.jenis === "akta" || d.jenis === "kk")?.ocrData?.namaAyah ||
+      ""
+    );
+
+    const isRekomPaspor =
+      activeTemplate?.slug?.includes("rekom") ||
+      activeTemplate?.id === "tpl-rekom-paspor" ||
+      activeTemplate?.kodeNomorDefault === "SR-PASPOR" ||
+      (activeTemplate?.nama || "").toLowerCase().includes("rekomendasi paspor");
+
+    const currentHal = (
+      customPerihal ||
+      activeTemplate?.perihalDefault ||
+      ""
+    ).toLowerCase();
+    const isEndorsement = currentHal.includes("endorse");
+
+    const isSingleWord = countNameWords(baseName) < 2;
+    const shouldAppendAyah = (isEndorsement || (isRekomPaspor && isSingleWord)) && Boolean(ayahName);
+    const finalNama = shouldAppendAyah
+      ? formatJamaahNameWithEndorsement(baseName, ayahName, true)
+      : baseName;
+
+    if (baseName) {
+      newFormData["_rawNamaJamaah"] = baseName;
+      newFormData["nama"] = finalNama;
+      newFormData["nama_lengkap"] = finalNama;
+      newFormData["Nama"] = finalNama;
+      newFormData["Nama Lengkap"] = finalNama;
+      newFormData["Nama Jamaah"] = finalNama;
+      newFormData["Nama Jama'ah"] = finalNama;
+      newFormData["nama_jamaah"] = finalNama;
+      newFormData["namapemohon"] = finalNama;
+      newFormData["Nama Pemohon"] = finalNama;
+    }
+
+    if (ayahName) {
+      newFormData["nama_ayah"] = ayahName;
+      newFormData["namaAyah"] = ayahName;
+      newFormData["Nama Ayah"] = ayahName;
+      newFormData["ayah"] = ayahName;
+    }
+
+    const nikVal =
+      jm.nik ||
+      jm.dokumen?.find?.((d: any) => d.jenis === "ktp")?.manualData?.nik ||
+      jm.dokumen?.find?.((d: any) => d.jenis === "ktp")?.ocrData?.nik ||
+      "";
+    if (nikVal) {
+      const trimmed = String(nikVal).trim();
+      newFormData["nik"] = trimmed;
+      newFormData["NIK"] = trimmed;
+      newFormData["no_identitas"] = trimmed;
+      newFormData["No Identitas"] = trimmed;
+      newFormData["nomor_identitas"] = trimmed;
+    }
+
+    const pasporVal =
+      jm.nomorPaspor ||
+      jm.passportNumber ||
+      jm.dokumen?.find?.((d: any) => d.jenis === "paspor")?.manualData?.nomorPaspor ||
+      jm.dokumen?.find?.((d: any) => d.jenis === "paspor")?.ocrData?.nomorPaspor ||
+      "";
+    if (pasporVal) {
+      const trimmed = String(pasporVal).trim();
+      newFormData["nomor_paspor"] = trimmed;
+      newFormData["Nomor Paspor"] = trimmed;
+      newFormData["paspor"] = trimmed;
+      newFormData["Paspor"] = trimmed;
+    }
+
+    const tempatLahirVal =
+      jm.tempatLahir && jm.tempatLahir !== "-"
+        ? jm.tempatLahir
+        : jm.dokumen?.find?.((d: any) => d.jenis === "ktp")?.manualData?.tempatLahir ||
+          jm.dokumen?.find?.((d: any) => d.jenis === "ktp")?.ocrData?.tempatLahir ||
+          "";
+    if (tempatLahirVal) {
+      const val = toTitleCase(tempatLahirVal);
+      newFormData["tempat_lahir"] = val;
+      newFormData["Tempat Lahir"] = val;
+      newFormData["tempatlahir"] = val;
+    }
+
+    const tglLahirVal =
+      jm.tanggalLahir && jm.tanggalLahir !== "-"
+        ? jm.tanggalLahir
+        : jm.dokumen?.find?.((d: any) => d.jenis === "ktp")?.manualData?.tanggalLahir ||
+          jm.dokumen?.find?.((d: any) => d.jenis === "ktp")?.ocrData?.tanggalLahir ||
+          "";
+    if (tglLahirVal) {
+      const iso = parseDateToIsoString(tglLahirVal);
+      const val = (iso ? formatIsoToIndonesianDate(iso) : null) || formatDate(tglLahirVal);
+      newFormData["tanggal_lahir"] = val;
+      newFormData["Tanggal Lahir"] = val;
+      newFormData["tgl_lahir"] = val;
+      newFormData["tanggallahir"] = val;
+    }
+
+    const jkVal =
+      jm.jenisKelamin ||
+      jm.gender ||
+      jm.dokumen?.find?.((d: any) => d.jenis === "ktp")?.manualData?.jenisKelamin ||
+      jm.dokumen?.find?.((d: any) => d.jenis === "ktp")?.ocrData?.jenisKelamin ||
+      "";
+    if (jkVal) {
+      const normalizedJk =
+        jkVal === "L" || jkVal === "LAKI-LAKI" ? "LAKI-LAKI" : jkVal === "P" || jkVal === "PEREMPUAN" ? "PEREMPUAN" : String(jkVal);
+      newFormData["jenis_kelamin"] = normalizedJk;
+      newFormData["Jenis Kelamin"] = normalizedJk;
+    }
+
+    const rawAlamat =
+      (jm.alamat && jm.alamat !== "-" ? jm.alamat : "") ||
+      (jm.alamatLengkap && jm.alamatLengkap !== "-" ? jm.alamatLengkap : "") ||
+      jm.dokumen?.find?.((d: any) => d.jenis === "ktp")?.manualData?.alamatLengkap ||
+      jm.dokumen?.find?.((d: any) => d.jenis === "ktp")?.manualData?.alamat ||
+      jm.dokumen?.find?.((d: any) => d.jenis === "ktp")?.ocrData?.alamatLengkap ||
+      jm.dokumen?.find?.((d: any) => d.jenis === "ktp")?.ocrData?.alamat ||
+      "";
+    if (rawAlamat) {
+      const val = toTitleCase(rawAlamat);
+      newFormData["alamat"] = val;
+      newFormData["Alamat"] = val;
+      newFormData["alamat_lengkap"] = val;
+      newFormData["Alamat Lengkap"] = val;
+    }
+
+    const telpVal = jm.nomorTelepon || jm.noHp || jm.phone || "";
+    if (telpVal) {
+      newFormData["nomor_telepon"] = telpVal;
+      newFormData["Nomor Telepon"] = telpVal;
+      newFormData["no_hp"] = telpVal;
+    }
+
+    const pekVal =
+      jm.pekerjaan ||
+      jm.dokumen?.find?.((d: any) => d.jenis === "ktp")?.manualData?.pekerjaan ||
+      jm.dokumen?.find?.((d: any) => d.jenis === "ktp")?.ocrData?.pekerjaan ||
+      "";
+    if (pekVal) {
+      const val = toTitleCase(pekVal);
+      newFormData["pekerjaan"] = val;
+      newFormData["Pekerjaan"] = val;
+    }
+
+    // Keberangkatan fields
+    if (kb) {
+      if (kb.namaPaket) {
+        newFormData["nama_paket"] = kb.namaPaket;
+        newFormData["Nama Paket"] = kb.namaPaket;
+        newFormData["paket"] = kb.namaPaket;
+      }
+      if (kb.kode || kb.kodePaket) {
+        newFormData["kode_paket"] = kb.kode || kb.kodePaket;
+        newFormData["kode"] = kb.kode || kb.kodePaket;
+      }
+      if (kb.tanggalBerangkat) {
+        const val = formatDate(kb.tanggalBerangkat);
+        newFormData["tanggal_berangkat"] = val;
+        newFormData["Tanggal Berangkat"] = val;
+        newFormData["bulan_keberangkatan"] = formatMonthYear(kb.tanggalBerangkat);
+        newFormData["Bulan Keberangkatan"] = formatMonthYear(kb.tanggalBerangkat);
+      }
+      if (kb.tanggalPulang) {
+        const val = formatDate(kb.tanggalPulang);
+        newFormData["tanggal_pulang"] = val;
+        newFormData["Tanggal Pulang"] = val;
+      }
+      if (kb.maskapai) {
+        newFormData["maskapai"] = kb.maskapai;
+        newFormData["Maskapai"] = kb.maskapai;
+      }
+      if (kb.hotelMekkah) {
+        newFormData["hotel_mekkah"] = kb.hotelMekkah;
+        newFormData["Hotel Mekkah"] = kb.hotelMekkah;
+      }
+      if (kb.hotelMadinah) {
+        newFormData["hotel_madinah"] = kb.hotelMadinah;
+        newFormData["Hotel Madinah"] = kb.hotelMadinah;
+      }
+      if (kb.programHari) {
+        newFormData["program_hari"] = `${kb.programHari} Hari`;
+        newFormData["Program Hari"] = `${kb.programHari} Hari`;
+      }
+    }
+
+    // Populate all effective placeholders
+    effectivePlaceholders.forEach((p) => {
+      if (newFormData[p.key]) return;
+      if (p.sourceType === "manifest" && p.manifestField) {
+        const val = resolveManifestFieldValue(p.manifestField, jm, kb);
+        if (val && val !== "-") {
+          newFormData[p.key] = val;
+        }
+      } else if (p.defaultValue) {
+        newFormData[p.key] = p.defaultValue;
+      }
+    });
+
+    setManualFormData(newFormData);
+  }, [
+    dataSourceMode,
+    selectedJamaahId,
+    activeJamaah,
+    activeKeberangkatan,
+    activeTemplate,
+    effectivePlaceholders,
+    customPerihal,
+  ]);
 
   // OCR Document Configuration (KTP, Akta, KK)
   const OCR_DOC_CONFIG: Record<
@@ -1802,20 +2044,31 @@ function GenerateSuratPageContent() {
       jamaahId: activeJamaah?.id,
       jamaahNama: toTitleCase(effectiveNama),
       jamaahPaspor:
-        activeJamaah?.nomorPaspor ||
+        manualFormData["nomor_paspor"] ||
+        manualFormData["Nomor Paspor"] ||
+        manualFormData["paspor"] ||
+        manualFormData["Paspor"] ||
         resolvedFieldValues["Nomor Paspor"] ||
         resolvedFieldValues["nomor_paspor"] ||
         resolvedFieldValues["Paspor"] ||
         resolvedFieldValues["paspor"] ||
+        activeJamaah?.nomorPaspor ||
         "-",
       jamaahNik:
-        activeJamaah?.nik ||
+        manualFormData["nik"] ||
+        manualFormData["NIK"] ||
+        manualFormData["no_identitas"] ||
+        manualFormData["No Identitas"] ||
         resolvedFieldValues["NIK"] ||
         resolvedFieldValues["nik"] ||
+        activeJamaah?.nik ||
         "-",
       packageId: activeKeberangkatan?.id,
       packageKode: activeKeberangkatan?.kode,
       packageName:
+        manualFormData["nama_paket"] ||
+        manualFormData["Nama Paket"] ||
+        manualFormData["paket"] ||
         activeKeberangkatan?.namaPaket ||
         (dataSourceMode === "manual" ? "Manual / Non-Manifest" : "Paket Umroh"),
       departureDate: activeKeberangkatan?.tanggalBerangkat,
@@ -1823,7 +2076,7 @@ function GenerateSuratPageContent() {
       perihal: renderedPerihal,
       generatedDate: new Date().toISOString(),
       createdBy: "Admin Operasional",
-      fieldsData: { ...resolvedFieldValues },
+      fieldsData: { ...resolvedFieldValues, ...manualFormData },
       renderedText: renderedLetterBody,
       templateFileBase64:
         activeAttachedFile?.templateFileBase64 ||

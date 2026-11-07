@@ -35,6 +35,7 @@ import {
 } from "lucide-react";
 import { SearchableSelect } from "@/shared/components/ui/SearchableSelect";
 import { groupHotelOptionsIntoVariants } from "@/shared/lib/hotel-utils";
+import { isPackageUpcoming, isPackageSeatFull } from "@/shared/lib/package-lifecycle";
 import type { JenisKelamin, Keberangkatan } from "@/shared/types";
 
 type Step = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
@@ -167,8 +168,19 @@ export default function RegisterPage() {
   const packageOptions = useMemo(() => {
     const hasAnyPublished = paketList.some(isPackagePublished);
     const eligiblePackages = hasAnyPublished
-      ? paketList.filter((p) => p.status !== "cancelled" && isPackagePublished(p))
-      : paketList.filter((p) => p.status !== "cancelled");
+      ? paketList.filter(
+          (p) =>
+            p.status !== "cancelled" &&
+            isPackagePublished(p) &&
+            isPackageUpcoming(p) &&
+            !isPackageSeatFull(p)
+        )
+      : paketList.filter(
+          (p) =>
+            p.status !== "cancelled" &&
+            isPackageUpcoming(p) &&
+            !isPackageSeatFull(p)
+        );
 
     return eligiblePackages.map((p) => {
       const isV2 = p.kode.includes("_V2") || 

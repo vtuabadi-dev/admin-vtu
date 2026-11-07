@@ -1,0 +1,1743 @@
+"use client";
+
+import { useEffect, useState, useMemo } from "react";
+import { Calendar, CalendarDays, Hotel, Search, Trash2, Info, Copy, Check, Pencil, FileText, UserCheck, UserPlus, FileSpreadsheet, Upload, Download, Loader2, Archive, Plane } from "lucide-react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { Modal } from "@/shared/components/ui/Modal";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/shared/components/ui/Card";
+import { StatusBadge } from "@/shared/components/ui/Badge";
+import { Button } from "@/shared/components/ui/Button";
+import { Input } from "@/shared/components/ui/Input";
+import { ErrorState } from "@/shared/components/ui/ErrorState";
+import { getKeberangkatanList, deleteKeberangkatan } from "@/server/actions/api";
+import type { Keberangkatan } from "@/shared/types";
+import { formatDate, cn, downloadFileFromUrl } from "@/shared/lib/utils";
+import { groupHotelOptionsIntoVariants } from "@/shared/lib/hotel-utils";
+import {
+  isPackageArchived,
+  isPackageInProgress,
+  isPackageUpcoming,
+  isPackageSeatFull,
+} from "@/shared/lib/package-lifecycle";
+import { useOperationalStore } from "@/stores/operational-store";
+
+const BULAN_LABEL: Record<number, string> = {
+  1: "Januari", 2: "Februari", 3: "Maret", 4: "April",
+  5: "Mei", 6: "Juni", 7: "Juli", 8: "Agustus",
+  9: "September", 10: "Oktober", 11: "November", 12: "Desember",
+};
+
+export function KeberangkatanView({ mode = "aktif" }: { mode?: "aktif" | "arsip" }) {
+  const storeIsLoaded = useOperationalStore((s) => s.isLoaded);
+  const storeKbrList = useOperationalStore((s) => s.keberangkatanList);
+
+  const router = useRouter();
+  const [activeSubTab, setActiveSubTab] = useState<"all" | "upcoming" | "in_progress">("all");
+  const [keberangkatan, setKeberangkatan] = useState<Keberangkatan[]>(storeKbrList);
+  const [loading, setLoading] = useState(!storeIsLoaded);
+  const [error, setError] = useState<Error | null>(null);
+  const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [openInfoId, setOpenInfoId] = useState<string | null>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [provisioningId, setProvisioningId] = useState<string | null>(null);
+  const [togglingKatalogId, setTogglingKatalogId] = useState<string | null>(null);
+
+  // Variant Modal State untuk Publikasi Katalog & Pendaftaran
+  const [variantModalGroup, setVariantModalGroup] = useState<{
+    groupKey: string;
+    title: string;
+    departureDate?: string;
+    packages: Keberangkatan[];
+    targetPackageId?: string;
+    isHotelOptionsMode?: boolean;
+  } | null>(null);
+
+  // Excel Import States
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importing, setImporting] = useState(false);
+  const [importResult, setImportResult] = useState<{
+    successCount: number;
+    errors: string[];
+  } | null>(null);
+  const [downloadingTemplate, setDownloadingTemplate] = useState(false);
+
+  const handleDownloadTemplate = async () => {
+    setDownloadingTemplate(true);
+    try {
+      await downloadFileFromUrl("/api/admin/keberangkatan/template", "template_import_keberangkatan.xlsx");
+    } catch (err: any) {
+      alert("Gagal mengunduh template: " + (err?.message || "Kesalahan jaringan"));
+    } finally {
+      setDownloadingTemplate(false);
+    }
+  };
+
+
+
+  const handleCopyId = async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    await navigator.clipboard.writeText(id);
+    setCopiedId(id);
+    setTimeout(() => setCopiedId(null), 1800);
+  };
+
+  const load = async (showSpinner = false) => {
+    try {
+      if (showSpinner || keberangkatan.length === 0) {
+        setLoading(true);
+      }
+      setError(null);
+      const data = await getKeberangkatanList();
+      setKeberangkatan(data);
+      useOperationalStore.getState().setKeberangkatanList(data);
+      useOperationalStore.getState().setIsLoaded(true);
+    } catch (err: any) {
+      setError(err instanceof Error ? err : new Error("Database Connection Error"));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleProvisionSingle = async (id: string) => {
+    setProvisioningId(id);
+    try {
+      const res = await fetch(`/api/keberangkatan/${id}/provision`, { method: "POST" });
+      const json = await res.json();
+      if (json.success) {
+        alert("Berhasil membuat seluruh struktur folder Google Drive!");
+        load(false);
+      } else {
+        alert(json.message || "Gagal membuat folder Google Drive");
+      }
+    } catch (err: any) {
+      alert("Terjadi kesalahan: " + (err?.message || "Gagal menghubungi server"));
+    } finally {
+      setProvisioningId(null);
+    }
+  };
+
+  const handleToggleKatalog = async (pkgId: string, newState: boolean) => {
+    setTogglingKatalogId(pkgId);
+    // Optimistic update
+    setKeberangkatan((prev) => {
+      const updated = prev.map((item) =>
+        item.id === pkgId
+          ? {
+              ...item,
+              isPublishedKatalog: newState,
+              driveFolderIds: {
+                ...(typeof item.driveFolderIds === "object" ? item.driveFolderIds : {}),
+                isPublishedKatalog: newState,
+              },
+            }
+          : item
+      );
+      useOperationalStore.getState().setKeberangkatanList(updated);
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem("vtu_katalog_packages_cache_v1", JSON.stringify(updated));
+        } catch {}
+      }
+      return updated;
+    });
+    try {
+      const res = await fetch(`/api/keberangkatan/${pkgId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          isPublishedKatalog: newState,
+          driveFolderIds: { isPublishedKatalog: newState },
+        }),
+      });
+      const json = await res.json();
+      if (!json.success) {
+        alert(json.message || "Gagal memperbarui status katalog paket");
+        load(false);
+      }
+    } catch (err: any) {
+      alert("Gagal menghubungi server: " + (err?.message || "Kesalahan jaringan"));
+      load(false);
+    } finally {
+      setTogglingKatalogId(null);
+    }
+  };
+
+  const handleToggleHotelOptionKatalog = async (pkgId: string, optIndices: number | number[], newState: boolean) => {
+    const indices = Array.isArray(optIndices) ? optIndices : [optIndices];
+    setTogglingKatalogId(`${pkgId}_opt_${indices[0]}`);
+
+    const targetPkg = keberangkatan.find((k) => k.id === pkgId);
+    if (!targetPkg) {
+      setTogglingKatalogId(null);
+      return;
+    }
+
+    let opts = targetPkg.hotelOptions;
+    if (typeof opts === "string") {
+      try { opts = JSON.parse(opts); } catch { opts = []; }
+    }
+    const currentOpts: any[] = Array.isArray(opts) ? [...opts] : [];
+    for (const idx of indices) {
+      if (currentOpts[idx]) {
+        currentOpts[idx] = {
+          ...currentOpts[idx],
+          isPublishedKatalog: newState,
+        };
+      }
+    }
+
+    const anyPublished = currentOpts.some((o: any, idx: number) => {
+      if (idx === 0) {
+        return o.isPublishedKatalog !== undefined
+          ? o.isPublishedKatalog === true
+          : (targetPkg.isPublishedKatalog ?? ((targetPkg.driveFolderIds as any)?.isPublishedKatalog === true));
+      }
+      return o.isPublishedKatalog === true;
+    });
+
+    setKeberangkatan((prev) => {
+      const updated = prev.map((item) =>
+        item.id === pkgId
+          ? {
+              ...item,
+              hotelOptions: currentOpts,
+              isPublishedKatalog: anyPublished,
+              driveFolderIds: {
+                ...(typeof item.driveFolderIds === "object" ? item.driveFolderIds : {}),
+                isPublishedKatalog: anyPublished,
+              },
+            }
+          : item
+      );
+      useOperationalStore.getState().setKeberangkatanList(updated);
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem("vtu_katalog_packages_cache_v1", JSON.stringify(updated));
+        } catch {}
+      }
+      return updated;
+    });
+
+    try {
+      const res = await fetch(`/api/keberangkatan/${pkgId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          hotelOptions: currentOpts,
+          isPublishedKatalog: anyPublished,
+          driveFolderIds: { isPublishedKatalog: anyPublished },
+        }),
+      });
+      const json = await res.json();
+      if (!json.success) {
+        alert(json.message || "Gagal memperbarui status publikasi varian");
+        load(false);
+      }
+    } catch (err: any) {
+      alert("Gagal menghubungi server: " + (err?.message || "Kesalahan jaringan"));
+      load(false);
+    } finally {
+      setTogglingKatalogId(null);
+    }
+  };
+
+  const handleImportExcel = async () => {
+    if (!importFile) return alert("Pilih file Excel terlebih dahulu");
+    setImporting(true);
+    setImportResult(null);
+
+    const formData = new FormData();
+    formData.append("file", importFile);
+
+    try {
+      const res = await fetch("/api/admin/keberangkatan/import", {
+        method: "POST",
+        body: formData,
+      });
+      const json = await res.json();
+      if (json.success) {
+        setImportResult({
+          successCount: json.createdCount,
+          errors: json.errors || [],
+        });
+        load(false); // Refresh the list
+      } else {
+        alert(json.message || "Gagal mengimpor data Excel");
+      }
+    } catch (err: any) {
+      console.error(err);
+      alert("Terjadi kesalahan saat mengimpor file");
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  useEffect(() => {
+    if (storeIsLoaded && storeKbrList.length > 0) {
+      setKeberangkatan(storeKbrList);
+      setLoading(false);
+      // Background silent revalidation
+      load(false);
+    } else {
+      load(true);
+    }
+
+    // Auto-provision any unprovisioned packages (e.g. September packages) in the background
+    fetch("/api/keberangkatan/provision-all", { method: "POST" })
+      .then((res) => res.json())
+      .then((json) => {
+        if (json.success && json.data?.provisioned > 0) {
+          console.log(`[Cloud Vault Auto-Sync] Provisioned ${json.data.provisioned} missing package folders.`);
+          load(false);
+        }
+      })
+      .catch((err) => console.error("[Cloud Vault Auto-Sync Error]", err));
+  }, []);
+
+  // Tutup popover ID Paket saat klik di luar
+  useEffect(() => {
+    if (!openInfoId) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      const btn = document.getElementById(`info-btn-${openInfoId}`);
+      if (btn && !btn.closest("[data-info-popover]") && !btn.contains(e.target as Node)) {
+        setOpenInfoId(null);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [openInfoId]);
+
+  const handleDelete = async (id: string) => {
+    if (confirm("Apakah Anda yakin ingin menghapus paket ini?")) {
+      try {
+        const res = await deleteKeberangkatan(id);
+        if (res && res.success === false) {
+          alert(res.message);
+        } else {
+          setKeberangkatan((prev) => prev.filter((k) => k.id !== id));
+          useOperationalStore.getState().setKeberangkatanList(
+            useOperationalStore.getState().keberangkatanList.filter((k) => k.id !== id)
+          );
+        }
+      } catch (error: any) {
+        alert("Gagal menghapus paket: " + (error?.message || "Terjadi kesalahan sistem"));
+      }
+    }
+  };
+
+  // Segmentasi Paket Berdasarkan Siklus Hidup (ADR-0031)
+  const archivedPackages = useMemo(() => keberangkatan.filter(isPackageArchived), [keberangkatan]);
+  const activePackages = useMemo(() => keberangkatan.filter((k) => !isPackageArchived(k)), [keberangkatan]);
+  const upcomingPackages = useMemo(() => activePackages.filter(isPackageUpcoming), [activePackages]);
+  const inProgressPackages = useMemo(() => activePackages.filter(isPackageInProgress), [activePackages]);
+
+  // Base list sesuai mode (Aktif vs Arsip) dan sub-tab (Semua Aktif, Akan Berangkat, Sedang Berjalan)
+  const baseList = useMemo(() => {
+    if (mode === "arsip") return archivedPackages;
+    if (activeSubTab === "upcoming") return upcomingPackages;
+    if (activeSubTab === "in_progress") return inProgressPackages;
+    return activePackages;
+  }, [mode, activeSubTab, archivedPackages, upcomingPackages, inProgressPackages, activePackages]);
+
+  const availableMonths = useMemo(() => {
+    const months = new Set<number>();
+    for (const k of baseList) {
+      if (k.tanggalBerangkat) {
+        months.add(new Date(k.tanggalBerangkat).getMonth() + 1);
+      }
+    }
+    return Array.from(months).sort((a, b) => a - b);
+  }, [baseList]);
+
+  const filteredKeberangkatan = useMemo(() => {
+    let result = [...baseList];
+
+    if (selectedMonth !== null) {
+      result = result.filter(
+        (k) => k.tanggalBerangkat && new Date(k.tanggalBerangkat).getMonth() + 1 === selectedMonth
+      );
+    }
+
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      result = result.filter((k) => {
+        const nama = (k.namaPaket || k.paketUmroh?.namaPaket || "").toLowerCase();
+        const kode = (k.kode || "").toLowerCase();
+        const maskapai = (k.maskapai || "").toLowerCase();
+        const mekkah = (k.hotelMekkah || "").toLowerCase();
+        const madinah = (k.hotelMadinah || "").toLowerCase();
+        return (
+          nama.includes(q) ||
+          kode.includes(q) ||
+          maskapai.includes(q) ||
+          mekkah.includes(q) ||
+          madinah.includes(q)
+        );
+      });
+    }
+    return result;
+  }, [keberangkatan, selectedMonth, searchQuery]);
+
+  // Helper untuk menentukan group key rombongan/varian secara konsisten antara induk dan anak
+  const getPackageGroupKey = (k: Keberangkatan, allList: Keberangkatan[]): string => {
+    if (k.parentKeberangkatanId) {
+      return `group_${k.parentKeberangkatanId}`;
+    }
+    const hasChildren = allList.some((other) => other.parentKeberangkatanId === k.id);
+    if (hasChildren) {
+      return `group_${k.id}`;
+    }
+    const baseCode = (k.kode || "").replace(/_V\d+$/i, "").trim().toLowerCase();
+    const getDateStr = (d: any) => {
+      if (!d) return "";
+      try { return new Date(d).toISOString().split("T")[0] || ""; } catch { return ""; }
+    };
+    const depDateStr = getDateStr(k.tanggalBerangkat);
+    if (baseCode && depDateStr) {
+      return `rom_${baseCode}_${depDateStr}`;
+    }
+    return `pkg_${k.id}`;
+  };
+
+  // Helper cek apakah paket merupakan varian kedua/tambahan (V2)
+  const isV2Variant = (pkg: Keberangkatan): boolean => {
+    return (
+      pkg.kode.includes("_V2") ||
+      pkg.kode.toLowerCase().includes("v2") ||
+      !!pkg.parentKeberangkatanId ||
+      (pkg as any).splitReason === "promo" ||
+      (pkg as any).splitReason === "spek" ||
+      (pkg as any).splitLabel?.toLowerCase().includes("v2") ||
+      (pkg as any).promoLabel?.toLowerCase().includes("v2")
+    );
+  };
+
+  // Group related packages (Parents and their children / variants) to compute joint accumulation quota
+  const groupStatsMap = useMemo(() => {
+    const map = new Map<string, {
+      allPackages: Keberangkatan[];
+      totalGroupQuota: number;
+      totalGroupFilled: number;
+      parentPackage: Keberangkatan | null;
+      childPackages: Keberangkatan[];
+    }>();
+
+    keberangkatan.forEach((k) => {
+      const groupKey = getPackageGroupKey(k, keberangkatan);
+
+      if (!map.has(groupKey)) {
+        map.set(groupKey, {
+          allPackages: [],
+          totalGroupQuota: 0,
+          totalGroupFilled: 0,
+          parentPackage: null,
+          childPackages: [],
+        });
+      }
+      const entry = map.get(groupKey)!;
+      entry.allPackages.push(k);
+      entry.totalGroupQuota += (k.maxSeat || k.kuota || 0);
+      entry.totalGroupFilled += (k.terisi || 0);
+
+      const isChild = isV2Variant(k);
+      if (isChild) {
+        entry.childPackages.push(k);
+      } else {
+        entry.parentPackage = k;
+      }
+    });
+
+    return map;
+  }, [keberangkatan]);
+
+  const handleKatalogSwitchClick = (pkg: Keberangkatan, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const groupKey = getPackageGroupKey(pkg, keberangkatan);
+    const groupStats = groupStatsMap.get(groupKey);
+    const groupPackages = groupStats?.allPackages || [pkg];
+
+    const isPub = pkg.isPublishedKatalog ?? ((pkg.driveFolderIds as any)?.isPublishedKatalog === true);
+    const variantGroups = groupHotelOptionsIntoVariants(pkg.hotelOptions, isPub);
+
+    if (groupPackages.length > 1) {
+      setVariantModalGroup({
+        groupKey,
+        title: pkg.namaPaket || pkg.kode,
+        departureDate: pkg.tanggalBerangkat,
+        packages: groupPackages,
+      });
+    } else if (variantGroups.length > 1) {
+      setVariantModalGroup({
+        groupKey: `pkg_${pkg.id}`,
+        title: pkg.namaPaket || pkg.kode,
+        departureDate: pkg.tanggalBerangkat,
+        packages: [pkg],
+        targetPackageId: pkg.id,
+        isHotelOptionsMode: true,
+      });
+    } else {
+      handleToggleKatalog(pkg.id, !isPub);
+    }
+  };
+
+  if (loading && keberangkatan.length === 0) {
+    return (
+      <div className="space-y-6 animate-pulse p-1">
+        <div className="flex items-center justify-between flex-wrap gap-4">
+          <div className="space-y-2">
+            <div className="h-7 w-48 bg-muted/60 rounded-md" />
+            <div className="h-4 w-72 bg-muted/40 rounded-md" />
+          </div>
+          <div className="h-10 w-36 bg-emerald-600/30 rounded-lg" />
+        </div>
+        <div className="h-10 w-full max-w-md bg-muted/40 rounded-lg" />
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="h-24 bg-card border rounded-xl p-4 space-y-2">
+              <div className="h-3 w-28 bg-muted/60 rounded" />
+              <div className="h-7 w-16 bg-muted/80 rounded" />
+            </div>
+          ))}
+        </div>
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+          {[1, 2].map((i) => (
+            <div key={i} className="h-72 bg-card border rounded-xl p-5 space-y-4">
+              <div className="flex justify-between items-start">
+                <div className="h-6 w-3/4 bg-muted/60 rounded" />
+                <div className="h-5 w-16 bg-muted/40 rounded-full" />
+              </div>
+              <div className="h-12 bg-muted/30 rounded-lg" />
+              <div className="h-12 bg-muted/30 rounded-lg" />
+              <div className="h-10 bg-muted/40 rounded-lg mt-auto" />
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex h-64 items-center justify-center">
+        <ErrorState onRetry={load} message={error.message} />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Tab Navigasi Utama: Paket Aktif vs Paket Arsip (ADR-0031) */}
+      <div className="flex items-center gap-2 border-b border-border/80 pb-3">
+        <Link href="/admin/keberangkatan">
+          <Button
+            type="button"
+            variant={mode === "aktif" ? "default" : "outline"}
+            size="sm"
+            className={cn(
+              "gap-2 font-bold transition-all",
+              mode === "aktif"
+                ? "bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs"
+                : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            <Calendar className="h-4 w-4" />
+            <span>Paket Aktif</span>
+            <span
+              className={cn(
+                "text-[10px] px-1.5 py-0.2 rounded-full font-mono",
+                mode === "aktif" ? "bg-white/20 text-white" : "bg-muted text-muted-foreground"
+              )}
+            >
+              {activePackages.length}
+            </span>
+          </Button>
+        </Link>
+        <Link href="/admin/keberangkatan/arsip">
+          <Button
+            type="button"
+            variant={mode === "arsip" ? "default" : "outline"}
+            size="sm"
+            className={cn(
+              "gap-2 font-bold transition-all",
+              mode === "arsip"
+                ? "bg-stone-700 hover:bg-stone-800 text-white shadow-xs"
+                : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            <Archive className="h-4 w-4" />
+            <span>Paket Arsip</span>
+            <span
+              className={cn(
+                "text-[10px] px-1.5 py-0.2 rounded-full font-mono",
+                mode === "arsip" ? "bg-white/20 text-white" : "bg-muted text-muted-foreground"
+              )}
+            >
+              {archivedPackages.length}
+            </span>
+          </Button>
+        </Link>
+      </div>
+
+      {/* Header */}
+      <div className="flex items-center justify-between flex-wrap gap-4">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
+            {mode === "aktif" ? (
+              <>
+                <Calendar className="h-6 w-6 text-emerald-600" />
+                <span>Paket Aktif</span>
+              </>
+            ) : (
+              <>
+                <Archive className="h-6 w-6 text-stone-600" />
+                <span>Paket Arsip</span>
+              </>
+            )}
+          </h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            {mode === "aktif"
+              ? "Kelola jadwal dan paket keberangkatan umroh yang sedang aktif (akan berangkat dan sedang berjalan)"
+              : "Daftar arsip paket keberangkatan yang agendanya telah selesai"}
+          </p>
+        </div>
+        {mode === "aktif" && (
+          <Button
+            onClick={() => {
+              setImportFile(null);
+              setImportResult(null);
+              setIsImportModalOpen(true);
+            }}
+            className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2"
+          >
+            <FileSpreadsheet className="h-4 w-4" />
+            Import Excel
+          </Button>
+        )}
+      </div>
+
+      {/* Search */}
+      <div className="relative max-w-md">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
+          placeholder="Cari paket, kode, maskapai, hotel..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="pl-9"
+        />
+      </div>
+
+      {/* Summary */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
+              {mode === "aktif" ? "Total Paket Aktif" : "Total Paket Arsip"}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-2xl font-bold">{baseList.length}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
+              Total Kuota
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-2xl font-bold">
+              {baseList.reduce((s, k) => s + (k.maxSeat || k.kuota || 0), 0)}
+            </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
+              Total Terisi
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-2xl font-bold">
+              {baseList.reduce((s, k) => s + (k.terisi || 0), 0)}
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* 2 Tab Status Perjalanan di Atas Filter Bulan (Hanya pada mode Paket Aktif - ADR-0031) */}
+      {mode === "aktif" && (
+        <div className="flex flex-wrap items-center gap-2 p-1.5 bg-muted/60 dark:bg-muted/20 rounded-2xl w-fit border border-border/60">
+          <button
+            type="button"
+            onClick={() => {
+              setActiveSubTab("all");
+              setSelectedMonth(null);
+            }}
+            className={cn(
+              "px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer",
+              activeSubTab === "all"
+                ? "bg-background text-foreground shadow-xs border border-border/60 font-black"
+                : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            <span>Semua Aktif</span>
+            <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 font-mono">
+              {activePackages.length}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setActiveSubTab("upcoming");
+              setSelectedMonth(null);
+            }}
+            className={cn(
+              "px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer",
+              activeSubTab === "upcoming"
+                ? "bg-background text-foreground shadow-xs border border-border/60 font-black text-blue-700 dark:text-blue-300"
+                : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            <Calendar className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
+            <span>Akan Berangkat</span>
+            <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-blue-500/15 text-blue-700 dark:text-blue-300 font-mono">
+              {upcomingPackages.length}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setActiveSubTab("in_progress");
+              setSelectedMonth(null);
+            }}
+            className={cn(
+              "px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer",
+              activeSubTab === "in_progress"
+                ? "bg-background text-foreground shadow-xs border border-border/60 font-black text-amber-700 dark:text-amber-300"
+                : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            <Plane className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+            <span>Sedang Berjalan</span>
+            <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-300 font-mono">
+              {inProgressPackages.length}
+            </span>
+          </button>
+        </div>
+      )}
+
+      {/* Month Tabs */}
+      <div className="flex flex-wrap items-center gap-1.5">
+        <Button
+          size="sm"
+          variant={selectedMonth === null ? "default" : "outline"}
+          onClick={() => setSelectedMonth(null)}
+        >
+          Semua ({baseList.length})
+        </Button>
+        {availableMonths.map((m) => {
+          const count = baseList.filter(
+            (k) => k.tanggalBerangkat && new Date(k.tanggalBerangkat).getMonth() + 1 === m
+          ).length;
+          return (
+            <Button
+              key={m}
+              size="sm"
+              variant={selectedMonth === m ? "default" : "outline"}
+              onClick={() => setSelectedMonth(m)}
+            >
+              {BULAN_LABEL[m]} ({count})
+            </Button>
+          );
+        })}
+      </div>
+
+      {/* Keberangkatan Cards */}
+      {filteredKeberangkatan.length === 0 ? (
+        <div className="flex flex-col h-48 items-center justify-center text-sm text-muted-foreground border-2 border-dashed rounded-2xl gap-2 p-6 text-center">
+          <Info className="h-8 w-8 text-muted-foreground/60" />
+          <p className="font-semibold text-foreground">
+            {mode === "arsip"
+              ? "Tidak ada arsip paket keberangkatan"
+              : activeSubTab === "upcoming"
+                ? "Tidak ada paket yang akan berangkat"
+                : activeSubTab === "in_progress"
+                  ? "Tidak ada paket yang sedang berjalan"
+                  : "Tidak ada paket aktif"}
+            {selectedMonth ? ` pada bulan ${BULAN_LABEL[selectedMonth]}` : ""}
+          </p>
+          <p className="text-xs text-muted-foreground">
+            {mode === "arsip"
+              ? "Paket otomatis masuk ke arsip ketika agendanya telah selesai (tanggal kepulangan terlewat)."
+              : "Paket yang belum berangkat dan sedang berjalan akan muncul di sini."}
+          </p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+          {filteredKeberangkatan.map((k) => {
+          const maxSeat = k.maxSeat || k.kuota || 0;
+          const persen = maxSeat > 0 ? Math.round((k.terisi / maxSeat) * 100) : 0;
+          const progressColor =
+            persen >= 90
+              ? "bg-success"
+              : persen >= 50
+                ? "bg-warning"
+                : "bg-primary";
+
+          const baseCode = (k.kode || "").replace(/_V\d+$/i, "").trim().toLowerCase();
+          const depDateStr = k.tanggalBerangkat ? new Date(k.tanggalBerangkat).toISOString().split("T")[0] : "";
+          const groupKey = k.parentKeberangkatanId
+            ? `parent_${k.parentKeberangkatanId}`
+            : (baseCode && depDateStr ? `rom_${baseCode}_${depDateStr}` : `pkg_${k.id}`);
+
+          const groupStats = groupStatsMap.get(groupKey);
+          const isPartOfSplit = groupStats ? groupStats.allPackages.length > 1 : false;
+          const groupTotalQuota = groupStats ? groupStats.totalGroupQuota : maxSeat;
+          const groupTotalFilled = groupStats ? groupStats.totalGroupFilled : k.terisi;
+
+          return (
+            <Card key={k.id} variant="operational" className="flex flex-col h-full border border-slate-200/90 bg-white rounded-2xl shadow-md hover:shadow-xl shadow-slate-200/70 border-l-[6px] border-l-emerald-600 transition-all duration-200 overflow-hidden">
+              <CardHeader className="pb-3 border-b bg-muted/10">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="space-y-1.5 flex-1 min-w-0">
+                    {/* Promo, Spek, or Split Variant Badges */}
+                    {(() => {
+                      const isPromo = (k as any).splitReason === "promo" || !!(k as any).promoLabel || !!(k as any).promoText || k.kode.includes("_V");
+                      const promoName = (k as any).promoLabel || (k as any).promoText || ((k as any).splitReason === "promo" ? (k as any).splitLabel : null) || (k.kode.includes("_V") ? "Promo Bintang 5" : null);
+
+                      const isSpek = (k as any).splitReason === "spek" || !!(k as any).spekLabel;
+                      const spekName = (k as any).spekLabel || ((k as any).splitReason === "spek" ? (k as any).splitLabel : "Spesifikasi Khusus");
+
+                      const isBranchSplit = (k as any).splitReason === "starting_point" || !!(k as any).parentKeberangkatanId;
+                      const branchName = (k as any).splitLabel || (k as any).startingPoint?.name || "Cabang";
+
+                      const parentInfo = (k as any).parentKeberangkatan?.namaPaket || (k as any).parentKeberangkatan?.kode;
+
+                      if (isSpek) {
+                        return (
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-extrabold bg-gradient-to-r from-purple-500/20 to-indigo-500/20 text-purple-900 dark:text-purple-200 border border-purple-500/40 shadow-xs">
+                              ⚙️ Spek: {spekName}
+                            </span>
+                            <span className="text-[10px] font-bold text-purple-700 dark:text-purple-400 bg-purple-100 dark:bg-purple-950/60 px-2 py-0.5 rounded border border-purple-300 dark:border-purple-800">
+                              🔀 Varian Spek
+                            </span>
+                            {parentInfo && (
+                              <span className="text-[10px] text-muted-foreground bg-secondary/60 px-2 py-0.5 rounded">
+                                Induk: {parentInfo}
+                              </span>
+                            )}
+                          </div>
+                        );
+                      }
+
+                      if (isPromo && promoName) {
+                        return (
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-extrabold bg-gradient-to-r from-amber-500/20 to-orange-500/20 text-amber-900 dark:text-amber-200 border border-amber-500/40 shadow-xs">
+                              🏷️ Promo: {promoName}
+                            </span>
+                            <span className="text-[10px] font-bold text-amber-700 dark:text-amber-400 bg-amber-100 dark:bg-amber-950/60 px-2 py-0.5 rounded border border-amber-300 dark:border-amber-800">
+                              🔀 Pecahan Paket (Variant)
+                            </span>
+                            {parentInfo && (
+                              <span className="text-[10px] text-muted-foreground bg-secondary/60 px-2 py-0.5 rounded">
+                                Induk: {parentInfo}
+                              </span>
+                            )}
+                          </div>
+                        );
+                      }
+
+                      if (isBranchSplit) {
+                        return (
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-extrabold bg-blue-500/15 text-blue-900 dark:text-blue-200 border border-blue-500/30">
+                              📍 Starting Point Cabang: {branchName}
+                            </span>
+                            <span className="text-[10px] font-bold text-blue-700 dark:text-blue-400 bg-blue-100 dark:bg-blue-950/60 px-2 py-0.5 rounded border border-blue-300 dark:border-blue-800">
+                              🔀 Pecahan Paket
+                            </span>
+                            {parentInfo && (
+                              <span className="text-[10px] text-blue-600 dark:text-blue-400 bg-blue-50/80 dark:bg-blue-950/40 px-2 py-0.5 rounded border border-blue-200 dark:border-blue-800/50">
+                                Lahir dari: {parentInfo}
+                              </span>
+                            )}
+                          </div>
+                        );
+                      }
+
+                      return null;
+                    })()}
+
+                    <CardTitle className="text-base font-bold leading-snug">{k.namaPaket || k.paketUmroh?.namaPaket || "-"}</CardTitle>
+                    <p className="text-xs text-muted-foreground mt-0.5 font-mono">
+                      {k.kode}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    {/* Tombol ID Paket Tersembunyi */}
+                    <div className="relative">
+                      <button
+                        id={`info-btn-${k.id}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setOpenInfoId(openInfoId === k.id ? null : k.id);
+                        }}
+                        className={cn(
+                          "inline-flex items-center justify-center h-6 w-6 rounded-full text-[11px] font-bold border transition-colors",
+                          openInfoId === k.id
+                            ? "bg-primary text-primary-foreground border-primary"
+                            : "bg-muted/60 text-muted-foreground border-border hover:bg-primary/10 hover:text-primary hover:border-primary/40"
+                        )}
+                        title="Lihat ID Paket"
+                        aria-label="Tampilkan ID Paket"
+                      >
+                        !
+                      </button>
+                      {openInfoId === k.id && (
+                        <div
+                          className="absolute right-0 top-8 z-50 w-72 rounded-lg border bg-popover shadow-lg p-3 animate-in fade-in-0 zoom-in-95"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <div className="flex items-center justify-between mb-1.5">
+                            <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1">
+                              <Info className="h-3 w-3" /> ID Paket
+                            </span>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); setOpenInfoId(null); }}
+                              className="text-muted-foreground hover:text-foreground transition-colors"
+                              aria-label="Tutup"
+                            >
+                              <span className="text-xs">✕</span>
+                            </button>
+                          </div>
+                          <div className="flex items-center gap-2 bg-muted rounded-md px-2.5 py-1.5">
+                            <code className="text-xs font-mono flex-1 break-all text-foreground select-all">
+                              {k.id}
+                            </code>
+                            <button
+                              onClick={(e) => handleCopyId(k.id, e)}
+                              className="shrink-0 text-muted-foreground hover:text-primary transition-colors"
+                              title="Salin ID"
+                              aria-label="Salin ID Paket"
+                            >
+                              {copiedId === k.id
+                                ? <Check className="h-3.5 w-3.5 text-success" />
+                                : <Copy className="h-3.5 w-3.5" />}
+                            </button>
+                          </div>
+                          <p className="text-[10px] text-muted-foreground mt-1.5">
+                            Single Source of Truth — tidak berubah seumur hidup paket
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                    <span
+                      className={cn(
+                        "inline-flex items-center justify-center h-6 w-6 rounded-full text-[10px] font-bold",
+                        persen >= 80
+                          ? "bg-success/10 text-success"
+                          : persen >= 50
+                            ? "bg-warning/10 text-warning"
+                            : "bg-destructive/10 text-destructive"
+                      )}
+                      title={`Skor kesiapan: ${persen}% (estimasi)`}
+                    >
+                      {persen}
+                    </span>
+                    <StatusBadge status={k.status} />
+                    {isPackageArchived(k) && (
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-stone-200 dark:bg-stone-800 text-stone-700 dark:text-stone-300 border border-stone-300 dark:border-stone-700" title="Paket telah selesai kepulangannya (Arsip)">
+                        <Archive className="h-3 w-3" />
+                        <span>Selesai</span>
+                      </span>
+                    )}
+                    {isPackageInProgress(k) && (
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30" title="Jamaah telah berangkat dan sedang berada di perjalanan">
+                        <Plane className="h-3 w-3" />
+                        <span>Sedang Berjalan</span>
+                      </span>
+                    )}
+                    {isPackageSeatFull(k) && (
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-500/15 text-rose-700 dark:text-rose-300 border border-rose-500/30" title="Seat paket ini telah penuh">
+                        <span>Penuh</span>
+                      </span>
+                    )}
+
+                    {/* Google Drive Folder Status & Direct Link */}
+                    {(() => {
+                      const meta = (k as any).driveFolderIds;
+                      const hasFolder = meta && meta.rootPackageFolderId && meta.rootPackageFolderId !== "local-mock";
+                      if (hasFolder) {
+                        return (
+                          <a
+                            href={`https://drive.google.com/drive/folders/${meta.rootPackageFolderId}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/20 border border-emerald-500/30 transition-colors"
+                            title="Buka Folder Google Drive Paket"
+                          >
+                            <span>📁 Drive</span> ↗
+                          </a>
+                        );
+                      }
+                      return (
+                        <button
+                          type="button"
+                          onClick={() => handleProvisionSingle(k.id)}
+                          disabled={provisioningId === k.id}
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/10 text-amber-700 hover:bg-amber-500/20 border border-amber-500/30 transition-colors disabled:opacity-50"
+                          title="Buat Seluruh Folder Google Drive Paket Ini"
+                        >
+                          {provisioningId === k.id ? (
+                            <span>⏳ Membuat...</span>
+                          ) : (
+                            <span>⚡ Buat Drive</span>
+                          )}
+                        </button>
+                      );
+                    })()}
+
+                    {/* INDIKATOR STATUS BROADCAST TELEGRAM (ADR-0026) */}
+                    {(() => {
+                      const tgBroadcast = (k.driveFolderIds as any)?.telegramBroadcast;
+                      const isBroadcasted = tgBroadcast?.isBroadcasted === true;
+                      return (
+                        <div className="flex items-center pl-1.5 border-l border-border/60">
+                          {isBroadcasted ? (
+                            <span
+                              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-sky-500/15 text-sky-700 dark:text-sky-300 border border-sky-500/30"
+                              title={`Sudah terbroadcast ke Telegram (${tgBroadcast?.targetGroup ? `Grup ${tgBroadcast.targetGroup.toUpperCase()} • ` : ""}${tgBroadcast?.broadcastedAt ? new Date(tgBroadcast.broadcastedAt).toLocaleDateString("id-ID") : ""})`}
+                            >
+                              <span className="text-emerald-600 font-black">✓</span>
+                              <span>Telegram</span>
+                            </span>
+                          ) : (
+                            <span
+                              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-muted/60 text-muted-foreground border border-border/60 opacity-60"
+                              title="Belum dibroadcast ke Telegram. Anda dapat membroadcast melalui menu Edit paket."
+                            >
+                              <span>Telegram</span>
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })()}
+
+                    {/* SAKLAR TOGGLE TAMPILKAN DI KATALOG & FORM PENDAFTARAN (ADR-0031) */}
+                    {(() => {
+                      const isArchived = isPackageArchived(k);
+                      const inProgress = isPackageInProgress(k);
+                      const isFull = isPackageSeatFull(k);
+
+                      if (isArchived) {
+                        return (
+                          <div className="flex items-center gap-1 pl-1.5 border-l border-border/60" title="Paket yang agendanya telah selesai otomatis tidak ditampilkan di katalog (Arsip)">
+                            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-tight hidden sm:inline">
+                              Katalog:
+                            </span>
+                            <span className="px-1.5 py-0.5 rounded text-[9.5px] font-semibold bg-muted text-muted-foreground border border-border">
+                              Nonaktif (Arsip)
+                            </span>
+                          </div>
+                        );
+                      }
+
+                      if (inProgress) {
+                        return (
+                          <div className="flex items-center gap-1 pl-1.5 border-l border-border/60" title="Paket yang sedang berjalan otomatis tidak ditampilkan di katalog">
+                            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-tight hidden sm:inline">
+                              Katalog:
+                            </span>
+                            <span className="px-1.5 py-0.5 rounded text-[9.5px] font-semibold bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/20">
+                              Nonaktif (Berjalan)
+                            </span>
+                          </div>
+                        );
+                      }
+
+                      const isPublished = k.isPublishedKatalog ?? ((k.driveFolderIds as any)?.isPublishedKatalog === true);
+                      const variantGroups = groupHotelOptionsIntoVariants(k.hotelOptions, isPublished);
+                      const hasHotelVariants = variantGroups.length > 1;
+
+                      let hasMultipleVariants = isPartOfSplit || hasHotelVariants;
+                      let variantCount = 1;
+                      let activeVariantCount = 0;
+
+                      if (isPartOfSplit && groupStats && groupStats.allPackages.length > 1) {
+                        variantCount = groupStats.allPackages.length;
+                        activeVariantCount = groupStats.allPackages.filter(
+                          (p) => p.isPublishedKatalog ?? ((p.driveFolderIds as any)?.isPublishedKatalog === true)
+                        ).length;
+                      } else if (hasHotelVariants) {
+                        variantCount = variantGroups.length;
+                        activeVariantCount = variantGroups.filter((g) => g.isPublished).length;
+                      }
+
+                      const isSwitchChecked = hasMultipleVariants ? activeVariantCount > 0 : isPublished;
+
+                      return (
+                        <div className="flex items-center gap-1.5 pl-1.5 border-l border-border/60">
+                          <button
+                            type="button"
+                            onClick={(e) => handleKatalogSwitchClick(k, e)}
+                            disabled={togglingKatalogId === k.id || togglingKatalogId?.startsWith(`${k.id}_`)}
+                            className="inline-flex items-center gap-1.5 cursor-pointer select-none bg-transparent border-none p-0 group"
+                            title={
+                              hasMultipleVariants
+                                ? `Paket ini memiliki ${variantCount} varian (${activeVariantCount}/${variantCount} aktif di katalog). Klik untuk mengatur publikasi varian.`
+                                : isPublished
+                                  ? "Paket aktif di Katalog & Pendaftaran. Klik untuk menonaktifkan."
+                                  : "Paket belum tampil di Katalog & Pendaftaran. Klik untuk mengaktifkan."
+                            }
+                          >
+                            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-tight group-hover:text-foreground transition-colors hidden sm:inline">
+                              Katalog:
+                            </span>
+
+                            {/* Saklar Switch */}
+                            <div
+                              role="switch"
+                              aria-checked={isSwitchChecked}
+                              className={cn(
+                                "relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden",
+                                isSwitchChecked ? "bg-emerald-600 shadow-[0_0_8px_rgba(16,185,129,0.4)]" : "bg-slate-300 dark:bg-slate-700",
+                                (togglingKatalogId === k.id || togglingKatalogId?.startsWith(`${k.id}_`)) && "opacity-50 cursor-wait"
+                              )}
+                            >
+                              <span
+                                aria-hidden="true"
+                                className={cn(
+                                  "pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out",
+                                  isSwitchChecked ? "translate-x-4" : "translate-x-0"
+                                )}
+                              />
+                            </div>
+
+                            {/* Indikator Rasio Varian Aktif (misal: 1/2) tepat di sebelah saklar jika varian > 1 */}
+                            {hasMultipleVariants && (
+                              <span
+                                className={cn(
+                                  "px-1.5 py-0.5 rounded text-[10.5px] font-extrabold font-mono border leading-none tracking-tight shadow-xs transition-all",
+                                  activeVariantCount > 0
+                                    ? "bg-purple-500/15 text-purple-700 dark:text-purple-300 border-purple-500/35"
+                                    : "bg-slate-100 dark:bg-slate-800 text-slate-500 border-slate-300 dark:border-slate-700"
+                                )}
+                                title={`${activeVariantCount} dari ${variantCount} varian ditampilkan di katalog`}
+                              >
+                                {activeVariantCount}/{variantCount}
+                              </span>
+                            )}
+
+                            {isFull && (
+                              <span
+                                className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-500/10 text-rose-700 dark:text-rose-300 border border-rose-500/20"
+                                title="Seat telah penuh sehingga otomatis tidak ditampilkan di katalog (Syarat 2)"
+                              >
+                                Full
+                              </span>
+                            )}
+                          </button>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="flex-1 flex flex-col justify-between p-5 space-y-4">
+                {/* Content Top & Middle (Stretches to fill vertical height) */}
+                <div className="space-y-4 flex-1">
+                  {/* Tanggal */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="flex items-center gap-2 text-sm">
+                      <CalendarDays className="h-4 w-4 text-muted-foreground shrink-0" />
+                      <div>
+                        <p className="text-xs text-muted-foreground">Berangkat</p>
+                        <p className="font-medium">
+                          {formatDate(k.tanggalBerangkat)}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm">
+                      <CalendarDays className="h-4 w-4 text-muted-foreground shrink-0" />
+                      <div>
+                        <p className="text-xs text-muted-foreground">Pulang</p>
+                        <p className="font-medium">
+                          {formatDate(k.tanggalPulang)}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Petugas Lapangan (Tour Leader & Muthowif) */}
+                  {(() => {
+                    const meta = (k as any).driveFolderIds || {};
+                    const tl = meta.tourLeader?.nama || (k as any).tourLeader?.nama;
+                    const muth = meta.muthowif?.nama || (k as any).muthowif?.nama;
+                    return (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs bg-muted/20 border p-2.5 rounded-md">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <UserCheck className="h-3.5 w-3.5 text-primary shrink-0" />
+                          <span className="text-muted-foreground font-medium shrink-0">TL:</span>
+                          <span className={cn("font-semibold truncate", tl ? "text-foreground" : "text-muted-foreground/70 italic")}>
+                            {tl || "Belum ada"}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <UserPlus className="h-3.5 w-3.5 text-primary shrink-0" />
+                          <span className="text-muted-foreground font-medium shrink-0">Muthowif:</span>
+                          <span className={cn("font-semibold truncate", muth ? "text-foreground" : "text-muted-foreground/70 italic")}>
+                            {muth || "Belum ada"}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* Hotel */}
+                  <div className="flex items-start gap-2 text-sm">
+                    <Hotel className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs text-muted-foreground mb-1 font-semibold">
+                        Komposisi Hotel (Mekkah & Madinah)
+                      </p>
+                      <div className="flex flex-col gap-1.5">
+                        {(() => {
+                          let optionsList = k.hotelOptions;
+                          if (typeof optionsList === "string") {
+                            try { optionsList = JSON.parse(optionsList); } catch { optionsList = []; }
+                          }
+                          if (Array.isArray(optionsList) && optionsList.length > 0) {
+                            // Clean out garbage empty TBA cluster items if valid clusters exist
+                            const validOptions = optionsList.filter((opt: any) => {
+                              const hasMek = opt.hotelMekkah && opt.hotelMekkah !== "TBA";
+                              const hasMed = opt.hotelMadinah && opt.hotelMadinah !== "TBA";
+                              const hasPrice = Number(opt.hargaBase || 0) > 0;
+                              return hasMek || hasMed || hasPrice;
+                            });
+                            const listToRender = validOptions.length > 0 ? validOptions : optionsList;
+
+                            return listToRender.map((opt: any, idx: number) => (
+                              <div key={idx} className="flex flex-wrap items-center gap-1.5 text-xs bg-card border p-1.5 rounded-md shadow-xs">
+                                {opt.clusterName && opt.clusterName !== "Reguler" && (
+                                  opt.isVarian2 || (opt.clusterName && opt.clusterName.toUpperCase().includes("VARIAN 2")) ? (
+                                    <span className="font-bold text-purple-700 bg-purple-100 border border-purple-300 dark:bg-purple-900/60 dark:text-purple-300 dark:border-purple-600 text-[10px] px-1.5 py-0.5 rounded uppercase flex items-center gap-1">
+                                      💜 {opt.variantName || "VARIAN 2"}{opt.clusterName && opt.clusterName.toUpperCase() !== (opt.variantName || "VARIAN 2").toUpperCase() ? ` • ${opt.clusterName.toUpperCase()}` : ""}
+                                    </span>
+                                  ) : (
+                                    <span className="font-bold text-primary text-[10px] bg-primary/10 border border-primary/20 px-1.5 py-0.5 rounded uppercase">
+                                      {opt.clusterName}
+                                    </span>
+                                  )
+                                )}
+                                <span className="font-semibold text-foreground">
+                                  {opt.hotelMekkah || k.hotelMekkah || "TBA"} <span className="text-muted-foreground font-normal text-[11px]">(Mekkah)</span>
+                                </span>
+                                <span className="text-muted-foreground font-semibold">&mdash;</span>
+                                <span className="font-semibold text-foreground">
+                                  {opt.hotelMadinah || k.hotelMadinah || "TBA"} <span className="text-muted-foreground font-normal text-[11px]">(Madinah)</span>
+                                </span>
+                              </div>
+                            ));
+                          }
+                          return (
+                            <div className="flex flex-wrap gap-1">
+                              <span className="inline-flex items-center rounded-md bg-muted/40 border px-2 py-1 text-xs font-medium">
+                                {k.hotelMekkah || "TBA"} &mdash; {k.hotelMadinah || "TBA"}
+                              </span>
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Bottom Pinned Section: Kuota Progress & Action Buttons */}
+                <div className="space-y-3 mt-auto pt-3 border-t border-border">
+                  {/* Kuota Progress */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-sm flex-wrap gap-1">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-muted-foreground font-medium">Kuota Paket Ini:</span>
+                        <span className="font-bold text-foreground">
+                          {k.terisi}/{maxSeat} Pax ({persen}%)
+                        </span>
+                      </div>
+                      {isPartOfSplit && (
+                        <span className="text-[11px] font-bold text-primary bg-primary/10 border border-primary/25 px-2 py-0.5 rounded-md">
+                          Total Rombongan: {groupTotalQuota} Seat
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="h-2.5 w-full rounded-full bg-muted overflow-hidden">
+                      <div
+                        className={cn(
+                          "h-2.5 rounded-full transition-all",
+                          progressColor
+                        )}
+                        style={{ width: `${Math.min(persen, 100)}%` }}
+                      />
+                    </div>
+
+                    {/* Akumulasi Kuota Rombongan Gabungan (Induk & Seluruh Variant/Pecahan) */}
+                    {isPartOfSplit && groupStats && (
+                      <div className="p-2.5 rounded-lg bg-muted/40 border border-border/80 space-y-2 text-xs">
+                        <div className="flex items-center justify-between font-semibold flex-wrap gap-1">
+                          <span className="flex items-center gap-1 text-muted-foreground">
+                            👥 Akumulasi Rombongan ({groupStats.allPackages.length} Paket):
+                          </span>
+                          <span className="text-foreground font-bold">
+                            {groupTotalFilled} / {groupTotalQuota} Pax Terisi ({groupTotalQuota > 0 ? Math.round((groupTotalFilled / groupTotalQuota) * 100) : 0}%)
+                          </span>
+                        </div>
+
+                        {/* Breakdown per paket dalam rombongan */}
+                        <div className="flex flex-wrap gap-1.5 pt-0.5">
+                          {groupStats.allPackages.map((pkg) => {
+                            const isThis = pkg.id === k.id;
+                            const pkgIsPromo = (pkg as any).splitReason === "promo" || (pkg as any).promoLabel || pkg.kode.includes("_V");
+                            const pkgLabel = pkgIsPromo 
+                              ? `Promo ${(pkg as any).promoLabel || (pkg as any).splitLabel || "V2"}`
+                              : (pkg as any).splitReason === "starting_point"
+                              ? `Cabang ${(pkg as any).splitLabel || "Cabang"}`
+                              : "Paket Induk";
+
+                            return (
+                              <span
+                                key={pkg.id}
+                                className={cn(
+                                  "inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium border",
+                                  isThis
+                                    ? "bg-primary/15 text-primary border-primary/40 font-bold shadow-2xs"
+                                    : "bg-background text-muted-foreground border-border"
+                                )}
+                              >
+                                {isThis && "👉 "}
+                                {pkgLabel}: <strong className="text-foreground">{pkg.maxSeat || pkg.kuota} Seat</strong>
+                                <span className="text-[10px] opacity-75">({pkg.terisi} terisi)</span>
+                              </span>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Action */}
+                  <div className="flex gap-2 pt-1">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="flex-1"
+                      onClick={() => router.push(`/admin/keberangkatan/${k.id}`)}
+                    >
+                      <Calendar className="mr-1.5 h-3.5 w-3.5 text-primary" />
+                      Itinerary
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="flex-1"
+                      onClick={() => router.push(`/admin/manifest?paketId=${k.id}&from=paket-aktif`)}
+                    >
+                      <FileText className="mr-1.5 h-3.5 w-3.5" />
+                      Manifest
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="shrink-0"
+                      title="Lengkapi & Edit Data Operasional Paket (Termasuk Broadcast Telegram)"
+                      onClick={() => router.push(`/admin/keberangkatan/${k.id}/edit`)}
+                    >
+                      <Pencil className="mr-1 h-3.5 w-3.5 text-muted-foreground" />
+                      Edit
+                      {(k.driveFolderIds as any)?.telegramBroadcast?.isBroadcasted && (
+                        <span className="ml-1 text-[11px] text-emerald-600 font-bold" title="Sudah pernah terbroadcast ke Telegram">✓</span>
+                      )}
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      className="shrink-0 px-2.5"
+                      title="Hapus Paket"
+                      onClick={() => handleDelete(k.id)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })}
+        </div>
+      )}
+      {/* Modal Pengaturan Varian Paket untuk Publikasi Katalog & Form Pendaftaran */}
+      <Modal
+        open={!!variantModalGroup}
+        onClose={() => setVariantModalGroup(null)}
+        title="Publikasi Katalog & Formulir Pendaftaran"
+        description="Paket ini memiliki lebih dari satu varian. Tentukan varian mana saja yang aktif untuk ditampilkan di Katalog Brosur & Formulir Pendaftaran Jamaah."
+        size="lg"
+      >
+        {variantModalGroup && (() => {
+          const isHotelMode = variantModalGroup.isHotelOptionsMode && !!variantModalGroup.targetPackageId;
+          const targetPkgForHotel = isHotelMode
+            ? keberangkatan.find((k) => k.id === variantModalGroup.targetPackageId) || variantModalGroup.packages[0]
+            : null;
+
+          const currentGroupKey = variantModalGroup.groupKey;
+          const currentStats = groupStatsMap.get(currentGroupKey);
+          const currentPackages = (currentStats?.allPackages && currentStats.allPackages.length > 0)
+            ? currentStats.allPackages
+            : variantModalGroup.packages;
+
+          const sortedPackages = [...currentPackages].sort((a, b) => {
+            const aIsV2 = isV2Variant(a);
+            const bIsV2 = isV2Variant(b);
+            if (!aIsV2 && bIsV2) return -1;
+            if (aIsV2 && !bIsV2) return 1;
+            return (a.kode || "").localeCompare(b.kode || "");
+          });
+
+          const totalGroupQuota = isHotelMode
+            ? (targetPkgForHotel?.maxSeat || targetPkgForHotel?.kuota || 45)
+            : (currentStats?.totalGroupQuota || sortedPackages.reduce((s, p) => s + (p.maxSeat || p.kuota || 0), 0));
+          const totalGroupFilled = isHotelMode
+            ? (targetPkgForHotel?.terisi || 0)
+            : (currentStats?.totalGroupFilled || sortedPackages.reduce((s, p) => s + (p.terisi || 0), 0));
+          const remainingGroup = Math.max(0, totalGroupQuota - totalGroupFilled);
+
+          return (
+            <div className="space-y-4 pt-1">
+              {/* Info Kuota Bersama */}
+              <div className="p-3.5 rounded-xl bg-gradient-to-r from-emerald-500/10 via-teal-500/10 to-slate-500/10 border border-emerald-500/25 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                <div>
+                  <div className="text-xs font-semibold text-muted-foreground">Rombongan Paket:</div>
+                  <div className="text-sm font-bold text-foreground">{variantModalGroup.title}</div>
+                </div>
+                <div className="flex items-center gap-2 text-xs">
+                  <div className="px-2.5 py-1 rounded-md bg-background border font-semibold">
+                    Total Kuota: <span className="font-bold text-emerald-600 dark:text-emerald-400">{totalGroupQuota}</span>
+                  </div>
+                  <div className="px-2.5 py-1 rounded-md bg-background border font-semibold">
+                    Sisa Gabungan: <span className="font-bold text-emerald-600 dark:text-emerald-400">{remainingGroup}</span> Seat
+                  </div>
+                </div>
+              </div>
+
+              {/* Daftar Varian dengan Switch Masing-Masing */}
+              <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
+                {isHotelMode && targetPkgForHotel ? (() => {
+                  const targetPub = targetPkgForHotel.isPublishedKatalog ?? ((targetPkgForHotel.driveFolderIds as any)?.isPublishedKatalog === true);
+                  const variantGroups = groupHotelOptionsIntoVariants(targetPkgForHotel.hotelOptions, targetPub);
+
+                  return variantGroups.map((vg) => {
+                    const isPub = vg.isPublished;
+                    const isToggling = vg.indices.some((idx) => togglingKatalogId === `${targetPkgForHotel.id}_opt_${idx}`);
+                    const variantTitle = vg.variantName;
+
+                    return (
+                      <div
+                        key={`vg_${vg.key}`}
+                        className={cn(
+                          "flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-xl border transition-all",
+                          isPub
+                            ? "border-emerald-500/40 bg-emerald-500/5 shadow-xs"
+                            : "border-border/80 bg-muted/20 opacity-80 hover:opacity-100"
+                        )}
+                      >
+                        <div className="space-y-1.5 flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            {vg.isV2 ? (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-extrabold bg-gradient-to-r from-purple-500/20 to-pink-500/20 text-purple-700 dark:text-purple-300 border border-purple-500/40 shadow-xs">
+                                ⚡ {variantTitle}
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-extrabold bg-emerald-500/20 text-emerald-800 dark:text-emerald-200 border border-emerald-500/40 shadow-xs">
+                                ⭐ Varian Utama (V1)
+                              </span>
+                            )}
+                            <span className="text-xs font-mono text-muted-foreground bg-muted px-2 py-0.5 rounded">
+                              {targetPkgForHotel.kode}
+                            </span>
+                            {vg.clusterSummary ? (
+                              <span className="text-[11px] font-semibold text-amber-700 dark:text-amber-300 bg-amber-500/15 border border-amber-500/30 px-2 py-0.5 rounded-md">
+                                {vg.items.length} Klaster: {vg.clusterSummary}
+                              </span>
+                            ) : null}
+                          </div>
+
+                          <div className="font-bold text-sm text-foreground line-clamp-1">
+                            {targetPkgForHotel.namaPaket || targetPkgForHotel.kode} - {variantTitle}
+                          </div>
+
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
+                            <span>✈️ {targetPkgForHotel.maskapai || "Garuda Indonesia"}</span>
+                            <span>•</span>
+                            <span>🏨 {vg.hotelMekkah} / {vg.hotelMadinah}</span>
+                            {vg.minPrice > 0 ? (
+                              <>
+                                <span>•</span>
+                                <span className="font-bold text-emerald-600 dark:text-emerald-400">
+                                  {vg.items.length > 1 ? "Mulai " : ""}Rp {Number(vg.minPrice).toLocaleString("id-ID")}
+                                </span>
+                              </>
+                            ) : null}
+                          </div>
+                        </div>
+
+                        {/* Saklar Switch Varian */}
+                        <div className="flex items-center justify-between sm:justify-end gap-3 pt-2 sm:pt-0 border-t sm:border-t-0 border-border/50 shrink-0">
+                          <div className="text-right">
+                            <div className={cn(
+                              "text-xs font-bold leading-tight",
+                              isPub ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"
+                            )}>
+                              {isPub ? "Tampil di Katalog & Form" : "Nonaktif (Disembunyikan)"}
+                            </div>
+                            <div className="text-[10px] text-muted-foreground">
+                              {isPub ? "Jamaah dapat melihat & mendaftar" : "Tidak muncul di publik"}
+                            </div>
+                          </div>
+
+                          <button
+                            type="button"
+                            role="switch"
+                            aria-checked={isPub}
+                            disabled={isToggling}
+                            onClick={() => handleToggleHotelOptionKatalog(targetPkgForHotel.id, vg.indices, !isPub)}
+                            className={cn(
+                              "relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden",
+                              isPub ? "bg-emerald-600 shadow-[0_0_10px_rgba(16,185,129,0.35)]" : "bg-slate-300 dark:bg-slate-700",
+                              isToggling && "opacity-50 cursor-wait"
+                            )}
+                          >
+                            <span
+                              aria-hidden="true"
+                              className={cn(
+                                "pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out",
+                                isPub ? "translate-x-5" : "translate-x-0"
+                              )}
+                            />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  });
+                })() : sortedPackages.map((pkgItem) => {
+                  const isV2 = isV2Variant(pkgItem);
+                  const isPub = pkgItem.isPublishedKatalog ?? ((pkgItem.driveFolderIds as any)?.isPublishedKatalog === true);
+                  const isToggling = togglingKatalogId === pkgItem.id;
+                  const variantLabel = (pkgItem as any).splitLabel || (pkgItem as any).promoLabel || (pkgItem as any).spekLabel;
+
+                  return (
+                    <div
+                      key={pkgItem.id}
+                      className={cn(
+                        "flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-xl border transition-all",
+                        isPub
+                          ? "border-emerald-500/40 bg-emerald-500/5 shadow-xs"
+                          : "border-border/80 bg-muted/20 opacity-80 hover:opacity-100"
+                      )}
+                    >
+                      <div className="space-y-1.5 flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          {isV2 ? (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-extrabold bg-gradient-to-r from-purple-500/20 to-pink-500/20 text-purple-700 dark:text-purple-300 border border-purple-500/40 shadow-xs">
+                              ⚡ Varian V2 {variantLabel ? `• ${variantLabel}` : "• Second Variant"}
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-extrabold bg-emerald-500/20 text-emerald-800 dark:text-emerald-200 border border-emerald-500/40 shadow-xs">
+                              ⭐ Varian Utama (V1)
+                            </span>
+                          )}
+                          <span className="text-xs font-mono text-muted-foreground bg-muted px-2 py-0.5 rounded">
+                            {pkgItem.kode}
+                          </span>
+                        </div>
+
+                        <div className="font-bold text-sm text-foreground line-clamp-1">
+                          {pkgItem.namaPaket || pkgItem.kode}
+                        </div>
+
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
+                          <span>✈️ {pkgItem.maskapai || "Saudia"}</span>
+                          <span>•</span>
+                          <span>🏨 {pkgItem.hotelMekkah || "Mekkah"} / {pkgItem.hotelMadinah || "Madinah"}</span>
+                          <span>•</span>
+                          <span>Terisi: <strong>{pkgItem.terisi}</strong> Pax</span>
+                        </div>
+                      </div>
+
+                      {/* Saklar Switch Varian */}
+                      <div className="flex items-center justify-between sm:justify-end gap-3 pt-2 sm:pt-0 border-t sm:border-t-0 border-border/50 shrink-0">
+                        <div className="text-right">
+                          <div className={cn(
+                            "text-xs font-bold leading-tight",
+                            isPub ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"
+                          )}>
+                            {isPub ? "Tampil di Katalog & Form" : "Nonaktif (Disembunyikan)"}
+                          </div>
+                          <div className="text-[10px] text-muted-foreground">
+                            {isPub ? "Jamaah dapat melihat & mendaftar" : "Tidak muncul di publik"}
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          role="switch"
+                          aria-checked={isPub}
+                          disabled={isToggling}
+                          onClick={() => handleToggleKatalog(pkgItem.id, !isPub)}
+                          className={cn(
+                            "relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden",
+                            isPub ? "bg-emerald-600 shadow-[0_0_10px_rgba(16,185,129,0.35)]" : "bg-slate-300 dark:bg-slate-700",
+                            isToggling && "opacity-50 cursor-wait"
+                          )}
+                        >
+                          <span
+                            aria-hidden="true"
+                            className={cn(
+                              "pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out",
+                              isPub ? "translate-x-5" : "translate-x-0"
+                            )}
+                          />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Footer Modal */}
+              <div className="flex items-center justify-end pt-3 border-t border-border">
+                <Button
+                  variant="default"
+                  onClick={() => setVariantModalGroup(null)}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs"
+                >
+                  Selesai
+                </Button>
+              </div>
+            </div>
+          );
+        })()}
+      </Modal>
+
+      {/* Modal Import Excel */}
+      <Modal
+        open={isImportModalOpen}
+        onClose={() => {
+          if (!importing) setIsImportModalOpen(false);
+        }}
+        title="Import Paket via Excel"
+        size="lg"
+      >
+        <div className="space-y-4 pt-2">
+          <p className="text-sm text-muted-foreground">
+            Unggah file Excel untuk membuat paket keberangkatan baru secara instan.
+          </p>
+
+          <div className="bg-muted/40 border rounded-lg p-3.5 flex items-center justify-between text-xs">
+            <span className="font-semibold text-foreground">Template Format Excel</span>
+            <button
+              type="button"
+              onClick={handleDownloadTemplate}
+              disabled={downloadingTemplate}
+              className="inline-flex items-center justify-center font-bold text-emerald-600 dark:text-emerald-400 hover:underline gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed bg-transparent border-none p-0"
+            >
+              {downloadingTemplate ? (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" /> Mengunduh...
+                </>
+              ) : (
+                <>
+                  <Download className="h-3.5 w-3.5" /> Download Template (.xlsx)
+                </>
+              )}
+            </button>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-xs font-bold text-foreground block">
+              Pilih File Excel
+            </label>
+            <div className="flex items-center justify-center border-2 border-dashed border-border rounded-lg p-6 bg-muted/20 hover:bg-muted/40 transition-colors relative cursor-pointer">
+              <input
+                type="file"
+                accept=".xlsx"
+                onChange={(e) => setImportFile(e.target.files?.[0] || null)}
+                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                disabled={importing}
+              />
+              <div className="flex flex-col items-center justify-center text-center space-y-1.5 pointer-events-none">
+                <Upload className="h-8 w-8 text-muted-foreground" />
+                <p className="text-sm font-semibold text-foreground">
+                  {importFile ? importFile.name : "Pilih atau Seret File Excel (.xlsx)"}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Format file wajib sesuai template
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {importResult && (
+            <div className="space-y-2.5 p-3.5 bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900 rounded-lg">
+              <h4 className="text-sm font-bold text-emerald-800 dark:text-emerald-300">
+                Hasil Import:
+              </h4>
+              <p className="text-xs text-emerald-700 dark:text-emerald-400">
+                ✓ Berhasil mengimpor <strong>{importResult.successCount}</strong> paket keberangkatan.
+              </p>
+              {importResult.errors.length > 0 && (
+                <div className="space-y-1 mt-2">
+                  <p className="text-xs font-bold text-red-600 dark:text-red-400">
+                    Detail Kesalahan ({importResult.errors.length} Baris):
+                  </p>
+                  <div className="max-h-28 overflow-y-auto text-[10px] text-red-500 font-mono space-y-0.5 border border-red-100 dark:border-red-950 rounded p-2 bg-red-50/50 dark:bg-red-950/10">
+                    {importResult.errors.map((err, idx) => (
+                      <div key={idx}>{err}</div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="flex items-center justify-end gap-3 pt-4 border-t border-border">
+            <Button
+              variant="outline"
+              onClick={() => setIsImportModalOpen(false)}
+              disabled={importing}
+            >
+              Tutup
+            </Button>
+            <Button
+              onClick={handleImportExcel}
+              disabled={importing || !importFile}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white"
+            >
+              {importing ? "Mengimpor..." : "Mulai Import"}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+    </div>
+  );
+}

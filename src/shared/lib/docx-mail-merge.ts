@@ -79,6 +79,80 @@ export function buildExpandedFieldMap(fieldValues: Record<string, string>): Reco
       result["No Surat 2"] = strVal;
     }
 
+    // NIK variations
+    if (
+      key.toLowerCase() === "nik" ||
+      key.toLowerCase().includes("no identitas") ||
+      key.toLowerCase() === "no_identitas" ||
+      key.toLowerCase() === "noktp" ||
+      key.toLowerCase() === "no_ktp" ||
+      key.toLowerCase().includes("nomor identitas") ||
+      key.toLowerCase() === "nomor_identitas"
+    ) {
+      result["NIK"] = strVal;
+      result["nik"] = strVal;
+      result["No Identitas"] = strVal;
+      result["no_identitas"] = strVal;
+      result["Nomor Identitas"] = strVal;
+      result["nomor_identitas"] = strVal;
+      result["No KTP"] = strVal;
+      result["no_ktp"] = strVal;
+    }
+
+    // Paspor variations
+    if (key.toLowerCase().includes("paspor") || key.toLowerCase().includes("passport")) {
+      result["Nomor Paspor"] = strVal;
+      result["nomor_paspor"] = strVal;
+      result["No Paspor"] = strVal;
+      result["no_paspor"] = strVal;
+      result["Paspor"] = strVal;
+      result["paspor"] = strVal;
+    }
+
+    // Alamat variations
+    if (key.toLowerCase().includes("alamat")) {
+      result["Alamat"] = strVal;
+      result["alamat"] = strVal;
+      result["Alamat Lengkap"] = strVal;
+      result["alamat_lengkap"] = strVal;
+    }
+
+    // Telepon / HP variations
+    if (key.toLowerCase().includes("telepon") || key.toLowerCase().includes("nohp") || key.toLowerCase().includes("no_hp") || key.toLowerCase().includes("phone")) {
+      result["Nomor Telepon"] = strVal;
+      result["nomor_telepon"] = strVal;
+      result["No HP"] = strVal;
+      result["no_hp"] = strVal;
+      result["Telepon"] = strVal;
+      result["telepon"] = strVal;
+    }
+
+    // Jenis Kelamin variations
+    if (key.toLowerCase().includes("jenis kelamin") || key.toLowerCase() === "jenis_kelamin" || key.toLowerCase() === "gender") {
+      result["Jenis Kelamin"] = strVal;
+      result["jenis_kelamin"] = strVal;
+    }
+
+    // Paket variations
+    if (key.toLowerCase().includes("nama paket") || key.toLowerCase() === "nama_paket" || key.toLowerCase() === "paket") {
+      result["Nama Paket"] = strVal;
+      result["nama_paket"] = strVal;
+      result["Paket"] = strVal;
+      result["paket"] = strVal;
+    }
+
+    // Tanggal Berangkat & Pulang
+    if (key.toLowerCase().includes("tanggal berangkat") || key.toLowerCase() === "tanggal_berangkat") {
+      result["Tanggal Berangkat"] = strVal;
+      result["tanggal_berangkat"] = strVal;
+    }
+    if (key.toLowerCase().includes("tanggal pulang") || key.toLowerCase() === "tanggal_pulang" || key.toLowerCase().includes("tanggal kembali")) {
+      result["Tanggal Pulang"] = strVal;
+      result["tanggal_pulang"] = strVal;
+      result["Tanggal Kembali"] = strVal;
+      result["tanggal_kembali"] = strVal;
+    }
+
     if (key.toLowerCase() === "hal" || key.toLowerCase() === "perihal") {
       result["Hal"] = strVal;
       result["Perihal"] = strVal;

@@ -948,12 +948,83 @@ export function resolveAutocratFieldValues(
   const normalizeKey = (s: string) =>
     s.toLowerCase().trim().replace(/[\u2018\u2019\u201A\u201B']/g, "'").replace(/[\s_\-\.]/g, "");
 
+  // Alias groups dictionary for instant bidirectional resolution between template tags and form inputs
+  const ALIAS_GROUPS: string[][] = [
+    // 1. Nama Jamaah
+    ["nama", "namajamaah", "namajama'ah", "namalengkap", "namapemohon", "namapeserta", "namakaryawan", "namatertanggung", "namapegawai", "_rawnamajamaah"],
+    // 2. NIK / No Identitas
+    ["nik", "noktp", "nomorktp", "noidentitas", "nomoridentitas", "noid", "nomorid", "nipnik"],
+    // 3. Paspor
+    ["paspor", "nomorpaspor", "nopaspor", "passport", "passportnumber"],
+    // 4. Tempat Lahir
+    ["tempatlahir", "kotalahir", "pob"],
+    // 5. Tanggal Lahir
+    ["tanggallahir", "tgllahir", "dob"],
+    // 6. Jenis Kelamin
+    ["jeniskelamin", "gender", "jk"],
+    // 7. Alamat
+    ["alamat", "alamatlengkap", "address"],
+    // 8. Nomor Telepon / HP
+    ["nomortelepon", "notelepon", "nohp", "telepon", "phone", "handphone", "wa", "whatsapp", "kontak"],
+    // 9. Pekerjaan
+    ["pekerjaan", "profesi", "occupation"],
+    // 10. Jabatan
+    ["jabatan", "posisi"],
+    // 11. Nama Ayah
+    ["namaayah", "ayah", "ayahkandung", "namaayahkandung"],
+    // 12. Paket
+    ["namapaket", "paket", "paketumroh"],
+    // 13. Kode Paket
+    ["kodepaket", "kode", "kodekeberangkatan"],
+    // 14. Tanggal Berangkat
+    ["tanggalberangkat", "tglberangkat", "tanggalawal", "tglawal", "tanggalmulai", "tglmulai"],
+    // 15. Tanggal Pulang
+    ["tanggalpulang", "tglpulang", "tanggalkembali", "tanggalakhir", "tglakhir", "tanggalselesai", "tglselesai"],
+    // 16. Bulan Keberangkatan
+    ["bulankeberangkatan", "bulanberangkat", "bulan", "bulanpaket", "bulanawal"],
+    // 17. Maskapai
+    ["maskapai", "airline", "penerbangan"],
+    // 18. Hotel Mekkah
+    ["hotelmekkah", "hotelmakkah"],
+    // 19. Hotel Madinah
+    ["hotelmadinah"],
+    // 20. Program Hari
+    ["programhari", "durasi", "lamacuti"],
+    // 21. Ditujukan Kepada / Instansi
+    ["ditujukankepada", "instansi", "namainstansi", "instansitujuan", "perusahaan", "namaperusahaan", "kantor"],
+    // 22. Kantor Imigrasi
+    ["kantorimigrasi", "kanim"],
+    // 23. Kota Kantor Imigrasi
+    ["kotakantorimigrasi", "kotakanim", "kotaimigrasi", "kotakantor"]
+  ];
+
   const getManualOverride = (k: string): string | undefined => {
     if (manualFormData[k] !== undefined) return manualFormData[k];
     const target = normalizeKey(k);
     for (const [mk, mv] of Object.entries(manualFormData)) {
       if (normalizeKey(mk) === target && mv !== undefined) return mv;
     }
+
+    // Cross-alias lookup via ALIAS_GROUPS (exact alias matching)
+    const matchedGroup = ALIAS_GROUPS.find((group) => group.includes(target));
+    if (matchedGroup) {
+      for (const [mk, mv] of Object.entries(manualFormData)) {
+        const normMk = normalizeKey(mk);
+        if (
+          matchedGroup.includes(normMk) &&
+          mv !== undefined &&
+          mv !== "" &&
+          mv !== "-"
+        ) {
+          // If searching for jamaah name, exclude ayah / company / package keys
+          if (matchedGroup[0] === "nama" && (normMk.includes("ayah") || normMk.includes("perusahaan") || normMk.includes("paket"))) {
+            continue;
+          }
+          return mv;
+        }
+      }
+    }
+
     // Cross-alias fallback for instansi/kantor/perusahaan <-> ditujukan_kepada
     if (
       (target.includes("instansi") || target.includes("kantor") || target.includes("namaperusahaan") || target.includes("perusahaan")) &&
@@ -1031,16 +1102,21 @@ export function resolveAutocratFieldValues(
     template.kodeNomorDefault === "SR-PASPOR" ||
     (template.nama || "").toLowerCase().includes("rekomendasi paspor");
 
-  const namaAyahCandidate =
+  // Nama Ayah strictly sourced from the Form inputs (manualFormData) as SSOT,
+  // or verified manifest fields (jamaah.namaAyah / ayahKandung).
+  // Document OCR extraction (ocrData) is NEVER used as an SSOT during letter generation.
+  const formAyah =
     getManualOverride("namaAyah") ||
     getManualOverride("nama_ayah") ||
     getManualOverride("Nama Ayah") ||
     getManualOverride("nama_ayah_kandung") ||
+    getManualOverride("ayah");
+
+  const namaAyahCandidate =
+    formAyah ||
     jamaah?.namaAyah ||
     jamaah?.ayahKandung ||
     jamaah?.fatherName ||
-    jamaah?.dokumen?.find?.((d: any) => d.jenis === "akta" || d.jenis === "kk" || d.jenis === "buku_nikah")?.manualData?.namaAyah ||
-    jamaah?.dokumen?.find?.((d: any) => d.jenis === "akta" || d.jenis === "kk" || d.jenis === "buku_nikah")?.ocrData?.namaAyah ||
     "";
 
   const allDefs = [
@@ -1097,7 +1173,7 @@ export function resolveAutocratFieldValues(
       return;
     }
 
-    // Check direct manual form override first
+    // Check direct manual form override first (Form input is the absolute SSOT)
     const directManualVal = getManualOverride(key);
     if (directManualVal !== undefined) {
       const isNamaJamaahKey =
@@ -1109,6 +1185,7 @@ export function resolveAutocratFieldValues(
 
       if (isNamaJamaahKey) {
         const isSingleWord = countNameWords(directManualVal) < 2;
+        // Only append father name if father name exists in form inputs or verified manifest, NEVER from raw ocrData
         const shouldAppendAyah = (isEndorsement || (isRekomPaspor && isSingleWord)) && Boolean(namaAyahCandidate);
         if (shouldAppendAyah) {
           values[key] = formatJamaahNameWithEndorsement(directManualVal, namaAyahCandidate, true);
@@ -1834,8 +1911,8 @@ export function resolveManifestFieldValue(
         return (
           jamaah.nomorPaspor ||
           jamaah.passportNumber ||
-          jamaah.dokumen?.find?.((d: any) => d.jenis === "paspor")?.ocrData?.nomorPaspor ||
           jamaah.dokumen?.find?.((d: any) => d.jenis === "paspor")?.manualData?.nomorPaspor ||
+          jamaah.dokumen?.find?.((d: any) => d.jenis === "paspor")?.ocrData?.nomorPaspor ||
           "-"
         );
       case "tempatLahir": {

@@ -574,7 +574,7 @@ Bulan: {{Bulan Awal}}`,
       expect(resolved.nama_lengkap).toBe("Siti Aminah");
     });
 
-    it("should resolve father's name from Akta Kelahiran document (d.jenis === 'akta')", () => {
+    it("should NOT take father's name directly from document ocrData as SSOT for letter generation", () => {
       const rekomTemplate = DEFAULT_SURAT_TEMPLATES[0]!;
       const mockJamaahWithAkta: any = {
         id: "jam-akta-1",
@@ -586,7 +586,23 @@ Bulan: {{Bulan Awal}}`,
           },
         ],
       };
+      // When manualData does not have father name, generator must not pull directly from ocrData
       const resolved = resolveAutocratFieldValues(rekomTemplate, mockJamaahWithAkta, null, {});
+      expect(resolved.nama_lengkap).toBe("Supriyadi");
+    });
+
+    it("should resolve father's name when present in form inputs (manualFormData) as SSOT", () => {
+      const rekomTemplate = DEFAULT_SURAT_TEMPLATES[0]!;
+      const mockJamaahWithAkta: any = {
+        id: "jam-akta-1",
+        namaLengkap: "Supriyadi",
+      };
+      // Father's name was prefilled into form from OCR verification and accepted
+      const manualData = {
+        nama_lengkap: "Supriyadi",
+        namaAyah: "Sulaiman",
+      };
+      const resolved = resolveAutocratFieldValues(rekomTemplate, mockJamaahWithAkta, null, manualData);
       expect(resolved.nama_lengkap).toBe("Supriyadi Sulaiman");
     });
 
@@ -603,6 +619,45 @@ Bulan: {{Bulan Awal}}`,
       };
       const resolved = resolveAutocratFieldValues(rekomTemplate, mockJamaah, null, manualData);
       expect(resolved.nama_lengkap).toBe("Siti Rahmawati");
+    });
+
+    it("should use exact form value even for single-word name when in manualFormData (Form is SSOT, not OCR)", () => {
+      const rekomTemplate = DEFAULT_SURAT_TEMPLATES[0]!;
+      const mockJamaahWithAkta: any = {
+        id: "jam-akta-2",
+        namaLengkap: "Supriyadi",
+        dokumen: [
+          {
+            jenis: "akta",
+            ocrData: { namaAyah: "Sulaiman" },
+          },
+        ],
+      };
+      // Admin verified/edited the name in the form to "Supriyadi"
+      const manualData = {
+        nama_lengkap: "Supriyadi",
+      };
+      const resolved = resolveAutocratFieldValues(rekomTemplate, mockJamaahWithAkta, null, manualData);
+      // Must NOT append Sulaiman from OCR because form is SSOT
+      expect(resolved.nama_lengkap).toBe("Supriyadi");
+    });
+
+    it("should resolve placeholders across alias groups directly from manualFormData as SSOT", () => {
+      const rekomTemplate = DEFAULT_SURAT_TEMPLATES[0]!;
+      const mockJamaah: any = {
+        id: "jam-alias-1",
+        nik: "1111222233334444",
+        nomorPaspor: "X999999",
+      };
+      // Form has revised/verified values with alias keys
+      const manualData = {
+        no_identitas: "3578010101010001",
+        paspor: "B1234567",
+        tempatlahir: "Surabaya",
+      };
+      const resolved = resolveAutocratFieldValues(rekomTemplate, mockJamaah, null, manualData);
+      expect(resolved.nik).toBe("3578010101010001");
+      expect(resolved.tempat_lahir).toBe("Surabaya");
     });
   });
 

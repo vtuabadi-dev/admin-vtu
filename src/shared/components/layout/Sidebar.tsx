@@ -98,6 +98,7 @@ const adminNav: NavSection[] = [
           { label: "Katalog Paket", href: "/admin/paket-umroh/katalog" },
           { label: "Info Hotel", href: "/admin/paket-umroh/info-hotel" },
           { label: "Paket Aktif", href: "/admin/keberangkatan" },
+          { label: "Paket Arsip", href: "/admin/keberangkatan/arsip" },
         ],
       },
     ],
@@ -279,7 +280,11 @@ export function Sidebar({ role, mobileOpen = false, onMobileClose }: SidebarProp
 
   function isChildActive(href: string): boolean {
     const [childPath] = href.split("?");
-    return pathname === childPath || pathname === href || pathname.startsWith(childPath + "/");
+    if (pathname === childPath || pathname === href) return true;
+    if (childPath === "/admin/keberangkatan" && pathname.startsWith("/admin/keberangkatan/arsip")) {
+      return false;
+    }
+    return pathname.startsWith(childPath + "/");
   }
 
   const displayName = user?.name ?? "Admin VTU";

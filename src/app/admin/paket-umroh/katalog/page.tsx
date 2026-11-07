@@ -31,6 +31,11 @@ import { Card, CardContent } from "@/shared/components/ui/Card";
 import { useSession } from "@/shared/hooks/use-session";
 import { formatNumberWithDots, getWhatsAppUrl, cn } from "@/shared/lib/utils";
 import { groupHotelOptionsIntoVariants } from "@/shared/lib/hotel-utils";
+import {
+  isPackageUpcoming,
+  isPackageSeatFull,
+  isPackageCatalogSwitchOn,
+} from "@/shared/lib/package-lifecycle";
 import type { Keberangkatan } from "@/shared/types";
 import { useOperationalStore } from "@/stores/operational-store";
 
@@ -405,12 +410,6 @@ export default function KatalogPaketPage() {
     fetchMyGuests();
   }, []);
 
-  // Helper cek apakah paket diaktifkan untuk katalog dari menu Paket Aktif
-  const isPackagePublishedInKatalog = (pkg: Keberangkatan): boolean => {
-    if (pkg.isPublishedKatalog !== undefined) return pkg.isPublishedKatalog;
-    const meta = typeof pkg.driveFolderIds === "object" ? pkg.driveFolderIds : null;
-    return meta?.isPublishedKatalog === true;
-  };
 
   // Ambil seluruh varian paket yang diaktifkan di Paket Aktif
   // Mendukung:
@@ -420,7 +419,19 @@ export default function KatalogPaketPage() {
     const list: Keberangkatan[] = [];
 
     for (const pkg of packages) {
-      const isPkgPub = isPackagePublishedInKatalog(pkg);
+      // TIGA SYARAT MUTLAK KATALOG PAKET (ADR-0031):
+      // Syarat 1: Paket aktif yang BELUM BERANGKAT (Upcoming)
+      if (!isPackageUpcoming(pkg)) {
+        continue;
+      }
+
+      // Syarat 2: Seat BELUM PENUH (terisi < kuota/maxSeat)
+      if (isPackageSeatFull(pkg)) {
+        continue;
+      }
+
+      // Syarat 3: Saklar penampilan katalog aktif
+      const isPkgPub = isPackageCatalogSwitchOn(pkg);
       const variantGroups = groupHotelOptionsIntoVariants(pkg.hotelOptions, isPkgPub);
 
       if (variantGroups.length > 1) {
