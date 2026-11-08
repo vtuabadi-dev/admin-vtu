@@ -19,8 +19,8 @@ import {
 import type { PackageDraftStatus } from "@/server/services/package-ai/types";
 
 const MAX_FLYER_SIZE = 10 * 1024 * 1024; // 10MB
-const VALID_MIME_TYPES = ["image/jpeg", "image/jpg"];
-const VALID_EXTENSIONS = ["jpg", "jpeg"];
+const VALID_MIME_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
+const VALID_EXTENSIONS = ["jpg", "jpeg", "png", "webp"];
 
 /**
  * POST: Upload a flyer image + caption for AI processing.
@@ -81,7 +81,7 @@ export async function POST(request: NextRequest) {
     if (!VALID_MIME_TYPES.includes(clientMime)) {
       return NextResponse.json({
         success: false,
-        message: "Hanya file JPG/JPEG yang diizinkan untuk flyer (invalid MIME type)",
+        message: "Hanya file JPG, JPEG, PNG, atau WEBP yang diizinkan untuk flyer (invalid MIME type)",
       }, { status: 400 });
     }
 
@@ -91,7 +91,7 @@ export async function POST(request: NextRequest) {
     if (!VALID_EXTENSIONS.includes(ext)) {
       return NextResponse.json({
         success: false,
-        message: "Hanya file dengan ekstensi .jpg atau .jpeg yang diizinkan",
+        message: "Hanya file dengan ekstensi .jpg, .jpeg, .png, atau .webp yang diizinkan",
       }, { status: 400 });
     }
 
@@ -102,10 +102,10 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    if (flyerFile.size < 10240) {
+    if (flyerFile.size < 1024) {
       return NextResponse.json({
         success: false,
-        message: "File flyer terlalu kecil (< 10KB), mungkin bukan gambar valid",
+        message: "File flyer terlalu kecil (< 1KB), mungkin bukan gambar valid",
       }, { status: 400 });
     }
 

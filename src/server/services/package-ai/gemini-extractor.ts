@@ -93,7 +93,12 @@ export async function extractWithGemini(
 
   const imageBuffer = fs.readFileSync(imagePath);
   const base64Image = imageBuffer.toString("base64");
-  const mimeType = "image/jpeg";
+  let mimeType = "image/jpeg";
+  if (imageBuffer.length >= 4 && imageBuffer[0] === 0x89 && imageBuffer[1] === 0x50 && imageBuffer[2] === 0x4E && imageBuffer[3] === 0x47) {
+    mimeType = "image/png";
+  } else if (imageBuffer.length >= 12 && imageBuffer[0] === 0x52 && imageBuffer[1] === 0x49 && imageBuffer[2] === 0x46 && imageBuffer[3] === 0x46) {
+    mimeType = "image/webp";
+  }
 
   // Clean hint prefix and OCR error strings
   const cleanCaption = caption.replace(/^\[MODUS KLASTER SEAT:.*\]\s*/gi, "").trim();
@@ -220,7 +225,7 @@ export async function extractWithGemini(
     `2. TEKS CAPTION: ${cleanCaption}\n\n` +
     `3. GAMBAR TERLAMPIR: Flyer Utama (Gambar #1) dan Flyer Itinerary Terakhir / Sebelum Terakhir (Gambar #2/#3 jika ada).`;
 
-  const candidateModels = ["gemini-flash-lite-latest", "gemini-3.5-flash-lite", "gemini-3.5-flash", "gemini-flash-latest", "gemini-pro-latest"];
+  const candidateModels = ["gemini-1.5-flash", "gemini-flash-latest", "gemini-flash-lite-latest", "gemini-2.5-flash", "gemini-pro-latest"];
   let lastError: any = null;
 
   // Outer Loop: Try API Keys in sequence
@@ -330,7 +335,7 @@ export async function extractWithGemini(
               contentParts.push({
                 inlineData: {
                   data: addBuf.toString("base64"),
-                  mimeType: "image/jpeg"
+                  mimeType: (addBuf.length >= 4 && addBuf[0] === 0x89 && addBuf[1] === 0x50) ? "image/png" : (addBuf.length >= 12 && addBuf[0] === 0x52 && addBuf[1] === 0x49) ? "image/webp" : "image/jpeg"
                 }
               });
             } catch (err) {

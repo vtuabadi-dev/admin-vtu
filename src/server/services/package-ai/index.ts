@@ -9,7 +9,7 @@
 
 import * as fs from "fs";
 import * as path from "path";
-import { validateImageMetadata } from "@/server/services/ocr.service";
+
 import { keberangkatanRepo } from "@/server/repositories";
 import { parseCaption } from "./caption-parser";
 import { buildPackageDraft } from "./package-builder";
@@ -78,7 +78,10 @@ export async function processPackageFlyer(
 ): Promise<PackageExtractionResult> {
   // Read and validate the image
   const imageBuffer = fs.readFileSync(imagePath);
-  const validation = validateImageMetadata(imageBuffer);
+  const isJpeg = imageBuffer.length >= 3 && imageBuffer[0] === 0xFF && imageBuffer[1] === 0xD8 && imageBuffer[2] === 0xFF;
+  const isPng = imageBuffer.length >= 4 && imageBuffer[0] === 0x89 && imageBuffer[1] === 0x50 && imageBuffer[2] === 0x4E && imageBuffer[3] === 0x47;
+  const isWebp = imageBuffer.length >= 12 && imageBuffer[0] === 0x52 && imageBuffer[1] === 0x49 && imageBuffer[2] === 0x46 && imageBuffer[3] === 0x46;
+  const validation = { valid: isJpeg || isPng || isWebp, issues: ["Format file harus JPEG, PNG, atau WEBP valid"] };
 
   if (!validation.valid) {
     throw new Error(
@@ -386,25 +389,20 @@ export function saveFlyerImage(
   buffer: Buffer,
   originalName: string
 ): string {
-  // Validate magic bytes for JPEG
-  const isJpeg = buffer.length >= 3 &&
-    buffer[0] === 0xFF &&
-    buffer[1] === 0xD8 &&
-    buffer[2] === 0xFF;
+  // Validate magic bytes for JPEG, PNG, or WEBP
+  const isJpeg = buffer.length >= 3 && buffer[0] === 0xFF && buffer[1] === 0xD8 && buffer[2] === 0xFF;
+  const isPng = buffer.length >= 4 && buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4E && buffer[3] === 0x47;
+  const isWebp = buffer.length >= 12 && buffer[0] === 0x52 && buffer[1] === 0x49 && buffer[2] === 0x46 && buffer[3] === 0x46;
 
-  if (!isJpeg) {
-    throw new Error(
-      "File harus dalam format JPEG (magic bytes mismatch). " +
-      "Hanya file JPG/JPEG yang diperbolehkan untuk flyer."
-    );
+  if (!isJpeg && !isPng && !isWebp) {
+    throw new Error("File harus dalam format gambar valid (JPEG, PNG, atau WEBP).");
   }
 
-  // Validate with existing OCR image validation
-  const validation = validateImageMetadata(buffer);
-  if (!validation.valid) {
-    throw new Error(
-      `Validasi gambar gagal: ${validation.issues.join("; ")}`
-    );
+  if (buffer.length < 1024) {
+    throw new Error("File gambar flyer terlalu kecil (< 1KB).");
+  }
+  if (buffer.length > 10 * 1024 * 1024) {
+    throw new Error("File gambar flyer terlalu besar (> 10MB).");
   }
 
   ensureTempDir();
