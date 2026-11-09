@@ -412,8 +412,19 @@ const SplitInvoiceModal = dynamic(
       }
       if (parts.length > 0) {
         itemDesc = `${trimmedName} (${parts.join(", ")})`;
+      } else if (selectedHotelMekkah || selectedHotelMadinah) {
+        const fallbackParts = [
+          selectedHotelMekkah ? `Mekkah: ${selectedHotelMekkah}` : "",
+          selectedHotelMadinah ? `Madinah: ${selectedHotelMadinah}` : "",
+        ].filter(Boolean);
+        if (fallbackParts.length > 0) {
+          itemDesc = `${trimmedName} (${fallbackParts.join(", ")})`;
+        }
       }
     }
+
+    const chosenMekkah = selectedHotelMekkah || originalHotelMekkah || undefined;
+    const chosenMadinah = selectedHotelMadinah || originalHotelMadinah || undefined;
 
     const newItem: BillingItem = {
       id: `bill-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
@@ -423,8 +434,8 @@ const SplitInvoiceModal = dynamic(
       qty: Math.max(1, newBillingQty),
       satuan: newBillingSatuan || "Pax",
       allocatedJamaah: allocated,
-      hotelMekkah: isHotelUpgrade && selectedHotelMekkah ? selectedHotelMekkah : undefined,
-      hotelMadinah: isHotelUpgrade && selectedHotelMadinah ? selectedHotelMadinah : undefined,
+      hotelMekkah: isHotelUpgrade ? chosenMekkah : undefined,
+      hotelMadinah: isHotelUpgrade ? chosenMadinah : undefined,
     };
 
     setBillingItems((prev) => [...prev, newItem]);
@@ -442,8 +453,8 @@ const SplitInvoiceModal = dynamic(
         jamaahIds,
         jamaahNames: allocated,
         groupId: targetGroupId,
-        hotelMekkah: selectedHotelMekkah || undefined,
-        hotelMadinah: selectedHotelMadinah || undefined,
+        hotelMekkah: chosenMekkah,
+        hotelMadinah: chosenMadinah,
       })
         .then((res) => {
           if (res.success) {
@@ -463,8 +474,8 @@ const SplitInvoiceModal = dynamic(
             if (allocated.includes(a.namaLengkap)) {
               return {
                 ...a,
-                hotelMekkah: selectedHotelMekkah || a.hotelMekkah,
-                hotelMadinah: selectedHotelMadinah || a.hotelMadinah,
+                hotelMekkah: chosenMekkah || a.hotelMekkah,
+                hotelMadinah: chosenMadinah || a.hotelMadinah,
               };
             }
             return a;

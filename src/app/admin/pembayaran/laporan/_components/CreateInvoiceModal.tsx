@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import {
   Search,
   CreditCard,
@@ -519,12 +519,22 @@ export default function CreateInvoiceModal({
     }
   }, [kategori, pricingOption, totalDiff]);
 
+  // Track previous group ID to prevent re-initializing and wiping custom billingItems when groupInfo local fields update
+  const prevGroupIdRef = useRef<string | null>(null);
+
   // Initialize dynamic billing items when groupInfo is loaded
   useEffect(() => {
     if (!groupInfo) {
+      prevGroupIdRef.current = null;
       setBillingItems([]);
       return;
     }
+
+    // Only rebuild initial items if group has actually changed to a different group
+    if (prevGroupIdRef.current === groupInfo.id) {
+      return;
+    }
+    prevGroupIdRef.current = groupInfo.id;
 
     const pax = groupInfo.jumlahAnggota || groupInfo.anggotaIds?.length || 1;
     const clusterDetails = resolvePackageClusterDetails(groupInfo);
@@ -585,7 +595,11 @@ export default function CreateInvoiceModal({
       });
     }
 
-    setBillingItems(items);
+    setBillingItems((prev) => {
+      // Preserve any custom user-added items
+      const userCustomItems = prev.filter((i) => !i.isDefault && !i.id.startsWith("room-upgrade-"));
+      return [...items, ...userCustomItems];
+    });
   }, [groupInfo]);
 
   const totalTambahan = useMemo(() => {
@@ -650,8 +664,19 @@ export default function CreateInvoiceModal({
       }
       if (parts.length > 0) {
         itemDesc = `${trimmed} (${parts.join(", ")})`;
+      } else if (selectedHotelMekkah || selectedHotelMadinah) {
+        const fallbackParts = [
+          selectedHotelMekkah ? `Mekkah: ${selectedHotelMekkah}` : "",
+          selectedHotelMadinah ? `Madinah: ${selectedHotelMadinah}` : "",
+        ].filter(Boolean);
+        if (fallbackParts.length > 0) {
+          itemDesc = `${trimmed} (${fallbackParts.join(", ")})`;
+        }
       }
     }
+
+    const chosenMekkah = selectedHotelMekkah || originalHotelMekkah || undefined;
+    const chosenMadinah = selectedHotelMadinah || originalHotelMadinah || undefined;
 
     const newItem: BillingItem = {
       id: `bill-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
@@ -661,8 +686,8 @@ export default function CreateInvoiceModal({
       qty: Math.max(1, newBillingQty),
       satuan: newBillingSatuan || "Pax",
       allocatedJamaah: allocated,
-      hotelMekkah: isHotelUpgrade && selectedHotelMekkah ? selectedHotelMekkah : undefined,
-      hotelMadinah: isHotelUpgrade && selectedHotelMadinah ? selectedHotelMadinah : undefined,
+      hotelMekkah: isHotelUpgrade ? chosenMekkah : undefined,
+      hotelMadinah: isHotelUpgrade ? chosenMadinah : undefined,
       isDefault: false,
     };
 
@@ -679,8 +704,8 @@ export default function CreateInvoiceModal({
         jamaahIds,
         jamaahNames: allocated,
         groupId: groupInfo.id,
-        hotelMekkah: selectedHotelMekkah || undefined,
-        hotelMadinah: selectedHotelMadinah || undefined,
+        hotelMekkah: chosenMekkah,
+        hotelMadinah: chosenMadinah,
       })
         .then((res) => {
           if (res.success) {
@@ -700,8 +725,8 @@ export default function CreateInvoiceModal({
             if (allocated.includes(a.namaLengkap)) {
               return {
                 ...a,
-                hotelMekkah: selectedHotelMekkah || a.hotelMekkah,
-                hotelMadinah: selectedHotelMadinah || a.hotelMadinah,
+                hotelMekkah: chosenMekkah || a.hotelMekkah,
+                hotelMadinah: chosenMadinah || a.hotelMadinah,
               };
             }
             return a;
@@ -835,6 +860,7 @@ export default function CreateInvoiceModal({
     setNominal(0);
     setJatuhTempo("");
     setCatatan("");
+    prevGroupIdRef.current = null;
     setGroupInfo(null);
     setH40Warning(null);
     setTargetPaketId("");
@@ -967,6 +993,7 @@ export default function CreateInvoiceModal({
         nominal,
         jatuhTempo: jatuhTempo || undefined,
         catatan: finalCatatan,
+        totalTagihan: calculatedTotalTagihan > 0 ? calculatedTotalTagihan : undefined,
       });
 
       onSuccess(res.nomorInvoice || res.id, nominal);

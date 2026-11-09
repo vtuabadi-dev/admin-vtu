@@ -148,6 +148,7 @@ export async function createInvoice(data: {
   scopePembatalan?: "SEBAGIAN" | "SELURUH";
   refundStatus?: "NON_REFUND" | "WITH_REFUND";
   jamaahTargetIds?: string[];
+  totalTagihan?: number;
 }) {
   const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, "");
   const randomSuffix = String(Math.floor(Math.random() * 9000) + 1000);
@@ -221,6 +222,24 @@ export async function createInvoice(data: {
     }
   } catch (err) {
     console.warn("Auto approve registration on invoice creation warning:", err);
+  }
+
+  // Update group totalTagihan if provided and different
+  if (data.totalTagihan && data.totalTagihan > 0) {
+    try {
+      const group = await prisma.registrationGroup.findUnique({ where: { id: data.groupId } });
+      if (group && group.totalTagihan !== data.totalTagihan) {
+        await prisma.registrationGroup.update({
+          where: { id: data.groupId },
+          data: {
+            totalTagihan: data.totalTagihan,
+            sisaPembayaran: Math.max(0, data.totalTagihan - group.totalPembayaran),
+          },
+        });
+      }
+    } catch (err) {
+      console.warn("Update group total tagihan warning:", err);
+    }
   }
 
   return created;
