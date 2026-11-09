@@ -12,6 +12,7 @@ export type RealtimeEntity =
   | "surat_templates"
   | "generated_surat_logs"
   | "roomings"
+  | "master_billing_options"
   | "all";
 
 export interface RealtimeEventPayload {
@@ -101,4 +102,19 @@ export function subscribeRealtimeEvents(listener: RealtimeListener): () => void 
   return () => {
     listeners.delete(listener);
   };
+}
+
+/**
+ * Subscribes specifically to events for a specific entity
+ */
+export function subscribeRealtime(
+  entity: RealtimeEntity,
+  callback: (event: RealtimeEventPayload) => void
+): () => void {
+  const handler = (evt: RealtimeEventPayload) => {
+    if (evt.entity === entity || evt.entity === "all") {
+      callback(evt);
+    }
+  };
+  return subscribeRealtimeEvents(handler);
 }

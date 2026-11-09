@@ -24,9 +24,7 @@ import {
   Download,
   FileDown,
   PlusCircle,
-  Plus,
   Settings2,
-  Edit3,
   Trash2,
   AlertTriangle,
   Building,
@@ -65,7 +63,8 @@ import {
   cachedReviewQueue,
   type InvoiceOrderItem,
 } from "./shared-constants";
-import { subscribeRealtimeEvents } from "@/shared/lib/realtime-bus";
+import { subscribeRealtimeEvents, subscribeRealtime, type RealtimeEventPayload } from "@/shared/lib/realtime-bus";
+import MasterBillingOptionsModal from "./MasterBillingOptionsModal";
 
 // Lazy-load invoice-pdf (34KB) — only fetched when user actually clicks print/download
 async function downloadInvoicePdf(payload: any, filename?: string) {
@@ -170,9 +169,6 @@ function PaymentReviewTabContent() {
   const [masterTambahanOptions, setMasterTambahanOptions] = useState<string[]>(getInitialTambahanOptions);
   const [masterPotonganOptions, setMasterPotonganOptions] = useState<string[]>(getInitialPotonganOptions);
   const [showManageJenisModal, setShowManageJenisModal] = useState(false);
-  const [tempNewJenis, setTempNewJenis] = useState("");
-  const [editingJenisIndex, setEditingJenisIndex] = useState<number | null>(null);
-  const [editingJenisText, setEditingJenisText] = useState("");
 
   const saveTambahanOptions = (opts: string[]) => {
     const clean = opts.filter((o) => !o.toLowerCase().includes("quad"));
@@ -189,88 +185,22 @@ function PaymentReviewTabContent() {
     }
   };
 
-  async function handleAddNewMasterJenisOrder() {
-    if (!tempNewJenis.trim()) return;
-    const name = tempNewJenis.trim();
-    if (newOrderType === "penambahan") {
-      if (!masterTambahanOptions.includes(name)) {
-        saveTambahanOptions([...masterTambahanOptions, name]);
+  // Realtime subscription for master billing options reordering & changes
+  useEffect(() => {
+    const unsub = subscribeRealtime("master_billing_options", (payload: RealtimeEventPayload) => {
+      if (payload.data && Array.isArray(payload.data.options)) {
+        if (payload.data.kategori === "tambahan") {
+          saveTambahanOptions(payload.data.options);
+        } else if (payload.data.kategori === "potongan") {
+          savePotonganOptions(payload.data.options);
+        }
       }
-      setNewOrderName(name);
-    } else {
-      if (!masterPotonganOptions.includes(name)) {
-        savePotonganOptions([...masterPotonganOptions, name]);
-      }
-      setNewOrderName(name);
-    }
-    setTempNewJenis("");
-
-    try {
-      await fetch("/api/admin/pembayaran/billing-options", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ kategori: newOrderType === "penambahan" ? "tambahan" : "potongan", nama: name }),
-      });
-    } catch (err) {
-      console.warn("[BillingOptions] Save error:", err);
-    }
-  }
-
-  async function handleSaveEditMasterJenisOrder(idx: number) {
-    if (!editingJenisText.trim()) return;
-    const name = editingJenisText.trim();
-    const isTambahan = newOrderType === "penambahan";
-    const oldName = isTambahan ? masterTambahanOptions[idx] : masterPotonganOptions[idx];
-
-    if (isTambahan) {
-      const updated = [...masterTambahanOptions];
-      updated[idx] = name;
-      saveTambahanOptions(updated);
-      if (newOrderName === oldName) setNewOrderName(name);
-    } else {
-      const updated = [...masterPotonganOptions];
-      updated[idx] = name;
-      savePotonganOptions(updated);
-      if (newOrderName === oldName) setNewOrderName(name);
-    }
-    setEditingJenisIndex(null);
-    setEditingJenisText("");
-
-    try {
-      await fetch("/api/admin/pembayaran/billing-options", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ oldNama: oldName, newNama: name, kategori: isTambahan ? "tambahan" : "potongan" }),
-      });
-    } catch (err) {
-      console.warn("[BillingOptions] Edit error:", err);
-    }
-  }
-
-  async function handleDeleteMasterJenisOrder(optName: string) {
-    const isTambahan = newOrderType === "penambahan";
-    if (isTambahan) {
-      const updated = masterTambahanOptions.filter((o) => o !== optName);
-      saveTambahanOptions(updated);
-      if (newOrderName === optName) setNewOrderName(updated[0] || "");
-    } else {
-      const updated = masterPotonganOptions.filter((o) => o !== optName);
-      savePotonganOptions(updated);
-      if (newOrderName === optName) setNewOrderName(updated[0] || "");
-    }
-
-    try {
-      await fetch("/api/admin/pembayaran/billing-options", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ nama: optName, kategori: isTambahan ? "tambahan" : "potongan" }),
-      });
-    } catch (err) {
-      console.warn("[BillingOptions] Delete error:", err);
-    }
-  }
+    });
+    return unsub;
+  }, []);
 
   function handleResetMasterDefaultsOrder() {
+    const kategori = newOrderType === "penambahan" ? "tambahan" : "potongan";
     if (newOrderType === "penambahan") {
       saveTambahanOptions(DEFAULT_TAMBAHAN_OPTIONS);
       setNewOrderName(DEFAULT_TAMBAHAN_OPTIONS[0] ?? "");
@@ -278,6 +208,15 @@ function PaymentReviewTabContent() {
       savePotonganOptions(DEFAULT_POTONGAN_OPTIONS);
       setNewOrderName(DEFAULT_POTONGAN_OPTIONS[0] ?? "");
     }
+    fetch("/api/admin/pembayaran/billing-options", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "reorder",
+        kategori,
+        options: newOrderType === "penambahan" ? DEFAULT_TAMBAHAN_OPTIONS : DEFAULT_POTONGAN_OPTIONS,
+      }),
+    }).catch(() => {});
   }
 
   useEffect(() => {
@@ -3197,116 +3136,34 @@ function PaymentReviewTabContent() {
         </div>
       </Modal>
 
-      {/* Modal Kelola Master Jenis Item (Edit / Hapus / Tambah Opsi) */}
-      <Modal
+      {/* Modal Kelola Master Opsi Item dengan Drag and Drop Urutan & Reorder */}
+      <MasterBillingOptionsModal
         open={showManageJenisModal}
         onClose={() => setShowManageJenisModal(false)}
-        title={`Kelola Master Opsi â€” ${newOrderType === "penambahan" ? "Tambahan Tagihan" : "Potongan / Diskon"}`}
-        size="sm"
-      >
-        <div className="space-y-4 pt-1">
-          <p className="text-xs text-muted-foreground">
-            Ubah nama atau hapus opsi jenis {newOrderType === "penambahan" ? "tambahan tagihan" : "potongan"} yang kurang sesuai. Perubahan tersimpan secara otomatis.
-          </p>
-
-          <div className="flex gap-2">
-            <Input
-              placeholder={newOrderType === "penambahan" ? "Tambah opsi tambahan..." : "Tambah opsi potongan..."}
-              value={tempNewJenis}
-              onChange={(e) => setTempNewJenis(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleAddNewMasterJenisOrder()}
-            />
-            <Button
-              type="button"
-              size="sm"
-              onClick={handleAddNewMasterJenisOrder}
-              disabled={!tempNewJenis.trim()}
-              className="bg-amber-600 hover:bg-amber-700 text-white shrink-0"
-            >
-              <Plus className="h-4 w-4 mr-1" /> Tambah
-            </Button>
-          </div>
-
-          <div className="space-y-1.5 max-h-60 overflow-y-auto pr-1">
-            {(newOrderType === "penambahan" ? masterTambahanOptions : masterPotonganOptions).map((opt: string, idx: number) => (
-              <div
-                key={`${opt}-${idx}`}
-                className="flex items-center justify-between p-2 rounded-lg bg-stone-100 dark:bg-stone-900 border text-xs"
-              >
-                {editingJenisIndex === idx ? (
-                  <div className="flex items-center gap-1.5 w-full">
-                    <Input
-                      value={editingJenisText}
-                      onChange={(e) => setEditingJenisText(e.target.value)}
-                      className="h-7 text-xs"
-                      autoFocus
-                    />
-                    <Button
-                      type="button"
-                      size="sm"
-                      className="h-7 px-2 text-[11px]"
-                      onClick={() => handleSaveEditMasterJenisOrder(idx)}
-                    >
-                      Simpan
-                    </Button>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="ghost"
-                      className="h-7 px-2 text-[11px]"
-                      onClick={() => setEditingJenisIndex(null)}
-                    >
-                      Batal
-                    </Button>
-                  </div>
-                ) : (
-                  <>
-                    <span className="font-medium text-foreground truncate">{opt}</span>
-                    <div className="flex items-center gap-1 shrink-0">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setEditingJenisIndex(idx);
-                          setEditingJenisText(opt);
-                        }}
-                        className="p-1 text-stone-400 hover:text-amber-600 transition-colors cursor-pointer"
-                        title="Edit Nama Jenis"
-                      >
-                        <Edit3 className="h-3.5 w-3.5" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteMasterJenisOrder(opt)}
-                        className="p-1 text-stone-400 hover:text-destructive transition-colors cursor-pointer"
-                        title="Hapus Jenis Ini"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
-                  </>
-                )}
-              </div>
-            ))}
-          </div>
-
-          <div className="flex justify-between items-center pt-2 border-t text-xs">
-            <button
-              type="button"
-              onClick={handleResetMasterDefaultsOrder}
-              className="text-stone-500 hover:text-foreground text-[11px] underline cursor-pointer"
-            >
-              Reset ke Opsi Standar Sistem
-            </button>
-            <Button
-              type="button"
-              size="sm"
-              onClick={() => setShowManageJenisModal(false)}
-            >
-              Selesai
-            </Button>
-          </div>
-        </div>
-      </Modal>
+        kategori={newOrderType === "penambahan" ? "tambahan" : "potongan"}
+        options={newOrderType === "penambahan" ? masterTambahanOptions : masterPotonganOptions}
+        onOptionsChange={(newOpts) => {
+          if (newOrderType === "penambahan") {
+            saveTambahanOptions(newOpts);
+          } else {
+            savePotonganOptions(newOpts);
+          }
+        }}
+        onResetDefaults={handleResetMasterDefaultsOrder}
+        onActiveOptionAdded={(newName) => {
+          setNewOrderName(newName);
+        }}
+        onActiveOptionRenamed={(oldName, newName) => {
+          if (newOrderName === oldName) setNewOrderName(newName);
+        }}
+        onActiveOptionDeleted={(deletedName) => {
+          if (newOrderName === deletedName) {
+            const currentList = newOrderType === "penambahan" ? masterTambahanOptions : masterPotonganOptions;
+            const remaining = currentList.filter((o) => o !== deletedName);
+            setNewOrderName(remaining[0] || "");
+          }
+        }}
+      />
 
       {/* Success Toast / Modal */}
       <Modal open={showSuccess} onClose={() => setShowSuccess(false)} title="Berhasil" size="sm">
