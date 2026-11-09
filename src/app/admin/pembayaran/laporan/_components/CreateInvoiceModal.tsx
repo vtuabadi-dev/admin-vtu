@@ -261,45 +261,68 @@ export default function CreateInvoiceModal({
     }
   }, [open]);
 
-  // Original package hotels for the active group
-  const originalHotelMekkah = useMemo(() => {
+  // Package default hotels from keberangkatan
+  const packageHotelMekkah = useMemo(() => {
     if (!groupInfo) return "";
     return (
       groupInfo.keberangkatan?.hotelMekkah ||
       groupInfo.paketKeberangkatan?.hotelMekkah ||
-      groupInfo.anggota?.[0]?.hotelMekkah ||
       keberangkatanList.find((k) => k.id === groupInfo.paketKeberangkatanId || k.id === groupInfo.keberangkatan?.id)?.hotelMekkah ||
       ""
     );
   }, [groupInfo, keberangkatanList]);
 
-  const originalHotelMadinah = useMemo(() => {
+  const packageHotelMadinah = useMemo(() => {
     if (!groupInfo) return "";
     return (
       groupInfo.keberangkatan?.hotelMadinah ||
       groupInfo.paketKeberangkatan?.hotelMadinah ||
-      groupInfo.anggota?.[0]?.hotelMadinah ||
       keberangkatanList.find((k) => k.id === groupInfo.paketKeberangkatanId || k.id === groupInfo.keberangkatan?.id)?.hotelMadinah ||
       ""
     );
   }, [groupInfo, keberangkatanList]);
 
-  // Sync initial hotel upgrade selection with original package hotels
+  // Current hotel of group members (e.g. from manifest if upgraded)
+  const currentHotelMekkah = useMemo(() => {
+    if (!groupInfo?.anggota || groupInfo.anggota.length === 0) return packageHotelMekkah;
+    return groupInfo.anggota[0]?.hotelMekkah || packageHotelMekkah;
+  }, [groupInfo, packageHotelMekkah]);
+
+  const currentHotelMadinah = useMemo(() => {
+    if (!groupInfo?.anggota || groupInfo.anggota.length === 0) return packageHotelMadinah;
+    return groupInfo.anggota[0]?.hotelMadinah || packageHotelMadinah;
+  }, [groupInfo, packageHotelMadinah]);
+
+  // Keep originalHotelMekkah as alias to packageHotelMekkah
+  const originalHotelMekkah = packageHotelMekkah;
+  const originalHotelMadinah = packageHotelMadinah;
+
+  // Sync initial hotel upgrade selection: prioritize current upgraded hotel of jamaah!
   useEffect(() => {
     if (isHotelUpgradeItem(newBillingNama)) {
-      if (originalHotelMekkah && !selectedHotelMekkah) {
-        setSelectedHotelMekkah(originalHotelMekkah);
+      const preferredMekkah = currentHotelMekkah || packageHotelMekkah;
+      const preferredMadinah = currentHotelMadinah || packageHotelMadinah;
+      if (preferredMekkah && !selectedHotelMekkah) {
+        setSelectedHotelMekkah(preferredMekkah);
       }
-      if (originalHotelMadinah && !selectedHotelMadinah) {
-        setSelectedHotelMadinah(originalHotelMadinah);
+      if (preferredMadinah && !selectedHotelMadinah) {
+        setSelectedHotelMadinah(preferredMadinah);
+      }
+
+      // Pre-select members who have this hotel
+      if (newBillingAllocatedMembers.length === 0 && groupInfo?.anggota) {
+        const allMemberNames = groupInfo.anggota.map((a: any) => a.namaLengkap).filter(Boolean);
+        setNewBillingAllocatedMembers(allMemberNames);
+        setNewBillingQty(Math.max(1, allMemberNames.length));
       }
     }
-  }, [newBillingNama, originalHotelMekkah, originalHotelMadinah, selectedHotelMekkah, selectedHotelMadinah]);
+  }, [newBillingNama, currentHotelMekkah, currentHotelMadinah, packageHotelMekkah, packageHotelMadinah, selectedHotelMekkah, selectedHotelMadinah, groupInfo, newBillingAllocatedMembers.length]);
 
   // Available options for Makkah & Madinah hotels
   const mekkahHotelOptions = useMemo(() => {
     const list = new Set<string>();
-    if (originalHotelMekkah) list.add(originalHotelMekkah);
+    if (currentHotelMekkah) list.add(currentHotelMekkah);
+    if (packageHotelMekkah) list.add(packageHotelMekkah);
     if (groupInfo?.keberangkatan?.hotelOptions && Array.isArray(groupInfo.keberangkatan.hotelOptions)) {
       groupInfo.keberangkatan.hotelOptions.forEach((opt: any) => {
         if (opt?.hotelMekkah) list.add(opt.hotelMekkah);
@@ -308,11 +331,12 @@ export default function CreateInvoiceModal({
     masterHotelsMekkah.forEach((h) => list.add(h));
     DEFAULT_MEKKAH_HOTELS.forEach((h) => list.add(h));
     return Array.from(list);
-  }, [originalHotelMekkah, groupInfo, masterHotelsMekkah]);
+  }, [currentHotelMekkah, packageHotelMekkah, groupInfo, masterHotelsMekkah]);
 
   const madinahHotelOptions = useMemo(() => {
     const list = new Set<string>();
-    if (originalHotelMadinah) list.add(originalHotelMadinah);
+    if (currentHotelMadinah) list.add(currentHotelMadinah);
+    if (packageHotelMadinah) list.add(packageHotelMadinah);
     if (groupInfo?.keberangkatan?.hotelOptions && Array.isArray(groupInfo.keberangkatan.hotelOptions)) {
       groupInfo.keberangkatan.hotelOptions.forEach((opt: any) => {
         if (opt?.hotelMadinah) list.add(opt.hotelMadinah);
@@ -321,7 +345,7 @@ export default function CreateInvoiceModal({
     masterHotelsMadinah.forEach((h) => list.add(h));
     DEFAULT_MADINAH_HOTELS.forEach((h) => list.add(h));
     return Array.from(list);
-  }, [originalHotelMadinah, groupInfo, masterHotelsMadinah]);
+  }, [currentHotelMadinah, packageHotelMadinah, groupInfo, masterHotelsMadinah]);
 
   // Compute full group code
   const currentFullCode = useMemo(() => {
@@ -595,9 +619,63 @@ export default function CreateInvoiceModal({
       });
     }
 
+    // Auto-detect existing Hotel Upgrade from manifest / anggota
+    const pkgMekkah = groupInfo.keberangkatan?.hotelMekkah || groupInfo.paketKeberangkatan?.hotelMekkah || "";
+    const pkgMadinah = groupInfo.keberangkatan?.hotelMadinah || groupInfo.paketKeberangkatan?.hotelMadinah || "";
+
+    const upgradedMekkahMembers = (groupInfo.anggota || []).filter(
+      (a: any) => a.hotelMekkah && pkgMekkah && a.hotelMekkah.trim().toLowerCase() !== pkgMekkah.trim().toLowerCase()
+    );
+    const upgradedMadinahMembers = (groupInfo.anggota || []).filter(
+      (a: any) => a.hotelMadinah && pkgMadinah && a.hotelMadinah.trim().toLowerCase() !== pkgMadinah.trim().toLowerCase()
+    );
+
+    if (upgradedMekkahMembers.length > 0 || upgradedMadinahMembers.length > 0) {
+      const parts: string[] = [];
+      const upHotelMekkah = upgradedMekkahMembers[0]?.hotelMekkah;
+      const upHotelMadinah = upgradedMadinahMembers[0]?.hotelMadinah;
+      if (upHotelMekkah && upHotelMekkah.trim().toLowerCase() !== pkgMekkah.trim().toLowerCase()) {
+        parts.push(`Mekkah: ${upHotelMekkah}`);
+      }
+      if (upHotelMadinah && upHotelMadinah.trim().toLowerCase() !== pkgMadinah.trim().toLowerCase()) {
+        parts.push(`Madinah: ${upHotelMadinah}`);
+      }
+
+      const targetAnggota = Array.from(
+        new Set([...upgradedMekkahMembers, ...upgradedMadinahMembers].map((a: any) => a.namaLengkap).filter(Boolean))
+      );
+
+      // Check if group's invoices or invoice items have nominal
+      let detectedNominal = 0;
+      for (const inv of (groupInfo.invoices || [])) {
+        for (const it of (inv.items || [])) {
+          if (isHotelUpgradeItem(it.deskripsi || "")) {
+            detectedNominal = it.hargaSatuan || 0;
+            break;
+          }
+        }
+        if (detectedNominal > 0) break;
+      }
+
+      items.push({
+        id: `hotel-upgrade-manifest`,
+        nama: `Upgrade Hotel (${parts.join(", ")})`,
+        kategori: "tambahan",
+        nominal: detectedNominal,
+        qty: targetAnggota.length || pax,
+        satuan: "Pax",
+        allocatedJamaah: targetAnggota.length > 0 ? targetAnggota : memberNames,
+        hotelMekkah: upHotelMekkah,
+        hotelMadinah: upHotelMadinah,
+        isDefault: false,
+      });
+    }
+
     setBillingItems((prev) => {
       // Preserve any custom user-added items
-      const userCustomItems = prev.filter((i) => !i.isDefault && !i.id.startsWith("room-upgrade-"));
+      const userCustomItems = prev.filter(
+        (i) => !i.isDefault && !i.id.startsWith("room-upgrade-") && !i.id.startsWith("hotel-upgrade-")
+      );
       return [...items, ...userCustomItems];
     });
   }, [groupInfo]);
@@ -2591,9 +2669,9 @@ export default function CreateInvoiceModal({
                   <Building className="h-4 w-4 text-amber-600 dark:text-amber-400" />
                   Pilih Hotel Tujuan Upgrade (Makkah & Madinah):
                 </label>
-                {(selectedHotelMekkah !== originalHotelMekkah || selectedHotelMadinah !== originalHotelMadinah) && (
+                {(currentHotelMekkah !== packageHotelMekkah || currentHotelMadinah !== packageHotelMadinah || (selectedHotelMekkah && selectedHotelMekkah !== packageHotelMekkah) || (selectedHotelMadinah && selectedHotelMadinah !== packageHotelMadinah)) && (
                   <span className="text-[10px] font-bold bg-amber-500/20 text-amber-800 dark:text-amber-300 px-2 py-0.5 rounded border border-amber-500/30">
-                    Upgrade Aktif
+                    Upgrade Terdeteksi / Aktif
                   </span>
                 )}
               </div>
@@ -2603,33 +2681,38 @@ export default function CreateInvoiceModal({
                 <div className="space-y-1">
                   <label className="text-[11px] font-semibold text-foreground flex items-center justify-between">
                     <span>🕋 Hotel Makkah</span>
-                    {originalHotelMekkah && (
-                      <span className="text-[10px] text-muted-foreground truncate max-w-[140px]" title={`Asal Paket: ${originalHotelMekkah}`}>
-                        Asal: {originalHotelMekkah}
+                    {packageHotelMekkah && (
+                      <span className="text-[10px] text-muted-foreground truncate max-w-[150px]" title={`Asal Paket: ${packageHotelMekkah}`}>
+                        Asal Paket: {packageHotelMekkah}
                       </span>
                     )}
                   </label>
                   <select
                     className="w-full rounded-md border border-input bg-background px-2.5 py-1.5 text-xs ring-offset-background focus:outline-none focus:ring-2 focus:ring-amber-500/50"
-                    value={selectedHotelMekkah || originalHotelMekkah}
+                    value={selectedHotelMekkah || currentHotelMekkah || packageHotelMekkah}
                     onChange={(e) => setSelectedHotelMekkah(e.target.value)}
                   >
-                    {originalHotelMekkah && (
-                      <option value={originalHotelMekkah}>
-                        {originalHotelMekkah} (Asal Paket)
+                    {currentHotelMekkah && currentHotelMekkah !== packageHotelMekkah && (
+                      <option value={currentHotelMekkah}>
+                        {currentHotelMekkah} (Hotel Saat Ini - Upgrade)
+                      </option>
+                    )}
+                    {packageHotelMekkah && (
+                      <option value={packageHotelMekkah}>
+                        {packageHotelMekkah} (Asal Paket Standar)
                       </option>
                     )}
                     {mekkahHotelOptions
-                      .filter((h) => h !== originalHotelMekkah)
+                      .filter((h) => h !== currentHotelMekkah && h !== packageHotelMekkah)
                       .map((h) => (
                         <option key={h} value={h}>
                           {h}
                         </option>
                       ))}
                   </select>
-                  {selectedHotelMekkah && selectedHotelMekkah !== originalHotelMekkah && (
+                  {currentHotelMekkah && currentHotelMekkah !== packageHotelMekkah && (
                     <p className="text-[10px] text-amber-600 dark:text-amber-400 font-medium">
-                      ✨ Upgrade dari: {originalHotelMekkah || "Asal Paket"}
+                      ✨ Hotel saat ini di manifest: <strong>{currentHotelMekkah}</strong>
                     </p>
                   )}
                 </div>
@@ -2638,33 +2721,38 @@ export default function CreateInvoiceModal({
                 <div className="space-y-1">
                   <label className="text-[11px] font-semibold text-foreground flex items-center justify-between">
                     <span>🕌 Hotel Madinah</span>
-                    {originalHotelMadinah && (
-                      <span className="text-[10px] text-muted-foreground truncate max-w-[140px]" title={`Asal Paket: ${originalHotelMadinah}`}>
-                        Asal: {originalHotelMadinah}
+                    {packageHotelMadinah && (
+                      <span className="text-[10px] text-muted-foreground truncate max-w-[150px]" title={`Asal Paket: ${packageHotelMadinah}`}>
+                        Asal Paket: {packageHotelMadinah}
                       </span>
                     )}
                   </label>
                   <select
                     className="w-full rounded-md border border-input bg-background px-2.5 py-1.5 text-xs ring-offset-background focus:outline-none focus:ring-2 focus:ring-amber-500/50"
-                    value={selectedHotelMadinah || originalHotelMadinah}
+                    value={selectedHotelMadinah || currentHotelMadinah || packageHotelMadinah}
                     onChange={(e) => setSelectedHotelMadinah(e.target.value)}
                   >
-                    {originalHotelMadinah && (
-                      <option value={originalHotelMadinah}>
-                        {originalHotelMadinah} (Asal Paket)
+                    {currentHotelMadinah && currentHotelMadinah !== packageHotelMadinah && (
+                      <option value={currentHotelMadinah}>
+                        {currentHotelMadinah} (Hotel Saat Ini - Upgrade)
+                      </option>
+                    )}
+                    {packageHotelMadinah && (
+                      <option value={packageHotelMadinah}>
+                        {packageHotelMadinah} (Asal Paket Standar)
                       </option>
                     )}
                     {madinahHotelOptions
-                      .filter((h) => h !== originalHotelMadinah)
+                      .filter((h) => h !== currentHotelMadinah && h !== packageHotelMadinah)
                       .map((h) => (
                         <option key={h} value={h}>
                           {h}
                         </option>
                       ))}
                   </select>
-                  {selectedHotelMadinah && selectedHotelMadinah !== originalHotelMadinah && (
+                  {currentHotelMadinah && currentHotelMadinah !== packageHotelMadinah && (
                     <p className="text-[10px] text-amber-600 dark:text-amber-400 font-medium">
-                      ✨ Upgrade dari: {originalHotelMadinah || "Asal Paket"}
+                      ✨ Hotel saat ini di manifest: <strong>{currentHotelMadinah}</strong>
                     </p>
                   )}
                 </div>
