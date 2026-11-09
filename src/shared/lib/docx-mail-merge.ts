@@ -23,88 +23,185 @@ function escapeRegex(str: string): string {
  * Expands field values with fuzzy variations (quotes, spaces, casing, synonyms)
  */
 export function buildExpandedFieldMap(fieldValues: Record<string, string>): Record<string, string> {
-  const result: Record<string, string> = { ...fieldValues };
+  const result: Record<string, string> = {};
 
+  // 1. Filter out internal keys and populate initial fields with quote variations
   for (const [key, val] of Object.entries(fieldValues)) {
     if (val === undefined || val === null) continue;
+    if (key.startsWith("_raw") || key === "_rawNamaJamaah" || key.toLowerCase() === "_rawnamajamaah") continue;
     const strVal = String(val).trim() === "" ? "-" : String(val);
+    result[key] = strVal;
 
     // Quote variations
     const curlyKey = key.replace(/'/g, "’");
     const straightKey = key.replace(/[’‘]/g, "'");
     result[curlyKey] = strVal;
     result[straightKey] = strVal;
+  }
 
-    // Word-spaced variations (e.g., "Ta nggal Lahir" vs "Tanggal Lahir")
-    if (key.toLowerCase().includes("tanggal lahir") || key.toLowerCase().includes("ta nggal lahir")) {
-      result["Tanggal Lahir"] = strVal;
-      result["Ta nggal Lahir"] = strVal;
-      result["ta nggal lahir"] = strVal;
-      result["tanggal_lahir"] = strVal;
-    }
+  const isValValid = (v: any): boolean => typeof v === "string" && v.trim() !== "" && v.trim() !== "-";
 
-    const lowerKey = key.toLowerCase();
-    const isPersonNameKey =
-      lowerKey === "nama" ||
-      lowerKey === "nama_lengkap" ||
-      lowerKey === "namalengkap" ||
-      lowerKey === "nama lengkap" ||
-      lowerKey === "nama_jamaah" ||
-      lowerKey === "namajamaah" ||
-      lowerKey === "nama jamaah" ||
-      lowerKey === "nama jama'ah" ||
-      lowerKey === "nama jama’ah" ||
-      lowerKey === "nama_pemohon" ||
-      lowerKey === "namapemohon" ||
-      lowerKey === "nama pemohon" ||
-      lowerKey === "nama_yang_cuti" ||
-      lowerKey === "namayangcuti" ||
-      lowerKey === "nama yang cuti" ||
-      lowerKey === "nama_peserta" ||
-      lowerKey === "namapeserta" ||
-      lowerKey === "nama peserta" ||
-      lowerKey === "nama_karyawan" ||
-      lowerKey === "namakaryawan" ||
-      lowerKey === "nama karyawan" ||
-      lowerKey === "nama_pegawai" ||
-      lowerKey === "namapegawai" ||
-      lowerKey === "nama pegawai" ||
-      lowerKey === "_rawnamajamaah" ||
-      (lowerKey.startsWith("nama") &&
-        !lowerKey.includes("ayah") &&
-        !lowerKey.includes("orangtua") &&
-        !lowerKey.includes("perusahaan") &&
-        !lowerKey.includes("kantor") &&
-        !lowerKey.includes("instansi") &&
-        !lowerKey.includes("paket") &&
-        !lowerKey.includes("hotel") &&
-        !lowerKey.includes("bank"));
+  // 2. Canonical Person Name Resolution (SSOT Enforced)
+  // Prioritize specific user-verified keys from form over generic aliases
+  const canonicalName =
+    (isValValid(fieldValues["Nama Jama’ah"]) && fieldValues["Nama Jama’ah"]) ||
+    (isValValid(fieldValues["Nama Jama'ah"]) && fieldValues["Nama Jama'ah"]) ||
+    (isValValid(fieldValues["nama_jama’ah"]) && fieldValues["nama_jama’ah"]) ||
+    (isValValid(fieldValues["nama_jama'ah"]) && fieldValues["nama_jama'ah"]) ||
+    (isValValid(fieldValues["Nama Lengkap"]) && fieldValues["Nama Lengkap"]) ||
+    (isValValid(fieldValues["nama_lengkap"]) && fieldValues["nama_lengkap"]) ||
+    (isValValid(fieldValues["Nama Pemohon"]) && fieldValues["Nama Pemohon"]) ||
+    (isValValid(fieldValues["namapemohon"]) && fieldValues["namapemohon"]) ||
+    (isValValid(fieldValues["nama_pemohon"]) && fieldValues["nama_pemohon"]) ||
+    (isValValid(fieldValues["Nama Yang Cuti"]) && fieldValues["Nama Yang Cuti"]) ||
+    (isValValid(fieldValues["nama_yang_cuti"]) && fieldValues["nama_yang_cuti"]) ||
+    (isValValid(fieldValues["Nama Peserta"]) && fieldValues["Nama Peserta"]) ||
+    (isValValid(fieldValues["nama_peserta"]) && fieldValues["nama_peserta"]) ||
+    (isValValid(fieldValues["Nama Karyawan"]) && fieldValues["Nama Karyawan"]) ||
+    (isValValid(fieldValues["nama_karyawan"]) && fieldValues["nama_karyawan"]) ||
+    (isValValid(fieldValues["Nama Pegawai"]) && fieldValues["Nama Pegawai"]) ||
+    (isValValid(fieldValues["nama_pegawai"]) && fieldValues["nama_pegawai"]) ||
+    (isValValid(fieldValues["Nama Jamaah"]) && fieldValues["Nama Jamaah"]) ||
+    (isValValid(fieldValues["nama_jamaah"]) && fieldValues["nama_jamaah"]) ||
+    (isValValid(fieldValues["Nama"]) && fieldValues["Nama"]) ||
+    (isValValid(fieldValues["nama"]) && fieldValues["nama"]);
 
-    if (isPersonNameKey) {
-      result["Nama"] = strVal;
-      result["nama"] = strVal;
-      result["Nama Lengkap"] = strVal;
-      result["nama_lengkap"] = strVal;
-      result["Nama Jamaah"] = strVal;
-      result["nama_jamaah"] = strVal;
-      result["Nama Jama'ah"] = strVal;
-      result["Nama Jama’ah"] = strVal;
-      result["Nama Pemohon"] = strVal;
-      result["nama_pemohon"] = strVal;
-      result["Nama Peserta"] = strVal;
-      result["nama_peserta"] = strVal;
-      result["Nama Karyawan"] = strVal;
-      result["nama_karyawan"] = strVal;
-      result["Nama Pegawai"] = strVal;
-      result["nama_pegawai"] = strVal;
-      result["Nama Yang Cuti"] = strVal;
-      result["nama_yang_cuti"] = strVal;
-    }
+  if (canonicalName) {
+    const finalName = String(canonicalName).trim();
+    const nameAliases = [
+      "Nama", "nama", "Nama Lengkap", "nama_lengkap", "namalengkap", "Nama Jamaah", "nama_jamaah", "namajamaah",
+      "Nama Jama'ah", "nama_jama'ah", "Nama Jama’ah", "nama_jama’ah",
+      "Nama Pemohon", "nama_pemohon", "namapemohon",
+      "Nama Peserta", "nama_peserta", "namapeserta",
+      "Nama Yang Cuti", "nama_yang_cuti", "namayangcuti",
+      "Nama Yang Bersangkutan", "nama_yang_bersangkutan", "namayangbersangkutan",
+      "Nama Karyawan", "nama_karyawan", "namakaryawan",
+      "Nama Pegawai", "nama_pegawai", "namapegawai"
+    ];
+    nameAliases.forEach((alias) => {
+      result[alias] = finalName;
+      result[alias.replace(/'/g, "’")] = finalName;
+      result[alias.replace(/[’‘]/g, "'")] = finalName;
+    });
+  }
 
-    if (key.toLowerCase().includes("tempat lahir")) {
-      result["Tempat Lahir"] = strVal;
-      result["tempat_lahir"] = strVal;
-    }
+  // 3. Canonical Tanggal Lahir Resolution
+  const canonicalTglLahir =
+    (isValValid(fieldValues["Tanggal Lahir"]) && fieldValues["Tanggal Lahir"]) ||
+    (isValValid(fieldValues["Ta nggal Lahir"]) && fieldValues["Ta nggal Lahir"]) ||
+    (isValValid(fieldValues["tanggal_lahir"]) && fieldValues["tanggal_lahir"]) ||
+    (isValValid(fieldValues["tanggallahir"]) && fieldValues["tanggallahir"]) ||
+    (isValValid(fieldValues["Tgl Lahir"]) && fieldValues["Tgl Lahir"]) ||
+    (isValValid(fieldValues["tgl_lahir"]) && fieldValues["tgl_lahir"]);
+
+  if (canonicalTglLahir) {
+    const finalTgl = String(canonicalTglLahir).trim();
+    result["Tanggal Lahir"] = finalTgl;
+    result["Ta nggal Lahir"] = finalTgl;
+    result["ta nggal lahir"] = finalTgl;
+    result["tanggal_lahir"] = finalTgl;
+    result["tanggallahir"] = finalTgl;
+    result["Tgl Lahir"] = finalTgl;
+    result["tgl_lahir"] = finalTgl;
+  }
+
+  // 4. Canonical Tempat Lahir Resolution
+  const canonicalTempatLahir =
+    (isValValid(fieldValues["Tempat Lahir"]) && fieldValues["Tempat Lahir"]) ||
+    (isValValid(fieldValues["tempat_lahir"]) && fieldValues["tempat_lahir"]) ||
+    (isValValid(fieldValues["tempatlahir"]) && fieldValues["tempatlahir"]) ||
+    (isValValid(fieldValues["kota_lahir"]) && fieldValues["kota_lahir"]) ||
+    (isValValid(fieldValues["kotalahir"]) && fieldValues["kotalahir"]);
+
+  if (canonicalTempatLahir) {
+    const finalTempat = String(canonicalTempatLahir).trim();
+    result["Tempat Lahir"] = finalTempat;
+    result["tempat_lahir"] = finalTempat;
+    result["tempatlahir"] = finalTempat;
+    result["kota_lahir"] = finalTempat;
+    result["kotalahir"] = finalTempat;
+  }
+
+  // 5. Canonical NIK / No Identitas Resolution
+  const canonicalNik =
+    (isValValid(fieldValues["NIK"]) && fieldValues["NIK"]) ||
+    (isValValid(fieldValues["nik"]) && fieldValues["nik"]) ||
+    (isValValid(fieldValues["No Identitas"]) && fieldValues["No Identitas"]) ||
+    (isValValid(fieldValues["no_identitas"]) && fieldValues["no_identitas"]) ||
+    (isValValid(fieldValues["Nomor Identitas"]) && fieldValues["Nomor Identitas"]) ||
+    (isValValid(fieldValues["nomor_identitas"]) && fieldValues["nomor_identitas"]) ||
+    (isValValid(fieldValues["No KTP"]) && fieldValues["No KTP"]) ||
+    (isValValid(fieldValues["no_ktp"]) && fieldValues["no_ktp"]) ||
+    (isValValid(fieldValues["noktp"]) && fieldValues["noktp"]);
+
+  if (canonicalNik) {
+    const finalNik = String(canonicalNik).trim();
+    result["NIK"] = finalNik;
+    result["nik"] = finalNik;
+    result["No Identitas"] = finalNik;
+    result["no_identitas"] = finalNik;
+    result["Nomor Identitas"] = finalNik;
+    result["nomor_identitas"] = finalNik;
+    result["No KTP"] = finalNik;
+    result["no_ktp"] = finalNik;
+  }
+
+  // 6. Canonical Alamat Resolution
+  const canonicalAlamat =
+    (isValValid(fieldValues["Alamat"]) && fieldValues["Alamat"]) ||
+    (isValValid(fieldValues["alamat"]) && fieldValues["alamat"]) ||
+    (isValValid(fieldValues["Alamat Lengkap"]) && fieldValues["Alamat Lengkap"]) ||
+    (isValValid(fieldValues["alamat_lengkap"]) && fieldValues["alamat_lengkap"]);
+
+  if (canonicalAlamat) {
+    const finalAlamat = String(canonicalAlamat).trim();
+    result["Alamat"] = finalAlamat;
+    result["alamat"] = finalAlamat;
+    result["Alamat Lengkap"] = finalAlamat;
+    result["alamat_lengkap"] = finalAlamat;
+  }
+
+  // 7. Canonical Paspor Resolution
+  const canonicalPaspor =
+    (isValValid(fieldValues["Nomor Paspor"]) && fieldValues["Nomor Paspor"]) ||
+    (isValValid(fieldValues["nomor_paspor"]) && fieldValues["nomor_paspor"]) ||
+    (isValValid(fieldValues["No Paspor"]) && fieldValues["No Paspor"]) ||
+    (isValValid(fieldValues["no_paspor"]) && fieldValues["no_paspor"]) ||
+    (isValValid(fieldValues["Paspor"]) && fieldValues["Paspor"]) ||
+    (isValValid(fieldValues["paspor"]) && fieldValues["paspor"]);
+
+  if (canonicalPaspor) {
+    const finalPaspor = String(canonicalPaspor).trim();
+    result["Nomor Paspor"] = finalPaspor;
+    result["nomor_paspor"] = finalPaspor;
+    result["No Paspor"] = finalPaspor;
+    result["no_paspor"] = finalPaspor;
+    result["Paspor"] = finalPaspor;
+    result["paspor"] = finalPaspor;
+  }
+
+  // 8. Canonical Nama Ayah Resolution
+  const canonicalAyah =
+    (isValValid(fieldValues["Nama Ayah"]) && fieldValues["Nama Ayah"]) ||
+    (isValValid(fieldValues["nama_ayah"]) && fieldValues["nama_ayah"]) ||
+    (isValValid(fieldValues["namaAyah"]) && fieldValues["namaAyah"]) ||
+    (isValValid(fieldValues["ayah"]) && fieldValues["ayah"]) ||
+    (isValValid(fieldValues["nama_ayah_kandung"]) && fieldValues["nama_ayah_kandung"]);
+
+  if (canonicalAyah) {
+    const finalAyah = String(canonicalAyah).trim();
+    result["Nama Ayah"] = finalAyah;
+    result["nama_ayah"] = finalAyah;
+    result["namaAyah"] = finalAyah;
+    result["ayah"] = finalAyah;
+    result["nama_ayah_kandung"] = finalAyah;
+  }
+
+  // 9. Standard other field expansions
+  for (const [key, val] of Object.entries(fieldValues)) {
+    if (val === undefined || val === null) continue;
+    if (key.startsWith("_raw")) continue;
+    const strVal = String(val).trim() === "" ? "-" : String(val);
 
     if (key.toLowerCase().includes("bulan") && key.toLowerCase().includes("keberangkatan")) {
       result["Bulan Keberangkatan"] = strVal;
@@ -129,45 +226,6 @@ export function buildExpandedFieldMap(fieldValues: Record<string, string>): Reco
       result["No Surat 2"] = strVal;
     }
 
-    // NIK variations
-    if (
-      key.toLowerCase() === "nik" ||
-      key.toLowerCase().includes("no identitas") ||
-      key.toLowerCase() === "no_identitas" ||
-      key.toLowerCase() === "noktp" ||
-      key.toLowerCase() === "no_ktp" ||
-      key.toLowerCase().includes("nomor identitas") ||
-      key.toLowerCase() === "nomor_identitas"
-    ) {
-      result["NIK"] = strVal;
-      result["nik"] = strVal;
-      result["No Identitas"] = strVal;
-      result["no_identitas"] = strVal;
-      result["Nomor Identitas"] = strVal;
-      result["nomor_identitas"] = strVal;
-      result["No KTP"] = strVal;
-      result["no_ktp"] = strVal;
-    }
-
-    // Paspor variations
-    if (key.toLowerCase().includes("paspor") || key.toLowerCase().includes("passport")) {
-      result["Nomor Paspor"] = strVal;
-      result["nomor_paspor"] = strVal;
-      result["No Paspor"] = strVal;
-      result["no_paspor"] = strVal;
-      result["Paspor"] = strVal;
-      result["paspor"] = strVal;
-    }
-
-    // Alamat variations
-    if (key.toLowerCase().includes("alamat")) {
-      result["Alamat"] = strVal;
-      result["alamat"] = strVal;
-      result["Alamat Lengkap"] = strVal;
-      result["alamat_lengkap"] = strVal;
-    }
-
-    // Telepon / HP variations
     if (key.toLowerCase().includes("telepon") || key.toLowerCase().includes("nohp") || key.toLowerCase().includes("no_hp") || key.toLowerCase().includes("phone")) {
       result["Nomor Telepon"] = strVal;
       result["nomor_telepon"] = strVal;
@@ -177,13 +235,11 @@ export function buildExpandedFieldMap(fieldValues: Record<string, string>): Reco
       result["telepon"] = strVal;
     }
 
-    // Jenis Kelamin variations
     if (key.toLowerCase().includes("jenis kelamin") || key.toLowerCase() === "jenis_kelamin" || key.toLowerCase() === "gender") {
       result["Jenis Kelamin"] = strVal;
       result["jenis_kelamin"] = strVal;
     }
 
-    // Paket variations
     if (key.toLowerCase().includes("nama paket") || key.toLowerCase() === "nama_paket" || key.toLowerCase() === "paket") {
       result["Nama Paket"] = strVal;
       result["nama_paket"] = strVal;
@@ -191,7 +247,6 @@ export function buildExpandedFieldMap(fieldValues: Record<string, string>): Reco
       result["paket"] = strVal;
     }
 
-    // Tanggal Berangkat & Pulang
     if (key.toLowerCase().includes("tanggal berangkat") || key.toLowerCase() === "tanggal_berangkat") {
       result["Tanggal Berangkat"] = strVal;
       result["tanggal_berangkat"] = strVal;
@@ -233,6 +288,10 @@ export function buildExpandedFieldMap(fieldValues: Record<string, string>): Reco
       result["kota_kanim"] = strVal;
     }
   }
+
+  // Ensure internal raw keys are purged completely from output
+  delete (result as any)["_rawNamaJamaah"];
+  delete (result as any)["_rawnamajamaah"];
 
   return result;
 }

@@ -1448,8 +1448,13 @@ function GenerateSuratPageContent() {
       setManualFormData((prev) => {
         const next = { ...prev, [key]: value };
 
+        // Normalisasi key tanpa spasi, tanda baca, dan semua jenis petik
+        const cleanK = key
+          .toLowerCase()
+          .replace(/[\u2018\u2019\u201A\u201B'`"]/g, "")
+          .replace(/[\s_\-\.]/g, "");
+
         // Jika field yang diubah adalah Hal / Perihal, periksa apakah mode endorsement aktif
-        const cleanK = key.toLowerCase().replace(/[\s_\-\.]/g, "");
         if (cleanK === "hal" || cleanK === "perihal") {
           const isEndorse = value.toLowerCase().includes("endorse");
 
@@ -1470,6 +1475,7 @@ function GenerateSuratPageContent() {
             ocrResultsData.ktp?.namaLengkap ||
             ocrResultsData.akta?.namaLengkap ||
             activeJamaah?.namaLengkap ||
+            prev["Nama Jama’ah"] ||
             prev["Nama Jama'ah"] ||
             prev["Nama Jamaah"] ||
             prev["nama"] ||
@@ -1482,7 +1488,10 @@ function GenerateSuratPageContent() {
               : cleanRawBase;
 
             // Update semua variasi key nama jamaah di form
-            const namaKeys = ["nama", "nama_lengkap", "Nama", "Nama Lengkap", "Nama Jamaah", "Nama Jama'ah", "nama_jamaah"];
+            const namaKeys = [
+              "nama", "nama_lengkap", "Nama", "Nama Lengkap",
+              "Nama Jamaah", "Nama Jama'ah", "Nama Jama’ah", "nama_jamaah", "nama_jama'ah", "nama_jama’ah"
+            ];
             namaKeys.forEach((nk) => {
               if (prev[nk] !== undefined || nk === key) {
                 next[nk] = targetNama;
@@ -1490,8 +1499,8 @@ function GenerateSuratPageContent() {
             });
 
             effectivePlaceholders.forEach((pl) => {
-              const pk = pl.key.toLowerCase().replace(/[\s_\-\.]/g, "");
-              const plbl = (pl.label || "").toLowerCase().replace(/[\s_\-\.]/g, "");
+              const pk = pl.key.toLowerCase().replace(/[\u2018\u2019\u201A\u201B'`"]/g, "").replace(/[\s_\-\.]/g, "");
+              const plbl = (pl.label || "").toLowerCase().replace(/[\u2018\u2019\u201A\u201B'`"]/g, "").replace(/[\s_\-\.]/g, "");
               if (
                 !pk.includes("ayah") &&
                 !plbl.includes("ayah") &&
@@ -1511,10 +1520,16 @@ function GenerateSuratPageContent() {
             !cleanK.includes("ayah") &&
             !cleanK.includes("perusahaan") &&
             !cleanK.includes("paket") &&
+            !cleanK.includes("hotel") &&
+            !cleanK.includes("bank") &&
             (cleanK === "nama" ||
               cleanK.includes("namajamaah") ||
               cleanK.includes("namalengkap") ||
-              cleanK === "namapemohon");
+              cleanK === "namapemohon" ||
+              cleanK === "namapeserta" ||
+              cleanK === "namakaryawan" ||
+              cleanK === "namapegawai" ||
+              cleanK === "namayangcuti");
 
           if (isNamaField) {
             next["_rawNamaJamaah"] = value;
@@ -1523,12 +1538,15 @@ function GenerateSuratPageContent() {
             const namaKeys = [
               "nama",
               "nama_lengkap",
+              "namalengkap",
               "Nama",
               "Nama Lengkap",
               "Nama Jamaah",
               "Nama Jama'ah",
               "Nama Jama’ah",
               "nama_jamaah",
+              "nama_jama'ah",
+              "nama_jama’ah",
               "namapemohon",
               "Nama Pemohon",
               "nama_pemohon",
@@ -1550,8 +1568,8 @@ function GenerateSuratPageContent() {
             });
 
             effectivePlaceholders.forEach((pl) => {
-              const pk = pl.key.toLowerCase().replace(/[\s_\-\.]/g, "");
-              const plbl = (pl.label || "").toLowerCase().replace(/[\s_\-\.]/g, "");
+              const pk = pl.key.toLowerCase().replace(/[\u2018\u2019\u201A\u201B'`"]/g, "").replace(/[\s_\-\.]/g, "");
+              const plbl = (pl.label || "").toLowerCase().replace(/[\u2018\u2019\u201A\u201B'`"]/g, "").replace(/[\s_\-\.]/g, "");
               if (
                 !pk.includes("ayah") &&
                 !plbl.includes("ayah") &&
@@ -1573,8 +1591,26 @@ function GenerateSuratPageContent() {
                 userEditedFieldKeysRef.current.add(pl.key);
               }
             });
+          } else if (cleanK.includes("tempatlahir") || cleanK.includes("kotalahir")) {
+            const tempatKeys = ["tempat_lahir", "tempatlahir", "Tempat Lahir", "kota_lahir", "kotalahir", "Tempat/Tgl Lahir"];
+            tempatKeys.forEach((tk) => {
+              next[tk] = value;
+              userEditedFieldKeysRef.current.add(tk);
+            });
+          } else if (cleanK.includes("tanggallahir") || cleanK.includes("tgllahir")) {
+            const tglKeys = ["tanggal_lahir", "tanggallahir", "tgl_lahir", "Tanggal Lahir", "Tgl Lahir", "Ta nggal Lahir"];
+            tglKeys.forEach((tk) => {
+              next[tk] = value;
+              userEditedFieldKeysRef.current.add(tk);
+            });
+          } else if (cleanK === "alamat" || cleanK.includes("alamatlengkap")) {
+            const alamatKeys = ["alamat", "Alamat", "alamat_lengkap", "Alamat Lengkap"];
+            alamatKeys.forEach((ak) => {
+              next[ak] = value;
+              userEditedFieldKeysRef.current.add(ak);
+            });
           } else if (cleanK === "nik" || cleanK.includes("identitas") || cleanK === "nipnik") {
-            const nikKeys = ["nik", "NIK", "no_identitas", "No Identitas", "nomor_identitas", "Nomor Identitas", "nip_nik", "NIP/NIK/NRP"];
+            const nikKeys = ["nik", "NIK", "no_identitas", "No Identitas", "nomor_identitas", "Nomor Identitas", "nip_nik", "NIP/NIK/NRP", "no_ktp", "No KTP", "noktp"];
             nikKeys.forEach((nk) => {
               next[nk] = value;
               userEditedFieldKeysRef.current.add(nk);
@@ -1586,14 +1622,11 @@ function GenerateSuratPageContent() {
               userEditedFieldKeysRef.current.add(pk);
             });
           } else if (cleanK.includes("ayah")) {
-            userEditedFieldKeysRef.current.add("namaAyah");
-            userEditedFieldKeysRef.current.add("nama_ayah");
-            userEditedFieldKeysRef.current.add("Nama Ayah");
-            userEditedFieldKeysRef.current.add("ayah");
-            next["namaAyah"] = value;
-            next["nama_ayah"] = value;
-            next["Nama Ayah"] = value;
-            next["ayah"] = value;
+            const ayahKeys = ["namaAyah", "nama_ayah", "Nama Ayah", "ayah", "nama_ayah_kandung"];
+            ayahKeys.forEach((ak) => {
+              next[ak] = value;
+              userEditedFieldKeysRef.current.add(ak);
+            });
           }
         }
 
@@ -2053,12 +2086,15 @@ function GenerateSuratPageContent() {
     const baseUrl = typeof window !== "undefined" ? window.location.origin : "https://vtuabadi.com";
     const regId = activeJamaah?.registrationId || activeJamaah?.id || "";
     const formNama =
+      manualFormData["Nama Jama’ah"] ||
+      manualFormData["Nama Jama'ah"] ||
+      manualFormData["nama_jama’ah"] ||
+      manualFormData["nama_jama'ah"] ||
       manualFormData["nama"] ||
       manualFormData["nama_lengkap"] ||
       manualFormData["Nama"] ||
       manualFormData["Nama Lengkap"] ||
       manualFormData["Nama Jamaah"] ||
-      manualFormData["Nama Jama'ah"] ||
       manualFormData["Nama Pemohon"] ||
       manualFormData["namapemohon"] ||
       manualFormData["nama_yang_cuti"] ||
@@ -2106,16 +2142,60 @@ function GenerateSuratPageContent() {
       }
     });
 
+    // Periksa apakah user telah mengedit nama secara eksplisit di kolom form
+    let editedNameFromForm = "";
+    if (userEditedFieldKeysRef.current && userEditedFieldKeysRef.current.size > 0) {
+      for (const key of Array.from(userEditedFieldKeysRef.current)) {
+        if (key === "_rawNamaJamaah") continue;
+        const cleanK = key.toLowerCase().replace(/[\u2018\u2019\u201A\u201B'`"]/g, "").replace(/[\s_\-\.]/g, "");
+        if (
+          !cleanK.includes("ayah") &&
+          !cleanK.includes("perusahaan") &&
+          !cleanK.includes("paket") &&
+          !cleanK.includes("hotel") &&
+          !cleanK.includes("bank") &&
+          (cleanK === "nama" ||
+            cleanK.includes("namajamaah") ||
+            cleanK.includes("namalengkap") ||
+            cleanK === "namapemohon" ||
+            cleanK === "namapeserta" ||
+            cleanK === "namakaryawan" ||
+            cleanK === "namapegawai" ||
+            cleanK === "namayangcuti")
+        ) {
+          if (submittedData[key] && submittedData[key].trim()) {
+            editedNameFromForm = submittedData[key].trim();
+            break;
+          }
+        }
+      }
+    }
+
     // Nama jamaah / pemohon mutlak diambil dari isian form yang tersubmit
     const formNama =
-      submittedData["nama"] ||
+      editedNameFromForm ||
+      submittedData["Nama Jama’ah"] ||
+      submittedData["Nama Jama'ah"] ||
+      submittedData["nama_jama’ah"] ||
+      submittedData["nama_jama'ah"] ||
+      submittedData["Nama Jamaah"] ||
+      submittedData["nama_jamaah"] ||
+      submittedData["Nama Lengkap"] ||
       submittedData["nama_lengkap"] ||
       submittedData["Nama"] ||
-      submittedData["Nama Lengkap"] ||
-      submittedData["Nama Jamaah"] ||
-      submittedData["Nama Jama'ah"] ||
+      submittedData["nama"] ||
+      manualFormData["Nama Jama’ah"] ||
+      manualFormData["Nama Jama'ah"] ||
+      manualFormData["Nama Lengkap"] ||
+      manualFormData["nama_lengkap"] ||
+      manualFormData["Nama"] ||
+      manualFormData["nama"] ||
       submittedData["Nama Pemohon"] ||
       submittedData["namapemohon"] ||
+      submittedData["nama_pemohon"] ||
+      submittedData["Nama Peserta"] ||
+      submittedData["nama_peserta"] ||
+      submittedData["Nama Yang Cuti"] ||
       submittedData["nama_yang_cuti"] ||
       extractNamaFromAutocratFields(submittedData, manualFormData, effectivePlaceholders) ||
       extractNamaFromAutocratFields(resolvedFieldValues, manualFormData, effectivePlaceholders) ||
@@ -2128,6 +2208,7 @@ function GenerateSuratPageContent() {
     const allNameKeys = [
       "nama", "Nama", "nama_lengkap", "Nama Lengkap",
       "Nama Jamaah", "nama_jamaah", "Nama Jama'ah", "Nama Jama’ah",
+      "nama_jama'ah", "nama_jama’ah",
       "Nama Pemohon", "namapemohon", "nama_pemohon",
       "Nama Peserta", "nama_peserta", "Nama Yang Cuti", "nama_yang_cuti",
       "Nama Karyawan", "nama_karyawan", "Nama Pegawai", "nama_pegawai",
@@ -2135,6 +2216,11 @@ function GenerateSuratPageContent() {
     ];
     allNameKeys.forEach((nk) => {
       submittedData[nk] = finalFormNama;
+    });
+
+    const finalFieldsData: Record<string, string> = { ...resolvedFieldValues, ...submittedData };
+    allNameKeys.forEach((nk) => {
+      finalFieldsData[nk] = finalFormNama;
     });
 
     const logItem: GeneratedSuratLog = {
@@ -2179,7 +2265,7 @@ function GenerateSuratPageContent() {
       perihal: renderedPerihal,
       generatedDate: new Date().toISOString(),
       createdBy: "Admin Operasional",
-      fieldsData: { ...resolvedFieldValues, ...submittedData },
+      fieldsData: finalFieldsData,
       renderedText: renderedLetterBody,
       templateFileBase64:
         activeAttachedFile?.templateFileBase64 ||

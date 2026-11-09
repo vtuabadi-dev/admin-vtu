@@ -1204,9 +1204,10 @@ export function resolveAutocratFieldValues(
         cleanK === "namapemohon";
 
       if (isNamaJamaahKey) {
-        const isSingleWord = countNameWords(directManualVal) < 2;
-        // Hanya format nama ayah jika nama di form adalah single word DAN formAyah secara eksplisit diisi di form (manualFormData)
-        const shouldAppendAyah = (isEndorsement || (isRekomPaspor && isSingleWord)) && Boolean(formAyah);
+        const isSingleWord = countNameWords(directManualVal) === 1;
+        const isRekomPaspor = template.slug === "tpl-rekom-paspor" || template.id === "tpl-rekom-paspor" || template.kategori === "imigrasi";
+        const isAlreadyContainingAyah = Boolean(formAyah && directManualVal.toLowerCase().includes(formAyah.toLowerCase()));
+        const shouldAppendAyah = (isEndorsement || (isRekomPaspor && isSingleWord)) && Boolean(formAyah) && !isAlreadyContainingAyah;
         if (shouldAppendAyah) {
           values[key] = formatJamaahNameWithEndorsement(directManualVal, formAyah, true);
         } else {

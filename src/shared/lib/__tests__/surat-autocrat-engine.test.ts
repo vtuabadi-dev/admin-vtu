@@ -982,6 +982,53 @@ Tanggal Cuti: <<Tanggal Cuti>>
       const merged = renderAutocratMergedText(templateContent, resolved);
       expect(merged).toBe("Nama: Muchamad Zamroni\nJabatan: -\nCatatan: -");
     });
+
+    it("should ensure form input fields are the absolute SSOT over raw OCR in buildExpandedFieldMap", () => {
+      // Simulates situation where OCR extracted raw text 'MUSLIHAH BINTI AHMAD',
+      // but user manually corrected the form field to 'Hj Muslihah'
+      const fieldValues: Record<string, string> = {
+        _rawNamaJamaah: "MUSLIHAH BINTI AHMAD",
+        nama: "MUSLIHAH BINTI AHMAD",
+        "Nama Jama’ah": "Hj Muslihah", // Curly quote tag as in Template_Surat_Rekomendasi_Paspor.docx
+        "Nomor Paspor": "B1234567",
+        "Tempat Lahir": "Surabaya",
+        "Tanggal Lahir": "12 Maret 1980",
+      };
+
+      const expanded = buildExpandedFieldMap(fieldValues);
+
+      // Verify that user manual form correction takes absolute priority
+      expect(expanded["Nama Jama’ah"]).toBe("Hj Muslihah");
+      expect(expanded["Nama Jama'ah"]).toBe("Hj Muslihah");
+      expect(expanded["Nama Lengkap"]).toBe("Hj Muslihah");
+      expect(expanded["Nama"]).toBe("Hj Muslihah");
+      expect(expanded["nama"]).toBe("Hj Muslihah");
+      expect(expanded["nama_lengkap"]).toBe("Hj Muslihah");
+      expect(expanded["nama_jamaah"]).toBe("Hj Muslihah");
+
+      // Verify internal raw keys are purged
+      expect((expanded as any)["_rawNamaJamaah"]).toBeUndefined();
+    });
+
+    it("should retain user manual form input as SSOT without appending father's name for 2-word names in Rekom Paspor", () => {
+      const rekomTemplate = DEFAULT_SURAT_TEMPLATES[0]!; // Rekom Paspor
+      const manualData = {
+        "Nama Jama’ah": "Muslihah Mansur",
+        "nama_ayah": "Ahmad",
+      };
+
+      const resolved = resolveAutocratFieldValues(
+        rekomTemplate,
+        null,
+        null,
+        manualData,
+        {},
+        rekomTemplate.placeholders
+      );
+
+      // When the user explicitly typed 2-word name 'Muslihah Mansur' in the form, it should remain 'Muslihah Mansur'
+      expect(resolved["Nama Jama’ah"]).toBe("Muslihah Mansur");
+    });
   });
 });
 
