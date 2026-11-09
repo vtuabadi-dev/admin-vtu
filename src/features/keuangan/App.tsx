@@ -1,11 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { DepartureGroup, ExpenseRecord } from './types';
 import {
   loadStoredGroups,
   saveStoredGroups,
   loadStoredExpenses,
   saveStoredExpenses,
-  resetToInitialData,
 } from './utils/storage';
 import { getDeadlineNotifications } from './utils/formatters';
 import { exportExpensesToPDF } from './utils/pdfExporter';
@@ -40,50 +39,57 @@ export default function App() {
   } | null>(null);
   const [defaultGroupIdForExpense, setDefaultGroupIdForExpense] = useState<string | undefined>();
   const [selectedGroupIdForLedger, setSelectedGroupIdForLedger] = useState<string>('ALL');
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // Load state on mount (sync with active Paket Umroh Keberangkatan API)
-  useEffect(() => {
-    async function syncActivePackages() {
-      try {
-        const res = await fetch('/api/keberangkatan');
-        if (res.ok) {
-          const json = await res.json();
-          if (Array.isArray(json.data) && json.data.length > 0) {
-            const mappedGroups: DepartureGroup[] = json.data.map((k: any) => {
-              const filled = Array.isArray(k.jamaahIds) ? k.jamaahIds.length : (k.terisi || 0);
-              const totalQuota = k.kuota || k.maxSeat || 45;
-              const statusStr = (k.status || '').toLowerCase();
-              const statusMapped = statusStr === 'selesai' ? 'Selesai' : (statusStr === 'draft' ? 'Direncanakan' : 'Aktif');
-              return {
-                id: k.id,
-                code: k.kode || k.kodeRegistrasi || 'GRP-001',
-                name: k.namaPaket || k.namaGroup || `Paket Umroh ${k.kode || ''}`,
-                packageType: k.paketUmroh?.namaPaket || k.namaPaket || 'Paket Umroh Regular',
-                departureDate: k.tanggalBerangkat ? String(k.tanggalBerangkat).slice(0, 10) : '2026-09-12',
-                returnDate: k.tanggalPulang ? String(k.tanggalPulang).slice(0, 10) : '2026-09-21',
-                totalQuota: totalQuota,
-                filledQuota: filled,
-                targetBudget: k.targetMaterialisasi || (k.hargaPaket ? Math.round(k.hargaPaket * totalQuota * 0.7) : 1250000000),
-                status: statusMapped,
-                notes: k.nomorPenerbangan ? `Flight: ${k.nomorPenerbangan}` : undefined,
-              };
-            });
-            setGroups(mappedGroups);
-            saveStoredGroups(mappedGroups);
-          } else {
-            setGroups(loadStoredGroups());
-          }
+  // Load and sync real data from database/API
+  const handleRefreshData = useCallback(async () => {
+    setIsRefreshing(true);
+    try {
+      const res = await fetch('/api/keberangkatan');
+      if (res.ok) {
+        const json = await res.json();
+        if (Array.isArray(json.data) && json.data.length > 0) {
+          const mappedGroups: DepartureGroup[] = json.data.map((k: any) => {
+            const filled = Array.isArray(k.jamaahIds) ? k.jamaahIds.length : (k.terisi || 0);
+            const totalQuota = k.kuota || k.maxSeat || 45;
+            const statusStr = (k.status || '').toLowerCase();
+            const statusMapped = statusStr === 'selesai' ? 'Selesai' : (statusStr === 'draft' ? 'Direncanakan' : 'Aktif');
+            return {
+              id: k.id,
+              code: k.kode || k.kodeRegistrasi || 'GRP-001',
+              name: k.namaPaket || k.namaGroup || `Paket Umroh ${k.kode || ''}`,
+              packageType: k.paketUmroh?.namaPaket || k.namaPaket || 'Paket Umroh Regular',
+              departureDate: k.tanggalBerangkat ? String(k.tanggalBerangkat).slice(0, 10) : '2026-09-12',
+              returnDate: k.tanggalPulang ? String(k.tanggalPulang).slice(0, 10) : '2026-09-21',
+              totalQuota: totalQuota,
+              filledQuota: filled,
+              targetBudget: k.targetMaterialisasi || (k.hargaPaket ? Math.round(k.hargaPaket * totalQuota * 0.7) : 1250000000),
+              status: statusMapped,
+              notes: k.nomorPenerbangan ? `Flight: ${k.nomorPenerbangan}` : undefined,
+            };
+          });
+          setGroups(mappedGroups);
+          saveStoredGroups(mappedGroups);
         } else {
           setGroups(loadStoredGroups());
         }
-      } catch (err) {
+      } else {
         setGroups(loadStoredGroups());
       }
-      setExpenses(loadStoredExpenses());
+    } catch (err) {
+      console.error('Gagal menyinkronkan data keberangkatan:', err);
+      setGroups(loadStoredGroups());
     }
-
-    syncActivePackages();
+    setExpenses(loadStoredExpenses());
+    setTimeout(() => {
+      setIsRefreshing(false);
+    }, 400);
   }, []);
+
+  // Load state on mount (sync with active Paket Umroh Keberangkatan API)
+  useEffect(() => {
+    handleRefreshData();
+  }, [handleRefreshData]);
 
   // Save to storage on state change
   useEffect(() => {
@@ -145,14 +151,6 @@ export default function App() {
     setExpenses(updated);
   };
 
-  const handleResetData = () => {
-    if (confirm('Reset seluruh data ke sampel awal travel umroh?')) {
-      const reset = resetToInitialData();
-      setGroups(reset.groups);
-      setExpenses(reset.expenses);
-    }
-  };
-
   const handleOpenNewExpense = (defaultGroupId?: string) => {
     setExpenseToEdit(null);
     setDefaultGroupIdForExpense(defaultGroupId);
@@ -179,7 +177,8 @@ export default function App() {
         onOpenNewExpense={() => handleOpenNewExpense()}
         onExportPDF={() => exportExpensesToPDF(expenses, groups)}
         onExportExcel={() => exportExpensesToExcel(expenses, groups)}
-        onResetData={handleResetData}
+        onRefreshData={handleRefreshData}
+        isRefreshing={isRefreshing}
       />
 
       {/* Urgent Payment Deadline Notification Banner */}

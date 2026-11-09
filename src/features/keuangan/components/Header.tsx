@@ -17,7 +17,9 @@ interface HeaderProps {
   onOpenNewExpense: () => void;
   onExportPDF?: () => void;
   onExportExcel?: () => void;
-  onResetData: () => void;
+  onResetData?: () => void;
+  onRefreshData?: () => void;
+  isRefreshing?: boolean;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -26,6 +28,8 @@ export const Header: React.FC<HeaderProps> = ({
   notifications,
   onOpenNewExpense,
   onResetData,
+  onRefreshData,
+  isRefreshing = false,
 }) => {
   const overdueCount = notifications.filter((n) => n.status === 'OVERDUE').length;
   const dueSoonCount = notifications.filter((n) => n.status === 'DUE_SOON').length;
@@ -55,13 +59,15 @@ export const Header: React.FC<HeaderProps> = ({
 
         {/* Action Buttons */}
         <div className="flex items-center gap-2 flex-wrap justify-center sm:justify-end">
-          {/* Reset Demo Data */}
+          {/* Refresh Real Data */}
           <button
-            onClick={onResetData}
-            className="p-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg text-slate-400 hover:text-white transition-colors"
-            title="Reset Data Sample Demo"
+            onClick={onRefreshData || onResetData}
+            disabled={isRefreshing}
+            className="p-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg text-slate-400 hover:text-white transition-colors disabled:opacity-50"
+            title="Refresh Data Asli"
+            aria-label="Refresh Data Asli"
           >
-            <RefreshCw className="w-4 h-4" />
+            <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin text-amber-400' : ''}`} />
           </button>
 
           {/* New Expense Button */}
