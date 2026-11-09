@@ -241,35 +241,6 @@ export const DepartureGroupList: React.FC<DepartureGroupListProps> = ({
         </div>
       </div>
 
-      {/* Month Pill Tabs */}
-      {availableMonths.length > 0 && (
-        <div className="flex items-center gap-1.5 flex-wrap">
-          <button
-            onClick={() => setMonthFilter('ALL')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-              monthFilter === 'ALL'
-                ? 'bg-emerald-700 text-white shadow-sm'
-                : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
-            }`}
-          >
-            Semua ({groups.length})
-          </button>
-          {availableMonths.map((m) => (
-            <button
-              key={m.key}
-              onClick={() => setMonthFilter(m.key)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                monthFilter === m.key
-                  ? 'bg-emerald-700 text-white shadow-sm'
-                  : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
-              }`}
-            >
-              {m.label} ({m.count})
-            </button>
-          ))}
-        </div>
-      )}
-
       {/* Empty State vs Groups Grid */}
       {filteredGroups.length === 0 ? (
         <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center shadow-sm">
