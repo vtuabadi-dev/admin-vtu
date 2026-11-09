@@ -23,6 +23,8 @@ export interface BillingItem {
   catatan?: string;
   isDefault?: boolean;
   allocatedJamaah?: string[];
+  hotelMekkah?: string;
+  hotelMadinah?: string;
 }
 
 export const DEFAULT_SATUAN_OPTIONS = [
@@ -103,6 +105,46 @@ export function getRoomTypeBadgeStyle(roomType?: string): string {
   if (norm.includes("mix")) return "bg-slate-500/10 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-800";
   return "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800";
 }
+
+export function isHotelUpgradeItem(name: string): boolean {
+  if (!name) return false;
+  const lower = name.toLowerCase().trim();
+  return lower.includes("hotel") || lower.includes("upgrade hotel");
+}
+
+export const DEFAULT_MEKKAH_HOTELS = [
+  "Pullman Zamzam Makkah",
+  "Fairmont Makkah Clock Royal Tower",
+  "Swissotel Makkah",
+  "Swissotel Al Maqam Makkah",
+  "Dar Al Eiman Royal",
+  "Movenpick Hotel & Residence Hajar Tower",
+  "Safwah Tower Makkah",
+  "Hilton Suites Makkah",
+  "Hilton Makkah Convention Hotel",
+  "Grand Al Massa",
+  "Rayyana Grand Plaza",
+  "Le Meridien Makkah",
+  "Jabal Omar Marriott",
+  "Anjum Hotel Makkah",
+  "Al Safwah Royale Orchid",
+];
+
+export const DEFAULT_MADINAH_HOTELS = [
+  "Taiba Front Hotel Madinah",
+  "Anwar Al Madinah Movenpick",
+  "Pullman Zamzam Madinah",
+  "Dallah Taibah Hotel",
+  "Rove Al Madinah Hotel",
+  "Madinah Hilton",
+  "Frontel Al Harithia",
+  "Al Aqeeq Madinah Hotel",
+  "Grand Plaza Madinah",
+  "Dar Al Taqwa Madinah",
+  "Oberoi Madinah",
+  "Saja Al Madinah",
+  "Mirage Al Salam",
+];
 
 export function isRoomUpgradeItem(name: string): boolean {
   const lower = name.toLowerCase();

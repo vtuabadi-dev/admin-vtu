@@ -723,3 +723,95 @@ export async function addJamaahToGroup(data: {
     return { success: false, message: err.message || "Gagal menambahkan jamaah ke grup" };
   }
 }
+
+/**
+ * Update data hotel (Makkah & Madinah) jamaah di manifest / database saat upgrade hotel dipilih
+ */
+export async function updateJamaahHotels(data: {
+  jamaahIds?: string[];
+  jamaahNames?: string[];
+  groupId?: string;
+  hotelMekkah?: string;
+  hotelMadinah?: string;
+}) {
+  try {
+    const { jamaahIds, jamaahNames, groupId, hotelMekkah, hotelMadinah } = data;
+    const updateData: Record<string, string> = {};
+    if (hotelMekkah && hotelMekkah.trim()) updateData.hotelMekkah = hotelMekkah.trim();
+    if (hotelMadinah && hotelMadinah.trim()) updateData.hotelMadinah = hotelMadinah.trim();
+
+    if (Object.keys(updateData).length === 0) {
+      return { success: false, message: "Tidak ada data hotel yang diperbarui" };
+    }
+
+    if (jamaahIds && jamaahIds.length > 0) {
+      await prisma.jamaah.updateMany({
+        where: { id: { in: jamaahIds } },
+        data: updateData,
+      });
+    } else if (jamaahNames && jamaahNames.length > 0 && groupId) {
+      await prisma.jamaah.updateMany({
+        where: {
+          groupId,
+          namaLengkap: { in: jamaahNames },
+        },
+        data: updateData,
+      });
+    }
+
+    return { success: true };
+  } catch (err: any) {
+    console.error("updateJamaahHotels error:", err);
+    return { success: false, message: err?.message || "Gagal mengupdate hotel jamaah" };
+  }
+}
+
+/**
+ * Mengambil daftar hotel master Mekkah dan Madinah
+ */
+export async function getMasterHotels(): Promise<{ mekkah: string[]; madinah: string[] }> {
+  try {
+    const hotels = await prisma.masterHotel.findMany({
+      include: { city: true },
+      orderBy: { name: "asc" },
+    });
+
+    const mekkah = hotels
+      .filter((h) => {
+        const cCode = (h.city?.code || "").toLowerCase();
+        const cName = (h.city?.name || "").toLowerCase();
+        const hName = h.name.toLowerCase();
+        return (
+          cCode === "mek" ||
+          cCode === "mkh" ||
+          cCode === "mak" ||
+          cName.includes("mekkah") ||
+          cName.includes("makkah") ||
+          hName.includes("makkah") ||
+          hName.includes("mekkah")
+        );
+      })
+      .map((h) => h.name);
+
+    const madinah = hotels
+      .filter((h) => {
+        const cCode = (h.city?.code || "").toLowerCase();
+        const cName = (h.city?.name || "").toLowerCase();
+        const hName = h.name.toLowerCase();
+        return (
+          cCode === "med" ||
+          cCode === "mdn" ||
+          cName.includes("madinah") ||
+          cName.includes("medina") ||
+          hName.includes("madinah") ||
+          hName.includes("medina")
+        );
+      })
+      .map((h) => h.name);
+
+    return { mekkah, madinah };
+  } catch (err) {
+    console.warn("getMasterHotels error:", err);
+    return { mekkah: [], madinah: [] };
+  }
+}

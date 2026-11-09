@@ -16,6 +16,8 @@ import {
   Settings2,
   Edit3,
   Trash2,
+  Building,
+  Users,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/components/ui/Card";
 import { Button } from "@/shared/components/ui/Button";
@@ -31,6 +33,8 @@ import {
   addPembayaran,
   fetchInvoiceSplitConfig,
   saveInvoiceSplitConfig,
+  updateJamaahHotels,
+  getMasterHotels,
 } from "@/server/actions/api";
 import type {
   GroupPaymentSummary,
@@ -46,7 +50,10 @@ import {
   DEFAULT_TAMBAHAN_OPTIONS,
   DEFAULT_POTONGAN_OPTIONS,
   DEFAULT_SATUAN_OPTIONS,
+  DEFAULT_MEKKAH_HOTELS,
+  DEFAULT_MADINAH_HOTELS,
   isRoomUpgradeItem,
+  isHotelUpgradeItem,
   detectRoomTypeFromName,
   getPackageUpgradePrice,
   resolvePackageClusterDetails,
@@ -55,7 +62,7 @@ import {
   getInitialPotonganOptions,
 } from "./_components/shared-constants";
 import MasterBillingOptionsModal from "./_components/MasterBillingOptionsModal";
-import { subscribeRealtime, type RealtimeEventPayload } from "@/shared/lib/realtime-bus";
+import { broadcastMutation, subscribeRealtime, type RealtimeEventPayload } from "@/shared/lib/realtime-bus";
 
 // Lazy-loaded components for fast initial bundle & load
 const PaymentReviewTab = dynamic(
@@ -130,6 +137,12 @@ const SplitInvoiceModal = dynamic(
   const [newBillingSatuan, setNewBillingSatuan] = useState<string>("Pax");
   const [newBillingAllocatedMembers, setNewBillingAllocatedMembers] = useState<string[]>([]);
   const [isCustomJenisMode, setIsCustomJenisMode] = useState<boolean>(false);
+
+  // Hotel Upgrade state
+  const [selectedHotelMekkah, setSelectedHotelMekkah] = useState<string>("");
+  const [selectedHotelMadinah, setSelectedHotelMadinah] = useState<string>("");
+  const [masterHotelsMekkah, setMasterHotelsMekkah] = useState<string[]>([]);
+  const [masterHotelsMadinah, setMasterHotelsMadinah] = useState<string[]>([]);
 
   // Edit Item Modal State
   const [editingItem, setEditingItem] = useState<BillingItem | null>(null);
@@ -218,6 +231,76 @@ const SplitInvoiceModal = dynamic(
       }),
     }).catch(() => {});
   }
+
+  // Load master hotels
+  useEffect(() => {
+    getMasterHotels().then((data) => {
+      if (data) {
+        if (Array.isArray(data.mekkah) && data.mekkah.length > 0) setMasterHotelsMekkah(data.mekkah);
+        if (Array.isArray(data.madinah) && data.madinah.length > 0) setMasterHotelsMadinah(data.madinah);
+      }
+    }).catch(() => {});
+  }, []);
+
+  // Original package hotels for the active group
+  const originalHotelMekkah = useMemo(() => {
+    if (!groupData) return "";
+    return (
+      groupData.keberangkatan?.hotelMekkah ||
+      (groupData as any)?.paketKeberangkatan?.hotelMekkah ||
+      groupData.anggota?.[0]?.hotelMekkah ||
+      ""
+    );
+  }, [groupData]);
+
+  const originalHotelMadinah = useMemo(() => {
+    if (!groupData) return "";
+    return (
+      groupData.keberangkatan?.hotelMadinah ||
+      (groupData as any)?.paketKeberangkatan?.hotelMadinah ||
+      groupData.anggota?.[0]?.hotelMadinah ||
+      ""
+    );
+  }, [groupData]);
+
+  // Sync initial hotel upgrade selection with original package hotels
+  useEffect(() => {
+    if (isHotelUpgradeItem(newBillingNama)) {
+      if (originalHotelMekkah && !selectedHotelMekkah) {
+        setSelectedHotelMekkah(originalHotelMekkah);
+      }
+      if (originalHotelMadinah && !selectedHotelMadinah) {
+        setSelectedHotelMadinah(originalHotelMadinah);
+      }
+    }
+  }, [newBillingNama, originalHotelMekkah, originalHotelMadinah, selectedHotelMekkah, selectedHotelMadinah]);
+
+  // Available options for Makkah & Madinah hotels
+  const mekkahHotelOptions = useMemo(() => {
+    const list = new Set<string>();
+    if (originalHotelMekkah) list.add(originalHotelMekkah);
+    if (groupData?.keberangkatan?.hotelOptions && Array.isArray(groupData.keberangkatan.hotelOptions)) {
+      groupData.keberangkatan.hotelOptions.forEach((opt: any) => {
+        if (opt?.hotelMekkah) list.add(opt.hotelMekkah);
+      });
+    }
+    masterHotelsMekkah.forEach((h) => list.add(h));
+    DEFAULT_MEKKAH_HOTELS.forEach((h) => list.add(h));
+    return Array.from(list);
+  }, [originalHotelMekkah, groupData, masterHotelsMekkah]);
+
+  const madinahHotelOptions = useMemo(() => {
+    const list = new Set<string>();
+    if (originalHotelMadinah) list.add(originalHotelMadinah);
+    if (groupData?.keberangkatan?.hotelOptions && Array.isArray(groupData.keberangkatan.hotelOptions)) {
+      groupData.keberangkatan.hotelOptions.forEach((opt: any) => {
+        if (opt?.hotelMadinah) list.add(opt.hotelMadinah);
+      });
+    }
+    masterHotelsMadinah.forEach((h) => list.add(h));
+    DEFAULT_MADINAH_HOTELS.forEach((h) => list.add(h));
+    return Array.from(list);
+  }, [originalHotelMadinah, groupData, masterHotelsMadinah]);
 
   // Alokasi
   const [alokasi, setAlokasi] = useState<Record<string, number>>({});
@@ -315,23 +398,87 @@ const SplitInvoiceModal = dynamic(
     }
 
     const isRoomUpgrade = !isPotongan && isRoomUpgradeItem(trimmedName);
-    const allocated = isRoomUpgrade && newBillingAllocatedMembers.length > 0 ? newBillingAllocatedMembers : undefined;
+    const isHotelUpgrade = !isPotongan && isHotelUpgradeItem(trimmedName);
+    const allocated = (isRoomUpgrade || isHotelUpgrade) && newBillingAllocatedMembers.length > 0 ? newBillingAllocatedMembers : undefined;
+
+    let itemDesc = trimmedName;
+    if (isHotelUpgrade) {
+      const parts: string[] = [];
+      if (selectedHotelMekkah && selectedHotelMekkah !== originalHotelMekkah) {
+        parts.push(`Mekkah: ${selectedHotelMekkah}`);
+      }
+      if (selectedHotelMadinah && selectedHotelMadinah !== originalHotelMadinah) {
+        parts.push(`Madinah: ${selectedHotelMadinah}`);
+      }
+      if (parts.length > 0) {
+        itemDesc = `${trimmedName} (${parts.join(", ")})`;
+      }
+    }
 
     const newItem: BillingItem = {
       id: `bill-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
-      nama: trimmedName,
+      nama: itemDesc,
       kategori: newBillingKategori,
       nominal: newBillingNominal,
       qty: Math.max(1, newBillingQty),
       satuan: newBillingSatuan || "Pax",
       allocatedJamaah: allocated,
+      hotelMekkah: isHotelUpgrade && selectedHotelMekkah ? selectedHotelMekkah : undefined,
+      hotelMadinah: isHotelUpgrade && selectedHotelMadinah ? selectedHotelMadinah : undefined,
     };
 
     setBillingItems((prev) => [...prev, newItem]);
+
+    // Update jamaah manifest hotels if hotel upgrade is configured
+    if (isHotelUpgrade && allocated && allocated.length > 0 && groupData) {
+      const memberObjs = (groupData.anggota || []).filter((a: any) =>
+        allocated.includes(a.namaLengkap)
+      );
+      const jamaahIds = memberObjs.map((a: any) => a.id).filter(Boolean);
+
+      const targetGroupId = groupData.groupId || groupData.id;
+
+      updateJamaahHotels({
+        jamaahIds,
+        jamaahNames: allocated,
+        groupId: targetGroupId,
+        hotelMekkah: selectedHotelMekkah || undefined,
+        hotelMadinah: selectedHotelMadinah || undefined,
+      })
+        .then((res) => {
+          if (res.success) {
+            broadcastMutation("jamaah", "UPDATE", { groupId: targetGroupId });
+            broadcastMutation("manifest", "UPDATE", { groupId: targetGroupId });
+            broadcastMutation("manifest_rows", "UPDATE", { groupId: targetGroupId });
+          }
+        })
+        .catch((err) => console.warn("[UpgradeHotel] Update manifest hotel error:", err));
+
+      // Update local groupData.anggota state immediately
+      setGroupData((prev: any) => {
+        if (!prev || !prev.anggota) return prev;
+        return {
+          ...prev,
+          anggota: prev.anggota.map((a: any) => {
+            if (allocated.includes(a.namaLengkap)) {
+              return {
+                ...a,
+                hotelMekkah: selectedHotelMekkah || a.hotelMekkah,
+                hotelMadinah: selectedHotelMadinah || a.hotelMadinah,
+              };
+            }
+            return a;
+          }),
+        };
+      });
+    }
+
     setNewBillingNominal(0);
     setNewBillingQty(1);
     setNewBillingSatuan("Pax");
     setNewBillingAllocatedMembers([]);
+    setSelectedHotelMekkah("");
+    setSelectedHotelMadinah("");
     setIsCustomJenisMode(false);
     setShowAddItemModal(false);
   }
@@ -1312,21 +1459,186 @@ const SplitInvoiceModal = dynamic(
             )}
           </div>
 
-          {/* 3. Nominal Input */}
+          {/* 3. Hotel Upgrade Selection (Makkah & Madinah) — Ditampilkan jika memilih jenis Upgrade Hotel */}
+          {newBillingKategori === "tambahan" && isHotelUpgradeItem(newBillingNama) && (
+            <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg space-y-3">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-amber-900 dark:text-amber-200 flex items-center gap-1.5">
+                  <Building className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                  Pilih Hotel Tujuan Upgrade (Makkah & Madinah):
+                </label>
+                {(selectedHotelMekkah !== originalHotelMekkah || selectedHotelMadinah !== originalHotelMadinah) && (
+                  <span className="text-[10px] font-bold bg-amber-500/20 text-amber-800 dark:text-amber-300 px-2 py-0.5 rounded border border-amber-500/30">
+                    Upgrade Aktif
+                  </span>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {/* Dropdown Hotel Makkah */}
+                <div className="space-y-1">
+                  <label className="text-[11px] font-semibold text-foreground flex items-center justify-between">
+                    <span>🕋 Hotel Makkah</span>
+                    {originalHotelMekkah && (
+                      <span className="text-[10px] text-muted-foreground truncate max-w-[140px]" title={`Asal Paket: ${originalHotelMekkah}`}>
+                        Asal: {originalHotelMekkah}
+                      </span>
+                    )}
+                  </label>
+                  <select
+                    className="w-full rounded-md border border-input bg-background px-2.5 py-1.5 text-xs ring-offset-background focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+                    value={selectedHotelMekkah || originalHotelMekkah}
+                    onChange={(e) => setSelectedHotelMekkah(e.target.value)}
+                  >
+                    {originalHotelMekkah && (
+                      <option value={originalHotelMekkah}>
+                        {originalHotelMekkah} (Asal Paket)
+                      </option>
+                    )}
+                    {mekkahHotelOptions
+                      .filter((h) => h !== originalHotelMekkah)
+                      .map((h) => (
+                        <option key={h} value={h}>
+                          {h}
+                        </option>
+                      ))}
+                  </select>
+                  {selectedHotelMekkah && selectedHotelMekkah !== originalHotelMekkah && (
+                    <p className="text-[10px] text-amber-600 dark:text-amber-400 font-medium">
+                      ✨ Upgrade dari: {originalHotelMekkah || "Asal Paket"}
+                    </p>
+                  )}
+                </div>
+
+                {/* Dropdown Hotel Madinah */}
+                <div className="space-y-1">
+                  <label className="text-[11px] font-semibold text-foreground flex items-center justify-between">
+                    <span>🕌 Hotel Madinah</span>
+                    {originalHotelMadinah && (
+                      <span className="text-[10px] text-muted-foreground truncate max-w-[140px]" title={`Asal Paket: ${originalHotelMadinah}`}>
+                        Asal: {originalHotelMadinah}
+                      </span>
+                    )}
+                  </label>
+                  <select
+                    className="w-full rounded-md border border-input bg-background px-2.5 py-1.5 text-xs ring-offset-background focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+                    value={selectedHotelMadinah || originalHotelMadinah}
+                    onChange={(e) => setSelectedHotelMadinah(e.target.value)}
+                  >
+                    {originalHotelMadinah && (
+                      <option value={originalHotelMadinah}>
+                        {originalHotelMadinah} (Asal Paket)
+                      </option>
+                    )}
+                    {madinahHotelOptions
+                      .filter((h) => h !== originalHotelMadinah)
+                      .map((h) => (
+                        <option key={h} value={h}>
+                          {h}
+                        </option>
+                      ))}
+                  </select>
+                  {selectedHotelMadinah && selectedHotelMadinah !== originalHotelMadinah && (
+                    <p className="text-[10px] text-amber-600 dark:text-amber-400 font-medium">
+                      ✨ Upgrade dari: {originalHotelMadinah || "Asal Paket"}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 4. Nominal Input — Kolom isian harga upgrade per pax */}
           <div>
             <label className="text-xs font-bold text-foreground block mb-1">
               Nominal Per Unit / Pax (Rp)
             </label>
             <Input
               type="number"
-              placeholder="Masukkan nominal"
+              placeholder="Masukkan nominal upgrade"
               value={newBillingNominal || ""}
               onChange={(e) => setNewBillingNominal(Number(e.target.value))}
             />
           </div>
 
-          {/* 4. Room Upgrade Allocation Section (Khusus Tambahan Upgrade Kamar) */}
-          {newBillingKategori === "tambahan" && isRoomUpgradeItem(newBillingNama) && (
+          {/* 5. Box Selection Jamaah Terkena Upgrade Hotel (Checklist Jamaah) */}
+          {newBillingKategori === "tambahan" && isHotelUpgradeItem(newBillingNama) && (
+            <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-amber-900 dark:text-amber-200 flex items-center gap-1.5">
+                  <Users className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                  Pilih Jamaah Rombongan yang Terkena Upgrade Hotel:
+                </label>
+                <span className="text-[10px] font-bold text-amber-700 dark:text-amber-300 bg-amber-500/20 px-2 py-0.5 rounded border border-amber-500/30">
+                  {newBillingAllocatedMembers.length} Jamaah Terpilih
+                </span>
+              </div>
+              <div className="flex items-center justify-between text-[10px] text-muted-foreground">
+                <span>Centang nama jamaah yang menerima upgrade hotel (Quantity otomatis tersinkron):</span>
+                <div className="flex gap-2 font-semibold">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const allNames = (activeAnggota.length > 0 ? activeAnggota : (groupData?.anggota || [])).map((a: any) => a.namaLengkap);
+                      setNewBillingAllocatedMembers(allNames);
+                      setNewBillingQty(Math.max(1, allNames.length));
+                    }}
+                    className="text-amber-600 dark:text-amber-400 hover:underline cursor-pointer"
+                  >
+                    Pilih Semua
+                  </button>
+                  <span>•</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setNewBillingAllocatedMembers([]);
+                      setNewBillingQty(1);
+                    }}
+                    className="text-stone-500 hover:underline cursor-pointer"
+                  >
+                    Reset
+                  </button>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-36 overflow-y-auto bg-background p-2 rounded-md border">
+                {(activeAnggota.length > 0 ? activeAnggota : (groupData?.anggota || [])).map((a: any, idx: number) => {
+                  const nama = a.namaLengkap;
+                  const isAllocated = newBillingAllocatedMembers.includes(nama);
+                  return (
+                    <label
+                      key={a.id || nama + idx}
+                      className={`flex items-center gap-2 p-1.5 rounded text-xs cursor-pointer transition-colors ${
+                        isAllocated
+                          ? "bg-amber-500/15 font-bold text-amber-900 dark:text-amber-200 border border-amber-500/30"
+                          : "text-muted-foreground hover:bg-muted"
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isAllocated}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            const updated = [...newBillingAllocatedMembers, nama];
+                            setNewBillingAllocatedMembers(updated);
+                            setNewBillingQty(Math.max(1, updated.length));
+                          } else {
+                            const updated = newBillingAllocatedMembers.filter((n) => n !== nama);
+                            setNewBillingAllocatedMembers(updated);
+                            setNewBillingQty(Math.max(1, updated.length));
+                          }
+                        }}
+                        className="rounded text-amber-600 focus:ring-amber-500 h-3.5 w-3.5 shrink-0"
+                      />
+                      <span className="truncate">{nama}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* 6. Room Upgrade Allocation Section (Khusus Tambahan Upgrade Kamar) */}
+          {newBillingKategori === "tambahan" && !isHotelUpgradeItem(newBillingNama) && isRoomUpgradeItem(newBillingNama) && (
             <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg space-y-2">
               <div className="flex items-center justify-between">
                 <label className="text-xs font-bold text-amber-900 dark:text-amber-200 flex items-center gap-1.5">

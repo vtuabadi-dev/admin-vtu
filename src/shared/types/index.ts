@@ -106,6 +106,8 @@ export interface RegistrationGroup {
     tanggalBerangkat?: string;
     tanggalPulang?: string;
     maskapai?: string;
+    hotelMekkah?: string;
+    hotelMadinah?: string;
     hotelOptions?: any;
     upgradeDouble?: number;
     upgradeTriple?: number;
@@ -118,6 +120,8 @@ export interface RegistrationGroup {
     tanggalBerangkat?: string;
     tanggalPulang?: string;
     maskapai?: string;
+    hotelMekkah?: string;
+    hotelMadinah?: string;
     hotelOptions?: any;
     upgradeDouble?: number;
     upgradeTriple?: number;
@@ -347,6 +351,7 @@ export interface InvoiceItem {
 // ============================================================
 
 export interface GroupPaymentSummary {
+  id?: string;
   groupId: string;
   kodeRegistrasi: string;
   namaGroup: string;
@@ -368,6 +373,8 @@ export interface GroupPaymentSummary {
     namaPaket: string;
     hargaPaket: number;
     tanggalBerangkat?: string;
+    hotelMekkah?: string;
+    hotelMadinah?: string;
     hotelOptions?: any;
     upgradeDouble?: number;
     upgradeTriple?: number;
