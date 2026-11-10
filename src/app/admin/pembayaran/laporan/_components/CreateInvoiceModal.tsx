@@ -863,6 +863,75 @@ export default function CreateInvoiceModal({
   }
 
   function handleRemoveBillingItem(id: string) {
+    const itemToRemove = billingItems.find((i) => i.id === id);
+    if (!itemToRemove || itemToRemove.isDefault) return;
+
+    const isHotelUpgrade =
+      isHotelUpgradeItem(itemToRemove.nama) || itemToRemove.id.startsWith("hotel-upgrade-");
+
+    if (isHotelUpgrade && groupInfo) {
+      const allocated =
+        itemToRemove.allocatedJamaah && itemToRemove.allocatedJamaah.length > 0
+          ? itemToRemove.allocatedJamaah
+          : (groupInfo.anggota || []).map((a: any) => a.namaLengkap).filter(Boolean);
+
+      const memberObjs = (groupInfo.anggota || []).filter((a: any) =>
+        allocated.includes(a.namaLengkap)
+      );
+      const jamaahIds = memberObjs.map((a: any) => a.id).filter(Boolean);
+
+      // Revert hotel to package default before upgrade
+      const defaultMekkah =
+        packageHotelMekkah ||
+        groupInfo.keberangkatan?.hotelMekkah ||
+        groupInfo.paketKeberangkatan?.hotelMekkah ||
+        "";
+      const defaultMadinah =
+        packageHotelMadinah ||
+        groupInfo.keberangkatan?.hotelMadinah ||
+        groupInfo.paketKeberangkatan?.hotelMadinah ||
+        "";
+
+      if (defaultMekkah || defaultMadinah) {
+        updateJamaahHotels({
+          jamaahIds,
+          jamaahNames: allocated,
+          groupId: groupInfo.id,
+          hotelMekkah: defaultMekkah,
+          hotelMadinah: defaultMadinah,
+        })
+          .then((res) => {
+            if (res.success) {
+              broadcastMutation("jamaah", "UPDATE", { groupId: groupInfo.id });
+              broadcastMutation("manifest", "UPDATE", { groupId: groupInfo.id });
+              broadcastMutation("manifest_rows", "UPDATE", { groupId: groupInfo.id });
+            }
+          })
+          .catch((err) => console.warn("[UpgradeHotel] Revert manifest hotel error:", err));
+
+        // Revert local groupInfo.anggota state immediately so auto-detect is not re-triggered
+        setGroupInfo((prev: any) => {
+          if (!prev || !prev.anggota) return prev;
+          return {
+            ...prev,
+            anggota: prev.anggota.map((a: any) => {
+              if (allocated.includes(a.namaLengkap)) {
+                return {
+                  ...a,
+                  hotelMekkah: defaultMekkah || a.hotelMekkah,
+                  hotelMadinah: defaultMadinah || a.hotelMadinah,
+                };
+              }
+              return a;
+            }),
+          };
+        });
+
+        if (defaultMekkah) setSelectedHotelMekkah(defaultMekkah);
+        if (defaultMadinah) setSelectedHotelMadinah(defaultMadinah);
+      }
+    }
+
     setBillingItems((prev) => prev.filter((i) => i.id !== id || i.isDefault));
   }
 

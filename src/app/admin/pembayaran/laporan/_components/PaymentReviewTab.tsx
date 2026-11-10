@@ -2121,6 +2121,51 @@ function PaymentReviewTabContent() {
                                   variant="ghost"
                                   className="h-6 w-6 p-0 text-destructive hover:bg-destructive/10"
                                   onClick={() => {
+                                    const isHotelUpgrade =
+                                      isHotelUpgradeItem(item.nama) || item.id.startsWith("hotel-upgrade-");
+
+                                    if (isHotelUpgrade) {
+                                      const allocated =
+                                        item.allocatedJamaah && item.allocatedJamaah.length > 0
+                                          ? item.allocatedJamaah
+                                          : (selectedPayment?.group?.anggota || []).map((a: any) => a.namaLengkap).filter(Boolean);
+                                      const targetGroupId = selectedPayment?.groupId || selectedPayment?.group?.id;
+                                      const defaultMekkah =
+                                        packageHotelMekkah ||
+                                        selectedPayment?.group?.keberangkatan?.hotelMekkah ||
+                                        "";
+                                      const defaultMadinah =
+                                        packageHotelMadinah ||
+                                        selectedPayment?.group?.keberangkatan?.hotelMadinah ||
+                                        "";
+
+                                      if (targetGroupId && (defaultMekkah || defaultMadinah)) {
+                                        updateJamaahHotels({
+                                          jamaahNames: allocated,
+                                          groupId: targetGroupId,
+                                          hotelMekkah: defaultMekkah,
+                                          hotelMadinah: defaultMadinah,
+                                        })
+                                          .then((res) => {
+                                            if (res.success) {
+                                              broadcastMutation("jamaah", "UPDATE", { groupId: targetGroupId });
+                                              broadcastMutation("manifest", "UPDATE", { groupId: targetGroupId });
+                                              broadcastMutation("manifest_rows", "UPDATE", { groupId: targetGroupId });
+                                            }
+                                          })
+                                          .catch((err) => console.warn("[UpgradeHotel] Revert manifest hotel error:", err));
+                                      }
+
+                                      if (defaultMekkah) {
+                                        setFormHotelMekkah(defaultMekkah);
+                                        setSelectedHotelMekkah(defaultMekkah);
+                                      }
+                                      if (defaultMadinah) {
+                                        setFormHotelMadinah(defaultMadinah);
+                                        setSelectedHotelMadinah(defaultMadinah);
+                                      }
+                                    }
+
                                     if (item.allocatedJamaah && item.allocatedJamaah.length > 0) {
                                       const defaultGroupRoom = detectRoomTypeFromName(selectedPayment?.group?.roomUpgrade || selectedPayment?.roomUpgrade || "Quad");
                                       setMemberRoomTypes((prev) => {
