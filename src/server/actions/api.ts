@@ -167,14 +167,33 @@ export async function createInvoice(data: {
   else if (data.kategori === "TAMBAH_JAMAAH") prefix = "INV-PAX";
 
   const nomorInvoice = data.nomorInvoice || `${prefix}-${dateStr}-${randomSuffix}`;
-  const tipe = data.subKategori || (data.kategori ? data.kategori.toLowerCase() : "pelunasan");
+  
+  // Normalize tipe strictly to valid Prisma enum TipeInvoice: "dp" | "cicilan" | "pelunasan" | "tambahan"
+  let normalizedTipe: "dp" | "cicilan" | "pelunasan" | "tambahan" = "pelunasan";
+  const rawTipe = (data.subKategori || (data.kategori ? data.kategori.toLowerCase() : "") || "").toLowerCase();
+  const rawCatatan = (data.catatan || "").toLowerCase();
+
+  if (rawTipe === "dp" || rawCatatan.includes("dp") || rawCatatan.includes("uang muka")) {
+    normalizedTipe = "dp";
+  } else if (rawTipe === "cicilan" || rawCatatan.includes("cicilan") || rawCatatan.includes("angsuran")) {
+    normalizedTipe = "cicilan";
+  } else if (
+    rawTipe === "tambahan" ||
+    data.kategori === "TAMBAH_JAMAAH" ||
+    data.kategori === "PINDAH_PAKET" ||
+    data.kategori === "PEMBATALAN"
+  ) {
+    normalizedTipe = "tambahan";
+  } else {
+    normalizedTipe = "pelunasan";
+  }
 
   const created = await prisma.invoice.create({
     data: {
       id: nomorInvoice,
       groupId: data.groupId,
       nomorInvoice,
-      tipe: tipe as any,
+      tipe: normalizedTipe,
       jumlah: data.nominal,
       sisaTagihan: data.nominal,
       status: "unpaid",
@@ -201,6 +220,43 @@ export async function createInvoice(data: {
         console.warn("Failed creating invoiceItem:", itemErr);
       }
     }
+
+    // If no upgrade hotel item exists in this invoice, check if any jamaah in group had upgraded hotel and revert to package default
+    const hasHotelUpgradeInItems = data.items.some((i) =>
+      (i.deskripsi || "").toLowerCase().includes("upgrade hotel")
+    );
+    if (!hasHotelUpgradeInItems) {
+      try {
+        const groupWithPkg = await prisma.registrationGroup.findUnique({
+          where: { id: data.groupId },
+          include: { keberangkatan: true, anggota: true },
+        });
+        if (groupWithPkg?.keberangkatan) {
+          const defaultMekkah = groupWithPkg.keberangkatan.hotelMekkah?.trim();
+          const defaultMadinah = groupWithPkg.keberangkatan.hotelMadinah?.trim();
+          if (defaultMekkah || defaultMadinah) {
+            const otherInvoices = await prisma.invoice.findMany({
+              where: { groupId: data.groupId, id: { not: created.id }, status: { not: "cancelled" } },
+              include: { items: true },
+            });
+            const hasOtherUpgrade = otherInvoices.some((inv) =>
+              inv.items?.some((it) => (it.deskripsi || "").toLowerCase().includes("upgrade hotel"))
+            );
+            if (!hasOtherUpgrade && groupWithPkg.anggota && groupWithPkg.anggota.length > 0) {
+              const updateData: Record<string, string> = {};
+              if (defaultMekkah) updateData.hotelMekkah = defaultMekkah;
+              if (defaultMadinah) updateData.hotelMadinah = defaultMadinah;
+              await prisma.jamaah.updateMany({
+                where: { groupId: data.groupId },
+                data: updateData,
+              });
+            }
+          }
+        }
+      } catch (revertErr) {
+        console.warn("Revert jamaah hotels on invoice creation warning:", revertErr);
+      }
+    }
   }
 
   // Create pending payment in review queue so it appears in Payment Review / Penerbitan Invoice
@@ -215,7 +271,7 @@ export async function createInvoice(data: {
             ? `Pembatalan: Biaya pembatalan`
             : data.kategori === "REFUND_MURNI"
               ? `Refund: Pengembalian dana`
-              : `Tagihan Invoice: ${tipe}`);
+              : `Tagihan Invoice: ${normalizedTipe}`);
 
     await prisma.pembayaran.create({
       data: {

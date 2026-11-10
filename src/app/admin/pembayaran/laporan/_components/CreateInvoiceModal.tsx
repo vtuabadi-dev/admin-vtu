@@ -1132,16 +1132,25 @@ export default function CreateInvoiceModal({
       else if (kategori === "REFUND_MURNI") finalCatatan = `Pengembalian dana (${refundType === "KELEBIHAN_BAYAR" ? "Kelebihan Bayar" : "Pengembalian Deposit"}) untuk group ${groupInfo.kodeRegistrasi}`;
     }
 
+    let resolvedSubKategori: "dp" | "cicilan" | "pelunasan" | "tambahan" = "pelunasan";
+    const catLower = finalCatatan.toLowerCase();
+    if (kategori === "PEMBAYARAN") {
+      if (catLower.includes("dp") || catLower.includes("uang muka")) {
+        resolvedSubKategori = "dp";
+      } else if (catLower.includes("cicilan") || catLower.includes("angsuran")) {
+        resolvedSubKategori = "cicilan";
+      } else {
+        resolvedSubKategori = "pelunasan";
+      }
+    } else {
+      resolvedSubKategori = "tambahan";
+    }
+
     try {
       const res = await createInvoice({
         groupId: groupInfo.id,
         kategori,
-        subKategori:
-          kategori === "PEMBATALAN"
-            ? `${scopePembatalan.toLowerCase()}_${refundStatus.toLowerCase()}`
-            : kategori === "REFUND_MURNI"
-              ? refundType.toLowerCase()
-              : kategori.toLowerCase(),
+        subKategori: resolvedSubKategori,
         scopePembatalan,
         refundStatus,
         nominal,
@@ -1161,6 +1170,9 @@ export default function CreateInvoiceModal({
       broadcastMutation("invoices", "INSERT", { id: res.id, groupId: groupInfo.id });
       broadcastMutation("pembayaran", "UPDATE", { groupId: groupInfo.id });
       broadcastMutation("registration_groups", "UPDATE", { id: groupInfo.id });
+      broadcastMutation("jamaah", "UPDATE", { groupId: groupInfo.id });
+      broadcastMutation("manifest", "UPDATE", { groupId: groupInfo.id });
+      broadcastMutation("manifest_rows", "UPDATE", { groupId: groupInfo.id });
       handleReset();
     } catch (e) {
       console.error("Failed to create invoice:", e);
