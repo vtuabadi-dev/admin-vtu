@@ -769,7 +769,14 @@ export default function CreateInvoiceModal({
       isDefault: false,
     };
 
-    setBillingItems((prev) => [...prev, newItem]);
+    setBillingItems((prev) => {
+      if (isHotelUpgrade) {
+        // Replace existing auto-detected placeholder with the user-configured item
+        const filtered = prev.filter((i) => !i.id.startsWith("hotel-upgrade-"));
+        return [...filtered, newItem];
+      }
+      return [...prev, newItem];
+    });
 
     // Update jamaah manifest hotels if hotel upgrade is configured
     if (isHotelUpgrade && allocated && allocated.length > 0 && groupInfo) {
@@ -1072,6 +1079,13 @@ export default function CreateInvoiceModal({
         jatuhTempo: jatuhTempo || undefined,
         catatan: finalCatatan,
         totalTagihan: calculatedTotalTagihan > 0 ? calculatedTotalTagihan : undefined,
+        items: billingItems.map((b) => ({
+          kategori: b.kategori,
+          deskripsi: b.nama,
+          qty: b.qty,
+          hargaSatuan: b.nominal,
+          jumlah: b.nominal * b.qty,
+        })),
       });
 
       onSuccess(res.nomorInvoice || res.id, nominal);

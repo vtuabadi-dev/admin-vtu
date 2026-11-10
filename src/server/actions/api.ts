@@ -149,6 +149,13 @@ export async function createInvoice(data: {
   refundStatus?: "NON_REFUND" | "WITH_REFUND";
   jamaahTargetIds?: string[];
   totalTagihan?: number;
+  items?: Array<{
+    kategori?: string;
+    deskripsi: string;
+    qty: number;
+    hargaSatuan: number;
+    jumlah?: number;
+  }>;
 }) {
   const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, "");
   const randomSuffix = String(Math.floor(Math.random() * 9000) + 1000);
@@ -174,6 +181,27 @@ export async function createInvoice(data: {
       jatuhTempo: data.jatuhTempo ? new Date(data.jatuhTempo) : new Date(Date.now() + 14 * 86400000),
     },
   });
+
+  // Persist invoice items if provided (SSOT for Manifest Pembayaran & Billing Details)
+  if (data.items && data.items.length > 0) {
+    for (const item of data.items) {
+      try {
+        await prisma.invoiceItem.create({
+          data: {
+            invoiceId: created.id,
+            kategori: item.kategori || "Tagihan",
+            deskripsi: item.deskripsi,
+            qty: item.qty || 1,
+            hargaSatuan: item.hargaSatuan || 0,
+            jumlah: item.jumlah !== undefined ? item.jumlah : (item.qty || 1) * (item.hargaSatuan || 0),
+            status: "active",
+          },
+        });
+      } catch (itemErr) {
+        console.warn("Failed creating invoiceItem:", itemErr);
+      }
+    }
+  }
 
   // Create pending payment in review queue so it appears in Payment Review / Penerbitan Invoice
   try {

@@ -462,7 +462,13 @@ const SplitInvoiceModal = dynamic(
       hotelMadinah: isHotelUpgrade ? chosenMadinah : undefined,
     };
 
-    setBillingItems((prev) => [...prev, newItem]);
+    setBillingItems((prev) => {
+      if (isHotelUpgrade) {
+        const filtered = prev.filter((i) => !i.id.startsWith("hotel-upgrade-"));
+        return [...filtered, newItem];
+      }
+      return [...prev, newItem];
+    });
 
     // Update jamaah manifest hotels if hotel upgrade is configured
     if (isHotelUpgrade && allocated && allocated.length > 0 && groupData) {

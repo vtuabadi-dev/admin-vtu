@@ -3316,22 +3316,25 @@ function PaymentReviewTabContent() {
 
                 const allocated = (isRoomUpgrade || isHotelUpgrade) && newOrderAllocatedMembers.length > 0 ? newOrderAllocatedMembers : undefined;
 
-                setOrderItems((prev) => [
-                  ...prev,
-                  {
-                    id: `item-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
-                    nama: finalItemName,
-                    nominal: totalNominal,
-                    qty: qty,
-                    satuan: newOrderSatuan || "Pax",
-                    hargaSatuan: newOrderNominal,
-                    tipe: newOrderType,
-                    kategori: isPotongan ? "potongan" : "tambahan",
-                    allocatedJamaah: allocated,
-                    hotelMekkah: isHotelUpgrade ? chosenMekkah : undefined,
-                    hotelMadinah: isHotelUpgrade ? chosenMadinah : undefined,
-                  },
-                ]);
+                setOrderItems((prev) => {
+                  const filtered = isHotelUpgrade ? prev.filter((i) => !i.id.startsWith("hotel-upgrade-")) : prev;
+                  return [
+                    ...filtered,
+                    {
+                      id: `item-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+                      nama: finalItemName,
+                      nominal: totalNominal,
+                      qty: qty,
+                      satuan: newOrderSatuan || "Pax",
+                      hargaSatuan: newOrderNominal,
+                      tipe: newOrderType,
+                      kategori: isPotongan ? "potongan" : "tambahan",
+                      allocatedJamaah: allocated,
+                      hotelMekkah: isHotelUpgrade ? chosenMekkah : undefined,
+                      hotelMadinah: isHotelUpgrade ? chosenMadinah : undefined,
+                    },
+                  ];
+                });
 
                 // Otomatis update hotel manifest jamaah jika upgrade hotel
                 if (isHotelUpgrade) {
