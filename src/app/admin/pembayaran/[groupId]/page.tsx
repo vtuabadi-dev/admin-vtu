@@ -31,6 +31,7 @@ import type {
 } from "@/shared/types";
 import { formatCurrency, formatDate, cn } from "@/shared/lib/utils";
 import { deriveGroupPaymentStatus } from "@/shared/lib/payment-utils";
+import { broadcastMutation } from "@/shared/lib/realtime-bus";
 import { CreditCard, Send, Plus, ArrowLeft, ChevronDown, ChevronUp, XCircle, Receipt, FileText } from "lucide-react";
 import { RequirePermission } from "@/shared/components/RequirePermission";
 
@@ -176,6 +177,12 @@ export default function GroupPaymentDetailPage({ params }: { params: { groupId: 
       );
       const refreshed = await getGroupPaymentSummary(groupId);
       if (refreshed) setSummary(refreshed);
+      broadcastMutation("invoices", "UPDATE", { groupId });
+      broadcastMutation("registration_groups", "UPDATE", { id: groupId });
+      broadcastMutation("manifest", "UPDATE", { groupId });
+      broadcastMutation("manifest_rows", "UPDATE", { groupId });
+      broadcastMutation("pembayaran", "UPDATE", { groupId });
+      broadcastMutation("jamaah", "UPDATE", { groupId });
       setCancelTarget(null);
       setCancelReason("");
       setSuccessMessage(`Item "${cancelTarget.itemKategori}" berhasil dibatalkan`);

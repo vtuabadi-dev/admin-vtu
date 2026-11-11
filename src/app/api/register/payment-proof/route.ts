@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { prisma } from "@/server/db/client";
+import { invoiceRepo } from "@/server/repositories";
+import { resolvePackageBillingConfig, resolveRoomUpgradeUnitPrice } from "@/shared/lib/billing-ssot";
 import { getStorageAdapter } from "@/server/storage";
 import { checkRateLimit, rateLimitKey, getRateLimitConfig } from "@/server/lib/rate-limit";
 
@@ -215,28 +217,15 @@ export async function POST(request: NextRequest) {
       createdJamaah.push(j);
     }
 
+    const pax = reg.paxCount || memberList.length || 1;
     if (!group) {
       const ketua = createdJamaah[0];
-      const pax = reg.paxCount || memberList.length || 1;
-      const basePricePerPax = matchedVariant?.hargaBase ? Number(matchedVariant.hargaBase) : (reg.keberangkatan?.hargaPaket || 0);
-      const basePaket = basePricePerPax * pax;
-
-      // Calculate room upgrade surcharge if selected during registration
-      let roomSurcharge = 0;
-      const roomType = (reg.roomUpgrade || "").toLowerCase().trim();
-      let upDouble = Number(matchedVariant?.upgradeDouble || 2500000);
-      let upTriple = Number(matchedVariant?.upgradeTriple || 1500000);
-      if (hOptsList[0]) {
-        if (!matchedVariant && Number(hOptsList[0].upgradeDouble) > 0) upDouble = Number(hOptsList[0].upgradeDouble);
-        if (!matchedVariant && Number(hOptsList[0].upgradeTriple) > 0) upTriple = Number(hOptsList[0].upgradeTriple);
-      }
-
-      if (roomType.includes("double")) {
-        roomSurcharge = upDouble * pax;
-      } else if (roomType.includes("triple")) {
-        roomSurcharge = upTriple * pax;
-      }
-
+      const pkgCfg = resolvePackageBillingConfig({
+        activePackage: reg.keberangkatan,
+        targetKlaster: reg.hotelUpgrade,
+      });
+      const basePaket = pkgCfg.hargaBase * pax;
+      const roomSurcharge = resolveRoomUpgradeUnitPrice(pkgCfg, reg.roomUpgrade) * pax;
       const totalTagihan = basePaket + roomSurcharge;
       const pkgInc = Array.isArray(reg.keberangkatan?.include) ? reg.keberangkatan.include : [];
       const hasKC =
@@ -283,6 +272,13 @@ export async function POST(request: NextRequest) {
       where: { id: { in: createdJamaah.map((j) => j.id) } },
       data: { groupId: group.id },
     });
+
+    // Materialize initial SSOT billing ledger (BILL-<groupId>) right at registration
+    await invoiceRepo.ensureInitialGroupLedger(group.id, {
+      roomUpgrade: reg.roomUpgrade,
+      targetKlaster: reg.hotelUpgrade,
+      paxCount: pax,
+    }).catch((err) => console.warn("ensureInitialGroupLedger in payment-proof warning:", err));
 
     groupId = group.id;
 

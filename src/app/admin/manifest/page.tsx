@@ -698,11 +698,13 @@ function resolveJamaahKeretaCepat(activePackage: any, groupObj: any, j: any): bo
     return groupObj.snapshotInclude.some((inc: string) => /kereta|fast train|haramain/i.test(inc));
   }
 
-  // 3. Invoice items / Addons
+  // 3. Invoice items / Addons (ignore cancelled invoices & cancelled items)
   if (groupObj?.invoices && Array.isArray(groupObj.invoices)) {
     for (const inv of groupObj.invoices) {
+      if (inv.status === "cancelled") continue;
       if (inv.items && Array.isArray(inv.items)) {
         const hasItem = inv.items.some((item: any) =>
+          item.status !== "cancelled" &&
           /kereta|fast train|haramain/i.test(`${item.deskripsi || ""} ${item.kategori || ""}`)
         );
         if (hasItem) return true;
@@ -756,11 +758,13 @@ function resolveJamaahCityTourThoif(activePackage: any, groupObj: any, j: any): 
     return groupObj.snapshotInclude.some((inc: string) => /th[ao]'?if|ta'?if|toif/i.test(inc));
   }
 
-  // 3. Invoice items / Addons
+  // 3. Invoice items / Addons (ignore cancelled invoices & cancelled items)
   if (groupObj?.invoices && Array.isArray(groupObj.invoices)) {
     for (const inv of groupObj.invoices) {
+      if (inv.status === "cancelled") continue;
       if (inv.items && Array.isArray(inv.items)) {
         const hasItem = inv.items.some((item: any) =>
+          item.status !== "cancelled" &&
           /th[ao]'?if|ta'?if|toif/i.test(`${item.deskripsi || ""} ${item.kategori || ""}`)
         );
         if (hasItem) return true;
@@ -986,7 +990,7 @@ function ManifestPageContent() {
   }, [loadAllData]);
 
   // Realtime live subscription: auto-reload manifest master table on any change
-  useRealtimeListener(["manifest", "manifest_rows", "jamaah", "registration_groups", "keberangkatan"], () => {
+  useRealtimeListener(["manifest", "manifest_rows", "jamaah", "registration_groups", "keberangkatan", "invoices"], () => {
     loadAllData();
   });
 

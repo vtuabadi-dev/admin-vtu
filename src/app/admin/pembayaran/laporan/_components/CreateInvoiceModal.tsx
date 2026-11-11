@@ -53,6 +53,7 @@ import {
   mergeSavedBillingItemsFromInvoices,
   mapBillingItemsToSyncPayload,
   calculateBillingItemsNetTotal,
+  hasMaterializedRoomOrFullLedger,
 } from "./shared-constants";
 import { broadcastMutation, subscribeRealtime, type RealtimeEventPayload } from "@/shared/lib/realtime-bus";
 import MasterBillingOptionsModal from "./MasterBillingOptionsModal";
@@ -610,7 +611,9 @@ export default function CreateInvoiceModal({
       },
     ];
 
-    if (upgradePrice > 0) {
+    const hasMaterializedLedger = hasMaterializedRoomOrFullLedger(groupInfo.invoices);
+
+    if (!hasMaterializedLedger && upgradePrice > 0) {
       items.push({
         id: `room-upgrade-${normRoom.toLowerCase()}`,
         nama: `Upgrade Kamar ${normRoom} (${pax} Pax)`,

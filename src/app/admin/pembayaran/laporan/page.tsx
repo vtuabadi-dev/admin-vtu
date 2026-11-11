@@ -64,6 +64,7 @@ import {
   mergeSavedBillingItemsFromInvoices,
   mapBillingItemsToSyncPayload,
   calculateBillingItemsNetTotal,
+  hasMaterializedRoomOrFullLedger,
 } from "./_components/shared-constants";
 import MasterBillingOptionsModal from "./_components/MasterBillingOptionsModal";
 import { broadcastMutation, subscribeRealtime, type RealtimeEventPayload } from "@/shared/lib/realtime-bus";
@@ -767,8 +768,9 @@ const SplitInvoiceModal = dynamic(
         },
       ];
 
-      // Item upgrade kamar independen (kategori: tambahan)
-      if (upgradePrice > 0) {
+      // Item upgrade kamar independen (hanya pre-ledger sebelum InvoiceItem termaterialisasi)
+      const hasMaterializedLedger = hasMaterializedRoomOrFullLedger(summary.invoices);
+      if (!hasMaterializedLedger && upgradePrice > 0) {
         initialItems.push({
           id: `room-upgrade-${normRoom.toLowerCase()}`,
           nama: `Upgrade Kamar ${normRoom} (${summary.jumlahAnggota} Pax)`,

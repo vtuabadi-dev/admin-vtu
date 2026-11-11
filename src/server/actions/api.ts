@@ -2,8 +2,13 @@
 
 import { prisma } from "@/server/db/client";
 import { packageService } from "@/server/services/package.service";
-import { groupRepo, pembayaranRepo } from "@/server/repositories";
+import { groupRepo, pembayaranRepo, invoiceRepo } from "@/server/repositories";
 import { syncPackageDocumentFileNamesToDrive } from "@/server/services/manifest-drive-sync.service";
+import {
+  getCanonicalItemDedupeKey,
+  isHotelUpgradeItem,
+  resolvePackageBillingConfig,
+} from "@/shared/lib/billing-ssot";
 import { revalidatePath } from "next/cache";
 
 interface BillingItemInput {
@@ -34,18 +39,59 @@ function normalizeBillingItemInput(it: BillingItemInput) {
   };
 }
 
-function getBillingItemDedupeKey(it: { kategori?: string; deskripsi?: string }): string {
-  const kat = (it.kategori || "").toLowerCase();
-  const desc = (it.deskripsi || "").trim().toLowerCase();
-  if (/upgrade\s*hotel/i.test(desc)) return "__UPGRADE_HOTEL__";
-  if (/upgrade\s*kamar/i.test(desc)) {
-    const rm = desc.includes("double") ? "double" : desc.includes("triple") ? "triple" : desc.includes("single") ? "single" : desc;
-    return `__UPGRADE_KAMAR__::${rm}`;
+async function revertGroupHotelsIfNoUpgradeItem(groupId: string) {
+  try {
+    const groupWithPkg = await prisma.registrationGroup.findUnique({
+      where: { id: groupId },
+      include: {
+        keberangkatan: {
+          include: { hotelMekkahMaster: true, hotelMadinahMaster: true },
+        },
+        anggota: true,
+        invoices: {
+          where: { status: { not: "cancelled" } },
+          include: { items: true },
+        },
+      },
+    });
+    if (!groupWithPkg?.keberangkatan) return;
+
+    const hasActiveHotelUpgrade = (groupWithPkg.invoices || []).some((inv) =>
+      (inv.items || []).some(
+        (it) => it.status !== "cancelled" && isHotelUpgradeItem(it.deskripsi || "")
+      )
+    );
+    if (hasActiveHotelUpgrade) return;
+
+    const pkgCfg = resolvePackageBillingConfig({
+      activePackage: groupWithPkg.keberangkatan,
+      group: groupWithPkg,
+      member: groupWithPkg.anggota?.[0],
+    });
+
+    const rawMekkah = pkgCfg.hotelMekkah || groupWithPkg.keberangkatan.hotelMekkah;
+    const rawMadinah = pkgCfg.hotelMadinah || groupWithPkg.keberangkatan.hotelMadinah;
+    const defaultMekkah = (
+      groupWithPkg.keberangkatan.hotelMekkahMaster?.name ||
+      (rawMekkah && !rawMekkah.startsWith("cm") ? rawMekkah : "")
+    ).trim();
+    const defaultMadinah = (
+      groupWithPkg.keberangkatan.hotelMadinahMaster?.name ||
+      (rawMadinah && !rawMadinah.startsWith("cm") ? rawMadinah : "")
+    ).trim();
+
+    if ((defaultMekkah || defaultMadinah) && groupWithPkg.anggota && groupWithPkg.anggota.length > 0) {
+      const updateData: Record<string, string> = {};
+      if (defaultMekkah) updateData.hotelMekkah = defaultMekkah;
+      if (defaultMadinah) updateData.hotelMadinah = defaultMadinah;
+      await prisma.jamaah.updateMany({
+        where: { groupId },
+        data: updateData,
+      });
+    }
+  } catch (revertErr) {
+    console.warn("Revert jamaah hotels warning:", revertErr);
   }
-  if ((kat === "utama" || /paket\s*umroh|biaya\s*paket/i.test(desc)) && !/penambahan.*jamaah/i.test(desc)) {
-    return "__BASE_PACKAGE__";
-  }
-  return `${kat}::${desc}`;
 }
 
 
@@ -216,14 +262,19 @@ export async function syncGroupBillingItems(data: {
         const norm = normalizeBillingItemInput(it);
         return {
           ...norm,
-          key: getBillingItemDedupeKey(norm),
+          key: getCanonicalItemDedupeKey(norm),
         };
       });
 
     const itemsSum = normalizedItems.reduce((sum, it) => sum + it.jumlah, 0);
     const hasBaseItem = normalizedItems.some((it) => it.key === "__BASE_PACKAGE__");
     const paxCount = group.anggota?.length || group.jumlahAnggota || 1;
-    const basePkgTotal = (group.keberangkatan?.hargaPaket || 0) * paxCount;
+    const pkgConfig = resolvePackageBillingConfig({
+      activePackage: group.keberangkatan,
+      group,
+      member: group.anggota?.[0],
+    });
+    const basePkgTotal = pkgConfig.hargaBase * paxCount;
 
     const netTotalTagihan =
       data.totalTagihan !== undefined && Number.isFinite(data.totalTagihan) && data.totalTagihan >= 0
@@ -312,7 +363,7 @@ export async function syncGroupBillingItems(data: {
               continue;
             }
 
-            const dbKey = getBillingItemDedupeKey(dbItem);
+            const dbKey = getCanonicalItemDedupeKey(dbItem);
             // Never auto-cancel base package unless caller explicitly passed a base package item
             if (dbKey === "__BASE_PACKAGE__" && !incomingByKey.has("__BASE_PACKAGE__")) {
               continue;
@@ -357,7 +408,7 @@ export async function syncGroupBillingItems(data: {
         // Any newly added items not yet on official invoices go into BILL-... delta ledger
         const hasBaseInOfficial = officialInvoices.some((inv) =>
           (inv.items || []).some(
-            (dbItem) => dbItem.status !== "cancelled" && getBillingItemDedupeKey(dbItem) === "__BASE_PACKAGE__"
+            (dbItem) => dbItem.status !== "cancelled" && getCanonicalItemDedupeKey(dbItem) === "__BASE_PACKAGE__"
           )
         );
 
@@ -508,7 +559,7 @@ export async function createInvoice(data: {
   for (const inv of existingOfficialInvoices) {
     for (const it of inv.items || []) {
       if (it.status !== "cancelled") {
-        existingOfficialKeys.add(getBillingItemDedupeKey(it));
+        existingOfficialKeys.add(getCanonicalItemDedupeKey(it));
       }
     }
   }
@@ -553,7 +604,7 @@ export async function createInvoice(data: {
     let insertedCount = 0;
     for (const rawItem of data.items) {
       const item = normalizeBillingItemInput(rawItem);
-      const itemKey = getBillingItemDedupeKey(item);
+      const itemKey = getCanonicalItemDedupeKey(item);
       // Avoid creating duplicate active items across official invoices if already recorded
       if (existingOfficialInvoices.length > 0 && existingOfficialKeys.has(itemKey)) {
         continue;
@@ -591,54 +642,12 @@ export async function createInvoice(data: {
       }).catch(() => {});
     }
 
-    // If no upgrade hotel item exists in this invoice, check if any jamaah in group had upgraded hotel and revert to package default
+    // If no upgrade hotel item exists in this invoice, revert jamaah hotels to package default when no other upgrade exists
     const hasHotelUpgradeInItems = data.items.some((i) =>
-      (i.deskripsi || "").toLowerCase().includes("upgrade hotel")
+      isHotelUpgradeItem(i.deskripsi || "")
     );
     if (!hasHotelUpgradeInItems) {
-      try {
-        const groupWithPkg = await prisma.registrationGroup.findUnique({
-          where: { id: data.groupId },
-          include: {
-            keberangkatan: {
-              include: { hotelMekkahMaster: true, hotelMadinahMaster: true },
-            },
-            anggota: true,
-          },
-        });
-        if (groupWithPkg?.keberangkatan) {
-          const rawMekkah = groupWithPkg.keberangkatan.hotelMekkah;
-          const rawMadinah = groupWithPkg.keberangkatan.hotelMadinah;
-          const defaultMekkah = (
-            groupWithPkg.keberangkatan.hotelMekkahMaster?.name ||
-            (rawMekkah && !rawMekkah.startsWith("cm") ? rawMekkah : "")
-          ).trim();
-          const defaultMadinah = (
-            groupWithPkg.keberangkatan.hotelMadinahMaster?.name ||
-            (rawMadinah && !rawMadinah.startsWith("cm") ? rawMadinah : "")
-          ).trim();
-          if (defaultMekkah || defaultMadinah) {
-            const otherInvoices = await prisma.invoice.findMany({
-              where: { groupId: data.groupId, id: { not: created.id }, status: { not: "cancelled" } },
-              include: { items: true },
-            });
-            const hasOtherUpgrade = otherInvoices.some((inv) =>
-              inv.items?.some((it) => it.status !== "cancelled" && (it.deskripsi || "").toLowerCase().includes("upgrade hotel"))
-            );
-            if (!hasOtherUpgrade && groupWithPkg.anggota && groupWithPkg.anggota.length > 0) {
-              const updateData: Record<string, string> = {};
-              if (defaultMekkah) updateData.hotelMekkah = defaultMekkah;
-              if (defaultMadinah) updateData.hotelMadinah = defaultMadinah;
-              await prisma.jamaah.updateMany({
-                where: { groupId: data.groupId },
-                data: updateData,
-              });
-            }
-          }
-        }
-      } catch (revertErr) {
-        console.warn("Revert jamaah hotels on invoice creation warning:", revertErr);
-      }
+      await revertGroupHotelsIfNoUpgradeItem(data.groupId);
     }
   }
 
@@ -923,8 +932,28 @@ export async function addPembayaran(data: any) {
   }
 }
 
-export async function cancelInvoiceItem(_invoiceId: string, _itemId: string, _reason: string, _user: string) {
-  return null as any;
+export async function cancelInvoiceItem(_invoiceId: string, itemId: string, reason: string, user: string) {
+  try {
+    const existingItem = await prisma.invoiceItem.findUnique({
+      where: { id: itemId },
+    });
+    const updatedInvoice = await invoiceRepo.cancelItem(itemId, user || "Admin", reason || "Dibatalkan admin");
+
+    if (existingItem && isHotelUpgradeItem(existingItem.deskripsi || "")) {
+      await revertGroupHotelsIfNoUpgradeItem(updatedInvoice.groupId);
+    }
+
+    try {
+      revalidatePath("/admin/manifest");
+      revalidatePath("/admin/pembayaran/laporan");
+      revalidatePath(`/admin/pembayaran/${updatedInvoice.groupId}`);
+    } catch {}
+
+    return updatedInvoice;
+  } catch (err) {
+    console.error("cancelInvoiceItem error:", err);
+    throw err;
+  }
 }
 
 export async function getGroupByKode(kode: string) {

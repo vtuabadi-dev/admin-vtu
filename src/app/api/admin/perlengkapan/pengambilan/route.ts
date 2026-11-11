@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { auth } from "@/server/auth";
 import { prisma } from "@/server/db/client";
+import { invoiceRepo } from "@/server/repositories";
 
 export async function GET(request: NextRequest) {
   const session = await auth();
@@ -370,112 +371,55 @@ export async function PUT(request: NextRequest) {
           }
         }
 
-        let targetInvoice = fullJamaah.group.invoices?.[0];
-        // Jika belum ada invoice aktif sama sekali, buat invoice baru untuk rombongan
-        if (!targetInvoice && fullJamaah.group.id) {
-          const invNo = `INV/${fullJamaah.group.kodeRegistrasi || fullJamaah.group.id}`;
-          targetInvoice = await prisma.invoice.create({
-            data: {
-              nomorInvoice: invNo,
-              groupId: fullJamaah.group.id,
-              tipe: "tambahan",
-              jumlah: 0,
-              sisaTagihan: 0,
-              status: "unpaid",
-              jatuhTempo: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-            },
-            include: { items: true },
-          });
-        }
+        const isTargetJahitItem = (desc: string) => {
+          const d = desc.toLowerCase();
+          return (
+            (d.includes("ongkos jahit") || d.includes("jahit seragam")) &&
+            (desc.includes(fullJamaah.namaLengkap) ||
+              desc.includes(fullJamaah.nomorPeserta) ||
+              desc.includes(fullJamaah.registrationId))
+          );
+        };
 
-        if (targetInvoice) {
-          const isTargetJahitItem = (desc: string) => {
-            const d = desc.toLowerCase();
-            return (
-              (d.includes("ongkos jahit") || d.includes("jahit seragam")) &&
-              (desc.includes(fullJamaah.namaLengkap) ||
-                desc.includes(fullJamaah.nomorPeserta) ||
-                desc.includes(fullJamaah.registrationId))
-            );
-          };
-
-          const existingJahit = (targetInvoice.items || []).find(
+        const groupInvoices = fullJamaah.group.invoices || [];
+        let existingJahit: any = null;
+        for (const inv of groupInvoices) {
+          const found = (inv.items || []).find(
             (item) => item.status === "active" && isTargetJahitItem(item.deskripsi || "")
           );
+          if (found) {
+            existingJahit = found;
+            break;
+          }
+        }
 
-          if (tookSeragamJadi && !existingJahit) {
-            // Tambahkan item invoice ongkos jahit Rp 100.000
-            await prisma.invoiceItem.create({
-              data: {
-                invoiceId: targetInvoice.id,
-                kategori: "tambahan",
-                deskripsi: `Ongkos Jahit Seragam Batik (${fullJamaah.namaLengkap})`,
-                qty: 1,
-                hargaSatuan: 100000,
-                jumlah: 100000,
-                status: "active",
-              },
-            });
+        if (tookSeragamJadi && !existingJahit) {
+          // Pastikan ledger SSOT (BILL-<groupId> berisi Base Paket) ada jika rombongan belum memiliki invoice
+          let targetInvoiceId =
+            groupInvoices.find((inv) => inv.id.startsWith("BILL-"))?.id || groupInvoices[0]?.id;
 
-            const activeItems = await prisma.invoiceItem.findMany({
-              where: { invoiceId: targetInvoice.id, status: "active" },
-            });
-            const newTotal = activeItems.reduce((sum, it) => sum + it.jumlah, 0);
-            const payments = await prisma.pembayaran.aggregate({
-              where: { invoiceId: targetInvoice.id, status: "verified" },
-              _sum: { jumlah: true },
-            });
-            const totalBayar = payments._sum.jumlah || 0;
-            const newSisa = Math.max(0, newTotal - totalBayar);
+          if (!targetInvoiceId && fullJamaah.group.id) {
+            const seeded = await invoiceRepo.ensureInitialGroupLedger(fullJamaah.group.id);
+            targetInvoiceId = seeded?.id;
+          }
 
-            await prisma.invoice.update({
-              where: { id: targetInvoice.id },
-              data: { jumlah: newTotal, sisaTagihan: newSisa },
-            });
-
-            await prisma.registrationGroup.update({
-              where: { id: fullJamaah.group.id },
-              data: {
-                totalTagihan: { increment: 100000 },
-                sisaPembayaran: { increment: 100000 },
-              },
-            });
-          } else if (!tookSeragamJadi && existingJahit) {
-            // Batalkan item invoice ongkos jahit karena beralih ke KAIN atau dibatalkan
-            await prisma.invoiceItem.update({
-              where: { id: existingJahit.id },
-              data: {
-                status: "cancelled",
-                cancelledAt: new Date(),
-                cancelledBy: petugasName,
-                cancellationReason: "Ganti ke Bahan Kain / Batal Seragam Jadi",
-              },
-            });
-
-            const activeItems = await prisma.invoiceItem.findMany({
-              where: { invoiceId: targetInvoice.id, status: "active" },
-            });
-            const newTotal = activeItems.reduce((sum, it) => sum + it.jumlah, 0);
-            const payments = await prisma.pembayaran.aggregate({
-              where: { invoiceId: targetInvoice.id, status: "verified" },
-              _sum: { jumlah: true },
-            });
-            const totalBayar = payments._sum.jumlah || 0;
-            const newSisa = Math.max(0, newTotal - totalBayar);
-
-            await prisma.invoice.update({
-              where: { id: targetInvoice.id },
-              data: { jumlah: newTotal, sisaTagihan: newSisa },
-            });
-
-            await prisma.registrationGroup.update({
-              where: { id: fullJamaah.group.id },
-              data: {
-                totalTagihan: { decrement: 100000 },
-                sisaPembayaran: { decrement: 100000 },
-              },
+          if (targetInvoiceId) {
+            await invoiceRepo.addItem(targetInvoiceId, {
+              kategori: "tambahan",
+              deskripsi: `Ongkos Jahit Seragam Batik (${fullJamaah.namaLengkap})`,
+              qty: 1,
+              hargaSatuan: 100000,
+              jumlah: 100000,
+              status: "active",
             });
           }
+        } else if (!tookSeragamJadi && existingJahit) {
+          // Batalkan item invoice ongkos jahit dan sinkronkan ulang tagihan grup secara kanonik
+          await invoiceRepo.cancelItem(
+            existingJahit.id,
+            petugasName,
+            "Ganti ke Bahan Kain / Batal Seragam Jadi"
+          );
         }
       }
     } catch (invoiceErr) {

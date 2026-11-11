@@ -1,4 +1,6 @@
 import { prisma } from "@/server/db/client";
+import { invoiceRepo } from "@/server/repositories/invoice.repository";
+import { resolvePackageBillingConfig, resolveRoomUpgradeUnitPrice } from "@/shared/lib/billing-ssot";
 import type { Pembayaran } from "@/shared/types";
 
 function mapPembayaran(row: any): Pembayaran {
@@ -179,41 +181,14 @@ export const pembayaranRepo = {
         ? (reg.members as any[]).sort((a, b) => (a.urutan || 0) - (b.urutan || 0))
         : [{ namaLengkap: reg.namaPerwakilan, jenisKelamin: "L", tempatLahir: "-", tanggalLahir: "2000-01-01", urutan: 1 }];
 
+      const pax = reg.paxCount || memberList.length || 1;
       if (!group) {
-        const pax = reg.paxCount || memberList.length || 1;
-        let basePricePerPax = reg.keberangkatan?.hargaPaket || 0;
-        let upDouble = 2500000;
-        let upTriple = 1500000;
-        try {
-          const hOpts = typeof reg.keberangkatan?.hotelOptions === "string"
-            ? JSON.parse(reg.keberangkatan.hotelOptions)
-            : reg.keberangkatan?.hotelOptions;
-          if (Array.isArray(hOpts) && hOpts.length > 0) {
-            const matchedCluster = reg.hotelUpgrade
-              ? hOpts.find((o: any) =>
-                  (o.clusterName && o.clusterName.toLowerCase() === reg.hotelUpgrade?.toLowerCase()) ||
-                  (o.variantName && o.variantName.toLowerCase() === reg.hotelUpgrade?.toLowerCase()) ||
-                  (o.clusterName && reg.hotelUpgrade?.toLowerCase().includes(o.clusterName.toLowerCase()))
-                )
-              : null;
-            const activeCluster = matchedCluster || hOpts[0];
-            if (activeCluster) {
-              if (Number(activeCluster.hargaBase) > 0) basePricePerPax = Number(activeCluster.hargaBase);
-              if (Number(activeCluster.upgradeDouble) > 0) upDouble = Number(activeCluster.upgradeDouble);
-              if (Number(activeCluster.upgradeTriple) > 0) upTriple = Number(activeCluster.upgradeTriple);
-            }
-          }
-        } catch {}
-
-        const basePaket = basePricePerPax * pax;
-        let roomSurcharge = 0;
-        const roomType = (reg.roomUpgrade || "").toLowerCase().trim();
-
-        if (roomType.includes("double")) {
-          roomSurcharge = upDouble * pax;
-        } else if (roomType.includes("triple")) {
-          roomSurcharge = upTriple * pax;
-        }
+        const pkgCfg = resolvePackageBillingConfig({
+          activePackage: reg.keberangkatan,
+          targetKlaster: reg.hotelUpgrade,
+        });
+        const basePaket = pkgCfg.hargaBase * pax;
+        const roomSurcharge = resolveRoomUpgradeUnitPrice(pkgCfg, reg.roomUpgrade) * pax;
         const totalTagihan = basePaket + roomSurcharge;
         group = await prisma.registrationGroup.create({
           data: {
@@ -273,6 +248,13 @@ export const pembayaranRepo = {
           data: { ketuaGroupId: createdJamaah[0].id },
         });
       }
+
+      // Materialize initial SSOT billing ledger (BILL-<groupId>) right on sync
+      await invoiceRepo.ensureInitialGroupLedger(group.id, {
+        roomUpgrade: reg.roomUpgrade,
+        targetKlaster: reg.hotelUpgrade,
+        paxCount: pax,
+      }).catch((err) => console.warn("ensureInitialGroupLedger in syncPendingRegistrations warning:", err));
 
       // Ensure all jamaah in this registration are linked to the group
       await prisma.jamaah.updateMany({

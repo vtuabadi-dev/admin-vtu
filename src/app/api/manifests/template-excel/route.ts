@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/server/auth";
 import { prisma } from "@/server/db";
 import { toTitleCase } from "@/shared/lib/utils";
+import { resolveCanonicalGroupBilling } from "@/shared/lib/billing-ssot";
 
 export const dynamic = "force-dynamic";
 
@@ -392,28 +393,48 @@ export async function GET(request: Request) {
             return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
           });
 
-          const memberCount = Math.max(1, sortedMembers.length);
-          const activeInvoice = group.invoices?.[0];
+          const activeInvoices = (group.invoices || []).filter((inv: any) => inv.status !== "cancelled");
+          const activeInvoice = activeInvoices[0];
           const payments = group.pembayaran || [];
 
-          // Total tagihan & pembayaran terpusat pada tingkat grup/PIC
-          let groupTagihan = group.totalTagihan
-            ? Number(group.totalTagihan)
-            : activeInvoice?.jumlah
-            ? Number(activeInvoice.jumlah)
-            : groupPkg.hargaPaket * memberCount;
+          // Single Source of Truth (ADR-0032): Hitung rincian & net total tagihan dari ledger kanonik grup
+          const canonicalBilling = resolveCanonicalGroupBilling({
+            group,
+            activePackage: groupPkg,
+            members: sortedMembers,
+          });
+
+          const {
+            biayaPaket: invoiceBiayaPaket,
+            upgradeKamar: invoiceUpgradeKamar,
+            upgradeHotel: invoiceUpgradeHotel,
+            ongkosJahit: invoiceOngkosJahit,
+            keretaCepat: invoiceKereta,
+            cityTourThoif: invoiceThoif,
+            paspor: invoicePaspor,
+            kursiRoda: invoiceKursiRoda,
+            ongkir: invoiceOngkir,
+            tambahanPerlengkapan: invoicePerlengkapan,
+            totalPotongan: invoiceDiskon,
+            netTotalTagihan: groupTagihan,
+          } = canonicalBilling.groupTotals;
+
+          const invoiceAddOns =
+            invoiceKereta +
+            invoiceThoif +
+            invoicePaspor +
+            invoiceKursiRoda +
+            invoiceOngkir +
+            invoicePerlengkapan;
 
           const groupPembayaran =
             group.totalPembayaran !== null && group.totalPembayaran !== undefined
               ? Number(group.totalPembayaran)
-              : payments.reduce((sum, p) => sum + Number(p.jumlah || 0), 0);
+              : payments
+                  .filter((p: any) => p.status === "verified")
+                  .reduce((sum: number, p: any) => sum + Number(p.jumlah || 0), 0);
 
-          let groupKurang =
-            group.sisaPembayaran !== null && group.sisaPembayaran !== undefined
-              ? Number(group.sisaPembayaran)
-              : activeInvoice?.sisaTagihan !== null && activeInvoice?.sisaTagihan !== undefined
-              ? Number(activeInvoice.sisaTagihan)
-              : Math.max(0, groupTagihan - groupPembayaran);
+          let groupKurang = Math.max(0, groupTagihan - groupPembayaran);
 
           if (groupPembayaran >= groupTagihan && groupTagihan > 0) {
             groupKurang = 0;
@@ -441,79 +462,6 @@ export async function GET(request: Request) {
             }
           } else if (!groupTitle.includes("[FB]") && !groupTitle.includes("[BF]")) {
             groupTitle = `${boardTag} ${groupTitle}`;
-          }
-
-          // Hitung rincian item tagihan invoice (Upgrade Kamar, Upgrade Hotel, Ongkos Jahit, Tambahan Perlengkapan, Diskon)
-          let invoiceUpgradeHotel = 0;
-          let invoiceUpgradeKamar = 0;
-          let invoiceOngkosJahit = 0;
-          let invoiceTambahanPerlengkapan = 0;
-          let invoiceDiskon = 0;
-
-          (group.invoices || []).forEach((inv: any) => {
-            if (inv.status === "cancelled") return;
-            (inv.items || []).forEach((item: any) => {
-              if (item.status === "cancelled") return;
-              const katLower = (item.kategori || "").toLowerCase();
-              const descLower = (item.deskripsi || "").toLowerCase();
-              const text = `${katLower} ${descLower}`;
-              if (katLower.includes("pembayaran invoice") || katLower.includes("angsuran")) return;
-
-              const itemVal = Number(item.jumlah || 0);
-              const isPotonganKat = katLower === "potongan" || katLower === "pengurangan";
-
-              if (text.includes("upgrade hotel") || (text.includes("hotel") && (text.includes("bintang") || text.includes("upgrade")))) {
-                invoiceUpgradeHotel += Math.abs(itemVal);
-              } else if (text.includes("upgrade kamar") || text.includes("double") || text.includes("triple") || text.includes("single")) {
-                invoiceUpgradeKamar += Math.abs(itemVal);
-              } else if (text.includes("jahit") || text.includes("tailor") || text.includes("jahitan")) {
-                invoiceOngkosJahit += Math.abs(itemVal);
-              } else if (
-                text.includes("perlengkapan") ||
-                text.includes("equipment") ||
-                text.includes("koper") ||
-                text.includes("seragam") ||
-                text.includes("ihram") ||
-                katLower.includes("perlengkapan")
-              ) {
-                invoiceTambahanPerlengkapan += Math.abs(itemVal);
-              } else if (isPotonganKat || text.includes("diskon") || text.includes("promo") || text.includes("voucher") || itemVal < 0) {
-                invoiceDiskon += Math.abs(itemVal);
-              } else if (
-                katLower !== "utama" &&
-                !text.includes("paket umroh") &&
-                !text.includes("biaya paket") &&
-                !(text.includes("penambahan") && text.includes("jamaah"))
-              ) {
-                if (itemVal > 0) invoiceTambahanPerlengkapan += itemVal;
-              }
-            });
-          });
-
-          // Otomatisasi 100.000 / pax jika jamaah mengambil seragam jadi (bukan kain)
-          if (invoiceOngkosJahit === 0) {
-            const seragamJadiCount = sortedMembers.filter((m: any) => {
-              const cat = (m.catatanPerlengkapan || "").toLowerCase();
-              const hasNote = cat.includes("seragam jadi") || cat.includes("ongkos jahit") || cat.includes("jahit");
-              const details = m.detailPengambilan || [];
-              const tookJadi = details.some((dp: any) => {
-                const code = (dp.code || dp.barang?.code || "").toUpperCase();
-                const name = (dp.name || dp.namaBarang || dp.barang?.name || "").toLowerCase();
-                const isSeragam = code.startsWith("SRG") || name.includes("seragam") || name.includes("batik");
-                const isSudah = dp.status === "SUDAH";
-                const uk = (dp.kodeUkuran || dp.petugas?.match(/#UK:([A-Za-z0-9_-]+)/)?.[1] || "").toUpperCase();
-                return isSeragam && isSudah && uk && uk !== "KAIN";
-              });
-              return hasNote || tookJadi;
-            }).length;
-
-            if (seragamJadiCount > 0) {
-              invoiceOngkosJahit = seragamJadiCount * 100000;
-              if (!group.totalTagihan || Number(group.totalTagihan) <= groupPkg.hargaPaket * memberCount) {
-                groupTagihan += invoiceOngkosJahit;
-                groupKurang += invoiceOngkosJahit;
-              }
-            }
           }
 
           sortedMembers.forEach((j, memberIdx) => {
@@ -586,11 +534,11 @@ export async function GET(request: Request) {
               // Finansial: Hanya terisi penuh di baris PIC grup (memberIdx === 0).
               // Anggota grup lainnya dikosongkan karena tagihan terpusat oleh PIC.
               noInvoice: isPic ? (activeInvoice?.nomorInvoice || (group.kodeRegistrasi ? `INV/${group.kodeRegistrasi}` : "")) : "",
-              biayaPaket: isPic ? Math.max(0, groupTagihan - invoiceUpgradeKamar - invoiceUpgradeHotel - invoiceOngkosJahit - invoiceTambahanPerlengkapan + invoiceDiskon) : "",
+              biayaPaket: isPic ? invoiceBiayaPaket : "",
               upgradeKamar: isPic ? invoiceUpgradeKamar : "",
               upgradeHotel: isPic ? invoiceUpgradeHotel : "",
               ongkosJahit: isPic ? invoiceOngkosJahit : "",
-              addOns: isPic ? invoiceTambahanPerlengkapan : "",
+              addOns: isPic ? invoiceAddOns : "",
               diskon: isPic ? invoiceDiskon : "",
               totalTagihan: isPic ? groupTagihan : "",
               totalPembayaran: isPic ? groupPembayaran : "",

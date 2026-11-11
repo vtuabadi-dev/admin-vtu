@@ -19,7 +19,7 @@ import {
 import { Button } from "@/shared/components/ui/Button";
 import { Modal } from "@/shared/components/ui/Modal";
 import { cn, getWhatsAppUrl, formatDate } from "@/shared/lib/utils";
-import { resolvePackageInclusionFlags } from "@/shared/lib/manifest-billing-utils";
+import { resolveCanonicalGroupBilling } from "@/shared/lib/billing-ssot";
 import type { Jamaah, RegistrationGroup, Keberangkatan, Pembayaran } from "@/shared/types";
 
 export interface ManifestPembayaranTableProps {
@@ -131,7 +131,6 @@ export function ManifestPembayaranTable({
       if (members.length === 0) return;
 
       const g = groupMap.get(gKey) || null;
-      const groupMembersCount = members.length || g?.jumlahAnggota || g?.anggotaIds?.length || 1;
 
       // Extract invoices & payments
       const invoices = g?.invoices || [];
@@ -142,216 +141,15 @@ export function ManifestPembayaranTable({
         latestInvoice?.nomorInvoice ||
         (g?.kodeRegistrasi ? `INV/${g.kodeRegistrasi}` : `INV-${gKey}`);
 
-      // Helper to determine members who have upgraded hotels for accurate item distribution
-      const pkgDefaultMekkah = (activePackage?.hotelMekkah || "").trim().toLowerCase();
-      const pkgDefaultMadinah = (activePackage?.hotelMadinah || "").trim().toLowerCase();
-
-      const hotelUpgradedIndices = new Set<number>();
-      members.forEach((m, idx) => {
-        const mMek = (m.hotelMekkah || "").trim().toLowerCase();
-        const mMad = (m.hotelMadinah || "").trim().toLowerCase();
-        if (
-          (mMek && pkgDefaultMekkah && mMek !== pkgDefaultMekkah) ||
-          (mMad && pkgDefaultMadinah && mMad !== pkgDefaultMadinah)
-        ) {
-          hotelUpgradedIndices.add(idx);
-        }
+      // Pass 1: Compute canonical item-level charges & netTagihan per member (SSOT ADR-0032)
+      const canonicalBilling = resolveCanonicalGroupBilling({
+        group: g,
+        activePackage,
+        members,
       });
 
-      const distributeAmount = (totalAmount: number, memberIdx: number, eligibleIndices?: Set<number>): number => {
-        if (eligibleIndices && eligibleIndices.size > 0) {
-          if (!eligibleIndices.has(memberIdx)) return 0;
-          const count = eligibleIndices.size;
-          const base = Math.trunc(totalAmount / count);
-          const rem = totalAmount - base * count;
-          const firstEligibleIdx = Math.min(...Array.from(eligibleIndices));
-          return memberIdx === firstEligibleIdx ? base + rem : base;
-        }
-        const base = Math.trunc(totalAmount / groupMembersCount);
-        const rem = totalAmount - base * groupMembersCount;
-        return memberIdx === 0 ? base + rem : base;
-      };
-
-      // Pass 1: Compute item-level charges and netTagihan per member
-      const memberDrafts = members.map((j, memberIdx) => {
-        const {
-          matchedVariant,
-          shouldChargeDefaultThoif,
-          shouldChargeDefaultKereta,
-        } = resolvePackageInclusionFlags({ activePackage, group: g, jamaah: j });
-
-        // Base Package Price
-        const roomType = String(g?.roomUpgrade || (j as any).tipeKamar || "quad").toLowerCase();
-        const baseQuad = Number(
-          (matchedVariant?.hargaBase && Number(matchedVariant.hargaBase) > 0 ? matchedVariant.hargaBase : 0) ||
-            (activePackage as any).hargaQuad ||
-            activePackage.hargaPaket ||
-            33900000
-        );
-        let biayaPaket = baseQuad;
-        let upgradeKamar = 0;
-        let upgradeKamarLabel = "";
-
-        if (roomType.includes("double")) {
-          const doubleAdd = Number(matchedVariant?.upgradeDouble || 0);
-          const doublePrice = doubleAdd > 0 ? baseQuad + doubleAdd : Number((activePackage as any).hargaDouble || baseQuad + 4000000);
-          upgradeKamar = doublePrice - baseQuad;
-          upgradeKamarLabel = "Upgrade Double";
-        } else if (roomType.includes("triple")) {
-          const tripleAdd = Number(matchedVariant?.upgradeTriple || 0);
-          const triplePrice = tripleAdd > 0 ? baseQuad + tripleAdd : Number((activePackage as any).hargaTriple || baseQuad + 2000000);
-          upgradeKamar = triplePrice - baseQuad;
-          upgradeKamarLabel = "Upgrade Triple";
-        } else if (roomType.includes("single")) {
-          const singleAdd = Number(matchedVariant?.upgradeSingle || 0);
-          const singlePrice = singleAdd > 0 ? baseQuad + singleAdd : Number((activePackage as any).hargaSingle || baseQuad + 8000000);
-          upgradeKamar = singlePrice - baseQuad;
-          upgradeKamarLabel = "Upgrade Single";
-        }
-
-        let keretaCepat = 0;
-        let cityTourThoif = 0;
-        let paspor = 0;
-        let kursiRoda = 0;
-        let ongkir = 0;
-        let ongkosJahit = 0;
-        let upgradeHotel = 0;
-        let upgradeHotelLabel = "";
-        let tambahanPerlengkapan = 0;
-        let tambahanLain = 0;
-        let diskonPromo = 0;
-        let potonganOngkir = 0;
-        let invoiceRoomUpgrade = 0;
-        let hasInvoiceRoomUpgrade = false;
-
-        activeInvoices.forEach((inv) => {
-          (inv.items || []).forEach((item) => {
-            if (item.status === "cancelled") return;
-            const katLower = (item.kategori || "").toLowerCase();
-            const descLower = (item.deskripsi || "").toLowerCase();
-            const text = `${katLower} ${descLower}`;
-
-            // Skip installment/receipt summary items that should not add to fee columns
-            if (katLower.includes("pembayaran invoice") || katLower.includes("angsuran")) {
-              return;
-            }
-
-            const rawJumlah = Number(item.jumlah || 0);
-            const isPotonganKat = katLower === "potongan" || katLower === "pengurangan";
-            const itemVal = distributeAmount(rawJumlah, memberIdx);
-
-            if (text.includes("kereta") || text.includes("fast train") || text.includes("haramain")) {
-              keretaCepat += Math.abs(itemVal);
-            } else if (text.includes("thoif") || text.includes("taif")) {
-              cityTourThoif += Math.abs(itemVal);
-            } else if (text.includes("paspor")) {
-              paspor += Math.abs(itemVal);
-            } else if (text.includes("kursi roda") || text.includes("wheelchair")) {
-              kursiRoda += Math.abs(itemVal);
-            } else if (text.includes("ongkir") || text.includes("ongkos kirim") || text.includes("ekspedisi")) {
-              if (itemVal < 0 || isPotonganKat) potonganOngkir += Math.abs(itemVal);
-              else ongkir += itemVal;
-            } else if (isPotonganKat || text.includes("diskon") || text.includes("promo") || text.includes("voucher") || itemVal < 0) {
-              diskonPromo += Math.abs(itemVal);
-            } else if (text.includes("upgrade hotel") || (text.includes("hotel") && (text.includes("bintang") || text.includes("upgrade")))) {
-              const hotelItemVal = distributeAmount(rawJumlah, memberIdx, hotelUpgradedIndices.size > 0 ? hotelUpgradedIndices : undefined);
-              upgradeHotel += hotelItemVal;
-              if (hotelItemVal > 0 || !upgradeHotelLabel) {
-                upgradeHotelLabel = item.deskripsi || "Upgrade Hotel";
-              }
-            } else if (text.includes("upgrade kamar") || text.includes("double") || text.includes("triple") || text.includes("single")) {
-              hasInvoiceRoomUpgrade = true;
-              invoiceRoomUpgrade += Math.abs(itemVal);
-              if (!upgradeKamarLabel) upgradeKamarLabel = item.deskripsi || "Upgrade Kamar";
-            } else if (text.includes("jahit") || text.includes("tailor") || text.includes("jahitan")) {
-              ongkosJahit += itemVal;
-            } else if (
-              text.includes("perlengkapan") ||
-              text.includes("equipment") ||
-              text.includes("koper") ||
-              text.includes("seragam") ||
-              text.includes("ihram") ||
-              katLower.includes("perlengkapan")
-            ) {
-              tambahanPerlengkapan += itemVal;
-            } else if (
-              katLower === "utama" ||
-              ((text.includes("paket umroh") || text.includes("biaya paket")) && !(text.includes("penambahan") && text.includes("jamaah")))
-            ) {
-              biayaPaket = itemVal;
-            } else if (!(text.includes("penambahan") && text.includes("jamaah"))) {
-              if (itemVal > 0) {
-                tambahanPerlengkapan += itemVal;
-                tambahanLain += itemVal;
-              }
-            }
-          });
-        });
-
-        if (hasInvoiceRoomUpgrade) {
-          upgradeKamar = invoiceRoomUpgrade;
-        }
-
-        if (keretaCepat === 0 && shouldChargeDefaultKereta) {
-          keretaCepat = 1250000;
-        }
-        if (cityTourThoif === 0 && shouldChargeDefaultThoif) {
-          cityTourThoif = 750000;
-        }
-
-        // Otomatis 100.000 / pax jika seragam yang diambil adalah seragam jadi (bukan kain)
-        if (ongkosJahit === 0) {
-          const detailList = (j as any).detailPengambilan || [];
-          const tookSeragamJadi = detailList.some((dp: any) => {
-            const code = (dp.code || dp.barang?.code || "").toUpperCase();
-            const name = (dp.name || dp.namaBarang || dp.barang?.name || "").toLowerCase();
-            const isSeragam = code.startsWith("SRG") || name.includes("seragam") || name.includes("batik");
-            const isSudah = dp.status === "SUDAH";
-            const uk = (dp.kodeUkuran || dp.petugas?.match(/#UK:([A-Za-z0-9_-]+)/)?.[1] || "").toUpperCase();
-            return isSeragam && isSudah && uk && uk !== "KAIN";
-          });
-
-          const cat = (j.catatanPerlengkapan || "").toLowerCase();
-          const hasJahitNote = cat.includes("seragam jadi") || cat.includes("ongkos jahit") || cat.includes("jahit");
-
-          if (tookSeragamJadi || hasJahitNote) {
-            ongkosJahit = 100000;
-          }
-        }
-
-        const totalUpgrade = upgradeKamar + upgradeHotel;
-        const totalPotongan = diskonPromo + potonganOngkir;
-        let netTagihan =
-          biayaPaket +
-          totalUpgrade +
-          keretaCepat +
-          cityTourThoif +
-          paspor +
-          kursiRoda +
-          ongkir +
-          ongkosJahit +
-          tambahanPerlengkapan -
-          totalPotongan;
-
-        if (g?.totalTagihan && g.totalTagihan > 0) {
-          const basePerMember = distributeAmount(Number(g.totalTagihan), memberIdx);
-          const hasExplicitJahitInvoice = activeInvoices.some((inv) =>
-            (inv.items || []).some(
-              (it) => it.status !== "cancelled" && /jahit|tailor/i.test(`${it.kategori || ""} ${it.deskripsi || ""}`)
-            )
-          );
-          if (hasExplicitJahitInvoice) {
-            netTagihan = basePerMember;
-          } else if (activeInvoices.some((inv) => (inv.items || []).some((it) => it.status !== "cancelled"))) {
-            // When explicit invoice items exist, trust itemized sum (+ any auto-detected unbilled seragam jahit)
-            netTagihan = Math.max(netTagihan, basePerMember + ongkosJahit);
-          } else {
-            netTagihan = Math.max(netTagihan, basePerMember + ongkosJahit);
-          }
-        }
-
-        const totalTagihan = netTagihan + totalPotongan;
-
+      const memberDrafts = canonicalBilling.memberBreakdowns.map((bd) => {
+        const j = bd.member as Jamaah;
         const sotName =
           (j.dokumen && Array.isArray(j.dokumen)
             ? j.dokumen.find((d: any) => d.jenis === "paspor")?.manualData?.namaLengkap ||
@@ -370,36 +168,30 @@ export function ManifestPembayaranTable({
           (j as any).noTelepon ||
           "";
 
-        const combinedUpgradeLabel = [upgradeKamarLabel, upgradeHotelLabel].filter(Boolean).join(" + ");
-        const keterangan =
-          combinedUpgradeLabel ||
-          (totalPotongan > 0 ? `Diskon Rp ${totalPotongan.toLocaleString("id-ID")}` : "") ||
-          "-";
-
         return {
           jamaah: j,
           sotName,
           phone,
-          biayaPaket,
-          upgradeKamar,
-          upgradeKamarLabel,
-          upgradeHotel,
-          upgradeHotelLabel,
-          totalUpgrade,
-          keretaCepat,
-          cityTourThoif,
-          paspor,
-          kursiRoda,
-          ongkir,
-          ongkosJahit,
-          tambahanPerlengkapan,
-          tambahanLain,
-          diskonPromo,
-          potonganOngkir,
-          totalPotongan,
-          netTagihan,
-          totalTagihan,
-          keterangan,
+          biayaPaket: bd.biayaPaket,
+          upgradeKamar: bd.upgradeKamar,
+          upgradeKamarLabel: bd.upgradeKamarLabel,
+          upgradeHotel: bd.upgradeHotel,
+          upgradeHotelLabel: bd.upgradeHotelLabel,
+          totalUpgrade: bd.totalUpgrade,
+          keretaCepat: bd.keretaCepat,
+          cityTourThoif: bd.cityTourThoif,
+          paspor: bd.paspor,
+          kursiRoda: bd.kursiRoda,
+          ongkir: bd.ongkir,
+          ongkosJahit: bd.ongkosJahit,
+          tambahanPerlengkapan: bd.tambahanPerlengkapan,
+          tambahanLain: bd.tambahanLain,
+          diskonPromo: bd.diskonPromo,
+          potonganOngkir: bd.potonganOngkir,
+          totalPotongan: bd.totalPotongan,
+          netTagihan: bd.netTagihan,
+          totalTagihan: bd.totalTagihan,
+          keterangan: bd.keterangan,
         };
       });
 
@@ -543,11 +335,12 @@ export function ManifestPembayaranTable({
 
       // Aggregate financials across all members in this group
       const totalTagihan = members.reduce((sum, m) => sum + m.totalTagihan, 0);
+      const netTagihan = members.reduce((sum, m) => sum + m.netTagihan, 0);
       const totalPembayaran = members.reduce((sum, m) => sum + m.totalPembayaran, 0);
-      const kurangBayar = Math.max(0, totalTagihan - totalPembayaran);
+      const kurangBayar = Math.max(0, netTagihan - totalPembayaran);
 
       let statusPembayaran: "LUNAS" | "CICILAN" | "BELUM BAYAR" = "BELUM BAYAR";
-      if (totalTagihan > 0 && kurangBayar === 0 && totalPembayaran >= totalTagihan) {
+      if (netTagihan > 0 && kurangBayar === 0 && totalPembayaran >= netTagihan) {
         statusPembayaran = "LUNAS";
       } else if (totalPembayaran > 0 && kurangBayar > 0) {
         statusPembayaran = "CICILAN";
@@ -568,7 +361,6 @@ export function ManifestPembayaranTable({
       const diskonPromo = members.reduce((sum, m) => sum + m.diskonPromo, 0);
       const potonganOngkir = members.reduce((sum, m) => sum + m.potonganOngkir, 0);
       const totalPotongan = members.reduce((sum, m) => sum + m.totalPotongan, 0);
-      const netTagihan = members.reduce((sum, m) => sum + m.netTagihan, 0);
 
       const uniqueKeterangan =
         Array.from(new Set(members.map((m) => m.keterangan).filter((k) => k && k !== "-"))).join(

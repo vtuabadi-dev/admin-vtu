@@ -65,6 +65,7 @@ import {
   setCachedReviewQueue,
   cachedReviewQueue,
   mergeSavedOrderItemsFromInvoices,
+  hasMaterializedRoomOrFullLedger,
   type InvoiceOrderItem,
 } from "./shared-constants";
 import { updateJamaahHotels, getMasterHotels, syncGroupBillingItems, createInvoice } from "@/server/actions/api";
@@ -698,8 +699,11 @@ function PaymentReviewTabContent() {
     setSelectedAnggota(memberNames);
     setMemberRoomTypes(initialRoomTypes);
 
-    // Otomatis isi rincian tagihan invoice dengan spesifikasi upgrade kamar yang dipilih saat pendaftaran
-    const initialOrderItems = syncRoomOrderItems(initialRoomTypes, [], payment);
+    // Otomatis isi rincian tagihan invoice dengan spesifikasi upgrade kamar hanya jika ledger belum termaterialisasi
+    const hasMaterializedLedger = hasMaterializedRoomOrFullLedger(payment.group?.invoices);
+    const initialOrderItems = hasMaterializedLedger
+      ? []
+      : syncRoomOrderItems(initialRoomTypes, [], payment);
 
     // Auto-detect existing Hotel Upgrade from manifest / anggota
     const pkgMekkah = payment.group?.keberangkatan?.hotelMekkah || "";
