@@ -15,6 +15,7 @@ import {
   Clock,
   Plus,
   Edit3,
+  FileEdit,
   Trash2,
   Settings2,
   Building,
@@ -76,7 +77,7 @@ export default function CreateInvoiceModal({
   onUpdatePotonganOptions?: (opts: string[]) => void;
 }) {
   const [kategori, setKategori] = useState<
-    "PEMBAYARAN" | "PINDAH_PAKET" | "TAMBAH_JAMAAH" | "PEMBATALAN" | "REFUND_MURNI"
+    "PEMBAYARAN" | "PEMBARUAN_INVOICE" | "PINDAH_PAKET" | "TAMBAH_JAMAAH" | "PEMBATALAN" | "REFUND_MURNI"
   >("PEMBAYARAN");
 
   // Sub-options
@@ -1146,12 +1147,14 @@ export default function CreateInvoiceModal({
       return;
     }
 
-    if (nominal <= 0) return;
+    const isRevisionMode = kategori === "PEMBARUAN_INVOICE";
+    if (!isRevisionMode && nominal <= 0) return;
     setLoading(true);
 
     let finalCatatan = catatan.trim();
     if (!finalCatatan) {
-      if (kategori === "PEMBAYARAN") finalCatatan = `Invoice pembayaran untuk group ${groupInfo.kodeRegistrasi}`;
+      if (isRevisionMode) finalCatatan = `Pembaruan rincian tagihan & potongan invoice group ${groupInfo.kodeRegistrasi} (tanpa pembayaran masuk)`;
+      else if (kategori === "PEMBAYARAN") finalCatatan = `Invoice pembayaran untuk group ${groupInfo.kodeRegistrasi}`;
       else if (kategori === "PEMBATALAN") finalCatatan = `Biaya pembatalan (${scopePembatalan === "SEBAGIAN" ? "Sebagian Jamaah" : "Seluruh Grup"} - ${refundStatus === "NON_REFUND" ? "Non-Refund / Biaya Hangus" : "Dengan Refund"}) untuk group ${groupInfo.kodeRegistrasi}`;
       else if (kategori === "REFUND_MURNI") finalCatatan = `Pengembalian dana (${refundType === "KELEBIHAN_BAYAR" ? "Kelebihan Bayar" : "Pengembalian Deposit"}) untuk group ${groupInfo.kodeRegistrasi}`;
     }
@@ -1171,26 +1174,24 @@ export default function CreateInvoiceModal({
     }
 
     try {
+      const effectiveNominal = isRevisionMode ? 0 : nominal;
       const res = await createInvoice({
         groupId: groupInfo.id,
         kategori,
         subKategori: resolvedSubKategori,
         scopePembatalan,
         refundStatus,
-        nominal,
+        nominal: effectiveNominal,
         jatuhTempo: jatuhTempo || undefined,
         catatan: finalCatatan,
         totalTagihan: calculatedTotalTagihan > 0 ? calculatedTotalTagihan : undefined,
-        items: billingItems.map((b) => ({
-          kategori: b.kategori,
-          deskripsi: b.nama,
-          qty: b.qty,
-          hargaSatuan: b.nominal,
-          jumlah: b.nominal * b.qty,
-        })),
+        items: mapBillingItemsToSyncPayload(billingItems),
       });
 
-      onSuccess(res.nomorInvoice || res.id, nominal);
+      onSuccess(
+        res.nomorInvoice || res.id,
+        isRevisionMode ? calculatedTotalTagihan : effectiveNominal
+      );
       broadcastMutation("invoices", "INSERT", { id: res.id, groupId: groupInfo.id });
       broadcastMutation("pembayaran", "UPDATE", { groupId: groupInfo.id });
       broadcastMutation("registration_groups", "UPDATE", { id: groupInfo.id });
@@ -1216,7 +1217,7 @@ export default function CreateInvoiceModal({
           <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
             PILIH KATEGORI / TUJUAN INVOICE
           </label>
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-1.5">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-1.5">
             <button
               type="button"
               onClick={() => setKategori("PEMBAYARAN")}
@@ -1229,6 +1230,20 @@ export default function CreateInvoiceModal({
             >
               <CreditCard className="h-4 w-4" />
               <span>Pembayaran</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setKategori("PEMBARUAN_INVOICE")}
+              className={cn(
+                "p-2 rounded-xl border text-center transition-all flex flex-col items-center justify-center gap-1 font-bold",
+                kategori === "PEMBARUAN_INVOICE"
+                  ? "bg-indigo-600 text-white border-indigo-600 shadow-sm"
+                  : "bg-stone-50 dark:bg-stone-900 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100"
+              )}
+            >
+              <FileEdit className="h-4 w-4" />
+              <span>Pembaruan Invoice</span>
             </button>
 
             <button
@@ -1392,7 +1407,7 @@ export default function CreateInvoiceModal({
 
           {lookupError && <p className="text-xs text-destructive font-medium">{lookupError}</p>}
 
-          {groupInfo && kategori !== "PEMBAYARAN" && (
+          {groupInfo && kategori !== "PEMBAYARAN" && kategori !== "PEMBARUAN_INVOICE" && (
             <div className="p-2.5 bg-background border border-amber-400/40 rounded-lg text-xs space-y-1">
               <p className="font-bold text-foreground">
                 Group: {groupInfo.namaGroup} <span className="font-mono text-amber-600">({groupInfo.kodeRegistrasi})</span>
@@ -1407,20 +1422,27 @@ export default function CreateInvoiceModal({
         {/* 2. DYNAMIC CATEGORY FORMS */}
         <div className="space-y-3 pt-1">
 
-          {/* DYNAMIC FORM FOR PEMBAYARAN */}
-          {kategori === "PEMBAYARAN" && !groupInfo && (
+          {/* DYNAMIC FORM FOR PEMBAYARAN & PEMBARUAN INVOICE */}
+          {(kategori === "PEMBAYARAN" || kategori === "PEMBARUAN_INVOICE") && !groupInfo && (
             <div className="p-8 text-center border border-dashed rounded-xl border-slate-300 dark:border-slate-700 bg-slate-50/50 dark:bg-stone-900/30 space-y-2">
-              <div className="w-12 h-12 rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mx-auto">
-                <CreditCard className="h-6 w-6" />
+              <div className={cn(
+                "w-12 h-12 rounded-full flex items-center justify-center mx-auto",
+                kategori === "PEMBARUAN_INVOICE"
+                  ? "bg-indigo-100 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400"
+                  : "bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400"
+              )}>
+                {kategori === "PEMBARUAN_INVOICE" ? <FileEdit className="h-6 w-6" /> : <CreditCard className="h-6 w-6" />}
               </div>
               <h3 className="font-bold text-sm text-foreground">Pilih Group Registrasi Jamaah</h3>
               <p className="text-xs text-muted-foreground max-w-md mx-auto">
-                Gunakan kolom pencarian 4 digit di atas atau klik salah satu rekomendasi grup pendaftaran aktif untuk memuat data sisa tagihan, rincian biaya paket, riwayat pembayaran, serta formulir pembayaran baru.
+                {kategori === "PEMBARUAN_INVOICE"
+                  ? "Gunakan kolom pencarian 4 digit di atas atau klik salah satu rekomendasi grup untuk mengubah rincian item tagihan/potongan dan menerbitkan pembaruan invoice tanpa pembayaran masuk."
+                  : "Gunakan kolom pencarian 4 digit di atas atau klik salah satu rekomendasi grup pendaftaran aktif untuk memuat data sisa tagihan, rincian biaya paket, riwayat pembayaran, serta formulir pembayaran baru."}
               </p>
             </div>
           )}
 
-          {kategori === "PEMBAYARAN" && groupInfo && financialSummary && (
+          {(kategori === "PEMBAYARAN" || kategori === "PEMBARUAN_INVOICE") && groupInfo && financialSummary && (
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
               {/* KOLOM KIRI: STATUS SISA TAGIHAN, RINCIAN BIAYA & RIWAYAT PEMBAYARAN */}
               <div className="lg:col-span-7 space-y-3.5">
@@ -1778,120 +1800,239 @@ export default function CreateInvoiceModal({
 
               </div>
 
-              {/* KOLOM KANAN: FORM PEMBAYARAN BARU YANG AKAN DIBAYARKAN */}
-              <div className="lg:col-span-5 p-4 bg-gradient-to-br from-emerald-500/5 via-background to-teal-500/5 border border-emerald-500/30 rounded-xl space-y-3.5 flex flex-col justify-between">
+              {/* KOLOM KANAN: FORM PEMBAYARAN BARU ATAU PEMBARUAN INVOICE */}
+              <div className={cn(
+                "lg:col-span-5 p-4 border rounded-xl space-y-3.5 flex flex-col justify-between bg-gradient-to-br via-background",
+                kategori === "PEMBARUAN_INVOICE"
+                  ? "from-indigo-500/5 to-blue-500/5 border-indigo-500/30"
+                  : "from-emerald-500/5 to-teal-500/5 border-emerald-500/30"
+              )}>
                 <div className="space-y-3">
-                  <div className="border-b border-emerald-500/20 pb-2">
-                    <h4 className="font-extrabold text-sm text-foreground flex items-center gap-1.5">
-                      <CreditCard className="h-4 w-4 text-emerald-600" />
-                      Kolom Pembayaran Baru
-                    </h4>
-                    <p className="text-[11px] text-muted-foreground mt-0.5">
-                      Tentukan nominal tagihan atau pembayaran yang akan dibayarkan oleh rombongan ini.
-                    </p>
-                  </div>
+                  {kategori === "PEMBARUAN_INVOICE" ? (
+                    <>
+                      <div className="border-b border-indigo-500/20 pb-2">
+                        <h4 className="font-extrabold text-sm text-foreground flex items-center gap-1.5">
+                          <FileEdit className="h-4 w-4 text-indigo-600" />
+                          Pembaruan Invoice (Tanpa Pembayaran)
+                        </h4>
+                        <p className="text-[11px] text-muted-foreground mt-0.5">
+                          Terbitkan revisi / pembaruan invoice atas perubahan item tagihan atau potongan tanpa adanya pembayaran yang masuk.
+                        </p>
+                      </div>
 
-                  {/* 1. NOMINAL DENGAN QUICK SHORTCUTS */}
-                  <div className="space-y-1.5">
-                    <label className="text-[11px] font-bold uppercase tracking-wider text-foreground block">
-                      Nominal Pembayaran Baru (Rp) <span className="text-red-500">*</span>
-                    </label>
+                      <div className="p-2.5 rounded-lg bg-indigo-500/10 border border-indigo-500/30 text-[11px] text-indigo-900 dark:text-indigo-200 space-y-1">
+                        <p className="font-bold">Mode Penyesuaian Tagihan (Rp 0 Dana Masuk)</p>
+                        <p className="text-[10.5px] opacity-90">
+                          Tidak ada transaksi pembayaran / pending review yang dibuat. Rincian item sebelah kiri akan disinkronkan ke Invoice & Manifest Pembayaran.
+                        </p>
+                      </div>
 
-                    {/* Quick Shortcuts */}
-                    <div className="flex flex-wrap gap-1">
-                      {financialSummary.sisaTagihan > 0 && (
-                        <button
-                          type="button"
-                          onClick={() => setNominal(financialSummary.sisaTagihan)}
-                          className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-100 hover:bg-emerald-200 text-emerald-800 dark:bg-emerald-950 dark:hover:bg-emerald-900 dark:text-emerald-300 transition-colors cursor-pointer"
-                        >
-                          Bayar Sisa: {formatCurrency(financialSummary.sisaTagihan)}
-                        </button>
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => setNominal(5000000 * financialSummary.basePax)}
-                        className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-800 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-300 transition-colors cursor-pointer"
-                      >
-                        DP: {formatCurrency(5000000 * financialSummary.basePax)}
-                      </button>
-                      {financialSummary.sisaTagihan > 10000000 && (
-                        <button
-                          type="button"
-                          onClick={() => setNominal(Math.round(financialSummary.sisaTagihan / 2))}
-                          className="text-[10px] font-bold px-2 py-0.5 rounded bg-blue-100 hover:bg-blue-200 text-blue-800 dark:bg-blue-950 dark:hover:bg-blue-900 dark:text-blue-300 transition-colors cursor-pointer"
-                        >
-                          50% Sisa: {formatCurrency(Math.round(financialSummary.sisaTagihan / 2))}
-                        </button>
-                      )}
-                    </div>
+                      <div className="p-3 rounded-lg bg-background border border-slate-200 dark:border-slate-800 space-y-2 text-xs">
+                        <div className="flex items-center justify-between">
+                          <span className="text-muted-foreground">Tagihan Utama + Tambahan:</span>
+                          <span className="font-mono font-semibold text-foreground">
+                            {formatCurrency(totalUtama + totalTambahan)}
+                          </span>
+                        </div>
+                        {totalPotongan > 0 && (
+                          <div className="flex items-center justify-between">
+                            <span className="text-muted-foreground">Total Potongan / Diskon:</span>
+                            <span className="font-mono font-semibold text-amber-600 dark:text-amber-400">
+                              - {formatCurrency(totalPotongan)}
+                            </span>
+                          </div>
+                        )}
+                        <div className="flex items-center justify-between pt-1.5 border-t border-slate-200 dark:border-slate-800">
+                          <span className="font-bold text-foreground">Total Tagihan Net Baru:</span>
+                          <span className="font-mono font-extrabold text-sm text-indigo-700 dark:text-indigo-300">
+                            {formatCurrency(calculatedTotalTagihan)}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-muted-foreground">Total Sudah Dibayar:</span>
+                          <span className="font-mono font-semibold text-emerald-700 dark:text-emerald-400">
+                            {formatCurrency(financialSummary.totalTerbayar)}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between pt-1 border-t border-dashed border-slate-200 dark:border-slate-800">
+                          <span className="font-bold text-foreground">Sisa Tagihan Terbaru:</span>
+                          <span className="font-mono font-extrabold text-rose-600 dark:text-rose-400">
+                            {formatCurrency(financialSummary.sisaTagihan)}
+                          </span>
+                        </div>
+                      </div>
 
-                    <CurrencyInput
-                      placeholder="Masukkan nominal angka"
-                      value={nominal}
-                      onChange={(val) => setNominal(val)}
-                      className="font-mono font-extrabold text-base border-emerald-400 focus:ring-emerald-500"
-                    />
+                      {/* Tanggal Jatuh Tempo */}
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between">
+                          <label className="text-[11px] font-bold uppercase tracking-wider text-foreground">
+                            Tanggal Jatuh Tempo
+                          </label>
+                          {h40Warning && (
+                            <span
+                              className={`text-[9.5px] font-bold px-1.5 py-0.5 rounded border ${
+                                h40Warning.isLate
+                                  ? "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300 border-red-300 dark:border-red-800 animate-pulse"
+                                  : "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800"
+                              }`}
+                            >
+                              {h40Warning.isLate ? "⚠️ ≤ H-40 Mepet" : "Standar H-40"}
+                            </span>
+                          )}
+                        </div>
+                        <Input
+                          type="date"
+                          value={jatuhTempo}
+                          onChange={(e) => setJatuhTempo(e.target.value)}
+                          className={`text-xs ${h40Warning?.isLate ? "border-red-500 font-bold bg-red-50/30" : ""}`}
+                        />
+                      </div>
 
-                    {/* Simulation Sisa Tagihan */}
-                    <div className="p-2 rounded-lg bg-emerald-100/40 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-[11px] flex items-center justify-between">
-                      <span className="text-muted-foreground">Sisa setelah pembayaran ini:</span>
-                      <span className="font-bold text-foreground">
-                        {formatCurrency(Math.max(0, financialSummary.sisaTagihan - nominal))}
-                      </span>
-                    </div>
-                  </div>
+                      {/* Catatan Perubahan Invoice */}
+                      <div className="space-y-1.5">
+                        <label className="text-[11px] font-bold uppercase tracking-wider text-foreground">
+                          Catatan Pembaruan Invoice
+                        </label>
+                        <div className="flex flex-wrap gap-1">
+                          {[
+                            "Penambahan item tagihan",
+                            "Pengurangan / pembatalan item",
+                            "Penyesuaian potongan / diskon",
+                            "Pembaruan invoice tanpa pembayaran",
+                          ].map((tpl) => (
+                            <button
+                              key={tpl}
+                              type="button"
+                              onClick={() => setCatatan(tpl)}
+                              className="text-[9.5px] font-semibold px-1.5 py-0.5 rounded border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                            >
+                              {tpl}
+                            </button>
+                          ))}
+                        </div>
+                        <Input
+                          placeholder="Contoh: Tambah Thoif / Hapus upgrade hotel / Diskon promo"
+                          value={catatan}
+                          onChange={(e) => setCatatan(e.target.value)}
+                          className="text-xs"
+                        />
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="border-b border-emerald-500/20 pb-2">
+                        <h4 className="font-extrabold text-sm text-foreground flex items-center gap-1.5">
+                          <CreditCard className="h-4 w-4 text-emerald-600" />
+                          Kolom Pembayaran Baru
+                        </h4>
+                        <p className="text-[11px] text-muted-foreground mt-0.5">
+                          Tentukan nominal tagihan atau pembayaran yang akan dibayarkan oleh rombongan ini.
+                        </p>
+                      </div>
 
-                  {/* 2. TANGGAL JATUH TEMPO */}
-                  <div className="space-y-1">
-                    <div className="flex items-center justify-between">
-                      <label className="text-[11px] font-bold uppercase tracking-wider text-foreground">
-                        Tanggal Jatuh Tempo
-                      </label>
-                      {h40Warning && (
-                        <span
-                          className={`text-[9.5px] font-bold px-1.5 py-0.5 rounded border ${
-                            h40Warning.isLate
-                              ? "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300 border-red-300 dark:border-red-800 animate-pulse"
-                              : "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800"
-                          }`}
-                        >
-                          {h40Warning.isLate ? "⚠️ ≤ H-40 Mepet" : "Standar H-40"}
-                        </span>
-                      )}
-                    </div>
-                    <Input
-                      type="date"
-                      value={jatuhTempo}
-                      onChange={(e) => setJatuhTempo(e.target.value)}
-                      className={`text-xs ${h40Warning?.isLate ? "border-red-500 font-bold bg-red-50/30" : ""}`}
-                    />
-                  </div>
+                      {/* 1. NOMINAL DENGAN QUICK SHORTCUTS */}
+                      <div className="space-y-1.5">
+                        <label className="text-[11px] font-bold uppercase tracking-wider text-foreground block">
+                          Nominal Pembayaran Baru (Rp) <span className="text-red-500">*</span>
+                        </label>
 
-                  {/* 3. CATATAN / RINCIAN TAGIHAN */}
-                  <div className="space-y-1.5">
-                    <label className="text-[11px] font-bold uppercase tracking-wider text-foreground">
-                      Catatan / Rincian Tagihan Invoice
-                    </label>
-                    <div className="flex flex-wrap gap-1">
-                      {["DP Pembayaran Pendaftaran", "Cicilan Tahap 1", "Cicilan Tahap 2", "Pelunasan Sisa Biaya"].map((tpl) => (
-                        <button
-                          key={tpl}
-                          type="button"
-                          onClick={() => setCatatan(tpl)}
-                          className="text-[9.5px] font-semibold px-1.5 py-0.5 rounded border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
-                        >
-                          {tpl}
-                        </button>
-                      ))}
-                    </div>
-                    <Input
-                      placeholder="Contoh: Cicilan tahap 1 atau pelunasan"
-                      value={catatan}
-                      onChange={(e) => setCatatan(e.target.value)}
-                      className="text-xs"
-                    />
-                  </div>
+                        {/* Quick Shortcuts */}
+                        <div className="flex flex-wrap gap-1">
+                          {financialSummary.sisaTagihan > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => setNominal(financialSummary.sisaTagihan)}
+                              className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-100 hover:bg-emerald-200 text-emerald-800 dark:bg-emerald-950 dark:hover:bg-emerald-900 dark:text-emerald-300 transition-colors cursor-pointer"
+                            >
+                              Bayar Sisa: {formatCurrency(financialSummary.sisaTagihan)}
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => setNominal(5000000 * financialSummary.basePax)}
+                            className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-800 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-300 transition-colors cursor-pointer"
+                          >
+                            DP: {formatCurrency(5000000 * financialSummary.basePax)}
+                          </button>
+                          {financialSummary.sisaTagihan > 10000000 && (
+                            <button
+                              type="button"
+                              onClick={() => setNominal(Math.round(financialSummary.sisaTagihan / 2))}
+                              className="text-[10px] font-bold px-2 py-0.5 rounded bg-blue-100 hover:bg-blue-200 text-blue-800 dark:bg-blue-950 dark:hover:bg-blue-900 dark:text-blue-300 transition-colors cursor-pointer"
+                            >
+                              50% Sisa: {formatCurrency(Math.round(financialSummary.sisaTagihan / 2))}
+                            </button>
+                          )}
+                        </div>
+
+                        <CurrencyInput
+                          placeholder="Masukkan nominal angka"
+                          value={nominal}
+                          onChange={(val) => setNominal(val)}
+                          className="font-mono font-extrabold text-base border-emerald-400 focus:ring-emerald-500"
+                        />
+
+                        {/* Simulation Sisa Tagihan */}
+                        <div className="p-2 rounded-lg bg-emerald-100/40 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-[11px] flex items-center justify-between">
+                          <span className="text-muted-foreground">Sisa setelah pembayaran ini:</span>
+                          <span className="font-bold text-foreground">
+                            {formatCurrency(Math.max(0, financialSummary.sisaTagihan - nominal))}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* 2. TANGGAL JATUH TEMPO */}
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between">
+                          <label className="text-[11px] font-bold uppercase tracking-wider text-foreground">
+                            Tanggal Jatuh Tempo
+                          </label>
+                          {h40Warning && (
+                            <span
+                              className={`text-[9.5px] font-bold px-1.5 py-0.5 rounded border ${
+                                h40Warning.isLate
+                                  ? "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300 border-red-300 dark:border-red-800 animate-pulse"
+                                  : "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800"
+                              }`}
+                            >
+                              {h40Warning.isLate ? "⚠️ ≤ H-40 Mepet" : "Standar H-40"}
+                            </span>
+                          )}
+                        </div>
+                        <Input
+                          type="date"
+                          value={jatuhTempo}
+                          onChange={(e) => setJatuhTempo(e.target.value)}
+                          className={`text-xs ${h40Warning?.isLate ? "border-red-500 font-bold bg-red-50/30" : ""}`}
+                        />
+                      </div>
+
+                      {/* 3. CATATAN / RINCIAN TAGIHAN */}
+                      <div className="space-y-1.5">
+                        <label className="text-[11px] font-bold uppercase tracking-wider text-foreground">
+                          Catatan / Rincian Tagihan Invoice
+                        </label>
+                        <div className="flex flex-wrap gap-1">
+                          {["DP Pembayaran Pendaftaran", "Cicilan Tahap 1", "Cicilan Tahap 2", "Pelunasan Sisa Biaya"].map((tpl) => (
+                            <button
+                              key={tpl}
+                              type="button"
+                              onClick={() => setCatatan(tpl)}
+                              className="text-[9.5px] font-semibold px-1.5 py-0.5 rounded border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                            >
+                              {tpl}
+                            </button>
+                          ))}
+                        </div>
+                        <Input
+                          placeholder="Contoh: Cicilan tahap 1 atau pelunasan"
+                          value={catatan}
+                          onChange={(e) => setCatatan(e.target.value)}
+                          className="text-xs"
+                        />
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
             </div>
@@ -2535,15 +2676,28 @@ export default function CreateInvoiceModal({
 
         {/* FOOTER ACTIONS */}
         <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-3 border-t sticky bottom-0 bg-background/95 backdrop-blur-xs z-20 mt-2 pb-1">
-          {kategori === "PEMBAYARAN" && groupInfo && financialSummary ? (
+          {(kategori === "PEMBAYARAN" || kategori === "PEMBARUAN_INVOICE") && groupInfo && financialSummary ? (
             <div className="text-xs text-muted-foreground hidden sm:flex items-center gap-3">
-              <span>
-                Sisa Tagihan: <strong className="text-foreground">{formatCurrency(financialSummary.sisaTagihan)}</strong>
-              </span>
-              {nominal > 0 && (
-                <span className="flex items-center gap-1 font-semibold text-emerald-600 dark:text-emerald-400">
-                  &rarr; Sisa Baru: {formatCurrency(Math.max(0, financialSummary.sisaTagihan - nominal))}
-                </span>
+              {kategori === "PEMBARUAN_INVOICE" ? (
+                <>
+                  <span>
+                    Total Tagihan Net: <strong className="text-indigo-700 dark:text-indigo-300">{formatCurrency(calculatedTotalTagihan)}</strong>
+                  </span>
+                  <span>
+                    Sisa: <strong className="text-foreground">{formatCurrency(financialSummary.sisaTagihan)}</strong>
+                  </span>
+                </>
+              ) : (
+                <>
+                  <span>
+                    Sisa Tagihan: <strong className="text-foreground">{formatCurrency(financialSummary.sisaTagihan)}</strong>
+                  </span>
+                  {nominal > 0 && (
+                    <span className="flex items-center gap-1 font-semibold text-emerald-600 dark:text-emerald-400">
+                      &rarr; Sisa Baru: {formatCurrency(Math.max(0, financialSummary.sisaTagihan - nominal))}
+                    </span>
+                  )}
+                </>
               )}
             </div>
           ) : (
@@ -2565,7 +2719,9 @@ export default function CreateInvoiceModal({
                     (pricingOption === "HARGA_BARU" && totalDiff < 0)
                   : kategori === "TAMBAH_JAMAAH"
                     ? tambahJamaahList.some((j) => !j.nama.trim())
-                    : nominal <= 0)
+                    : kategori === "PEMBARUAN_INVOICE"
+                      ? false
+                      : nominal <= 0)
               }
               className={cn(
                 "font-bold text-white",
@@ -2577,7 +2733,9 @@ export default function CreateInvoiceModal({
                       ? "bg-blue-600 hover:bg-blue-700"
                       : kategori === "TAMBAH_JAMAAH"
                         ? "bg-purple-600 hover:bg-purple-700"
-                        : "bg-emerald-600 hover:bg-emerald-700"
+                        : kategori === "PEMBARUAN_INVOICE"
+                          ? "bg-indigo-600 hover:bg-indigo-700"
+                          : "bg-emerald-600 hover:bg-emerald-700"
               )}
             >
               {loading
@@ -2592,7 +2750,9 @@ export default function CreateInvoiceModal({
                       ? "Terbitkan Credit Note Pembatalan"
                       : kategori === "REFUND_MURNI"
                         ? "Terbitkan Bukti Refund"
-                        : `Terbitkan Invoice (${formatCurrency(nominal)})`}
+                        : kategori === "PEMBARUAN_INVOICE"
+                          ? "Terbitkan Pembaruan Invoice"
+                          : `Terbitkan Invoice (${formatCurrency(nominal)})`}
             </Button>
           </div>
         </div>

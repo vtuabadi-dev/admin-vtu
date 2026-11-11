@@ -1,6 +1,6 @@
 "use client";
 
-import type { InvoiceOrderItem } from "@/shared/lib/invoice-pdf";
+import type { InvoiceOrderItem, InvoicePaymentRecord, InvoicePdfData } from "@/shared/lib/invoice-pdf";
 import type {
   GroupPaymentSummary,
   Pembayaran,
@@ -429,5 +429,125 @@ export function calculateBillingItemsNetTotal(items: BillingItem[]): number {
   }, 0);
 }
 
+export function buildInvoicePdfDataForGroup(params: {
+  group: any;
+  billingItems: BillingItem[];
+  invoiceNumber: string;
+  invoiceDate?: string;
+  jatuhTempo?: string | Date;
+  catatan?: string;
+  nominalPembayaran?: number;
+}): InvoicePdfData {
+  const { group, billingItems, invoiceNumber, invoiceDate, jatuhTempo, catatan, nominalPembayaran } = params;
+  const paxCount = Math.max(
+    1,
+    group?.jumlahAnggota || group?.anggota?.length || group?.anggotaIds?.length || 1
+  );
+  const pkg = group?.keberangkatan || group?.paketKeberangkatan;
+  const pkgCfg = resolvePackageBillingConfig({
+    activePackage: pkg,
+    group,
+    member: group?.anggota?.[0],
+  });
+
+  const utamaItems = billingItems.filter((i) => i.kategori === "utama");
+  const totalUtama = utamaItems.reduce((s, i) => s + (i.nominal || 0) * Math.max(1, i.qty || 1), 0);
+  const hargaSatuanPaket =
+    utamaItems.length > 0 && utamaItems[0]
+      ? utamaItems[0].nominal || Math.round(totalUtama / paxCount)
+      : pkgCfg.hargaBase;
+
+  const baseTotal = totalUtama > 0 ? totalUtama : hargaSatuanPaket * paxCount;
+  const totalBebanTambahan = billingItems
+    .filter((i) => i.kategori === "tambahan")
+    .reduce((s, i) => s + (i.nominal || 0) * Math.max(1, i.qty || 1), 0);
+  const totalPengurangan = billingItems
+    .filter((i) => i.kategori === "potongan")
+    .reduce((s, i) => s + (i.nominal || 0) * Math.max(1, i.qty || 1), 0);
+  const netTotal = Math.max(0, baseTotal + totalBebanTambahan - totalPengurangan);
+
+  const verifiedPayments = (group?.pembayaran || []).filter((p: any) => p.status === "verified");
+  const totalPembayaran =
+    verifiedPayments.length > 0
+      ? verifiedPayments.reduce((s: number, p: any) => s + Number(p.jumlah || 0), 0)
+      : Number(group?.totalPembayaran || 0);
+  const sisaTagihan = Math.max(0, netTotal - totalPembayaran);
+
+  const orderItems: InvoiceOrderItem[] = billingItems
+    .filter((i) => i.kategori !== "utama")
+    .map((i) => ({
+      id: i.id,
+      kategori: i.kategori,
+      nama: i.nama,
+      tipe: i.kategori === "potongan" ? "pengurangan" : "penambahan",
+      nominal: (i.nominal || 0) * Math.max(1, i.qty || 1),
+      qty: Math.max(1, i.qty || 1),
+      hargaSatuan: i.nominal || 0,
+      satuan: i.satuan || "Pax",
+      allocatedJamaah: i.allocatedJamaah,
+      hotelMekkah: i.hotelMekkah,
+      hotelMadinah: i.hotelMadinah,
+    }));
+
+  const paymentHistory: InvoicePaymentRecord[] = verifiedPayments.map((p: any) => ({
+    tanggal: p.tanggal
+      ? new Date(p.tanggal).toLocaleDateString("id-ID", {
+          day: "2-digit",
+          month: "2-digit",
+          year: "numeric",
+        })
+      : "-",
+    metode: (p.metode || "transfer").toUpperCase(),
+    nominal: Number(p.jumlah || 0),
+  }));
+
+  const memberNames = (group?.anggota || [])
+    .map((a: any) => a?.namaLengkap)
+    .filter(Boolean);
+
+  return {
+    invoiceNumber,
+    invoiceDate:
+      invoiceDate ||
+      new Date().toLocaleDateString("id-ID", { day: "2-digit", month: "long", year: "numeric" }),
+    kodeRegistrasi: group?.kodeRegistrasi || "-",
+    namaGroup: group?.namaGroup || "Rombongan Jamaah",
+    picName: group?.ketuaGroup?.namaLengkap || group?.kontakNama || group?.namaGroup,
+    picPhone: group?.ketuaGroup?.telepon || group?.kontakHp || group?.anggota?.[0]?.nomorTelepon,
+    telepon: group?.ketuaGroup?.telepon || group?.kontakHp || group?.anggota?.[0]?.nomorTelepon,
+    namaPaket: pkg?.namaPaket || "Paket Umroh",
+    jumlahPax: paxCount,
+    hargaSatuanPaket,
+    tanggalBerangkat: pkg?.tanggalBerangkat
+      ? new Date(pkg.tanggalBerangkat).toLocaleDateString("id-ID", {
+          day: "2-digit",
+          month: "long",
+          year: "numeric",
+        })
+      : undefined,
+    hotelMekkah: group?.anggota?.[0]?.hotelMekkah || pkgCfg.hotelMekkah || pkg?.hotelMekkah,
+    hotelMadinah: group?.anggota?.[0]?.hotelMadinah || pkgCfg.hotelMadinah || pkg?.hotelMadinah,
+    anggota: memberNames,
+    orderItems,
+    paymentHistory,
+    totalTagihan: netTotal,
+    totalBebanTambahan,
+    totalPengurangan,
+    totalTagihanDisesuaikan: netTotal,
+    totalPembayaran,
+    sisaTagihan,
+    nominal: nominalPembayaran ?? 0,
+    maksimalPelunasan: jatuhTempo
+      ? new Date(jatuhTempo).toLocaleDateString("id-ID", {
+          day: "2-digit",
+          month: "long",
+          year: "numeric",
+        })
+      : undefined,
+    dueDate: jatuhTempo ? new Date(jatuhTempo).toISOString() : undefined,
+    catatan,
+  };
+}
+
 // Re-export types for convenience
-export type { InvoiceOrderItem, GroupPaymentSummary, Pembayaran, MetodePembayaran, InvoiceSplitConfig, InvoiceSplitItem };
+export type { InvoiceOrderItem, InvoicePaymentRecord, InvoicePdfData, GroupPaymentSummary, Pembayaran, MetodePembayaran, InvoiceSplitConfig, InvoiceSplitItem };

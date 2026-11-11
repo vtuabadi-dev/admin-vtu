@@ -176,26 +176,22 @@ export function isHotelUpgradeItem(name?: string | null): boolean {
   return lower.includes("upgrade hotel") || lower.includes("hotel");
 }
 
-export function shouldSkipNonBillingInvoiceItem(it?: CanonicalBillingItemLike | null): boolean {
-  if (!it || it.status === "cancelled") return true;
-  const katLower = (it.kategori || "").toLowerCase();
-  const descLower = (it.deskripsi || it.nama || "").toLowerCase();
-  return (
-    katLower.includes("pembayaran invoice") ||
-    katLower.includes("angsuran") ||
-    /penambahan\s+\d+\s+pax\s+jamaah/i.test(descLower)
-  );
-}
-
 function isLedgerMarkerInvoiceItem(it?: CanonicalBillingItemLike | null): boolean {
   if (!it) return false;
   const katLower = (it.kategori || "").toLowerCase();
   const descLower = (it.deskripsi || it.nama || "").toLowerCase();
   return (
     katLower.includes("pembayaran invoice") ||
+    katLower.includes("pembaruan invoice") ||
+    katLower.includes("revisi invoice") ||
     katLower.includes("angsuran") ||
     /penambahan\s+\d+\s+pax\s+jamaah/i.test(descLower)
   );
+}
+
+export function shouldSkipNonBillingInvoiceItem(it?: CanonicalBillingItemLike | null): boolean {
+  if (!it || it.status === "cancelled") return true;
+  return isLedgerMarkerInvoiceItem(it);
 }
 
 export function isDeductionItem(it: CanonicalBillingItemLike): boolean {

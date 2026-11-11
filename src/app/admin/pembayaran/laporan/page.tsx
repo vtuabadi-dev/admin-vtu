@@ -15,6 +15,9 @@ import {
   PlusCircle,
   Settings2,
   Edit3,
+  FileEdit,
+  FileText,
+  Download,
   Trash2,
   Building,
   Users,
@@ -36,6 +39,7 @@ import {
   updateJamaahHotels,
   getMasterHotels,
   syncGroupBillingItems,
+  createInvoice,
 } from "@/server/actions/api";
 import type {
   GroupPaymentSummary,
@@ -65,9 +69,16 @@ import {
   mapBillingItemsToSyncPayload,
   calculateBillingItemsNetTotal,
   hasMaterializedRoomOrFullLedger,
+  buildInvoicePdfDataForGroup,
+  type InvoicePdfData,
 } from "./_components/shared-constants";
 import MasterBillingOptionsModal from "./_components/MasterBillingOptionsModal";
 import { broadcastMutation, subscribeRealtime, type RealtimeEventPayload } from "@/shared/lib/realtime-bus";
+
+async function triggerDownloadInvoicePdf(payload: InvoicePdfData, filename?: string) {
+  const { downloadInvoicePdf } = await import("@/shared/lib/invoice-pdf");
+  downloadInvoicePdf(payload, filename);
+}
 
 // Lazy-loaded components for fast initial bundle & load
 const PaymentReviewTab = dynamic(
@@ -122,10 +133,16 @@ const SplitInvoiceModal = dynamic(
   const [showSplitModal, setShowSplitModal] = useState(false);
 
   // Form
+  const [formMode, setFormMode] = useState<"pembayaran" | "pembaruan">("pembayaran");
   const [nominal, setNominal] = useState(0);
   const [metode, setMetode] = useState<MetodePembayaran>("transfer");
   const [catatan, setCatatan] = useState("");
   const [submitting, setSubmitting] = useState(false);
+
+  // Pembaruan Invoice (tanpa pembayaran masuk)
+  const [revisionCatatan, setRevisionCatatan] = useState("");
+  const [revisionJatuhTempo, setRevisionJatuhTempo] = useState("");
+  const [submittingRevision, setSubmittingRevision] = useState(false);
 
   // WA Transfer Slip Drag & Drop / Paste state
   const [waTransferPreview, setWaTransferPreview] = useState<string | null>(null);
@@ -336,7 +353,12 @@ const SplitInvoiceModal = dynamic(
 
   // Success modal
   const [showSuccess, setShowSuccess] = useState(false);
-  const [successData, setSuccessData] = useState<{ invoiceNumber: string; amount: number } | null>(null);
+  const [successData, setSuccessData] = useState<{
+    invoiceNumber: string;
+    amount: number;
+    mode?: "pembayaran" | "pembaruan";
+    pdfPayload?: InvoicePdfData;
+  } | null>(null);
 
   // Active split item
   const activeSplit = splitConfig?.splits.find((s) => s.id === activeSplitId) ?? null;
@@ -409,6 +431,36 @@ const SplitInvoiceModal = dynamic(
     const dibayar = groupData?.totalPembayaran || 0;
     return calculatedTotalTagihan - dibayar;
   }, [calculatedTotalTagihan, groupData?.totalPembayaran]);
+
+  const officialInvoices = useMemo(() => {
+    return (groupData?.invoices || []).filter(
+      (inv) => inv && inv.status !== "cancelled" && !String(inv.id).startsWith("BILL-")
+    );
+  }, [groupData?.invoices]);
+
+  // Seed default jatuh tempo for Pembaruan Invoice when a group is loaded
+  useEffect(() => {
+    if (!groupData) {
+      setRevisionJatuhTempo("");
+      return;
+    }
+    const existingDue = officialInvoices[0]?.jatuhTempo || groupData.invoices?.[0]?.jatuhTempo;
+    if (existingDue) {
+      const parsed = new Date(existingDue);
+      if (!Number.isNaN(parsed.getTime())) {
+        setRevisionJatuhTempo(parsed.toISOString().split("T")[0]!);
+        return;
+      }
+    }
+    if (groupData.keberangkatan?.tanggalBerangkat) {
+      const h40 = new Date(groupData.keberangkatan.tanggalBerangkat);
+      h40.setDate(h40.getDate() - 40);
+      setRevisionJatuhTempo(h40.toISOString().split("T")[0]!);
+    } else {
+      const def = new Date(Date.now() + 14 * 86400000);
+      setRevisionJatuhTempo(def.toISOString().split("T")[0]!);
+    }
+  }, [groupData?.groupId, groupData?.keberangkatan?.tanggalBerangkat, officialInvoices]);
 
   async function persistBillingItemsToDb(nextItems: BillingItem[]) {
     const targetGroupId = groupData?.groupId || (groupData as any)?.id;
@@ -885,7 +937,19 @@ const SplitInvoiceModal = dynamic(
 
       const invoiceNumber = `INV-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${String(Math.floor(Math.random() * 9000) + 1000)}`;
 
-      setSuccessData({ invoiceNumber, amount: nominal });
+      // Refresh
+      const summary = await getGroupPaymentSummary(groupData.groupId);
+      setGroupData(summary ?? null);
+
+      const pdfPayload = buildInvoicePdfDataForGroup({
+        group: summary ?? groupData,
+        billingItems: adjustedBillingItems,
+        invoiceNumber,
+        nominalPembayaran: nominal,
+        catatan: catatan || undefined,
+      });
+
+      setSuccessData({ invoiceNumber, amount: nominal, mode: "pembayaran", pdfPayload });
       setShowSuccess(true);
 
       // Reset form
@@ -895,9 +959,6 @@ const SplitInvoiceModal = dynamic(
       setWaTransferPreview(null);
       setWaTransferFile(null);
 
-      // Refresh
-      const summary = await getGroupPaymentSummary(groupData.groupId);
-      setGroupData(summary ?? null);
       broadcastMutation("pembayaran", "INSERT", { groupId: groupData.groupId });
       broadcastMutation("registration_groups", "UPDATE", { id: groupData.groupId });
       broadcastMutation("manifest", "UPDATE", { groupId: groupData.groupId });
@@ -906,6 +967,64 @@ const SplitInvoiceModal = dynamic(
       // silently fail
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function handleSubmitInvoiceRevision() {
+    if (!groupData) return;
+
+    setSubmittingRevision(true);
+    try {
+      const targetGroupId = groupData.groupId || (groupData as any).id;
+      const snapshotItems = adjustedBillingItems;
+      const finalCatatan =
+        revisionCatatan.trim() ||
+        `Pembaruan rincian tagihan & potongan invoice tanpa pembayaran masuk`;
+
+      const created = await createInvoice({
+        groupId: targetGroupId,
+        kategori: "PEMBARUAN_INVOICE",
+        subKategori: "tambahan",
+        nominal: 0,
+        jatuhTempo: revisionJatuhTempo || undefined,
+        catatan: finalCatatan,
+        totalTagihan: calculatedTotalTagihan,
+        items: mapBillingItemsToSyncPayload(snapshotItems),
+      });
+
+      const summary = await getGroupPaymentSummary(targetGroupId);
+      setGroupData(summary ?? null);
+
+      const invoiceNumber = created.nomorInvoice || created.id;
+      const pdfPayload = buildInvoicePdfDataForGroup({
+        group: summary ?? groupData,
+        billingItems: snapshotItems,
+        invoiceNumber,
+        jatuhTempo: revisionJatuhTempo || created.jatuhTempo,
+        catatan: finalCatatan,
+        nominalPembayaran: 0,
+      });
+
+      setSuccessData({
+        invoiceNumber,
+        amount: calculatedTotalTagihan,
+        mode: "pembaruan",
+        pdfPayload,
+      });
+      setShowSuccess(true);
+      setRevisionCatatan("");
+
+      broadcastMutation("invoices", "INSERT", { id: created.id, groupId: targetGroupId });
+      broadcastMutation("registration_groups", "UPDATE", { id: targetGroupId });
+      broadcastMutation("jamaah", "UPDATE", { groupId: targetGroupId });
+      broadcastMutation("manifest", "UPDATE", { groupId: targetGroupId });
+      broadcastMutation("manifest_rows", "UPDATE", { groupId: targetGroupId });
+      broadcastMutation("pembayaran", "UPDATE", { groupId: targetGroupId });
+    } catch (err) {
+      console.error("Failed to issue invoice revision:", err);
+      alert("Gagal menyimpan pembaruan invoice. Silakan coba lagi.");
+    } finally {
+      setSubmittingRevision(false);
     }
   }
 
@@ -1290,22 +1409,262 @@ const SplitInvoiceModal = dynamic(
                         </tbody>
                       </table>
                     )}
+
+                    {/* Riwayat Invoice Terbit / Pembaruan Invoice */}
+                    {officialInvoices.length > 0 && (
+                      <div className="mt-5 pt-4 border-t space-y-2.5">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                            <FileText className="h-3.5 w-3.5 text-indigo-500" />
+                            Riwayat Invoice Terbit ({officialInvoices.length})
+                          </span>
+                          <span className="text-[10px] text-muted-foreground">
+                            Termasuk pembaruan tanpa pembayaran
+                          </span>
+                        </div>
+                        <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+                          {officialInvoices.map((inv) => {
+                            const isRevisionInv = inv.nomorInvoice.startsWith("INV-UPD");
+                            return (
+                              <div
+                                key={inv.id}
+                                className="flex items-center justify-between gap-2 p-2.5 rounded-lg border bg-stone-50/60 dark:bg-stone-900/40 text-xs"
+                              >
+                                <div className="min-w-0 space-y-0.5">
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <span className="font-mono font-bold text-foreground">
+                                      {inv.nomorInvoice}
+                                    </span>
+                                    <span
+                                      className={`text-[9.5px] font-bold px-1.5 py-0.5 rounded uppercase ${
+                                        isRevisionInv
+                                          ? "bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300"
+                                          : "bg-stone-200 text-stone-700 dark:bg-stone-800 dark:text-stone-300"
+                                      }`}
+                                    >
+                                      {isRevisionInv ? "Pembaruan" : inv.tipe}
+                                    </span>
+                                    <StatusBadge status={inv.status} />
+                                  </div>
+                                  <p className="text-[10.5px] text-muted-foreground">
+                                    Jatuh tempo: {formatDate(inv.jatuhTempo)} &middot; Sisa: {formatCurrency(inv.sisaTagihan)}
+                                  </p>
+                                </div>
+                                <div className="flex items-center gap-2 shrink-0">
+                                  <span className="font-mono font-bold text-foreground tabular-nums">
+                                    {formatCurrency(inv.jumlah)}
+                                  </span>
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-7 px-2 text-[11px]"
+                                    onClick={() => {
+                                      const pdfPayload = buildInvoicePdfDataForGroup({
+                                        group: groupData,
+                                        billingItems: adjustedBillingItems,
+                                        invoiceNumber: inv.nomorInvoice,
+                                        jatuhTempo: inv.jatuhTempo,
+                                        nominalPembayaran: 0,
+                                      });
+                                      void triggerDownloadInvoicePdf(pdfPayload);
+                                    }}
+                                    title="Download PDF Invoice"
+                                  >
+                                    <Download className="h-3.5 w-3.5 mr-1" />
+                                    PDF
+                                  </Button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               </div>
 
-              {/* RIGHT: Payment Form */}
+              {/* RIGHT: Payment Form or Invoice Revision Form */}
               <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-sm">
-                      <CreditCard className="h-4 w-4" />
-                      {activeSplit
-                        ? `Form Pembayaran â€” ${activeSplit.label}`
-                        : "Form Pembayaran Baru"}
-                    </CardTitle>
+                  <CardHeader className="space-y-3 pb-3">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <CardTitle className="flex items-center gap-2 text-sm">
+                        {formMode === "pembaruan" ? (
+                          <FileEdit className="h-4 w-4 text-indigo-500" />
+                        ) : (
+                          <CreditCard className="h-4 w-4" />
+                        )}
+                        {formMode === "pembaruan"
+                          ? activeSplit
+                            ? `Pembaruan Invoice — ${activeSplit.label}`
+                            : "Pembaruan Invoice Group"
+                          : activeSplit
+                            ? `Form Pembayaran — ${activeSplit.label}`
+                            : "Form Pembayaran Baru"}
+                      </CardTitle>
+                    </div>
+
+                    {/* Action Mode Switcher */}
+                    <div className="grid grid-cols-2 gap-1.5 p-1 rounded-lg bg-stone-100 dark:bg-stone-900 border border-stone-200 dark:border-stone-800">
+                      <button
+                        type="button"
+                        onClick={() => setFormMode("pembayaran")}
+                        className={`flex items-center justify-center gap-1.5 py-1.5 px-2.5 rounded-md text-xs font-bold transition-all cursor-pointer ${
+                          formMode === "pembayaran"
+                            ? "bg-background text-foreground shadow-xs border border-stone-200/80 dark:border-stone-700"
+                            : "text-muted-foreground hover:text-foreground"
+                        }`}
+                      >
+                        <CreditCard className="h-3.5 w-3.5" />
+                        Input Pembayaran
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setFormMode("pembaruan")}
+                        className={`flex items-center justify-center gap-1.5 py-1.5 px-2.5 rounded-md text-xs font-bold transition-all cursor-pointer ${
+                          formMode === "pembaruan"
+                            ? "bg-indigo-600 text-white shadow-xs"
+                            : "text-muted-foreground hover:text-foreground"
+                        }`}
+                      >
+                        <FileEdit className="h-3.5 w-3.5" />
+                        Pembaruan Invoice
+                      </button>
+                    </div>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    {/* Drag & Drop Bukti Transfer WA (Sebelum Nominal Pembayaran) */}
+                    {formMode === "pembaruan" ? (
+                      <>
+                        <div className="p-3 rounded-lg bg-indigo-500/10 border border-indigo-500/30 text-xs space-y-1">
+                          <p className="font-bold text-indigo-700 dark:text-indigo-300 flex items-center gap-1.5">
+                            <FileEdit className="h-3.5 w-3.5" />
+                            Pembaruan Tagihan Tanpa Pembayaran Masuk (Rp 0)
+                          </p>
+                          <p className="text-[11px] text-muted-foreground leading-relaxed">
+                            Gunakan fitur ini saat ada penambahan, perubahan, atau pengurangan item tagihan / potongan di sebelah kiri tanpa ada dana pembayaran yang masuk. Tidak ada antrean tinjauan pembayaran palsu yang dibuat.
+                          </p>
+                        </div>
+
+                        {/* Ringkasan Tagihan Terkini */}
+                        <div className="p-3 rounded-lg border bg-stone-50/70 dark:bg-stone-900/50 space-y-2 text-xs">
+                          <div className="flex items-center justify-between">
+                            <span className="text-muted-foreground">Total Tagihan Utama & Tambahan</span>
+                            <span className="font-mono font-semibold tabular-nums">
+                              {formatCurrency(calculatedTotalTagihan + totalPotongan)}
+                            </span>
+                          </div>
+                          {totalPotongan > 0 && (
+                            <div className="flex items-center justify-between">
+                              <span className="text-muted-foreground">Total Potongan / Diskon</span>
+                              <span className="font-mono font-semibold text-amber-600 dark:text-amber-400 tabular-nums">
+                                - {formatCurrency(totalPotongan)}
+                              </span>
+                            </div>
+                          )}
+                          <div className="flex items-center justify-between pt-2 border-t">
+                            <span className="font-bold text-foreground">Total Tagihan Akhir (Net)</span>
+                            <span className="font-mono font-extrabold text-sm text-indigo-700 dark:text-indigo-300 tabular-nums">
+                              {formatCurrency(calculatedTotalTagihan)}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-muted-foreground">Total Sudah Dibayar</span>
+                            <span className="font-mono font-semibold text-emerald-700 dark:text-emerald-400 tabular-nums">
+                              {formatCurrency(groupData.totalPembayaran || 0)}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between pt-1.5 border-t border-dashed">
+                            <span className="font-bold text-foreground">Sisa Tagihan Terbaru</span>
+                            <span className="font-mono font-extrabold text-destructive tabular-nums">
+                              {formatCurrency(Math.max(0, calculatedSisaPembayaran))}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Preview Ringkas Item yang Akan Tercatat */}
+                        <div className="space-y-1.5">
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="font-semibold text-foreground">
+                              Item Rincian yang Diterbitkan ({adjustedBillingItems.length})
+                            </span>
+                            <span className="text-[10.5px] text-muted-foreground">
+                              Sinkron dengan Manifest
+                            </span>
+                          </div>
+                          <div className="max-h-36 overflow-y-auto rounded-md border divide-y text-xs bg-background">
+                            {adjustedBillingItems.map((it) => {
+                              const lineTotal = (it.nominal || 0) * Math.max(1, it.qty || 1);
+                              return (
+                                <div key={it.id} className="px-2.5 py-1.5 flex items-center justify-between gap-2">
+                                  <span className="truncate text-foreground">
+                                    {it.nama} <span className="text-muted-foreground">({it.qty} {it.satuan || "Pax"})</span>
+                                  </span>
+                                  <span
+                                    className={`font-mono font-semibold shrink-0 tabular-nums ${
+                                      it.kategori === "potongan" ? "text-amber-600 dark:text-amber-400" : "text-foreground"
+                                    }`}
+                                  >
+                                    {it.kategori === "potongan" ? `- ${formatCurrency(lineTotal)}` : formatCurrency(lineTotal)}
+                                  </span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+
+                        {/* Tanggal Jatuh Tempo */}
+                        <div>
+                          <label className="text-xs font-semibold uppercase tracking-wider text-foreground block mb-1">
+                            Tanggal Jatuh Tempo Invoice
+                          </label>
+                          <Input
+                            type="date"
+                            value={revisionJatuhTempo}
+                            onChange={(e) => setRevisionJatuhTempo(e.target.value)}
+                          />
+                        </div>
+
+                        {/* Catatan Perubahan Invoice */}
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-semibold uppercase tracking-wider text-foreground block">
+                            Catatan Pembaruan Invoice
+                          </label>
+                          <div className="flex flex-wrap gap-1">
+                            {[
+                              "Penambahan item tagihan",
+                              "Pengurangan item tagihan",
+                              "Pembatalan item tambahan",
+                              "Penyesuaian potongan / diskon",
+                            ].map((tpl) => (
+                              <button
+                                key={tpl}
+                                type="button"
+                                onClick={() => setRevisionCatatan(tpl)}
+                                className="text-[10px] font-semibold px-2 py-0.5 rounded border border-stone-300 dark:border-stone-700 hover:bg-stone-100 dark:hover:bg-stone-800 transition-colors cursor-pointer"
+                              >
+                                {tpl}
+                              </button>
+                            ))}
+                          </div>
+                          <Input
+                            placeholder="Contoh: Tambah biaya Thoif / Hapus upgrade hotel / Diskon"
+                            value={revisionCatatan}
+                            onChange={(e) => setRevisionCatatan(e.target.value)}
+                          />
+                        </div>
+
+                        <Button
+                          className="w-full font-bold bg-indigo-600 hover:bg-indigo-700 text-white"
+                          onClick={handleSubmitInvoiceRevision}
+                          disabled={submittingRevision || !groupData}
+                        >
+                          {submittingRevision ? "Memproses Pembaruan..." : "Submit Pembaruan Invoice"}
+                        </Button>
+                      </>
+                    ) : (
+                      <>
+                        {/* Drag & Drop Bukti Transfer WA (Sebelum Nominal Pembayaran) */}
                     <div>
                       <label className="text-xs font-bold text-foreground flex items-center gap-1.5 uppercase tracking-wider mb-1.5">
                         <Sparkles className="h-3.5 w-3.5 text-amber-500" />
@@ -1471,6 +1830,8 @@ const SplitInvoiceModal = dynamic(
                     >
                       {submitting ? "Menyimpan..." : "Submit Pembayaran"}
                     </Button>
+                      </>
+                    )}
                   </CardContent>
                 </Card>
               </div>
@@ -1486,9 +1847,18 @@ const SplitInvoiceModal = dynamic(
       <CreateInvoiceModal
         open={showCreateInvoiceModal}
         onClose={() => setShowCreateInvoiceModal(false)}
-        onSuccess={(invNumber, amount) => {
+        onSuccess={async (invNumber, amount) => {
           setShowCreateInvoiceModal(false);
-          setSuccessData({ invoiceNumber: invNumber, amount });
+          const isRev = invNumber.startsWith("INV-UPD");
+          if (groupData?.groupId) {
+            const summary = await getGroupPaymentSummary(groupData.groupId).catch(() => null);
+            if (summary) setGroupData(summary);
+          }
+          setSuccessData({
+            invoiceNumber: invNumber,
+            amount,
+            mode: isRev ? "pembaruan" : "pembayaran",
+          });
           setShowSuccess(true);
         }}
         masterTambahanOptions={masterTambahanOptions}
@@ -2154,23 +2524,47 @@ const SplitInvoiceModal = dynamic(
       <Modal
         open={showSuccess}
         onClose={() => setShowSuccess(false)}
-        title="Operasi Berhasil"
+        title={successData?.mode === "pembaruan" ? "Pembaruan Invoice Berhasil" : "Operasi Berhasil"}
         size="sm"
       >
         <div className="space-y-3 text-center">
           <CheckCircle className="mx-auto h-10 w-10 text-success" />
           <div>
-            <p className="font-medium">Transaksi / Invoice dicatat</p>
+            <p className="font-medium">
+              {successData?.mode === "pembaruan"
+                ? "Pembaruan rincian invoice telah diterbitkan (tanpa pembayaran masuk)"
+                : "Transaksi / Invoice dicatat"}
+            </p>
             <p className="text-sm text-muted-foreground">
               Nomor Invoice: <span className="font-mono font-bold text-foreground">{successData?.invoiceNumber}</span>
             </p>
-            <p className="text-lg font-bold mt-1 text-amber-500">
+            <p className="text-xs text-muted-foreground mt-1.5">
+              {successData?.mode === "pembaruan" ? "Total Tagihan Akhir (Net)" : "Nominal"}
+            </p>
+            <p className="text-lg font-bold text-amber-500">
               {successData ? formatCurrency(successData.amount) : ""}
             </p>
           </div>
-          <Button className="w-full font-bold" onClick={() => setShowSuccess(false)}>
-            Tutup
-          </Button>
+          <div className="flex flex-col gap-2">
+            {successData?.pdfPayload && (
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full font-semibold"
+                onClick={() => {
+                  if (successData?.pdfPayload) {
+                    void triggerDownloadInvoicePdf(successData.pdfPayload);
+                  }
+                }}
+              >
+                <Download className="h-4 w-4 mr-1.5" />
+                Download PDF Invoice
+              </Button>
+            )}
+            <Button className="w-full font-bold" onClick={() => setShowSuccess(false)}>
+              Tutup
+            </Button>
+          </div>
         </div>
       </Modal>
     </div>

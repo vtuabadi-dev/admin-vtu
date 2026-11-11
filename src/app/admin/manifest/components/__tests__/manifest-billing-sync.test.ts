@@ -5,12 +5,15 @@ import {
   resolveRoomUpgradeUnitPrice,
   hasMaterializedRoomOrFullLedger,
   resolveCanonicalGroupBilling,
+  shouldSkipNonBillingInvoiceItem,
+  extractActiveLedgerItems,
 } from "@/shared/lib/billing-ssot";
 import {
   mergeSavedBillingItemsFromInvoices,
   mergeSavedOrderItemsFromInvoices,
   mapBillingItemsToSyncPayload,
   calculateBillingItemsNetTotal,
+  buildInvoicePdfDataForGroup,
   type BillingItem,
 } from "@/app/admin/pembayaran/laporan/_components/shared-constants";
 import type { InvoiceOrderItem } from "@/shared/lib/invoice-pdf";
@@ -482,6 +485,181 @@ describe("Manifest Pembayaran & Billing Sync Regression Suite (ADR-0032 SSOT)", 
       expect(merged[1]?.tipe).toBe("pengurangan");
       expect(merged[1]?.hargaSatuan).toBe(1000000);
       expect(merged[1]?.nominal).toBe(1000000);
+    });
+  });
+
+  describe("Pembaruan Invoice Tanpa Pembayaran Masuk (SSOT & Zero-Payment Revision)", () => {
+    it("skips Pembaruan Invoice / Revisi Invoice audit marker items in both SSOT engine and Invoice UI merger", () => {
+      const markerRevision = {
+        kategori: "Pembaruan Invoice",
+        deskripsi: "Pembaruan rincian tagihan & potongan invoice (tanpa pembayaran masuk)",
+        qty: 1,
+        hargaSatuan: 0,
+        jumlah: 0,
+        status: "active",
+      };
+      const markerRevisiAlt = {
+        kategori: "Revisi Invoice",
+        deskripsi: "Pengurangan item upgrade hotel",
+        qty: 1,
+        hargaSatuan: 2500000,
+        jumlah: 2500000,
+        status: "active",
+      };
+
+      expect(shouldSkipNonBillingInvoiceItem(markerRevision)).toBe(true);
+      expect(shouldSkipNonBillingInvoiceItem(markerRevisiAlt)).toBe(true);
+
+      const pkg = {
+        id: "pkg-umroh-9h",
+        hargaPaket: 29900000,
+        hotelMekkah: "LE MERIDIEN TOWERS",
+        hotelMadinah: "DURRAT AL EIMAN",
+      };
+      const members = [
+        { id: "m1", namaLengkap: "ARDI", hotelMekkah: "LE MERIDIEN TOWERS", hotelMadinah: "DURRAT AL EIMAN" },
+        { id: "m2", namaLengkap: "IRDA", hotelMekkah: "LE MERIDIEN TOWERS", hotelMadinah: "DURRAT AL EIMAN" },
+        { id: "m3", namaLengkap: "KADRI", hotelMekkah: "LE MERIDIEN TOWERS", hotelMadinah: "DURRAT AL EIMAN" },
+      ];
+      const group = {
+        id: "grp-ardi",
+        kodeRegistrasi: "GRP-2026-0012",
+        jumlahAnggota: 3,
+        keberangkatan: pkg,
+        invoices: [
+          {
+            id: "INV-20261110-1001",
+            nomorInvoice: "INV-20261110-1001",
+            status: "unpaid",
+            items: [
+              {
+                id: "it-base",
+                kategori: "utama",
+                deskripsi: "PAKET UMROH 9 H (3 Pax)",
+                qty: 3,
+                hargaSatuan: 29900000,
+                jumlah: 89700000,
+                status: "active",
+              },
+              {
+                id: "it-hotel-cancelled",
+                kategori: "tambahan",
+                deskripsi: "Upgrade Hotel (Mekkah: SAFWAH TOWER)",
+                qty: 3,
+                hargaSatuan: 2000000,
+                jumlah: 6000000,
+                status: "cancelled",
+              },
+            ],
+          },
+          {
+            id: "INV-UPD-20261111-2002",
+            nomorInvoice: "INV-UPD-20261111-2002",
+            status: "unpaid",
+            items: [
+              markerRevision,
+              {
+                id: "it-thoif",
+                kategori: "tambahan",
+                deskripsi: "City Tour Thoif",
+                qty: 3,
+                hargaSatuan: 750000,
+                jumlah: 2250000,
+                status: "active",
+              },
+              {
+                id: "it-diskon",
+                kategori: "potongan",
+                deskripsi: "Diskon Rombongan",
+                qty: 1,
+                hargaSatuan: -1000000,
+                jumlah: -1000000,
+                status: "active",
+              },
+            ],
+          },
+        ],
+      };
+
+      const extracted = extractActiveLedgerItems(group.invoices);
+      expect(extracted).toHaveLength(3);
+
+      const canonical = resolveCanonicalGroupBilling({ group, activePackage: pkg, members });
+      expect(canonical.groupTotals.biayaPaket).toBe(89700000);
+      expect(canonical.groupTotals.upgradeHotel).toBe(0);
+      expect(canonical.groupTotals.cityTourThoif).toBe(2250000);
+      expect(canonical.groupTotals.diskonPromo).toBe(1000000);
+      expect(canonical.groupTotals.netTotalTagihan).toBe(89700000 + 2250000 - 1000000);
+
+      const mergedUi = mergeSavedBillingItemsFromInvoices([], group.invoices);
+      expect(mergedUi).toHaveLength(3);
+      expect(calculateBillingItemsNetTotal(mergedUi)).toBe(89700000 + 2250000 - 1000000);
+    });
+
+    it("builds PDF revision payload with zero incoming payment and empty verified payment history", () => {
+      const billingItems: BillingItem[] = [
+        {
+          id: "base-1",
+          nama: "PAKET UMROH 9 H (3 Pax)",
+          kategori: "utama",
+          nominal: 29900000,
+          qty: 3,
+          satuan: "Pax",
+          isDefault: true,
+        },
+        {
+          id: "add-1",
+          nama: "City Tour Thoif",
+          kategori: "tambahan",
+          nominal: 750000,
+          qty: 3,
+          satuan: "Pax",
+        },
+        {
+          id: "disc-1",
+          nama: "Potongan Promo",
+          kategori: "potongan",
+          nominal: 500000,
+          qty: 1,
+          satuan: "Pax",
+        },
+      ];
+
+      const group = {
+        groupId: "grp-ardi",
+        kodeRegistrasi: "GRP-2026-0012",
+        namaGroup: "GRUP ARDI",
+        jumlahAnggota: 3,
+        totalPembayaran: 0,
+        anggota: [{ namaLengkap: "ARDI", hotelMekkah: "LE MERIDIEN TOWERS", hotelMadinah: "DURRAT AL EIMAN" }],
+        pembayaran: [{ id: "p-pending", status: "pending", jumlah: 15000000, metode: "transfer", tanggal: "2026-10-23" }],
+        keberangkatan: {
+          namaPaket: "PAKET UMROH 9 H",
+          hargaPaket: 29900000,
+          hotelMekkah: "LE MERIDIEN TOWERS",
+          hotelMadinah: "DURRAT AL EIMAN",
+        },
+      };
+
+      const pdfData = buildInvoicePdfDataForGroup({
+        group,
+        billingItems,
+        invoiceNumber: "INV-UPD-20261111-1234",
+        jatuhTempo: "2026-11-13",
+        catatan: "Penambahan City Tour Thoif tanpa pembayaran masuk",
+        nominalPembayaran: 0,
+      });
+
+      expect(pdfData.invoiceNumber).toBe("INV-UPD-20261111-1234");
+      expect(pdfData.totalTagihanDisesuaikan).toBe(89700000 + 2250000 - 500000);
+      expect(pdfData.totalBebanTambahan).toBe(2250000);
+      expect(pdfData.totalPengurangan).toBe(500000);
+      expect(pdfData.totalPembayaran).toBe(0);
+      expect(pdfData.sisaTagihan).toBe(91450000);
+      expect(pdfData.paymentHistory).toEqual([]);
+      expect(pdfData.orderItems).toHaveLength(2);
+      expect(pdfData.orderItems?.[0]?.tipe).toBe("penambahan");
+      expect(pdfData.orderItems?.[1]?.tipe).toBe("pengurangan");
     });
   });
 });

@@ -501,6 +501,14 @@ export function generateInvoicePdf(data: InvoicePdfData): jsPDF {
         idx === 0 ? "DP Pendaftaran" : `Pelunasan Tahap ${idx}`,
       ]);
     });
+  } else if (Array.isArray(data.paymentHistory) && (data.totalPembayaran ?? 0) === 0 && (data.nominal ?? 0) === 0) {
+    historyRows.push([
+      "-",
+      data.invoiceDate || "-",
+      "-",
+      "0",
+      data.catatan || "Pembaruan rincian tagihan (belum ada pembayaran)",
+    ]);
   } else {
     historyRows.push([
       "1",
