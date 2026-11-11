@@ -339,6 +339,7 @@ export const pembayaranRepo = {
                 hotelMekkah: true,
                 hotelMadinah: true,
                 hotelOptions: true,
+                include: true,
                 packageType: {
                   select: { name: true },
                 },
@@ -351,6 +352,11 @@ export const pembayaranRepo = {
                 paxCount: true,
               },
               take: 1,
+            },
+            invoices: {
+              where: { status: { not: "cancelled" } },
+              include: { items: true },
+              orderBy: { createdAt: "desc" },
             },
             pembayaran: {
               select: {
@@ -380,6 +386,10 @@ export const pembayaranRepo = {
                 kota: true,
                 kecamatan: true,
                 kelurahan: true,
+                hotelMekkah: true,
+                hotelMadinah: true,
+                isKeretaCepat: true,
+                isCityTourThoif: true,
                 createdAt: true,
               },
               orderBy: [{ registrationId: "asc" }, { createdAt: "asc" }],

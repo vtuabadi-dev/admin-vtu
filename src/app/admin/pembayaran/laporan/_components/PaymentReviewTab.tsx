@@ -64,9 +64,10 @@ import {
   getInitialReviewQueue,
   setCachedReviewQueue,
   cachedReviewQueue,
+  mergeSavedOrderItemsFromInvoices,
   type InvoiceOrderItem,
 } from "./shared-constants";
-import { updateJamaahHotels, getMasterHotels } from "@/server/actions/api";
+import { updateJamaahHotels, getMasterHotels, syncGroupBillingItems, createInvoice } from "@/server/actions/api";
 import { broadcastMutation, subscribeRealtimeEvents, subscribeRealtime, type RealtimeEventPayload } from "@/shared/lib/realtime-bus";
 import MasterBillingOptionsModal from "./MasterBillingOptionsModal";
 
@@ -495,6 +496,115 @@ function PaymentReviewTabContent() {
     }
   }, [newOrderType, showAddOrderModal, masterTambahanOptions, masterPotonganOptions]);
 
+  const buildOrderSyncPayload = useCallback(
+    (items: InvoiceOrderItem[], paymentObj?: any) => {
+      const p = paymentObj || selectedPayment;
+      const payload: Array<{
+        kategori?: string;
+        deskripsi: string;
+        qty: number;
+        hargaSatuan: number;
+        jumlah?: number;
+      }> = [];
+      const groupPax =
+        p?.group?.anggota?.length || p?.group?.jumlahAnggota || availableAnggota.length || 1;
+      const clusterDetails = resolvePackageClusterDetails(p);
+      const pkgUnit =
+        clusterDetails.hargaBase || p?.group?.keberangkatan?.hargaPaket || 0;
+      const pkgName =
+        p?.group?.keberangkatan?.namaPaket || p?.namaPaket || "Paket Umroh";
+      const clusterSuffix =
+        clusterDetails.isCustomCluster &&
+        clusterDetails.clusterName &&
+        clusterDetails.clusterName !== "Reguler"
+          ? ` - Klaster ${clusterDetails.clusterName}`
+          : "";
+
+      if (pkgUnit > 0) {
+        payload.push({
+          kategori: "utama",
+          deskripsi: `${pkgName}${clusterSuffix} (${groupPax} Pax)`,
+          qty: groupPax,
+          hargaSatuan: pkgUnit,
+          jumlah: pkgUnit * groupPax,
+        });
+      }
+
+      for (const it of items) {
+        const qty = Math.max(1, it.qty || 1);
+        const unit = Math.abs(Math.round(it.hargaSatuan || (it.nominal || 0) / qty));
+        payload.push({
+          kategori: it.tipe === "pengurangan" ? "potongan" : "tambahan",
+          deskripsi: it.nama,
+          qty,
+          hargaSatuan: unit,
+          jumlah: unit * qty,
+        });
+      }
+
+      return payload;
+    },
+    [selectedPayment, availableAnggota.length]
+  );
+
+  const syncOrderItemsToDb = useCallback(
+    async (nextItems: InvoiceOrderItem[], paymentObj?: any) => {
+      const p = paymentObj || selectedPayment;
+      const targetGroupId = p?.groupId || p?.group?.id;
+      if (!targetGroupId) return;
+
+      const payload = buildOrderSyncPayload(nextItems, p);
+      try {
+        const res = await syncGroupBillingItems({
+          groupId: targetGroupId,
+          items: payload,
+        });
+        if (res.success && res.totalTagihan !== undefined) {
+          const updatedTotal = res.totalTagihan;
+          const updatedSisa = res.sisaPembayaran;
+          setSelectedPayment((prev: any) =>
+            prev
+              ? {
+                  ...prev,
+                  group: prev.group
+                    ? {
+                        ...prev.group,
+                        totalTagihan: updatedTotal,
+                        sisaPembayaran: updatedSisa ?? prev.group.sisaPembayaran,
+                      }
+                    : prev.group,
+                }
+              : prev
+          );
+          setQueue((prev) =>
+            prev.map((q) =>
+              (q.groupId || q.group?.id) === targetGroupId
+                ? {
+                    ...q,
+                    group: q.group
+                      ? {
+                          ...q.group,
+                          totalTagihan: updatedTotal,
+                          sisaPembayaran: updatedSisa ?? q.group.sisaPembayaran,
+                        }
+                      : q.group,
+                  }
+                : q
+            )
+          );
+          broadcastMutation("invoices", "UPDATE", { groupId: targetGroupId });
+          broadcastMutation("registration_groups", "UPDATE", { id: targetGroupId });
+          broadcastMutation("manifest", "UPDATE", { groupId: targetGroupId });
+          broadcastMutation("manifest_rows", "UPDATE", { groupId: targetGroupId });
+          broadcastMutation("pembayaran", "UPDATE", { groupId: targetGroupId });
+        }
+      } catch (err) {
+        console.error("[PaymentReviewTab] Sync billing items error:", err);
+      }
+    },
+    [selectedPayment, buildOrderSyncPayload]
+  );
+
   // When a payment row is clicked to create/view invoice
   const handleSelectPayment = (payment: any) => {
     setSelectedPayment(payment);
@@ -631,7 +741,11 @@ function PaymentReviewTabContent() {
       });
     }
 
-    setOrderItems(initialOrderItems);
+    const hydratedOrderItems = mergeSavedOrderItemsFromInvoices(
+      initialOrderItems,
+      payment.group?.invoices
+    );
+    setOrderItems(hydratedOrderItems);
   };
 
   const handleApprove = useCallback(async (payment: any) => {
@@ -1062,13 +1176,45 @@ function PaymentReviewTabContent() {
     if (!selectedPayment) return;
     setSubmittingInvoice(true);
     try {
+      const targetGroupId = selectedPayment?.groupId || selectedPayment?.group?.id;
+      let finalInvoiceNumber = invoiceNumber;
+
+      if (targetGroupId) {
+        const syncPayload = buildOrderSyncPayload(orderItems, selectedPayment);
+        const existingInvId = selectedPayment.invoiceId;
+        if (!existingInvId || existingInvId.startsWith("BILL-")) {
+          const jenisLower = (formJenis || "").toLowerCase();
+          const subKategori: "dp" | "cicilan" | "pelunasan" = jenisLower.includes("dp")
+            ? "dp"
+            : jenisLower.includes("cicil")
+              ? "cicilan"
+              : "pelunasan";
+          const createdInv = await createInvoice({
+            groupId: targetGroupId,
+            nomorInvoice: invoiceNumber,
+            pembayaranId: selectedPayment.id,
+            nominal: formNominal,
+            subKategori,
+            catatan: formCatatan || `${formJenis} (${formBank})`,
+            totalTagihan:
+              groupTotalTagihanDisesuaikan > 0 ? groupTotalTagihanDisesuaikan : undefined,
+            items: syncPayload,
+          });
+          if (createdInv?.nomorInvoice) {
+            finalInvoiceNumber = createdInv.nomorInvoice;
+          }
+        } else {
+          await syncOrderItemsToDb(orderItems, selectedPayment);
+        }
+      }
+
       const res = await fetch(`/api/pembayaran/${selectedPayment.id}/approve`, { method: "POST" });
       if (!res.ok) throw new Error("Gagal menyetujui");
 
-      setSuccessMessage(`Invoice ${invoiceNumber} untuk ${selectedPayment.namaGroup || "Group"} (${formatCurrency(formNominal)}) berhasil diterbitkan!`);
+      setSuccessMessage(`Invoice ${finalInvoiceNumber} untuk ${selectedPayment.namaGroup || "Group"} (${formatCurrency(formNominal)}) berhasil diterbitkan!`);
       setShowSuccess(true);
 
-      const updated = { ...selectedPayment, status: "verified", invoiceId: invoiceNumber, jumlah: formNominal };
+      const updated = { ...selectedPayment, status: "verified", invoiceId: finalInvoiceNumber, jumlah: formNominal };
       setQueue((prev) =>
         prev.map((p) =>
           p.id === selectedPayment.id ? updated : p
@@ -1077,8 +1223,16 @@ function PaymentReviewTabContent() {
       setSelectedPayment(updated);
       setSendInvoiceTarget(updated);
 
+      if (targetGroupId) {
+        broadcastMutation("invoices", "INSERT", { groupId: targetGroupId });
+        broadcastMutation("pembayaran", "UPDATE", { groupId: targetGroupId });
+        broadcastMutation("registration_groups", "UPDATE", { id: targetGroupId });
+        broadcastMutation("manifest", "UPDATE", { groupId: targetGroupId });
+        broadcastMutation("manifest_rows", "UPDATE", { groupId: targetGroupId });
+      }
+
       // Auto-generate & download official PDF invoice upon issuance
-      const payload = getInvoicePdfPayload(updated, invoiceNumber, formNominal);
+      const payload = getInvoicePdfPayload(updated, finalInvoiceNumber, formNominal);
       downloadInvoicePdf(payload);
 
       // Otomatis sinkronkan invoice ke Google Drive terpusat
@@ -2176,7 +2330,9 @@ function PaymentReviewTabContent() {
                                         return updated;
                                       });
                                     }
-                                    setOrderItems((prev) => prev.filter((i) => i.id !== item.id));
+                                    const nextOrderItems = orderItems.filter((i) => i.id !== item.id);
+                                    setOrderItems(nextOrderItems);
+                                    void syncOrderItemsToDb(nextOrderItems);
                                   }}
                                 >
                                   <Trash2 className="h-3.5 w-3.5" />
@@ -3361,25 +3517,27 @@ function PaymentReviewTabContent() {
 
                 const allocated = (isRoomUpgrade || isHotelUpgrade) && newOrderAllocatedMembers.length > 0 ? newOrderAllocatedMembers : undefined;
 
-                setOrderItems((prev) => {
-                  const filtered = isHotelUpgrade ? prev.filter((i) => !i.id.startsWith("hotel-upgrade-")) : prev;
-                  return [
-                    ...filtered,
-                    {
-                      id: `item-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
-                      nama: finalItemName,
-                      nominal: totalNominal,
-                      qty: qty,
-                      satuan: newOrderSatuan || "Pax",
-                      hargaSatuan: newOrderNominal,
-                      tipe: newOrderType,
-                      kategori: isPotongan ? "potongan" : "tambahan",
-                      allocatedJamaah: allocated,
-                      hotelMekkah: isHotelUpgrade ? chosenMekkah : undefined,
-                      hotelMadinah: isHotelUpgrade ? chosenMadinah : undefined,
-                    },
-                  ];
-                });
+                const filtered = isHotelUpgrade
+                  ? orderItems.filter((i) => !isHotelUpgradeItem(i.nama) && !i.id.startsWith("hotel-upgrade-"))
+                  : orderItems;
+                const nextOrderItems: InvoiceOrderItem[] = [
+                  ...filtered,
+                  {
+                    id: `item-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+                    nama: finalItemName,
+                    nominal: totalNominal,
+                    qty: qty,
+                    satuan: newOrderSatuan || "Pax",
+                    hargaSatuan: newOrderNominal,
+                    tipe: newOrderType,
+                    kategori: isPotongan ? "potongan" : "tambahan",
+                    allocatedJamaah: allocated,
+                    hotelMekkah: isHotelUpgrade ? chosenMekkah : undefined,
+                    hotelMadinah: isHotelUpgrade ? chosenMadinah : undefined,
+                  },
+                ];
+                setOrderItems(nextOrderItems);
+                void syncOrderItemsToDb(nextOrderItems);
 
                 // Otomatis update hotel manifest jamaah jika upgrade hotel
                 if (isHotelUpgrade) {
@@ -3495,18 +3653,18 @@ function PaymentReviewTabContent() {
                 const targetRoom = detectRoomTypeFromName(reallocatingItem.nama);
                 const defaultGroupRoom = detectRoomTypeFromName(selectedPayment?.group?.roomUpgrade || selectedPayment?.roomUpgrade || "Quad");
 
-                setOrderItems((prev) =>
-                  prev.map((it) =>
-                    it.id === reallocatingItem.id
-                      ? {
-                          ...it,
-                          allocatedJamaah: newAlloc.length > 0 ? newAlloc : undefined,
-                          qty: newAlloc.length > 0 ? newQty : (it.qty || 1),
-                          nominal: (it.hargaSatuan || (it.nominal / (it.qty || 1))) * (newAlloc.length > 0 ? newQty : (it.qty || 1)),
-                        }
-                      : it
-                  )
+                const nextOrderItems = orderItems.map((it) =>
+                  it.id === reallocatingItem.id
+                    ? {
+                        ...it,
+                        allocatedJamaah: newAlloc.length > 0 ? newAlloc : undefined,
+                        qty: newAlloc.length > 0 ? newQty : (it.qty || 1),
+                        nominal: (it.hargaSatuan || (it.nominal / (it.qty || 1))) * (newAlloc.length > 0 ? newQty : (it.qty || 1)),
+                      }
+                    : it
                 );
+                setOrderItems(nextOrderItems);
+                void syncOrderItemsToDb(nextOrderItems);
 
                 // Update member room types
                 setMemberRoomTypes((prev) => {

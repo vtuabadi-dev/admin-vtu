@@ -4,6 +4,49 @@ import { prisma } from "@/server/db/client";
 import { packageService } from "@/server/services/package.service";
 import { groupRepo, pembayaranRepo } from "@/server/repositories";
 import { syncPackageDocumentFileNamesToDrive } from "@/server/services/manifest-drive-sync.service";
+import { revalidatePath } from "next/cache";
+
+interface BillingItemInput {
+  kategori?: string;
+  deskripsi: string;
+  qty: number;
+  hargaSatuan: number;
+  jumlah?: number;
+}
+
+function normalizeBillingItemInput(it: BillingItemInput) {
+  const katRaw = (it.kategori || "tambahan").trim();
+  const katLower = katRaw.toLowerCase();
+  const isPotongan = katLower === "potongan" || katLower === "pengurangan";
+  const qty = Math.max(1, Math.round(Number(it.qty) || 1));
+  const rawHarga = Number(it.hargaSatuan);
+  const baseAbsHarga = Number.isFinite(rawHarga)
+    ? Math.abs(Math.round(rawHarga))
+    : Math.abs(Math.round((Number(it.jumlah) || 0) / qty));
+  const signedHarga = isPotongan ? -baseAbsHarga : baseAbsHarga;
+  const signedJumlah = signedHarga * qty;
+  return {
+    kategori: katRaw || "tambahan",
+    deskripsi: (it.deskripsi || "Item Tagihan").trim(),
+    qty,
+    hargaSatuan: signedHarga,
+    jumlah: signedJumlah,
+  };
+}
+
+function getBillingItemDedupeKey(it: { kategori?: string; deskripsi?: string }): string {
+  const kat = (it.kategori || "").toLowerCase();
+  const desc = (it.deskripsi || "").trim().toLowerCase();
+  if (/upgrade\s*hotel/i.test(desc)) return "__UPGRADE_HOTEL__";
+  if (/upgrade\s*kamar/i.test(desc)) {
+    const rm = desc.includes("double") ? "double" : desc.includes("triple") ? "triple" : desc.includes("single") ? "single" : desc;
+    return `__UPGRADE_KAMAR__::${rm}`;
+  }
+  if ((kat === "utama" || /paket\s*umroh|biaya\s*paket/i.test(desc)) && !/penambahan.*jamaah/i.test(desc)) {
+    return "__BASE_PACKAGE__";
+  }
+  return `${kat}::${desc}`;
+}
 
 
 // ==========================================
@@ -137,9 +180,276 @@ export async function getInvoiceList() {
   }) as any;
 }
 
+/**
+ * Synchronize group billing items directly to PostgreSQL (invoices + invoice_items + registration_groups.totalTagihan)
+ * so any item addition, edit, or deletion persists immediately and reflects in Manifest Pembayaran.
+ */
+export async function syncGroupBillingItems(data: {
+  groupId: string;
+  totalTagihan?: number;
+  items: BillingItemInput[];
+}) {
+  try {
+    const group = await prisma.registrationGroup.findFirst({
+      where: {
+        OR: [{ id: data.groupId }, { kodeRegistrasi: data.groupId }],
+      },
+      include: {
+        keberangkatan: true,
+        anggota: true,
+        invoices: {
+          where: { status: { not: "cancelled" } },
+          include: { items: true },
+          orderBy: { createdAt: "asc" },
+        },
+        pembayaran: true,
+      },
+    });
+
+    if (!group) {
+      return { success: false, message: "Group tidak ditemukan" };
+    }
+
+    const normalizedItems = (data.items || [])
+      .filter((it) => it && (it.deskripsi || "").trim().length > 0)
+      .map((it) => {
+        const norm = normalizeBillingItemInput(it);
+        return {
+          ...norm,
+          key: getBillingItemDedupeKey(norm),
+        };
+      });
+
+    const itemsSum = normalizedItems.reduce((sum, it) => sum + it.jumlah, 0);
+    const hasBaseItem = normalizedItems.some((it) => it.key === "__BASE_PACKAGE__");
+    const paxCount = group.anggota?.length || group.jumlahAnggota || 1;
+    const basePkgTotal = (group.keberangkatan?.hargaPaket || 0) * paxCount;
+
+    const netTotalTagihan =
+      data.totalTagihan !== undefined && Number.isFinite(data.totalTagihan) && data.totalTagihan >= 0
+        ? Math.round(data.totalTagihan)
+        : Math.max(0, hasBaseItem ? itemsSum : basePkgTotal + itemsSum);
+
+    const verifiedPaid = (group.pembayaran || [])
+      .filter((p) => p.status === "verified")
+      .reduce((sum, p) => sum + (p.jumlah || 0), 0);
+    const sisaPembayaran = Math.max(0, netTotalTagihan - verifiedPaid);
+
+    const draftId = `BILL-${group.id}`;
+    const draftNomor = `TAG-${group.kodeRegistrasi || group.id.slice(-6).toUpperCase()}`;
+
+    const activeInvoices = group.invoices || [];
+    const officialInvoices = activeInvoices.filter((inv) => !inv.id.startsWith("BILL-"));
+    const existingDraft = activeInvoices.find((inv) => inv.id === draftId);
+
+    // Determine default due date: H-40 from departure or +14 days
+    let defaultJatuhTempo = new Date(Date.now() + 14 * 86400000);
+    if (group.keberangkatan?.tanggalBerangkat) {
+      const h40 = new Date(group.keberangkatan.tanggalBerangkat);
+      h40.setDate(h40.getDate() - 40);
+      defaultJatuhTempo = h40;
+    }
+
+    await prisma.$transaction(async (tx) => {
+      if (officialInvoices.length === 0) {
+        // Case A: No formal invoice exists yet — manage the group billing ledger (BILL-...)
+        if (existingDraft) {
+          await tx.invoiceItem.deleteMany({ where: { invoiceId: draftId } });
+        }
+
+        await tx.invoice.upsert({
+          where: { id: draftId },
+          create: {
+            id: draftId,
+            nomorInvoice: draftNomor,
+            groupId: group.id,
+            tipe: "pelunasan",
+            jumlah: netTotalTagihan,
+            sisaTagihan: sisaPembayaran,
+            status: verifiedPaid >= netTotalTagihan && netTotalTagihan > 0 ? "paid" : "unpaid",
+            jatuhTempo: defaultJatuhTempo,
+          },
+          update: {
+            jumlah: netTotalTagihan,
+            sisaTagihan: sisaPembayaran,
+            status: verifiedPaid >= netTotalTagihan && netTotalTagihan > 0 ? "paid" : "unpaid",
+          },
+        });
+
+        for (const it of normalizedItems) {
+          await tx.invoiceItem.create({
+            data: {
+              invoiceId: draftId,
+              kategori: it.kategori,
+              deskripsi: it.deskripsi,
+              qty: it.qty,
+              hargaSatuan: it.hargaSatuan,
+              jumlah: it.jumlah,
+              status: "active",
+            },
+          });
+        }
+      } else {
+        // Case B: Formal invoice(s) exist — update matching items or store un-invoiced delta items in BILL-...
+        const incomingByKey = new Map<string, (typeof normalizedItems)[number]>();
+        for (const it of normalizedItems) {
+          // If duplicate keys appear in incoming list, sum or keep latest configured
+          incomingByKey.set(it.key, it);
+        }
+
+        const matchedIncomingKeys = new Set<string>();
+
+        for (const inv of officialInvoices) {
+          for (const dbItem of inv.items || []) {
+            if (dbItem.status === "cancelled") continue;
+            const katLower = (dbItem.kategori || "").toLowerCase();
+            const descLower = (dbItem.deskripsi || "").toLowerCase();
+            if (
+              katLower.includes("pembayaran invoice") ||
+              katLower.includes("angsuran") ||
+              /penambahan\s+\d+\s+pax\s+jamaah/i.test(descLower)
+            ) {
+              continue;
+            }
+
+            const dbKey = getBillingItemDedupeKey(dbItem);
+            // Never auto-cancel base package unless caller explicitly passed a base package item
+            if (dbKey === "__BASE_PACKAGE__" && !incomingByKey.has("__BASE_PACKAGE__")) {
+              continue;
+            }
+            const matched = incomingByKey.get(dbKey);
+
+            if (!matched) {
+              // Item was deleted by admin — cancel on the official invoice so manifest & ledger match
+              await tx.invoiceItem.update({
+                where: { id: dbItem.id },
+                data: {
+                  status: "cancelled",
+                  cancelledAt: new Date(),
+                  cancelledBy: "admin",
+                  cancellationReason: "Dihapus dari rincian tagihan group",
+                },
+              });
+            } else {
+              matchedIncomingKeys.add(dbKey);
+              // Update value/description if modified
+              if (
+                dbItem.deskripsi !== matched.deskripsi ||
+                dbItem.qty !== matched.qty ||
+                dbItem.hargaSatuan !== matched.hargaSatuan ||
+                dbItem.jumlah !== matched.jumlah
+              ) {
+                await tx.invoiceItem.update({
+                  where: { id: dbItem.id },
+                  data: {
+                    kategori: matched.kategori,
+                    deskripsi: matched.deskripsi,
+                    qty: matched.qty,
+                    hargaSatuan: matched.hargaSatuan,
+                    jumlah: matched.jumlah,
+                  },
+                });
+              }
+            }
+          }
+        }
+
+        // Any newly added items not yet on official invoices go into BILL-... delta ledger
+        const hasBaseInOfficial = officialInvoices.some((inv) =>
+          (inv.items || []).some(
+            (dbItem) => dbItem.status !== "cancelled" && getBillingItemDedupeKey(dbItem) === "__BASE_PACKAGE__"
+          )
+        );
+
+        const deltaItems = normalizedItems.filter((it) => {
+          if (matchedIncomingKeys.has(it.key)) return false;
+          if (it.key === "__BASE_PACKAGE__" && hasBaseInOfficial) return false;
+          // Also exclude base package if PaymentReviewTab didn't create a base item previously
+          return true;
+        });
+
+        if (deltaItems.length > 0) {
+          const deltaTotal = Math.max(
+            0,
+            deltaItems.reduce((s, it) => s + it.jumlah, 0)
+          );
+          if (existingDraft) {
+            await tx.invoiceItem.deleteMany({ where: { invoiceId: draftId } });
+          }
+
+          await tx.invoice.upsert({
+            where: { id: draftId },
+            create: {
+              id: draftId,
+              nomorInvoice: draftNomor,
+              groupId: group.id,
+              tipe: "tambahan",
+              jumlah: deltaTotal,
+              sisaTagihan: deltaTotal,
+              status: "unpaid",
+              jatuhTempo: officialInvoices[0]?.jatuhTempo || defaultJatuhTempo,
+            },
+            update: {
+              jumlah: deltaTotal,
+              sisaTagihan: deltaTotal,
+              status: "unpaid",
+            },
+          });
+
+          for (const it of deltaItems) {
+            await tx.invoiceItem.create({
+              data: {
+                invoiceId: draftId,
+                kategori: it.kategori,
+                deskripsi: it.deskripsi,
+                qty: it.qty,
+                hargaSatuan: it.hargaSatuan,
+                jumlah: it.jumlah,
+                status: "active",
+              },
+            });
+          }
+        } else if (existingDraft) {
+          await tx.pembayaran.updateMany({
+            where: { invoiceId: draftId },
+            data: { invoiceId: officialInvoices[0]?.id ?? null },
+          });
+          await tx.invoiceItem.deleteMany({ where: { invoiceId: draftId } });
+          await tx.invoice.delete({ where: { id: draftId } });
+        }
+      }
+
+      await tx.registrationGroup.update({
+        where: { id: group.id },
+        data: {
+          totalTagihan: netTotalTagihan,
+          totalPembayaran: verifiedPaid,
+          sisaPembayaran,
+        },
+      });
+    });
+
+    try {
+      revalidatePath("/admin/manifest");
+      revalidatePath("/admin/pembayaran/laporan");
+      revalidatePath(`/admin/pembayaran/${group.id}`);
+    } catch {}
+
+    return {
+      success: true,
+      totalTagihan: netTotalTagihan,
+      sisaPembayaran,
+    };
+  } catch (err: any) {
+    console.error("syncGroupBillingItems error:", err);
+    return { success: false, message: err?.message || "Gagal menyinkronkan item tagihan" };
+  }
+}
+
 export async function createInvoice(data: {
   groupId: string;
   nomorInvoice?: string;
+  pembayaranId?: string;
   nominal: number;
   jatuhTempo?: string;
   catatan?: string;
@@ -149,13 +459,7 @@ export async function createInvoice(data: {
   refundStatus?: "NON_REFUND" | "WITH_REFUND";
   jamaahTargetIds?: string[];
   totalTagihan?: number;
-  items?: Array<{
-    kategori?: string;
-    deskripsi: string;
-    qty: number;
-    hargaSatuan: number;
-    jumlah?: number;
-  }>;
+  items?: BillingItemInput[];
 }) {
   const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, "");
   const randomSuffix = String(Math.floor(Math.random() * 9000) + 1000);
@@ -167,6 +471,7 @@ export async function createInvoice(data: {
   else if (data.kategori === "TAMBAH_JAMAAH") prefix = "INV-PAX";
 
   const nomorInvoice = data.nomorInvoice || `${prefix}-${dateStr}-${randomSuffix}`;
+  const safeInvoiceId = nomorInvoice.replace(/[^A-Za-z0-9_-]/g, "-");
   
   // Normalize tipe strictly to valid Prisma enum TipeInvoice: "dp" | "cicilan" | "pelunasan" | "tambahan"
   let normalizedTipe: "dp" | "cicilan" | "pelunasan" | "tambahan" = "pelunasan";
@@ -188,11 +493,38 @@ export async function createInvoice(data: {
     normalizedTipe = "pelunasan";
   }
 
+  // Gather existing official invoices BEFORE creating the new one so we don't duplicate items in manifest
+  const draftId = `BILL-${data.groupId}`;
+  const existingOfficialInvoices = await prisma.invoice.findMany({
+    where: {
+      groupId: data.groupId,
+      status: { not: "cancelled" },
+      id: { not: draftId },
+    },
+    include: { items: true },
+  });
+
+  const existingOfficialKeys = new Set<string>();
+  for (const inv of existingOfficialInvoices) {
+    for (const it of inv.items || []) {
+      if (it.status !== "cancelled") {
+        existingOfficialKeys.add(getBillingItemDedupeKey(it));
+      }
+    }
+  }
+
+  // Reuse existing invoice id with suffix if collision happens on safeInvoiceId
+  const existingSameId = await prisma.invoice.findFirst({
+    where: { OR: [{ id: safeInvoiceId }, { nomorInvoice }] },
+  });
+  const finalId = existingSameId ? `${safeInvoiceId}-${randomSuffix}` : safeInvoiceId;
+  const finalNomor = existingSameId ? `${nomorInvoice}-${randomSuffix}` : nomorInvoice;
+
   const created = await prisma.invoice.create({
     data: {
-      id: nomorInvoice,
+      id: finalId,
       groupId: data.groupId,
-      nomorInvoice,
+      nomorInvoice: finalNomor,
       tipe: normalizedTipe,
       jumlah: data.nominal,
       sisaTagihan: data.nominal,
@@ -201,24 +533,62 @@ export async function createInvoice(data: {
     },
   });
 
-  // Persist invoice items if provided (SSOT for Manifest Pembayaran & Billing Details)
+  // Remove/promote any pre-issuance billing ledger (BILL-...) cleanly to avoid duplicating items
+  try {
+    const existingDraft = await prisma.invoice.findUnique({ where: { id: draftId } });
+    if (existingDraft) {
+      await prisma.pembayaran.updateMany({
+        where: { invoiceId: draftId },
+        data: { invoiceId: created.id },
+      });
+      await prisma.invoiceItem.deleteMany({ where: { invoiceId: draftId } });
+      await prisma.invoice.delete({ where: { id: draftId } });
+    }
+  } catch (draftErr) {
+    console.warn("Promote draft billing ledger warning:", draftErr);
+  }
+
+  // Persist invoice items if provided (deduplicating against already-recorded official invoice items)
   if (data.items && data.items.length > 0) {
-    for (const item of data.items) {
+    let insertedCount = 0;
+    for (const rawItem of data.items) {
+      const item = normalizeBillingItemInput(rawItem);
+      const itemKey = getBillingItemDedupeKey(item);
+      // Avoid creating duplicate active items across official invoices if already recorded
+      if (existingOfficialInvoices.length > 0 && existingOfficialKeys.has(itemKey)) {
+        continue;
+      }
       try {
         await prisma.invoiceItem.create({
           data: {
             invoiceId: created.id,
             kategori: item.kategori || "Tagihan",
             deskripsi: item.deskripsi,
-            qty: item.qty || 1,
-            hargaSatuan: item.hargaSatuan || 0,
-            jumlah: item.jumlah !== undefined ? item.jumlah : (item.qty || 1) * (item.hargaSatuan || 0),
+            qty: item.qty,
+            hargaSatuan: item.hargaSatuan,
+            jumlah: item.jumlah,
             status: "active",
           },
         });
+        insertedCount++;
       } catch (itemErr) {
         console.warn("Failed creating invoiceItem:", itemErr);
       }
+    }
+
+    // If all items were already stored on prior invoices, add a clear non-duplicating installment receipt item
+    if (insertedCount === 0 && data.nominal > 0) {
+      await prisma.invoiceItem.create({
+        data: {
+          invoiceId: created.id,
+          kategori: "Pembayaran Invoice",
+          deskripsi: data.catatan || `Tagihan Pembayaran (${normalizedTipe.toUpperCase()})`,
+          qty: 1,
+          hargaSatuan: data.nominal,
+          jumlah: data.nominal,
+          status: "active",
+        },
+      }).catch(() => {});
     }
 
     // If no upgrade hotel item exists in this invoice, check if any jamaah in group had upgraded hotel and revert to package default
@@ -229,18 +599,31 @@ export async function createInvoice(data: {
       try {
         const groupWithPkg = await prisma.registrationGroup.findUnique({
           where: { id: data.groupId },
-          include: { keberangkatan: true, anggota: true },
+          include: {
+            keberangkatan: {
+              include: { hotelMekkahMaster: true, hotelMadinahMaster: true },
+            },
+            anggota: true,
+          },
         });
         if (groupWithPkg?.keberangkatan) {
-          const defaultMekkah = groupWithPkg.keberangkatan.hotelMekkah?.trim();
-          const defaultMadinah = groupWithPkg.keberangkatan.hotelMadinah?.trim();
+          const rawMekkah = groupWithPkg.keberangkatan.hotelMekkah;
+          const rawMadinah = groupWithPkg.keberangkatan.hotelMadinah;
+          const defaultMekkah = (
+            groupWithPkg.keberangkatan.hotelMekkahMaster?.name ||
+            (rawMekkah && !rawMekkah.startsWith("cm") ? rawMekkah : "")
+          ).trim();
+          const defaultMadinah = (
+            groupWithPkg.keberangkatan.hotelMadinahMaster?.name ||
+            (rawMadinah && !rawMadinah.startsWith("cm") ? rawMadinah : "")
+          ).trim();
           if (defaultMekkah || defaultMadinah) {
             const otherInvoices = await prisma.invoice.findMany({
               where: { groupId: data.groupId, id: { not: created.id }, status: { not: "cancelled" } },
               include: { items: true },
             });
             const hasOtherUpgrade = otherInvoices.some((inv) =>
-              inv.items?.some((it) => (it.deskripsi || "").toLowerCase().includes("upgrade hotel"))
+              inv.items?.some((it) => it.status !== "cancelled" && (it.deskripsi || "").toLowerCase().includes("upgrade hotel"))
             );
             if (!hasOtherUpgrade && groupWithPkg.anggota && groupWithPkg.anggota.length > 0) {
               const updateData: Record<string, string> = {};
@@ -259,34 +642,41 @@ export async function createInvoice(data: {
     }
   }
 
-  // Create pending payment in review queue so it appears in Payment Review / Penerbitan Invoice
-  try {
-    const catatanPembayaran =
-      data.catatan ||
-      (data.kategori === "PINDAH_PAKET"
-        ? `Pindah Paket: Selisih biaya paket`
-        : data.kategori === "TAMBAH_JAMAAH"
-          ? `Tambah Jamaah: Tagihan penambahan jamaah`
-          : data.kategori === "PEMBATALAN"
-            ? `Pembatalan: Biaya pembatalan`
-            : data.kategori === "REFUND_MURNI"
-              ? `Refund: Pengembalian dana`
-              : `Tagihan Invoice: ${normalizedTipe}`);
+  // Link existing payment if called during approval, otherwise create pending payment in review queue
+  if (data.pembayaranId) {
+    await prisma.pembayaran.update({
+      where: { id: data.pembayaranId },
+      data: { invoiceId: created.id },
+    }).catch((err) => console.warn("Link pembayaran to invoice warning:", err));
+  } else {
+    try {
+      const catatanPembayaran =
+        data.catatan ||
+        (data.kategori === "PINDAH_PAKET"
+          ? `Pindah Paket: Selisih biaya paket`
+          : data.kategori === "TAMBAH_JAMAAH"
+            ? `Tambah Jamaah: Tagihan penambahan jamaah`
+            : data.kategori === "PEMBATALAN"
+              ? `Pembatalan: Biaya pembatalan`
+              : data.kategori === "REFUND_MURNI"
+                ? `Refund: Pengembalian dana`
+                : `Tagihan Invoice: ${normalizedTipe}`);
 
-    await prisma.pembayaran.create({
-      data: {
-        groupId: data.groupId,
-        invoiceId: created.id,
-        jumlah: data.nominal,
-        metode: "transfer",
-        tanggal: new Date(),
-        status: "pending",
-        sumber: "admin",
-        catatan: catatanPembayaran,
-      },
-    });
-  } catch (err) {
-    console.warn("Failed creating pending pembayaran in review queue:", err);
+      await prisma.pembayaran.create({
+        data: {
+          groupId: data.groupId,
+          invoiceId: created.id,
+          jumlah: data.nominal,
+          metode: "transfer",
+          tanggal: new Date(),
+          status: "pending",
+          sumber: "admin",
+          catatan: catatanPembayaran,
+        },
+      });
+    } catch (err) {
+      console.warn("Failed creating pending pembayaran in review queue:", err);
+    }
   }
 
   // Auto-Approve Registration Request if pending
@@ -325,6 +715,12 @@ export async function createInvoice(data: {
       console.warn("Update group total tagihan warning:", err);
     }
   }
+
+  try {
+    revalidatePath("/admin/manifest");
+    revalidatePath("/admin/pembayaran/laporan");
+    revalidatePath(`/admin/pembayaran/${data.groupId}`);
+  } catch {}
 
   return created;
 }

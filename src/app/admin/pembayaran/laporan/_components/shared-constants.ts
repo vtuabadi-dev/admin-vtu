@@ -428,5 +428,180 @@ export function getInitialReviewQueue(): any[] {
   return [];
 }
 
+function getClientInvoiceItemKey(it: { kategori?: string; deskripsi?: string; tipe?: string; hargaSatuan?: number; jumlah?: number }): string {
+  const kat = (it.kategori || "").toLowerCase();
+  const desc = (it.deskripsi || "").trim().toLowerCase();
+  if (isHotelUpgradeItem(desc)) return "__UPGRADE_HOTEL__";
+  if (isRoomUpgradeItem(desc)) {
+    const rm = desc.includes("double") ? "double" : desc.includes("triple") ? "triple" : desc.includes("single") ? "single" : desc;
+    return `__UPGRADE_KAMAR__::${rm}`;
+  }
+  if ((kat === "utama" || /paket\s*umroh|biaya\s*paket/i.test(desc)) && !/penambahan.*jamaah/i.test(desc)) {
+    return "__BASE_PACKAGE__";
+  }
+  const isPotongan =
+    kat === "potongan" ||
+    kat === "pengurangan" ||
+    it.tipe === "pengurangan" ||
+    (it.hargaSatuan || 0) < 0 ||
+    (it.jumlah || 0) < 0;
+  return `${isPotongan ? "potongan" : "tambahan"}::${desc}`;
+}
+
+function shouldSkipNonBillingInvoiceItem(it: { kategori?: string; deskripsi?: string; status?: string }): boolean {
+  if (it.status === "cancelled") return true;
+  const katLower = (it.kategori || "").toLowerCase();
+  const descLower = (it.deskripsi || "").toLowerCase();
+  return (
+    katLower.includes("pembayaran invoice") ||
+    katLower.includes("angsuran") ||
+    /penambahan\s+\d+\s+pax\s+jamaah/i.test(descLower)
+  );
+}
+
+/**
+ * Extract saved active invoice items and merge them cleanly into initial BillingItem[].
+ * Preserves manifest/room defaults and deduplicates items across multiple invoices.
+ */
+export function mergeSavedBillingItemsFromInvoices(
+  baseItems: BillingItem[],
+  invoices?: any[]
+): BillingItem[] {
+  if (!invoices || invoices.length === 0) return baseItems;
+
+  const result = baseItems.map((it) => ({ ...it }));
+  const seenKeys = new Set<string>(
+    result.map((it) => getClientInvoiceItemKey({ kategori: it.kategori, deskripsi: it.nama }))
+  );
+
+  for (const inv of invoices) {
+    if (!inv || inv.status === "cancelled") continue;
+    for (const it of inv.items || []) {
+      if (shouldSkipNonBillingInvoiceItem(it)) continue;
+      const katLower = (it.kategori || "").toLowerCase();
+      const isPotongan =
+        katLower === "potongan" ||
+        katLower === "pengurangan" ||
+        (it.hargaSatuan || 0) < 0 ||
+        (it.jumlah || 0) < 0;
+      const qty = Math.max(1, Math.round(Number(it.qty) || 1));
+      const rawUnit = Number(it.hargaSatuan);
+      const unitNominal = Number.isFinite(rawUnit)
+        ? Math.abs(Math.round(rawUnit))
+        : Math.abs(Math.round((Number(it.jumlah) || 0) / qty));
+      const key = getClientInvoiceItemKey(it);
+
+      if (key === "__BASE_PACKAGE__" || seenKeys.has(key)) {
+        const idx = result.findIndex(
+          (b) => getClientInvoiceItemKey({ kategori: b.kategori, deskripsi: b.nama }) === key
+        );
+        const existing = idx >= 0 ? result[idx] : undefined;
+        if (existing && unitNominal > 0) {
+          result[idx] = { ...existing, nominal: unitNominal, qty };
+        }
+        continue;
+      }
+
+      seenKeys.add(key);
+      result.push({
+        id: it.id ? `db-${it.id}` : `db-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        nama: it.deskripsi || it.kategori || "Item Tagihan",
+        kategori: isPotongan ? "potongan" : "tambahan",
+        nominal: unitNominal,
+        qty,
+        satuan: "Pax",
+        isDefault: false,
+      });
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Extract saved active invoice items and merge them into PaymentReviewTab InvoiceOrderItem[]
+ * (where nominal = total = hargaSatuan * qty, and base package is rendered separately).
+ */
+export function mergeSavedOrderItemsFromInvoices(
+  baseOrderItems: InvoiceOrderItem[],
+  invoices?: any[]
+): InvoiceOrderItem[] {
+  if (!invoices || invoices.length === 0) return baseOrderItems;
+
+  const result = baseOrderItems.map((it) => ({ ...it }));
+  const seenKeys = new Set<string>(
+    result.map((it) => getClientInvoiceItemKey({ kategori: it.kategori, deskripsi: it.nama, tipe: it.tipe }))
+  );
+
+  for (const inv of invoices) {
+    if (!inv || inv.status === "cancelled") continue;
+    for (const it of inv.items || []) {
+      if (shouldSkipNonBillingInvoiceItem(it)) continue;
+      const key = getClientInvoiceItemKey(it);
+      if (key === "__BASE_PACKAGE__") continue;
+
+      const katLower = (it.kategori || "").toLowerCase();
+      const isPotongan =
+        katLower === "potongan" ||
+        katLower === "pengurangan" ||
+        (it.hargaSatuan || 0) < 0 ||
+        (it.jumlah || 0) < 0;
+      const qty = Math.max(1, Math.round(Number(it.qty) || 1));
+      const rawUnit = Number(it.hargaSatuan);
+      const unitNominal = Number.isFinite(rawUnit)
+        ? Math.abs(Math.round(rawUnit))
+        : Math.abs(Math.round((Number(it.jumlah) || 0) / qty));
+      const totalNominal = unitNominal * qty;
+
+      if (seenKeys.has(key)) {
+        const idx = result.findIndex(
+          (o) => getClientInvoiceItemKey({ kategori: o.kategori, deskripsi: o.nama, tipe: o.tipe }) === key
+        );
+        const existing = idx >= 0 ? result[idx] : undefined;
+        if (existing && unitNominal > 0) {
+          result[idx] = {
+            ...existing,
+            hargaSatuan: unitNominal,
+            qty,
+            nominal: totalNominal,
+          };
+        }
+        continue;
+      }
+
+      seenKeys.add(key);
+      result.push({
+        id: it.id ? `db-${it.id}` : `db-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        nama: it.deskripsi || it.kategori || "Item Tagihan",
+        kategori: isPotongan ? "potongan" : "tambahan",
+        tipe: isPotongan ? "pengurangan" : "penambahan",
+        qty,
+        satuan: "Pax",
+        hargaSatuan: unitNominal,
+        nominal: totalNominal,
+      });
+    }
+  }
+
+  return result;
+}
+
+export function mapBillingItemsToSyncPayload(items: BillingItem[]) {
+  return items.map((b) => ({
+    kategori: b.kategori,
+    deskripsi: b.nama,
+    qty: Math.max(1, b.qty || 1),
+    hargaSatuan: b.nominal,
+    jumlah: b.nominal * Math.max(1, b.qty || 1),
+  }));
+}
+
+export function calculateBillingItemsNetTotal(items: BillingItem[]): number {
+  return items.reduce((sum, i) => {
+    const sub = (i.nominal || 0) * Math.max(1, i.qty || 1);
+    return i.kategori === "potongan" ? sum - sub : sum + sub;
+  }, 0);
+}
+
 // Re-export types for convenience
 export type { InvoiceOrderItem, GroupPaymentSummary, Pembayaran, MetodePembayaran, InvoiceSplitConfig, InvoiceSplitItem };

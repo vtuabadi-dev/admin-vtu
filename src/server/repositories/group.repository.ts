@@ -326,7 +326,9 @@ export const groupRepo = {
         },
         pembayaran: { include: { alokasi: true } },
         invoices: { include: { items: true } },
-        keberangkatan: true,
+        keberangkatan: {
+          include: { hotelMekkahMaster: true, hotelMadinahMaster: true },
+        },
         registrationRequests: {
           select: {
             id: true,
@@ -370,7 +372,9 @@ export const groupRepo = {
               },
               pembayaran: { include: { alokasi: true } },
               invoices: { include: { items: true } },
-              keberangkatan: true,
+              keberangkatan: {
+                include: { hotelMekkahMaster: true, hotelMadinahMaster: true },
+              },
               registrationRequests: {
                 select: {
                   id: true,
@@ -503,6 +507,20 @@ export const groupRepo = {
             tanggalBerangkat: row.keberangkatan.tanggalBerangkat
               ? row.keberangkatan.tanggalBerangkat.toISOString()
               : undefined,
+            hotelMekkah:
+              row.keberangkatan.hotelMekkahMaster?.name ||
+              (row.keberangkatan.hotelMekkah && !row.keberangkatan.hotelMekkah.startsWith("cm")
+                ? row.keberangkatan.hotelMekkah
+                : undefined) ||
+              row.keberangkatan.hotelMekkah ||
+              "TBA",
+            hotelMadinah:
+              row.keberangkatan.hotelMadinahMaster?.name ||
+              (row.keberangkatan.hotelMadinah && !row.keberangkatan.hotelMadinah.startsWith("cm")
+                ? row.keberangkatan.hotelMadinah
+                : undefined) ||
+              row.keberangkatan.hotelMadinah ||
+              "TBA",
             hotelOptions: row.keberangkatan.hotelOptions,
             upgradeDouble: row.keberangkatan.upgradeDouble,
             upgradeTriple: row.keberangkatan.upgradeTriple,
@@ -517,7 +535,9 @@ export const groupRepo = {
         anggota: { include: { dokumen: true } },
         pembayaran: { include: { alokasi: true } },
         invoices: { include: { items: true } },
-        keberangkatan: true,
+        keberangkatan: {
+          include: { hotelMekkahMaster: true, hotelMadinahMaster: true },
+        },
         registrationRequests: {
           select: {
             id: true,
@@ -548,6 +568,20 @@ export const groupRepo = {
             tanggalBerangkat: row.keberangkatan.tanggalBerangkat
               ? row.keberangkatan.tanggalBerangkat.toISOString()
               : undefined,
+            hotelMekkah:
+              row.keberangkatan.hotelMekkahMaster?.name ||
+              (row.keberangkatan.hotelMekkah && !row.keberangkatan.hotelMekkah.startsWith("cm")
+                ? row.keberangkatan.hotelMekkah
+                : undefined) ||
+              row.keberangkatan.hotelMekkah ||
+              "TBA",
+            hotelMadinah:
+              row.keberangkatan.hotelMadinahMaster?.name ||
+              (row.keberangkatan.hotelMadinah && !row.keberangkatan.hotelMadinah.startsWith("cm")
+                ? row.keberangkatan.hotelMadinah
+                : undefined) ||
+              row.keberangkatan.hotelMadinah ||
+              "TBA",
             hotelOptions: row.keberangkatan.hotelOptions,
             upgradeDouble: row.keberangkatan.upgradeDouble,
             upgradeTriple: row.keberangkatan.upgradeTriple,

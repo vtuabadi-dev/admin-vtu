@@ -30,6 +30,7 @@ import {
   getGroupList,
   getKeberangkatanList,
   createInvoice,
+  syncGroupBillingItems,
   addJamaahToGroup,
   updateJamaahHotels,
   getMasterHotels,
@@ -49,6 +50,9 @@ import {
   getPackageUpgradePrice,
   detectRoomTypeFromName,
   isBaseRoomType,
+  mergeSavedBillingItemsFromInvoices,
+  mapBillingItemsToSyncPayload,
+  calculateBillingItemsNetTotal,
 } from "./shared-constants";
 import { broadcastMutation, subscribeRealtime, type RealtimeEventPayload } from "@/shared/lib/realtime-bus";
 import MasterBillingOptionsModal from "./MasterBillingOptionsModal";
@@ -645,23 +649,11 @@ export default function CreateInvoiceModal({
         new Set([...upgradedMekkahMembers, ...upgradedMadinahMembers].map((a: any) => a.namaLengkap).filter(Boolean))
       );
 
-      // Check if group's invoices or invoice items have nominal
-      let detectedNominal = 0;
-      for (const inv of (groupInfo.invoices || [])) {
-        for (const it of (inv.items || [])) {
-          if (isHotelUpgradeItem(it.deskripsi || "")) {
-            detectedNominal = it.hargaSatuan || 0;
-            break;
-          }
-        }
-        if (detectedNominal > 0) break;
-      }
-
       items.push({
         id: `hotel-upgrade-manifest`,
         nama: `Upgrade Hotel (${parts.join(", ")})`,
         kategori: "tambahan",
-        nominal: detectedNominal,
+        nominal: 0,
         qty: targetAnggota.length || pax,
         satuan: "Pax",
         allocatedJamaah: targetAnggota.length > 0 ? targetAnggota : memberNames,
@@ -671,13 +663,8 @@ export default function CreateInvoiceModal({
       });
     }
 
-    setBillingItems((prev) => {
-      // Preserve any custom user-added items
-      const userCustomItems = prev.filter(
-        (i) => !i.isDefault && !i.id.startsWith("room-upgrade-") && !i.id.startsWith("hotel-upgrade-")
-      );
-      return [...items, ...userCustomItems];
-    });
+    const hydratedItems = mergeSavedBillingItemsFromInvoices(items, groupInfo.invoices);
+    setBillingItems(hydratedItems);
   }, [groupInfo]);
 
   const totalTambahan = useMemo(() => {
@@ -704,6 +691,38 @@ export default function CreateInvoiceModal({
     }
     return groupInfo?.totalTagihan || 0;
   }, [billingItems, totalUtama, totalTambahan, totalPotongan, groupInfo?.totalTagihan]);
+
+  async function persistBillingItemsToDb(nextItems: BillingItem[]) {
+    if (!groupInfo?.id) return;
+    const nextTotal = Math.max(0, calculateBillingItemsNetTotal(nextItems));
+    try {
+      const res = await syncGroupBillingItems({
+        groupId: groupInfo.id,
+        totalTagihan: nextTotal,
+        items: mapBillingItemsToSyncPayload(nextItems),
+      });
+      if (res.success) {
+        const syncedTotal = res.totalTagihan ?? nextTotal;
+        setGroupInfo((prev: any) =>
+          prev
+            ? {
+                ...prev,
+                totalTagihan: syncedTotal,
+                sisaPembayaran:
+                  res.sisaPembayaran ?? Math.max(0, syncedTotal - (prev.totalPembayaran || 0)),
+              }
+            : prev
+        );
+        broadcastMutation("invoices", "UPDATE", { groupId: groupInfo.id });
+        broadcastMutation("registration_groups", "UPDATE", { id: groupInfo.id });
+        broadcastMutation("manifest", "UPDATE", { groupId: groupInfo.id });
+        broadcastMutation("manifest_rows", "UPDATE", { groupId: groupInfo.id });
+        broadcastMutation("pembayaran", "UPDATE", { groupId: groupInfo.id });
+      }
+    } catch (err) {
+      console.error("[CreateInvoiceModal] Sync billing items error:", err);
+    }
+  }
 
   function handleAddBillingItem() {
     if (!newBillingNama.trim() || newBillingNominal <= 0) return;
@@ -769,14 +788,14 @@ export default function CreateInvoiceModal({
       isDefault: false,
     };
 
-    setBillingItems((prev) => {
-      if (isHotelUpgrade) {
-        // Replace existing auto-detected placeholder with the user-configured item
-        const filtered = prev.filter((i) => !i.id.startsWith("hotel-upgrade-"));
-        return [...filtered, newItem];
-      }
-      return [...prev, newItem];
-    });
+    const nextItems = isHotelUpgrade
+      ? [
+          ...billingItems.filter((i) => !isHotelUpgradeItem(i.nama) && !i.id.startsWith("hotel-upgrade-")),
+          newItem,
+        ]
+      : [...billingItems, newItem];
+    setBillingItems(nextItems);
+    void persistBillingItemsToDb(nextItems);
 
     // Update jamaah manifest hotels if hotel upgrade is configured
     if (isHotelUpgrade && allocated && allocated.length > 0 && groupInfo) {
@@ -843,21 +862,21 @@ export default function CreateInvoiceModal({
 
   function handleSaveEditItem() {
     if (!editingItem || !editItemNama.trim() || editItemNominal < 0) return;
-    setBillingItems((prev) =>
-      prev.map((i) =>
-        i.id === editingItem.id
-          ? {
-              ...i,
-              nama: editItemNama.trim(),
-              kategori: editItemKategori,
-              nominal: editItemNominal,
-              qty: Math.max(1, editItemQty),
-              satuan: editItemSatuan || "Pax",
-              catatan: editItemCatatan.trim() || undefined,
-            }
-          : i
-      )
+    const nextItems = billingItems.map((i) =>
+      i.id === editingItem.id
+        ? {
+            ...i,
+            nama: editItemNama.trim(),
+            kategori: editItemKategori,
+            nominal: editItemNominal,
+            qty: Math.max(1, editItemQty),
+            satuan: editItemSatuan || "Pax",
+            catatan: editItemCatatan.trim() || undefined,
+          }
+        : i
     );
+    setBillingItems(nextItems);
+    void persistBillingItemsToDb(nextItems);
     setShowEditItemModal(false);
     setEditingItem(null);
   }
@@ -932,7 +951,9 @@ export default function CreateInvoiceModal({
       }
     }
 
-    setBillingItems((prev) => prev.filter((i) => i.id !== id || i.isDefault));
+    const nextItems = billingItems.filter((i) => i.id !== id || i.isDefault);
+    setBillingItems(nextItems);
+    void persistBillingItemsToDb(nextItems);
   }
 
   // Comprehensive financial summary for selected group

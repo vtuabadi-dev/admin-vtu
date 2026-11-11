@@ -451,29 +451,40 @@ export async function GET(request: Request) {
           let invoiceDiskon = 0;
 
           (group.invoices || []).forEach((inv: any) => {
+            if (inv.status === "cancelled") return;
             (inv.items || []).forEach((item: any) => {
               if (item.status === "cancelled") return;
-              const text = `${item.kategori || ""} ${item.deskripsi || ""}`.toLowerCase();
+              const katLower = (item.kategori || "").toLowerCase();
+              const descLower = (item.deskripsi || "").toLowerCase();
+              const text = `${katLower} ${descLower}`;
+              if (katLower.includes("pembayaran invoice") || katLower.includes("angsuran")) return;
+
               const itemVal = Number(item.jumlah || 0);
+              const isPotonganKat = katLower === "potongan" || katLower === "pengurangan";
 
               if (text.includes("upgrade hotel") || (text.includes("hotel") && (text.includes("bintang") || text.includes("upgrade")))) {
-                invoiceUpgradeHotel += itemVal;
+                invoiceUpgradeHotel += Math.abs(itemVal);
               } else if (text.includes("upgrade kamar") || text.includes("double") || text.includes("triple") || text.includes("single")) {
-                invoiceUpgradeKamar += itemVal;
+                invoiceUpgradeKamar += Math.abs(itemVal);
               } else if (text.includes("jahit") || text.includes("tailor") || text.includes("jahitan")) {
-                invoiceOngkosJahit += itemVal;
+                invoiceOngkosJahit += Math.abs(itemVal);
               } else if (
                 text.includes("perlengkapan") ||
                 text.includes("equipment") ||
                 text.includes("koper") ||
                 text.includes("seragam") ||
                 text.includes("ihram") ||
-                (item.kategori || "").toLowerCase().includes("perlengkapan")
+                katLower.includes("perlengkapan")
               ) {
-                invoiceTambahanPerlengkapan += itemVal;
-              } else if (text.includes("diskon") || text.includes("promo") || text.includes("voucher") || itemVal < 0) {
+                invoiceTambahanPerlengkapan += Math.abs(itemVal);
+              } else if (isPotonganKat || text.includes("diskon") || text.includes("promo") || text.includes("voucher") || itemVal < 0) {
                 invoiceDiskon += Math.abs(itemVal);
-              } else if (!text.includes("paket umroh") && !text.includes("biaya paket")) {
+              } else if (
+                katLower !== "utama" &&
+                !text.includes("paket umroh") &&
+                !text.includes("biaya paket") &&
+                !(text.includes("penambahan") && text.includes("jamaah"))
+              ) {
                 if (itemVal > 0) invoiceTambahanPerlengkapan += itemVal;
               }
             });

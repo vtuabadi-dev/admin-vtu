@@ -35,6 +35,7 @@ import {
   saveInvoiceSplitConfig,
   updateJamaahHotels,
   getMasterHotels,
+  syncGroupBillingItems,
 } from "@/server/actions/api";
 import type {
   GroupPaymentSummary,
@@ -60,6 +61,9 @@ import {
   isBaseRoomType,
   getInitialTambahanOptions,
   getInitialPotonganOptions,
+  mergeSavedBillingItemsFromInvoices,
+  mapBillingItemsToSyncPayload,
+  calculateBillingItemsNetTotal,
 } from "./_components/shared-constants";
 import MasterBillingOptionsModal from "./_components/MasterBillingOptionsModal";
 import { broadcastMutation, subscribeRealtime, type RealtimeEventPayload } from "@/shared/lib/realtime-bus";
@@ -405,6 +409,39 @@ const SplitInvoiceModal = dynamic(
     return calculatedTotalTagihan - dibayar;
   }, [calculatedTotalTagihan, groupData?.totalPembayaran]);
 
+  async function persistBillingItemsToDb(nextItems: BillingItem[]) {
+    const targetGroupId = groupData?.groupId || (groupData as any)?.id;
+    if (!targetGroupId) return;
+    const nextTotal = Math.max(0, calculateBillingItemsNetTotal(nextItems));
+    try {
+      const res = await syncGroupBillingItems({
+        groupId: targetGroupId,
+        totalTagihan: nextTotal,
+        items: mapBillingItemsToSyncPayload(nextItems),
+      });
+      if (res.success) {
+        const syncedTotal = res.totalTagihan ?? nextTotal;
+        setGroupData((prev) =>
+          prev
+            ? {
+                ...prev,
+                totalTagihan: syncedTotal,
+                sisaPembayaran:
+                  res.sisaPembayaran ?? Math.max(0, syncedTotal - (prev.totalPembayaran || 0)),
+              }
+            : prev
+        );
+        broadcastMutation("invoices", "UPDATE", { groupId: targetGroupId });
+        broadcastMutation("registration_groups", "UPDATE", { id: targetGroupId });
+        broadcastMutation("manifest", "UPDATE", { groupId: targetGroupId });
+        broadcastMutation("manifest_rows", "UPDATE", { groupId: targetGroupId });
+        broadcastMutation("pembayaran", "UPDATE", { groupId: targetGroupId });
+      }
+    } catch (err) {
+      console.error("[LaporanPage] Sync billing items error:", err);
+    }
+  }
+
   function handleAddBillingItem() {
     if (!newBillingNama.trim() || newBillingNominal <= 0) return;
 
@@ -462,13 +499,14 @@ const SplitInvoiceModal = dynamic(
       hotelMadinah: isHotelUpgrade ? chosenMadinah : undefined,
     };
 
-    setBillingItems((prev) => {
-      if (isHotelUpgrade) {
-        const filtered = prev.filter((i) => !i.id.startsWith("hotel-upgrade-"));
-        return [...filtered, newItem];
-      }
-      return [...prev, newItem];
-    });
+    const nextItems = isHotelUpgrade
+      ? [
+          ...billingItems.filter((i) => !isHotelUpgradeItem(i.nama) && !i.id.startsWith("hotel-upgrade-")),
+          newItem,
+        ]
+      : [...billingItems, newItem];
+    setBillingItems(nextItems);
+    void persistBillingItemsToDb(nextItems);
 
     // Update jamaah manifest hotels if hotel upgrade is configured
     if (isHotelUpgrade && allocated && allocated.length > 0 && groupData) {
@@ -538,22 +576,22 @@ const SplitInvoiceModal = dynamic(
 
   function handleSaveEditItem() {
     if (!editingItem || !editItemNama.trim() || editItemNominal < 0) return;
-    setBillingItems((prev) =>
-      prev.map((i) =>
-        i.id === editingItem.id
-          ? {
-              ...i,
-              nama: editItemNama.trim(),
-              kategori: editItemKategori,
-              nominal: editItemNominal,
-              qty: Math.max(1, editItemQty),
-              satuan: editItemSatuan || "Pax",
-              catatan: editItemCatatan.trim() || undefined,
-              allocatedJamaah: editItemAllocatedMembers.length > 0 ? editItemAllocatedMembers : undefined,
-            }
-          : i
-      )
+    const nextItems = billingItems.map((i) =>
+      i.id === editingItem.id
+        ? {
+            ...i,
+            nama: editItemNama.trim(),
+            kategori: editItemKategori,
+            nominal: editItemNominal,
+            qty: Math.max(1, editItemQty),
+            satuan: editItemSatuan || "Pax",
+            catatan: editItemCatatan.trim() || undefined,
+            allocatedJamaah: editItemAllocatedMembers.length > 0 ? editItemAllocatedMembers : undefined,
+          }
+        : i
     );
+    setBillingItems(nextItems);
+    void persistBillingItemsToDb(nextItems);
     setShowEditItemModal(false);
     setEditingItem(null);
   }
@@ -619,7 +657,9 @@ const SplitInvoiceModal = dynamic(
       }
     }
 
-    setBillingItems((prev) => prev.filter((i) => i.id !== id || i.isDefault));
+    const nextItems = billingItems.filter((i) => i.id !== id || i.isDefault);
+    setBillingItems(nextItems);
+    void persistBillingItemsToDb(nextItems);
   }
 
   function handleWaFileProcess(file: File) {
@@ -767,22 +807,11 @@ const SplitInvoiceModal = dynamic(
           new Set([...upgradedMekkahMembers, ...upgradedMadinahMembers].map((a: any) => a.namaLengkap).filter(Boolean))
         );
 
-        let detectedNominal = 0;
-        for (const inv of (summary.invoices || [])) {
-          for (const it of (inv.items || [])) {
-            if (isHotelUpgradeItem(it.deskripsi || "")) {
-              detectedNominal = it.hargaSatuan || 0;
-              break;
-            }
-          }
-          if (detectedNominal > 0) break;
-        }
-
         initialItems.push({
           id: `hotel-upgrade-manifest`,
           nama: `Upgrade Hotel (${parts.join(", ")})`,
           kategori: "tambahan",
-          nominal: detectedNominal,
+          nominal: 0,
           qty: targetAnggota.length || summary.jumlahAnggota,
           satuan: "Pax",
           allocatedJamaah: targetAnggota.length > 0 ? targetAnggota : memberNames,
@@ -792,8 +821,9 @@ const SplitInvoiceModal = dynamic(
         });
       }
 
+      const hydratedItems = mergeSavedBillingItemsFromInvoices(initialItems, summary.invoices);
       setGroupData(summary);
-      setBillingItems(initialItems);
+      setBillingItems(hydratedItems);
       if (split) {
         setSplitConfig(split);
         setActiveSplitId(split.splits[0]?.id ?? null);
@@ -866,6 +896,10 @@ const SplitInvoiceModal = dynamic(
       // Refresh
       const summary = await getGroupPaymentSummary(groupData.groupId);
       setGroupData(summary ?? null);
+      broadcastMutation("pembayaran", "INSERT", { groupId: groupData.groupId });
+      broadcastMutation("registration_groups", "UPDATE", { id: groupData.groupId });
+      broadcastMutation("manifest", "UPDATE", { groupId: groupData.groupId });
+      broadcastMutation("manifest_rows", "UPDATE", { groupId: groupData.groupId });
     } catch {
       // silently fail
     } finally {
