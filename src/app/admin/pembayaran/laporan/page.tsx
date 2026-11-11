@@ -19,7 +19,6 @@ import {
   FileText,
   Download,
   Trash2,
-  Building,
   Users,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/components/ui/Card";
@@ -30,6 +29,7 @@ import { Select } from "@/shared/components/ui/Select";
 import { Modal } from "@/shared/components/ui/Modal";
 import { StatusBadge } from "@/shared/components/ui/Badge";
 import { LoadingSkeleton } from "@/shared/components/LoadingSkeleton";
+import { HotelUpgradeSelector } from "./_components/HotelUpgradeSelector";
 import {
   getGroupPaymentSummary,
   getGroupByKode,
@@ -2019,101 +2019,18 @@ const SplitInvoiceModal = dynamic(
 
           {/* 3. Hotel Upgrade Selection (Makkah & Madinah) — Ditampilkan jika memilih jenis Upgrade Hotel */}
           {newBillingKategori === "tambahan" && isHotelUpgradeItem(newBillingNama) && (
-            <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg space-y-3">
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-bold text-amber-900 dark:text-amber-200 flex items-center gap-1.5">
-                  <Building className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-                  Pilih Hotel Tujuan Upgrade (Makkah & Madinah):
-                </label>
-                {(currentHotelMekkah !== packageHotelMekkah || currentHotelMadinah !== packageHotelMadinah || (selectedHotelMekkah && selectedHotelMekkah !== packageHotelMekkah) || (selectedHotelMadinah && selectedHotelMadinah !== packageHotelMadinah)) && (
-                  <span className="text-[10px] font-bold bg-amber-500/20 text-amber-800 dark:text-amber-300 px-2 py-0.5 rounded border border-amber-500/30">
-                    Upgrade Terdeteksi / Aktif
-                  </span>
-                )}
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {/* Dropdown Hotel Makkah */}
-                <div className="space-y-1">
-                  <label className="text-[11px] font-semibold text-foreground flex items-center justify-between">
-                    <span>🕋 Hotel Makkah</span>
-                    {packageHotelMekkah && (
-                      <span className="text-[10px] text-muted-foreground truncate max-w-[150px]" title={`Asal Paket: ${packageHotelMekkah}`}>
-                        Asal Paket: {packageHotelMekkah}
-                      </span>
-                    )}
-                  </label>
-                  <select
-                    className="w-full rounded-md border border-input bg-background px-2.5 py-1.5 text-xs ring-offset-background focus:outline-none focus:ring-2 focus:ring-amber-500/50"
-                    value={selectedHotelMekkah || currentHotelMekkah || packageHotelMekkah}
-                    onChange={(e) => setSelectedHotelMekkah(e.target.value)}
-                  >
-                    {currentHotelMekkah && currentHotelMekkah !== packageHotelMekkah && (
-                      <option value={currentHotelMekkah}>
-                        {currentHotelMekkah} (Hotel Saat Ini - Upgrade)
-                      </option>
-                    )}
-                    {packageHotelMekkah && (
-                      <option value={packageHotelMekkah}>
-                        {packageHotelMekkah} (Asal Paket Standar)
-                      </option>
-                    )}
-                    {mekkahHotelOptions
-                      .filter((h) => h !== currentHotelMekkah && h !== packageHotelMekkah)
-                      .map((h) => (
-                        <option key={h} value={h}>
-                          {h}
-                        </option>
-                      ))}
-                  </select>
-                  {currentHotelMekkah && currentHotelMekkah !== packageHotelMekkah && (
-                    <p className="text-[10px] text-amber-600 dark:text-amber-400 font-medium">
-                      ✨ Hotel saat ini di manifest: <strong>{currentHotelMekkah}</strong>
-                    </p>
-                  )}
-                </div>
-
-                {/* Dropdown Hotel Madinah */}
-                <div className="space-y-1">
-                  <label className="text-[11px] font-semibold text-foreground flex items-center justify-between">
-                    <span>🕌 Hotel Madinah</span>
-                    {packageHotelMadinah && (
-                      <span className="text-[10px] text-muted-foreground truncate max-w-[150px]" title={`Asal Paket: ${packageHotelMadinah}`}>
-                        Asal Paket: {packageHotelMadinah}
-                      </span>
-                    )}
-                  </label>
-                  <select
-                    className="w-full rounded-md border border-input bg-background px-2.5 py-1.5 text-xs ring-offset-background focus:outline-none focus:ring-2 focus:ring-amber-500/50"
-                    value={selectedHotelMadinah || currentHotelMadinah || packageHotelMadinah}
-                    onChange={(e) => setSelectedHotelMadinah(e.target.value)}
-                  >
-                    {currentHotelMadinah && currentHotelMadinah !== packageHotelMadinah && (
-                      <option value={currentHotelMadinah}>
-                        {currentHotelMadinah} (Hotel Saat Ini - Upgrade)
-                      </option>
-                    )}
-                    {packageHotelMadinah && (
-                      <option value={packageHotelMadinah}>
-                        {packageHotelMadinah} (Asal Paket Standar)
-                      </option>
-                    )}
-                    {madinahHotelOptions
-                      .filter((h) => h !== currentHotelMadinah && h !== packageHotelMadinah)
-                      .map((h) => (
-                        <option key={h} value={h}>
-                          {h}
-                        </option>
-                      ))}
-                  </select>
-                  {currentHotelMadinah && currentHotelMadinah !== packageHotelMadinah && (
-                    <p className="text-[10px] text-amber-600 dark:text-amber-400 font-medium">
-                      ✨ Hotel saat ini di manifest: <strong>{currentHotelMadinah}</strong>
-                    </p>
-                  )}
-                </div>
-              </div>
-            </div>
+            <HotelUpgradeSelector
+              currentHotelMekkah={currentHotelMekkah}
+              packageHotelMekkah={packageHotelMekkah}
+              selectedHotelMekkah={selectedHotelMekkah}
+              onChangeHotelMekkah={setSelectedHotelMekkah}
+              mekkahHotelOptions={mekkahHotelOptions}
+              currentHotelMadinah={currentHotelMadinah}
+              packageHotelMadinah={packageHotelMadinah}
+              selectedHotelMadinah={selectedHotelMadinah}
+              onChangeHotelMadinah={setSelectedHotelMadinah}
+              madinahHotelOptions={madinahHotelOptions}
+            />
           )}
 
           {/* 4. Nominal Input — Kolom isian harga upgrade per pax */}
