@@ -18,7 +18,10 @@ export async function GET(request: NextRequest) {
   if (!session?.user) {
     try {
       const result = await packageService.findAll({ status, limit, offset });
-      return NextResponse.json({ success: true, data: result.data, total: result.total });
+      return NextResponse.json(
+        { success: true, data: result.data, total: result.total },
+        { headers: { "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate" } }
+      );
     } catch (error) {
       return NextResponse.json({ success: false, message: (error as Error).message }, { status: 500 });
     }
@@ -29,7 +32,10 @@ export async function GET(request: NextRequest) {
 
   try {
     const result = await packageService.findAll({ status, limit, offset });
-    return NextResponse.json({ success: true, data: result.data, total: result.total });
+    return NextResponse.json(
+      { success: true, data: result.data, total: result.total },
+      { headers: { "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate" } }
+    );
   } catch (error) {
     return NextResponse.json({ success: false, message: (error as Error).message }, { status: 500 });
   }

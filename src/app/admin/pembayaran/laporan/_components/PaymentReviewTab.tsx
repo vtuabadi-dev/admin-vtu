@@ -69,7 +69,12 @@ import {
   hasMaterializedRoomOrFullLedger,
   type InvoiceOrderItem,
 } from "./shared-constants";
-import { updateJamaahHotels, getMasterHotels, syncGroupBillingItems, createInvoice } from "@/server/actions/api";
+import { getMasterHotels, createInvoice } from "@/server/actions/api";
+import {
+  syncBillingItemsAndStore,
+  syncJamaahHotelsAndStore,
+  refreshStoreGroupSummaryById,
+} from "./billing-sync-client";
 import { broadcastMutation, subscribeRealtimeEvents, subscribeRealtime, type RealtimeEventPayload } from "@/shared/lib/realtime-bus";
 import MasterBillingOptionsModal from "./MasterBillingOptionsModal";
 
@@ -159,6 +164,7 @@ function PaymentReviewTabContent() {
   // Order Items / Adjustments (Beban Tambahan & Pengurangan Biaya)
   const [orderItems, setOrderItems] = useState<InvoiceOrderItem[]>([]);
   const [showAddOrderModal, setShowAddOrderModal] = useState(false);
+  const [savingOrderItem, setSavingOrderItem] = useState(false);
   const [newOrderName, setNewOrderName] = useState("");
   const [newOrderType, setNewOrderType] = useState<"penambahan" | "pengurangan">("penambahan");
   const [newOrderNominal, setNewOrderNominal] = useState<number>(0);
@@ -557,7 +563,7 @@ function PaymentReviewTabContent() {
 
       const payload = buildOrderSyncPayload(nextItems, p);
       try {
-        const res = await syncGroupBillingItems({
+        const res = await syncBillingItemsAndStore({
           groupId: targetGroupId,
           items: payload,
         });
@@ -573,6 +579,7 @@ function PaymentReviewTabContent() {
                         ...prev.group,
                         totalTagihan: updatedTotal,
                         sisaPembayaran: updatedSisa ?? prev.group.sisaPembayaran,
+                        ...(res.group?.invoices ? { invoices: res.group.invoices } : {}),
                       }
                     : prev.group,
                 }
@@ -588,17 +595,13 @@ function PaymentReviewTabContent() {
                           ...q.group,
                           totalTagihan: updatedTotal,
                           sisaPembayaran: updatedSisa ?? q.group.sisaPembayaran,
+                          ...(res.group?.invoices ? { invoices: res.group.invoices } : {}),
                         }
                       : q.group,
                   }
                 : q
             )
           );
-          broadcastMutation("invoices", "UPDATE", { groupId: targetGroupId });
-          broadcastMutation("registration_groups", "UPDATE", { id: targetGroupId });
-          broadcastMutation("manifest", "UPDATE", { groupId: targetGroupId });
-          broadcastMutation("manifest_rows", "UPDATE", { groupId: targetGroupId });
-          broadcastMutation("pembayaran", "UPDATE", { groupId: targetGroupId });
         }
       } catch (err) {
         console.error("[PaymentReviewTab] Sync billing items error:", err);
@@ -1229,6 +1232,7 @@ function PaymentReviewTabContent() {
       setSendInvoiceTarget(updated);
 
       if (targetGroupId) {
+        await refreshStoreGroupSummaryById(targetGroupId);
         broadcastMutation("invoices", "INSERT", { groupId: targetGroupId });
         broadcastMutation("pembayaran", "UPDATE", { groupId: targetGroupId });
         broadcastMutation("registration_groups", "UPDATE", { id: targetGroupId });
@@ -2299,20 +2303,12 @@ function PaymentReviewTabContent() {
                                         "";
 
                                       if (targetGroupId && (defaultMekkah || defaultMadinah)) {
-                                        updateJamaahHotels({
+                                        syncJamaahHotelsAndStore({
                                           jamaahNames: allocated,
                                           groupId: targetGroupId,
                                           hotelMekkah: defaultMekkah,
                                           hotelMadinah: defaultMadinah,
-                                        })
-                                          .then((res) => {
-                                            if (res.success) {
-                                              broadcastMutation("jamaah", "UPDATE", { groupId: targetGroupId });
-                                              broadcastMutation("manifest", "UPDATE", { groupId: targetGroupId });
-                                              broadcastMutation("manifest_rows", "UPDATE", { groupId: targetGroupId });
-                                            }
-                                          })
-                                          .catch((err) => console.warn("[UpgradeHotel] Revert manifest hotel error:", err));
+                                        }).catch((err) => console.warn("[UpgradeHotel] Revert manifest hotel error:", err));
                                       }
 
                                       if (defaultMekkah) {
@@ -3396,6 +3392,7 @@ function PaymentReviewTabContent() {
               type="button"
               variant="outline"
               size="sm"
+              disabled={savingOrderItem}
               onClick={() => setShowAddOrderModal(false)}
             >
               Batal
@@ -3404,7 +3401,8 @@ function PaymentReviewTabContent() {
               type="button"
               size="sm"
               className="font-bold bg-amber-500 hover:bg-amber-600 text-slate-950"
-              onClick={() => {
+              onClick={async () => {
+                if (savingOrderItem) return;
                 if (!newOrderName.trim() || newOrderNominal <= 0) return;
                 const trimmedName = newOrderName.trim();
                 const isPotongan = newOrderType === "pengurangan";
@@ -3459,24 +3457,28 @@ function PaymentReviewTabContent() {
                   },
                 ];
                 setOrderItems(nextOrderItems);
-                void syncOrderItemsToDb(nextOrderItems);
-
-                // Otomatis update hotel manifest jamaah jika upgrade hotel
-                if (isHotelUpgrade) {
+                setSavingOrderItem(true);
+                try {
+                  const hotelTargetGroupId = selectedPayment?.groupId || selectedPayment?.group?.id;
                   const targetMembers = newOrderAllocatedMembers.length > 0
                     ? newOrderAllocatedMembers
                     : (selectedAnggota.length > 0 ? selectedAnggota : availableAnggota);
-                  const targetGroupId = selectedPayment?.groupId || selectedPayment?.group?.id;
 
-                  updateJamaahHotels({
-                    jamaahNames: targetMembers,
-                    groupId: targetGroupId,
-                    hotelMekkah: chosenMekkah,
-                    hotelMadinah: chosenMadinah,
-                  }).then(() => {
-                    broadcastMutation("jamaah", "UPDATE");
-                    broadcastMutation("manifest", "UPDATE");
-                  }).catch((err) => console.error("Failed to update jamaah hotels:", err));
+                  await Promise.all([
+                    syncOrderItemsToDb(nextOrderItems),
+                    isHotelUpgrade && hotelTargetGroupId
+                      ? syncJamaahHotelsAndStore({
+                          jamaahNames: targetMembers,
+                          groupId: hotelTargetGroupId,
+                          hotelMekkah: chosenMekkah,
+                          hotelMadinah: chosenMadinah,
+                        })
+                      : Promise.resolve(),
+                  ]);
+                } catch (err) {
+                  console.error("Failed to update order items / jamaah hotels:", err);
+                } finally {
+                  setSavingOrderItem(false);
                 }
 
                 // Otomatis update tipe kamar jamaah jika ini adalah upgrade kamar
@@ -3500,9 +3502,9 @@ function PaymentReviewTabContent() {
                 setIsOrderCustomJenisMode(false);
                 setShowAddOrderModal(false);
               }}
-              disabled={!newOrderName.trim() || newOrderNominal <= 0}
+              disabled={savingOrderItem || !newOrderName.trim() || newOrderNominal <= 0}
             >
-              Simpan Item
+              {savingOrderItem ? "Menyimpan..." : "Simpan Item"}
             </Button>
           </div>
         </div>

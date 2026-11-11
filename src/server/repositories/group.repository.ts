@@ -132,10 +132,20 @@ function mapInvoice(inv: any): Invoice {
 // ────────────────────────────────────────────────────────────
 
 export const groupRepo = {
-  async findAll(params?: { status?: string; keberangkatanId?: string; limit?: number; offset?: number }) {
+  async findAll(params?: {
+    status?: string;
+    keberangkatanId?: string;
+    keberangkatanIds?: string[];
+    limit?: number;
+    offset?: number;
+  }) {
     const where: any = {};
     if (params?.status) where.status = params.status;
-    if (params?.keberangkatanId) where.paketKeberangkatanId = params.keberangkatanId;
+    if (params?.keberangkatanIds && params.keberangkatanIds.length > 0) {
+      where.paketKeberangkatanId = { in: params.keberangkatanIds };
+    } else if (params?.keberangkatanId) {
+      where.paketKeberangkatanId = params.keberangkatanId;
+    }
 
     const [rows, total] = await Promise.all([
       prisma.registrationGroup.findMany({

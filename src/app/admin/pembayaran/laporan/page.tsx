@@ -36,11 +36,14 @@ import {
   addPembayaran,
   fetchInvoiceSplitConfig,
   saveInvoiceSplitConfig,
-  updateJamaahHotels,
   getMasterHotels,
-  syncGroupBillingItems,
   createInvoice,
 } from "@/server/actions/api";
+import {
+  syncBillingItemsAndStore,
+  syncJamaahHotelsAndStore,
+  syncGroupSummaryIntoStore,
+} from "./_components/billing-sync-client";
 import type {
   GroupPaymentSummary,
   Pembayaran,
@@ -152,6 +155,7 @@ const SplitInvoiceModal = dynamic(
 // Billing Breakdown Items state (Rincian Tagihan & Potongan)
   const [billingItems, setBillingItems] = useState<BillingItem[]>([]);
   const [showAddItemModal, setShowAddItemModal] = useState(false);
+  const [savingBillingItem, setSavingBillingItem] = useState(false);
   const [newBillingNama, setNewBillingNama] = useState("");
   const [newBillingKategori, setNewBillingKategori] = useState<"tambahan" | "potongan">("tambahan");
   const [newBillingNominal, setNewBillingNominal] = useState(0);
@@ -467,7 +471,7 @@ const SplitInvoiceModal = dynamic(
     if (!targetGroupId) return;
     const nextTotal = Math.max(0, calculateBillingItemsNetTotal(nextItems));
     try {
-      const res = await syncGroupBillingItems({
+      const res = await syncBillingItemsAndStore({
         groupId: targetGroupId,
         totalTagihan: nextTotal,
         items: mapBillingItemsToSyncPayload(nextItems),
@@ -481,22 +485,18 @@ const SplitInvoiceModal = dynamic(
                 totalTagihan: syncedTotal,
                 sisaPembayaran:
                   res.sisaPembayaran ?? Math.max(0, syncedTotal - (prev.totalPembayaran || 0)),
+                ...(res.group?.invoices ? { invoices: res.group.invoices } : {}),
               }
             : prev
         );
-        broadcastMutation("invoices", "UPDATE", { groupId: targetGroupId });
-        broadcastMutation("registration_groups", "UPDATE", { id: targetGroupId });
-        broadcastMutation("manifest", "UPDATE", { groupId: targetGroupId });
-        broadcastMutation("manifest_rows", "UPDATE", { groupId: targetGroupId });
-        broadcastMutation("pembayaran", "UPDATE", { groupId: targetGroupId });
       }
     } catch (err) {
       console.error("[LaporanPage] Sync billing items error:", err);
     }
   }
 
-  function handleAddBillingItem() {
-    if (!newBillingNama.trim() || newBillingNominal <= 0) return;
+  async function handleAddBillingItem() {
+    if (!newBillingNama.trim() || newBillingNominal <= 0 || savingBillingItem) return;
 
     const trimmedName = newBillingNama.trim();
     const isPotongan = newBillingKategori === "potongan";
@@ -558,61 +558,63 @@ const SplitInvoiceModal = dynamic(
           newItem,
         ]
       : [...billingItems, newItem];
+
+    setSavingBillingItem(true);
     setBillingItems(nextItems);
-    void persistBillingItemsToDb(nextItems);
 
-    // Update jamaah manifest hotels if hotel upgrade is configured
-    if (isHotelUpgrade && allocated && allocated.length > 0 && groupData) {
-      const memberObjs = (groupData.anggota || []).filter((a: any) =>
-        allocated.includes(a.namaLengkap)
-      );
-      const jamaahIds = memberObjs.map((a: any) => a.id).filter(Boolean);
+    try {
+      let hotelSyncPromise: Promise<unknown> = Promise.resolve();
 
-      const targetGroupId = groupData.groupId || groupData.id;
+      // Update jamaah manifest hotels if hotel upgrade is configured
+      if (isHotelUpgrade && allocated && allocated.length > 0 && groupData) {
+        const memberObjs = (groupData.anggota || []).filter((a: any) =>
+          allocated.includes(a.namaLengkap)
+        );
+        const jamaahIds = memberObjs.map((a: any) => a.id).filter(Boolean);
+        const targetGroupId = groupData.groupId || groupData.id || "";
 
-      updateJamaahHotels({
-        jamaahIds,
-        jamaahNames: allocated,
-        groupId: targetGroupId,
-        hotelMekkah: chosenMekkah,
-        hotelMadinah: chosenMadinah,
-      })
-        .then((res) => {
-          if (res.success) {
-            broadcastMutation("jamaah", "UPDATE", { groupId: targetGroupId });
-            broadcastMutation("manifest", "UPDATE", { groupId: targetGroupId });
-            broadcastMutation("manifest_rows", "UPDATE", { groupId: targetGroupId });
-          }
-        })
-        .catch((err) => console.warn("[UpgradeHotel] Update manifest hotel error:", err));
+        if (targetGroupId) {
+          hotelSyncPromise = syncJamaahHotelsAndStore({
+            jamaahIds,
+            jamaahNames: allocated,
+            groupId: targetGroupId,
+            hotelMekkah: chosenMekkah,
+            hotelMadinah: chosenMadinah,
+          }).catch((err) => console.warn("[UpgradeHotel] Update manifest hotel error:", err));
+        }
 
-      // Update local groupData.anggota state immediately
-      setGroupData((prev: any) => {
-        if (!prev || !prev.anggota) return prev;
-        return {
-          ...prev,
-          anggota: prev.anggota.map((a: any) => {
-            if (allocated.includes(a.namaLengkap)) {
-              return {
-                ...a,
-                hotelMekkah: chosenMekkah || a.hotelMekkah,
-                hotelMadinah: chosenMadinah || a.hotelMadinah,
-              };
-            }
-            return a;
-          }),
-        };
-      });
+        // Update local groupData.anggota state immediately
+        setGroupData((prev: any) => {
+          if (!prev || !prev.anggota) return prev;
+          return {
+            ...prev,
+            anggota: prev.anggota.map((a: any) => {
+              if (allocated.includes(a.namaLengkap)) {
+                return {
+                  ...a,
+                  hotelMekkah: chosenMekkah || a.hotelMekkah,
+                  hotelMadinah: chosenMadinah || a.hotelMadinah,
+                };
+              }
+              return a;
+            }),
+          };
+        });
+      }
+
+      await Promise.all([persistBillingItemsToDb(nextItems), hotelSyncPromise]);
+
+      setNewBillingNominal(0);
+      setNewBillingQty(1);
+      setNewBillingSatuan("Pax");
+      setNewBillingAllocatedMembers([]);
+      setSelectedHotelMekkah("");
+      setSelectedHotelMadinah("");
+      setIsCustomJenisMode(false);
+      setShowAddItemModal(false);
+    } finally {
+      setSavingBillingItem(false);
     }
-
-    setNewBillingNominal(0);
-    setNewBillingQty(1);
-    setNewBillingSatuan("Pax");
-    setNewBillingAllocatedMembers([]);
-    setSelectedHotelMekkah("");
-    setSelectedHotelMadinah("");
-    setIsCustomJenisMode(false);
-    setShowAddItemModal(false);
   }
 
   function handleOpenEditItem(item: BillingItem) {
@@ -627,8 +629,8 @@ const SplitInvoiceModal = dynamic(
     setShowEditItemModal(true);
   }
 
-  function handleSaveEditItem() {
-    if (!editingItem || !editItemNama.trim() || editItemNominal < 0) return;
+  async function handleSaveEditItem() {
+    if (!editingItem || !editItemNama.trim() || editItemNominal < 0 || savingBillingItem) return;
     const nextItems = billingItems.map((i) =>
       i.id === editingItem.id
         ? {
@@ -643,10 +645,15 @@ const SplitInvoiceModal = dynamic(
           }
         : i
     );
+    setSavingBillingItem(true);
     setBillingItems(nextItems);
-    void persistBillingItemsToDb(nextItems);
-    setShowEditItemModal(false);
-    setEditingItem(null);
+    try {
+      await persistBillingItemsToDb(nextItems);
+      setShowEditItemModal(false);
+      setEditingItem(null);
+    } finally {
+      setSavingBillingItem(false);
+    }
   }
 
   function handleRemoveBillingItem(id: string) {
@@ -666,27 +673,19 @@ const SplitInvoiceModal = dynamic(
         allocated.includes(a.namaLengkap)
       );
       const jamaahIds = memberObjs.map((a: any) => a.id).filter(Boolean);
-      const targetGroupId = groupData.groupId || groupData.id;
+      const targetGroupId = groupData.groupId || groupData.id || "";
 
       const defaultMekkah = packageHotelMekkah || groupData.keberangkatan?.hotelMekkah || "";
       const defaultMadinah = packageHotelMadinah || groupData.keberangkatan?.hotelMadinah || "";
 
-      if (defaultMekkah || defaultMadinah) {
-        updateJamaahHotels({
+      if (targetGroupId && (defaultMekkah || defaultMadinah)) {
+        void syncJamaahHotelsAndStore({
           jamaahIds,
           jamaahNames: allocated,
           groupId: targetGroupId,
           hotelMekkah: defaultMekkah,
           hotelMadinah: defaultMadinah,
-        })
-          .then((res) => {
-            if (res.success) {
-              broadcastMutation("jamaah", "UPDATE", { groupId: targetGroupId });
-              broadcastMutation("manifest", "UPDATE", { groupId: targetGroupId });
-              broadcastMutation("manifest_rows", "UPDATE", { groupId: targetGroupId });
-            }
-          })
-          .catch((err) => console.warn("[UpgradeHotel] Revert manifest hotel error:", err));
+        }).catch((err) => console.warn("[UpgradeHotel] Revert manifest hotel error:", err));
 
         setGroupData((prev: any) => {
           if (!prev || !prev.anggota) return prev;
@@ -940,6 +939,7 @@ const SplitInvoiceModal = dynamic(
       // Refresh
       const summary = await getGroupPaymentSummary(groupData.groupId);
       setGroupData(summary ?? null);
+      syncGroupSummaryIntoStore(summary);
 
       const pdfPayload = buildInvoicePdfDataForGroup({
         group: summary ?? groupData,
@@ -994,6 +994,7 @@ const SplitInvoiceModal = dynamic(
 
       const summary = await getGroupPaymentSummary(targetGroupId);
       setGroupData(summary ?? null);
+      syncGroupSummaryIntoStore(summary);
 
       const invoiceNumber = created.nomorInvoice || created.id;
       const pdfPayload = buildInvoicePdfDataForGroup({
@@ -2249,6 +2250,7 @@ const SplitInvoiceModal = dynamic(
               type="button"
               variant="outline"
               size="sm"
+              disabled={savingBillingItem}
               onClick={() => setShowAddItemModal(false)}
             >
               Batal
@@ -2258,9 +2260,9 @@ const SplitInvoiceModal = dynamic(
               size="sm"
               className="font-bold bg-amber-500 hover:bg-amber-600 text-slate-950"
               onClick={handleAddBillingItem}
-              disabled={!newBillingNama.trim() || newBillingNominal <= 0}
+              disabled={savingBillingItem || !newBillingNama.trim() || newBillingNominal <= 0}
             >
-              Simpan Item
+              {savingBillingItem ? "Menyimpan..." : "Simpan Item"}
             </Button>
           </div>
         </div>
@@ -2417,6 +2419,7 @@ const SplitInvoiceModal = dynamic(
               type="button"
               variant="outline"
               size="sm"
+              disabled={savingBillingItem}
               onClick={() => {
                 setShowEditItemModal(false);
                 setEditingItem(null);
@@ -2429,9 +2432,9 @@ const SplitInvoiceModal = dynamic(
               size="sm"
               className="font-bold bg-amber-500 hover:bg-amber-600 text-slate-950"
               onClick={handleSaveEditItem}
-              disabled={!editItemNama.trim() || editItemNominal < 0}
+              disabled={savingBillingItem || !editItemNama.trim() || editItemNominal < 0}
             >
-              Simpan Perubahan
+              {savingBillingItem ? "Menyimpan..." : "Simpan Perubahan"}
             </Button>
           </div>
         </div>

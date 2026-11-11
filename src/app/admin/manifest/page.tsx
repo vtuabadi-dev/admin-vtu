@@ -1,7 +1,7 @@
 "use client";
 
 // Manifest v2.5 - Unified Single Source Cluster Resolution [Vercel vtu-admin]
-import { useEffect, useState, useCallback, useMemo, Suspense } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   Download,
@@ -33,7 +33,7 @@ import { Modal } from "@/shared/components/ui/Modal";
 import { ErrorState } from "@/shared/components/ui/ErrorState";
 import { formatDateShort, formatDate, cn, downloadFileFromUrl } from "@/shared/lib/utils";
 import type { Manifest, Keberangkatan, Jamaah, RegistrationGroup, FlightSegment } from "@/shared/types";
-import { useOperationalStore } from "@/stores/operational-store";
+import { mergeEntitiesById, useOperationalStore } from "@/stores/operational-store";
 import { extractFilesFromEvent } from "@/shared/lib/file-drop-utils";
 import { resolveHotelForKlaster } from "@/shared/lib/hotel-utils";
 import { hasPackageTourLeader } from "@/shared/lib/file-standardization";
@@ -837,9 +837,12 @@ function ManifestPageContent() {
   const storeKeberangkatan = useOperationalStore((s) => s.keberangkatanList);
   const storeJamaah = useOperationalStore((s) => s.jamaahList);
   const storeGroups = useOperationalStore((s) => s.groupList);
+  const storeStaleFlags = useOperationalStore((s) => s.staleFlags);
   const setStoreKeberangkatan = useOperationalStore((s) => s.setKeberangkatanList);
   const setStoreJamaah = useOperationalStore((s) => s.setJamaahList);
   const setStoreGroups = useOperationalStore((s) => s.setGroupList);
+  const upsertStoreGroups = useOperationalStore((s) => s.upsertGroupsInStore);
+  const upsertStoreJamaah = useOperationalStore((s) => s.upsertJamaahInStore);
 
   const [, setManifests] = useState<Manifest[]>([]);
   const [keberangkatanList, setKeberangkatanList] = useState<Keberangkatan[]>(storeKeberangkatan);
@@ -849,7 +852,15 @@ function ManifestPageContent() {
   const [selectedMonthTab, setSelectedMonthTab] = useState<string>("ALL");
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(storeKeberangkatan.length === 0);
+  const [syncing, setSyncing] = useState<boolean>(false);
   const [error, setError] = useState<Error | null>(null);
+
+  const requestSeqRef = useRef<number>(0);
+  const keberangkatanListRef = useRef<Keberangkatan[]>(keberangkatanList);
+  keberangkatanListRef.current = keberangkatanList;
+  const selectedKeberangkatanRef = useRef<string>(selectedKeberangkatan);
+  selectedKeberangkatanRef.current = selectedKeberangkatan;
+  const groupedPackageTreeRef = useRef<{ parent: Keberangkatan; children: Keberangkatan[] }[]>([]);
 
   // Excel Import Modal state
   const [importModalOpen, setImportModalOpen] = useState(false);
@@ -939,51 +950,121 @@ function ManifestPageContent() {
   }, [storeKeberangkatan, storeJamaah, storeGroups, keberangkatanList.length]);
 
   const loadAllData = useCallback(async () => {
-    if (storeKeberangkatan.length === 0 && keberangkatanList.length === 0) {
+    const seq = ++requestSeqRef.current;
+    const hasWarmCache =
+      useOperationalStore.getState().keberangkatanList.length > 0 ||
+      keberangkatanListRef.current.length > 0;
+
+    if (!hasWarmCache) {
       setLoading(true);
     }
+    setSyncing(true);
     setError(null);
+
     try {
       const timestamp = Date.now();
       const noCacheOpts = {
         cache: "no-store" as RequestCache,
         headers: { "Cache-Control": "no-cache, no-store, must-revalidate" },
       };
-      const [resMan, resKbr, resJam, resGrp] = await Promise.all([
-        fetch(`/api/manifests?_t=${timestamp}`, noCacheOpts),
-        fetch(`/api/keberangkatan?_t=${timestamp}`, noCacheOpts),
-        fetch(`/api/jamaah?_t=${timestamp}`, noCacheOpts),
-        fetch(`/api/groups?_t=${timestamp}`, noCacheOpts),
-      ]);
 
-      if (!resMan.ok || !resKbr.ok || !resJam.ok) {
-        throw new Error("Gagal mengambil data dari server");
+      const targetPkgId = selectedKeberangkatanRef.current;
+      let fullGroupsResolved = false;
+      let fullJamaahResolved = false;
+
+      // Phase 1: Fast package-priority sync for active package
+      const priorityTasks: Promise<void>[] = [];
+      if (targetPkgId) {
+        const pkgNode = groupedPackageTreeRef.current.find(
+          (node) => node.parent.id === targetPkgId || node.children.some((c) => c.id === targetPkgId)
+        );
+        const relatedPkgIds = pkgNode
+          ? Array.from(new Set([pkgNode.parent.id, ...pkgNode.children.map((c) => c.id)]))
+          : [targetPkgId];
+        const qsIds = encodeURIComponent(relatedPkgIds.join(","));
+
+        priorityTasks.push(
+          fetch(`/api/groups?keberangkatanIds=${qsIds}&_t=${timestamp}`, noCacheOpts)
+            .then(async (res) => {
+              if (!res.ok) return;
+              const json = await res.json();
+              if (seq !== requestSeqRef.current || fullGroupsResolved) return;
+              const incoming: RegistrationGroup[] = json.data ?? [];
+              if (incoming.length > 0) {
+                setGroups((prev) => mergeEntitiesById(prev, incoming));
+                upsertStoreGroups(incoming);
+              }
+            })
+            .catch(() => {})
+        );
+
+        priorityTasks.push(
+          fetch(`/api/jamaah?keberangkatanIds=${qsIds}&_t=${timestamp}`, noCacheOpts)
+            .then(async (res) => {
+              if (!res.ok) return;
+              const json = await res.json();
+              if (seq !== requestSeqRef.current || fullJamaahResolved) return;
+              const incoming: Jamaah[] = json.data ?? [];
+              if (incoming.length > 0) {
+                setAllJamaah((prev) => mergeEntitiesById(prev, incoming));
+                upsertStoreJamaah(incoming);
+              }
+            })
+            .catch(() => {})
+        );
       }
 
-      const jsonMan = await resMan.json();
-      const jsonKbr = await resKbr.json();
-      const jsonJam = await resJam.json();
-      const jsonGrp = resGrp.ok ? await resGrp.json() : { data: [] };
+      // Phase 2: Full progressive sync (apply each endpoint immediately on resolution)
+      const fullManPromise = fetch(`/api/manifests?_t=${timestamp}`, noCacheOpts).then(async (res) => {
+        if (!res.ok) throw new Error("Gagal mengambil data dari server");
+        const json = await res.json();
+        if (seq !== requestSeqRef.current) return;
+        setManifests(json.data ?? []);
+      });
 
-      const kbrData = jsonKbr.data ?? [];
-      const jamData = jsonJam.data ?? [];
-      const grpData = jsonGrp.data ?? [];
+      const fullKbrPromise = fetch(`/api/keberangkatan?_t=${timestamp}`, noCacheOpts).then(async (res) => {
+        if (!res.ok) throw new Error("Gagal mengambil data dari server");
+        const json = await res.json();
+        if (seq !== requestSeqRef.current) return;
+        const kbrData: Keberangkatan[] = json.data ?? [];
+        setKeberangkatanList(kbrData);
+        setStoreKeberangkatan(kbrData);
+      });
 
-      setManifests(jsonMan.data ?? []);
-      setKeberangkatanList(kbrData);
-      setAllJamaah(jamData);
-      setGroups(grpData);
+      const fullJamPromise = fetch(`/api/jamaah?_t=${timestamp}`, noCacheOpts).then(async (res) => {
+        if (!res.ok) throw new Error("Gagal mengambil data dari server");
+        const json = await res.json();
+        if (seq !== requestSeqRef.current) return;
+        fullJamaahResolved = true;
+        const jamData: Jamaah[] = json.data ?? [];
+        setAllJamaah(jamData);
+        setStoreJamaah(jamData);
+      });
 
-      // Hydrate operational store for fast instant navigation
-      setStoreKeberangkatan(kbrData);
-      setStoreJamaah(jamData);
-      setStoreGroups(grpData);
+      const fullGrpPromise = fetch(`/api/groups?_t=${timestamp}`, noCacheOpts)
+        .then(async (res) => {
+          if (!res.ok) return;
+          const json = await res.json();
+          if (seq !== requestSeqRef.current) return;
+          fullGroupsResolved = true;
+          const grpData: RegistrationGroup[] = json.data ?? [];
+          setGroups(grpData);
+          setStoreGroups(grpData);
+        })
+        .catch(() => {});
+
+      await Promise.all([fullManPromise, fullKbrPromise, fullJamPromise, fullGrpPromise, ...priorityTasks]);
     } catch (err: any) {
-      setError(err instanceof Error ? err : new Error("Database Connection Error"));
+      if (seq === requestSeqRef.current) {
+        setError(err instanceof Error ? err : new Error("Database Connection Error"));
+      }
     } finally {
-      setLoading(false);
+      if (seq === requestSeqRef.current) {
+        setLoading(false);
+        setSyncing(false);
+      }
     }
-  }, [keberangkatanList.length, setStoreGroups, setStoreJamaah, setStoreKeberangkatan, storeKeberangkatan.length]);
+  }, [setStoreGroups, setStoreJamaah, setStoreKeberangkatan, upsertStoreGroups, upsertStoreJamaah]);
 
   useEffect(() => {
     loadAllData();
@@ -1093,6 +1174,8 @@ function ManifestPageContent() {
 
     return result;
   }, [keberangkatanList]);
+
+  groupedPackageTreeRef.current = groupedPackageTree;
 
   // Group package hierarchy by Departure Month & Year
   const groupedByMonth = useMemo(() => {
@@ -2075,7 +2158,15 @@ function ManifestPageContent() {
             )}
 
             {/* VIEW MODE TABS: OPERASIONAL VS PEMBAYARAN & RINCIAN TAGIHAN */}
-            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-stone-200 dark:border-stone-800 pb-2">
+            {((syncing && !loading) || storeStaleFlags.groups || storeStaleFlags.jamaah) && (
+        <div className="flex items-center justify-end">
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 px-3 py-1 text-[11px] font-semibold text-amber-700 dark:text-amber-300">
+            <RefreshCw className="h-3 w-3 animate-spin" />
+            Menyinkronkan data terbaru...
+          </span>
+        </div>
+      )}
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-stone-200 dark:border-stone-800 pb-2">
               <div className="flex items-center gap-1.5 p-1 bg-stone-100 dark:bg-stone-900 rounded-xl border border-stone-200 dark:border-stone-800">
                 <button
                   onClick={() => {

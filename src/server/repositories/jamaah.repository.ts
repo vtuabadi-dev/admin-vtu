@@ -60,9 +60,22 @@ function mapJamaah(row: any): Jamaah {
 // ────────────────────────────────────────────────────────────
 
 export const jamaahRepo = {
-  async findAll(params?: { groupId?: string; status?: string; search?: string; limit?: number; offset?: number }) {
+  async findAll(params?: {
+    groupId?: string;
+    keberangkatanId?: string;
+    keberangkatanIds?: string[];
+    status?: string;
+    search?: string;
+    limit?: number;
+    offset?: number;
+  }) {
     const where: any = {};
     if (params?.groupId) where.groupId = params.groupId;
+    if (params?.keberangkatanIds && params.keberangkatanIds.length > 0) {
+      where.group = { paketKeberangkatanId: { in: params.keberangkatanIds } };
+    } else if (params?.keberangkatanId) {
+      where.group = { paketKeberangkatanId: params.keberangkatanId };
+    }
     if (params?.status) where.status = params.status;
     if (params?.search) {
       const s = params.search.trim();

@@ -15,11 +15,15 @@ export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl;
   const status = searchParams.get("status") ?? undefined;
   const keberangkatanId = searchParams.get("keberangkatanId") ?? undefined;
+  const keberangkatanIdsRaw = searchParams.get("keberangkatanIds");
+  const keberangkatanIds = keberangkatanIdsRaw
+    ? keberangkatanIdsRaw.split(",").map((s) => s.trim()).filter(Boolean)
+    : undefined;
   const limit = searchParams.get("limit") ? parseInt(searchParams.get("limit")!) : undefined;
   const offset = searchParams.get("offset") ? parseInt(searchParams.get("offset")!) : undefined;
 
   try {
-    const result = await groupRepo.findAll({ status, keberangkatanId, limit, offset });
+    const result = await groupRepo.findAll({ status, keberangkatanId, keberangkatanIds, limit, offset });
     return NextResponse.json(
       { success: true, data: result.data, total: result.total },
       {

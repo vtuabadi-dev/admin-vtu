@@ -478,10 +478,13 @@ export async function syncGroupBillingItems(data: {
       revalidatePath(`/admin/pembayaran/${group.id}`);
     } catch {}
 
+    const updatedGroup = await groupRepo.findById(group.id).catch(() => null);
+
     return {
       success: true,
       totalTagihan: netTotalTagihan,
       sisaPembayaran,
+      group: updatedGroup,
     };
   } catch (err: any) {
     console.error("syncGroupBillingItems error:", err);

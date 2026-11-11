@@ -31,11 +31,14 @@ import {
   getGroupList,
   getKeberangkatanList,
   createInvoice,
-  syncGroupBillingItems,
   addJamaahToGroup,
-  updateJamaahHotels,
   getMasterHotels,
 } from "@/server/actions/api";
+import {
+  syncBillingItemsAndStore,
+  syncJamaahHotelsAndStore,
+  refreshStoreGroupSummaryById,
+} from "./billing-sync-client";
 import {
   BillingItem,
   DEFAULT_SATUAN_OPTIONS,
@@ -145,6 +148,7 @@ export default function CreateInvoiceModal({
   // Dynamic Billing Items State for Invoice Modal
   const [billingItems, setBillingItems] = useState<BillingItem[]>([]);
   const [showAddItemModal, setShowAddItemModal] = useState(false);
+  const [savingBillingItem, setSavingBillingItem] = useState(false);
   const [newBillingNama, setNewBillingNama] = useState("");
   const [newBillingKategori, setNewBillingKategori] = useState<"tambahan" | "potongan">("tambahan");
   const [newBillingNominal, setNewBillingNominal] = useState(0);
@@ -700,7 +704,7 @@ export default function CreateInvoiceModal({
     if (!groupInfo?.id) return;
     const nextTotal = Math.max(0, calculateBillingItemsNetTotal(nextItems));
     try {
-      const res = await syncGroupBillingItems({
+      const res = await syncBillingItemsAndStore({
         groupId: groupInfo.id,
         totalTagihan: nextTotal,
         items: mapBillingItemsToSyncPayload(nextItems),
@@ -714,22 +718,18 @@ export default function CreateInvoiceModal({
                 totalTagihan: syncedTotal,
                 sisaPembayaran:
                   res.sisaPembayaran ?? Math.max(0, syncedTotal - (prev.totalPembayaran || 0)),
+                ...(res.group?.invoices ? { invoices: res.group.invoices } : {}),
               }
             : prev
         );
-        broadcastMutation("invoices", "UPDATE", { groupId: groupInfo.id });
-        broadcastMutation("registration_groups", "UPDATE", { id: groupInfo.id });
-        broadcastMutation("manifest", "UPDATE", { groupId: groupInfo.id });
-        broadcastMutation("manifest_rows", "UPDATE", { groupId: groupInfo.id });
-        broadcastMutation("pembayaran", "UPDATE", { groupId: groupInfo.id });
       }
     } catch (err) {
       console.error("[CreateInvoiceModal] Sync billing items error:", err);
     }
   }
 
-  function handleAddBillingItem() {
-    if (!newBillingNama.trim() || newBillingNominal <= 0) return;
+  async function handleAddBillingItem() {
+    if (!newBillingNama.trim() || newBillingNominal <= 0 || savingBillingItem) return;
     const trimmed = newBillingNama.trim();
     if (newBillingKategori === "tambahan") {
       if (!masterTambahanOptions.includes(trimmed)) {
@@ -798,59 +798,60 @@ export default function CreateInvoiceModal({
           newItem,
         ]
       : [...billingItems, newItem];
+
+    setSavingBillingItem(true);
     setBillingItems(nextItems);
-    void persistBillingItemsToDb(nextItems);
 
-    // Update jamaah manifest hotels if hotel upgrade is configured
-    if (isHotelUpgrade && allocated && allocated.length > 0 && groupInfo) {
-      const memberObjs = (groupInfo.anggota || []).filter((a: any) =>
-        allocated.includes(a.namaLengkap)
-      );
-      const jamaahIds = memberObjs.map((a: any) => a.id).filter(Boolean);
+    try {
+      let hotelSyncPromise: Promise<unknown> = Promise.resolve();
 
-      updateJamaahHotels({
-        jamaahIds,
-        jamaahNames: allocated,
-        groupId: groupInfo.id,
-        hotelMekkah: chosenMekkah,
-        hotelMadinah: chosenMadinah,
-      })
-        .then((res) => {
-          if (res.success) {
-            broadcastMutation("jamaah", "UPDATE", { groupId: groupInfo.id });
-            broadcastMutation("manifest", "UPDATE", { groupId: groupInfo.id });
-            broadcastMutation("manifest_rows", "UPDATE", { groupId: groupInfo.id });
-          }
-        })
-        .catch((err) => console.warn("[UpgradeHotel] Update manifest hotel error:", err));
+      // Update jamaah manifest hotels if hotel upgrade is configured
+      if (isHotelUpgrade && allocated && allocated.length > 0 && groupInfo) {
+        const memberObjs = (groupInfo.anggota || []).filter((a: any) =>
+          allocated.includes(a.namaLengkap)
+        );
+        const jamaahIds = memberObjs.map((a: any) => a.id).filter(Boolean);
 
-      // Update local groupInfo.anggota state immediately
-      setGroupInfo((prev: any) => {
-        if (!prev || !prev.anggota) return prev;
-        return {
-          ...prev,
-          anggota: prev.anggota.map((a: any) => {
-            if (allocated.includes(a.namaLengkap)) {
-              return {
-                ...a,
-                hotelMekkah: chosenMekkah || a.hotelMekkah,
-                hotelMadinah: chosenMadinah || a.hotelMadinah,
-              };
-            }
-            return a;
-          }),
-        };
-      });
+        hotelSyncPromise = syncJamaahHotelsAndStore({
+          jamaahIds,
+          jamaahNames: allocated,
+          groupId: groupInfo.id,
+          hotelMekkah: chosenMekkah,
+          hotelMadinah: chosenMadinah,
+        }).catch((err) => console.warn("[UpgradeHotel] Update manifest hotel error:", err));
+
+        // Update local groupInfo.anggota state immediately
+        setGroupInfo((prev: any) => {
+          if (!prev || !prev.anggota) return prev;
+          return {
+            ...prev,
+            anggota: prev.anggota.map((a: any) => {
+              if (allocated.includes(a.namaLengkap)) {
+                return {
+                  ...a,
+                  hotelMekkah: chosenMekkah || a.hotelMekkah,
+                  hotelMadinah: chosenMadinah || a.hotelMadinah,
+                };
+              }
+              return a;
+            }),
+          };
+        });
+      }
+
+      await Promise.all([persistBillingItemsToDb(nextItems), hotelSyncPromise]);
+
+      setNewBillingNominal(0);
+      setNewBillingQty(1);
+      setNewBillingSatuan("Pax");
+      setNewBillingAllocatedMembers([]);
+      setSelectedHotelMekkah("");
+      setSelectedHotelMadinah("");
+      setIsCustomJenisMode(false);
+      setShowAddItemModal(false);
+    } finally {
+      setSavingBillingItem(false);
     }
-
-    setNewBillingNominal(0);
-    setNewBillingQty(1);
-    setNewBillingSatuan("Pax");
-    setNewBillingAllocatedMembers([]);
-    setSelectedHotelMekkah("");
-    setSelectedHotelMadinah("");
-    setIsCustomJenisMode(false);
-    setShowAddItemModal(false);
   }
 
   function handleOpenEditItem(item: BillingItem) {
@@ -864,8 +865,8 @@ export default function CreateInvoiceModal({
     setShowEditItemModal(true);
   }
 
-  function handleSaveEditItem() {
-    if (!editingItem || !editItemNama.trim() || editItemNominal < 0) return;
+  async function handleSaveEditItem() {
+    if (!editingItem || !editItemNama.trim() || editItemNominal < 0 || savingBillingItem) return;
     const nextItems = billingItems.map((i) =>
       i.id === editingItem.id
         ? {
@@ -879,10 +880,15 @@ export default function CreateInvoiceModal({
           }
         : i
     );
+    setSavingBillingItem(true);
     setBillingItems(nextItems);
-    void persistBillingItemsToDb(nextItems);
-    setShowEditItemModal(false);
-    setEditingItem(null);
+    try {
+      await persistBillingItemsToDb(nextItems);
+      setShowEditItemModal(false);
+      setEditingItem(null);
+    } finally {
+      setSavingBillingItem(false);
+    }
   }
 
   function handleRemoveBillingItem(id: string) {
@@ -916,21 +922,13 @@ export default function CreateInvoiceModal({
         "";
 
       if (defaultMekkah || defaultMadinah) {
-        updateJamaahHotels({
+        void syncJamaahHotelsAndStore({
           jamaahIds,
           jamaahNames: allocated,
           groupId: groupInfo.id,
           hotelMekkah: defaultMekkah,
           hotelMadinah: defaultMadinah,
-        })
-          .then((res) => {
-            if (res.success) {
-              broadcastMutation("jamaah", "UPDATE", { groupId: groupInfo.id });
-              broadcastMutation("manifest", "UPDATE", { groupId: groupInfo.id });
-              broadcastMutation("manifest_rows", "UPDATE", { groupId: groupInfo.id });
-            }
-          })
-          .catch((err) => console.warn("[UpgradeHotel] Revert manifest hotel error:", err));
+        }).catch((err) => console.warn("[UpgradeHotel] Revert manifest hotel error:", err));
 
         // Revert local groupInfo.anggota state immediately so auto-detect is not re-triggered
         setGroupInfo((prev: any) => {
@@ -1095,6 +1093,7 @@ export default function CreateInvoiceModal({
           `PINDAH-${groupInfo.kodeRegistrasi || groupInfo.id.slice(-6).toUpperCase()}`;
         const finalAmount = moveJson.data?.totalAdditionalBill || 0;
 
+        await refreshStoreGroupSummaryById(groupInfo.id, ["jamaah"]);
         onSuccess(resultInvNumber, finalAmount);
         broadcastMutation("registration_groups", "UPDATE", { id: groupInfo.id });
         broadcastMutation("keberangkatan", "UPDATE");
@@ -1131,6 +1130,7 @@ export default function CreateInvoiceModal({
           throw new Error(res.message || "Gagal menambahkan jamaah ke grup");
         }
 
+        await refreshStoreGroupSummaryById(groupInfo.id, ["jamaah"]);
         onSuccess(res.invoiceNumber || `INV-PAX-${groupInfo.kodeRegistrasi}`, res.amount || 0);
         broadcastMutation("registration_groups", "UPDATE", { id: groupInfo.id });
         broadcastMutation("jamaah", "INSERT", { groupId: groupInfo.id });
@@ -1188,6 +1188,7 @@ export default function CreateInvoiceModal({
         items: mapBillingItemsToSyncPayload(billingItems),
       });
 
+      await refreshStoreGroupSummaryById(groupInfo.id);
       onSuccess(
         res.nomorInvoice || res.id,
         isRevisionMode ? calculatedTotalTagihan : effectiveNominal
@@ -3172,6 +3173,7 @@ export default function CreateInvoiceModal({
               type="button"
               variant="outline"
               size="sm"
+              disabled={savingBillingItem}
               onClick={() => setShowAddItemModal(false)}
             >
               Batal
@@ -3181,9 +3183,9 @@ export default function CreateInvoiceModal({
               size="sm"
               className="font-bold bg-amber-500 hover:bg-amber-600 text-slate-950"
               onClick={handleAddBillingItem}
-              disabled={!newBillingNama.trim() || newBillingNominal <= 0}
+              disabled={savingBillingItem || !newBillingNama.trim() || newBillingNominal <= 0}
             >
-              Simpan Item
+              {savingBillingItem ? "Menyimpan..." : "Simpan Item"}
             </Button>
           </div>
         </div>
@@ -3344,6 +3346,7 @@ export default function CreateInvoiceModal({
               type="button"
               variant="outline"
               size="sm"
+              disabled={savingBillingItem}
               onClick={() => {
                 setShowEditItemModal(false);
                 setEditingItem(null);
@@ -3356,9 +3359,9 @@ export default function CreateInvoiceModal({
               size="sm"
               className="font-bold bg-amber-500 hover:bg-amber-600 text-slate-950"
               onClick={handleSaveEditItem}
-              disabled={!editItemNama.trim() || editItemNominal < 0}
+              disabled={savingBillingItem || !editItemNama.trim() || editItemNominal < 0}
             >
-              Simpan Perubahan
+              {savingBillingItem ? "Menyimpan..." : "Simpan Perubahan"}
             </Button>
           </div>
         </div>
