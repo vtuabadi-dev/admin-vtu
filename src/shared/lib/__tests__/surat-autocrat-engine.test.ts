@@ -21,6 +21,8 @@ import {
   countNameWords,
   generateWaTemplateText,
   parseWaFormText,
+  buildTemplateDefaultManualValues,
+  reconcileFormDataOnTemplateSync,
 } from "@/shared/lib/surat-autocrat-engine";
 import { searchKantorImigrasi, getKotaFromKanimName } from "@/shared/lib/kantor-imigrasi";
 import { buildExpandedFieldMap } from "@/shared/lib/docx-mail-merge";
@@ -1028,6 +1030,111 @@ Tanggal Cuti: <<Tanggal Cuti>>
 
       // When the user explicitly typed 2-word name 'Muslihah Mansur' in the form, it should remain 'Muslihah Mansur'
       expect(resolved["Nama Jama’ah"]).toBe("Muslihah Mansur");
+    });
+  });
+
+  describe("Template Sync Form Preservation (Regression Guard)", () => {
+    const baseTemplate = {
+      ...DEFAULT_SURAT_TEMPLATES[0]!,
+      id: "tpl-rekom-1",
+      slug: "rekom-paspor-kemenag",
+      perihalDefault: "Permohonan Rekomendasi Pembuatan Paspor Umroh",
+      placeholders: [
+        { key: "Nama Jamaah", label: "Nama Jamaah", sourceType: "manifest" as const, manifestField: "jamaah.namaLengkap", order: 1 },
+        { key: "NIK", label: "NIK", sourceType: "manifest" as const, manifestField: "jamaah.nik", order: 2 },
+        { key: "Hal", label: "Hal", sourceType: "manual" as const, defaultValue: "Pembuatan Paspor Baru", order: 3 },
+        { key: "Catatan", label: "Catatan", sourceType: "manual" as const, defaultValue: "Sesuai KTP", order: 4 },
+      ],
+    };
+
+    it("extracts only manual placeholders with non-empty defaultValue in buildTemplateDefaultManualValues", () => {
+      expect(buildTemplateDefaultManualValues(baseTemplate)).toEqual({
+        Hal: "Pembuatan Paspor Baru",
+        Catatan: "Sesuai KTP",
+      });
+      expect(buildTemplateDefaultManualValues(null)).toEqual({});
+    });
+
+    it("preserves OCR and user-edited form values (including fields cleared to empty string) when the same template gets a new object reference during background sync", () => {
+      const refreshedSameTemplate = {
+        ...baseTemplate,
+        placeholders: baseTemplate.placeholders.map((p) => ({ ...p })),
+      };
+
+      const userEditedAndOcrData = {
+        "Nama Jamaah": "SITI AMINAH BINTI ABDULLAH",
+        NIK: "3515081122334455",
+        Hal: "", // user explicitly cleared a defaultValue field mid-edit
+      };
+
+      const result = reconcileFormDataOnTemplateSync({
+        currentFormData: userEditedAndOcrData,
+        previousTemplateKey: "rekom-paspor-kemenag",
+        nextTemplate: refreshedSameTemplate,
+      });
+
+      expect(result.shouldResetForm).toBe(false);
+      expect(result.nextTemplateKey).toBe("rekom-paspor-kemenag");
+      expect(result.nextPerihal).toBeUndefined();
+      // Existing fields (including explicitly cleared empty string) remain untouched; missing default is filled
+      expect(result.nextFormData).toEqual({
+        "Nama Jamaah": "SITI AMINAH BINTI ABDULLAH",
+        NIK: "3515081122334455",
+        Hal: "",
+        Catatan: "Sesuai KTP",
+      });
+    });
+
+    it("resets form to template defaults and updates perihal when switching to a different template or initializing", () => {
+      const targetTemplate = {
+        ...DEFAULT_SURAT_TEMPLATES[0]!,
+        id: "tpl-cuti-2",
+        slug: "surat-izin-cuti",
+        perihalDefault: "Permohonan Izin Cuti Kerja",
+        placeholders: [
+          { key: "Nama Jamaah", label: "Nama Jamaah", sourceType: "manifest" as const, order: 1 },
+          { key: "Instansi", label: "Instansi", sourceType: "manual" as const, defaultValue: "PT Maju Jaya", order: 2 },
+        ],
+      };
+
+      const previousData = {
+        "Nama Jamaah": "SITI AMINAH",
+        NIK: "3515081122334455",
+      };
+
+      const switched = reconcileFormDataOnTemplateSync({
+        currentFormData: previousData,
+        previousTemplateKey: "rekom-paspor-kemenag",
+        nextTemplate: targetTemplate,
+      });
+
+      expect(switched.shouldResetForm).toBe(true);
+      expect(switched.nextTemplateKey).toBe("surat-izin-cuti");
+      expect(switched.nextPerihal).toBe("Permohonan Izin Cuti Kerja");
+      expect(switched.nextFormData).toEqual({
+        Instansi: "PT Maju Jaya",
+      });
+
+      const initial = reconcileFormDataOnTemplateSync({
+        currentFormData: {},
+        previousTemplateKey: "",
+        nextTemplate: targetTemplate,
+      });
+      expect(initial.shouldResetForm).toBe(true);
+      expect(initial.nextFormData).toEqual({ Instansi: "PT Maju Jaya" });
+    });
+
+    it("returns current form data unchanged when nextTemplate is null or undefined", () => {
+      const current = { "Nama Jamaah": "BUDI SANTOSO" };
+      const res = reconcileFormDataOnTemplateSync({
+        currentFormData: current,
+        previousTemplateKey: "rekom-paspor-kemenag",
+        nextTemplate: null,
+      });
+
+      expect(res.shouldResetForm).toBe(false);
+      expect(res.nextTemplateKey).toBe("rekom-paspor-kemenag");
+      expect(res.nextFormData).toBe(current);
     });
   });
 });

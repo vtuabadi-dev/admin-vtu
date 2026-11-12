@@ -77,6 +77,7 @@ import {
   resolveManifestFieldValue,
   generateWaTemplateText,
   parseWaFormText,
+  reconcileFormDataOnTemplateSync,
   type ParsedWaResult,
 } from "@/shared/lib/surat-autocrat-engine";
 import { downloadMergedDocx } from "@/shared/lib/docx-mail-merge";
@@ -222,6 +223,9 @@ function GenerateSuratPageContent() {
     akta: null,
     kk: null,
   });
+  const ocrResultsRef = useRef(ocrResultsData);
+  ocrResultsRef.current = ocrResultsData;
+  const [ocrResultRevision, setOcrResultRevision] = useState<number>(0);
   const [ocrErrors, setOcrErrors] = useState<Record<OcrDocType, string | null>>({
     ktp: null,
     akta: null,
@@ -276,8 +280,13 @@ function GenerateSuratPageContent() {
   const userEditedFieldKeysRef = useRef<Set<string>>(new Set());
   const lastAppliedOcrHashRef = useRef<string>("");
   const lastLoadedJamaahIdRef = useRef<string>("");
+  const lastInitializedTemplateKeyRef = useRef<string>("");
+  const lastTemplatesSignatureRef = useRef<string>("");
+  const lastSyncedUrlTemplateParamRef = useRef<string>("");
   const [nomorUrutSurat, setNomorUrutSurat] = useState<string>("001");
   const [customPerihal, setCustomPerihal] = useState<string>("");
+  const customPerihalRef = useRef<string>(customPerihal);
+  customPerihalRef.current = customPerihal;
 
   // History state
   const [historyLogs, setHistoryLogs] = useState<GeneratedSuratLog[]>([]);
@@ -300,21 +309,29 @@ function GenerateSuratPageContent() {
 
   // Load Templates & History
   const loadAll = useCallback(async () => {
+    const commitTemplatesIfChanged = (candidate: SuratTemplate[]) => {
+      if (!Array.isArray(candidate) || candidate.length === 0) return;
+      const sig = JSON.stringify(candidate);
+      if (sig === lastTemplatesSignatureRef.current) return;
+      lastTemplatesSignatureRef.current = sig;
+      setTemplates(candidate);
+    };
+
     // 1. Templates
     try {
       const res = await fetch("/api/master/surat-templates");
       if (res.ok) {
         const json = await res.json();
         if (json.data && Array.isArray(json.data) && json.data.length > 0) {
-          setTemplates(json.data);
+          commitTemplatesIfChanged(json.data);
         } else {
-          setTemplates(loadSavedSuratTemplates());
+          commitTemplatesIfChanged(loadSavedSuratTemplates());
         }
       } else {
-        setTemplates(loadSavedSuratTemplates());
+        commitTemplatesIfChanged(loadSavedSuratTemplates());
       }
     } catch {
-      setTemplates(loadSavedSuratTemplates());
+      commitTemplatesIfChanged(loadSavedSuratTemplates());
     }
 
     // 2. History logs
@@ -341,7 +358,8 @@ function GenerateSuratPageContent() {
     }
 
     // 3. Operational store data
-    if (storeKbrList.length === 0 || !storeJamaah || storeJamaah.length === 0) {
+    const { keberangkatanList: currentKbrList, jamaahList: currentJamaahList } = useOperationalStore.getState();
+    if (currentKbrList.length === 0 || !currentJamaahList || currentJamaahList.length === 0) {
       try {
         const [kbrRes, jamRes] = await Promise.all([
           fetch("/api/keberangkatan"),
@@ -359,7 +377,7 @@ function GenerateSuratPageContent() {
         console.error("Failed to load initial data for surat:", err);
       }
     }
-  }, [storeKbrList.length, storeJamaah, setStoreKbrList, setStoreJamaah]);
+  }, [setStoreKbrList, setStoreJamaah]);
 
   useEffect(() => {
     loadAll();
@@ -370,13 +388,14 @@ function GenerateSuratPageContent() {
     loadAll();
   });
 
-  // Sync template from URL param
+  // Sync template from URL param (once per distinct query param)
   useEffect(() => {
-    if (initialTemplateParam) {
+    if (initialTemplateParam && lastSyncedUrlTemplateParamRef.current !== initialTemplateParam) {
       const found = templates.find(
         (t) => t.slug === initialTemplateParam || t.slug.includes(initialTemplateParam) || t.id === initialTemplateParam
       );
       if (found) {
+        lastSyncedUrlTemplateParamRef.current = initialTemplateParam;
         setSelectedTemplateSlug(found.slug);
       }
     }
@@ -390,6 +409,8 @@ function GenerateSuratPageContent() {
       DEFAULT_SURAT_TEMPLATES[0]
     ) as SuratTemplate;
   }, [templates, selectedTemplateSlug]);
+  const activeTemplateRef = useRef<SuratTemplate>(activeTemplate);
+  activeTemplateRef.current = activeTemplate;
 
   // Filtered templates for dropdown search
   const filteredDropdownTemplates = useMemo(() => {
@@ -476,19 +497,33 @@ function GenerateSuratPageContent() {
     return availableJamaahList.find((j: any) => j.id === selectedJamaahId) || null;
   }, [availableJamaahList, selectedJamaahId, dataSourceMode]);
 
-  // Reset form when template changes
+  // Reconcile form only when template identity (slug/id) changes; preserve OCR/manual edits during background refreshes
   useEffect(() => {
-    if (activeTemplate) {
-      setCustomPerihal(activeTemplate.perihalDefault || "");
+    if (!activeTemplate) return;
+    const prevKey = lastInitializedTemplateKeyRef.current;
+    const nextKey = (activeTemplate.slug || activeTemplate.id || "").trim();
+    const isInitialOrSwitched = !prevKey || prevKey !== nextKey;
+    const isActualSwitch = Boolean(prevKey && prevKey !== nextKey);
 
-      // Populate default manual values
-      const initialManual: Record<string, string> = {};
-      activeTemplate.placeholders.forEach((p) => {
-        if (p.sourceType === "manual" && p.defaultValue) {
-          initialManual[p.key] = p.defaultValue;
-        }
-      });
-      setManualFormData(initialManual);
+    lastInitializedTemplateKeyRef.current = nextKey;
+
+    if (isInitialOrSwitched) {
+      setCustomPerihal(activeTemplate.perihalDefault || "");
+    }
+
+    setManualFormData((prev) =>
+      reconcileFormDataOnTemplateSync({
+        currentFormData: prev,
+        previousTemplateKey: prevKey,
+        nextTemplate: activeTemplate,
+      }).nextFormData
+    );
+
+    if (isActualSwitch) {
+      userEditedFieldKeysRef.current.clear();
+      lastAppliedOcrHashRef.current = "";
+      setOcrFilledFieldKeys(new Set());
+      setParsedWaFilledFieldKeys(new Set());
     }
   }, [activeTemplate]);
 
@@ -619,6 +654,7 @@ function GenerateSuratPageContent() {
 
       // Update state & storage
       const newTemplates = templates.map((t) => (t.id === updatedTemplate.id ? updatedTemplate : t));
+      lastTemplatesSignatureRef.current = JSON.stringify(newTemplates);
       setTemplates(newTemplates);
       saveSuratTemplates(newTemplates);
 
@@ -1134,26 +1170,26 @@ function GenerateSuratPageContent() {
           .replace(/[\u2018\u2019\u201A\u201B'"`{}[\]()_.\-:\/\\]/g, "")
           .replace(/\s+/g, "");
 
-      // Periksa apakah template saat ini adalah surat rekomendasi paspor
-      const isRekomPaspor =
-        activeTemplate?.slug?.includes("rekom") ||
-        activeTemplate?.id === "tpl-rekom-paspor" ||
-        activeTemplate?.kodeNomorDefault === "SR-PASPOR" ||
-        (activeTemplate?.nama || "").toLowerCase().includes("rekomendasi paspor");
+      const computeNextFormState = (prev: Record<string, string>) => {
+        const currentTpl = activeTemplateRef.current;
+        const isRekomPaspor =
+          currentTpl?.slug?.includes("rekom") ||
+          currentTpl?.id === "tpl-rekom-paspor" ||
+          currentTpl?.kodeNomorDefault === "SR-PASPOR" ||
+          (currentTpl?.nama || "").toLowerCase().includes("rekomendasi paspor");
 
-      // Periksa apakah perihal / hal saat ini adalah endorsement nama
-      const currentHalVal = (
-        manualFormData["Hal"] ||
-        manualFormData["hal"] ||
-        manualFormData["perihal"] ||
-        manualFormData["Perihal"] ||
-        customPerihal ||
-        activeTemplate?.perihalDefault ||
-        ""
-      ).toLowerCase();
-      const isCurrentlyEndorsement = currentHalVal.includes("endorse");
+        // Periksa apakah perihal / hal saat ini adalah endorsement nama
+        const currentHalVal = (
+          prev["Hal"] ||
+          prev["hal"] ||
+          prev["perihal"] ||
+          prev["Perihal"] ||
+          customPerihalRef.current ||
+          currentTpl?.perihalDefault ||
+          ""
+        ).toLowerCase();
+        const isCurrentlyEndorsement = currentHalVal.includes("endorse");
 
-      setManualFormData((prev) => {
         const next = { ...prev };
         const newlyFilled = new Set<string>();
 
@@ -1198,25 +1234,25 @@ function GenerateSuratPageContent() {
         }
         if (alamatCandidate) {
           const val = toTitleCase(alamatCandidate);
-          next["alamat"] = val;
-          next["Alamat"] = val;
-          next["alamat_lengkap"] = val;
-          next["Alamat Lengkap"] = val;
+          if (forceOverwrite || !userEditedFieldKeysRef.current.has("alamat")) next["alamat"] = val;
+          if (forceOverwrite || !userEditedFieldKeysRef.current.has("Alamat")) next["Alamat"] = val;
+          if (forceOverwrite || !userEditedFieldKeysRef.current.has("alamat_lengkap")) next["alamat_lengkap"] = val;
+          if (forceOverwrite || !userEditedFieldKeysRef.current.has("Alamat Lengkap")) next["Alamat Lengkap"] = val;
         }
         if (tanggalLahirCandidate) {
           const iso = parseDateToIsoString(tanggalLahirCandidate);
           const formattedTgl = (iso ? formatIsoToIndonesianDate(iso) : null) || tanggalLahirCandidate;
-          next["tanggal_lahir"] = formattedTgl;
-          next["Tanggal Lahir"] = formattedTgl;
-          next["tgl_lahir"] = formattedTgl;
-          next["Tgl Lahir"] = formattedTgl;
-          next["tanggallahir"] = formattedTgl;
+          if (forceOverwrite || !userEditedFieldKeysRef.current.has("tanggal_lahir")) next["tanggal_lahir"] = formattedTgl;
+          if (forceOverwrite || !userEditedFieldKeysRef.current.has("Tanggal Lahir")) next["Tanggal Lahir"] = formattedTgl;
+          if (forceOverwrite || !userEditedFieldKeysRef.current.has("tgl_lahir")) next["tgl_lahir"] = formattedTgl;
+          if (forceOverwrite || !userEditedFieldKeysRef.current.has("Tgl Lahir")) next["Tgl Lahir"] = formattedTgl;
+          if (forceOverwrite || !userEditedFieldKeysRef.current.has("tanggallahir")) next["tanggallahir"] = formattedTgl;
         }
         if (tempatLahirCandidate) {
           const val = toTitleCase(tempatLahirCandidate);
-          next["tempat_lahir"] = val;
-          next["Tempat Lahir"] = val;
-          next["tempatlahir"] = val;
+          if (forceOverwrite || !userEditedFieldKeysRef.current.has("tempat_lahir")) next["tempat_lahir"] = val;
+          if (forceOverwrite || !userEditedFieldKeysRef.current.has("Tempat Lahir")) next["Tempat Lahir"] = val;
+          if (forceOverwrite || !userEditedFieldKeysRef.current.has("tempatlahir")) next["tempatlahir"] = val;
         }
 
         effectivePlaceholders.forEach((p) => {
@@ -1434,12 +1470,23 @@ function GenerateSuratPageContent() {
           }
         });
 
+        return { next, newlyFilled };
+      };
+
+      setManualFormData((prev) => computeNextFormState(prev).next);
+      const { newlyFilled } = computeNextFormState({});
+      if (newlyFilled.size > 0) {
         setOcrFilledFieldKeys((prevSet) => new Set([...Array.from(prevSet), ...Array.from(newlyFilled)]));
-        return next;
-      });
+      }
     },
     [effectivePlaceholders]
   );
+
+  const markUserEditedField = useCallback((...keys: string[]) => {
+    keys.forEach((k) => {
+      if (k) userEditedFieldKeysRef.current.add(k);
+    });
+  }, []);
 
   // Handler perubahan nilai field input form dengan sinkronisasi otomatis nama endorsement saat Hal berubah
   const handleUpdateFieldValue = useCallback(
@@ -1642,7 +1689,10 @@ function GenerateSuratPageContent() {
     const hasAnyOcr = (["ktp", "akta", "kk"] as OcrDocType[]).some((j) => ocrResultsData[j]);
     if (!hasAnyOcr) return;
 
-    const ocrHash = `${selectedTemplateSlug}_${JSON.stringify({
+    const ocrHash = `${selectedTemplateSlug}_rev${ocrResultRevision}_${JSON.stringify({
+      hasKtp: Boolean(ocrResultsData.ktp),
+      hasAkta: Boolean(ocrResultsData.akta),
+      hasKk: Boolean(ocrResultsData.kk),
       ktp: ocrResultsData.ktp?.nik || ocrResultsData.ktp?.namaLengkap,
       akta: ocrResultsData.akta?.namaAyah || ocrResultsData.akta?.namaLengkap,
       kk: ocrResultsData.kk?.nomorKk || ocrResultsData.kk?.namaAyah,
@@ -1652,7 +1702,7 @@ function GenerateSuratPageContent() {
       lastAppliedOcrHashRef.current = ocrHash;
       applyAllOcrResultsToForm(ocrResultsData);
     }
-  }, [dataSourceMode, selectedTemplateSlug, ocrResultsData, applyAllOcrResultsToForm]);
+  }, [dataSourceMode, selectedTemplateSlug, ocrResultsData, ocrResultRevision, applyAllOcrResultsToForm]);
 
   // Helper to handle pasted file (from event or clipboard API)
   const handlePasteFile = useCallback(
@@ -1890,11 +1940,10 @@ function GenerateSuratPageContent() {
       }
 
       // ── TAHAP 4: TERAPKAN VARIABEL OCR KE FORM ──
-      setOcrResultsData((prev) => {
-        const next = { ...prev, [jenis]: ocrResultData };
-        applyAllOcrResultsToForm(next);
-        return next;
-      });
+      const nextOcrResults = { ...ocrResultsRef.current, [jenis]: ocrResultData };
+      ocrResultsRef.current = nextOcrResults;
+      setOcrResultsData(nextOcrResults);
+      setOcrResultRevision((r) => r + 1);
 
       setOcrStatuses((prev) => ({ ...prev, [jenis]: "success" }));
       const docLabel = OCR_DOC_CONFIG[jenis]?.title || jenis.toUpperCase();
@@ -1918,11 +1967,13 @@ function GenerateSuratPageContent() {
     setOcrFiles((prev) => ({ ...prev, [jenis]: null }));
     setOcrPreviews((prev) => ({ ...prev, [jenis]: null }));
     setOcrStatuses((prev) => ({ ...prev, [jenis]: "idle" }));
-    setOcrResultsData((prev) => {
-      const next = { ...prev, [jenis]: null };
-      applyAllOcrResultsToForm(next);
-      return next;
-    });
+    const nextOcrResults = { ...ocrResultsRef.current, [jenis]: null };
+    ocrResultsRef.current = nextOcrResults;
+    setOcrResultsData(nextOcrResults);
+    setOcrResultRevision((r) => r + 1);
+    if (!Object.values(nextOcrResults).some(Boolean)) {
+      setOcrFilledFieldKeys(new Set());
+    }
     setOcrErrors((prev) => ({ ...prev, [jenis]: null }));
     setOcrUploadedDocs((prev) => ({ ...prev, [jenis]: null }));
   };
@@ -4096,7 +4147,7 @@ function GenerateSuratPageContent() {
                             <KantorImigrasiCombobox
                               value={displayValue}
                               onChange={(kanimNama, kanimKota) => {
-                                const nextData: Record<string, string> = { ...manualFormData, [p.key]: kanimNama };
+                                const updates: Record<string, string> = { [p.key]: kanimNama };
                                 const effectiveKota = toTitleCase(kanimKota || getKotaFromKanimName(kanimNama));
 
                                 if (effectiveKota) {
@@ -4114,11 +4165,12 @@ function GenerateSuratPageContent() {
                                       lbl.includes("kotakantor") ||
                                       (k.includes("kota") && !k.includes("lahir") && !k.includes("paket"))
                                     ) {
-                                      nextData[pl.key] = effectiveKota;
+                                      updates[pl.key] = effectiveKota;
                                     }
                                   });
                                 }
-                                setManualFormData(nextData);
+                                markUserEditedField(...Object.keys(updates));
+                                setManualFormData((prev) => ({ ...prev, ...updates }));
                               }}
                               placeholder={p.placeholderHint || "Cari atau ketik Kantor Imigrasi / Layanan Paspor..."}
                             />
@@ -4156,14 +4208,16 @@ function GenerateSuratPageContent() {
                                 <Input
                                   type="text"
                                   value={displayValue}
-                                  onChange={(e) =>
-                                    setManualFormData((prev) => ({ ...prev, [p.key]: e.target.value }))
-                                  }
+                                  onChange={(e) => {
+                                    markUserEditedField(p.key);
+                                    setManualFormData((prev) => ({ ...prev, [p.key]: e.target.value }));
+                                  }}
                                   onBlur={() => {
                                     const [sIso, eIso] = parseDateRangeToIsoStrings(displayValue);
                                     if (sIso && eIso) {
                                       const norm = formatIsoToIndonesianDateRange(sIso, eIso);
                                       if (norm && norm !== displayValue) {
+                                        markUserEditedField(p.key);
                                         setManualFormData((prev) => ({ ...prev, [p.key]: norm }));
                                       }
                                     }
@@ -4189,6 +4243,7 @@ function GenerateSuratPageContent() {
                                         onChange={(e) => {
                                           const newStart = e.target.value;
                                           const newFormatted = formatIsoToIndonesianDateRange(newStart, endIso);
+                                          markUserEditedField(p.key);
                                           setManualFormData((prev) => ({ ...prev, [p.key]: newFormatted }));
                                         }}
                                         className="h-8 w-full text-xs px-2.5 rounded-md border border-input bg-background text-foreground cursor-pointer focus:ring-1 focus:ring-emerald-500"
@@ -4205,6 +4260,7 @@ function GenerateSuratPageContent() {
                                         onChange={(e) => {
                                           const newEnd = e.target.value;
                                           const newFormatted = formatIsoToIndonesianDateRange(startIso, newEnd);
+                                          markUserEditedField(p.key);
                                           setManualFormData((prev) => ({ ...prev, [p.key]: newFormatted }));
                                         }}
                                         className="h-8 w-full text-xs px-2.5 rounded-md border border-input bg-background text-foreground cursor-pointer focus:ring-1 focus:ring-emerald-500"
@@ -4227,9 +4283,10 @@ function GenerateSuratPageContent() {
                                   <Input
                                     type="text"
                                     value={displayValue}
-                                    onChange={(e) =>
-                                      setManualFormData((prev) => ({ ...prev, [p.key]: e.target.value }))
-                                    }
+                                    onChange={(e) => {
+                                      markUserEditedField(p.key);
+                                      setManualFormData((prev) => ({ ...prev, [p.key]: e.target.value }));
+                                    }}
                                     placeholder={p.placeholderHint || "Contoh: 10 Juni 1990"}
                                     className="text-xs h-9 bg-background text-foreground pr-8 font-medium"
                                   />
@@ -4262,6 +4319,7 @@ function GenerateSuratPageContent() {
                                       const val = e.target.value;
                                       if (val) {
                                         const formatted = formatIsoToIndonesianDate(val);
+                                        markUserEditedField(p.key);
                                         setManualFormData((prev) => ({ ...prev, [p.key]: formatted }));
                                       }
                                     }}
@@ -4304,9 +4362,10 @@ function GenerateSuratPageContent() {
                                   <Input
                                     type="text"
                                     value={displayValue}
-                                    onChange={(e) =>
-                                      setManualFormData((prev) => ({ ...prev, [p.key]: e.target.value }))
-                                    }
+                                    onChange={(e) => {
+                                      markUserEditedField(p.key);
+                                      setManualFormData((prev) => ({ ...prev, [p.key]: e.target.value }));
+                                    }}
                                     placeholder={p.placeholderHint || "Contoh: September 2026"}
                                     className="text-xs h-9 bg-background text-foreground pr-8 font-medium"
                                   />
@@ -4339,6 +4398,7 @@ function GenerateSuratPageContent() {
                                       const val = e.target.value;
                                       if (val) {
                                         const formatted = formatIsoToIndonesianMonthYear(val);
+                                        markUserEditedField(p.key);
                                         setManualFormData((prev) => ({ ...prev, [p.key]: formatted }));
                                       }
                                     }}

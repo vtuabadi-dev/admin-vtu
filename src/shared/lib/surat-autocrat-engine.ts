@@ -3392,3 +3392,70 @@ export function parseWaFormText(
   };
 }
 
+/**
+ * Mengambil nilai default awal dari placeholder bertipe manual pada template surat.
+ */
+export function buildTemplateDefaultManualValues(
+  template: SuratTemplate | null | undefined
+): Record<string, string> {
+  const defaults: Record<string, string> = {};
+  if (!template?.placeholders) return defaults;
+  template.placeholders.forEach((p) => {
+    if (p.sourceType === "manual" && p.defaultValue) {
+      defaults[p.key] = p.defaultValue;
+    }
+  });
+  return defaults;
+}
+
+/**
+ * Menjaga isian form surat (OCR / WA / editan manual) tetap utuh saat daftar template
+ * direfresh di background untuk template yang sama, dan hanya me-reset ketika identitas
+ * template (slug/id) benar-benar berpindah.
+ */
+export function reconcileFormDataOnTemplateSync(params: {
+  currentFormData: Record<string, string>;
+  previousTemplateKey: string;
+  nextTemplate: SuratTemplate | null | undefined;
+}): {
+  nextTemplateKey: string;
+  nextFormData: Record<string, string>;
+  nextPerihal?: string;
+  shouldResetForm: boolean;
+} {
+  const { currentFormData, previousTemplateKey, nextTemplate } = params;
+  if (!nextTemplate) {
+    return {
+      nextTemplateKey: previousTemplateKey,
+      nextFormData: currentFormData,
+      shouldResetForm: false,
+    };
+  }
+
+  const nextTemplateKey = (nextTemplate.slug || nextTemplate.id || "").trim();
+  const defaults = buildTemplateDefaultManualValues(nextTemplate);
+
+  if (!previousTemplateKey || previousTemplateKey !== nextTemplateKey) {
+    return {
+      nextTemplateKey,
+      nextFormData: defaults,
+      nextPerihal: nextTemplate.perihalDefault || "",
+      shouldResetForm: true,
+    };
+  }
+
+  let hasMissingDefault = false;
+  for (const [key, val] of Object.entries(defaults)) {
+    if (currentFormData[key] === undefined && val) {
+      hasMissingDefault = true;
+      break;
+    }
+  }
+
+  return {
+    nextTemplateKey,
+    nextFormData: hasMissingDefault ? { ...defaults, ...currentFormData } : currentFormData,
+    shouldResetForm: false,
+  };
+}
+
