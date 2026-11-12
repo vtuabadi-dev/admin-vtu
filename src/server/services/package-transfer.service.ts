@@ -1,6 +1,7 @@
 import { prisma } from "@/server/db/client";
 import { formatStandardDocumentFileName, hasPackageTourLeader } from "@/shared/lib/file-standardization";
 import { moveAndRenameDriveFile, provisionPackageStorage } from "@/server/storage/google-drive";
+import { recordInvoiceAuditLog } from "@/server/services/invoice-audit.service";
 
 export interface TransferPackageInput {
   groupId: string;
@@ -346,6 +347,22 @@ export async function transferPackageGroup(
       totalAdditionalBill,
       memberManifestNumberMap,
     };
+  });
+
+  await recordInvoiceAuditLog({
+    groupId: existingGroup.id,
+    kodeRegistrasi: existingGroup.kodeRegistrasi,
+    namaGroup: existingGroup.namaGroup,
+    namaPaket: targetPaket.namaPaket,
+    invoiceId: txResult.createdInvoice?.id,
+    nomorInvoice: txResult.createdInvoice?.nomorInvoice,
+    eventKind: "PINDAH_PAKET",
+    action: "paket.transfer",
+    detail: `Pindah paket ${existingGroup.namaGroup} (${paxCount} pax) dari "${existingGroup.keberangkatan?.namaPaket || existingGroup.paketKeberangkatanId}" ke "${targetPaket.namaPaket}" [Mode: ${input.pricingOption}${txResult.totalAdditionalBill > 0 ? `, Tambahan Tagihan: Rp ${txResult.totalAdditionalBill.toLocaleString("id-ID")}` : ", Tanpa Biaya Tambahan"}]`,
+    beforeTotal: existingGroup.totalTagihan,
+    afterTotal: existingGroup.totalTagihan + txResult.totalAdditionalBill,
+    manifestImpact: ["Manifest Paket Keberangkatan", "Data Jamaah & Kuota", "Manifest Pembayaran"],
+    actorOverride: input.authorName ? { userName: input.authorName } : undefined,
   });
 
   // 4. Post-Commit Asynchronous Google Drive Relocation (Outside DB Transaction)

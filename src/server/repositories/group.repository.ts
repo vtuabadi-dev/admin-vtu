@@ -1,4 +1,6 @@
 import { prisma } from "@/server/db/client";
+import { fetchInvoiceAuditEntries } from "@/server/services/invoice-audit.service";
+import { buildGroupInvoiceAuditTimeline } from "@/shared/lib/invoice-audit-log";
 import type {
   RegistrationGroup,
   GroupPaymentSummary,
@@ -6,6 +8,18 @@ import type {
   Invoice,
   InvoiceSplitConfig,
 } from "@/shared/types";
+
+function groupAuditEntriesByGroupId(auditEntries: any[]): Map<string, any[]> {
+  const map = new Map<string, any[]>();
+  for (const ae of auditEntries || []) {
+    const gid = ae?.entityId;
+    if (!gid) continue;
+    const list = map.get(gid) || [];
+    list.push(ae);
+    map.set(gid, list);
+  }
+  return map;
+}
 
 function mapGroup(row: any): RegistrationGroup {
   const req = row.registrationRequests && row.registrationRequests.length > 0 ? row.registrationRequests[0] : null;
@@ -147,7 +161,7 @@ export const groupRepo = {
       where.paketKeberangkatanId = params.keberangkatanId;
     }
 
-    const [rows, total] = await Promise.all([
+    const [rows, total, auditEntries] = await Promise.all([
       prisma.registrationGroup.findMany({
         where,
         include: {
@@ -162,22 +176,43 @@ export const groupRepo = {
         orderBy: { createdAt: "asc" },
       }),
       prisma.registrationGroup.count({ where }),
+      fetchInvoiceAuditEntries({ limit: 500 }),
     ]);
-    return { data: rows.map(mapGroup), total };
+    const auditByGroup = groupAuditEntriesByGroupId(auditEntries);
+    const data = rows.map((row: any) => {
+      const mapped = mapGroup(row);
+      mapped.invoiceLogs = buildGroupInvoiceAuditTimeline({
+        group: mapped,
+        auditEntries: auditByGroup.get(mapped.id) || [],
+        order: "desc",
+      });
+      return mapped;
+    });
+    return { data, total };
   },
 
   async findById(id: string) {
-    const row = await prisma.registrationGroup.findUnique({
-      where: { id },
-      include: {
-        anggota: true,
-        keberangkatan: { include: { paketUmroh: true, hotelMekkahMaster: true, hotelMadinahMaster: true } },
-        registrationRequests: { select: { hotelUpgrade: true, roomUpgrade: true } },
-        invoices: { include: { items: true } },
-        pembayaran: { include: { alokasi: true } },
-      },
+    const [row, auditEntries] = await Promise.all([
+      prisma.registrationGroup.findUnique({
+        where: { id },
+        include: {
+          anggota: true,
+          keberangkatan: { include: { paketUmroh: true, hotelMekkahMaster: true, hotelMadinahMaster: true } },
+          registrationRequests: { select: { hotelUpgrade: true, roomUpgrade: true } },
+          invoices: { include: { items: true } },
+          pembayaran: { include: { alokasi: true } },
+        },
+      }),
+      fetchInvoiceAuditEntries({ groupId: id, limit: 150 }),
+    ]);
+    if (!row) return null;
+    const mapped = mapGroup(row);
+    mapped.invoiceLogs = buildGroupInvoiceAuditTimeline({
+      group: mapped,
+      auditEntries,
+      order: "desc",
     });
-    return row ? mapGroup(row) : null;
+    return mapped;
   },
 
   async findByKode(kodeRegistrasi: string) {
@@ -210,7 +245,16 @@ export const groupRepo = {
       },
     });
 
-    if (row) return mapGroup(row);
+    if (row) {
+      const mapped = mapGroup(row);
+      const auditEntries = await fetchInvoiceAuditEntries({ groupId: mapped.id, limit: 150 });
+      mapped.invoiceLogs = buildGroupInvoiceAuditTimeline({
+        group: mapped,
+        auditEntries,
+        order: "desc",
+      });
+      return mapped;
+    }
 
     // Fallback search in RegistrationRequest
     const req: any = await prisma.registrationRequest.findFirst({
@@ -509,6 +553,18 @@ export const groupRepo = {
       })),
       pembayaran: row.pembayaran.map(mapPembayaran),
       invoices: row.invoices.map(mapInvoice),
+      invoiceLogs: buildGroupInvoiceAuditTimeline({
+        group: {
+          id: row.id,
+          kodeRegistrasi: row.kodeRegistrasi,
+          namaGroup: row.namaGroup,
+          namaPaket: row.keberangkatan?.namaPaket,
+          invoices: row.invoices.map(mapInvoice),
+          pembayaran: row.pembayaran.map(mapPembayaran),
+        },
+        auditEntries: await fetchInvoiceAuditEntries({ groupId: row.id, limit: 150 }),
+        order: "desc",
+      }),
       keberangkatan: row.keberangkatan
         ? {
             id: row.keberangkatan.id,
@@ -540,25 +596,32 @@ export const groupRepo = {
   },
 
   async getAllPaymentSummaries(): Promise<GroupPaymentSummary[]> {
-    const rows = await prisma.registrationGroup.findMany({
-      include: {
-        anggota: { include: { dokumen: true } },
-        pembayaran: { include: { alokasi: true } },
-        invoices: { include: { items: true } },
-        keberangkatan: {
-          include: { hotelMekkahMaster: true, hotelMadinahMaster: true },
-        },
-        registrationRequests: {
-          select: {
-            id: true,
-            hotelUpgrade: true,
-            roomUpgrade: true,
+    const [rows, auditEntries] = await Promise.all([
+      prisma.registrationGroup.findMany({
+        include: {
+          anggota: { include: { dokumen: true } },
+          pembayaran: { include: { alokasi: true } },
+          invoices: { include: { items: true } },
+          keberangkatan: {
+            include: { hotelMekkahMaster: true, hotelMadinahMaster: true },
+          },
+          registrationRequests: {
+            select: {
+              id: true,
+              hotelUpgrade: true,
+              roomUpgrade: true,
+            },
           },
         },
-      },
-      orderBy: { createdAt: "desc" },
-    });
-    return rows.map((row: any) => ({
+        orderBy: { createdAt: "desc" },
+      }),
+      fetchInvoiceAuditEntries({ limit: 500 }),
+    ]);
+    const auditByGroup = groupAuditEntriesByGroupId(auditEntries);
+    return rows.map((row: any) => {
+      const mappedInvoices = row.invoices.map(mapInvoice);
+      const mappedPayments = row.pembayaran.map(mapPembayaran);
+      return {
       groupId: row.id,
       kodeRegistrasi: row.kodeRegistrasi,
       namaGroup: row.namaGroup,
@@ -625,9 +688,22 @@ export const groupRepo = {
         createdAt: a.createdAt.toISOString(),
         updatedAt: a.updatedAt.toISOString(),
       })),
-      pembayaran: row.pembayaran.map(mapPembayaran),
-      invoices: row.invoices.map(mapInvoice),
-    }));
+      pembayaran: mappedPayments,
+      invoices: mappedInvoices,
+      invoiceLogs: buildGroupInvoiceAuditTimeline({
+        group: {
+          id: row.id,
+          kodeRegistrasi: row.kodeRegistrasi,
+          namaGroup: row.namaGroup,
+          namaPaket: row.keberangkatan?.namaPaket,
+          invoices: mappedInvoices,
+          pembayaran: mappedPayments,
+        },
+        auditEntries: auditByGroup.get(row.id) || [],
+        order: "desc",
+      }),
+    };
+    });
   },
 
   async getInvoiceSplitConfig(groupId: string): Promise<InvoiceSplitConfig | null> {

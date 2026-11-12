@@ -10,6 +10,8 @@ import {
   resolvePackageBillingConfig,
   shouldSkipNonBillingInvoiceItem,
 } from "@/shared/lib/billing-ssot";
+import { computeBillingItemsDiff, formatBillingDiffSummary } from "@/shared/lib/invoice-audit-log";
+import { collectActiveBillingSnapshots, recordInvoiceAuditLog } from "@/server/services/invoice-audit.service";
 import { revalidatePath } from "next/cache";
 
 interface BillingItemInput {
@@ -235,6 +237,8 @@ export async function syncGroupBillingItems(data: {
   groupId: string;
   totalTagihan?: number;
   items: BillingItemInput[];
+  skipAuditLog?: boolean;
+  auditReason?: string;
 }) {
   try {
     const group = await prisma.registrationGroup.findFirst({
@@ -256,6 +260,9 @@ export async function syncGroupBillingItems(data: {
     if (!group) {
       return { success: false, message: "Group tidak ditemukan" };
     }
+
+    const beforeTotalTagihan = group.totalTagihan;
+    const beforeItemsSnapshot = collectActiveBillingSnapshots(group.invoices);
 
     const normalizedItems = (data.items || [])
       .filter((it) => it && (it.deskripsi || "").trim().length > 0)
@@ -480,6 +487,37 @@ export async function syncGroupBillingItems(data: {
 
     const updatedGroup = await groupRepo.findById(group.id).catch(() => null);
 
+    if (!data.skipAuditLog) {
+      const afterItemsSnapshot = updatedGroup?.invoices
+        ? collectActiveBillingSnapshots(updatedGroup.invoices)
+        : normalizedItems.map((it) => ({
+            kategori: it.kategori,
+            deskripsi: it.deskripsi,
+            qty: it.qty,
+            hargaSatuan: it.hargaSatuan,
+            jumlah: it.jumlah,
+            status: "active",
+          }));
+      const diff = computeBillingItemsDiff(beforeItemsSnapshot, afterItemsSnapshot);
+      if (diff.hasChanges || beforeTotalTagihan !== netTotalTagihan) {
+        const detail = data.auditReason
+          ? `${data.auditReason} • ${formatBillingDiffSummary(diff.itemsDiff, beforeTotalTagihan, netTotalTagihan)}`
+          : formatBillingDiffSummary(diff.itemsDiff, beforeTotalTagihan, netTotalTagihan);
+        await recordInvoiceAuditLog({
+          groupId: group.id,
+          kodeRegistrasi: group.kodeRegistrasi,
+          namaGroup: group.namaGroup,
+          namaPaket: group.keberangkatan?.namaPaket,
+          eventKind: "SYNC_ITEM_TAGIHAN",
+          action: "billing.sync_items",
+          detail,
+          beforeTotal: beforeTotalTagihan,
+          afterTotal: netTotalTagihan,
+          itemsDiff: diff.itemsDiff,
+        });
+      }
+    }
+
     return {
       success: true,
       totalTagihan: netTotalTagihan,
@@ -542,6 +580,21 @@ export async function createInvoice(data: {
     normalizedTipe = "pelunasan";
   }
 
+  const preGroupAudit = await prisma.registrationGroup
+    .findUnique({
+      where: { id: data.groupId },
+      include: {
+        keberangkatan: { select: { namaPaket: true } },
+        invoices: {
+          where: { status: { not: "cancelled" } },
+          include: { items: true },
+        },
+      },
+    })
+    .catch(() => null);
+  const preTotalTagihan = preGroupAudit?.totalTagihan;
+  const preBillingSnapshot = collectActiveBillingSnapshots(preGroupAudit?.invoices);
+
   // For Pembaruan Invoice (without incoming payment), sync billing items first so edits/cancellations apply cleanly
   let syncRes: { success?: boolean; totalTagihan?: number; sisaPembayaran?: number } | null = null;
   if (isRevision && data.items && data.items.length > 0) {
@@ -549,6 +602,7 @@ export async function createInvoice(data: {
       groupId: data.groupId,
       totalTagihan: data.totalTagihan,
       items: data.items,
+      skipAuditLog: true,
     });
   }
 
@@ -778,6 +832,72 @@ export async function createInvoice(data: {
     }
   }
 
+  const postGroupAudit = await prisma.registrationGroup
+    .findUnique({
+      where: { id: data.groupId },
+      include: {
+        invoices: {
+          where: { status: { not: "cancelled" } },
+          include: { items: true },
+        },
+      },
+    })
+    .catch(() => null);
+
+  const postBillingSnapshot = collectActiveBillingSnapshots(postGroupAudit?.invoices);
+  const invoiceDiff = computeBillingItemsDiff(preBillingSnapshot, postBillingSnapshot);
+  const postTotalTagihan = postGroupAudit?.totalTagihan ?? invoiceAmount;
+  const mappedEventKind =
+    data.kategori === "PEMBARUAN_INVOICE"
+      ? "PEMBARUAN_INVOICE"
+      : data.kategori === "PINDAH_PAKET"
+        ? "PINDAH_PAKET"
+        : data.kategori === "TAMBAH_JAMAAH"
+          ? "TAMBAH_JAMAAH"
+          : data.kategori === "PEMBATALAN"
+            ? "PEMBATALAN_ITEM"
+            : data.kategori === "REFUND_MURNI"
+              ? "REFUND"
+              : "PENERBITAN_INVOICE";
+  const mappedAction =
+    mappedEventKind === "PEMBARUAN_INVOICE"
+      ? "invoice.pembaruan"
+      : mappedEventKind === "PINDAH_PAKET"
+        ? "invoice.pindah_paket"
+        : mappedEventKind === "TAMBAH_JAMAAH"
+          ? "invoice.tambah_jamaah"
+          : mappedEventKind === "PEMBATALAN_ITEM"
+            ? "invoice.pembatalan"
+            : mappedEventKind === "REFUND"
+              ? "invoice.refund"
+              : "invoice.issue";
+
+  const diffHeadline = invoiceDiff.hasChanges
+    ? formatBillingDiffSummary(invoiceDiff.itemsDiff, preTotalTagihan, postTotalTagihan)
+    : typeof preTotalTagihan === "number" && preTotalTagihan !== postTotalTagihan
+      ? `Total Tagihan: Rp ${preTotalTagihan.toLocaleString("id-ID")} -> Rp ${postTotalTagihan.toLocaleString("id-ID")}`
+      : `Net Tagihan: Rp ${postTotalTagihan.toLocaleString("id-ID")}`;
+
+  const auditDetail = isRevision
+    ? `Pembaruan Invoice ${created.nomorInvoice} (Rp 0 kas masuk)${data.catatan ? ` [${data.catatan}]` : ""} • ${diffHeadline}`
+    : `Penerbitan Invoice ${created.nomorInvoice}${data.catatan ? ` [${data.catatan}]` : ""} • ${diffHeadline}`;
+
+  await recordInvoiceAuditLog({
+    groupId: data.groupId,
+    kodeRegistrasi: preGroupAudit?.kodeRegistrasi,
+    namaGroup: preGroupAudit?.namaGroup,
+    namaPaket: preGroupAudit?.keberangkatan?.namaPaket,
+    invoiceId: created.id,
+    nomorInvoice: created.nomorInvoice,
+    eventKind: mappedEventKind,
+    action: mappedAction,
+    detail: auditDetail,
+    beforeTotal: preTotalTagihan,
+    afterTotal: postTotalTagihan,
+    itemsDiff: invoiceDiff.itemsDiff,
+    catatan: data.catatan,
+  });
+
   try {
     revalidatePath("/admin/manifest");
     revalidatePath("/admin/pembayaran/laporan");
@@ -989,11 +1109,51 @@ export async function cancelInvoiceItem(_invoiceId: string, itemId: string, reas
   try {
     const existingItem = await prisma.invoiceItem.findUnique({
       where: { id: itemId },
+      include: {
+        invoice: {
+          include: {
+            group: { select: { id: true, kodeRegistrasi: true, namaGroup: true, totalTagihan: true } },
+          },
+        },
+      },
     });
+    const beforeTotal = existingItem?.invoice?.group?.totalTagihan;
     const updatedInvoice = await invoiceRepo.cancelItem(itemId, user || "Admin", reason || "Dibatalkan admin");
 
     if (existingItem && isHotelUpgradeItem(existingItem.deskripsi || "")) {
       await revertGroupHotelsIfNoUpgradeItem(updatedInvoice.groupId);
+    }
+
+    if (existingItem) {
+      const updatedGroup = await prisma.registrationGroup
+        .findUnique({ where: { id: updatedInvoice.groupId }, select: { totalTagihan: true } })
+        .catch(() => null);
+      await recordInvoiceAuditLog({
+        groupId: updatedInvoice.groupId,
+        kodeRegistrasi: existingItem.invoice?.group?.kodeRegistrasi,
+        namaGroup: existingItem.invoice?.group?.namaGroup,
+        invoiceId: updatedInvoice.id,
+        nomorInvoice: existingItem.invoice?.nomorInvoice,
+        eventKind: "PEMBATALAN_ITEM",
+        action: "invoice.cancel_item",
+        detail: `Membatalkan item "${existingItem.deskripsi}" (Rp ${Math.abs(existingItem.jumlah).toLocaleString("id-ID")})${reason ? ` — ${reason}` : ""}`,
+        beforeTotal,
+        afterTotal: updatedGroup?.totalTagihan,
+        itemsDiff: [
+          {
+            type: "cancelled",
+            deskripsi: existingItem.deskripsi,
+            kategori: existingItem.kategori || "Tagihan",
+            beforeQty: existingItem.qty,
+            beforeHargaSatuan: existingItem.hargaSatuan,
+            beforeJumlah: existingItem.jumlah,
+            afterJumlah: 0,
+            deltaJumlah: -existingItem.jumlah,
+          },
+        ],
+        catatan: reason,
+        actorOverride: user ? { userName: user } : undefined,
+      });
     }
 
     try {
@@ -1272,6 +1432,31 @@ export async function addJamaahToGroup(data: {
       console.warn("Failed creating pending pembayaran for additional jamaah:", err);
     }
 
+    await recordInvoiceAuditLog({
+      groupId: group.id,
+      kodeRegistrasi: group.kodeRegistrasi,
+      namaGroup: group.namaGroup,
+      namaPaket: group.keberangkatan?.namaPaket,
+      invoiceId: createdInvoice.id,
+      nomorInvoice,
+      eventKind: "TAMBAH_JAMAAH",
+      action: "jamaah.add_pax",
+      detail: `Tambah ${data.jamaahList.length} pax jamaah (${data.jamaahList.map((j) => j.namaLengkap).join(", ")}) • Invoice ${nomorInvoice} • Tagihan Rp ${group.totalTagihan.toLocaleString("id-ID")} -> Rp ${newTotalTagihan.toLocaleString("id-ID")}`,
+      beforeTotal: group.totalTagihan,
+      afterTotal: newTotalTagihan,
+      itemsDiff: [
+        {
+          type: "added",
+          deskripsi: `Penambahan ${data.jamaahList.length} pax jamaah: ${rincianAnggota}`,
+          kategori: "Paket Umroh",
+          afterQty: data.jamaahList.length,
+          afterHargaSatuan: baseTarif,
+          afterJumlah: nominalTambahan,
+          deltaJumlah: nominalTambahan,
+        },
+      ],
+    });
+
     // ADR-0030: Trigger non-blocking background re-sync of Google Drive file names
     // strictly isolated to this specific departure package (paketKeberangkatanId)
     if (group.paketKeberangkatanId) {
@@ -1325,6 +1510,37 @@ export async function updateJamaahHotels(data: {
       return { success: false, message: "Tidak ada data hotel yang diperbarui" };
     }
 
+    const beforeRows =
+      jamaahIds && jamaahIds.length > 0
+        ? await prisma.jamaah
+            .findMany({
+              where: { id: { in: jamaahIds } },
+              select: {
+                id: true,
+                groupId: true,
+                namaLengkap: true,
+                hotelMekkah: true,
+                hotelMadinah: true,
+                group: { select: { kodeRegistrasi: true, namaGroup: true } },
+              },
+            })
+            .catch(() => [])
+        : jamaahNames && jamaahNames.length > 0 && groupId
+          ? await prisma.jamaah
+              .findMany({
+                where: { groupId, namaLengkap: { in: jamaahNames } },
+                select: {
+                  id: true,
+                  groupId: true,
+                  namaLengkap: true,
+                  hotelMekkah: true,
+                  hotelMadinah: true,
+                  group: { select: { kodeRegistrasi: true, namaGroup: true } },
+                },
+              })
+              .catch(() => [])
+          : [];
+
     if (jamaahIds && jamaahIds.length > 0) {
       await prisma.jamaah.updateMany({
         where: { id: { in: jamaahIds } },
@@ -1338,6 +1554,29 @@ export async function updateJamaahHotels(data: {
         },
         data: updateData,
       });
+    }
+
+    const changedRows = beforeRows.filter(
+      (r) =>
+        (updateData.hotelMekkah && r.hotelMekkah !== updateData.hotelMekkah) ||
+        (updateData.hotelMadinah && r.hotelMadinah !== updateData.hotelMadinah)
+    );
+    if (changedRows.length > 0) {
+      const targetGroupId = groupId || changedRows[0]?.groupId;
+      if (targetGroupId) {
+        const hotelParts: string[] = [];
+        if (updateData.hotelMekkah) hotelParts.push(`Mekkah: ${updateData.hotelMekkah}`);
+        if (updateData.hotelMadinah) hotelParts.push(`Madinah: ${updateData.hotelMadinah}`);
+        await recordInvoiceAuditLog({
+          groupId: targetGroupId,
+          kodeRegistrasi: changedRows[0]?.group?.kodeRegistrasi,
+          namaGroup: changedRows[0]?.group?.namaGroup,
+          eventKind: "UPGRADE_HOTEL",
+          action: "jamaah.hotel_update",
+          detail: `Update hotel ${changedRows.length} jamaah (${changedRows.map((r) => r.namaLengkap).slice(0, 4).join(", ")}${changedRows.length > 4 ? ", ..." : ""}) -> ${hotelParts.join(" | ")}`,
+          manifestImpact: ["Upgrade Hotel", "Manifest Hotel", "Data Jamaah"],
+        });
+      }
     }
 
     return { success: true };

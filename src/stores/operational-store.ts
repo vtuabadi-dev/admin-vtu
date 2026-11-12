@@ -110,6 +110,7 @@ export function buildPartialGroupFromSummary(
     anggota: summary.anggota,
     pembayaran: summary.pembayaran,
     invoices: summary.invoices,
+    invoiceLogs: summary.invoiceLogs,
     hotelUpgrade: summary.hotelUpgrade,
     roomUpgrade: summary.roomUpgrade,
     isKeretaCepat: summary.isKeretaCepat,
@@ -302,7 +303,9 @@ export const useOperationalStore = create<OperationalStore>((set) => ({
       }
       if ((payReviewRes as any).ok) {
         const j = await (payReviewRes as Response).json();
-        pendingReviewCount = (j.data ?? []).length;
+        pendingReviewCount = (j.data ?? []).filter(
+          (p: any) => !p?.isLogOnly && p?.recordType !== "invoice_log" && p?.status === "pending"
+        ).length;
       }
       if ((docReviewRes as any).ok) {
         const j = await (docReviewRes as Response).json();

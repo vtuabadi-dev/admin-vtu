@@ -1,7 +1,101 @@
 import { prisma } from "@/server/db/client";
+import { auditRepo } from "@/server/repositories/audit.repository";
 import { invoiceRepo } from "@/server/repositories/invoice.repository";
+import { fetchInvoiceAuditEntries } from "@/server/services/invoice-audit.service";
 import { resolvePackageBillingConfig, resolveRoomUpgradeUnitPrice } from "@/shared/lib/billing-ssot";
+import {
+  buildGroupInvoiceAuditTimeline,
+  buildQueueItemFromInvoiceLog,
+} from "@/shared/lib/invoice-audit-log";
 import type { Pembayaran } from "@/shared/types";
+
+const REVIEW_GROUP_SELECT = {
+  id: true,
+  kodeRegistrasi: true,
+  namaGroup: true,
+  totalTagihan: true,
+  totalPembayaran: true,
+  sisaPembayaran: true,
+  keberangkatan: {
+    select: {
+      id: true,
+      kode: true,
+      namaPaket: true,
+      hargaPaket: true,
+      tanggalBerangkat: true,
+      tanggalPulang: true,
+      hotelMekkah: true,
+      hotelMadinah: true,
+      hotelOptions: true,
+      include: true,
+      packageType: {
+        select: { name: true },
+      },
+    },
+  },
+  registrationRequests: {
+    select: {
+      roomUpgrade: true,
+      hotelUpgrade: true,
+      paxCount: true,
+    },
+    take: 1,
+  },
+  invoices: {
+    where: { status: { not: "cancelled" as const } },
+    include: { items: true },
+    orderBy: { createdAt: "desc" as const },
+  },
+  pembayaran: {
+    select: {
+      id: true,
+      tanggal: true,
+      jumlah: true,
+      metode: true,
+      bankPengirim: true,
+      status: true,
+      catatan: true,
+      invoiceId: true,
+      invoiceDriveId: true,
+      buktiUrl: true,
+    },
+    orderBy: { tanggal: "asc" as const },
+  },
+  anggota: {
+    select: {
+      id: true,
+      registrationId: true,
+      namaLengkap: true,
+      nomorPeserta: true,
+      nomorTelepon: true,
+      email: true,
+      alamat: true,
+      provinsi: true,
+      kota: true,
+      kecamatan: true,
+      kelurahan: true,
+      hotelMekkah: true,
+      hotelMadinah: true,
+      isKeretaCepat: true,
+      isCityTourThoif: true,
+      createdAt: true,
+    },
+    orderBy: [{ registrationId: "asc" as const }, { createdAt: "asc" as const }],
+  },
+  ketuaGroup: {
+    select: {
+      id: true,
+      namaLengkap: true,
+      nomorTelepon: true,
+      email: true,
+      alamat: true,
+      provinsi: true,
+      kota: true,
+      kecamatan: true,
+      kelurahan: true,
+    },
+  },
+};
 
 function mapPembayaran(row: any): Pembayaran {
   return {
@@ -129,6 +223,19 @@ export const pembayaranRepo = {
       }
     }
 
+    try {
+      await auditRepo.create({
+        userId: "system",
+        userName: verifiedBy || "Admin",
+        role: "admin_pembayaran",
+        module: "pembayaran",
+        action: "pembayaran.approve",
+        detail: `Menyetujui pembayaran Rp ${row.jumlah.toLocaleString("id-ID")} (ID: ${row.id})`,
+        entityId: row.groupId,
+        entityType: "Pembayaran",
+      });
+    } catch { /* non-blocking audit */ }
+
     return mapPembayaran(row);
   },
 
@@ -138,6 +245,20 @@ export const pembayaranRepo = {
       data: { status: "rejected", alasanReject, reviewedBy, reviewedAt: new Date() },
       include: { alokasi: true },
     });
+
+    try {
+      await auditRepo.create({
+        userId: "system",
+        userName: reviewedBy || "Admin",
+        role: "admin_pembayaran",
+        module: "pembayaran",
+        action: "pembayaran.reject",
+        detail: `Menolak pembayaran Rp ${row.jumlah.toLocaleString("id-ID")} (Alasan: ${alasanReject})`,
+        entityId: row.groupId,
+        entityType: "Pembayaran",
+      });
+    } catch { /* non-blocking audit */ }
+
     return mapPembayaran(row);
   },
 
@@ -292,108 +413,135 @@ export const pembayaranRepo = {
 
   async getReviewQueue(statusFilter?: string) {
     // Pure read query — sync logic moved to syncPendingRegistrations()
+    const includeInvoiceLogs =
+      !statusFilter || statusFilter === "all" || statusFilter === "logged";
     const whereClause: any = {};
-    if (statusFilter && statusFilter !== "all") {
+    if (statusFilter && statusFilter !== "all" && statusFilter !== "logged") {
       whereClause.status = statusFilter;
     }
-    const rows = await prisma.pembayaran.findMany({
-      where: whereClause,
-      take: 150,
-      orderBy: { tanggal: "desc" },
-      include: {
-        alokasi: true,
-        group: {
-          select: {
-            id: true,
-            kodeRegistrasi: true,
-            namaGroup: true,
-            totalTagihan: true,
-            totalPembayaran: true,
-            sisaPembayaran: true,
-            keberangkatan: {
-              select: {
-                id: true,
-                kode: true,
-                namaPaket: true,
-                hargaPaket: true,
-                tanggalBerangkat: true,
-                tanggalPulang: true,
-                hotelMekkah: true,
-                hotelMadinah: true,
-                hotelOptions: true,
-                include: true,
-                packageType: {
-                  select: { name: true },
-                },
+
+    const [rows, auditEntries, revisionInvoices] = await Promise.all([
+      statusFilter === "logged"
+        ? Promise.resolve([])
+        : prisma.pembayaran.findMany({
+            where: whereClause,
+            take: 150,
+            orderBy: { tanggal: "desc" },
+            include: {
+              alokasi: true,
+              group: {
+                select: REVIEW_GROUP_SELECT,
               },
             },
-            registrationRequests: {
-              select: {
-                roomUpgrade: true,
-                hotelUpgrade: true,
-                paxCount: true,
-              },
-              take: 1,
+          }),
+      includeInvoiceLogs ? fetchInvoiceAuditEntries({ limit: 150 }) : Promise.resolve([]),
+      includeInvoiceLogs
+        ? prisma.invoice.findMany({
+            where: {
+              OR: [
+                { nomorInvoice: { startsWith: "INV-UPD-" } },
+                { nomorInvoice: { startsWith: "INV-PAX-" } },
+                { nomorInvoice: { startsWith: "PINDAH-" } },
+                { nomorInvoice: { startsWith: "CN-CANCEL-" } },
+                { nomorInvoice: { startsWith: "REF-" } },
+                { items: { some: { status: "cancelled" } } },
+              ],
             },
-            invoices: {
-              where: { status: { not: "cancelled" } },
-              include: { items: true },
-              orderBy: { createdAt: "desc" },
-            },
-            pembayaran: {
-              select: {
-                id: true,
-                tanggal: true,
-                jumlah: true,
-                metode: true,
-                bankPengirim: true,
-                status: true,
-                catatan: true,
-                invoiceId: true,
-                invoiceDriveId: true,
-                buktiUrl: true,
-              },
-              orderBy: { tanggal: "asc" },
-            },
-            anggota: {
-              select: {
-                id: true,
-                registrationId: true,
-                namaLengkap: true,
-                nomorPeserta: true,
-                nomorTelepon: true,
-                email: true,
-                alamat: true,
-                provinsi: true,
-                kota: true,
-                kecamatan: true,
-                kelurahan: true,
-                hotelMekkah: true,
-                hotelMadinah: true,
-                isKeretaCepat: true,
-                isCityTourThoif: true,
-                createdAt: true,
-              },
-              orderBy: [{ registrationId: "asc" }, { createdAt: "asc" }],
-            },
-            ketuaGroup: {
-              select: {
-                id: true,
-                namaLengkap: true,
-                nomorTelepon: true,
-                email: true,
-                alamat: true,
-                provinsi: true,
-                kota: true,
-                kecamatan: true,
-                kelurahan: true,
-              },
-            },
+            select: { groupId: true },
+            take: 150,
+            orderBy: { createdAt: "desc" },
+          })
+        : Promise.resolve([]),
+    ]);
+
+    // Build group cache and backfill missing groups referenced by audit entries or revision invoices
+    const groupMap = new Map<string, any>();
+    for (const r of rows) {
+      if ((r as any).group?.id) {
+        groupMap.set((r as any).group.id, (r as any).group);
+      }
+    }
+
+    if (includeInvoiceLogs) {
+      const missingGroupIds = new Set<string>();
+      for (const ae of auditEntries) {
+        if (ae.entityId && !groupMap.has(ae.entityId)) {
+          missingGroupIds.add(ae.entityId);
+        }
+      }
+      for (const inv of revisionInvoices) {
+        if (inv.groupId && !groupMap.has(inv.groupId)) {
+          missingGroupIds.add(inv.groupId);
+        }
+      }
+
+      if (missingGroupIds.size > 0) {
+        const extraGroups = await prisma.registrationGroup.findMany({
+          where: { id: { in: Array.from(missingGroupIds) } },
+          select: REVIEW_GROUP_SELECT,
+        });
+        for (const eg of extraGroups) {
+          groupMap.set(eg.id, eg);
+        }
+      }
+    }
+
+    // Group audit entries by groupId & attach chronological invoiceLogs onto each group
+    const auditByGroup = new Map<string, any[]>();
+    for (const ae of auditEntries) {
+      if (!ae.entityId) continue;
+      const list = auditByGroup.get(ae.entityId) || [];
+      list.push(ae);
+      auditByGroup.set(ae.entityId, list);
+    }
+
+    const allInvoiceLogItems: any[] = [];
+    if (includeInvoiceLogs) {
+      const seenLogIds = new Set<string>();
+      for (const [gid, g] of Array.from(groupMap.entries())) {
+        const mappedInvoices = (g.invoices || []).map((inv: any) => ({
+          ...inv,
+          createdAt: inv.createdAt instanceof Date ? inv.createdAt.toISOString() : inv.createdAt,
+          updatedAt: inv.updatedAt instanceof Date ? inv.updatedAt.toISOString() : inv.updatedAt,
+          jatuhTempo: inv.jatuhTempo instanceof Date ? inv.jatuhTempo.toISOString() : inv.jatuhTempo,
+          items: (inv.items || []).map((it: any) => ({
+            ...it,
+            cancelledAt: it.cancelledAt instanceof Date ? it.cancelledAt.toISOString() : it.cancelledAt,
+          })),
+        }));
+        const mappedPayments = (g.pembayaran || []).map((p: any) => ({
+          ...p,
+          tanggal: p.tanggal instanceof Date ? p.tanggal.toISOString() : p.tanggal,
+        }));
+        const logs = buildGroupInvoiceAuditTimeline({
+          group: {
+            id: g.id,
+            kodeRegistrasi: g.kodeRegistrasi,
+            namaGroup: g.namaGroup,
+            namaPaket: g.keberangkatan?.namaPaket,
+            invoices: mappedInvoices,
+            pembayaran: mappedPayments,
           },
-        },
-      },
-    });
-    // Deduplicate mapped rows by unique groupId + status + sumber + buktiUrl so identical duplicate entries are never shown twice
+          auditEntries: auditByGroup.get(gid) || [],
+          order: "desc",
+        });
+        g.invoiceLogs = logs;
+
+        for (const log of logs) {
+          if (seenLogIds.has(log.id)) continue;
+          seenLogIds.add(log.id);
+          allInvoiceLogItems.push(
+            buildQueueItemFromInvoiceLog(log, {
+              ...g,
+              roomUpgrade: g.registrationRequests?.[0]?.roomUpgrade || g.roomUpgrade || null,
+              hotelUpgrade: g.registrationRequests?.[0]?.hotelUpgrade || g.hotelUpgrade || null,
+            })
+          );
+        }
+      }
+    }
+
+    // Deduplicate mapped payment rows by unique groupId + status + sumber + buktiUrl so identical duplicate entries are never shown twice
     const seen = new Set<string>();
     const uniqueRows: any[] = [];
     for (const r of rows) {
@@ -404,17 +552,28 @@ export const pembayaranRepo = {
       }
     }
 
-    return uniqueRows.map((r: any) => ({
+    const paymentItems = uniqueRows.map((r: any) => ({
       ...mapPembayaran(r),
+      recordType: "payment" as const,
+      isLogOnly: false,
       kodeRegistrasi: (r as any).group?.kodeRegistrasi,
       namaGroup: (r as any).group?.namaGroup,
       roomUpgrade: (r as any).group?.registrationRequests?.[0]?.roomUpgrade || (r as any).group?.roomUpgrade || null,
       hotelUpgrade: (r as any).group?.registrationRequests?.[0]?.hotelUpgrade || (r as any).group?.hotelUpgrade || null,
-      group: (r as any).group,
+      group: groupMap.get(r.groupId) || (r as any).group,
     }));
+
+    return [...paymentItems, ...allInvoiceLogItems].sort((a, b) => {
+      const ta = new Date(a.tanggal || 0).getTime() || 0;
+      const tb = new Date(b.tanggal || 0).getTime() || 0;
+      return tb - ta;
+    });
   },
 
   async delete(id: string, cascadeRegistration = false) {
+    if (String(id).startsWith("invlog-")) {
+      throw new Error("Log pembaruan invoice bersifat audit permanen dan tidak dapat dihapus");
+    }
     const payment = await prisma.pembayaran.findUnique({
       where: { id },
       include: {

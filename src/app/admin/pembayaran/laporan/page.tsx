@@ -29,6 +29,8 @@ import { Select } from "@/shared/components/ui/Select";
 import { Modal } from "@/shared/components/ui/Modal";
 import { StatusBadge } from "@/shared/components/ui/Badge";
 import { LoadingSkeleton } from "@/shared/components/LoadingSkeleton";
+import { InvoiceLogActionBadge, InvoiceLogMetaDetails } from "@/shared/components/ui/InvoiceLogBadges";
+import { buildUnifiedPaymentHistory } from "@/shared/lib/invoice-audit-log";
 import { HotelUpgradeSelector } from "./_components/HotelUpgradeSelector";
 import {
   getGroupPaymentSummary,
@@ -441,6 +443,14 @@ const SplitInvoiceModal = dynamic(
       (inv) => inv && inv.status !== "cancelled" && !String(inv.id).startsWith("BILL-")
     );
   }, [groupData?.invoices]);
+
+  const unifiedGroupHistory = useMemo(() => {
+    return buildUnifiedPaymentHistory(
+      activePembayaran,
+      groupData?.invoiceLogs || [],
+      "desc"
+    );
+  }, [activePembayaran, groupData?.invoiceLogs]);
 
   // Seed default jatuh tempo for Pembaruan Invoice when a group is loaded
   useEffect(() => {
@@ -1021,6 +1031,7 @@ const SplitInvoiceModal = dynamic(
       broadcastMutation("manifest", "UPDATE", { groupId: targetGroupId });
       broadcastMutation("manifest_rows", "UPDATE", { groupId: targetGroupId });
       broadcastMutation("pembayaran", "UPDATE", { groupId: targetGroupId });
+      broadcastMutation("audit_entries", "INSERT", { groupId: targetGroupId });
     } catch (err) {
       console.error("Failed to issue invoice revision:", err);
       alert("Gagal menyimpan pembaruan invoice. Silakan coba lagi.");
@@ -1353,14 +1364,14 @@ const SplitInvoiceModal = dynamic(
                     </CardContent>
                   </Card>
 
-                  {/* CARD 2: RIWAYAT PEMBAYARAN GROUP */}
+                  {/* CARD 2: RIWAYAT PEMBAYARAN & LOG PEMBARUAN INVOICE GROUP */}
                   <Card>
                     <CardHeader>
                       <div className="flex items-center justify-between">
                         <CardTitle className="text-sm">
                           {activeSplit
-                            ? `Riwayat Pembayaran â€” ${activeSplit.label}`
-                            : "Riwayat Pembayaran Group"}
+                            ? `Riwayat Pembayaran & Log Invoice â€” ${activeSplit.label}`
+                            : "Riwayat Pembayaran & Log Pembaruan Invoice Group"}
                         </CardTitle>
                         {!splitConfig && (
                           <Button
@@ -1376,34 +1387,68 @@ const SplitInvoiceModal = dynamic(
                       </div>
                     </CardHeader>
                   <CardContent>
-                    {activePembayaran.length === 0 ? (
+                    {unifiedGroupHistory.length === 0 ? (
                       <p className="text-sm text-muted-foreground py-8 text-center">
-                        Belum ada pembayaran untuk {activeSplit ? activeSplit.label : "group ini"}
+                        Belum ada pembayaran maupun log pembaruan invoice untuk {activeSplit ? activeSplit.label : "group ini"}
                       </p>
                     ) : (
                       <table className="w-full text-sm">
                         <thead>
                           <tr className="border-b text-left text-xs font-medium text-muted-foreground">
                             <th className="pb-2">Tanggal</th>
-                            <th className="pb-2">Invoice</th>
-                            <th className="pb-2 text-right">Nominal</th>
-                            <th className="pb-2">Status</th>
+                            <th className="pb-2">Aktivitas / Invoice</th>
+                            <th className="pb-2 text-right">Kas Masuk</th>
+                            <th className="pb-2 text-center">Status</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y">
-                          {activePembayaran.map((p) => (
-                            <tr key={p.id}>
-                              <td className="py-2 text-xs">{formatDate(p.tanggal)}</td>
-                              <td className="py-2">
-                                <span className="font-mono text-xs text-muted-foreground">
-                                  {p.invoiceId ? `INV-${p.invoiceId.slice(-6)}` : "-"}
-                                </span>
+                          {unifiedGroupHistory.map((entry) => (
+                            <tr
+                              key={entry.id}
+                              className={entry.isLogOnly ? "bg-indigo-500/[0.03]" : undefined}
+                            >
+                              <td className="py-2 text-xs whitespace-nowrap align-top">
+                                {formatDate(entry.timestamp)}
                               </td>
-                              <td className="py-2 text-right font-medium tabular-nums">
-                                {formatCurrency(p.jumlah)}
+                              <td className="py-2 pr-2 align-top">
+                                {entry.isLogOnly && entry.rawLog ? (
+                                  <div className="space-y-1">
+                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                      <InvoiceLogActionBadge log={entry.rawLog} compact />
+                                      {entry.invoiceRef && (
+                                        <span className="font-mono text-[10.5px] font-semibold text-indigo-700 dark:text-indigo-300">
+                                          {entry.invoiceRef}
+                                        </span>
+                                      )}
+                                    </div>
+                                    <InvoiceLogMetaDetails log={entry.rawLog} maxDiffs={2} />
+                                  </div>
+                                ) : (
+                                  <div className="space-y-0.5">
+                                    <span className="font-mono text-xs text-muted-foreground block">
+                                      {entry.invoiceRef ? entry.invoiceRef : "-"}
+                                    </span>
+                                    <span className="text-[11px] text-foreground">
+                                      {entry.metode?.toUpperCase()} {entry.description && entry.description !== "-" ? `• ${entry.description}` : ""}
+                                    </span>
+                                  </div>
+                                )}
                               </td>
-                              <td className="py-2">
-                                <StatusBadge status={p.status} />
+                              <td className="py-2 text-right font-medium tabular-nums whitespace-nowrap align-top">
+                                {entry.isLogOnly ? (
+                                  <span className="text-xs text-muted-foreground">Rp 0</span>
+                                ) : (
+                                  formatCurrency(entry.cashInAmount)
+                                )}
+                              </td>
+                              <td className="py-2 text-center align-top">
+                                {entry.isLogOnly ? (
+                                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+                                    Tercatat
+                                  </span>
+                                ) : (
+                                  <StatusBadge status={entry.status as any} />
+                                )}
                               </td>
                             </tr>
                           ))}

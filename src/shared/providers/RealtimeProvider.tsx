@@ -63,6 +63,9 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
       case "roomings":
       case "penghuni_kamar":
         return "roomings";
+      case "audit_entries":
+      case "auditentry":
+        return "audit_entries";
       default:
         return "all";
     }

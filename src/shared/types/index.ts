@@ -95,6 +95,7 @@ export interface RegistrationGroup {
   kontakHp?: string;
   invoices?: Invoice[];
   pembayaran?: Pembayaran[];
+  invoiceLogs?: InvoiceAuditLogEntry[];
   createdAt: string;
   updatedAt: string;
   packageEntryTime?: string;
@@ -304,6 +305,71 @@ export interface Pembayaran {
   /** How this payment is allocated across group members */
   alokasi: AlokasiPembayaran[];
   invoiceDriveId?: string;
+  /** Distinguish real cash payment vs non-cash invoice/billing audit log entry */
+  recordType?: "payment" | "invoice_log";
+  isLogOnly?: boolean;
+  auditLog?: InvoiceAuditLogEntry;
+}
+
+export type InvoiceAuditEventKind =
+  | "PEMBARUAN_INVOICE"
+  | "SYNC_ITEM_TAGIHAN"
+  | "PENERBITAN_INVOICE"
+  | "TAMBAH_JAMAAH"
+  | "PINDAH_PAKET"
+  | "UPGRADE_HOTEL"
+  | "PEMBATALAN_ITEM"
+  | "REFUND"
+  | "APPROVAL_PEMBAYARAN"
+  | "PENOLAKAN_PEMBAYARAN";
+
+export interface BillingItemSnapshot {
+  id?: string;
+  kategori: string;
+  deskripsi: string;
+  qty: number;
+  hargaSatuan: number;
+  jumlah: number;
+  status?: string;
+}
+
+export interface BillingItemDelta {
+  type: "added" | "updated" | "removed" | "cancelled";
+  deskripsi: string;
+  kategori: string;
+  beforeQty?: number;
+  afterQty?: number;
+  beforeHargaSatuan?: number;
+  afterHargaSatuan?: number;
+  beforeJumlah?: number;
+  afterJumlah?: number;
+  deltaJumlah: number;
+}
+
+export interface InvoiceAuditLogEntry {
+  id: string;
+  groupId: string;
+  kodeRegistrasi?: string;
+  namaGroup?: string;
+  namaPaket?: string;
+  invoiceId?: string;
+  nomorInvoice?: string;
+  timestamp: string;
+  actorName: string;
+  actorRole?: string;
+  eventKind: InvoiceAuditEventKind;
+  action: string;
+  title: string;
+  summary: string;
+  manifestImpact: string[];
+  totalBefore?: number;
+  totalAfter?: number;
+  deltaTotal?: number;
+  itemsDiff?: BillingItemDelta[];
+  catatan?: string;
+  source: "audit_entry" | "invoice_history" | "activity_event";
+  isLogOnly: true;
+  cashInAmount: 0;
 }
 
 export interface AlokasiPembayaran {
@@ -363,6 +429,7 @@ export interface GroupPaymentSummary {
   anggota: Jamaah[];
   pembayaran: Pembayaran[];
   invoices: Invoice[];
+  invoiceLogs?: InvoiceAuditLogEntry[];
   hotelUpgrade?: string;
   roomUpgrade?: string;
   isKeretaCepat?: boolean;

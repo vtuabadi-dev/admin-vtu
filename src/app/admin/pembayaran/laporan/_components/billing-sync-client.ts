@@ -26,6 +26,7 @@ export function broadcastBillingGroupMutation(
   broadcastMutation("registration_groups", "UPDATE", { id: groupId });
   broadcastMutation("manifest", "UPDATE", { groupId });
   broadcastMutation("manifest_rows", "UPDATE", { groupId });
+  broadcastMutation("audit_entries", "INSERT", { groupId });
   if (options?.includePembayaran) {
     broadcastMutation("pembayaran", "UPDATE", { groupId });
   }

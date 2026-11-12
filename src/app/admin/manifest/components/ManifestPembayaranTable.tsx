@@ -18,9 +18,11 @@ import {
 } from "lucide-react";
 import { Button } from "@/shared/components/ui/Button";
 import { Modal } from "@/shared/components/ui/Modal";
+import { InvoiceLogActionBadge, InvoiceLogMetaDetails } from "@/shared/components/ui/InvoiceLogBadges";
+import { buildUnifiedPaymentHistory } from "@/shared/lib/invoice-audit-log";
 import { cn, getWhatsAppUrl, formatDate } from "@/shared/lib/utils";
 import { resolveCanonicalGroupBilling } from "@/shared/lib/billing-ssot";
-import type { Jamaah, RegistrationGroup, Keberangkatan, Pembayaran } from "@/shared/types";
+import type { Jamaah, RegistrationGroup, Keberangkatan, Pembayaran, InvoiceAuditLogEntry } from "@/shared/types";
 
 export interface ManifestPembayaranTableProps {
   activePackage: Keberangkatan;
@@ -76,6 +78,7 @@ export interface JamaahFinancialRow {
   paxCount?: number;
   memberNames?: string[];
   payments?: Pembayaran[];
+  invoiceLogs?: InvoiceAuditLogEntry[];
 }
 
 export function ManifestPembayaranTable({
@@ -285,6 +288,7 @@ export function ManifestPembayaranTable({
           netTagihan: draft.netTagihan,
           keterangan: draft.keterangan,
           payments: g?.pembayaran || [],
+          invoiceLogs: g?.invoiceLogs || [],
         });
       });
 
@@ -406,6 +410,7 @@ export function ManifestPembayaranTable({
         paxCount: members.length,
         memberNames,
         payments: g?.pembayaran || [],
+        invoiceLogs: g?.invoiceLogs || [],
       });
     });
 
@@ -1552,89 +1557,132 @@ PT VAUZA TAMMA ABADI`;
               </div>
             </div>
 
-            {/* Tabel Riwayat Pembayaran */}
-            <div className="space-y-2">
-              <h4 className="text-xs font-bold text-stone-300 uppercase tracking-wider flex items-center gap-1.5">
-                <Receipt className="w-4 h-4 text-amber-500" />
-                <span>Daftar Transaksi Pembayaran Masuk</span>
-              </h4>
+            {/* Tabel Riwayat Pembayaran & Log Pembaruan Invoice */}
+            {(() => {
+              const modalHistory = buildUnifiedPaymentHistory(
+                selectedDetailRow.payments || [],
+                selectedDetailRow.invoiceLogs || [],
+                "desc"
+              );
+              return (
+                <div className="space-y-2">
+                  <h4 className="text-xs font-bold text-stone-300 uppercase tracking-wider flex items-center gap-1.5">
+                    <Receipt className="w-4 h-4 text-amber-500" />
+                    <span>Daftar Transaksi Pembayaran &amp; Log Pembaruan Invoice ({modalHistory.length})</span>
+                  </h4>
 
-              {(!selectedDetailRow.payments || selectedDetailRow.payments.length === 0) ? (
-                <div className="p-8 text-center border border-dashed border-stone-800 rounded-xl bg-stone-950/40 space-y-2">
-                  <Receipt className="w-8 h-8 text-stone-600 mx-auto" />
-                  <p className="text-xs text-stone-400 font-medium">
-                    Belum ada riwayat transaksi pembayaran tercatat untuk rombongan ini.
-                  </p>
-                </div>
-              ) : (
-                <div className="border border-stone-800 rounded-xl overflow-hidden shadow-xs">
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-xs text-left">
-                      <thead className="bg-stone-900 text-stone-400 font-bold border-b border-stone-800">
-                        <tr>
-                          <th className="px-3 py-2.5 text-center w-10">#</th>
-                          <th className="px-3 py-2.5">Tanggal Bayar</th>
-                          <th className="px-3 py-2.5">Metode</th>
-                          <th className="px-3 py-2.5">Keterangan / Bank</th>
-                          <th className="px-3 py-2.5 text-center">Status</th>
-                          <th className="px-3 py-2.5 text-right">Nominal Bayar</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-stone-800 bg-stone-950/80">
-                        {selectedDetailRow.payments.map((p, pIdx) => {
-                          const isVerified = p.status === "verified";
-                          return (
-                            <tr key={p.id || pIdx} className="hover:bg-stone-900/50 transition-colors">
-                              <td className="px-3 py-2.5 text-center font-mono text-stone-500">
-                                {pIdx + 1}
-                              </td>
-                              <td className="px-3 py-2.5 font-medium text-stone-200">
-                                {formatDate(p.tanggal || (p as any).createdAt)}
-                              </td>
-                              <td className="px-3 py-2.5">
-                                <span className="uppercase font-semibold text-[11px] px-2 py-0.5 rounded bg-stone-800 text-stone-300 border border-stone-700">
-                                  {p.metode || "Transfer"}
-                                </span>
-                              </td>
-                              <td className="px-3 py-2.5 text-stone-400">
-                                {p.bankPengirim ? `${p.bankPengirim} (${p.nomorRekening || "-"})` : (p.catatan || "-")}
-                              </td>
-                              <td className="px-3 py-2.5 text-center">
-                                <span
-                                  className={cn(
-                                    "text-[10px] font-bold px-2 py-0.5 rounded-full",
-                                    isVerified
-                                      ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30"
-                                      : p.status === "rejected"
-                                      ? "bg-red-500/10 text-red-400 border border-red-500/30"
-                                      : "bg-amber-500/10 text-amber-400 border border-amber-500/30"
-                                  )}
+                  {modalHistory.length === 0 ? (
+                    <div className="p-8 text-center border border-dashed border-stone-800 rounded-xl bg-stone-950/40 space-y-2">
+                      <Receipt className="w-8 h-8 text-stone-600 mx-auto" />
+                      <p className="text-xs text-stone-400 font-medium">
+                        Belum ada riwayat transaksi pembayaran maupun log pembaruan invoice untuk rombongan ini.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="border border-stone-800 rounded-xl overflow-hidden shadow-xs">
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-xs text-left">
+                          <thead className="bg-stone-900 text-stone-400 font-bold border-b border-stone-800">
+                            <tr>
+                              <th className="px-3 py-2.5 text-center w-10">#</th>
+                              <th className="px-3 py-2.5">Tanggal</th>
+                              <th className="px-3 py-2.5">Jenis / Metode</th>
+                              <th className="px-3 py-2.5">Keterangan &amp; Dampak Manifest</th>
+                              <th className="px-3 py-2.5 text-center">Status</th>
+                              <th className="px-3 py-2.5 text-right">Kas Masuk</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-stone-800 bg-stone-950/80">
+                            {modalHistory.map((entry, pIdx) => {
+                              const isVerified = entry.status === "verified";
+                              return (
+                                <tr
+                                  key={entry.id || pIdx}
+                                  className={
+                                    entry.isLogOnly
+                                      ? "bg-indigo-950/20 hover:bg-indigo-950/35 transition-colors"
+                                      : "hover:bg-stone-900/50 transition-colors"
+                                  }
                                 >
-                                  {isVerified ? "Terverifikasi" : p.status === "rejected" ? "Ditolak" : "Pending"}
-                                </span>
+                                  <td className="px-3 py-2.5 text-center font-mono text-stone-500 align-top">
+                                    {pIdx + 1}
+                                  </td>
+                                  <td className="px-3 py-2.5 font-medium text-stone-200 whitespace-nowrap align-top">
+                                    {formatDate(entry.timestamp)}
+                                  </td>
+                                  <td className="px-3 py-2.5 align-top">
+                                    {entry.isLogOnly && entry.rawLog ? (
+                                      <InvoiceLogActionBadge log={entry.rawLog} compact />
+                                    ) : (
+                                      <span className="uppercase font-semibold text-[11px] px-2 py-0.5 rounded bg-stone-800 text-stone-300 border border-stone-700">
+                                        {entry.metode || "Transfer"}
+                                      </span>
+                                    )}
+                                  </td>
+                                  <td className="px-3 py-2.5 text-stone-300 align-top">
+                                    {entry.isLogOnly && entry.rawLog ? (
+                                      <div className="space-y-1">
+                                        {entry.invoiceRef && (
+                                          <span className="font-mono text-[10.5px] font-bold text-indigo-300 block">
+                                            {entry.invoiceRef}
+                                          </span>
+                                        )}
+                                        <InvoiceLogMetaDetails log={entry.rawLog} maxDiffs={3} />
+                                      </div>
+                                    ) : (
+                                      <span>{entry.description || "-"}</span>
+                                    )}
+                                  </td>
+                                  <td className="px-3 py-2.5 text-center align-top">
+                                    {entry.isLogOnly ? (
+                                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-500/15 text-indigo-300 border border-indigo-500/30">
+                                        Tercatat
+                                      </span>
+                                    ) : (
+                                      <span
+                                        className={cn(
+                                          "text-[10px] font-bold px-2 py-0.5 rounded-full",
+                                          isVerified
+                                            ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30"
+                                            : entry.status === "rejected"
+                                            ? "bg-red-500/10 text-red-400 border border-red-500/30"
+                                            : "bg-amber-500/10 text-amber-400 border border-amber-500/30"
+                                        )}
+                                      >
+                                        {isVerified ? "Terverifikasi" : entry.status === "rejected" ? "Ditolak" : "Pending"}
+                                      </span>
+                                    )}
+                                  </td>
+                                  <td className="px-3 py-2.5 text-right font-mono font-bold whitespace-nowrap align-top">
+                                    {entry.isLogOnly ? (
+                                      <span className="text-stone-400">Rp 0</span>
+                                    ) : (
+                                      <span className="text-emerald-400">
+                                        Rp {Number(entry.cashInAmount || 0).toLocaleString("id-ID")}
+                                      </span>
+                                    )}
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                          <tfoot className="bg-stone-900 border-t border-stone-800 font-bold">
+                            <tr>
+                              <td colSpan={5} className="px-3 py-2.5 text-right text-stone-300">
+                                TOTAL PEMBAYARAN:
                               </td>
-                              <td className="px-3 py-2.5 text-right font-mono font-bold text-emerald-400">
-                                Rp {Number(p.jumlah || 0).toLocaleString("id-ID")}
+                              <td className="px-3 py-2.5 text-right font-mono text-emerald-400">
+                                Rp {selectedDetailRow.totalPembayaran.toLocaleString("id-ID")}
                               </td>
                             </tr>
-                          );
-                        })}
-                      </tbody>
-                      <tfoot className="bg-stone-900 border-t border-stone-800 font-bold">
-                        <tr>
-                          <td colSpan={5} className="px-3 py-2.5 text-right text-stone-300">
-                            TOTAL PEMBAYARAN:
-                          </td>
-                          <td className="px-3 py-2.5 text-right font-mono text-emerald-400">
-                            Rp {selectedDetailRow.totalPembayaran.toLocaleString("id-ID")}
-                          </td>
-                        </tr>
-                      </tfoot>
-                    </table>
-                  </div>
+                          </tfoot>
+                        </table>
+                      </div>
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
+              );
+            })()}
 
             {/* Modal Actions */}
             <div className="flex items-center justify-between pt-3 border-t border-stone-800">

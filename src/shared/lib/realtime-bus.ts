@@ -13,6 +13,7 @@ export type RealtimeEntity =
   | "generated_surat_logs"
   | "roomings"
   | "master_billing_options"
+  | "audit_entries"
   | "all";
 
 export interface RealtimeEventPayload {

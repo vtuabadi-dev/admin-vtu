@@ -17,6 +17,8 @@ import {
   Modal,
 } from "@/shared/components/ui";
 import type { GroupPaymentSummary, Keberangkatan } from "@/shared/types";
+import { InvoiceLogActionBadge, InvoiceLogMetaDetails } from "@/shared/components/ui/InvoiceLogBadges";
+import { buildUnifiedPaymentHistory } from "@/shared/lib/invoice-audit-log";
 import { formatCurrency, formatDate, getWhatsAppUrl } from "@/shared/lib/utils";
 import { useRealtimeListener } from "@/shared/providers/RealtimeProvider";
 import {
@@ -221,8 +223,8 @@ export default function PembayaranMonitoringPage() {
     loadData();
   }, [loadData]);
 
-  // Realtime synchronization: auto-reload data when payments, invoices, or groups change
-  useRealtimeListener(["pembayaran", "invoices", "registration_groups", "keberangkatan"], () => {
+  // Realtime synchronization: auto-reload data when payments, invoices, audit logs, or groups change
+  useRealtimeListener(["pembayaran", "invoices", "registration_groups", "keberangkatan", "audit_entries"], () => {
     loadData();
   });
 
@@ -1000,54 +1002,92 @@ PT VAUZA TAMMA ABADI`;
               </div>
             </div>
 
-            {/* Payment Transactions Table */}
-            <div className="space-y-2">
-              <h4 className="text-xs font-bold text-foreground uppercase tracking-wider flex items-center gap-1.5">
-                <History className="w-3.5 h-3.5 text-sky-600" />
-                Daftar Riwayat Pembayaran ({historyModalGroup.pembayaran?.length || 0} Transaksi)
-              </h4>
+            {/* Payment & Invoice Log Transactions Table */}
+            {(() => {
+              const combined = buildUnifiedPaymentHistory(
+                historyModalGroup.pembayaran || [],
+                historyModalGroup.invoiceLogs || [],
+                "desc"
+              );
+              return (
+                <div className="space-y-2">
+                  <h4 className="text-xs font-bold text-foreground uppercase tracking-wider flex items-center gap-1.5">
+                    <History className="w-3.5 h-3.5 text-sky-600" />
+                    Daftar Riwayat Pembayaran &amp; Log Invoice ({combined.length} Entri)
+                  </h4>
 
-              {historyModalGroup.pembayaran && historyModalGroup.pembayaran.length > 0 ? (
-                <div className="border rounded-xl overflow-hidden max-h-60 overflow-y-auto">
-                  <table className="w-full text-xs">
-                    <thead className="bg-muted/50 border-b text-muted-foreground font-semibold">
-                      <tr>
-                        <th className="py-2 px-3 text-left">Tanggal</th>
-                        <th className="py-2 px-3 text-left">No. Invoice</th>
-                        <th className="py-2 px-3 text-left">Metode</th>
-                        <th className="py-2 px-3 text-right">Nominal</th>
-                        <th className="py-2 px-3 text-center">Status</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border">
-                      {historyModalGroup.pembayaran.map((p: any, idx: number) => (
-                        <tr key={p.id || idx} className="hover:bg-muted/20">
-                          <td className="py-2 px-3 whitespace-nowrap font-medium text-foreground">
-                            {formatDate(p.tanggalPembayaran || p.createdAt || "")}
-                          </td>
-                          <td className="py-2 px-3 font-mono text-muted-foreground">
-                            {p.invoiceNumber || p.invoiceId || "-"}
-                          </td>
-                          <td className="py-2 px-3 capitalize">
-                            {p.metodePembayaran || p.metode || "Transfer"}
-                          </td>
-                          <td className="py-2 px-3 text-right font-bold text-emerald-600 tabular-nums">
-                            {formatCurrency(p.jumlah)}
-                          </td>
-                          <td className="py-2 px-3 text-center">
-                            <StatusBadge status={p.status || "verified"} />
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                  {combined.length > 0 ? (
+                    <div className="border rounded-xl overflow-hidden max-h-64 overflow-y-auto">
+                      <table className="w-full text-xs">
+                        <thead className="bg-muted/50 border-b text-muted-foreground font-semibold">
+                          <tr>
+                            <th className="py-2 px-3 text-left">Tanggal</th>
+                            <th className="py-2 px-3 text-left">Invoice / Aktivitas</th>
+                            <th className="py-2 px-3 text-left">Metode / Aktor</th>
+                            <th className="py-2 px-3 text-right">Kas Masuk</th>
+                            <th className="py-2 px-3 text-center">Status</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-border">
+                          {combined.map((entry, idx) => (
+                            <tr
+                              key={entry.id || idx}
+                              className={entry.isLogOnly ? "bg-indigo-500/[0.03] hover:bg-indigo-500/[0.08]" : "hover:bg-muted/20"}
+                            >
+                              <td className="py-2 px-3 whitespace-nowrap font-medium text-foreground align-top">
+                                {formatDate(entry.timestamp || "")}
+                              </td>
+                              <td className="py-2 px-3 align-top">
+                                {entry.isLogOnly && entry.rawLog ? (
+                                  <div className="space-y-1">
+                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                      <InvoiceLogActionBadge log={entry.rawLog} compact />
+                                      {entry.invoiceRef && (
+                                        <span className="font-mono text-indigo-700 dark:text-indigo-300 font-semibold">
+                                          {entry.invoiceRef}
+                                        </span>
+                                      )}
+                                    </div>
+                                    <InvoiceLogMetaDetails log={entry.rawLog} maxDiffs={2} />
+                                  </div>
+                                ) : (
+                                  <span className="font-mono text-muted-foreground">
+                                    {entry.invoiceRef || "-"}
+                                  </span>
+                                )}
+                              </td>
+                              <td className="py-2 px-3 capitalize align-top">
+                                {entry.isLogOnly ? (entry.actorName || "Admin") : entry.metode}
+                              </td>
+                              <td className="py-2 px-3 text-right font-bold tabular-nums align-top whitespace-nowrap">
+                                {entry.isLogOnly ? (
+                                  <span className="text-muted-foreground">Rp 0</span>
+                                ) : (
+                                  <span className="text-emerald-600">{formatCurrency(entry.cashInAmount)}</span>
+                                )}
+                              </td>
+                              <td className="py-2 px-3 text-center align-top">
+                                {entry.isLogOnly ? (
+                                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+                                    Tercatat
+                                  </span>
+                                ) : (
+                                  <StatusBadge status={(entry.status as any) || "verified"} />
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <div className="p-6 text-center border rounded-xl bg-muted/20 text-muted-foreground text-xs">
+                      Belum ada riwayat transaksi pembayaran maupun log invoice tercatat untuk grup ini.
+                    </div>
+                  )}
                 </div>
-              ) : (
-                <div className="p-6 text-center border rounded-xl bg-muted/20 text-muted-foreground text-xs">
-                  Belum ada riwayat transaksi pembayaran tercatat untuk grup ini.
-                </div>
-              )}
-            </div>
+              );
+            })()}
 
             {/* Modal Actions */}
             <div className="flex items-center justify-between pt-3 border-t">

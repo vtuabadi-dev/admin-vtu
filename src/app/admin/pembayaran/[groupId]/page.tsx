@@ -30,6 +30,8 @@ import type {
   MetodePembayaran,
 } from "@/shared/types";
 import { formatCurrency, formatDate, cn } from "@/shared/lib/utils";
+import { InvoiceLogActionBadge, InvoiceLogMetaDetails } from "@/shared/components/ui/InvoiceLogBadges";
+import { buildUnifiedPaymentHistory } from "@/shared/lib/invoice-audit-log";
 import { deriveGroupPaymentStatus } from "@/shared/lib/payment-utils";
 import { broadcastMutation } from "@/shared/lib/realtime-bus";
 import { CreditCard, Send, Plus, ArrowLeft, ChevronDown, ChevronUp, XCircle, Receipt, FileText } from "lucide-react";
@@ -312,65 +314,125 @@ export default function GroupPaymentDetailPage({ params }: { params: { groupId: 
           <Tabs tabs={paymentTabs} defaultTab="histori">
             {(activeTab) => (
               <>
-                {activeTab === "histori" && (
-                  <Card>
-                    <CardContent className="p-0">
-                      {summary.pembayaran.length === 0 ? (
-                        <p className="text-sm text-muted-foreground py-8 text-center">Belum ada histori pembayaran</p>
-                      ) : (
-                        <div className="relative w-full overflow-auto">
-                          <table className="w-full caption-bottom text-sm dense-table">
-                            <thead>
-                              <tr className="border-b">
-                                <th className="h-10 w-10 px-3 text-left font-medium text-muted-foreground">#</th>
-                                <th className="h-10 px-3 text-left font-medium text-muted-foreground">Tanggal</th>
-                                <th className="h-10 px-3 text-right font-medium text-muted-foreground">Jumlah</th>
-                                <th className="h-10 px-3 text-left font-medium text-muted-foreground">Metode</th>
-                                <th className="h-10 px-3 text-center font-medium text-muted-foreground">Alokasi</th>
-                                <th className="h-10 px-3 text-left font-medium text-muted-foreground">Status</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {summary.pembayaran.map((p, idx) => (
-                                <Fragment key={p.id}>
-                                  <tr
-                                    className="border-b hover:bg-muted/50 cursor-pointer"
-                                    onClick={() => setExpandedPaymentId(expandedPaymentId === p.id ? null : p.id)}
-                                  >
-                                    <td className="p-3 text-xs text-muted-foreground">{idx + 1}</td>
-                                    <td className="p-3">{formatDate(p.tanggal)}</td>
-                                    <td className="p-3 text-right font-medium tabular-nums">{formatCurrency(p.jumlah)}</td>
-                                    <td className="p-3"><Badge variant="outline">{getMetodeLabel(p.metode)}</Badge></td>
-                                    <td className="p-3 text-center text-xs text-muted-foreground">{p.alokasi.length} org</td>
-                                    <td className="p-3"><StatusBadge status={p.status} /></td>
-                                  </tr>
-                                  {expandedPaymentId === p.id && (
-                                    <tr className="bg-muted/20">
-                                      <td colSpan={6} className="p-0">
-                                        <div className="px-12 py-3 space-y-1 border-t">
-                                          <p className="text-xs font-medium text-muted-foreground mb-1.5">Rincian Alokasi:</p>
-                                          {p.alokasi.map((a) => (
-                                            <div key={a.jamaahId} className="flex items-center justify-between text-sm">
-                                              <span className="text-muted-foreground">{a.namaJamaah}</span>
-                                              <span className="font-medium tabular-nums">{formatCurrency(a.jumlah)}</span>
+                {activeTab === "histori" && (() => {
+                  const combinedHistory = buildUnifiedPaymentHistory(
+                    summary.pembayaran || [],
+                    summary.invoiceLogs || [],
+                    "desc"
+                  );
+                  return (
+                    <Card>
+                      <CardContent className="p-0">
+                        {combinedHistory.length === 0 ? (
+                          <p className="text-sm text-muted-foreground py-8 text-center">
+                            Belum ada histori pembayaran maupun log pembaruan invoice
+                          </p>
+                        ) : (
+                          <div className="relative w-full overflow-auto">
+                            <table className="w-full caption-bottom text-sm dense-table">
+                              <thead>
+                                <tr className="border-b">
+                                  <th className="h-10 w-10 px-3 text-left font-medium text-muted-foreground">#</th>
+                                  <th className="h-10 px-3 text-left font-medium text-muted-foreground">Tanggal</th>
+                                  <th className="h-10 px-3 text-left font-medium text-muted-foreground">Aktivitas / Jenis</th>
+                                  <th className="h-10 px-3 text-right font-medium text-muted-foreground">Kas Masuk</th>
+                                  <th className="h-10 px-3 text-left font-medium text-muted-foreground">Metode / Aktor</th>
+                                  <th className="h-10 px-3 text-center font-medium text-muted-foreground">Alokasi / Dampak</th>
+                                  <th className="h-10 px-3 text-left font-medium text-muted-foreground">Status</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {combinedHistory.map((entry, idx) => (
+                                  <Fragment key={entry.id}>
+                                    <tr
+                                      className={cn(
+                                        "border-b cursor-pointer",
+                                        entry.isLogOnly ? "bg-indigo-500/[0.03] hover:bg-indigo-500/[0.07]" : "hover:bg-muted/50"
+                                      )}
+                                      onClick={() => setExpandedPaymentId(expandedPaymentId === entry.id ? null : entry.id)}
+                                    >
+                                      <td className="p-3 text-xs text-muted-foreground">{idx + 1}</td>
+                                      <td className="p-3 whitespace-nowrap">{formatDate(entry.timestamp)}</td>
+                                      <td className="p-3">
+                                        {entry.isLogOnly && entry.rawLog ? (
+                                          <div className="space-y-0.5">
+                                            <div className="flex items-center gap-1.5 flex-wrap">
+                                              <InvoiceLogActionBadge log={entry.rawLog} compact />
+                                              {entry.invoiceRef && (
+                                                <span className="font-mono text-xs font-semibold text-indigo-700 dark:text-indigo-300">
+                                                  {entry.invoiceRef}
+                                                </span>
+                                              )}
                                             </div>
-                                          ))}
-                                          {p.catatan && (
-                                            <p className="text-xs text-muted-foreground pt-1.5 border-t mt-1.5">Catatan: {p.catatan}</p>
-                                          )}
-                                        </div>
+                                            <p className="text-xs text-muted-foreground line-clamp-1">{entry.description}</p>
+                                          </div>
+                                        ) : (
+                                          <span className="text-xs font-medium">{entry.title}</span>
+                                        )}
+                                      </td>
+                                      <td className="p-3 text-right font-medium tabular-nums whitespace-nowrap">
+                                        {entry.isLogOnly ? (
+                                          <span className="text-xs text-muted-foreground">Rp 0</span>
+                                        ) : (
+                                          formatCurrency(entry.cashInAmount)
+                                        )}
+                                      </td>
+                                      <td className="p-3">
+                                        <Badge variant="outline">
+                                          {entry.isLogOnly ? (entry.actorName || "Admin") : getMetodeLabel(entry.metode as MetodePembayaran)}
+                                        </Badge>
+                                      </td>
+                                      <td className="p-3 text-center text-xs text-muted-foreground">
+                                        {entry.isLogOnly
+                                          ? (entry.manifestImpact?.join(", ") || "Tagihan Manifest")
+                                          : `${entry.rawPayment?.alokasi?.length ?? 0} org`}
+                                      </td>
+                                      <td className="p-3">
+                                        {entry.isLogOnly ? (
+                                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+                                            Tercatat
+                                          </span>
+                                        ) : (
+                                          <StatusBadge status={entry.status as any} />
+                                        )}
                                       </td>
                                     </tr>
-                                  )}
-                                </Fragment>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                )}
+                                    {expandedPaymentId === entry.id && (
+                                      <tr className="bg-muted/20">
+                                        <td colSpan={7} className="p-0">
+                                          <div className="px-10 py-3 space-y-1.5 border-t">
+                                            {entry.isLogOnly && entry.rawLog ? (
+                                              <InvoiceLogMetaDetails log={entry.rawLog} maxDiffs={8} />
+                                            ) : (
+                                              <>
+                                                <p className="text-xs font-medium text-muted-foreground mb-1.5">Rincian Alokasi:</p>
+                                                {(entry.rawPayment?.alokasi || []).map((a) => (
+                                                  <div key={a.jamaahId} className="flex items-center justify-between text-sm">
+                                                    <span className="text-muted-foreground">{a.namaJamaah}</span>
+                                                    <span className="font-medium tabular-nums">{formatCurrency(a.jumlah)}</span>
+                                                  </div>
+                                                ))}
+                                                {entry.rawPayment?.catatan && (
+                                                  <p className="text-xs text-muted-foreground pt-1.5 border-t mt-1.5">
+                                                    Catatan: {entry.rawPayment.catatan}
+                                                  </p>
+                                                )}
+                                              </>
+                                            )}
+                                          </div>
+                                        </td>
+                                      </tr>
+                                    )}
+                                  </Fragment>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  );
+                })()}
 
                 {activeTab === "invoice" && (
                   <div className="space-y-3">

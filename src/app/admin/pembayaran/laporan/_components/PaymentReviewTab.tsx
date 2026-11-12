@@ -43,6 +43,11 @@ import { HotelUpgradeSelector } from "./HotelUpgradeSelector";
 import { Badge } from "@/shared/components/ui/Badge";
 import { EmptyState } from "@/shared/components/EmptyState";
 import { LoadingSkeleton } from "@/shared/components/LoadingSkeleton";
+import { InvoiceLogActionBadge, InvoiceLogMetaDetails } from "@/shared/components/ui/InvoiceLogBadges";
+import {
+  buildUnifiedPaymentHistory,
+  isReviewLogOnlyEntry,
+} from "@/shared/lib/invoice-audit-log";
 import { formatCurrency, formatDate, formatInvoicePersonName, getManifestAlamat, getWhatsAppUrl } from "@/shared/lib/utils";
 import {
   ALASAN_REJECT,
@@ -401,6 +406,7 @@ function PaymentReviewTabContent() {
         event.entity === "pembayaran" ||
         event.entity === "invoices" ||
         event.entity === "registration_groups" ||
+        event.entity === "audit_entries" ||
         event.entity === "all"
       ) {
         if (typeof window !== "undefined") {
@@ -415,7 +421,7 @@ function PaymentReviewTabContent() {
   }, [loadData]);
 
   const handleDeleteSinglePayment = async () => {
-    if (!deletePaymentTarget) return;
+    if (!deletePaymentTarget || isReviewLogOnlyEntry(deletePaymentTarget)) return;
     setIsDeletingPayment(true);
     try {
       const res = await fetch(`/api/pembayaran/${deletePaymentTarget.id}?cascade=${cascadeGroupDelete}`, {
@@ -1283,6 +1289,9 @@ function PaymentReviewTabContent() {
   }, [rejectTarget, rejectReason, rejectNotes, selectedPayment]);
 
   const getPaymentTypeBadge = (p: any) => {
+    if (isReviewLogOnlyEntry(p) && p.auditLog) {
+      return <InvoiceLogActionBadge log={p.auditLog} />;
+    }
     const cat = (p.catatan || "").toLowerCase();
     const invId = (p.invoiceId || "").toLowerCase();
     if (cat.includes("tambah jamaah") || cat.includes("penambahan jamaah") || p.sumber === "tambah_jamaah" || invId.startsWith("inv-pax")) {
@@ -1321,6 +1330,13 @@ function PaymentReviewTabContent() {
   };
 
   const getMetodeBadge = (p: any) => {
+    if (isReviewLogOnlyEntry(p)) {
+      return (
+        <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+          Log Sistem
+        </span>
+      );
+    }
     const m = (p.metode || "").toLowerCase();
     if (m === "cash" || m === "tunai") {
       return (
@@ -1350,21 +1366,44 @@ function PaymentReviewTabContent() {
     );
   };
 
+  const cashQueue = useMemo(
+    () => queue.filter((q) => !isReviewLogOnlyEntry(q)),
+    [queue]
+  );
+  const invoiceLogQueue = useMemo(
+    () => queue.filter((q) => isReviewLogOnlyEntry(q)),
+    [queue]
+  );
+
   const filteredQueue = queue.filter((p) => {
-    if (statusFilter !== "all" && p.status !== statusFilter) return false;
+    const isLogEntry = isReviewLogOnlyEntry(p);
+    if (statusFilter === "logged") {
+      if (!isLogEntry) return false;
+    } else if (statusFilter !== "all") {
+      if (isLogEntry || p.status !== statusFilter) return false;
+    }
 
     if (jenisFilter !== "all") {
-      const cat = (p.catatan || "").toLowerCase();
-      const invId = (p.invoiceId || "").toLowerCase();
-      const isTambahJamaah = cat.includes("tambah jamaah") || cat.includes("penambahan jamaah") || p.sumber === "tambah_jamaah" || invId.startsWith("inv-pax");
-      const isPindahPaket = cat.includes("pindah paket") || invId.startsWith("inv-paket") || invId.startsWith("pindah-");
-      const isDP = !isTambahJamaah && !isPindahPaket && (cat.includes("dp") || cat.includes("daftar") || cat.includes("pendaftaran") || p.sumber === "jamaah_dp");
-      const isLunas = !isTambahJamaah && !isPindahPaket && (cat.includes("lunas") || cat.includes("pelunasan") || (p.group?.totalTagihan && p.jumlah >= p.group.totalTagihan));
-      if (jenisFilter === "tambah_jamaah" && !isTambahJamaah) return false;
-      if (jenisFilter === "pindah_paket" && !isPindahPaket) return false;
-      if (jenisFilter === "dp" && !isDP) return false;
-      if (jenisFilter === "pelunasan" && !isLunas) return false;
-      if (jenisFilter === "tagihan" && (isTambahJamaah || isPindahPaket || isDP || isLunas)) return false;
+      if (jenisFilter === "pembaruan_invoice") {
+        if (!isLogEntry && !(p.invoiceId || "").toLowerCase().startsWith("inv-upd")) return false;
+      } else if (isLogEntry) {
+        const ek = p.auditLog?.eventKind;
+        if (jenisFilter === "tambah_jamaah" && ek !== "TAMBAH_JAMAAH") return false;
+        if (jenisFilter === "pindah_paket" && ek !== "PINDAH_PAKET") return false;
+        if (jenisFilter === "dp" || jenisFilter === "pelunasan" || jenisFilter === "tagihan") return false;
+      } else {
+        const cat = (p.catatan || "").toLowerCase();
+        const invId = (p.invoiceId || "").toLowerCase();
+        const isTambahJamaah = cat.includes("tambah jamaah") || cat.includes("penambahan jamaah") || p.sumber === "tambah_jamaah" || invId.startsWith("inv-pax");
+        const isPindahPaket = cat.includes("pindah paket") || invId.startsWith("inv-paket") || invId.startsWith("pindah-");
+        const isDP = !isTambahJamaah && !isPindahPaket && (cat.includes("dp") || cat.includes("daftar") || cat.includes("pendaftaran") || p.sumber === "jamaah_dp");
+        const isLunas = !isTambahJamaah && !isPindahPaket && (cat.includes("lunas") || cat.includes("pelunasan") || (p.group?.totalTagihan && p.jumlah >= p.group.totalTagihan));
+        if (jenisFilter === "tambah_jamaah" && !isTambahJamaah) return false;
+        if (jenisFilter === "pindah_paket" && !isPindahPaket) return false;
+        if (jenisFilter === "dp" && !isDP) return false;
+        if (jenisFilter === "pelunasan" && !isLunas) return false;
+        if (jenisFilter === "tagihan" && (isTambahJamaah || isPindahPaket || isDP || isLunas)) return false;
+      }
     }
 
     // Filter Tanggal
@@ -1411,8 +1450,10 @@ function PaymentReviewTabContent() {
       const matchKode = (p.kodeRegistrasi || "").toLowerCase().includes(q);
       const matchName = (p.namaGroup || "").toLowerCase().includes(q);
       const matchBank = (p.bankPengirim || "").toLowerCase().includes(q);
+      const matchInvoice = (p.invoiceId || p.auditLog?.nomorInvoice || "").toLowerCase().includes(q);
+      const matchDetail = (p.catatan || p.auditLog?.summary || "").toLowerCase().includes(q);
       const matchNominal = String(p.jumlah).includes(q);
-      if (!matchKode && !matchName && !matchBank && !matchNominal) return false;
+      if (!matchKode && !matchName && !matchBank && !matchInvoice && !matchDetail && !matchNominal) return false;
     }
 
     return true;
@@ -1466,9 +1507,22 @@ function PaymentReviewTabContent() {
   const paymentHistoryList =
     selectedPayment?.group?.pembayaran && selectedPayment.group.pembayaran.length > 0
       ? selectedPayment.group.pembayaran
-      : selectedPayment
+      : selectedPayment && !isReviewLogOnlyEntry(selectedPayment)
       ? [selectedPayment]
       : [];
+
+  const unifiedHistoryList = useMemo(
+    () =>
+      buildUnifiedPaymentHistory(
+        paymentHistoryList,
+        selectedPayment?.group?.invoiceLogs ||
+          (selectedPayment?.auditLog ? [selectedPayment.auditLog] : []),
+        "desc"
+      ),
+    [paymentHistoryList, selectedPayment]
+  );
+
+  const isSelectedLogOnly = isReviewLogOnlyEntry(selectedPayment);
 
   return (
     <div className="space-y-4">
@@ -1543,9 +1597,10 @@ function PaymentReviewTabContent() {
             className="px-2.5 py-1.5 bg-background border rounded-lg text-xs font-medium focus:outline-none focus:ring-1 focus:ring-primary"
           >
             <option value="all">Semua Status ({queue.length})</option>
-            <option value="pending">Menunggu ({queue.filter((q) => q.status === "pending").length})</option>
-            <option value="verified">Disetujui ({queue.filter((q) => q.status === "verified").length})</option>
-            <option value="rejected">Ditolak ({queue.filter((q) => q.status === "rejected").length})</option>
+            <option value="pending">Menunggu ({cashQueue.filter((q) => q.status === "pending").length})</option>
+            <option value="verified">Disetujui ({cashQueue.filter((q) => q.status === "verified").length})</option>
+            <option value="rejected">Ditolak ({cashQueue.filter((q) => q.status === "rejected").length})</option>
+            <option value="logged">Log Invoice ({invoiceLogQueue.length})</option>
           </select>
 
           {/* Jenis Filter */}
@@ -1555,6 +1610,7 @@ function PaymentReviewTabContent() {
             className="px-2.5 py-1.5 bg-background border rounded-lg text-xs font-medium focus:outline-none focus:ring-1 focus:ring-primary"
           >
             <option value="all">Semua Jenis</option>
+            <option value="pembaruan_invoice">Pembaruan / Log Invoice</option>
             <option value="tambah_jamaah">Tambah Jamaah</option>
             <option value="dp">DP (Pendaftaran)</option>
             <option value="pindah_paket">Pindah Paket</option>
@@ -1600,12 +1656,12 @@ function PaymentReviewTabContent() {
             variant="destructive"
             size="sm"
             onClick={() => setShowDeleteAllPaymentsModal(true)}
-            disabled={queue.length === 0 || isDeletingPayment}
+            disabled={cashQueue.length === 0 || isDeletingPayment}
             className="h-8 px-2.5 text-xs font-bold gap-1.5 bg-red-600 hover:bg-red-700 text-white shadow-xs cursor-pointer ml-auto"
-            title="Hapus seluruh antrian data pembayaran percobaan"
+            title="Hapus seluruh antrian data pembayaran percobaan (log audit tetap aman)"
           >
             <Trash2 className="w-3.5 h-3.5" />
-            <span>Hapus Data Percobaan ({queue.length})</span>
+            <span>Hapus Data Percobaan ({cashQueue.length})</span>
           </Button>
         </div>
       </div>
@@ -1642,31 +1698,68 @@ function PaymentReviewTabContent() {
                     <tbody className="divide-y text-xs">
                       {filteredQueue.map((p, idx) => {
                         const isSelected = selectedPayment?.id === p.id;
+                        const isLogEntry = isReviewLogOnlyEntry(p);
                         return (
                           <tr
                             key={p.id}
                             className={`transition-colors cursor-pointer ${
                               isSelected
                                 ? "bg-amber-500/10 border-l-4 border-l-amber-500 font-medium"
-                                : "hover:bg-muted/30"
+                                : isLogEntry
+                                  ? "bg-indigo-500/[0.03] hover:bg-indigo-500/[0.08]"
+                                  : "hover:bg-muted/30"
                             }`}
                             onClick={() => handleSelectPayment(p)}
                           >
                             <td className="px-2.5 py-2.5 text-center text-muted-foreground">{idx + 1}</td>
                             <td className="px-2.5 py-2.5">
                               <p className="font-bold text-foreground leading-tight">{p.namaGroup ?? p.groupId}</p>
-                              <div className="flex items-center gap-1.5 mt-0.5">
+                              <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
                                 <span className="font-mono text-[10px] text-amber-600 dark:text-amber-400 bg-amber-500/10 px-1 rounded font-bold">
                                   {p.kodeRegistrasi ?? "-"}
                                 </span>
                                 <span className="text-[10px] text-muted-foreground">
                                   {formatDate(p.tanggal)}
                                 </span>
+                                {isLogEntry && p.auditLog?.nomorInvoice && (
+                                  <span className="font-mono text-[10px] text-indigo-600 dark:text-indigo-300 font-semibold">
+                                    {p.auditLog.nomorInvoice}
+                                  </span>
+                                )}
                               </div>
+                              {isLogEntry && p.auditLog?.summary && (
+                                <p className="text-[10.5px] text-muted-foreground mt-0.5 line-clamp-1 max-w-[280px]">
+                                  {p.auditLog.summary}
+                                </p>
+                              )}
                             </td>
                             <td className="px-2.5 py-2.5">{getPaymentTypeBadge(p)}</td>
                             <td className="px-2.5 py-2.5 text-right font-extrabold text-foreground font-mono">
-                              {formatCurrency(p.jumlah)}
+                              {isLogEntry ? (
+                                <div className="flex flex-col items-end">
+                                  <span className="text-[11px] font-bold text-muted-foreground">
+                                    Rp 0 Masuk
+                                  </span>
+                                  {typeof p.auditLog?.deltaTotal === "number" && p.auditLog.deltaTotal !== 0 ? (
+                                    <span
+                                      className={`text-[10px] font-bold ${
+                                        p.auditLog.deltaTotal > 0
+                                          ? "text-amber-600 dark:text-amber-400"
+                                          : "text-emerald-600 dark:text-emerald-400"
+                                      }`}
+                                    >
+                                      {p.auditLog.deltaTotal > 0 ? "+" : "-"}
+                                      {formatCurrency(Math.abs(p.auditLog.deltaTotal))}
+                                    </span>
+                                  ) : typeof p.auditLog?.totalAfter === "number" ? (
+                                    <span className="text-[10px] text-indigo-600 dark:text-indigo-300 font-semibold">
+                                      Net: {formatCurrency(p.auditLog.totalAfter)}
+                                    </span>
+                                  ) : null}
+                                </div>
+                              ) : (
+                                formatCurrency(p.jumlah)
+                              )}
                             </td>
                             {!selectedPayment && (
                               <td className="px-2.5 py-2.5 text-center">
@@ -1688,13 +1781,31 @@ function PaymentReviewTabContent() {
                                 >
                                   <Eye className="h-4 w-4" />
                                 </Button>
+                              ) : isLogEntry && p.invoiceId ? (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-7 w-7 p-0 rounded-full text-indigo-600 hover:bg-indigo-500/10"
+                                  title="Lihat Preview Invoice"
+                                  onClick={() => {
+                                    const inv = p.invoiceId;
+                                    const kode = p.kodeRegistrasi || p.groupId || "";
+                                    window.open(`/invoice/${encodeURIComponent(inv)}?kode=${encodeURIComponent(kode)}`, "_blank");
+                                  }}
+                                >
+                                  <FileText className="h-4 w-4" />
+                                </Button>
                               ) : (
                                 <span className="text-muted-foreground text-[10px]">-</span>
                               )}
                             </td>
                             {!selectedPayment && (
                               <td className="px-3 py-3 text-center">
-                                {p.status === "verified" ? (
+                                {isLogEntry ? (
+                                  <Badge className="text-[10px] bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+                                    Log Tercatat
+                                  </Badge>
+                                ) : p.status === "verified" ? (
                                   <Badge variant="success" className="text-[10px]">Verified</Badge>
                                 ) : p.status === "rejected" ? (
                                   <Badge variant="destructive" className="text-[10px]">Ditolak</Badge>
@@ -1706,7 +1817,18 @@ function PaymentReviewTabContent() {
                             {!selectedPayment && (
                               <td className="px-3 py-3 text-center" onClick={(e) => e.stopPropagation()}>
                                 <div className="flex items-center justify-center gap-1">
-                                  {p.status === "verified" ? (
+                                  {isLogEntry ? (
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="h-7 text-xs font-bold gap-1.5 border-indigo-300 text-indigo-700 hover:bg-indigo-50 dark:border-indigo-700 dark:text-indigo-300"
+                                      onClick={() => handleSelectPayment(p)}
+                                      title="Buka Detail Log & Rincian Tagihan"
+                                    >
+                                      <FileText className="h-3.5 w-3.5" />
+                                      Detail Log
+                                    </Button>
+                                  ) : p.status === "verified" ? (
                                     <Button
                                       size="sm"
                                       className="h-7 text-xs font-bold gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs"
@@ -1749,16 +1871,18 @@ function PaymentReviewTabContent() {
                                     </>
                                   )}
 
-                                  {/* Tombol Hapus Satuan */}
-                                  <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    className="h-7 w-7 p-0 text-muted-foreground hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 cursor-pointer ml-0.5"
-                                    title="Hapus data pembayaran / percobaan ini"
-                                    onClick={() => setDeletePaymentTarget(p)}
-                                  >
-                                    <Trash2 className="h-3.5 w-3.5" />
-                                  </Button>
+                                  {/* Tombol Hapus Satuan (hanya untuk transaksi kas, bukan audit log permanen) */}
+                                  {!isLogEntry && (
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      className="h-7 w-7 p-0 text-muted-foreground hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 cursor-pointer ml-0.5"
+                                      title="Hapus data pembayaran / percobaan ini"
+                                      onClick={() => setDeletePaymentTarget(p)}
+                                    >
+                                      <Trash2 className="h-3.5 w-3.5" />
+                                    </Button>
+                                  )}
                                 </div>
                               </td>
                             )}
@@ -1790,9 +1914,15 @@ function PaymentReviewTabContent() {
                   </p>
                 </div>
                 <div className="flex items-center gap-1">
-                  <Badge variant={selectedPayment.status === "verified" ? "success" : "warning"} className="text-[10px] font-bold">
-                    {selectedPayment.status === "verified" ? "Invoice Terbit" : "Draft Invoice"}
-                  </Badge>
+                  {isSelectedLogOnly ? (
+                    <Badge className="text-[10px] font-bold bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+                      Log Pembaruan Invoice
+                    </Badge>
+                  ) : (
+                    <Badge variant={selectedPayment.status === "verified" ? "success" : "warning"} className="text-[10px] font-bold">
+                      {selectedPayment.status === "verified" ? "Invoice Terbit" : "Draft Invoice"}
+                    </Badge>
+                  )}
                   <Button
                     variant="ghost"
                     size="sm"
@@ -1844,6 +1974,19 @@ function PaymentReviewTabContent() {
                     </div>
                   </div>
                 </div>
+
+                {/* 1.5 Log Audit Pembaruan Invoice Banner (hanya tampil untuk entri log non-kas) */}
+                {isSelectedLogOnly && selectedPayment.auditLog && (
+                  <div className="p-3 rounded-xl border border-indigo-500/30 bg-indigo-500/[0.06] space-y-2">
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                      <InvoiceLogActionBadge log={selectedPayment.auditLog} />
+                      <span className="text-[10px] font-mono text-muted-foreground">
+                        {formatDate(selectedPayment.auditLog.timestamp)} &bull; Kas Masuk: Rp 0
+                      </span>
+                    </div>
+                    <InvoiceLogMetaDetails log={selectedPayment.auditLog} maxDiffs={6} />
+                  </div>
+                )}
 
                 {/* 2. Rincian Form Invoice Tagihan */}
                 <div className="space-y-3">
@@ -2365,59 +2508,92 @@ function PaymentReviewTabContent() {
                         <Receipt className="w-4 h-4" />
                       </div>
                       <div>
-                        <h4 className="font-bold text-foreground text-xs">Riwayat Pembayaran</h4>
+                        <h4 className="font-bold text-foreground text-xs">Riwayat Pembayaran &amp; Log Invoice</h4>
                         <p className="text-[10px] text-muted-foreground">
-                          Daftar riwayat transaksi pembayaran yang telah masuk untuk grup / jamaah ini.
+                          Riwayat transaksi kas masuk serta log penerbitan / perubahan tagihan grup ini.
                         </p>
                       </div>
                     </div>
                     <Badge variant="outline" className="text-[10.5px] font-mono font-bold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800">
-                      Total Masuk: {formatCurrency(groupTotalBayar || selectedPayment?.jumlah || 0)}
+                      Total Masuk: {formatCurrency(groupTotalBayar || (isSelectedLogOnly ? 0 : selectedPayment?.jumlah || 0))}
                     </Badge>
                   </div>
 
-                  {/* Payment History Table */}
-                  {paymentHistoryList.length > 0 ? (
-                    <div className="overflow-x-auto rounded-lg border bg-background max-h-48 overflow-y-auto">
+                  {/* Unified Payment & Invoice Log History Table */}
+                  {unifiedHistoryList.length > 0 ? (
+                    <div className="overflow-x-auto rounded-lg border bg-background max-h-56 overflow-y-auto">
                       <table className="w-full text-left text-[11px]">
                         <thead>
                           <tr className="border-b bg-muted/60 text-muted-foreground font-bold uppercase tracking-wider text-[10px] sticky top-0 bg-muted/90 backdrop-blur-xs">
                             <th className="py-2 px-2.5 text-center w-8">#</th>
                             <th className="py-2 px-2.5">Tanggal</th>
-                            <th className="py-2 px-2.5">Tahap / Jenis</th>
-                            <th className="py-2 px-2.5">Metode &amp; Bank</th>
-                            <th className="py-2 px-2.5 text-right">Nominal</th>
+                            <th className="py-2 px-2.5">Aktivitas / Jenis</th>
+                            <th className="py-2 px-2.5">Keterangan / Metode</th>
+                            <th className="py-2 px-2.5 text-right">Kas Masuk</th>
                             <th className="py-2 px-2.5 text-center">Status</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y text-xs font-medium">
-                          {paymentHistoryList.map((p: any, idx: number) => {
-                            const isCurrent = p.id === selectedPayment.id;
+                          {unifiedHistoryList.map((entry, idx) => {
+                            const isCurrent = entry.id === selectedPayment.id;
                             return (
                               <tr
-                                key={p.id || idx}
-                                className={isCurrent ? "bg-amber-500/10 font-bold" : "hover:bg-muted/30"}
+                                key={entry.id || idx}
+                                className={
+                                  isCurrent
+                                    ? "bg-amber-500/10 font-bold"
+                                    : entry.isLogOnly
+                                      ? "bg-indigo-500/[0.03] hover:bg-indigo-500/[0.07]"
+                                      : "hover:bg-muted/30"
+                                }
                               >
                                 <td className="py-2 px-2.5 text-center text-muted-foreground font-mono">{idx + 1}</td>
                                 <td className="py-2 px-2.5 font-semibold text-foreground whitespace-nowrap">
-                                  {p.tanggal ? formatDate(p.tanggal) : "-"}
+                                  {entry.timestamp ? formatDate(entry.timestamp) : "-"}
                                 </td>
-                                <td className="py-2 px-2.5 font-bold text-slate-800 dark:text-slate-200">
-                                  {p.jenisPembayaran || p.tahap || "Pembayaran"}
+                                <td className="py-2 px-2.5">
+                                  {entry.isLogOnly && entry.rawLog ? (
+                                    <InvoiceLogActionBadge log={entry.rawLog} compact />
+                                  ) : (
+                                    <span className="font-bold text-slate-800 dark:text-slate-200">{entry.title}</span>
+                                  )}
                                 </td>
-                                <td className="py-2 px-2.5 text-muted-foreground whitespace-nowrap">
-                                  <span className="font-semibold text-foreground uppercase">
-                                    {p.bankPengirim ? `Transfer ${p.bankPengirim}` : p.metode || "Transfer"}
-                                  </span>
-                                  {p.noRekening ? <span className="font-mono text-[10px] block text-stone-500">({p.noRekening})</span> : null}
+                                <td className="py-2 px-2.5 text-muted-foreground">
+                                  {entry.isLogOnly && entry.rawLog ? (
+                                    <div className="max-w-[260px]">
+                                      <p className="text-[10.5px] text-foreground leading-snug">{entry.description}</p>
+                                      {entry.invoiceRef && (
+                                        <span className="font-mono text-[9.5px] text-indigo-600 dark:text-indigo-300">
+                                          {entry.invoiceRef}
+                                        </span>
+                                      )}
+                                    </div>
+                                  ) : (
+                                    <>
+                                      <span className="font-semibold text-foreground uppercase">{entry.metode}</span>
+                                      {entry.description && entry.description !== "-" && (
+                                        <span className="text-[10px] block text-stone-500">{entry.description}</span>
+                                      )}
+                                    </>
+                                  )}
                                 </td>
-                                <td className="py-2 px-2.5 text-right font-extrabold font-mono text-emerald-700 dark:text-emerald-400 whitespace-nowrap">
-                                  {formatCurrency(p.jumlah || 0)}
+                                <td className="py-2 px-2.5 text-right font-extrabold font-mono whitespace-nowrap">
+                                  {entry.isLogOnly ? (
+                                    <span className="text-[10.5px] text-muted-foreground">Rp 0</span>
+                                  ) : (
+                                    <span className="text-emerald-700 dark:text-emerald-400">
+                                      {formatCurrency(entry.cashInAmount || 0)}
+                                    </span>
+                                  )}
                                 </td>
                                 <td className="py-2 px-2.5 text-center whitespace-nowrap">
-                                  {p.status === "verified" ? (
+                                  {entry.isLogOnly ? (
+                                    <Badge className="text-[9.5px] px-1.5 py-0 bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+                                      Tercatat
+                                    </Badge>
+                                  ) : entry.status === "verified" ? (
                                     <Badge variant="success" className="text-[9.5px] px-1.5 py-0">Verified</Badge>
-                                  ) : p.status === "rejected" ? (
+                                  ) : entry.status === "rejected" ? (
                                     <Badge variant="destructive" className="text-[9.5px] px-1.5 py-0">Ditolak</Badge>
                                   ) : (
                                     <Badge variant="warning" className="text-[9.5px] px-1.5 py-0">Pending</Badge>
@@ -2431,7 +2607,7 @@ function PaymentReviewTabContent() {
                     </div>
                   ) : (
                     <div className="p-3 text-center text-muted-foreground text-[11px] border border-dashed rounded-lg bg-muted/20">
-                      Belum ada riwayat pembayaran yang tercatat sebelumnya.
+                      Belum ada riwayat pembayaran atau log pembaruan invoice tercatat sebelumnya.
                     </div>
                   )}
                 </div>
@@ -2483,7 +2659,50 @@ function PaymentReviewTabContent() {
 
                 {/* 5. Action Buttons di Form Invoice */}
                 <div className="pt-2 border-t flex flex-col gap-2">
-                  {selectedPayment.status === "verified" ? (
+                  {isSelectedLogOnly ? (
+                    <div className="space-y-2">
+                      <div className="p-2.5 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-indigo-900 dark:text-indigo-200 flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <FileText className="h-4 w-4 text-indigo-600 shrink-0" />
+                          <span className="text-xs font-semibold">
+                            Entri audit log pembaruan invoice (Rp 0 kas masuk &mdash; tidak memerlukan persetujuan kas)
+                          </span>
+                        </div>
+                        <Badge className="text-[10px] bg-indigo-500/15 text-indigo-700 dark:text-indigo-200 border border-indigo-300 dark:border-indigo-700">
+                          Tercatat
+                        </Badge>
+                      </div>
+                      <div className="flex gap-2 flex-wrap">
+                        <Button
+                          className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold h-9 text-xs gap-1.5 shadow-sm"
+                          onClick={() => setSendInvoiceTarget(selectedPayment)}
+                        >
+                          <Send className="h-4 w-4" />
+                          Kirim Invoice (WhatsApp / Email)
+                        </Button>
+                        <Button
+                          variant="outline"
+                          className="font-bold h-9 text-xs gap-1.5 border-indigo-600/30 text-indigo-700 hover:bg-indigo-50 dark:text-indigo-300"
+                          onClick={() => {
+                            const inv = selectedPayment.invoiceId || invoiceNumber;
+                            const kode = selectedPayment.kodeRegistrasi || selectedPayment.groupId || "";
+                            window.open(`/invoice/${encodeURIComponent(inv)}?kode=${encodeURIComponent(kode)}`, "_blank");
+                          }}
+                        >
+                          <Eye className="h-4 w-4" />
+                          Preview Invoice
+                        </Button>
+                        <Button
+                          variant="outline"
+                          className="font-bold h-9 text-xs gap-1.5 border-indigo-600/30 text-indigo-700 hover:bg-indigo-50 dark:text-indigo-300"
+                          onClick={() => handleDownloadPdf(selectedPayment)}
+                        >
+                          <Download className="h-4 w-4" />
+                          Unduh PDF
+                        </Button>
+                      </div>
+                    </div>
+                  ) : selectedPayment.status === "verified" ? (
                     <div className="space-y-2">
                       <div className="p-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-900 dark:text-emerald-300 flex items-center justify-between gap-2">
                         <div className="flex items-center gap-2">
@@ -2571,7 +2790,7 @@ function PaymentReviewTabContent() {
                     </div>
                   )}
 
-                  {selectedPayment.status === "pending" && (
+                  {!isSelectedLogOnly && selectedPayment.status === "pending" && (
                     <Button
                       variant="ghost"
                       size="sm"
@@ -2587,17 +2806,19 @@ function PaymentReviewTabContent() {
                     </Button>
                   )}
 
-                  {/* Tombol Hapus Transaksi & Data Percobaan Ini */}
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="w-full text-xs font-bold text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 h-8 gap-1.5 border border-dashed border-red-300 dark:border-red-800 cursor-pointer mt-1"
-                    onClick={() => setDeletePaymentTarget(selectedPayment)}
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                    <span>Hapus Data Transaksi / Percobaan Ini</span>
-                  </Button>
+                  {/* Tombol Hapus Transaksi & Data Percobaan Ini (dinonaktifkan untuk log audit) */}
+                  {!isSelectedLogOnly && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="w-full text-xs font-bold text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 h-8 gap-1.5 border border-dashed border-red-300 dark:border-red-800 cursor-pointer mt-1"
+                      onClick={() => setDeletePaymentTarget(selectedPayment)}
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Hapus Data Transaksi / Percobaan Ini</span>
+                    </Button>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -2988,7 +3209,7 @@ function PaymentReviewTabContent() {
                 PERINGATAN: Tindakan ini bersifat PERMANEN dan tidak dapat dibatalkan!
               </p>
               <p className="text-red-700 dark:text-red-300">
-                Seluruh ({queue.length}) data pembayaran percobaan, alokasi pembayaran, dan kwitansi invoice terkait akan dihapus total dari database.
+                Seluruh ({cashQueue.length}) data pembayaran percobaan, alokasi pembayaran, dan kwitansi pembayaran terkait akan dihapus total dari database (log audit invoice tetap terjaga).
               </p>
             </div>
           </div>

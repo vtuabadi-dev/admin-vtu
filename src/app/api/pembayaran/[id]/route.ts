@@ -30,6 +30,13 @@ export async function DELETE(
   const { searchParams } = request.nextUrl;
   const cascade = searchParams.get("cascade") === "true";
 
+  if (params.id.startsWith("invlog-")) {
+    return NextResponse.json(
+      { success: false, message: "Log pembaruan invoice bersifat audit permanen dan tidak dapat dihapus." },
+      { status: 400 }
+    );
+  }
+
   try {
     const payment = await pembayaranRepo.findById(params.id);
     if (!payment) return NextResponse.json({ success: false, message: "Data pembayaran tidak ditemukan" }, { status: 404 });

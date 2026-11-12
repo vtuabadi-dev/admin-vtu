@@ -1071,7 +1071,7 @@ function ManifestPageContent() {
   }, [loadAllData]);
 
   // Realtime live subscription: auto-reload manifest master table on any change
-  useRealtimeListener(["manifest", "manifest_rows", "jamaah", "registration_groups", "keberangkatan", "invoices"], () => {
+  useRealtimeListener(["manifest", "manifest_rows", "jamaah", "registration_groups", "keberangkatan", "invoices", "audit_entries"], () => {
     loadAllData();
   });
 

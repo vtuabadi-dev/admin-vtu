@@ -60,6 +60,8 @@ import {
   hasMaterializedRoomOrFullLedger,
 } from "./shared-constants";
 import { broadcastMutation, subscribeRealtime, type RealtimeEventPayload } from "@/shared/lib/realtime-bus";
+import { InvoiceLogActionBadge, InvoiceLogMetaDetails } from "@/shared/components/ui/InvoiceLogBadges";
+import { buildUnifiedPaymentHistory } from "@/shared/lib/invoice-audit-log";
 import MasterBillingOptionsModal from "./MasterBillingOptionsModal";
 
 export default function CreateInvoiceModal({
@@ -1029,6 +1031,7 @@ export default function CreateInvoiceModal({
       pendingPayments,
       allPayments: (groupInfo.pembayaran || []) as any[],
       invoices: (groupInfo.invoices || []) as any[],
+      invoiceLogs: (groupInfo.invoiceLogs || []) as any[],
     };
   }, [groupInfo, currentPackage, calculatedTotalTagihan]);
 
@@ -1099,6 +1102,7 @@ export default function CreateInvoiceModal({
         broadcastMutation("keberangkatan", "UPDATE");
         broadcastMutation("invoices", "INSERT");
         broadcastMutation("pembayaran", "INSERT", { groupId: groupInfo.id });
+        broadcastMutation("audit_entries", "INSERT", { groupId: groupInfo.id });
         handleReset();
       } catch (e: any) {
         console.error("Failed to move package:", e);
@@ -1137,6 +1141,7 @@ export default function CreateInvoiceModal({
         broadcastMutation("keberangkatan", "UPDATE");
         broadcastMutation("invoices", "INSERT");
         broadcastMutation("pembayaran", "INSERT", { groupId: groupInfo.id });
+        broadcastMutation("audit_entries", "INSERT", { groupId: groupInfo.id });
         handleReset();
       } catch (e: any) {
         console.error("Failed to add jamaah:", e);
@@ -1199,6 +1204,7 @@ export default function CreateInvoiceModal({
       broadcastMutation("jamaah", "UPDATE", { groupId: groupInfo.id });
       broadcastMutation("manifest", "UPDATE", { groupId: groupInfo.id });
       broadcastMutation("manifest_rows", "UPDATE", { groupId: groupInfo.id });
+      broadcastMutation("audit_entries", "INSERT", { groupId: groupInfo.id });
       handleReset();
     } catch (e) {
       console.error("Failed to create invoice:", e);
@@ -1737,67 +1743,109 @@ export default function CreateInvoiceModal({
                   )}
                 </div>
 
-                {/* 3. RIWAYAT PEMBAYARAN JAMAAH */}
-                <div className="p-3 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-xl space-y-2.5">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
-                      <Clock className="h-4 w-4 text-emerald-600" />
-                      Riwayat Pembayaran Jamaah ({financialSummary.allPayments.length})
-                    </span>
-                    <span className="text-[10px] text-muted-foreground">
-                      Log Transaksi Masuk
-                    </span>
-                  </div>
+                {/* 3. RIWAYAT PEMBAYARAN JAMAAH & LOG INVOICE */}
+                {(() => {
+                  const combinedHistory = buildUnifiedPaymentHistory(
+                    financialSummary.allPayments || [],
+                    financialSummary.invoiceLogs || [],
+                    "desc"
+                  );
+                  return (
+                    <div className="p-3 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-xl space-y-2.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                          <Clock className="h-4 w-4 text-emerald-600" />
+                          Riwayat Pembayaran &amp; Log Invoice ({combinedHistory.length})
+                        </span>
+                        <span className="text-[10px] text-muted-foreground">
+                          Kas Masuk &amp; Pembaruan Tagihan
+                        </span>
+                      </div>
 
-                  {financialSummary.allPayments.length > 0 ? (
-                    <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
-                      {financialSummary.allPayments.map((p: any) => (
-                        <div
-                          key={p.id}
-                          className="p-2.5 bg-background border border-slate-200 dark:border-slate-800 rounded-lg flex items-center justify-between gap-3 text-xs"
-                        >
-                          <div className="space-y-0.5">
-                            <div className="flex items-center gap-2">
-                              <span className="font-bold text-slate-900 dark:text-slate-100">
-                                {p.tanggal ? formatDateShort(p.tanggal) : "-"}
-                              </span>
-                              <span className="text-[9.5px] uppercase font-bold px-1.5 py-0.2 rounded bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
-                                {p.metode || "TRANSFER"}
-                              </span>
-                              <span className={cn(
-                                "text-[9px] font-bold px-1.5 py-0.2 rounded",
-                                p.status === "verified" ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300" :
-                                p.status === "rejected" ? "bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300" :
-                                "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300"
-                              )}>
-                                {p.status === "verified" ? "Verified" : p.status === "rejected" ? "Ditolak" : "Pending Review"}
-                              </span>
-                            </div>
-                            <p className="text-[10.5px] text-muted-foreground">
-                              {p.catatan || (p.bankPengirim ? `${p.bankPengirim} (${p.nomorRekening || "-"})` : "Pembayaran")}
-                            </p>
-                          </div>
-                          <div className="text-right shrink-0">
-                            <p className="font-extrabold text-foreground">{formatCurrency(p.jumlah)}</p>
-                            {p.buktiUrl && (
-                              <button
-                                type="button"
-                                onClick={() => setPreviewBuktiUrl(p.buktiUrl)}
-                                className="text-[10px] text-emerald-600 hover:text-emerald-700 underline font-semibold cursor-pointer block"
+                      {combinedHistory.length > 0 ? (
+                        <div className="space-y-1.5 max-h-56 overflow-y-auto pr-1">
+                          {combinedHistory.map((entry) =>
+                            entry.isLogOnly && entry.rawLog ? (
+                              <div
+                                key={entry.id}
+                                className="p-2.5 bg-indigo-500/[0.04] border border-indigo-200 dark:border-indigo-900/60 rounded-lg space-y-1 text-xs"
                               >
-                                Lihat Bukti
-                              </button>
-                            )}
-                          </div>
+                                <div className="flex items-center justify-between gap-2 flex-wrap">
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <span className="font-bold text-slate-900 dark:text-slate-100">
+                                      {entry.timestamp ? formatDateShort(entry.timestamp) : "-"}
+                                    </span>
+                                    <InvoiceLogActionBadge log={entry.rawLog} compact />
+                                    {entry.invoiceRef && (
+                                      <span className="font-mono text-[10px] font-semibold text-indigo-700 dark:text-indigo-300">
+                                        {entry.invoiceRef}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <span className="text-[10px] font-mono font-bold text-muted-foreground">
+                                    Rp 0 Masuk
+                                  </span>
+                                </div>
+                                <InvoiceLogMetaDetails log={entry.rawLog} maxDiffs={2} />
+                              </div>
+                            ) : (
+                              <div
+                                key={entry.id}
+                                className="p-2.5 bg-background border border-slate-200 dark:border-slate-800 rounded-lg flex items-center justify-between gap-3 text-xs"
+                              >
+                                <div className="space-y-0.5">
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-bold text-slate-900 dark:text-slate-100">
+                                      {entry.timestamp ? formatDateShort(entry.timestamp) : "-"}
+                                    </span>
+                                    <span className="text-[9.5px] uppercase font-bold px-1.5 py-0.2 rounded bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                                      {entry.metode || "TRANSFER"}
+                                    </span>
+                                    <span
+                                      className={cn(
+                                        "text-[9px] font-bold px-1.5 py-0.2 rounded",
+                                        entry.status === "verified"
+                                          ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
+                                          : entry.status === "rejected"
+                                            ? "bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300"
+                                            : "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300"
+                                      )}
+                                    >
+                                      {entry.status === "verified"
+                                        ? "Verified"
+                                        : entry.status === "rejected"
+                                          ? "Ditolak"
+                                          : "Pending Review"}
+                                    </span>
+                                  </div>
+                                  <p className="text-[10.5px] text-muted-foreground">
+                                    {entry.description && entry.description !== "-" ? entry.description : "Pembayaran"}
+                                  </p>
+                                </div>
+                                <div className="text-right shrink-0">
+                                  <p className="font-extrabold text-foreground">{formatCurrency(entry.cashInAmount)}</p>
+                                  {entry.rawPayment?.buktiUrl && (
+                                    <button
+                                      type="button"
+                                      onClick={() => setPreviewBuktiUrl(entry.rawPayment?.buktiUrl || null)}
+                                      className="text-[10px] text-emerald-600 hover:text-emerald-700 underline font-semibold cursor-pointer block"
+                                    >
+                                      Lihat Bukti
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            )
+                          )}
                         </div>
-                      ))}
+                      ) : (
+                        <p className="text-[11px] text-muted-foreground italic text-center py-2.5 bg-background rounded-lg border border-dashed">
+                          Belum ada riwayat pembayaran maupun log pembaruan invoice untuk grup ini.
+                        </p>
+                      )}
                     </div>
-                  ) : (
-                    <p className="text-[11px] text-muted-foreground italic text-center py-2.5 bg-background rounded-lg border border-dashed">
-                      Belum ada riwayat pembayaran yang tercatat untuk grup ini.
-                    </p>
-                  )}
-                </div>
+                  );
+                })()}
 
               </div>
 
