@@ -1375,6 +1375,22 @@ function PaymentReviewTabContent() {
     [queue]
   );
 
+  // Hooks must always run unconditionally before any early return (`if (loading)`).
+  const unifiedHistoryList = useMemo(() => {
+    const paymentHistoryList =
+      selectedPayment?.group?.pembayaran && selectedPayment.group.pembayaran.length > 0
+        ? selectedPayment.group.pembayaran
+        : selectedPayment && !isReviewLogOnlyEntry(selectedPayment)
+        ? [selectedPayment]
+        : [];
+    return buildUnifiedPaymentHistory(
+      paymentHistoryList,
+      selectedPayment?.group?.invoiceLogs ||
+        (selectedPayment?.auditLog ? [selectedPayment.auditLog] : []),
+      "desc"
+    );
+  }, [selectedPayment]);
+
   const filteredQueue = queue.filter((p) => {
     const isLogEntry = isReviewLogOnlyEntry(p);
     if (statusFilter === "logged") {
@@ -1502,24 +1518,6 @@ function PaymentReviewTabContent() {
   const groupSisaTagihan = Math.max(
     0,
     groupTotalTagihanDisesuaikan - (groupTotalBayar + (selectedPayment?.status === "verified" ? 0 : formNominal))
-  );
-
-  const paymentHistoryList =
-    selectedPayment?.group?.pembayaran && selectedPayment.group.pembayaran.length > 0
-      ? selectedPayment.group.pembayaran
-      : selectedPayment && !isReviewLogOnlyEntry(selectedPayment)
-      ? [selectedPayment]
-      : [];
-
-  const unifiedHistoryList = useMemo(
-    () =>
-      buildUnifiedPaymentHistory(
-        paymentHistoryList,
-        selectedPayment?.group?.invoiceLogs ||
-          (selectedPayment?.auditLog ? [selectedPayment.auditLog] : []),
-        "desc"
-      ),
-    [paymentHistoryList, selectedPayment]
   );
 
   const isSelectedLogOnly = isReviewLogOnlyEntry(selectedPayment);
