@@ -7,6 +7,9 @@ import {
   resolveCanonicalGroupBilling,
   shouldSkipNonBillingInvoiceItem,
   extractActiveLedgerItems,
+  parseBillingItemAllocation,
+  formatBillingItemDescriptionWithAllocation,
+  getCanonicalItemDedupeKey,
 } from "@/shared/lib/billing-ssot";
 import {
   mergeSavedBillingItemsFromInvoices,
@@ -660,6 +663,189 @@ describe("Manifest Pembayaran & Billing Sync Regression Suite (ADR-0032 SSOT)", 
       expect(pdfData.orderItems).toHaveLength(2);
       expect(pdfData.orderItems?.[0]?.tipe).toBe("penambahan");
       expect(pdfData.orderItems?.[1]?.tipe).toBe("pengurangan");
+    });
+  });
+
+  describe("ADR-0034 Per-Member Allocation & SSOT Distribution", () => {
+    it("parses and formats (Peruntukan: ...) canonically and idempotently", () => {
+      const formatted = formatBillingItemDescriptionWithAllocation("Sewa Kursi Roda", ["ARDI", "IRDA"]);
+      expect(formatted).toBe("Sewa Kursi Roda (Peruntukan: ARDI, IRDA)");
+
+      // Idempotent when already containing token
+      const reFormatted = formatBillingItemDescriptionWithAllocation(formatted, ["ARDI", "ARDI"]);
+      expect(reFormatted).toBe("Sewa Kursi Roda (Peruntukan: ARDI)");
+
+      const parsed = parseBillingItemAllocation("Upgrade Hotel (Mekkah: SAFWAH TOWER) (Peruntukan: ARDI, KAORI)");
+      expect(parsed.cleanNama).toBe("Upgrade Hotel (Mekkah: SAFWAH TOWER)");
+      expect(parsed.allocatedJamaah).toEqual(["ARDI", "KAORI"]);
+    });
+
+    it("keeps identical dedupe keys when updating Peruntukan so sync updates InvoiceItem in-place", () => {
+      const k1 = getCanonicalItemDedupeKey({ kategori: "tambahan", deskripsi: "Sewa Kursi Roda" });
+      const k2 = getCanonicalItemDedupeKey({
+        kategori: "tambahan",
+        deskripsi: "Sewa Kursi Roda (Peruntukan: ARDI)",
+      });
+      const k3 = getCanonicalItemDedupeKey({
+        kategori: "tambahan",
+        deskripsi: "Sewa Kursi Roda (Peruntukan: ARDI, KAORI)",
+      });
+      expect(k1).toBe("tambahan::sewa kursi roda");
+      expect(k2).toBe(k1);
+      expect(k3).toBe(k1);
+    });
+
+    it("charges Sewa Kursi Roda Rp 250.000 strictly to ARDI instead of splitting evenly across 3 pax", () => {
+      const pkg = {
+        id: "pkg-dec03",
+        namaPaket: "PAKET UMROH 9 H JKT ( JED.C-J ) - 03 Des 2026 (QR)",
+        hargaPaket: 29900000,
+        hotelMekkah: "LE MERIDIEN TOWERS",
+        hotelMadinah: "DURRAT AL EIMAN",
+      };
+      const members = [
+        { id: "m-1", namaLengkap: "ARDI", tipeKamar: "Quad", hotelMekkah: "SAFWAH TOWER" },
+        { id: "m-2", namaLengkap: "IRDA", tipeKamar: "Quad", hotelMekkah: "SAFWAH TOWER" },
+        { id: "m-3", namaLengkap: "KAORI", tipeKamar: "Quad", hotelMekkah: "SAFWAH TOWER" },
+      ];
+      const group = {
+        id: "grp-012",
+        jumlahAnggota: 3,
+        keberangkatan: pkg,
+        invoices: [
+          {
+            id: "inv-upd-1",
+            status: "unpaid",
+            items: [
+              {
+                id: "i-base",
+                kategori: "utama",
+                deskripsi: "PAKET UMROH 9 H JKT (3 Pax)",
+                qty: 3,
+                hargaSatuan: 29900000,
+                jumlah: 89700000,
+                status: "active",
+              },
+              {
+                id: "i-hotel",
+                kategori: "tambahan",
+                deskripsi: "Upgrade Hotel (Mekkah: SAFWAH TOWER) (Peruntukan: ARDI, IRDA, KAORI)",
+                qty: 3,
+                hargaSatuan: 4500000,
+                jumlah: 13500000,
+                status: "active",
+              },
+              {
+                id: "i-kursi",
+                kategori: "tambahan",
+                deskripsi: "Sewa Kursi Roda (Peruntukan: ARDI)",
+                qty: 1,
+                hargaSatuan: 250000,
+                jumlah: 250000,
+                status: "active",
+              },
+            ],
+          },
+        ],
+      };
+
+      const billing = resolveCanonicalGroupBilling({ group, activePackage: pkg, members });
+      expect(billing.memberBreakdowns).toHaveLength(3);
+      expect(billing.memberBreakdowns[0]?.kursiRoda).toBe(250000);
+      expect(billing.memberBreakdowns[1]?.kursiRoda).toBe(0);
+      expect(billing.memberBreakdowns[2]?.kursiRoda).toBe(0);
+      expect(billing.groupTotals.kursiRoda).toBe(250000);
+      expect(billing.groupTotals.netTotalTagihan).toBe(103450000);
+    });
+
+    it("distributes subset and 'Semua (N Pax)' allocations accurately across add-ons and discounts", () => {
+      const pkg = { id: "pkg-sub", namaPaket: "PAKET UMROH 9 H", hargaPaket: 29900000 };
+      const members = [
+        { id: "m-1", namaLengkap: "ARDI" },
+        { id: "m-2", namaLengkap: "IRDA" },
+        { id: "m-3", namaLengkap: "KAORI" },
+      ];
+      const group = {
+        id: "grp-sub",
+        jumlahAnggota: 3,
+        keberangkatan: pkg,
+        invoices: [
+          {
+            id: "inv-1",
+            status: "unpaid",
+            items: [
+              { id: "b1", kategori: "utama", deskripsi: "Paket", qty: 3, hargaSatuan: 29900000, jumlah: 89700000, status: "active" },
+              {
+                id: "k1",
+                kategori: "tambahan",
+                deskripsi: "Kereta Cepat Haramain (Peruntukan: ARDI, KAORI)",
+                qty: 2,
+                hargaSatuan: 750000,
+                jumlah: 1500000,
+                status: "active",
+              },
+              {
+                id: "d1",
+                kategori: "potongan",
+                deskripsi: "Potongan Promo (Peruntukan: IRDA)",
+                qty: 1,
+                hargaSatuan: -400000,
+                jumlah: -400000,
+                status: "active",
+              },
+              {
+                id: "t1",
+                kategori: "tambahan",
+                deskripsi: "Sewa Kursi Roda (Peruntukan: ARDI, IRDA, KAORI)",
+                qty: 3,
+                hargaSatuan: 250000,
+                jumlah: 750000,
+                status: "active",
+              },
+            ],
+          },
+        ],
+      };
+
+      const res = resolveCanonicalGroupBilling({ group, activePackage: pkg, members });
+      expect(res.memberBreakdowns[0]?.keretaCepat).toBe(750000);
+      expect(res.memberBreakdowns[1]?.keretaCepat).toBe(0);
+      expect(res.memberBreakdowns[2]?.keretaCepat).toBe(750000);
+      expect(res.memberBreakdowns[0]?.diskonPromo).toBe(0);
+      expect(res.memberBreakdowns[1]?.diskonPromo).toBe(400000);
+      expect(res.memberBreakdowns[2]?.diskonPromo).toBe(0);
+      expect(res.memberBreakdowns.map((b) => b.kursiRoda)).toEqual([250000, 250000, 250000]);
+    });
+
+    it("roundtrips allocatedJamaah between InvoiceItem.deskripsi and BillingItem/OrderItem", () => {
+      const invoices = [
+        {
+          id: "inv-rt",
+          status: "unpaid",
+          items: [
+            {
+              id: "i-1",
+              kategori: "tambahan",
+              deskripsi: "Sewa Kursi Roda (Peruntukan: ARDI)",
+              qty: 1,
+              hargaSatuan: 250000,
+              jumlah: 250000,
+              status: "active",
+            },
+          ],
+        },
+      ];
+
+      const hydratedBilling = mergeSavedBillingItemsFromInvoices([], invoices);
+      expect(hydratedBilling[0]?.nama).toBe("Sewa Kursi Roda");
+      expect(hydratedBilling[0]?.allocatedJamaah).toEqual(["ARDI"]);
+
+      const hydratedOrders = mergeSavedOrderItemsFromInvoices([], invoices);
+      expect(hydratedOrders[0]?.nama).toBe("Sewa Kursi Roda");
+      expect(hydratedOrders[0]?.allocatedJamaah).toEqual(["ARDI"]);
+
+      const payload = mapBillingItemsToSyncPayload(hydratedBilling);
+      expect(payload[0]?.deskripsi).toBe("Sewa Kursi Roda (Peruntukan: ARDI)");
     });
   });
 });

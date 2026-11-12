@@ -17,11 +17,19 @@ import {
   resolvePackageBillingConfig,
   resolveRoomUpgradeUnitPrice,
   getCanonicalItemDedupeKey,
+  parseBillingItemAllocation,
+  formatBillingItemDescriptionWithAllocation,
   shouldSkipNonBillingInvoiceItem as ssotShouldSkipNonBillingInvoiceItem,
   hasMaterializedRoomOrFullLedger,
 } from "@/shared/lib/billing-ssot";
 
-export { hasMaterializedRoomOrFullLedger, resolvePackageBillingConfig, resolveRoomUpgradeUnitPrice };
+export {
+  hasMaterializedRoomOrFullLedger,
+  resolvePackageBillingConfig,
+  resolveRoomUpgradeUnitPrice,
+  parseBillingItemAllocation,
+  formatBillingItemDescriptionWithAllocation,
+};
 
 // ============================================================
 // INTERFACES
@@ -315,6 +323,8 @@ export function mergeSavedBillingItemsFromInvoices(
       const unitNominal = Number.isFinite(rawUnit)
         ? Math.abs(Math.round(rawUnit))
         : Math.abs(Math.round((Number(it.jumlah) || 0) / qty));
+      const parsedAlloc = parseBillingItemAllocation(it.deskripsi || it.kategori || "Item Tagihan");
+      const cleanNama = parsedAlloc.cleanNama || it.deskripsi || it.kategori || "Item Tagihan";
       const key = getClientInvoiceItemKey(it);
 
       if (seenKeys.has(key)) {
@@ -322,8 +332,17 @@ export function mergeSavedBillingItemsFromInvoices(
           (b) => getClientInvoiceItemKey({ kategori: b.kategori, deskripsi: b.nama }) === key
         );
         const existing = idx >= 0 ? result[idx] : undefined;
-        if (existing && unitNominal > 0) {
-          result[idx] = { ...existing, nominal: unitNominal, qty };
+        if (existing && (unitNominal > 0 || parsedAlloc.allocatedJamaah.length > 0)) {
+          result[idx] = {
+            ...existing,
+            nama: cleanNama,
+            nominal: unitNominal > 0 ? unitNominal : existing.nominal,
+            qty: unitNominal > 0 ? qty : existing.qty,
+            allocatedJamaah:
+              parsedAlloc.allocatedJamaah.length > 0
+                ? parsedAlloc.allocatedJamaah
+                : existing.allocatedJamaah,
+          };
         }
         continue;
       }
@@ -331,12 +350,15 @@ export function mergeSavedBillingItemsFromInvoices(
       seenKeys.add(key);
       result.push({
         id: it.id ? `db-${it.id}` : `db-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-        nama: it.deskripsi || it.kategori || "Item Tagihan",
+        nama: cleanNama,
         kategori: isPotongan ? "potongan" : key === "__BASE_PACKAGE__" ? "utama" : "tambahan",
         nominal: unitNominal,
         qty,
         satuan: "Pax",
         isDefault: key === "__BASE_PACKAGE__",
+        ...(parsedAlloc.allocatedJamaah.length > 0
+          ? { allocatedJamaah: parsedAlloc.allocatedJamaah }
+          : {}),
       });
     }
   }
@@ -377,6 +399,8 @@ export function mergeSavedOrderItemsFromInvoices(
       const unitNominal = Number.isFinite(rawUnit)
         ? Math.abs(Math.round(rawUnit))
         : Math.abs(Math.round((Number(it.jumlah) || 0) / qty));
+      const parsedAlloc = parseBillingItemAllocation(it.deskripsi || it.kategori || "Item Tagihan");
+      const cleanNama = parsedAlloc.cleanNama || it.deskripsi || it.kategori || "Item Tagihan";
       const totalNominal = unitNominal * qty;
 
       if (seenKeys.has(key)) {
@@ -384,12 +408,17 @@ export function mergeSavedOrderItemsFromInvoices(
           (o) => getClientInvoiceItemKey({ kategori: o.kategori, deskripsi: o.nama, tipe: o.tipe }) === key
         );
         const existing = idx >= 0 ? result[idx] : undefined;
-        if (existing && unitNominal > 0) {
+        if (existing && (unitNominal > 0 || parsedAlloc.allocatedJamaah.length > 0)) {
           result[idx] = {
             ...existing,
-            hargaSatuan: unitNominal,
-            qty,
-            nominal: totalNominal,
+            nama: cleanNama,
+            hargaSatuan: unitNominal > 0 ? unitNominal : existing.hargaSatuan,
+            qty: unitNominal > 0 ? qty : existing.qty,
+            nominal: unitNominal > 0 ? totalNominal : existing.nominal,
+            allocatedJamaah:
+              parsedAlloc.allocatedJamaah.length > 0
+                ? parsedAlloc.allocatedJamaah
+                : existing.allocatedJamaah,
           };
         }
         continue;
@@ -398,13 +427,16 @@ export function mergeSavedOrderItemsFromInvoices(
       seenKeys.add(key);
       result.push({
         id: it.id ? `db-${it.id}` : `db-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-        nama: it.deskripsi || it.kategori || "Item Tagihan",
+        nama: cleanNama,
         kategori: isPotongan ? "potongan" : "tambahan",
         tipe: isPotongan ? "pengurangan" : "penambahan",
         qty,
         satuan: "Pax",
         hargaSatuan: unitNominal,
         nominal: totalNominal,
+        ...(parsedAlloc.allocatedJamaah.length > 0
+          ? { allocatedJamaah: parsedAlloc.allocatedJamaah }
+          : {}),
       });
     }
   }
@@ -415,7 +447,7 @@ export function mergeSavedOrderItemsFromInvoices(
 export function mapBillingItemsToSyncPayload(items: BillingItem[]) {
   return items.map((b) => ({
     kategori: b.kategori,
-    deskripsi: b.nama,
+    deskripsi: formatBillingItemDescriptionWithAllocation(b.nama, b.allocatedJamaah),
     qty: Math.max(1, b.qty || 1),
     hargaSatuan: b.nominal,
     jumlah: b.nominal * Math.max(1, b.qty || 1),

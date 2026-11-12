@@ -6,6 +6,7 @@ import type {
   InvoiceAuditLogEntry,
   Pembayaran,
 } from "@/shared/types";
+import { parseBillingItemAllocation } from "./billing-ssot";
 
 const formatRp = (n: number): string =>
   `Rp ${Math.abs(Math.round(n || 0)).toLocaleString("id-ID")}`;
@@ -18,7 +19,8 @@ const formatSignedRp = (n: number): string => {
 
 export function normalizeBillingItemKey(item: { kategori?: string; deskripsi?: string }): string {
   const kat = (item.kategori || "").toLowerCase().trim();
-  const desc = (item.deskripsi || "").toLowerCase().trim();
+  const parsed = parseBillingItemAllocation(item.deskripsi || "");
+  const desc = parsed.cleanNama.toLowerCase().trim();
   return `${kat}::${desc}`;
 }
 
@@ -202,7 +204,8 @@ export function computeBillingItemsDiff(
     if (
       matchedBefore.qty !== afterItem.qty ||
       matchedBefore.hargaSatuan !== afterItem.hargaSatuan ||
-      beforeSigned !== afterSigned
+      beforeSigned !== afterSigned ||
+      (matchedBefore.deskripsi || "").trim() !== (afterItem.deskripsi || "").trim()
     ) {
       itemsDiff.push({
         type: "updated",

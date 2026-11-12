@@ -211,9 +211,79 @@ export function isDeductionItem(it: CanonicalBillingItemLike): boolean {
   );
 }
 
+const ALLOCATION_TOKEN_REGEX = /\s*(?:\((?:Peruntukan|Alokasi|Untuk)\s*:\s*([^)]+)\)|\[(?:Peruntukan|Alokasi|Untuk)\s*:\s*([^\]]+)\])\s*/gi;
+
+/**
+ * Memisahkan deskripsi item bersih dengan daftar nama jamaah pada token `(Peruntukan: ...)`.
+ */
+export function parseBillingItemAllocation(rawDesc?: string | null): {
+  cleanNama: string;
+  allocatedJamaah: string[];
+} {
+  const input = String(rawDesc || "").trim();
+  if (!input) {
+    return { cleanNama: "", allocatedJamaah: [] };
+  }
+
+  const collected: string[] = [];
+  const seen = new Set<string>();
+  const cleanNama = input
+    .replace(ALLOCATION_TOKEN_REGEX, (_match, parenGroup, bracketGroup) => {
+      const inner = String(parenGroup || bracketGroup || "");
+      for (const part of inner.split(/[,;\n]+/)) {
+        const cleaned = part.trim();
+        if (!cleaned) continue;
+        const norm = cleaned.toLowerCase();
+        if (!seen.has(norm)) {
+          seen.add(norm);
+          collected.push(cleaned);
+        }
+      }
+      return " ";
+    })
+    .replace(/\s{2,}/g, " ")
+    .trim();
+
+  return {
+    cleanNama: cleanNama || input,
+    allocatedJamaah: collected,
+  };
+}
+
+/**
+ * Memformat deskripsi item persisten dengan akhiran kanonik `(Peruntukan: ...)` secara idempoten.
+ */
+export function formatBillingItemDescriptionWithAllocation(
+  nama: string,
+  allocatedJamaah?: string[] | null
+): string {
+  const parsed = parseBillingItemAllocation(nama);
+  const baseNama = (parsed.cleanNama || nama || "").trim();
+  const names = (Array.isArray(allocatedJamaah) ? allocatedJamaah : parsed.allocatedJamaah)
+    .map((x) => String(x || "").trim())
+    .filter(Boolean);
+
+  if (names.length === 0) {
+    return baseNama;
+  }
+
+  const deduped: string[] = [];
+  const seen = new Set<string>();
+  for (const n of names) {
+    const key = n.toLowerCase();
+    if (!seen.has(key)) {
+      seen.add(key);
+      deduped.push(n);
+    }
+  }
+
+  return `${baseNama} (Peruntukan: ${deduped.join(", ")})`;
+}
+
 export function getCanonicalItemDedupeKey(it: CanonicalBillingItemLike): string {
   const kat = (it.kategori || "").toLowerCase().trim();
-  const desc = (it.deskripsi || it.nama || "").trim().toLowerCase();
+  const parsed = parseBillingItemAllocation(it.deskripsi || it.nama || "");
+  const desc = parsed.cleanNama.trim().toLowerCase();
   const paxKey =
     Array.isArray(it.paxNames) && it.paxNames.length > 0
       ? `::pax=${[...it.paxNames]
@@ -613,10 +683,18 @@ export function extractActiveLedgerItems(invoices?: CanonicalInvoiceLike[] | nul
             ? -(absUnit * qty)
             : absUnit * qty;
 
-      const deskripsi = (raw.deskripsi || raw.nama || raw.kategori || "Item Tagihan").trim();
+      const rawDeskripsi = (raw.deskripsi || raw.nama || raw.kategori || "Item Tagihan").trim();
+      const parsedAlloc = parseBillingItemAllocation(rawDeskripsi);
+      const deskripsi = (parsedAlloc.cleanNama || rawDeskripsi || "Item Tagihan").trim();
+      const resolvedPaxNames =
+        Array.isArray(raw.paxNames) && raw.paxNames.length > 0
+          ? raw.paxNames
+          : parsedAlloc.allocatedJamaah.length > 0
+            ? parsedAlloc.allocatedJamaah
+            : undefined;
       const kategori = isPotongan ? "potongan" : raw.kategori || "tambahan";
-      const key = getCanonicalItemDedupeKey(raw);
-      const category = classifyInvoiceItemCategory(raw);
+      const key = getCanonicalItemDedupeKey({ ...raw, deskripsi });
+      const category = classifyInvoiceItemCategory({ ...raw, deskripsi });
 
       const normalized: ExtractedLedgerItem = {
         id: raw.id,
@@ -628,7 +706,7 @@ export function extractActiveLedgerItems(invoices?: CanonicalInvoiceLike[] | nul
         unitNominal: absUnit,
         signedAmount,
         isPotongan,
-        paxNames: raw.paxNames,
+        paxNames: resolvedPaxNames,
       };
 
       const existingIdx = keyToIndex.get(key);
@@ -674,6 +752,56 @@ export function distributeAmount(
   const base = Math.trunc(roundedTotal / safeCount);
   const rem = roundedTotal - base * safeCount;
   return memberIdx === 0 ? base + rem : base;
+}
+
+function collectMemberComparableNames(member: any): string[] {
+  const candidates = [
+    member?.namaLengkap,
+    member?.nama,
+    member?.paspor?.manualData?.namaLengkap,
+    member?.paspor?.ocrData?.namaLengkap,
+    member?.paspor?.namaLengkap,
+    member?.ktp?.manualData?.namaLengkap,
+    member?.ktp?.ocrData?.namaLengkap,
+  ];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const c of candidates) {
+    const norm = String(c || "").replace(/\s+/g, " ").trim().toLowerCase();
+    if (norm && !seen.has(norm)) {
+      seen.add(norm);
+      out.push(norm);
+    }
+  }
+  return out;
+}
+
+/**
+ * Mencocokkan daftar nama peruntukan item (`paxNames` / token `Peruntukan`) dengan indeks anggota efektif.
+ * Mengembalikan `undefined` jika item tidak memiliki alokasi spesifik (fallback bagi rata legacy).
+ */
+export function resolveEligibleMemberIndices(
+  paxNames: string[] | null | undefined,
+  members: any[]
+): Set<number> | undefined {
+  if (!Array.isArray(paxNames) || paxNames.length === 0 || !Array.isArray(members) || members.length === 0) {
+    return undefined;
+  }
+
+  const targetNames = new Set(
+    paxNames.map((n) => String(n || "").replace(/\s+/g, " ").trim().toLowerCase()).filter(Boolean)
+  );
+  if (targetNames.size === 0) return undefined;
+
+  const indices = new Set<number>();
+  members.forEach((m, idx) => {
+    const memberNames = collectMemberComparableNames(m);
+    if (memberNames.some((mn) => targetNames.has(mn))) {
+      indices.add(idx);
+    }
+  });
+
+  return indices.size > 0 ? indices : undefined;
 }
 
 /**
@@ -760,58 +888,124 @@ export function resolveCanonicalGroupBilling(params: {
 
     for (const item of activeItems) {
       const absAmount = Math.abs(item.signedAmount);
+      const allocatedIndices = resolveEligibleMemberIndices(item.paxNames, effectiveMembers);
 
       switch (item.category) {
         case "basePaket":
-          biayaPaket += distributeAmount(item.signedAmount, memberIdx, effectiveMembers.length);
+          biayaPaket += distributeAmount(
+            item.signedAmount,
+            memberIdx,
+            effectiveMembers.length,
+            allocatedIndices
+          );
           break;
         case "upgradeKamar": {
-          upgradeKamar += distributeAmount(absAmount, memberIdx, effectiveMembers.length);
-          if (!upgradeKamarLabel) upgradeKamarLabel = item.deskripsi || "Upgrade Kamar";
-          break;
-        }
-        case "upgradeHotel": {
           const val = distributeAmount(
             absAmount,
             memberIdx,
             effectiveMembers.length,
-            hotelUpgradedIndices.size > 0 ? hotelUpgradedIndices : undefined
+            allocatedIndices
+          );
+          upgradeKamar += val;
+          if (val > 0 || (!allocatedIndices && !upgradeKamarLabel)) {
+            upgradeKamarLabel = item.deskripsi || "Upgrade Kamar";
+          }
+          break;
+        }
+        case "upgradeHotel": {
+          const hotelIndices =
+            allocatedIndices || (hotelUpgradedIndices.size > 0 ? hotelUpgradedIndices : undefined);
+          const val = distributeAmount(
+            absAmount,
+            memberIdx,
+            effectiveMembers.length,
+            hotelIndices
           );
           upgradeHotel += val;
-          if (val > 0 || !upgradeHotelLabel) {
+          if (val > 0 || (!hotelIndices && !upgradeHotelLabel)) {
             upgradeHotelLabel = item.deskripsi || "Upgrade Hotel";
           }
           break;
         }
         case "keretaCepat":
-          keretaCepat += distributeAmount(absAmount, memberIdx, effectiveMembers.length);
+          keretaCepat += distributeAmount(
+            absAmount,
+            memberIdx,
+            effectiveMembers.length,
+            allocatedIndices
+          );
           break;
         case "thoif":
-          cityTourThoif += distributeAmount(absAmount, memberIdx, effectiveMembers.length);
+          cityTourThoif += distributeAmount(
+            absAmount,
+            memberIdx,
+            effectiveMembers.length,
+            allocatedIndices
+          );
           break;
         case "paspor":
-          paspor += distributeAmount(absAmount, memberIdx, effectiveMembers.length);
+          paspor += distributeAmount(
+            absAmount,
+            memberIdx,
+            effectiveMembers.length,
+            allocatedIndices
+          );
           break;
         case "kursiRoda":
-          kursiRoda += distributeAmount(absAmount, memberIdx, effectiveMembers.length);
+          kursiRoda += distributeAmount(
+            absAmount,
+            memberIdx,
+            effectiveMembers.length,
+            allocatedIndices
+          );
           break;
         case "ongkir":
-          ongkir += distributeAmount(absAmount, memberIdx, effectiveMembers.length);
+          ongkir += distributeAmount(
+            absAmount,
+            memberIdx,
+            effectiveMembers.length,
+            allocatedIndices
+          );
           break;
         case "potonganOngkir":
-          potonganOngkir += distributeAmount(absAmount, memberIdx, effectiveMembers.length);
+          potonganOngkir += distributeAmount(
+            absAmount,
+            memberIdx,
+            effectiveMembers.length,
+            allocatedIndices
+          );
           break;
         case "diskon":
-          diskonPromo += distributeAmount(absAmount, memberIdx, effectiveMembers.length);
+          diskonPromo += distributeAmount(
+            absAmount,
+            memberIdx,
+            effectiveMembers.length,
+            allocatedIndices
+          );
           break;
         case "ongkosJahit":
-          ongkosJahit += distributeAmount(absAmount, memberIdx, effectiveMembers.length);
+          ongkosJahit += distributeAmount(
+            absAmount,
+            memberIdx,
+            effectiveMembers.length,
+            allocatedIndices
+          );
           break;
         case "tambahanPerlengkapan":
-          tambahanPerlengkapan += distributeAmount(absAmount, memberIdx, effectiveMembers.length);
+          tambahanPerlengkapan += distributeAmount(
+            absAmount,
+            memberIdx,
+            effectiveMembers.length,
+            allocatedIndices
+          );
           break;
         case "tambahanLain": {
-          const val = distributeAmount(absAmount, memberIdx, effectiveMembers.length);
+          const val = distributeAmount(
+            absAmount,
+            memberIdx,
+            effectiveMembers.length,
+            allocatedIndices
+          );
           tambahanPerlengkapan += val;
           tambahanLain += val;
           break;

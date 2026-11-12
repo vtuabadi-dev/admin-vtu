@@ -244,5 +244,35 @@ describe("invoice-audit-log", () => {
     expect(unified[1]?.isLogOnly).toBe(false);
     expect(unified[1]?.cashInAmount).toBe(15000000);
   });
+
+  it("treats Peruntukan-only edits on an existing item as updated instead of removed+added (ADR-0034)", () => {
+    const before = [
+      {
+        kategori: "tambahan",
+        deskripsi: "Sewa Kursi Roda",
+        qty: 1,
+        hargaSatuan: 250000,
+        jumlah: 250000,
+        status: "active",
+      },
+    ];
+    const after = [
+      {
+        kategori: "tambahan",
+        deskripsi: "Sewa Kursi Roda (Peruntukan: ARDI)",
+        qty: 1,
+        hargaSatuan: 250000,
+        jumlah: 250000,
+        status: "active",
+      },
+    ];
+
+    const diff = computeBillingItemsDiff(before, after);
+    expect(diff.hasChanges).toBe(true);
+    expect(diff.addedCount).toBe(0);
+    expect(diff.removedCount).toBe(0);
+    expect(diff.updatedCount).toBe(1);
+    expect(diff.deltaTotal).toBe(0);
+  });
 });
 

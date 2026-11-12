@@ -6,6 +6,7 @@ import {
   VAUZA_TAMMA_QR_BASE64,
 } from "./invoice-logo";
 import { resolveHotelForKlaster } from "./hotel-utils";
+import { parseBillingItemAllocation } from "./billing-ssot";
 
 export interface InvoiceOrderItem {
   id: string;
@@ -429,14 +430,21 @@ export function generateInvoicePdf(data: InvoicePdfData): jsPDF {
       const nominal = it.nominal || 0;
       const itQty = it.qty || 1;
       const unit = it.hargaSatuan || (nominal / itQty);
-      const desc = it.allocatedJamaah && it.allocatedJamaah.length > 0
-        ? `${it.nama}\n(Peruntukan: ${it.allocatedJamaah.join(", ")})`
-        : it.nama;
+      const parsed = parseBillingItemAllocation(it.nama);
+      const cleanNama = parsed.cleanNama || it.nama;
+      const effectiveAlloc =
+        it.allocatedJamaah && it.allocatedJamaah.length > 0
+          ? it.allocatedJamaah
+          : parsed.allocatedJamaah;
+      const desc =
+        effectiveAlloc.length > 0
+          ? `${cleanNama}\n(Peruntukan: ${effectiveAlloc.join(", ")})`
+          : cleanNama;
       table1Rows.push([
         `${idx + 2}`,
         desc,
         fmtRp(unit),
-        `${itQty} Pax`,
+        `${itQty} ${it.satuan || "Pax"}`,
         `${sign}${fmtRp(nominal)}`,
       ]);
     });

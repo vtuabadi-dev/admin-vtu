@@ -18,7 +18,6 @@ import {
   FileEdit,
   Trash2,
   Settings2,
-  Users,
 } from "lucide-react";
 import { cn, formatDateShort, formatCurrency } from "@/shared/lib/utils";
 import { Button } from "@/shared/components/ui/Button";
@@ -26,6 +25,11 @@ import { Input } from "@/shared/components/ui/Input";
 import { CurrencyInput } from "@/shared/components/ui/CurrencyInput";
 import { Modal } from "@/shared/components/ui/Modal";
 import { HotelUpgradeSelector } from "./HotelUpgradeSelector";
+import {
+  MemberAllocationSelector,
+  extractGroupMemberNames,
+  isMemberAllocationValid,
+} from "./MemberAllocationSelector";
 import {
   getGroupByKode,
   getGroupList,
@@ -58,6 +62,7 @@ import {
   mapBillingItemsToSyncPayload,
   calculateBillingItemsNetTotal,
   hasMaterializedRoomOrFullLedger,
+  parseBillingItemAllocation,
 } from "./shared-constants";
 import { broadcastMutation, subscribeRealtime, type RealtimeEventPayload } from "@/shared/lib/realtime-bus";
 import { InvoiceLogActionBadge, InvoiceLogMetaDetails } from "@/shared/components/ui/InvoiceLogBadges";
@@ -158,6 +163,7 @@ export default function CreateInvoiceModal({
   const [newBillingSatuan, setNewBillingSatuan] = useState<string>("Pax");
   const [newBillingAllocatedMembers, setNewBillingAllocatedMembers] = useState<string[]>([]);
   const [isCustomJenisMode, setIsCustomJenisMode] = useState<boolean>(false);
+  const [isCustomNewSatuanMode, setIsCustomNewSatuanMode] = useState<boolean>(false);
 
   // Hotel Upgrade state
   const [selectedHotelMekkah, setSelectedHotelMekkah] = useState<string>("");
@@ -174,6 +180,8 @@ export default function CreateInvoiceModal({
   const [editItemQty, setEditItemQty] = useState(1);
   const [editItemSatuan, setEditItemSatuan] = useState("Pax");
   const [editItemCatatan, setEditItemCatatan] = useState("");
+  const [editItemAllocatedMembers, setEditItemAllocatedMembers] = useState<string[]>([]);
+  const [isCustomEditSatuanMode, setIsCustomEditSatuanMode] = useState<boolean>(false);
 
   const [internalTambahanOptions, setInternalTambahanOptions] = useState<string[]>(getInitialTambahanOptions);
   const [internalPotonganOptions, setInternalPotonganOptions] = useState<string[]>(getInitialPotonganOptions);
@@ -752,9 +760,10 @@ export default function CreateInvoiceModal({
         }).catch(() => {});
       }
     }
-    const isRoomUpgrade = newBillingKategori === "tambahan" && isRoomUpgradeItem(trimmed);
+    const groupMemberNames = extractGroupMemberNames(groupInfo?.anggota);
+    if (!isMemberAllocationValid(groupMemberNames, newBillingAllocatedMembers)) return;
     const isHotelUpgrade = newBillingKategori === "tambahan" && isHotelUpgradeItem(trimmed);
-    const allocated = (isRoomUpgrade || isHotelUpgrade) && newBillingAllocatedMembers.length > 0 ? newBillingAllocatedMembers : undefined;
+    const allocated = newBillingAllocatedMembers.length > 0 ? newBillingAllocatedMembers : undefined;
 
     let itemDesc = trimmed;
     if (isHotelUpgrade) {
@@ -857,28 +866,58 @@ export default function CreateInvoiceModal({
   }
 
   function handleOpenEditItem(item: BillingItem) {
+    const parsed = parseBillingItemAllocation(item.nama);
+    const unitStr = item.satuan || "Pax";
+    const groupMemberNames = extractGroupMemberNames(groupInfo?.anggota);
+    const existingAlloc =
+      item.allocatedJamaah && item.allocatedJamaah.length > 0
+        ? item.allocatedJamaah
+        : parsed.allocatedJamaah;
     setEditingItem(item);
-    setEditItemNama(item.nama);
+    setEditItemNama(parsed.cleanNama || item.nama);
     setEditItemKategori(item.kategori);
     setEditItemNominal(item.nominal);
     setEditItemQty(item.qty);
-    setEditItemSatuan(item.satuan || "Pax");
+    setEditItemSatuan(unitStr);
+    setIsCustomEditSatuanMode(!DEFAULT_SATUAN_OPTIONS.includes(unitStr));
     setEditItemCatatan(item.catatan || "");
+    setEditItemAllocatedMembers(
+      !item.isDefault && existingAlloc.length === 0 && groupMemberNames.length === 1
+        ? groupMemberNames.slice(0, 1)
+        : existingAlloc
+    );
     setShowEditItemModal(true);
   }
 
   async function handleSaveEditItem() {
     if (!editingItem || !editItemNama.trim() || editItemNominal < 0 || savingBillingItem) return;
+    const groupMemberNames = extractGroupMemberNames(groupInfo?.anggota);
+    if (
+      !isMemberAllocationValid(
+        groupMemberNames,
+        editItemAllocatedMembers,
+        Boolean(editingItem.isDefault)
+      )
+    ) {
+      return;
+    }
+    const cleanNama = parseBillingItemAllocation(editItemNama).cleanNama || editItemNama.trim();
+    const nextAllocated = editingItem.isDefault
+      ? editingItem.allocatedJamaah
+      : editItemAllocatedMembers.length > 0
+        ? editItemAllocatedMembers
+        : undefined;
     const nextItems = billingItems.map((i) =>
       i.id === editingItem.id
         ? {
             ...i,
-            nama: editItemNama.trim(),
+            nama: cleanNama,
             kategori: editItemKategori,
             nominal: editItemNominal,
             qty: Math.max(1, editItemQty),
             satuan: editItemSatuan || "Pax",
             catatan: editItemCatatan.trim() || undefined,
+            allocatedJamaah: nextAllocated,
           }
         : i
     );
@@ -1581,7 +1620,9 @@ export default function CreateInvoiceModal({
                         setNewBillingNominal(getPackageUpgradePrice(groupInfo, defaultOpt));
                         setNewBillingQty(1);
                         setNewBillingSatuan("Pax");
-                        setNewBillingAllocatedMembers([]);
+                        setIsCustomNewSatuanMode(false);
+                        const memberNames = extractGroupMemberNames(groupInfo?.anggota);
+                        setNewBillingAllocatedMembers(memberNames.length === 1 ? memberNames.slice(0, 1) : []);
                         setIsCustomJenisMode(false);
                         setShowAddItemModal(true);
                       }}
@@ -3018,192 +3059,29 @@ export default function CreateInvoiceModal({
             />
           </div>
 
-          {/* 5. Box Selection Jamaah Terkena Upgrade Hotel (Checklist Jamaah) */}
-          {newBillingKategori === "tambahan" && isHotelUpgradeItem(newBillingNama) && (
-            <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg space-y-2">
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-bold text-amber-900 dark:text-amber-200 flex items-center gap-1.5">
-                  <Users className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-                  Pilih Jamaah Rombongan yang Terkena Upgrade Hotel:
-                </label>
-                <span className="text-[10px] font-bold text-amber-700 dark:text-amber-300 bg-amber-500/20 px-2 py-0.5 rounded border border-amber-500/30">
-                  {newBillingAllocatedMembers.length} Jamaah Terpilih
-                </span>
-              </div>
-              <div className="flex items-center justify-between text-[10px] text-muted-foreground">
-                <span>Centang nama jamaah yang menerima upgrade hotel (Quantity otomatis tersinkron):</span>
-                <div className="flex gap-2 font-semibold">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const allNames = (groupInfo?.anggota || []).map((a: any, idx: number) => a.namaLengkap || `Anggota ${idx + 1}`);
-                      setNewBillingAllocatedMembers(allNames);
-                      setNewBillingQty(Math.max(1, allNames.length));
-                    }}
-                    className="text-amber-600 dark:text-amber-400 hover:underline cursor-pointer"
-                  >
-                    Pilih Semua
-                  </button>
-                  <span>•</span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setNewBillingAllocatedMembers([]);
-                      setNewBillingQty(1);
-                    }}
-                    className="text-stone-500 hover:underline cursor-pointer"
-                  >
-                    Reset
-                  </button>
-                </div>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-36 overflow-y-auto bg-background p-2 rounded-md border">
-                {(groupInfo?.anggota || []).map((a: any, idx: number) => {
-                  const nama = a.namaLengkap || `Anggota ${idx + 1}`;
-                  const isAllocated = newBillingAllocatedMembers.includes(nama);
-                  return (
-                    <label
-                      key={a.id || nama + idx}
-                      className={`flex items-center gap-2 p-1.5 rounded text-xs cursor-pointer transition-colors ${
-                        isAllocated
-                          ? "bg-amber-500/15 font-bold text-amber-900 dark:text-amber-200 border border-amber-500/30"
-                          : "text-muted-foreground hover:bg-muted"
-                      }`}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={isAllocated}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            const updated = [...newBillingAllocatedMembers, nama];
-                            setNewBillingAllocatedMembers(updated);
-                            setNewBillingQty(Math.max(1, updated.length));
-                          } else {
-                            const updated = newBillingAllocatedMembers.filter((n) => n !== nama);
-                            setNewBillingAllocatedMembers(updated);
-                            setNewBillingQty(Math.max(1, updated.length));
-                          }
-                        }}
-                        className="rounded text-amber-600 focus:ring-amber-500 h-3.5 w-3.5 shrink-0"
-                      />
-                      <span className="truncate">{nama}</span>
-                    </label>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* 6. Room Upgrade Allocation Section (Khusus Tambahan Upgrade Kamar) */}
-          {newBillingKategori === "tambahan" && !isHotelUpgradeItem(newBillingNama) && isRoomUpgradeItem(newBillingNama) && (
-            <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg space-y-2">
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-bold text-amber-900 dark:text-amber-200 flex items-center gap-1.5">
-                  Alokasikan Kamar ke Jamaah:
-                </label>
-                <span className="text-[10px] font-bold text-amber-700 dark:text-amber-300 bg-amber-500/20 px-2 py-0.5 rounded">
-                  {newBillingAllocatedMembers.length} Jamaah Terpilih
-                </span>
-              </div>
-              <p className="text-[10px] text-muted-foreground">
-                Centang jamaah yang mendapatkan kamar {detectRoomTypeFromName(newBillingNama)}. (Quantity otomatis tersinkron).
-              </p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-36 overflow-y-auto bg-background p-2 rounded-md border">
-                {(groupInfo?.anggota || []).map((a: any, idx: number) => {
-                  const nama = a.namaLengkap || `Anggota ${idx + 1}`;
-                  const isAllocated = newBillingAllocatedMembers.includes(nama);
-                  return (
-                    <label
-                      key={a.id || nama + idx}
-                      className={`flex items-center gap-2 p-1.5 rounded text-xs cursor-pointer transition-colors ${
-                        isAllocated
-                          ? "bg-amber-500/15 font-bold text-amber-900 dark:text-amber-200 border border-amber-500/30"
-                          : "text-muted-foreground hover:bg-muted"
-                      }`}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={isAllocated}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            const updated = [...newBillingAllocatedMembers, nama];
-                            setNewBillingAllocatedMembers(updated);
-                            setNewBillingQty(Math.max(1, updated.length));
-                          } else {
-                            const updated = newBillingAllocatedMembers.filter((n) => n !== nama);
-                            setNewBillingAllocatedMembers(updated);
-                            setNewBillingQty(Math.max(1, updated.length));
-                          }
-                        }}
-                        className="rounded text-amber-600 focus:ring-amber-500 h-3.5 w-3.5 shrink-0"
-                      />
-                      <span className="truncate">{nama}</span>
-                    </label>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* 5. Quantity & Satuan Input (Fleksibel) */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs font-bold text-foreground block mb-1">
-                Berapa Banyak (Quantity)
-              </label>
-              <Input
-                type="number"
-                min={1}
-                placeholder="1"
-                value={newBillingQty}
-                onChange={(e) => {
-                  const val = parseInt(e.target.value, 10);
-                  if (isNaN(val) || val < 1) setNewBillingQty(1);
-                  else setNewBillingQty(val);
-                }}
-              />
-              <p className="mt-1 text-[10px] text-muted-foreground">
-                Jumlah pembelian item aktual.
-              </p>
-            </div>
-
-            <div>
-              <label className="text-xs font-bold text-foreground block mb-1">
-                Satuan Item
-              </label>
-              <div className="flex gap-1.5">
-                <select
-                  value={DEFAULT_SATUAN_OPTIONS.includes(newBillingSatuan) ? newBillingSatuan : "custom"}
-                  onChange={(e) => {
-                    if (e.target.value !== "custom") {
-                      setNewBillingSatuan(e.target.value);
-                    } else {
-                      setNewBillingSatuan("");
-                    }
-                  }}
-                  className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-xs shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                >
-                  {DEFAULT_SATUAN_OPTIONS.map((opt) => (
-                    <option key={opt} value={opt}>
-                      {opt}
-                    </option>
-                  ))}
-                  <option value="custom">Kustom (Lainnya)...</option>
-                </select>
-                {!DEFAULT_SATUAN_OPTIONS.includes(newBillingSatuan) && (
-                  <Input
-                    placeholder="Satuan..."
-                    value={newBillingSatuan}
-                    onChange={(e) => setNewBillingSatuan(e.target.value)}
-                    className="text-xs w-28"
-                  />
-                )}
-              </div>
-              <p className="mt-1 text-[10px] text-muted-foreground">
-                Contoh: Pax, Kamar, Pcs, Box, Kg.
-              </p>
-            </div>
-          </div>
+          {/* 5. Quantity, Satuan & Alokasi Peruntukan Anggota Rombongan */}
+          <MemberAllocationSelector
+            qty={newBillingQty}
+            onQtyChange={setNewBillingQty}
+            satuan={newBillingSatuan}
+            onSatuanChange={setNewBillingSatuan}
+            isCustomSatuanMode={isCustomNewSatuanMode}
+            onCustomSatuanModeChange={setIsCustomNewSatuanMode}
+            memberNames={extractGroupMemberNames(groupInfo?.anggota)}
+            selectedMembers={newBillingAllocatedMembers}
+            onSelectedMembersChange={setNewBillingAllocatedMembers}
+            autoSyncQtyWithSelection={
+              newBillingKategori === "tambahan" &&
+              (isHotelUpgradeItem(newBillingNama) || isRoomUpgradeItem(newBillingNama))
+            }
+            allocationTitle={
+              newBillingKategori === "tambahan" && isHotelUpgradeItem(newBillingNama)
+                ? "Pilih Jamaah yang Terkena Upgrade Hotel:"
+                : newBillingKategori === "tambahan" && isRoomUpgradeItem(newBillingNama)
+                  ? `Alokasikan Kamar (${detectRoomTypeFromName(newBillingNama)}) ke Jamaah:`
+                  : "Diperuntukkan untuk Anggota Rombongan:"
+            }
+          />
 
           {/* Subtotal Preview */}
           {newBillingNominal > 0 && (
@@ -3231,7 +3109,15 @@ export default function CreateInvoiceModal({
               size="sm"
               className="font-bold bg-amber-500 hover:bg-amber-600 text-slate-950"
               onClick={handleAddBillingItem}
-              disabled={savingBillingItem || !newBillingNama.trim() || newBillingNominal <= 0}
+              disabled={
+                savingBillingItem ||
+                !newBillingNama.trim() ||
+                newBillingNominal <= 0 ||
+                !isMemberAllocationValid(
+                  extractGroupMemberNames(groupInfo?.anggota),
+                  newBillingAllocatedMembers
+                )
+              }
             >
               {savingBillingItem ? "Menyimpan..." : "Simpan Item"}
             </Button>
@@ -3300,62 +3186,19 @@ export default function CreateInvoiceModal({
             )}
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs font-bold text-foreground block mb-1">
-                Berapa Banyak (Quantity)
-              </label>
-              <Input
-                type="number"
-                min={1}
-                value={editItemQty}
-                onChange={(e) => {
-                  const val = parseInt(e.target.value, 10);
-                  setEditItemQty(isNaN(val) || val < 1 ? 1 : val);
-                }}
-              />
-              <p className="mt-1 text-[10px] text-muted-foreground">
-                Bebas diisi sesuai pembelian.
-              </p>
-            </div>
-
-            <div>
-              <label className="text-xs font-bold text-foreground block mb-1">
-                Satuan Item
-              </label>
-              <div className="flex gap-1.5">
-                <select
-                  value={DEFAULT_SATUAN_OPTIONS.includes(editItemSatuan) ? editItemSatuan : "custom"}
-                  onChange={(e) => {
-                    if (e.target.value !== "custom") {
-                      setEditItemSatuan(e.target.value);
-                    } else {
-                      setEditItemSatuan("");
-                    }
-                  }}
-                  className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-xs shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                >
-                  {DEFAULT_SATUAN_OPTIONS.map((opt) => (
-                    <option key={opt} value={opt}>
-                      {opt}
-                    </option>
-                  ))}
-                  <option value="custom">Kustom (Lainnya)...</option>
-                </select>
-                {!DEFAULT_SATUAN_OPTIONS.includes(editItemSatuan) && (
-                  <Input
-                    placeholder="Satuan..."
-                    value={editItemSatuan}
-                    onChange={(e) => setEditItemSatuan(e.target.value)}
-                    className="text-xs w-28"
-                  />
-                )}
-              </div>
-              <p className="mt-1 text-[10px] text-muted-foreground">
-                Contoh: Pax, Kamar, Pcs, Box, Kg.
-              </p>
-            </div>
-          </div>
+          <MemberAllocationSelector
+            qty={editItemQty}
+            onQtyChange={setEditItemQty}
+            satuan={editItemSatuan}
+            onSatuanChange={setEditItemSatuan}
+            isCustomSatuanMode={isCustomEditSatuanMode}
+            onCustomSatuanModeChange={setIsCustomEditSatuanMode}
+            memberNames={extractGroupMemberNames(groupInfo?.anggota)}
+            selectedMembers={editItemAllocatedMembers}
+            onSelectedMembersChange={setEditItemAllocatedMembers}
+            disabledAllocation={Boolean(editingItem?.isDefault)}
+            autoSyncQtyWithSelection={false}
+          />
 
           <div>
             <label className="text-xs font-bold text-foreground block mb-1">
@@ -3407,7 +3250,16 @@ export default function CreateInvoiceModal({
               size="sm"
               className="font-bold bg-amber-500 hover:bg-amber-600 text-slate-950"
               onClick={handleSaveEditItem}
-              disabled={savingBillingItem || !editItemNama.trim() || editItemNominal < 0}
+              disabled={
+                savingBillingItem ||
+                !editItemNama.trim() ||
+                editItemNominal < 0 ||
+                !isMemberAllocationValid(
+                  extractGroupMemberNames(groupInfo?.anggota),
+                  editItemAllocatedMembers,
+                  Boolean(editingItem?.isDefault)
+                )
+              }
             >
               {savingBillingItem ? "Menyimpan..." : "Simpan Perubahan"}
             </Button>
