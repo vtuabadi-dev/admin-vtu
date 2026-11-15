@@ -11,7 +11,8 @@ import {
   MapPin, 
   Calendar, 
   Users, 
-  Sparkles
+  Sparkles,
+  Loader2
 } from "lucide-react";
 import { formatDateDdMmmmTttt } from "@/shared/lib/utils";
 
@@ -34,6 +35,7 @@ interface PairingCanvasProps {
   initialChildItems: { tempId: string; name: string; date: string }[];
   totalGroupCapacity: number;
   initialChildSeat?: number;
+  isSubmitting?: boolean;
   onConfirm: (pairs: DepartureItemPair[]) => void;
   onCancel: () => void;
 }
@@ -45,11 +47,15 @@ export function PairingCanvas({
   initialChildItems,
   totalGroupCapacity,
   initialChildSeat,
+  isSubmitting = false,
   onConfirm,
   onCancel,
 }: PairingCanvasProps) {
   const [childList, setChildList] = useState(initialChildItems);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [isInternalSubmitting, setIsInternalSubmitting] = useState(false);
+
+  const submitting = isSubmitting || isInternalSubmitting;
 
   // Default parent seat allocations (based on initial allocation from wizard if available, or half)
   const defaultParentSeat =
@@ -84,6 +90,12 @@ export function PairingCanvas({
     setParentSeats(computeInitialParentSeats());
   }, [initialChildSeat, totalGroupCapacity, parentItems]);
 
+  useEffect(() => {
+    if (!isSubmitting) {
+      setIsInternalSubmitting(false);
+    }
+  }, [isSubmitting]);
+
   const countMatch = parentItems.length === childList.length;
 
   const handleDragStart = (index: number) => {
@@ -115,8 +127,9 @@ export function PairingCanvas({
   };
 
   const handleSubmit = () => {
-    if (!countMatch) return;
+    if (!countMatch || submitting) return;
 
+    setIsInternalSubmitting(true);
     const pairs: DepartureItemPair[] = parentItems.map((parent, i) => {
       const child = childList[i]!;
       const parentSeatAlloc = parentSeats[i] ?? defaultParentSeat;
@@ -301,18 +314,31 @@ export function PairingCanvas({
 
       {/* Bottom Action Footer */}
       <div className="pt-4 border-t border-slate-800 flex items-center justify-between">
-        <Button variant="outline" onClick={onCancel} className="text-slate-300 border-slate-700">
+        <Button
+          variant="outline"
+          disabled={submitting}
+          onClick={onCancel}
+          className="text-slate-300 border-slate-700 disabled:opacity-50"
+        >
           Batal
         </Button>
 
         <div className="flex items-center gap-3">
           <Button
             variant="default"
-            disabled={!countMatch}
+            disabled={!countMatch || submitting}
             onClick={handleSubmit}
-            className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-6 py-2.5 rounded-xl shadow-lg shadow-emerald-900/30 flex items-center gap-2"
+            className="bg-emerald-600 hover:bg-emerald-500 disabled:bg-emerald-800/80 disabled:opacity-60 text-white font-bold px-6 py-2.5 rounded-xl shadow-lg shadow-emerald-900/30 flex items-center gap-2 cursor-pointer disabled:cursor-not-allowed"
           >
-            <CheckCircle2 className="h-4 w-4" /> Simpan &amp; Hubungkan Pasangan Paket
+            {submitting ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" /> Menyimpan &amp; Menghubungkan...
+              </>
+            ) : (
+              <>
+                <CheckCircle2 className="h-4 w-4" /> Simpan &amp; Hubungkan Pasangan Paket
+              </>
+            )}
           </Button>
         </div>
       </div>

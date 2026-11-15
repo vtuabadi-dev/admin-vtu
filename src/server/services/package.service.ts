@@ -75,18 +75,14 @@ export const packageService = {
           });
           kodeGrup = finalKodeGrup;
 
-          let groupRecord = await prisma.paketGrup.findUnique({
+          const groupRecord = await prisma.paketGrup.upsert({
             where: { kodeGrup: finalKodeGrup },
+            update: {},
+            create: {
+              kodeGrup: finalKodeGrup,
+              namaPaket: initialParentKeb.namaPaket || `${pCode} Group`,
+            },
           });
-
-          if (!groupRecord) {
-            groupRecord = await prisma.paketGrup.create({
-              data: {
-                kodeGrup: finalKodeGrup,
-                namaPaket: initialParentKeb.namaPaket || `${pCode} Group`,
-              },
-            });
-          }
           paketGrupId = groupRecord.id;
 
           // Update parent to be part of this group
@@ -106,18 +102,14 @@ export const packageService = {
         tanggalList: departureDates,
       });
 
-      let groupRecord = await prisma.paketGrup.findUnique({
+      const groupRecord = await prisma.paketGrup.upsert({
         where: { kodeGrup },
+        update: {},
+        create: {
+          kodeGrup,
+          namaPaket: data.namaPaket || `${pCode} ${sCode} Group`,
+        },
       });
-
-      if (!groupRecord) {
-        groupRecord = await prisma.paketGrup.create({
-          data: {
-            kodeGrup,
-            namaPaket: data.namaPaket || `${pCode} ${sCode} Group`,
-          },
-        });
-      }
       paketGrupId = groupRecord.id;
     }
 
@@ -458,6 +450,39 @@ export const packageService = {
         }
       }
 
+      // Idempotency: Jika paket split starting point untuk induk & kota cabang ini pada tanggal ini sudah ada di DB
+      // (misalnya karena concurrent request, double-click, atau retry), kita tidak membuat paket baru yang bentrok kode,
+      // melainkan meng-update kuotanya secara aman dan idempotensial.
+      const isStartingPointSplitDate = (data.splitReason === "starting_point" || data.splitType === "starting_point");
+      if (parentRecord && isStartingPointSplitDate && data.startingPointId) {
+        const existingChildKeb = await prisma.keberangkatan.findFirst({
+          where: {
+            parentKeberangkatanId: parentRecord.id,
+            startingPointId: data.startingPointId,
+            tanggalBerangkat: {
+              gte: new Date(`${depDateStr}T00:00:00.000Z`),
+              lte: new Date(`${depDateStr}T23:59:59.999Z`),
+            },
+          },
+        });
+
+        if (existingChildKeb) {
+          const assignedChildSeat = typeof pairedItemForThisDate?.childSeat === "number"
+            ? pairedItemForThisDate.childSeat
+            : parseInt(data.kapasitas || data.kuota || "45", 10);
+
+          const updatedChild = await prisma.keberangkatan.update({
+            where: { id: existingChildKeb.id },
+            data: {
+              kuota: assignedChildSeat,
+              maxSeat: assignedChildSeat,
+            },
+          });
+          createdList.push(updatedChild);
+          continue;
+        }
+      }
+
       // ADR-0025: Deteksi apakah ini Paket Split Varian (Promo, Spek, Varian Fasilitas, dll)
       const isSplitVariant = !!parentRecord && !!data.splitReason && data.splitReason !== "starting_point";
       const variantName = isSplitVariant
@@ -497,12 +522,11 @@ export const packageService = {
       let childPaketGrupId = parentRecord?.paketGrupId || paketGrupId || undefined;
       if (parentRecord && !childPaketGrupId) {
         const fallbackGroupCode = data.kodeGrup || `GRP-${parentRecord.kode}`;
-        let grp = await prisma.paketGrup.findUnique({ where: { kodeGrup: fallbackGroupCode } });
-        if (!grp) {
-          grp = await prisma.paketGrup.create({
-            data: { kodeGrup: fallbackGroupCode, namaPaket: parentRecord.namaPaket },
-          });
-        }
+        const grp = await prisma.paketGrup.upsert({
+          where: { kodeGrup: fallbackGroupCode },
+          update: {},
+          create: { kodeGrup: fallbackGroupCode, namaPaket: parentRecord.namaPaket },
+        });
         childPaketGrupId = grp.id;
         await prisma.keberangkatan.update({
           where: { id: parentRecord.id },
@@ -649,42 +673,116 @@ export const packageService = {
         }
       }
 
-      const created = await keberangkatanRepo.create({
-        kode: kodeIndividu,
-        kodeIndividu,
-        paketGrupId: childPaketGrupId,
-        parentKeberangkatanId: specificParentId,
-        splitReason: data.splitReason || (data.splitType || undefined),
-        splitLabel: data.splitLabel || data.spekLabel || data.promoLabel || undefined,
-        promoLabel: data.promoLabel || (data.splitReason === "promo" ? data.splitLabel : undefined),
-        spekLabel: data.spekLabel || (data.splitReason === "spek" ? data.splitLabel : undefined),
-        notes: lineageNotes || undefined,
-        driveFolderIds,
-        flyerUrl: finalFlyerUrl,
-        flyerDriveId: uploadedFlyerDriveId || data.flyerDriveId || undefined,
-        caption: packageCaption,
-        include: includeList,
-        namaPaket: formattedPackageName,
-        hargaPaket: parseInt(data.hargaBase || data.hargaPaket || "0", 10),
-        tanggalBerangkat: depDate.toISOString(),
-        tanggalPulang: retDate.toISOString(),
-        maskapai: airline?.name || data.maskapai || "Saudia",
-        maskapaiId: data.maskapaiId,
-        nomorPenerbangan: data.nomorPenerbangan || "SV-816",
-        hotelMekkah: finalHotelMekkah,
-        hotelMekkahId: data.hotelMekkahId,
-        hotelMadinah: finalHotelMadinah,
-        hotelMadinahId: data.hotelMadinahId,
-        startingPointId: data.startingPointId,
-        packageTypeId: data.packageTypeId,
-        kuota: assignedChildSeat,
-        maxSeat: assignedChildSeat,
-        targetMaterialisasi: parseInt(data.targetMaterialisasi || data.targetMaterialis || "30", 10),
-        terisi: 0,
-        status: "scheduled",
-        durationDays: durasiHari,
-        hotelOptions: hotelOptionsArray,
-      } as any);
+      let created;
+      try {
+        created = await keberangkatanRepo.create({
+          kode: kodeIndividu,
+          kodeIndividu,
+          paketGrupId: childPaketGrupId,
+          parentKeberangkatanId: specificParentId,
+          splitReason: data.splitReason || (data.splitType || undefined),
+          splitLabel: data.splitLabel || data.spekLabel || data.promoLabel || undefined,
+          promoLabel: data.promoLabel || (data.splitReason === "promo" ? data.splitLabel : undefined),
+          spekLabel: data.spekLabel || (data.splitReason === "spek" ? data.splitLabel : undefined),
+          notes: lineageNotes || undefined,
+          driveFolderIds,
+          flyerUrl: finalFlyerUrl,
+          flyerDriveId: uploadedFlyerDriveId || data.flyerDriveId || undefined,
+          caption: packageCaption,
+          include: includeList,
+          namaPaket: formattedPackageName,
+          hargaPaket: parseInt(data.hargaBase || data.hargaPaket || "0", 10),
+          tanggalBerangkat: depDate.toISOString(),
+          tanggalPulang: retDate.toISOString(),
+          maskapai: airline?.name || data.maskapai || "Saudia",
+          maskapaiId: data.maskapaiId,
+          nomorPenerbangan: data.nomorPenerbangan || "SV-816",
+          hotelMekkah: finalHotelMekkah,
+          hotelMekkahId: data.hotelMekkahId,
+          hotelMadinah: finalHotelMadinah,
+          hotelMadinahId: data.hotelMadinahId,
+          startingPointId: data.startingPointId,
+          packageTypeId: data.packageTypeId,
+          kuota: assignedChildSeat,
+          maxSeat: assignedChildSeat,
+          targetMaterialisasi: parseInt(data.targetMaterialisasi || data.targetMaterialis || "30", 10),
+          terisi: 0,
+          status: "scheduled",
+          durationDays: durasiHari,
+          hotelOptions: hotelOptionsArray,
+        } as any);
+      } catch (createErr: any) {
+        if (createErr?.code === "P2002" || createErr?.message?.includes("Unique constraint")) {
+          // Benturan unique constraint akibat concurrent request / race condition:
+          // Cek apakah paket tersebut baru saja dibuat oleh request paralel
+          const alreadyCreated = await prisma.keberangkatan.findFirst({
+            where: {
+              OR: [
+                { kode: kodeIndividu },
+                { kodeIndividu: kodeIndividu },
+                ...(specificParentId && data.startingPointId ? [{
+                  parentKeberangkatanId: specificParentId,
+                  startingPointId: data.startingPointId,
+                  tanggalBerangkat: {
+                    gte: new Date(`${depDateStr}T00:00:00.000Z`),
+                    lte: new Date(`${depDateStr}T23:59:59.999Z`),
+                  },
+                }] : []),
+              ],
+            },
+          });
+
+          if (alreadyCreated) {
+            created = await prisma.keberangkatan.update({
+              where: { id: alreadyCreated.id },
+              data: {
+                kuota: assignedChildSeat,
+                maxSeat: assignedChildSeat,
+              },
+            });
+          } else {
+            const fallbackCode = `${baseKodeIndividu}_${Date.now()}`;
+            created = await keberangkatanRepo.create({
+              kode: fallbackCode,
+              kodeIndividu: fallbackCode,
+              paketGrupId: childPaketGrupId,
+              parentKeberangkatanId: specificParentId,
+              splitReason: data.splitReason || (data.splitType || undefined),
+              splitLabel: data.splitLabel || data.spekLabel || data.promoLabel || undefined,
+              promoLabel: data.promoLabel || (data.splitReason === "promo" ? data.splitLabel : undefined),
+              spekLabel: data.spekLabel || (data.splitReason === "spek" ? data.splitLabel : undefined),
+              notes: lineageNotes || undefined,
+              driveFolderIds,
+              flyerUrl: finalFlyerUrl,
+              flyerDriveId: uploadedFlyerDriveId || data.flyerDriveId || undefined,
+              caption: packageCaption,
+              include: includeList,
+              namaPaket: formattedPackageName,
+              hargaPaket: parseInt(data.hargaBase || data.hargaPaket || "0", 10),
+              tanggalBerangkat: depDate.toISOString(),
+              tanggalPulang: retDate.toISOString(),
+              maskapai: airline?.name || data.maskapai || "Saudia",
+              maskapaiId: data.maskapaiId,
+              nomorPenerbangan: data.nomorPenerbangan || "SV-816",
+              hotelMekkah: finalHotelMekkah,
+              hotelMekkahId: data.hotelMekkahId,
+              hotelMadinah: finalHotelMadinah,
+              hotelMadinahId: data.hotelMadinahId,
+              startingPointId: data.startingPointId,
+              packageTypeId: data.packageTypeId,
+              kuota: assignedChildSeat,
+              maxSeat: assignedChildSeat,
+              targetMaterialisasi: parseInt(data.targetMaterialisasi || data.targetMaterialis || "30", 10),
+              terisi: 0,
+              status: "scheduled",
+              durationDays: durasiHari,
+              hotelOptions: hotelOptionsArray,
+            } as any);
+          }
+        } else {
+          throw createErr;
+        }
+      }
 
       createdList.push(created);
     }

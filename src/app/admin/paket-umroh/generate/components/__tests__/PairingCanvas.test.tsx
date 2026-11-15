@@ -87,4 +87,29 @@ describe("PairingCanvas", () => {
     expect(screen.getByDisplayValue("23")).toBeInTheDocument();
     expect(screen.getByText("22 Seat")).toBeInTheDocument();
   });
+
+  it("mencegah double submission saat tombol Simpan diklik berulang kali", () => {
+    const onConfirmMock = vi.fn();
+    render(
+      <PairingCanvas
+        {...defaultProps}
+        initialChildSeat={14}
+        onConfirm={onConfirmMock}
+      />
+    );
+
+    const submitBtn = screen.getByRole("button", { name: /simpan & hubungkan pasangan paket/i });
+    expect(submitBtn).toBeEnabled();
+
+    // Klik pertama
+    fireEvent.click(submitBtn);
+    expect(onConfirmMock).toHaveBeenCalledTimes(1);
+
+    // Setelah klik pertama, tombol harus dalam keadaan submitting / disabled
+    expect(screen.getByText(/menyimpan & menghubungkan/i)).toBeInTheDocument();
+
+    // Klik kedua saat masih submitting tidak boleh memicu onConfirm lagi
+    fireEvent.click(submitBtn);
+    expect(onConfirmMock).toHaveBeenCalledTimes(1);
+  });
 });

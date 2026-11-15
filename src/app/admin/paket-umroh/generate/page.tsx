@@ -58,6 +58,7 @@ export default function GeneratePaketPage() {
   const [loadingGroups, setLoadingGroups] = useState(false);
   const [selectedParentGroupId, setSelectedParentGroupId] = useState<string>("");
   const [showPairingCanvas, setShowPairingCanvas] = useState(false);
+  const isPairingSubmittingRef = useRef(false);
 
   // OCR state — multi-file drag-and-drop
   const [flyerFiles, setFlyerFiles] = useState<File[]>([]);
@@ -3780,8 +3781,11 @@ export default function GeneratePaketPage() {
               }))}
               totalGroupCapacity={selectedParentGroup.totalCapacity || 45}
               initialChildSeat={parseInt(formData.kapasitas, 10) || 15}
+              isSubmitting={loading}
               onCancel={() => setShowPairingCanvas(false)}
               onConfirm={async (pairs) => {
+                if (isPairingSubmittingRef.current) return;
+                isPairingSubmittingRef.current = true;
                 setLoading(true);
                 try {
                   const childCityName = options?.cities.find(c => c.id === formData.startingPointId)?.name || "Surabaya";
@@ -3879,6 +3883,7 @@ export default function GeneratePaketPage() {
                   alert("Terjadi kesalahan: " + e?.message);
                 } finally {
                   setLoading(false);
+                  isPairingSubmittingRef.current = false;
                 }
               }}
             />
