@@ -997,10 +997,13 @@ export default function GeneratePaketPage() {
         return;
       }
 
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 50000);
+
       const bodyData = new FormData();
       bodyData.append("flyer", flyerUtama);
 
-      // Lampirkan SELURUH flyer tambahan/itinerary (khususnya Flyer #2 yang memuat Hari-1 dan Hari-2, serta hari kepulangan)
+      // Lampirkan flyer tambahan/itinerary tanpa duplikasi
       if (flyerFiles.length > 1) {
         for (let i = 1; i < flyerFiles.length; i++) {
           const addFile = flyerFiles[i];
@@ -1010,23 +1013,19 @@ export default function GeneratePaketPage() {
         }
       }
 
-      // Backwards compatibility: lampirkan juga lastFlyer dan penultimateFlyer
-      if (flyerFiles.length >= 2) {
-        const lastFlyer = flyerFiles[flyerFiles.length - 1];
-        if (lastFlyer) bodyData.append("lastFlyer", lastFlyer);
-      }
-      if (flyerFiles.length >= 3) {
-        const penultimateFlyer = flyerFiles[flyerFiles.length - 2];
-        if (penultimateFlyer) bodyData.append("penultimateFlyer", penultimateFlyer);
-      }
-
       bodyData.append("caption", caption || `Proses dokumen flyer ${flyerUtama.name}`);
       bodyData.append("isAdaKlaster", formData.isAdaKlaster);
 
-      const res = await fetch("/api/admin/packages/ai-import", {
-        method: "POST",
-        body: bodyData,
-      });
+      let res: Response;
+      try {
+        res = await fetch("/api/admin/packages/ai-import", {
+          method: "POST",
+          body: bodyData,
+          signal: controller.signal,
+        });
+      } finally {
+        clearTimeout(timeoutId);
+      }
 
       const resJson = await res.json();
       if (res.ok && resJson.success) {
@@ -1396,9 +1395,13 @@ export default function GeneratePaketPage() {
           `📲 *Informasi & Pendaftaran:* Segera hubungi customer care kami sebelum kuota habis!`;
         setCaption(autoCap);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      setOcrWarning("Gagal menghubungi server ekstraksi AI.");
+      if (err?.name === "AbortError") {
+        setOcrWarning("Proses ekstraksi AI memakan waktu lebih dari 50 detik dan dihentikan. Silakan coba kembali atau gunakan 1-2 brosur utama.");
+      } else {
+        setOcrWarning("Gagal menghubungi server ekstraksi AI: " + (err?.message || "Koneksi terputus"));
+      }
     } finally {
       setUploading(false);
     }

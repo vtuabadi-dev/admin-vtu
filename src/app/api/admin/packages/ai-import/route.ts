@@ -22,6 +22,9 @@ const MAX_FLYER_SIZE = 10 * 1024 * 1024; // 10MB
 const VALID_MIME_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
 const VALID_EXTENSIONS = ["jpg", "jpeg", "png", "webp"];
 
+export const maxDuration = 60;
+export const dynamic = "force-dynamic";
+
 /**
  * POST: Upload a flyer image + caption for AI processing.
  *

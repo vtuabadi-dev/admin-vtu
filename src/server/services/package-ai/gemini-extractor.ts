@@ -322,15 +322,38 @@ export async function extractWithGemini(
           const validAddPaths = additionalImagePaths.filter(p => p && fs.existsSync(p));
           const totalValid = validAddPaths.length;
 
-          validAddPaths.forEach((addPath, idx) => {
+          // Optimasi: pilih hanya flyer yang relevan untuk rute/tujuan kepulangan agar payload hemat & cepat
+          const selectedAddImages: { path: string; label: string }[] = [];
+          if (totalValid <= 2) {
+            validAddPaths.forEach((p, idx) => {
+              selectedAddImages.push({
+                path: p,
+                label: idx === totalValid - 1
+                  ? `\n--- [GAMBAR #${idx + 2} / GAMBAR TERAKHIR: FLYER ITINERARY KEPULANGAN (PERIKSA BANDARA KEPULANGAN / OUT DARI SAUDI: JEDDAH ATAU MADINAH!)] ---\n`
+                  : `\n--- [GAMBAR #${idx + 2}: FLYER ITINERARY HARI PERTAMA / KEDUA] ---\n`,
+              });
+            });
+          } else {
+            // Gambar itinerary pertama (Hari 1/2 tujuan awal di Saudi)
+            selectedAddImages.push({
+              path: validAddPaths[0]!,
+              label: `\n--- [GAMBAR #2: FLYER ITINERARY HARI PERTAMA / KEDUA (KOTA TUJUAN PERTAMA DI SAUDI SETELAH MENDARAT)] ---\n`,
+            });
+            // Gambar sebelum terakhir
+            selectedAddImages.push({
+              path: validAddPaths[totalValid - 2]!,
+              label: `\n--- [GAMBAR SEBELUM TERAKHIR: FLYER ITINERARY MENJELANG KEPULANGAN (PERIKSA AGENDA TRANSFER BANDARA)] ---\n`,
+            });
+            // Gambar terakhir (Kepulangan)
+            selectedAddImages.push({
+              path: validAddPaths[totalValid - 1]!,
+              label: `\n--- [GAMBAR TERAKHIR: FLYER ITINERARY KEPULANGAN (PERIKSA DENGAN SANGAT JELI BANDARA KEPULANGAN / OUT: JEDDAH ATAU MADINAH!)] ---\n`,
+            });
+          }
+
+          selectedAddImages.forEach(({ path: addPath, label }) => {
             try {
               const addBuf = fs.readFileSync(addPath);
-              let label = `\n--- [GAMBAR #${idx + 2}: FLYER ITINERARY] ---\n`;
-              if (idx === totalValid - 1) {
-                label = `\n--- [GAMBAR #${idx + 2} / GAMBAR TERAKHIR: FLYER ITINERARY KEPULANGAN (PERIKSA DENGAN SANGAT JELI BANDARA KEPULANGAN / OUT DARI SAUDI: JEDDAH ATAU MADINAH!)] ---\n`;
-              } else if (idx === totalValid - 2) {
-                label = `\n--- [GAMBAR #${idx + 2} / GAMBAR KEDUA DARI AKHIR: FLYER ITINERARY MENJELANG KEPULANGAN (PERIKSA AGENDA HARI-HARI AKHIR, TRANSFER BANDARA, 'MADINAH-JEDDAH', ATAU 'KING ABDUL AZIZ AIRPORT')] ---\n`;
-              }
               contentParts.push(label);
               contentParts.push({
                 inlineData: {
