@@ -998,7 +998,7 @@ export default function GeneratePaketPage() {
       }
 
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 50000);
+      const timeoutId = setTimeout(() => controller.abort(), 75000);
 
       const bodyData = new FormData();
       bodyData.append("flyer", flyerUtama);
@@ -1398,7 +1398,7 @@ export default function GeneratePaketPage() {
     } catch (err: any) {
       console.error(err);
       if (err?.name === "AbortError") {
-        setOcrWarning("Proses ekstraksi AI memakan waktu lebih dari 50 detik dan dihentikan. Silakan coba kembali atau gunakan 1-2 brosur utama.");
+        setOcrWarning("Proses ekstraksi AI memakan waktu lebih dari 75 detik dan dihentikan. Silakan coba kembali atau gunakan 1-2 brosur utama.");
       } else {
         setOcrWarning("Gagal menghubungi server ekstraksi AI: " + (err?.message || "Koneksi terputus"));
       }

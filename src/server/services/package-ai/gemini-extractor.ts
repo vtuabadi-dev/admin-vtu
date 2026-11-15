@@ -225,7 +225,7 @@ export async function extractWithGemini(
     `2. TEKS CAPTION: ${cleanCaption}\n\n` +
     `3. GAMBAR TERLAMPIR: Flyer Utama (Gambar #1) dan Flyer Itinerary Terakhir / Sebelum Terakhir (Gambar #2/#3 jika ada).`;
 
-  const candidateModels = ["gemini-1.5-flash", "gemini-flash-latest", "gemini-flash-lite-latest", "gemini-2.5-flash", "gemini-pro-latest"];
+  const candidateModels = ["gemini-2.5-flash", "gemini-flash-lite-latest", "gemini-2.5-pro"];
   let lastError: any = null;
 
   // Outer Loop: Try API Keys in sequence
