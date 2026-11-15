@@ -52,17 +52,37 @@ export function PairingCanvas({
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
 
   // Default parent seat allocations (based on initial allocation from wizard if available, or half)
-  const defaultParentSeat = initialChildSeat 
-    ? Math.max(1, totalGroupCapacity - initialChildSeat)
-    : Math.ceil(totalGroupCapacity / 2);
-  const [parentSeats, setParentSeats] = useState<number[]>(
-    parentItems.map(p => p.seat || defaultParentSeat)
-  );
+  const defaultParentSeat =
+    typeof initialChildSeat === "number" && initialChildSeat > 0
+      ? Math.max(1, totalGroupCapacity - initialChildSeat)
+      : Math.ceil(totalGroupCapacity / 2);
+
+  const computeInitialParentSeats = () => {
+    return parentItems.map((p) => {
+      // Prioritaskan alokasi dari slider/wizard (initialChildSeat)
+      // agar kuota terpecah sesuai pengaturan slider (contoh: 45 - 14 = 31 seat)
+      if (typeof initialChildSeat === "number" && initialChildSeat > 0) {
+        return Math.max(1, totalGroupCapacity - initialChildSeat);
+      }
+      // Jika parent item sudah memiliki kuota pecahan yang lebih kecil dari total kapasitas
+      if (typeof p.seat === "number" && p.seat > 0 && p.seat < totalGroupCapacity) {
+        return p.seat;
+      }
+      return defaultParentSeat;
+    });
+  };
+
+  const [parentSeats, setParentSeats] = useState<number[]>(computeInitialParentSeats);
 
   // Keep child items in sync if initialChildItems change
   useEffect(() => {
     setChildList(initialChildItems);
   }, [initialChildItems]);
+
+  // Sinkronkan parentSeats jika alokasi dari slider atau parentItems berubah
+  useEffect(() => {
+    setParentSeats(computeInitialParentSeats());
+  }, [initialChildSeat, totalGroupCapacity, parentItems]);
 
   const countMatch = parentItems.length === childList.length;
 
