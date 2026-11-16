@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/server/db/client";
 
+// A migration must never be executed by Next.js static prerendering during a build.
+export const dynamic = "force-dynamic";
+
 // Temporary migration endpoint — hit once then delete
 export async function GET() {
   const results: string[] = [];

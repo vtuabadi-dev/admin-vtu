@@ -14,18 +14,8 @@ export default function GSAPIntroLoader({
   onComplete,
   forceShow = false,
 }: GSAPIntroLoaderProps) {
-  const [isVisible, setIsVisible] = useState(() => {
-    if (typeof window !== "undefined") {
-      try {
-        const played = localStorage.getItem("vtu_intro_played") || sessionStorage.getItem("vtu_intro_played");
-        if (played && !forceShow) {
-          document.documentElement.classList.remove("intro-pending");
-          return false;
-        }
-      } catch {}
-    }
-    return true;
-  });
+  // The first client render must match server HTML. Read storage after hydration.
+  const [isVisible, setIsVisible] = useState(true);
 
   const overlayRef = useRef<HTMLDivElement | null>(null);
   const ambientGlowRef = useRef<HTMLDivElement | null>(null);
@@ -40,7 +30,10 @@ export default function GSAPIntroLoader({
   // Check Storage for Intro state (ADR-0027: Persist across browser reopenings)
   useEffect(() => {
     if (typeof window !== "undefined") {
-      const played = localStorage.getItem("vtu_intro_played") || sessionStorage.getItem("vtu_intro_played");
+      let played: string | null = null;
+      try {
+        played = localStorage.getItem("vtu_intro_played") || sessionStorage.getItem("vtu_intro_played");
+      } catch {}
       if (played && !forceShow) {
         document.documentElement.classList.remove("intro-pending");
         setIsVisible(false);

@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState, useMemo, useCallback } from "react";
+import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { Search, Users, FileText, AlertCircle, Plus } from "lucide-react";
+import { Search, Users, FileText, AlertCircle } from "lucide-react";
 import { Card, CardContent } from "@/shared/components/ui/Card";
 import { StatCard } from "@/shared/components/ui/StatCard";
 import { StatusBadge } from "@/shared/components/ui/Badge";
@@ -10,6 +10,7 @@ import { Button } from "@/shared/components/ui/Button";
 import { Table } from "@/shared/components/ui/Table";
 import { Tabs } from "@/shared/components/ui/Tabs";
 import { ErrorState } from "@/shared/components/ui/ErrorState";
+import { DataPageSkeleton } from "@/shared/components/ui/DataPageSkeleton";
 import {
   getJamaahList,
   getInvoiceList,
@@ -30,6 +31,8 @@ export default function JamaahListPage() {
   const [groups, setGroups] = useState<RegistrationGroup[]>(storeGroups || []);
   const [loading, setLoading] = useState(!storeJamaah || storeJamaah.length === 0);
   const [error, setError] = useState<Error | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const requestId = useRef(0);
   const [activeTab, setActiveTab] = useState("semua");
 
   // --- Smart 4-Digit GRP Lookup State (Sesuai Gambar 2) ---
@@ -45,23 +48,32 @@ export default function JamaahListPage() {
   }, [searchYear, searchSeq]);
 
   const load = useCallback(async (showLoading = false) => {
+    const currentRequest = ++requestId.current;
     try {
       if (showLoading) setLoading(true);
+      setRefreshing(true);
       setError(null);
       const [j, inv, g] = await Promise.all([
-        getJamaahList().catch(() => []),
-        getInvoiceList().catch(() => []),
-        getGroupList().catch(() => []),
+        getJamaahList(),
+        getInvoiceList(),
+        getGroupList(),
       ]);
+      if (currentRequest !== requestId.current) return;
       setJamaahList(j);
       setInvoices(inv);
       setGroups(g);
     } catch (err: any) {
+      if (currentRequest !== requestId.current) return;
       setError(err instanceof Error ? err : new Error("Database Connection Error"));
     } finally {
-      setLoading(false);
+      if (currentRequest === requestId.current) {
+        setLoading(false);
+        setRefreshing(false);
+      }
     }
   }, []);
+
+  useEffect(() => () => { requestId.current += 1; }, []);
 
   useEffect(() => {
     // If store already pre-fetched data during SplashScreen login, use it instantly
@@ -244,14 +256,10 @@ export default function JamaahListPage() {
   // --- Loading state ---
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <p className="text-muted-foreground">Memuat data jamaah...</p>
-      </div>
-    );
+    return <DataPageSkeleton label="Memuat data jamaah..." />;
   }
 
-  if (error) {
+  if (error && jamaahList.length === 0) {
     return (
       <div className="flex h-64 items-center justify-center">
         <ErrorState onRetry={load} message={error.message} />
@@ -261,18 +269,20 @@ export default function JamaahListPage() {
 
   return (
     <div className="space-y-6">
+      {error && (
+        <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          <span>Data belum dapat diperbarui. Menampilkan data terakhir.</span>
+          <Button variant="outline" size="sm" onClick={() => load(false)}>Coba Lagi</Button>
+        </div>
+      )}
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Data Jamaah</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Kelola data dan status jamaah umroh
+          <p role="status" className="text-sm text-muted-foreground mt-1">
+            {refreshing ? "Memperbarui data jamaah..." : "Kelola data dan status jamaah umroh"}
           </p>
         </div>
-        <Button>
-          <Plus className="mr-2 h-4 w-4" />
-          Tambah Jamaah
-        </Button>
       </div>
 
       {/* Stats row */}

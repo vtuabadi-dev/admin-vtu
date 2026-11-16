@@ -8,6 +8,7 @@ import { Button } from "@/shared/components/ui/Button";
 import { Table } from "@/shared/components/ui/Table";
 import { Select } from "@/shared/components/ui/Select";
 import { ErrorState } from "@/shared/components/ui/ErrorState";
+import { DataPageSkeleton } from "@/shared/components/ui/DataPageSkeleton";
 import { OperationalAlertPanel } from "@/shared/components/OperationalAlertPanel";
 import { OperationalWarnings } from "@/shared/components/OperationalWarnings";
 import {
@@ -37,6 +38,7 @@ import Link from "next/link";
 
 export default function AdminDashboardPage() {
   const storeIsLoaded = useOperationalStore((s) => s.isLoaded);
+  const isAnalyticsLoading = useOperationalStore((s) => s.isAnalyticsLoading);
   const storeStats = useOperationalStore((s) => s.stats);
   const storeAlerts = useOperationalStore((s) => s.alerts);
   const storeKbrList = useOperationalStore((s) => s.keberangkatanList);
@@ -66,105 +68,39 @@ export default function AdminDashboardPage() {
 
   // ── Load global data ────────────────────────────────────────────
   const load = useCallback(async () => {
+    setLoading(!useOperationalStore.getState().stats);
+    setError(null);
     try {
-      setLoading(true);
-      setError(null);
-      const [statsRes, alertsRes, kbrRes, payReviewRes, docReviewRes, invRes] = await Promise.all([
-        fetch("/api/dashboard/stats"),
-        fetch("/api/dashboard/alerts"),
-        fetch("/api/keberangkatan"),
-        fetch("/api/pembayaran/review"),
-        fetch("/api/dokumen/review"),
-        fetch("/api/invoices"),
-      ]);
-
-      if (!statsRes.ok || !kbrRes.ok) {
-        throw new Error("Gagal memuat data dari server");
-      }
-
-      if (statsRes.ok) { const j = await statsRes.json(); setStats(j.data ?? j); }
-      if (alertsRes.ok) { const j = await alertsRes.json(); setAlerts(j.data ?? []); }
-      if (kbrRes.ok) { const j = await kbrRes.json(); setKbrList(j.data ?? []); }
-      if (payReviewRes.ok) { const j = await payReviewRes.json(); setPendingReviewCount((j.data ?? []).length); }
-      if (docReviewRes.ok) { const j = await docReviewRes.json(); setPendingDocReviewCount((j.data ?? []).length); }
-      if (invRes.ok) {
-        const j = await invRes.json();
-        const invoices = j.data ?? [];
-        const overdue = invoices
-          .filter((inv: any) => inv.status === "overdue")
-          .reduce((sum: number, inv: any) => sum + (inv.sisaTagihan ?? 0), 0);
-        setOverdueAmount(overdue);
-      }
-    } catch (err: any) {
-      setError(err instanceof Error ? err : new Error("Database Connection Error"));
+      await useOperationalStore.getState().loadAllData();
+      const loadError = useOperationalStore.getState().loadError;
+      if (loadError) throw new Error(loadError);
+    } catch (err) {
+      setError(err instanceof Error ? err : new Error("Gagal memuat data operasional."));
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    if (storeIsLoaded) {
-      setStats(storeStats);
-      setAlerts(storeAlerts);
-      setKbrList(storeKbrList);
-      setScores(storeScores);
-      setIntelMap(storeIntelMap);
-      setPendingReviewCount(storePendingReviewCount);
-      setPendingDocReviewCount(storePendingDocReviewCount);
-
-      const overdue = storeInvoices
-        .filter((inv: any) => inv.status === "overdue")
-        .reduce((sum: number, inv: any) => sum + (inv.sisaTagihan ?? 0), 0);
-      setOverdueAmount(overdue);
-      setLoading(false);
-    } else {
-      load();
+    if (!storeIsLoaded) {
+      void load();
+      return;
     }
-  }, [
-    load,
-    storeIsLoaded,
-    storeStats,
-    storeAlerts,
-    storeKbrList,
-    storeScores,
-    storeIntelMap,
-    storePendingReviewCount,
-    storePendingDocReviewCount,
-    storeInvoices,
-  ]);
+    setStats(storeStats);
+    setAlerts(storeAlerts);
+    setKbrList(storeKbrList);
+    setScores(storeScores);
+    setIntelMap(storeIntelMap);
+    setPendingReviewCount(storePendingReviewCount);
+    setPendingDocReviewCount(storePendingDocReviewCount);
+    setOverdueAmount(storeInvoices
+      .filter((inv: any) => inv.status === "overdue")
+      .reduce((sum: number, inv: any) => sum + (inv.sisaTagihan ?? 0), 0));
+    setLoading(false);
+    setError(null);
+  }, [load, storeIsLoaded, storeStats, storeAlerts, storeKbrList, storeScores,
+    storeIntelMap, storePendingReviewCount, storePendingDocReviewCount, storeInvoices]);
 
-  // ── Load per-package readiness after kbrList loads ──────────────
-  useEffect(() => {
-    if (storeIsLoaded) return; // Skip if loaded by global store to prevent N+1 fetches!
-    if (kbrList.length === 0) return;
-    async function loadScores() {
-      const scoreMap: Record<string, PackageReadinessScore> = {};
-      const intelAcc: Record<string, any> = {};
-      await Promise.all(
-        kbrList.map(async (pkg) => {
-          try {
-            const [scoreRes, intelRes] = await Promise.all([
-              fetch(`/api/keberangkatan/${pkg.id}/readiness-score`),
-              fetch(`/api/keberangkatan/${pkg.id}/intelligence`),
-            ]);
-            if (scoreRes.ok) {
-              const j = await scoreRes.json();
-              if (j.data) scoreMap[pkg.id] = j.data;
-            }
-            if (intelRes.ok) {
-              const j = await intelRes.json();
-              if (j.data) intelAcc[pkg.id] = j.data;
-            }
-          } catch { /* per-package load can fail gracefully */ }
-        })
-      );
-      setScores(scoreMap);
-      setIntelMap(intelAcc);
-    }
-    loadScores();
-  }, [kbrList, storeIsLoaded]);
-
-  // ── Load package-specific data when filter changes ──────────────
   const loadPackageData = useCallback(async (kbrId: string) => {
     setLoadingPackage(true);
     try {
@@ -201,7 +137,6 @@ export default function AdminDashboardPage() {
 
   const selectedKbr = (() => {
     if (!isFiltered) return null;
-    console.log("[DEBUG FIND kbrList]", typeof kbrList, Array.isArray(kbrList), kbrList);
     if (!Array.isArray(kbrList)) return null;
     return kbrList.find((k) => k.id === selectedPackageId) ?? null;
   })();
@@ -227,11 +162,7 @@ export default function AdminDashboardPage() {
 
   // ── Loading ─────────────────────────────────────────────────────
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <p className="text-muted-foreground">Memuat data operasional...</p>
-      </div>
-    );
+    return <DataPageSkeleton label="Memuat data operasional..." />;
   }
 
   if (error || !stats) {
@@ -263,8 +194,9 @@ export default function AdminDashboardPage() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Dashboard Operasional</h1>
-          <p className="text-sm text-muted-foreground mt-1">
+          <p role="status" className="text-sm text-muted-foreground mt-1">
             Ringkasan operasional keberangkatan umroh
+            {isAnalyticsLoading && <span> · Memuat analitik paket...</span>}
           </p>
         </div>
         <div className="flex items-center gap-3">

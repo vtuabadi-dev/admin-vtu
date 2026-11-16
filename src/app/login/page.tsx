@@ -64,12 +64,7 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeMobileTab, setActiveMobileTab] = useState<"login" | "portals">("login");
-  const [isIntroPending, setIsIntroPending] = useState<boolean>(() => {
-    if (typeof window === "undefined") return false;
-    const played = sessionStorage.getItem("vtu_intro_played");
-    const hasPendingClass = document.documentElement.classList.contains("intro-pending");
-    return !played && hasPendingClass;
-  });
+  const [isIntroPending, setIsIntroPending] = useState(true);
 
   // Listen for intro completion event
   useEffect(() => {
@@ -80,6 +75,10 @@ export default function LoginPage() {
     };
 
     window.addEventListener("vtu:intro-complete", handleIntroComplete);
+    // The intro may have finished in a child effect before this listener was attached.
+    if (!document.documentElement.classList.contains("intro-pending")) {
+      setIsIntroPending(false);
+    }
     return () => {
       window.removeEventListener("vtu:intro-complete", handleIntroComplete);
     };

@@ -135,6 +135,8 @@ interface OperationalStore {
   scores: Record<string, PackageReadinessScore>;
   intelMap: Record<string, any>;
   isLoaded: boolean;
+  loadError: string | null;
+  isAnalyticsLoading: boolean;
   staleFlags: OperationalStaleFlags;
 
   setStats: (stats: DashboardStats) => void;
@@ -157,6 +159,10 @@ interface OperationalStore {
   loadAllData: () => Promise<void>;
 }
 
+// Splash screen and page effects share one request, including React Strict Mode mounts.
+let pendingLoad: Promise<void> | null = null;
+let latestLoadVersion = 0;
+
 export const useOperationalStore = create<OperationalStore>((set) => ({
   stats: null,
   alerts: [],
@@ -169,6 +175,8 @@ export const useOperationalStore = create<OperationalStore>((set) => ({
   scores: {},
   intelMap: {},
   isLoaded: false,
+  loadError: null,
+  isAnalyticsLoading: false,
   staleFlags: { groups: false, jamaah: false },
 
   setStats: (stats) => set({ stats }),
@@ -235,103 +243,130 @@ export const useOperationalStore = create<OperationalStore>((set) => ({
   },
 
   loadAllData: async () => {
+    if (pendingLoad) return pendingLoad;
+    const loadVersion = ++latestLoadVersion;
+    pendingLoad = (async () => {
+      try {
+        const [
+          statsRes,
+          alertsRes,
+          kbrRes,
+          payReviewRes,
+          docReviewRes,
+          invRes,
+          jamaahRes,
+          groupRes,
+        ] = await Promise.all([
+          fetch("/api/dashboard/stats").catch(() => ({ ok: false })),
+          fetch("/api/dashboard/alerts").catch(() => ({ ok: false })),
+          fetch("/api/keberangkatan").catch(() => ({ ok: false })),
+          fetch("/api/pembayaran/review").catch(() => ({ ok: false })),
+          fetch("/api/dokumen/review").catch(() => ({ ok: false })),
+          fetch("/api/invoices").catch(() => ({ ok: false })),
+          getJamaahList().catch(() => []),
+          getGroupList().catch(() => []),
+        ]);
+
+        if (!statsRes.ok || !kbrRes.ok) {
+          throw new Error("Gagal memuat data operasional. Silakan coba lagi.");
+        }
+
+        let stats: DashboardStats | null = null;
+        let alerts: OperationalAlert[] = [];
+        let keberangkatanList: Keberangkatan[] = [];
+        let pendingReviewCount = 0;
+        let pendingDocReviewCount = 0;
+        let invoices: any[] = [];
+        let jamaahList: Jamaah[] = Array.isArray(jamaahRes) ? jamaahRes : [];
+        let groupList: RegistrationGroup[] = Array.isArray(groupRes) ? groupRes : [];
+        const scores: Record<string, PackageReadinessScore> = {};
+        const intelMap: Record<string, any> = {};
+
+        if ((statsRes as any).ok) {
+          const j = await (statsRes as Response).json();
+          stats = j.data ?? j;
+        }
+        if ((alertsRes as any).ok) {
+          const j = await (alertsRes as Response).json();
+          alerts = j.data ?? [];
+        }
+        if ((kbrRes as any).ok) {
+          const j = await (kbrRes as Response).json();
+          keberangkatanList = j.data ?? [];
+
+        }
+        if ((payReviewRes as any).ok) {
+          const j = await (payReviewRes as Response).json();
+          pendingReviewCount = (j.data ?? []).filter(
+            (p: any) => !p?.isLogOnly && p?.recordType !== "invoice_log" && p?.status === "pending"
+          ).length;
+        }
+        if ((docReviewRes as any).ok) {
+          const j = await (docReviewRes as Response).json();
+          pendingDocReviewCount = (j.data ?? []).length;
+        }
+        if ((invRes as any).ok) {
+          const j = await (invRes as Response).json();
+          invoices = j.data ?? [];
+        }
+
+        set({
+          stats,
+          alerts,
+          keberangkatanList,
+          jamaahList,
+          groupList,
+          pendingReviewCount,
+          pendingDocReviewCount,
+          invoices,
+          isLoaded: true,
+          loadError: null,
+          isAnalyticsLoading: keberangkatanList.length > 0,
+          staleFlags: { groups: false, jamaah: false },
+        });
+
+        // Publish the core snapshot before optional per-package analytics complete.
+        // Bound concurrency so analytics do not saturate the database connection pool.
+        const loadAnalytics = async () => {
+          for (let offset = 0; offset < keberangkatanList.length; offset += 4) {
+            if (loadVersion !== latestLoadVersion) return;
+            await Promise.all(keberangkatanList.slice(offset, offset + 4).map(async (pkg) => {
+              try {
+                const [scoreRes, intelRes] = await Promise.all([
+                  fetch(`/api/keberangkatan/${pkg.id}/readiness-score`),
+                  fetch(`/api/keberangkatan/${pkg.id}/intelligence`),
+                ]);
+                if (scoreRes.ok) {
+                  const result = await scoreRes.json();
+                  if (result.data) scores[pkg.id] = result.data;
+                }
+                if (intelRes.ok) {
+                  const result = await intelRes.json();
+                  if (result.data) intelMap[pkg.id] = result.data;
+                }
+              } catch (error) {
+                console.warn(`[useOperationalStore] Failed to load data for package ${pkg.id}:`, error);
+              }
+            }));
+          }
+          if (loadVersion === latestLoadVersion) {
+            set({ scores, intelMap, isAnalyticsLoading: false });
+          }
+        };
+        // Refreshes after an edit must not be held behind an older analytics job.
+        void loadAnalytics().catch((error) => {
+          console.warn("[useOperationalStore] Failed to load analytics:", error);
+          if (loadVersion === latestLoadVersion) set({ isAnalyticsLoading: false });
+        });
+      } catch (error) {
+        console.error("[useOperationalStore] Failed to pre-fetch global data:", error);
+        set({ loadError: error instanceof Error ? error.message : "Gagal memuat data operasional.", isAnalyticsLoading: false });
+      }
+    })();
     try {
-      const [
-        statsRes,
-        alertsRes,
-        kbrRes,
-        payReviewRes,
-        docReviewRes,
-        invRes,
-        jamaahRes,
-        groupRes,
-      ] = await Promise.all([
-        fetch("/api/dashboard/stats").catch(() => ({ ok: false })),
-        fetch("/api/dashboard/alerts").catch(() => ({ ok: false })),
-        fetch("/api/keberangkatan").catch(() => ({ ok: false })),
-        fetch("/api/pembayaran/review").catch(() => ({ ok: false })),
-        fetch("/api/dokumen/review").catch(() => ({ ok: false })),
-        fetch("/api/invoices").catch(() => ({ ok: false })),
-        getJamaahList().catch(() => []),
-        getGroupList().catch(() => []),
-      ]);
-
-      let stats: DashboardStats | null = null;
-      let alerts: OperationalAlert[] = [];
-      let keberangkatanList: Keberangkatan[] = [];
-      let pendingReviewCount = 0;
-      let pendingDocReviewCount = 0;
-      let invoices: any[] = [];
-      let jamaahList: Jamaah[] = Array.isArray(jamaahRes) ? jamaahRes : [];
-      let groupList: RegistrationGroup[] = Array.isArray(groupRes) ? groupRes : [];
-      const scores: Record<string, PackageReadinessScore> = {};
-      const intelMap: Record<string, any> = {};
-
-      if ((statsRes as any).ok) {
-        const j = await (statsRes as Response).json();
-        stats = j.data ?? j;
-      }
-      if ((alertsRes as any).ok) {
-        const j = await (alertsRes as Response).json();
-        alerts = j.data ?? [];
-      }
-      if ((kbrRes as any).ok) {
-        const j = await (kbrRes as Response).json();
-        keberangkatanList = j.data ?? [];
-
-        // Pre-fetch scores and intel maps for all packages in parallel
-        await Promise.all(
-          keberangkatanList.map(async (pkg) => {
-            try {
-              const [scoreRes, intelRes] = await Promise.all([
-                fetch(`/api/keberangkatan/${pkg.id}/readiness-score`),
-                fetch(`/api/keberangkatan/${pkg.id}/intelligence`),
-              ]);
-              if (scoreRes.ok) {
-                const sj = await scoreRes.json();
-                if (sj.data) scores[pkg.id] = sj.data;
-              }
-              if (intelRes.ok) {
-                const ij = await intelRes.json();
-                if (ij.data) intelMap[pkg.id] = ij.data;
-              }
-            } catch (err) {
-              console.warn(`[useOperationalStore] Failed to load data for package ${pkg.id}:`, err);
-            }
-          })
-        );
-      }
-      if ((payReviewRes as any).ok) {
-        const j = await (payReviewRes as Response).json();
-        pendingReviewCount = (j.data ?? []).filter(
-          (p: any) => !p?.isLogOnly && p?.recordType !== "invoice_log" && p?.status === "pending"
-        ).length;
-      }
-      if ((docReviewRes as any).ok) {
-        const j = await (docReviewRes as Response).json();
-        pendingDocReviewCount = (j.data ?? []).length;
-      }
-      if ((invRes as any).ok) {
-        const j = await (invRes as Response).json();
-        invoices = j.data ?? [];
-      }
-
-      set({
-        stats,
-        alerts,
-        keberangkatanList,
-        jamaahList,
-        groupList,
-        pendingReviewCount,
-        pendingDocReviewCount,
-        invoices,
-        scores,
-        intelMap,
-        isLoaded: true,
-        staleFlags: { groups: false, jamaah: false },
-      });
-    } catch (error) {
-      console.error("[useOperationalStore] Failed to pre-fetch global data:", error);
+      await pendingLoad;
+    } finally {
+      pendingLoad = null;
     }
   },
 }));

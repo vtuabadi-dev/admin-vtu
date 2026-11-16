@@ -2,92 +2,39 @@
 
 import { useEffect, useState } from "react";
 import { useOperationalStore } from "@/stores/operational-store";
-import { Shield, Loader2 } from "lucide-react";
+import { Loader2, Shield } from "lucide-react";
 
 export function SplashScreen() {
-  const isLoaded = useOperationalStore((s) => s.isLoaded);
   const loadAllData = useOperationalStore((s) => s.loadAllData);
+  const isLoaded = useOperationalStore((s) => s.isLoaded);
+  const [visible, setVisible] = useState(false);
 
-  const [loadingText, setLoadingText] = useState("Menghubungkan ke server...");
-  const [shouldRender, setShouldRender] = useState(() => {
-    if (typeof window !== "undefined") {
-      try {
-        if (localStorage.getItem("vtu_intro_completed") === "true") {
-          return false;
-        }
-      } catch {}
-    }
-    return true;
-  });
-  const [isFadingOut, setIsFadingOut] = useState(false);
-
-  // Cycle through loading texts to feel alive
   useEffect(() => {
-    if (isLoaded || !shouldRender) return;
-    const texts = [
-      "Menghubungkan ke server...",
-      "Memuat data statistik...",
-      "Sinkronisasi manifes & dokumen...",
-      "Menganalisis kesiapan paket...",
-      "Mempersiapkan dasbor...",
-    ];
-    let idx = 0;
-    const interval = setInterval(() => {
-      idx = (idx + 1) % texts.length;
-      setLoadingText(texts[idx] || "");
-    }, 600);
-
-    return () => clearInterval(interval);
-  }, [isLoaded, shouldRender]);
-
-  // Handle initialization and single-time intro display (ADR-0027)
-  useEffect(() => {
-    const alreadyCompleted = typeof window !== "undefined" && localStorage.getItem("vtu_intro_completed") === "true";
-    if (alreadyCompleted) {
-      if (!isLoaded) {
-        loadAllData().catch((err) => console.error("Background pre-fetch error:", err));
-      }
-      return;
+    let active = true;
+    if (useOperationalStore.getState().isLoaded) return;
+    try {
+      setVisible(localStorage.getItem("vtu_intro_completed") !== "true");
+    } catch {
+      setVisible(true);
     }
+    loadAllData().then(() => {
+      if (!active || !useOperationalStore.getState().isLoaded) return;
+      try { localStorage.setItem("vtu_intro_completed", "true"); } catch {}
+    }).catch(() => {
+      // The page presents the error and retry action; never mark failed loads complete.
+    }).finally(() => {
+      if (active) setVisible(false);
+    });
+    return () => { active = false; };
+  }, [loadAllData]);
 
-    const startTime = Date.now();
-
-    async function init() {
-      try {
-        await loadAllData();
-      } catch (err) {
-        console.error("Failed to load pre-fetch data:", err);
-      } finally {
-        const elapsedTime = Date.now() - startTime;
-        const minDuration = 2500; // 2.5 seconds for visual aftereffect
-        const delay = Math.max(0, minDuration - elapsedTime);
-
-        setTimeout(() => {
-          setIsFadingOut(true);
-          try {
-            localStorage.setItem("vtu_intro_completed", "true");
-          } catch {}
-          setTimeout(() => {
-            setShouldRender(false);
-          }, 700); // match duration-700
-        }, delay);
-      }
-    }
-
-    if (!isLoaded) {
-      init();
-    } else {
-      try {
-        localStorage.setItem("vtu_intro_completed", "true");
-      } catch {}
-      setShouldRender(false);
-    }
-  }, [isLoaded, loadAllData]);
-
-  if (!shouldRender) return null;
-
+  if (!visible || isLoaded) return null;
+  const isFadingOut = false;
+  const loadingText = "Memuat data operasional...";
   return (
     <div
+      role="status"
+      aria-live="polite"
       className={`fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-gradient-to-br from-[#03150e] via-[#062118] to-[#010906] transition-opacity duration-700 ease-out ${
         isFadingOut ? "opacity-0 pointer-events-none" : "opacity-100"
       }`}
