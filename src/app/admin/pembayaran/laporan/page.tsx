@@ -114,7 +114,7 @@ const SplitInvoiceModal = dynamic(
 );
 
 
-﻿export default function LaporanPembayaranPage() {
+export default function LaporanPembayaranPage() {
   const [activeTab, setActiveTab] = useState<"laporan" | "review">("review");
   const [showCreateInvoiceModal, setShowCreateInvoiceModal] = useState(false);
 
