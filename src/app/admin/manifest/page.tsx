@@ -208,18 +208,31 @@ function getPackageFlightSegments(pkg: Keberangkatan): FlightSegment[] {
 }
 
 function getSingleSourceOfTruthName(j: any): string {
+  // 1. Prioritas Utama: Nama Paspor (Dokumen OCR / Manual Verification)
   if (j.dokumen && Array.isArray(j.dokumen)) {
     const pasporDoc = j.dokumen.find((d: any) => d.jenis === "paspor");
     if (pasporDoc) {
       const pName = pasporDoc.manualData?.namaLengkap || pasporDoc.ocrData?.namaLengkap;
-      if (pName && pName.trim()) return pName.trim();
+      if (pName && typeof pName === "string" && pName.trim()) return pName.trim();
     }
+  }
+  if (j.namaPaspor && typeof j.namaPaspor === "string" && j.namaPaspor.trim()) {
+    return j.namaPaspor.trim();
+  }
+
+  // 2. Prioritas Kedua: Nama KTP (Dokumen OCR / Manual Verification)
+  if (j.dokumen && Array.isArray(j.dokumen)) {
     const ktpDoc = j.dokumen.find((d: any) => d.jenis === "ktp");
     if (ktpDoc) {
       const kName = ktpDoc.manualData?.namaLengkap || ktpDoc.ocrData?.namaLengkap;
-      if (kName && kName.trim()) return kName.trim();
+      if (kName && typeof kName === "string" && kName.trim()) return kName.trim();
     }
   }
+  if (j.namaKtp && typeof j.namaKtp === "string" && j.namaKtp.trim()) {
+    return j.namaKtp.trim();
+  }
+
+  // 3. Prioritas Ketiga: Nama Registrasi Awal di Formulir Pendaftaran
   return j.namaLengkap || "-";
 }
 

@@ -74,6 +74,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, message: "Jumlah anggota tidak sesuai dengan paxCount" }, { status: 400 });
     }
 
+    for (let i = 0; i < body.members.length; i++) {
+      const m = body.members[i];
+      if (!m || typeof m.namaLengkap !== "string" || !m.namaLengkap.trim()) {
+        return NextResponse.json(
+          { success: false, message: `Nama lengkap jamaah #${i + 1} wajib diisi` },
+          { status: 400 }
+        );
+      }
+    }
+
     if (!body.paketId) {
       return NextResponse.json({ success: false, message: "Paket keberangkatan wajib dipilih" }, { status: 400 });
     }

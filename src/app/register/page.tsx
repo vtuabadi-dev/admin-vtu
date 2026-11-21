@@ -371,7 +371,17 @@ export default function RegisterPage() {
     const draft = loadDraftFromStorage();
     if (draft) {
       try {
-        if (draft.step && draft.step >= 1 && draft.step <= 8) setStep(draft.step as Step);
+        let restoredStep = draft.step && draft.step >= 1 && draft.step <= 8 ? (draft.step as Step) : 1;
+        // If restored past step 4, ensure all members actually have names filled
+        if (restoredStep > 4 && Array.isArray(draft.members)) {
+          const hasEmptyMemberName = draft.members.some(
+            (m: any) => !m.namaLengkap || !String(m.namaLengkap).trim()
+          );
+          if (hasEmptyMemberName) {
+            restoredStep = 4;
+          }
+        }
+        setStep(restoredStep);
         if (draft.namaPerwakilan) setNamaPerwakilan(draft.namaPerwakilan);
         if (draft.nomorTelepon) setNomorTelepon(draft.nomorTelepon);
         if (draft.emailPerwakilan) setEmailPerwakilan(draft.emailPerwakilan);
@@ -873,6 +883,18 @@ export default function RegisterPage() {
   // Submit registration
   const handleSubmit = async () => {
     if (isSubmitting) return;
+
+    // Validate that all members have complete names before submitting
+    const emptyMemberIdx = members.findIndex((m) => !m.namaLengkap || !m.namaLengkap.trim());
+    if (emptyMemberIdx !== -1) {
+      setErrors((prev) => ({
+        ...prev,
+        [`member_${emptyMemberIdx}_nama`]: `Nama lengkap jamaah #${emptyMemberIdx + 1} wajib diisi`,
+      }));
+      setStep(4);
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {

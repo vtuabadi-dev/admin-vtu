@@ -95,7 +95,13 @@ export function resolveJamaahManifestName(jamaah: any): string {
         return pName.trim();
       }
     }
+  }
 
+  if (jamaah.namaPaspor && typeof jamaah.namaPaspor === "string" && jamaah.namaPaspor.trim()) {
+    return jamaah.namaPaspor.trim();
+  }
+
+  if (jamaah.dokumen && Array.isArray(jamaah.dokumen)) {
     const ktpDoc = jamaah.dokumen.find((d: any) => d.jenis === "ktp");
     if (ktpDoc) {
       const kName = ktpDoc.manualData?.namaLengkap || ktpDoc.ocrData?.namaLengkap;
@@ -103,6 +109,10 @@ export function resolveJamaahManifestName(jamaah: any): string {
         return kName.trim();
       }
     }
+  }
+
+  if (jamaah.namaKtp && typeof jamaah.namaKtp === "string" && jamaah.namaKtp.trim()) {
+    return jamaah.namaKtp.trim();
   }
 
   return jamaah.namaLengkap || "JAMAAH";

@@ -342,7 +342,7 @@ export const pembayaranRepo = {
               registrationId: regId,
               groupId: group.id,
               nomorPeserta: regId,
-              namaLengkap: m.namaLengkap || (i === 0 ? reg.namaPerwakilan : `Anggota ${i + 1}`),
+              namaLengkap: (m.namaLengkap && m.namaLengkap.trim()) ? m.namaLengkap.trim() : (i === 0 ? reg.namaPerwakilan : `Anggota ${i + 1}`),
               namaAyah: "",
               jenisKelamin: ((m.jenisKelamin) as any) || "L",
               tempatLahir: m.tempatLahir || "-",
