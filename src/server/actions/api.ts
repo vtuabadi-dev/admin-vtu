@@ -2,7 +2,7 @@
 
 import { prisma } from "@/server/db/client";
 import { packageService } from "@/server/services/package.service";
-import { groupRepo, pembayaranRepo, invoiceRepo } from "@/server/repositories";
+import { groupRepo, pembayaranRepo, invoiceRepo, recalculatePackageFilledSeats } from "@/server/repositories";
 import { syncPackageDocumentFileNamesToDrive } from "@/server/services/manifest-drive-sync.service";
 import {
   getCanonicalItemDedupeKey,
@@ -114,6 +114,14 @@ export async function getKeberangkatanList() {
         hotelMadinahMaster: true,
         startingPoint: true,
         packageType: true,
+        groups: {
+          include: {
+            anggota: {
+              where: { status: { not: "batal" as any } },
+              select: { id: true },
+            },
+          },
+        },
       },
     });
     return list.map((k) => {
@@ -124,9 +132,21 @@ export async function getKeberangkatanList() {
         nama = `${nama} ${promoTag}`;
       }
 
+      const activePaxCount = (k.groups !== undefined && Array.isArray(k.groups))
+        ? k.groups.reduce((sum: number, g: any) => sum + (g.anggota?.length || 0), 0)
+        : (k.terisi ?? 0);
+
+      if (k.terisi !== activePaxCount) {
+        prisma.keberangkatan.update({
+          where: { id: k.id },
+          data: { terisi: activePaxCount },
+        }).catch(() => {});
+      }
+
       return {
         ...k,
         namaPaket: nama,
+        terisi: activePaxCount,
         tanggalBerangkat: k.tanggalBerangkat ? k.tanggalBerangkat.toISOString() : new Date().toISOString(),
         tanggalPulang: k.tanggalPulang ? k.tanggalPulang.toISOString() : new Date().toISOString(),
         createdAt: k.createdAt ? k.createdAt.toISOString() : new Date().toISOString(),
@@ -899,6 +919,10 @@ export async function createInvoice(data: {
   });
 
   try {
+    if (preGroupAudit?.paketKeberangkatanId) {
+      await recalculatePackageFilledSeats(preGroupAudit.paketKeberangkatanId).catch(() => {});
+    }
+    revalidatePath("/admin/keberangkatan");
     revalidatePath("/admin/manifest");
     revalidatePath("/admin/pembayaran/laporan");
     revalidatePath(`/admin/pembayaran/${data.groupId}`);

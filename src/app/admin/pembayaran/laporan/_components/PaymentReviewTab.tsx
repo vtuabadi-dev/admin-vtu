@@ -772,6 +772,17 @@ function PaymentReviewTabContent() {
       }
       setSuccessMessage(`Pembayaran ${formatCurrency(payment.jumlah)} untuk ${payment.namaGroup || "Group"} telah disetujui`);
       setShowSuccess(true);
+
+      const targetGroupId = payment.groupId || payment.group?.id;
+      if (targetGroupId) {
+        await refreshStoreGroupSummaryById(targetGroupId);
+        broadcastMutation("invoices", "UPDATE", { groupId: targetGroupId });
+        broadcastMutation("pembayaran", "UPDATE", { id: payment.id, groupId: targetGroupId });
+        broadcastMutation("registration_groups", "UPDATE", { id: targetGroupId });
+        broadcastMutation("manifest", "UPDATE", { groupId: targetGroupId });
+        broadcastMutation("manifest_rows", "UPDATE", { groupId: targetGroupId });
+      }
+      broadcastMutation("keberangkatan", "UPDATE");
     } catch {
       window.alert("Gagal menyetujui pembayaran");
     } finally {
@@ -1241,6 +1252,7 @@ function PaymentReviewTabContent() {
         broadcastMutation("registration_groups", "UPDATE", { id: targetGroupId });
         broadcastMutation("manifest", "UPDATE", { groupId: targetGroupId });
         broadcastMutation("manifest_rows", "UPDATE", { groupId: targetGroupId });
+        broadcastMutation("keberangkatan", "UPDATE", { groupId: targetGroupId });
       }
 
       // Auto-generate & download official PDF invoice upon issuance

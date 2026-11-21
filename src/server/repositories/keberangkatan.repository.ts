@@ -1,6 +1,36 @@
 import { prisma } from "@/server/db/client";
 import type { Keberangkatan } from "@/shared/types";
+import type { Prisma } from "@prisma/client";
 import { purgePackageStorageFolder } from "@/server/storage/google-drive";
+
+/**
+ * Single Source of Truth helper to dynamically recalculate and persist
+ * active (non-batal) jamaah count as `keberangkatan.terisi`.
+ */
+export async function recalculatePackageFilledSeats(
+  keberangkatanId: string,
+  tx?: Prisma.TransactionClient
+): Promise<number> {
+  if (!keberangkatanId) return 0;
+  const client = tx || prisma;
+  const count = await client.jamaah.count({
+    where: {
+      group: { paketKeberangkatanId: keberangkatanId },
+      status: { not: "batal" as any },
+    },
+  });
+
+  await client.keberangkatan
+    .update({
+      where: { id: keberangkatanId },
+      data: { terisi: count },
+    })
+    .catch((err) =>
+      console.warn(`[recalculatePackageFilledSeats] Failed to update terisi for ${keberangkatanId}:`, err)
+    );
+
+  return count;
+}
 
 function mapKeberangkatan(row: any): Keberangkatan {
   const maskapaiName = row.maskapaiMaster?.name || (row.maskapai && !row.maskapai.startsWith("cm") ? row.maskapai : undefined) || "Saudia";
@@ -586,4 +616,5 @@ export const keberangkatanRepo = {
       return { groups: [], individuals: [] };
     }
   },
+  recalculateFilledSeats: recalculatePackageFilledSeats,
 };

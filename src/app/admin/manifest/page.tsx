@@ -1075,6 +1075,14 @@ function ManifestPageContent() {
     loadAllData();
   });
 
+  // Background sync fallback: periodic auto-reload to ensure external public registrations reflect within 20s
+  useEffect(() => {
+    const timer = setInterval(() => {
+      loadAllData();
+    }, 20000);
+    return () => clearInterval(timer);
+  }, [loadAllData]);
+
   // Selected package details
   const activePackage = useMemo(() => {
     if (!selectedKeberangkatan) return null;

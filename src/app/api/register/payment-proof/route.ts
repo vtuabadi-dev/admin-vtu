@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { prisma } from "@/server/db/client";
-import { invoiceRepo } from "@/server/repositories";
+import { invoiceRepo, recalculatePackageFilledSeats } from "@/server/repositories";
 import { resolvePackageBillingConfig, resolveRoomUpgradeUnitPrice } from "@/shared/lib/billing-ssot";
 import { getStorageAdapter } from "@/server/storage";
 import { checkRateLimit, rateLimitKey, getRateLimitConfig } from "@/server/lib/rate-limit";
@@ -279,6 +279,13 @@ export async function POST(request: NextRequest) {
       targetKlaster: reg.hotelUpgrade,
       paxCount: pax,
     }).catch((err) => console.warn("ensureInitialGroupLedger in payment-proof warning:", err));
+
+    // Immediately recalculate & update package filled seats (keberangkatan.terisi)
+    if (reg.paketId) {
+      await recalculatePackageFilledSeats(reg.paketId).catch((err) =>
+        console.warn("[payment-proof] recalculatePackageFilledSeats warning:", err)
+      );
+    }
 
     groupId = group.id;
 

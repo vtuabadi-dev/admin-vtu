@@ -1,6 +1,6 @@
 export { jamaahRepo } from "./jamaah.repository";
 export { groupRepo } from "./group.repository";
-export { keberangkatanRepo } from "./keberangkatan.repository";
+export { keberangkatanRepo, recalculatePackageFilledSeats } from "./keberangkatan.repository";
 export { invoiceRepo } from "./invoice.repository";
 export { pembayaranRepo } from "./pembayaran.repository";
 export { manifestRepo } from "./manifest.repository";

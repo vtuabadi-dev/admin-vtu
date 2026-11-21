@@ -1,6 +1,7 @@
 import { prisma } from "@/server/db/client";
 import { auditRepo } from "@/server/repositories/audit.repository";
 import { invoiceRepo } from "@/server/repositories/invoice.repository";
+import { recalculatePackageFilledSeats } from "@/server/repositories/keberangkatan.repository";
 import { fetchInvoiceAuditEntries } from "@/server/services/invoice-audit.service";
 import { resolvePackageBillingConfig, resolveRoomUpgradeUnitPrice } from "@/shared/lib/billing-ssot";
 import {
@@ -206,6 +207,9 @@ export const pembayaranRepo = {
         where: { id: row.groupId },
         data: { sisaPembayaran: Math.max(0, group.totalTagihan - (allVerified._sum.jumlah ?? 0)) },
       });
+      if (group.paketKeberangkatanId) {
+        await recalculatePackageFilledSeats(group.paketKeberangkatanId).catch(() => {});
+      }
     }
 
     // Update invoice sisaTagihan if linked

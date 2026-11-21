@@ -26,6 +26,7 @@ import {
   isPackageSeatFull,
 } from "@/shared/lib/package-lifecycle";
 import { useOperationalStore } from "@/stores/operational-store";
+import { useRealtimeListener } from "@/shared/providers/RealtimeProvider";
 
 const BULAN_LABEL: Record<number, string> = {
   1: "Januari", 2: "Februari", 3: "Maret", 4: "April",
@@ -300,6 +301,22 @@ export function KeberangkatanView({ mode = "aktif" }: { mode?: "aktif" | "arsip"
         }
       })
       .catch((err) => console.error("[Cloud Vault Auto-Sync Error]", err));
+  }, []);
+
+  // Realtime subscription: auto-reload packages on any mutations
+  useRealtimeListener(
+    ["keberangkatan", "registration_groups", "jamaah", "invoices", "pembayaran"],
+    () => {
+      load(false);
+    }
+  );
+
+  // Background sync fallback: refresh package seat counts every 20 seconds
+  useEffect(() => {
+    const timer = setInterval(() => {
+      load(false);
+    }, 20000);
+    return () => clearInterval(timer);
   }, []);
 
   // Tutup popover ID Paket saat klik di luar

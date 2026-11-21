@@ -1243,6 +1243,7 @@ export default function CreateInvoiceModal({
       broadcastMutation("jamaah", "UPDATE", { groupId: groupInfo.id });
       broadcastMutation("manifest", "UPDATE", { groupId: groupInfo.id });
       broadcastMutation("manifest_rows", "UPDATE", { groupId: groupInfo.id });
+      broadcastMutation("keberangkatan", "UPDATE", { groupId: groupInfo.id });
       broadcastMutation("audit_entries", "INSERT", { groupId: groupInfo.id });
       handleReset();
     } catch (e) {
