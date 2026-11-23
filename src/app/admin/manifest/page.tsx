@@ -2179,15 +2179,7 @@ function ManifestPageContent() {
             )}
 
             {/* VIEW MODE TABS: OPERASIONAL VS PEMBAYARAN & RINCIAN TAGIHAN */}
-            {((syncing && !loading) || storeStaleFlags.groups || storeStaleFlags.jamaah) && (
-        <div className="flex items-center justify-end">
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 px-3 py-1 text-[11px] font-semibold text-amber-700 dark:text-amber-300">
-            <RefreshCw className="h-3 w-3 animate-spin" />
-            Menyinkronkan data terbaru...
-          </span>
-        </div>
-      )}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-stone-200 dark:border-stone-800 pb-2">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-stone-200 dark:border-stone-800 pb-2">
               <div className="flex items-center gap-1.5 p-1 bg-stone-100 dark:bg-stone-900 rounded-xl border border-stone-200 dark:border-stone-800">
                 <button
                   onClick={() => {
@@ -2226,6 +2218,15 @@ function ManifestPageContent() {
                   </span>
                 </button>
               </div>
+
+              {((syncing && !loading) || storeStaleFlags.groups || storeStaleFlags.jamaah) && (
+                <div className="flex items-center">
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 px-3 py-1 text-[11px] font-semibold text-amber-700 dark:text-amber-300">
+                    <RefreshCw className="h-3 w-3 animate-spin" />
+                    Menyinkronkan data terbaru...
+                  </span>
+                </div>
+              )}
             </div>
 
             {/* CONDITIONAL RENDER: FINANCIAL BREAKDOWN VS OPERATIONAL TABLE */}
