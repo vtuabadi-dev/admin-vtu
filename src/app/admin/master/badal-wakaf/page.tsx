@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/shared/components/ui/Button";
 import { Input } from "@/shared/components/ui/Input";
+import { CurrencyInput } from "@/shared/components/ui/CurrencyInput";
 import { Modal } from "@/shared/components/ui/Modal";
 import { Badge } from "@/shared/components/ui/Badge";
 import { BankSelect } from "@/shared/components/ui/BankSelect";
@@ -241,16 +242,12 @@ export default function MasterBadalWakafPage() {
             <div className="p-6 flex-1 flex flex-col justify-center space-y-4">
               <div className="space-y-1.5">
                 <label className="text-sm font-medium text-slate-700">Nominal Harga (Rp)</label>
-                <div className="relative">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 font-medium">Rp</span>
-                  <input 
-                    type="number"
-                    value={prices.BADAL_UMROH}
-                    onChange={(e) => setPrices({ ...prices, BADAL_UMROH: Number(e.target.value) })}
-                    className="w-full pl-12 pr-4 py-3 bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all font-semibold text-slate-900"
-                    placeholder="2500000"
-                  />
-                </div>
+                <CurrencyInput 
+                  value={prices.BADAL_UMROH}
+                  onChange={(val) => setPrices({ ...prices, BADAL_UMROH: val })}
+                  className="w-full py-2.5 font-semibold text-slate-900"
+                  placeholder="0"
+                />
                 <p className="text-xs text-slate-500 mt-1">Preview Format: <span className="font-semibold text-emerald-700">{formatRupiah(prices.BADAL_UMROH || 0)}</span></p>
               </div>
             </div>
@@ -282,16 +279,12 @@ export default function MasterBadalWakafPage() {
             <div className="p-6 flex-1 flex flex-col justify-center space-y-4">
               <div className="space-y-1.5">
                 <label className="text-sm font-medium text-slate-700">Nominal Harga (Rp)</label>
-                <div className="relative">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 font-medium">Rp</span>
-                  <input 
-                    type="number"
-                    value={prices.WAKAF_QURAN}
-                    onChange={(e) => setPrices({ ...prices, WAKAF_QURAN: Number(e.target.value) })}
-                    className="w-full pl-12 pr-4 py-3 bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all font-semibold text-slate-900"
-                    placeholder="350000"
-                  />
-                </div>
+                <CurrencyInput 
+                  value={prices.WAKAF_QURAN}
+                  onChange={(val) => setPrices({ ...prices, WAKAF_QURAN: val })}
+                  className="w-full py-2.5 font-semibold text-slate-900"
+                  placeholder="0"
+                />
                 <p className="text-xs text-slate-500 mt-1">Preview Format: <span className="font-semibold text-indigo-700">{formatRupiah(prices.WAKAF_QURAN || 0)}</span></p>
               </div>
             </div>

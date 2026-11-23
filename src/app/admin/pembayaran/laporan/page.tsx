@@ -2137,11 +2137,10 @@ export default function LaporanPembayaranPage() {
             <label className="text-xs font-bold text-foreground block mb-1">
               Nominal Per Unit / Pax (Rp)
             </label>
-            <Input
-              type="number"
-              placeholder="Masukkan nominal upgrade"
-              value={newBillingNominal || ""}
-              onChange={(e) => setNewBillingNominal(Number(e.target.value))}
+            <CurrencyInput
+              placeholder="0"
+              value={newBillingNominal}
+              onChange={(val) => setNewBillingNominal(val)}
             />
           </div>
 

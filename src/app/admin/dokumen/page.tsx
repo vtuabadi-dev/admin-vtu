@@ -552,14 +552,16 @@ function DokumenPageContent() {
   // --- Rekap: Package Searchable Options ---
   const packageOptions = useMemo(() => {
     return keberangkatanList.map((k: any) => {
-      const kode = k.kode || "";
       const nama = k.namaPaket || k.paketUmroh?.namaPaket || "Paket Keberangkatan";
       const tgl = k.tanggalBerangkat ? formatDate(k.tanggalBerangkat) : "";
       const maskapai = k.maskapai ? `(${k.maskapai})` : "";
-      const sPoint = k.startingPoint ? `• ${k.startingPoint}` : "";
+      const sPointLabel = typeof k.startingPoint === "string"
+        ? k.startingPoint
+        : (k.startingPoint?.name || k.startingPoint?.namaKota || k.startingPoint?.code || "");
+      const sPoint = sPointLabel ? `• ${sPointLabel}` : "";
       return {
         value: k.id,
-        label: kode ? `[${kode}] ${nama}` : nama,
+        label: nama,
         sublabel: [tgl, maskapai, sPoint].filter(Boolean).join(" "),
       };
     });

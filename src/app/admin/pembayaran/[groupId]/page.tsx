@@ -17,6 +17,7 @@ import {
   Badge,
   StatusBadge,
   Input,
+  CurrencyInput,
   Select,
   Table,
   Modal,
@@ -602,7 +603,16 @@ export default function GroupPaymentDetailPage({ params }: { params: { groupId: 
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <Input id="f-nominal" label="Nominal" type="number" placeholder="Rp ..." value={nominal} onChange={(e) => { setNominal(e.target.value); setFormError(""); }} />
+                <CurrencyInput
+                  id="f-nominal"
+                  label="Nominal"
+                  placeholder="0"
+                  value={Number(nominal) || 0}
+                  onChange={(val) => {
+                    setNominal(String(val));
+                    setFormError("");
+                  }}
+                />
                 <Select id="f-metode" label="Metode" options={metodeOptions} value={metode} onChange={(e) => setMetode(e.target.value as MetodePembayaran)} />
                 <Input id="f-catatan" label="Catatan" placeholder="Opsional" value={catatan} onChange={(e) => setCatatan(e.target.value)} />
 
@@ -616,7 +626,13 @@ export default function GroupPaymentDetailPage({ params }: { params: { groupId: 
                       <div key={item.jamaahId} className="flex items-center gap-2">
                         <input type="checkbox" checked={item.checked} onChange={(e) => setAlokasiForm((prev) => prev.map((a) => a.jamaahId === item.jamaahId ? { ...a, checked: e.target.checked } : a))} className="h-4 w-4 shrink-0 rounded" />
                         <span className="text-xs flex-1 truncate">{item.namaJamaah}</span>
-                        <input type="number" value={item.jumlah} onChange={(e) => setAlokasiForm((prev) => prev.map((a) => a.jamaahId === item.jamaahId ? { ...a, jumlah: e.target.value } : a))} placeholder="Rp" disabled={!item.checked} className="h-7 w-28 rounded-md border border-input bg-transparent px-2 text-xs text-right tabular-nums disabled:opacity-40 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" />
+                        <CurrencyInput
+                          value={Number(item.jumlah) || 0}
+                          onChange={(val) => setAlokasiForm((prev) => prev.map((a) => a.jamaahId === item.jamaahId ? { ...a, jumlah: String(val) } : a))}
+                          placeholder="0"
+                          disabled={!item.checked}
+                          className="h-7 w-32 text-xs text-right tabular-nums disabled:opacity-40"
+                        />
                       </div>
                     ))}
                   </div>

@@ -14,6 +14,7 @@ import {
   Modal,
   Select,
   Input,
+  CurrencyInput,
 } from "@/shared/components/ui";
 import { formatCurrency, formatDate } from "@/shared/lib/utils";
 import {
@@ -162,12 +163,11 @@ function BayarModal({
         </div>
 
         {/* Form fields */}
-        <Input
+        <CurrencyInput
           label="Nominal Transfer"
-          type="number"
-          placeholder="Rp ..."
-          value={nominal}
-          onChange={(e) => setNominal(e.target.value)}
+          placeholder="0"
+          value={Number(nominal) || 0}
+          onChange={(val) => setNominal(String(val))}
           id="modal-nominal"
         />
 

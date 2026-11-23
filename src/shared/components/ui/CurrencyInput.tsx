@@ -2,9 +2,10 @@ import React, { forwardRef } from "react";
 import { cn } from "@/shared/lib/utils";
 
 export interface CurrencyInputProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, "value" | "onChange"> {
-  value: number;
+  value?: number | string | null;
   onChange: (val: number) => void;
   prefix?: string;
+  prefixClassName?: string;
   error?: string;
   label?: string;
 }
@@ -23,7 +24,7 @@ export function parseDotsToNumber(formattedStr: string): number {
 }
 
 export const CurrencyInput = forwardRef<HTMLInputElement, CurrencyInputProps>(
-  ({ className, value, onChange, prefix = "Rp", error, label, id, placeholder = "0", disabled, ...props }, ref) => {
+  ({ className, value, onChange, prefix = "Rp", prefixClassName, error, label, id, placeholder = "0", disabled, ...props }, ref) => {
     const displayValue = formatNumberWithDots(value);
 
     return (
@@ -38,7 +39,12 @@ export const CurrencyInput = forwardRef<HTMLInputElement, CurrencyInputProps>(
         )}
         <div className="relative flex items-center w-full">
           {prefix && (
-            <span className="absolute left-3 font-extrabold text-xs text-amber-600 dark:text-amber-400 select-none pointer-events-none z-10">
+            <span
+              className={cn(
+                "absolute left-3 font-extrabold text-xs text-amber-600 dark:text-amber-400 select-none pointer-events-none z-10",
+                prefixClassName
+              )}
+            >
               {prefix}
             </span>
           )}

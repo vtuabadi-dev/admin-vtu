@@ -1160,6 +1160,9 @@ function PaymentReviewTabContent() {
     // Buka tab WhatsApp Web secara langsung
     window.open(waUrl, "_blank");
 
+    // Tutup jendela modal kirim invoice di belakangnya
+    setSendInvoiceTarget(null);
+
     setSuccessMessage(`File (${customFilename}) otomatis terunduh & WhatsApp Web dibuka langsung ke nomor ${cleanPhone || "Jamaah"}!`);
     setShowSuccess(true);
   };
@@ -1177,6 +1180,9 @@ function PaymentReviewTabContent() {
     const msg = generateInvoiceMessage(sendInvoiceTarget, invNum, nom);
     const mailtoUrl = `mailto:${targetEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(msg)}`;
     window.location.href = mailtoUrl;
+
+    // Tutup jendela modal kirim invoice di belakangnya
+    setSendInvoiceTarget(null);
 
     setSuccessMessage("File PDF Invoice telah diunduh untuk dilampirkan ke email!");
     setShowSuccess(true);
@@ -3437,11 +3443,10 @@ function PaymentReviewTabContent() {
             <label className="text-xs font-bold text-foreground block mb-1">
               Nominal Per Unit / Pax (Rp)
             </label>
-            <Input
-              type="number"
-              placeholder="Masukkan nominal"
-              value={newOrderNominal || ""}
-              onChange={(e) => setNewOrderNominal(Number(e.target.value))}
+            <CurrencyInput
+              placeholder="0"
+              value={newOrderNominal}
+              onChange={(val) => setNewOrderNominal(val)}
             />
           </div>
 
@@ -3746,10 +3751,24 @@ function PaymentReviewTabContent() {
       />
 
       {/* Success Toast / Modal */}
-      <Modal open={showSuccess} onClose={() => setShowSuccess(false)} title="Berhasil" size="sm">
+      <Modal
+        open={showSuccess}
+        onClose={() => {
+          setShowSuccess(false);
+          setSendInvoiceTarget(null);
+        }}
+        title="Berhasil"
+        size="sm"
+      >
         <p className="text-sm font-medium">{successMessage}</p>
         <div className="flex justify-end mt-4">
-          <Button size="sm" onClick={() => setShowSuccess(false)}>
+          <Button
+            size="sm"
+            onClick={() => {
+              setShowSuccess(false);
+              setSendInvoiceTarget(null);
+            }}
+          >
             Tutup
           </Button>
         </div>

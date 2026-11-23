@@ -2461,14 +2461,11 @@ export default function CreateInvoiceModal({
                           <label className="text-[10.5px] font-medium text-muted-foreground block mb-1">
                             Nominal Upgrade Total (Rp)
                           </label>
-                          <input
-                            type="number"
-                            min="0"
-                            step="100000"
-                            placeholder="Contoh: 4000000"
-                            value={hotelUpgradeNominal || ""}
-                            onChange={(e) => setHotelUpgradeNominal(Math.max(0, parseInt(e.target.value, 10) || 0))}
-                            className="w-full px-2.5 py-1.5 bg-background border rounded-lg text-xs font-bold text-foreground focus:ring-1 focus:ring-blue-500"
+                          <CurrencyInput
+                            placeholder="0"
+                            value={hotelUpgradeNominal}
+                            onChange={(val) => setHotelUpgradeNominal(val)}
+                            className="h-8 text-xs font-bold"
                           />
                         </div>
                       </div>
@@ -3052,11 +3049,10 @@ export default function CreateInvoiceModal({
             <label className="text-xs font-bold text-foreground block mb-1">
               Nominal Per Unit / Pax (Rp)
             </label>
-            <Input
-              type="number"
-              placeholder="Masukkan nominal upgrade"
-              value={newBillingNominal || ""}
-              onChange={(e) => setNewBillingNominal(Number(e.target.value))}
+            <CurrencyInput
+              placeholder="0"
+              value={newBillingNominal}
+              onChange={(val) => setNewBillingNominal(val)}
             />
           </div>
 

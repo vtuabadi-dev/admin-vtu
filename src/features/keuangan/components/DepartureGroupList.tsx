@@ -17,6 +17,7 @@ import {
   formatTanggalIndo,
   calculateGroupExpenses,
 } from '../utils/formatters';
+import { CurrencyInput } from '@/shared/components/ui/CurrencyInput';
 
 interface DepartureGroupListProps {
   groups: DepartureGroup[];
@@ -530,14 +531,11 @@ export const DepartureGroupList: React.FC<DepartureGroupListProps> = ({
 
               <div>
                 <label className="block font-bold text-slate-700 mb-1">Target Budget Anggaran (Rp)</label>
-                <input
-                  type="number"
-                  min="0"
-                  step="1000000"
-                  required
+                <CurrencyInput
                   value={targetBudget}
-                  onChange={(e) => setTargetBudget(Number(e.target.value))}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-xl font-bold text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                  onChange={(val) => setTargetBudget(val)}
+                  placeholder="0"
+                  className="w-full font-bold text-slate-900 bg-white"
                 />
               </div>
 

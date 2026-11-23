@@ -460,13 +460,12 @@ function GenerateSuratPageContent() {
   // Memoized Searchable Options for Paket Keberangkatan
   const packageOptions = useMemo(() => {
     return storeKbrList.map((k: any) => {
-      const kode = k.kode || k.kodePaket || "KBR";
       const nama = k.namaPaket || k.name || "Paket Keberangkatan";
       const tgl = k.tanggalBerangkat || k.departureDate ? formatDateShort(k.tanggalBerangkat || k.departureDate) : "-";
       const count = k.jamaahIds?.length || k.totalJamaah || k.jamaahCount || 0;
       return {
         value: k.id,
-        label: `${kode} — ${nama}`,
+        label: nama,
         sublabel: `Berangkat: ${tgl} • ${count > 0 ? `${count} Jamaah` : "Jadwal Aktif"}`,
       };
     });

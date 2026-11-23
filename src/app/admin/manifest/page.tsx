@@ -26,6 +26,7 @@ import {
 import { Card, CardContent } from "@/shared/components/ui/Card";
 import { Button } from "@/shared/components/ui/Button";
 import { Input } from "@/shared/components/ui/Input";
+import { CurrencyInput } from "@/shared/components/ui/CurrencyInput";
 import { Select } from "@/shared/components/ui/Select";
 import { SearchableSelect } from "@/shared/components/ui/SearchableSelect";
 import { StatusBadge } from "@/shared/components/ui/Badge";
@@ -3933,12 +3934,11 @@ function ManifestPageContent() {
                       </div>
                       <div>
                         <label className="text-[10px] text-muted-foreground block mb-0.5">Nominal Upgrade Total (Rp)</label>
-                        <input
-                          type="number"
-                          placeholder="Contoh: 4000000"
-                          value={moveHotelUpgradeNominal || ""}
-                          onChange={(e) => setMoveHotelUpgradeNominal(Math.max(0, parseInt(e.target.value, 10) || 0))}
-                          className="w-full px-2 py-1 text-xs border rounded bg-background font-bold"
+                        <CurrencyInput
+                          placeholder="0"
+                          value={moveHotelUpgradeNominal}
+                          onChange={(val) => setMoveHotelUpgradeNominal(val)}
+                          className="h-7 text-xs font-bold"
                         />
                       </div>
                     </div>

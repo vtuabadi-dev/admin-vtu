@@ -14,6 +14,7 @@ import {
 import { DepartureGroup, ExpenseCategory, ExpenseRecord, PaymentStatus } from '../types';
 import { SAR_TO_IDR } from '../utils/formatters';
 import { loadStoredCategories, saveCustomCategory } from '../utils/storage';
+import { CurrencyInput } from '@/shared/components/ui/CurrencyInput';
 
 interface ExpenseModalProps {
   isOpen: boolean;
@@ -483,15 +484,11 @@ export const ExpenseModal: React.FC<ExpenseModalProps> = ({
 
             {currencyMode === 'IDR' ? (
               <div>
-                <input
-                  type="number"
-                  min="0"
-                  step="1000"
-                  required
+                <CurrencyInput
                   value={amount}
-                  onChange={(e) => setAmount(Number(e.target.value))}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-xl font-bold text-base text-emerald-800 bg-white focus:ring-2 focus:ring-emerald-500 focus:outline-none"
-                  placeholder="25000000"
+                  onChange={(val) => setAmount(val)}
+                  placeholder="0"
+                  className="w-full font-bold text-base text-emerald-800 bg-white"
                 />
               </div>
             ) : (
@@ -535,13 +532,11 @@ export const ExpenseModal: React.FC<ExpenseModalProps> = ({
             {paymentStatus === 'DP / Partial' && (
               <div>
                 <label className="block font-bold text-slate-700 mb-1">Jumlah Sudah DP (Rp)</label>
-                <input
-                  type="number"
-                  min="0"
-                  max={amount}
+                <CurrencyInput
                   value={paidAmount}
-                  onChange={(e) => setPaidAmount(Number(e.target.value))}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-xl font-bold text-emerald-800"
+                  onChange={(val) => setPaidAmount(val)}
+                  placeholder="0"
+                  className="w-full font-bold text-emerald-800 bg-white"
                 />
               </div>
             )}

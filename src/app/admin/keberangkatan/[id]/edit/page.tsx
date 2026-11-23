@@ -27,6 +27,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/components/ui/Card";
 import { Button } from "@/shared/components/ui/Button";
 import { Input } from "@/shared/components/ui/Input";
+import { CurrencyInput } from "@/shared/components/ui/CurrencyInput";
 import { ErrorState } from "@/shared/components/ui/ErrorState";
 import { SearchableSelect } from "@/shared/components/ui/SearchableSelect";
 import { getKeberangkatanById } from "@/server/actions/api";
@@ -1019,13 +1020,11 @@ export default function EditKeberangkatanPage() {
               <label className="block text-xs font-bold text-foreground mb-1">
                 Harga Base Paket (Rp)
               </label>
-              <Input
-                type="number"
-                min={0}
+              <CurrencyInput
                 value={hargaPaket}
-                onChange={(e) => setHargaPaket(parseInt(e.target.value, 10) || 0)}
+                onChange={(val) => setHargaPaket(val)}
                 className="font-semibold bg-card"
-                placeholder="35000000"
+                placeholder="0"
               />
               <p className="text-[11px] text-muted-foreground mt-1">
                 Harga per pax paket (di luar add-on).
@@ -1038,12 +1037,9 @@ export default function EditKeberangkatanPage() {
               <label className="block text-xs font-bold text-foreground mb-1">
                 Harga Upgrade Kamar Double (Rp)
               </label>
-              <Input
-                type="number"
-                min={0}
+              <CurrencyInput
                 value={upgradeDouble}
-                onChange={(e) => {
-                  const val = parseInt(e.target.value, 10) || 0;
+                onChange={(val) => {
                   setUpgradeDouble(val);
                   setHotelOptions((prev) => {
                     if (prev.length === 0) return prev;
@@ -1053,7 +1049,7 @@ export default function EditKeberangkatanPage() {
                   });
                 }}
                 className="font-semibold bg-card"
-                placeholder="4500000"
+                placeholder="0"
               />
               <p className="text-[11px] text-muted-foreground mt-1">
                 Biaya tambahan kamar berdua (Double) per pax.
@@ -1063,12 +1059,9 @@ export default function EditKeberangkatanPage() {
               <label className="block text-xs font-bold text-foreground mb-1">
                 Harga Upgrade Kamar Triple (Rp)
               </label>
-              <Input
-                type="number"
-                min={0}
+              <CurrencyInput
                 value={upgradeTriple}
-                onChange={(e) => {
-                  const val = parseInt(e.target.value, 10) || 0;
+                onChange={(val) => {
                   setUpgradeTriple(val);
                   setHotelOptions((prev) => {
                     if (prev.length === 0) return prev;
@@ -1078,7 +1071,7 @@ export default function EditKeberangkatanPage() {
                   });
                 }}
                 className="font-semibold bg-card"
-                placeholder="3000000"
+                placeholder="0"
               />
               <p className="text-[11px] text-muted-foreground mt-1">
                 Biaya tambahan kamar bertiga (Triple) per pax.
@@ -1703,38 +1696,32 @@ export default function EditKeberangkatanPage() {
                         <label className="block text-[11px] font-bold text-foreground mb-1">
                           Upgrade Double (Rp):
                         </label>
-                        <Input
-                          type="number"
-                          min={0}
+                        <CurrencyInput
                           value={opt.upgradeDouble ?? 0}
-                          onChange={(e) => {
-                            const val = parseInt(e.target.value, 10) || 0;
+                          onChange={(val) => {
                             const updated = [...hotelOptions];
                             updated[idx] = { ...updated[idx], upgradeDouble: val };
                             setHotelOptions(updated);
                             if (idx === 0) setUpgradeDouble(val);
                           }}
                           className="h-8 text-xs font-semibold bg-background"
-                          placeholder="4500000"
+                          placeholder="0"
                         />
                       </div>
                       <div>
                         <label className="block text-[11px] font-bold text-foreground mb-1">
                           Upgrade Triple (Rp):
                         </label>
-                        <Input
-                          type="number"
-                          min={0}
+                        <CurrencyInput
                           value={opt.upgradeTriple ?? 0}
-                          onChange={(e) => {
-                            const val = parseInt(e.target.value, 10) || 0;
+                          onChange={(val) => {
                             const updated = [...hotelOptions];
                             updated[idx] = { ...updated[idx], upgradeTriple: val };
                             setHotelOptions(updated);
                             if (idx === 0) setUpgradeTriple(val);
                           }}
                           className="h-8 text-xs font-semibold bg-background"
-                          placeholder="3000000"
+                          placeholder="0"
                         />
                       </div>
                     </div>

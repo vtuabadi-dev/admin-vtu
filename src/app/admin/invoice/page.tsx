@@ -19,6 +19,7 @@ import {
   Modal,
   Select,
   Input,
+  CurrencyInput,
 } from "@/shared/components/ui";
 import { StatCard } from "@/shared/components/ui/StatCard";
 import type {
@@ -143,14 +144,12 @@ function CatatPembayaranModal({
           </div>
         </div>
 
-        <Input
+        <CurrencyInput
           id="jumlah-bayar"
           label="Jumlah Pembayaran"
-          type="number"
-          placeholder="Masukkan nominal"
-          value={jumlah}
-          onChange={(e) => setJumlah(e.target.value)}
-          required
+          placeholder="0"
+          value={Number(jumlah) || 0}
+          onChange={(val) => setJumlah(String(val))}
         />
 
         <div className="space-y-1">
@@ -561,14 +560,12 @@ function BuatInvoiceModal({
         />
 
         {/* Jumlah */}
-        <Input
+        <CurrencyInput
           id="jumlah"
           label="Jumlah Tagihan"
-          type="number"
-          placeholder="Masukkan nominal"
-          value={jumlah}
-          onChange={(e) => setJumlah(e.target.value)}
-          required
+          placeholder="0"
+          value={Number(jumlah) || 0}
+          onChange={(val) => setJumlah(String(val))}
         />
 
         {/* Jatuh Tempo */}
@@ -613,13 +610,11 @@ function BuatInvoiceModal({
                   />
                 </div>
                 <div className="w-36">
-                  <input
-                    type="number"
-                    placeholder="Jumlah"
-                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                    value={item.jumlah}
-                    onChange={(e) =>
-                      handleItemChange(idx, "jumlah", e.target.value)
+                  <CurrencyInput
+                    placeholder="0"
+                    value={Number(item.jumlah) || 0}
+                    onChange={(val) =>
+                      handleItemChange(idx, "jumlah", String(val))
                     }
                   />
                 </div>
