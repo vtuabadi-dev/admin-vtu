@@ -20,7 +20,6 @@ const PUBLIC_PATHS = [
   "/api/wakaf-quran",
   "/api/master/harga-layanan",
   "/api/keberangkatan",
-  "/api/migrate-terms",
   "/api/operational-documents",
   "/api/assets",
 ];

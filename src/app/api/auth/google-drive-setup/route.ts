@@ -1,6 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/server/auth";
 
 export async function GET(req: NextRequest) {
+  const session = await auth();
+  if (!session?.user) {
+    return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
+  }
+  if (session.user.role !== "super_admin") {
+    return NextResponse.json({ success: false, message: "Forbidden" }, { status: 403 });
+  }
+
   const clientId = process.env.GOOGLE_CLIENT_ID;
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
 
