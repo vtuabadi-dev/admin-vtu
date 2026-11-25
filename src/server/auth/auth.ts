@@ -52,6 +52,40 @@ const MOCK_CREDENTIALS: Record<string, { password: string; role: OperationalRole
 
 
 
+export async function authorizeUser(credentials: Record<string, unknown> | undefined) {
+  const email = (credentials?.email as string)?.toLowerCase().trim();
+  const password = credentials?.password as string;
+
+  if (!email || !password) {
+    return null;
+  }
+
+  // Dynamic import — Prisma is server-only and must not be bundled in middleware
+  try {
+    const { prisma } = await import("@/server/db/client");
+    const user = await prisma.user.findUnique({ where: { email } });
+    if (user) {
+      const bcrypt = await import("bcryptjs");
+      const valid = await bcrypt.compare(password, user.passwordHash);
+      if (valid) {
+        return { id: user.id, name: user.name, email: user.email, role: user.role, mustChangePassword: user.mustChangePassword };
+      }
+    }
+  } catch (e) {
+    console.error("[AUTH] DB error saat login", (e as Error)?.name);
+  }
+
+  // Fallback to predefined instant/demo credentials (strictly disabled in production)
+  if (process.env.NODE_ENV !== "production" && process.env.ALLOW_DEMO_LOGIN === "true") {
+    const mock = MOCK_CREDENTIALS[email];
+    if (mock && mock.password === password) {
+      return { id: `mock-${email.replace(/[^a-z0-9]/g, "-")}`, name: mock.name, email, role: mock.role };
+    }
+  }
+
+  return null;
+}
+
 export const { handlers, auth, signIn, signOut } = NextAuth({
   secret: getAuthSecret(),
   trustHost: true,
@@ -62,46 +96,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         email: { label: "Email", type: "email" },
         password: { label: "Password", type: "password" },
       },
-      async authorize(credentials) {
-        const email = (credentials.email as string)?.toLowerCase().trim();
-        const password = credentials.password as string;
-
-        if (!email || !password) {
-          console.log("[AUTH DEBUG] Missing email or password");
-          return null;
-        }
-
-        // Dynamic import — Prisma is server-only and must not be bundled in middleware
-        try {
-          const { prisma } = await import("@/server/db/client");
-          const user = await prisma.user.findUnique({ where: { email } });
-          console.log("[AUTH DEBUG] DB lookup for:", email, "→ found:", !!user, "NODE_ENV:", process.env.NODE_ENV);
-          if (user) {
-            const bcrypt = await import("bcryptjs");
-            const valid = await bcrypt.compare(password, user.passwordHash);
-            console.log("[AUTH DEBUG] bcrypt.compare result:", valid, "hash prefix:", user.passwordHash.substring(0, 10));
-            if (valid) {
-              console.log("[AUTH DEBUG] ✅ Login SUCCESS for:", email, "role:", user.role);
-              return { id: user.id, name: user.name, email: user.email, role: user.role, mustChangePassword: user.mustChangePassword };
-            }
-            console.log("[AUTH DEBUG] ❌ Password MISMATCH for:", email);
-          } else {
-            console.log("[AUTH DEBUG] ❌ User NOT FOUND:", email);
-          }
-        } catch (e: any) {
-          console.log("[AUTH DEBUG] ❌ DB ERROR:", e.message || e);
-        }
-
-        // Fallback to predefined instant/demo credentials (for quick admin testing & demo buttons)
-        const mock = MOCK_CREDENTIALS[email];
-        if (mock && mock.password === password) {
-          console.log("[AUTH DEBUG] ✅ Demo/Instant login SUCCESS for:", email);
-          return { id: `mock-${email.replace(/[^a-z0-9]/g, "-")}`, name: mock.name, email, role: mock.role };
-        }
-
-        console.log("[AUTH DEBUG] ❌ Login FAILED for:", email);
-        return null;
-      },
+      authorize: authorizeUser,
     }),
   ],
   callbacks: {

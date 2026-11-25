@@ -84,15 +84,18 @@ export default function LoginPage() {
     };
   }, []);
 
-  // Instant admin login handler
-  const handleInstantAdminLogin = async (targetEmail = "admin@vtu.id", targetPass = "admin123") => {
-    if (isSubmitting) return;
-    setEmail(targetEmail);
-    setPassword(targetPass);
+  // Instant admin login handler (strictly development only)
+  const isDev = (process.env.NODE_ENV as string) !== "production";
+  const handleInstantAdminLogin = async () => {
+    if (isSubmitting || !isDev) return;
+    const demoEmail = isDev ? "admin@vtu.id" : "";
+    const demoPass = isDev ? "admin123" : "";
+    setEmail(demoEmail);
+    setPassword(demoPass);
     clearError();
     setIsSubmitting(true);
     try {
-      await login(targetEmail, targetPass);
+      await login(demoEmail, demoPass);
     } catch {
       // Errors handled by auth store
     } finally {
@@ -374,19 +377,23 @@ export default function LoginPage() {
               )}
             </button>
 
-            <div className={styles.adminDivider}>
-              <span>atau akses admin</span>
-            </div>
+            {isDev && (
+              <>
+                <div className={styles.adminDivider}>
+                  <span>atau akses admin</span>
+                </div>
 
-            <button
-              type="button"
-              className={styles.adminButton}
-              onClick={() => handleInstantAdminLogin("admin@vtu.id", "admin123")}
-              disabled={isSubmitting}
-            >
-              <Zap size={16} className="text-amber-400 fill-amber-400 animate-pulse" />
-              <span>⚡ Login Instan Super Admin</span>
-            </button>
+                <button
+                  type="button"
+                  className={styles.adminButton}
+                  onClick={handleInstantAdminLogin}
+                  disabled={isSubmitting}
+                >
+                  <Zap size={16} className="text-amber-400 fill-amber-400 animate-pulse" />
+                  <span>⚡ Login Instan Super Admin</span>
+                </button>
+              </>
+            )}
           </form>
         </div>
 
