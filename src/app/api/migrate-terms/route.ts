@@ -1,11 +1,20 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/server/db/client";
+import { auth } from "@/server/auth";
 
 // A migration must never be executed by Next.js static prerendering during a build.
 export const dynamic = "force-dynamic";
 
 // Temporary migration endpoint — hit once then delete
 export async function GET() {
+  const session = await auth();
+  if (!session?.user) {
+    return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
+  }
+  if (session.user.role !== "super_admin") {
+    return NextResponse.json({ success: false, message: "Forbidden" }, { status: 403 });
+  }
+
   const results: string[] = [];
 
   try {
