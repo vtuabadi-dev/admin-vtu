@@ -84,6 +84,7 @@ export function isSidebarItemVisible(role: OperationalRole | undefined | null, s
 
   // Hide SUPER_ADMIN-only items
   const superAdminOnlyKeys = new Set([
+    "LAINNYA-Manajemen User",
     "LAINNYA-Audit Trail",
     "LAINNYA-Kesehatan Sistem",
     "LAINNYA-Maintenance",
