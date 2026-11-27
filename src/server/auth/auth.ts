@@ -68,7 +68,14 @@ export async function authorizeUser(credentials: Record<string, unknown> | undef
       const bcrypt = await import("bcryptjs");
       const valid = await bcrypt.compare(password, user.passwordHash);
       if (valid) {
-        return { id: user.id, name: user.name, email: user.email, role: user.role, mustChangePassword: user.mustChangePassword };
+        return {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          role: user.role,
+          secondaryRoles: (user.secondaryRoles as OperationalRole[]) ?? [],
+          mustChangePassword: user.mustChangePassword,
+        };
       }
     }
   } catch (e) {
@@ -79,14 +86,14 @@ export async function authorizeUser(credentials: Record<string, unknown> | undef
   if (process.env.NODE_ENV !== "production" && process.env.ALLOW_DEMO_LOGIN === "true") {
     const mock = MOCK_CREDENTIALS[email];
     if (mock && mock.password === password) {
-      return { id: `mock-${email.replace(/[^a-z0-9]/g, "-")}`, name: mock.name, email, role: mock.role };
+      return { id: `mock-${email.replace(/[^a-z0-9]/g, "-")}`, name: mock.name, email, role: mock.role, secondaryRoles: [] };
     }
   }
 
   return null;
 }
 
-export const { handlers, auth, signIn, signOut } = NextAuth({
+export const authConfig = {
   secret: getAuthSecret(),
   trustHost: true,
   providers: [
@@ -100,17 +107,19 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     }),
   ],
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user }: any) {
       if (user) {
         token.role = user.role as OperationalRole;
+        token.secondaryRoles = (user.secondaryRoles as OperationalRole[]) ?? [];
         token.id = user.id;
         token.mustChangePassword = user.mustChangePassword ?? false;
       }
       return token;
     },
-    async session({ session, token }) {
+    async session({ session, token }: any) {
       if (session.user) {
         session.user.role = token.role as OperationalRole;
+        session.user.secondaryRoles = (token.secondaryRoles as OperationalRole[]) ?? [];
         session.user.id = token.id as string;
         session.user.mustChangePassword = token.mustChangePassword as boolean | undefined;
       }
@@ -121,10 +130,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     signIn: "/login",
   },
   session: {
-    strategy: "jwt",
+    strategy: "jwt" as const,
     maxAge: 30 * 24 * 60 * 60, // 30 hari (persistent session)
   },
   jwt: {
     maxAge: 30 * 24 * 60 * 60, // 30 hari (persistent JWT)
   },
-});
+};
+
+export const { handlers, auth, signIn, signOut } = NextAuth(authConfig);

@@ -19,6 +19,7 @@ export function useSession() {
   return {
     user,
     role: user?.role as OperationalRole | undefined,
+    secondaryRoles: (user?.secondaryRoles as OperationalRole[]) ?? [],
     isAuthenticated,
     isLoading,
     loginError,

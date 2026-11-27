@@ -93,6 +93,7 @@ describe("Auth Demo Login Security & Fallback Invariants", () => {
       name: "Super Admin Real",
       email: "superadmin@vtu.id",
       role: "super_admin",
+      secondaryRoles: [],
       mustChangePassword: false,
     });
     expect(mockCompare).toHaveBeenCalledWith("CorrectRealPassword123!", "$2a$10$hashedPasswordHere");
@@ -135,6 +136,7 @@ describe("Auth Demo Login Security & Fallback Invariants", () => {
       name: "Super Admin (Legacy)",
       email: "admin@vtu.id",
       role: "super_admin",
+      secondaryRoles: [],
     });
   });
 
