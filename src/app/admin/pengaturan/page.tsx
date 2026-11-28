@@ -11,6 +11,8 @@ import { Badge } from "@/shared/components/ui/Badge";
 import { OcrSettingsTab } from "./components/OcrSettingsTab";
 import { TelegramBroadcastTab } from "./components/TelegramBroadcastTab";
 import { DAFTAR_KANTOR_CABANG, getKantorCabang } from "@/shared/lib/kantor-cabang";
+import { useSession } from "@/shared/hooks/use-session";
+import type { OperationalRole } from "@/shared/types";
 import {
   getCompanyProfile,
   saveCompanyProfile,
@@ -986,6 +988,24 @@ function DatabaseStorage() {
 // ============================================================
 
 export default function PengaturanPage() {
+  const { role, secondaryRoles = [] } = useSession();
+  const canAccessTelegramAndOcr =
+    role === "super_admin" ||
+    role === "admin_operasional" ||
+    secondaryRoles.includes("super_admin" as OperationalRole) ||
+    secondaryRoles.includes("admin_operasional" as OperationalRole);
+
+  const availableTabs = [
+    { value: "perusahaan", label: "Profil Perusahaan (PT)" },
+    { value: "akun", label: "Akun Admin" },
+    { value: "sistem", label: "Preferensi Sistem" },
+    { value: "notifikasi", label: "Notifikasi" },
+    ...(canAccessTelegramAndOcr ? [{ value: "broadcast", label: "Broadcast Telegram" }] : []),
+    { value: "operasional", label: "Aturan Operasional" },
+    ...(canAccessTelegramAndOcr ? [{ value: "ocr", label: "Integrasi OCR" }] : []),
+    { value: "infra", label: "Infrastruktur" },
+  ];
+
   return (
     <PermissionGuard module="sistem">
       <div className="space-y-6">
@@ -996,18 +1016,7 @@ export default function PengaturanPage() {
           </p>
         </div>
 
-        <Tabs
-          tabs={[
-            { value: "perusahaan", label: "Profil Perusahaan (PT)" },
-            { value: "akun", label: "Akun Admin" },
-            { value: "sistem", label: "Preferensi Sistem" },
-            { value: "notifikasi", label: "Notifikasi" },
-            { value: "broadcast", label: "Broadcast Telegram" },
-            { value: "operasional", label: "Aturan Operasional" },
-            { value: "ocr", label: "Integrasi OCR" },
-            { value: "infra", label: "Infrastruktur" },
-          ]}
-        >
+        <Tabs tabs={availableTabs}>
           {(activeTab) => {
             switch (activeTab) {
               case "perusahaan":
@@ -1019,11 +1028,11 @@ export default function PengaturanPage() {
               case "notifikasi":
                 return <NotifikasiSettings />;
               case "broadcast":
-                return <TelegramBroadcastTab />;
+                return canAccessTelegramAndOcr ? <TelegramBroadcastTab /> : null;
               case "operasional":
                 return <AturanOperasional />;
               case "ocr":
-                return <OcrSettingsTab />;
+                return canAccessTelegramAndOcr ? <OcrSettingsTab /> : null;
               case "infra":
                 return <DatabaseStorage />;
               default:
