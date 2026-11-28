@@ -29,11 +29,12 @@ function SettingRow({ label, desc, children }: { label: string; desc?: string; c
 }
 
 export function TelegramBroadcastTab() {
-  const [botToken, setBotToken] = useState("");
+  const [maskedToken, setMaskedToken] = useState("");
+  const [newBotToken, setNewBotToken] = useState("");
   const [groupIdJakarta, setGroupIdJakarta] = useState("");
   const [groupIdSurabaya, setGroupIdSurabaya] = useState("");
   const [enabled, setEnabled] = useState(true);
-  const [showToken, setShowToken] = useState(false);
+  const [showNewToken, setShowNewToken] = useState(false);
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -48,7 +49,7 @@ export function TelegramBroadcastTab() {
         const res = await fetch("/api/admin/settings/telegram");
         const json = await res.json();
         if (json.success && json.data) {
-          setBotToken(json.data.botToken || "");
+          setMaskedToken(json.data.maskedToken || "");
           setGroupIdJakarta(json.data.groupIdJakarta || "");
           setGroupIdSurabaya(json.data.groupIdSurabaya || "");
           setEnabled(json.data.enabled !== false);
@@ -66,19 +67,27 @@ export function TelegramBroadcastTab() {
     setSaving(true);
     setFeedback(null);
     try {
+      const payload: Record<string, any> = {
+        groupIdJakarta,
+        groupIdSurabaya,
+        enabled,
+      };
+      if (newBotToken && newBotToken.trim() !== "" && !newBotToken.includes("•")) {
+        payload.botToken = newBotToken.trim();
+      }
+
       const res = await fetch("/api/admin/settings/telegram", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          botToken,
-          groupIdJakarta,
-          groupIdSurabaya,
-          enabled,
-        }),
+        body: JSON.stringify(payload),
       });
       const json = await res.json().catch(() => null);
       if (res.ok && json?.success) {
         setFeedback({ type: "success", message: "Konfigurasi Broadcast Telegram berhasil disimpan!" });
+        if (json.data?.maskedToken) {
+          setMaskedToken(json.data.maskedToken);
+        }
+        setNewBotToken("");
       } else {
         setFeedback({ type: "error", message: json?.message || `Gagal menyimpan konfigurasi (HTTP ${res.status}).` });
       }
@@ -96,16 +105,20 @@ export function TelegramBroadcastTab() {
     setFeedback(null);
 
     try {
+      const payload: Record<string, any> = {
+        action: "test_broadcast",
+        targetGroup,
+        groupIdJakarta,
+        groupIdSurabaya,
+      };
+      if (newBotToken && newBotToken.trim() !== "" && !newBotToken.includes("•")) {
+        payload.botToken = newBotToken.trim();
+      }
+
       const res = await fetch("/api/admin/settings/telegram", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "test_broadcast",
-          targetGroup,
-          botToken,
-          groupIdJakarta,
-          groupIdSurabaya,
-        }),
+        body: JSON.stringify(payload),
       });
 
       const json = await res.json().catch(() => null);
@@ -133,7 +146,7 @@ export function TelegramBroadcastTab() {
     return <div className="py-8 text-center text-sm text-muted-foreground">Memuat konfigurasi Telegram...</div>;
   }
 
-  const isConfigured = Boolean(botToken && (groupIdJakarta || groupIdSurabaya));
+  const isConfigured = Boolean((maskedToken || newBotToken) && (groupIdJakarta || groupIdSurabaya));
 
   return (
     <div className="space-y-6">
@@ -206,21 +219,32 @@ export function TelegramBroadcastTab() {
           label="Telegram Bot Token"
           desc="Token Bot HTTP API yang didapatkan dari @BotFather (misal: 123456789:AAFg...)"
         >
-          <div className="relative flex items-center">
-            <input
-              type={showToken ? "text" : "password"}
-              value={botToken}
-              onChange={(e) => setBotToken(e.target.value)}
-              placeholder="Masukkan Token Bot Telegram"
-              className="h-9 w-72 rounded-md border border-slate-300 bg-white px-3 pr-9 py-1 text-sm font-mono text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500"
-            />
-            <button
-              type="button"
-              onClick={() => setShowToken(!showToken)}
-              className="absolute right-2 text-slate-400 hover:text-slate-700"
-            >
-              {showToken ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-            </button>
+          <div className="space-y-2">
+            {maskedToken && (
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-slate-500 font-medium">Token aktif:</span>
+                <code className="text-xs font-mono bg-slate-100 border border-slate-200 px-2 py-0.5 rounded text-slate-700">
+                  {maskedToken}
+                </code>
+              </div>
+            )}
+            <div className="relative flex items-center">
+              <input
+                type={showNewToken ? "text" : "password"}
+                value={newBotToken}
+                onChange={(e) => setNewBotToken(e.target.value)}
+                placeholder={maskedToken ? "Ketik token baru jika ingin mengganti..." : "Masukkan Token Bot Telegram"}
+                className="h-9 w-72 rounded-md border border-slate-300 bg-white px-3 pr-9 py-1 text-sm font-mono text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500"
+              />
+              <button
+                type="button"
+                onClick={() => setShowNewToken(!showNewToken)}
+                className="absolute right-2 text-slate-400 hover:text-slate-700"
+                title={showNewToken ? "Sembunyikan" : "Tampilkan"}
+              >
+                {showNewToken ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
           </div>
         </SettingRow>
       </SettingSection>
@@ -269,7 +293,7 @@ export function TelegramBroadcastTab() {
             variant="outline"
             size="sm"
             onClick={() => handleTestBroadcast("jakarta")}
-            disabled={testingJkt || !botToken || !groupIdJakarta}
+            disabled={testingJkt || (!maskedToken && !newBotToken) || !groupIdJakarta}
             className="gap-1.5"
           >
             <Send className="h-3.5 w-3.5" />
@@ -280,7 +304,7 @@ export function TelegramBroadcastTab() {
             variant="outline"
             size="sm"
             onClick={() => handleTestBroadcast("surabaya")}
-            disabled={testingSub || !botToken || !groupIdSurabaya}
+            disabled={testingSub || (!maskedToken && !newBotToken) || !groupIdSurabaya}
             className="gap-1.5"
           >
             <Send className="h-3.5 w-3.5" />

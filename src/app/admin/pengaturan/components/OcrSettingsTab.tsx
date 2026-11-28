@@ -21,7 +21,8 @@ interface OcrProvider {
   id: string;
   label: string;
   providerType: "google_vision" | "external_api";
-  apiKey: string;
+  apiKey?: string;
+  apiKeyMasked?: string;
   apiUrl: string | null;
   apiHeaderName: string | null;
   apiHeaderPrefix: string | null;
@@ -138,7 +139,7 @@ function ProviderFormModal({
       setForm({
         label: initial.label,
         providerType: initial.providerType,
-        apiKey: initial.apiKey,
+        apiKey: "",
         apiUrl: initial.apiUrl || "",
         apiHeaderName: initial.apiHeaderName || "Authorization",
         apiHeaderPrefix: initial.apiHeaderPrefix || "Bearer",
@@ -162,17 +163,22 @@ function ProviderFormModal({
   }, [initial, open]);
 
   const handleSave = () => {
-    onSave({
+    const payload: any = {
       label: form.label,
       providerType: form.providerType,
-      apiKey: form.apiKey,
       apiUrl: form.apiUrl || undefined,
       apiHeaderName: form.apiHeaderName || undefined,
       apiHeaderPrefix: form.apiHeaderPrefix || undefined,
       rotationOrder: form.rotationOrder,
       rotationCount: form.rotationCount,
       dailyLimit: form.dailyLimit ? parseInt(form.dailyLimit) : null,
-    });
+    };
+    if (form.apiKey && form.apiKey.trim() !== "" && !form.apiKey.includes("•")) {
+      payload.apiKey = form.apiKey.trim();
+    } else if (!initial) {
+      payload.apiKey = form.apiKey;
+    }
+    onSave(payload);
   };
 
   return (
@@ -188,7 +194,19 @@ function ProviderFormModal({
           value={form.providerType}
           onChange={(e) => setForm({ ...form, providerType: e.target.value })}
         />
-        <Input label="API Key" value={form.apiKey} onChange={(e) => setForm({ ...form, apiKey: e.target.value })} placeholder="Masukkan API key" />
+        <div className="space-y-1">
+          <Input
+            label="API Key"
+            value={form.apiKey}
+            onChange={(e) => setForm({ ...form, apiKey: e.target.value })}
+            placeholder={initial?.apiKeyMasked ? `Tersimpan: ${initial.apiKeyMasked} (kosongkan jika tidak diubah)` : "Masukkan API key"}
+          />
+          {initial?.apiKeyMasked && (
+            <p className="text-[11px] text-muted-foreground">
+              Kunci saat ini: <span className="font-mono">{initial.apiKeyMasked}</span>. Kosongkan jika tidak ingin mengubah kunci.
+            </p>
+          )}
+        </div>
         {form.providerType === "external_api" && (
           <>
             <Input label="API URL" value={form.apiUrl} onChange={(e) => setForm({ ...form, apiUrl: e.target.value })} placeholder="https://ocr.example.com/api/ocr" />
@@ -377,7 +395,12 @@ function ProvidersTab() {
               {providers.map((p) => (
                 <tr key={p.id} className="border-t hover:bg-muted/30">
                   <td className="px-4 py-2.5 text-muted-foreground">{p.rotationOrder}</td>
-                  <td className="px-4 py-2.5 font-medium">{p.label}</td>
+                  <td className="px-4 py-2.5 font-medium">
+                    <div>{p.label}</div>
+                    {p.apiKeyMasked && (
+                      <div className="text-[11px] font-mono text-muted-foreground">{p.apiKeyMasked}</div>
+                    )}
+                  </td>
                   <td className="px-4 py-2.5 text-muted-foreground font-medium">
                     {p.providerType === "google_vision" || (p.providerType as string) === "google_ai_studio"
                       ? "Google AI Studio"
