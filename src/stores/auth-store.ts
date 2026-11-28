@@ -8,6 +8,7 @@ interface AuthUser {
   name: string;
   email: string;
   role: OperationalRole;
+  secondaryRoles?: OperationalRole[];
 }
 
 interface AuthState {
@@ -76,6 +77,7 @@ export const useAuthStore = create<AuthState>()(
                   name: session.user.name ?? "",
                   email: session.user.email ?? normalizedEmail,
                   role: userRole,
+                  secondaryRoles: (session.user.secondaryRoles as OperationalRole[]) ?? [],
                 },
                 isAuthenticated: true,
                 loginError: null,
@@ -174,6 +176,17 @@ export const useAuthStore = create<AuthState>()(
                     sessionExpired: false,
                     lastActivity: 0,
                   });
+                } else if (session.user.role) {
+                  // Keep client store synchronized with server session roles
+                  useAuthStore.setState((prev) => ({
+                    user: prev.user
+                      ? {
+                          ...prev.user,
+                          role: session.user.role as OperationalRole,
+                          secondaryRoles: (session.user.secondaryRoles as OperationalRole[]) ?? [],
+                        }
+                      : null,
+                  }));
                 }
               })
               .catch(() => {

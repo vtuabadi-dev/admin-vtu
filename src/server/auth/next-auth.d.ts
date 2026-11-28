@@ -3,6 +3,7 @@ import type { OperationalRole } from "@/shared/types";
 declare module "next-auth" {
   interface User {
     role?: OperationalRole;
+    secondaryRoles?: OperationalRole[];
     mustChangePassword?: boolean;
   }
   interface Session {
@@ -12,6 +13,7 @@ declare module "next-auth" {
       email?: string | null;
       image?: string | null;
       role?: OperationalRole;
+      secondaryRoles?: OperationalRole[];
       mustChangePassword?: boolean;
     };
   }
@@ -21,6 +23,7 @@ declare module "next-auth/jwt" {
   interface JWT {
     id?: string;
     role?: OperationalRole;
+    secondaryRoles?: OperationalRole[];
     mustChangePassword?: boolean;
   }
 }
